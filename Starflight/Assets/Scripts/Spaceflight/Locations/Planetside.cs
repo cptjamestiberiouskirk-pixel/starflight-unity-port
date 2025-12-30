@@ -68,6 +68,12 @@ public class Planetside : MonoBehaviour
 		// get to the player data
 		var playerData = DataController.m_instance.m_playerData;
 
+		// if we are returning from disembarked, transfer TV cargo to ship and refuel TV
+		if ( playerData.m_general.m_lastLocation == PD_General.Location.Disembarked )
+		{
+			TransferTerrainVehicleCargo();
+		}
+
 		// get to the star data
 		var star = gameData.m_starList[ playerData.m_general.m_currentStarId ];
 
@@ -148,5 +154,73 @@ public class Planetside : MonoBehaviour
 	{
 		m_dustStorm.Clear();
 		m_dustStorm.Play();
+	}
+
+	// transfer all cargo from terrain vehicle to ship and refuel the terrain vehicle
+	void TransferTerrainVehicleCargo()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+
+		// refuel the terrain vehicle
+		playerData.m_terrainVehicle.Refuel();
+
+		// transfer elements from TV to ship
+		var tvElements = playerData.m_terrainVehicle.m_elementStorage;
+		var shipRemainingVolume = playerData.m_playerShip.GetRemainingVolume();
+		var totalVolumeTransferred = 0;
+
+		// copy the list since we're modifying it
+		var elementsToTransfer = new System.Collections.Generic.List<PD_ElementReference>( tvElements.m_elementList );
+
+		foreach ( var elementRef in elementsToTransfer )
+		{
+			var volumeToTransfer = Mathf.Min( elementRef.m_volume, shipRemainingVolume - totalVolumeTransferred );
+
+			if ( volumeToTransfer > 0 )
+			{
+				// add to ship
+				playerData.m_playerShip.AddElement( elementRef.m_elementId, volumeToTransfer );
+
+				// remove from TV
+				playerData.m_terrainVehicle.RemoveElement( elementRef.m_elementId, volumeToTransfer );
+
+				totalVolumeTransferred += volumeToTransfer;
+
+				Debug.Log( "Transferred " + volumeToTransfer + " m³ of element " + elementRef.m_elementId + " from TV to ship." );
+			}
+		}
+
+		// transfer artifacts from TV to ship
+		var tvArtifacts = playerData.m_terrainVehicle.m_artifactStorage;
+
+		// copy the list since we're modifying it
+		var artifactsToTransfer = new System.Collections.Generic.List<PD_ArtifactReference>( tvArtifacts.m_artifactList );
+
+		foreach ( var artifactRef in artifactsToTransfer )
+		{
+			var artifactVolume = gameData.m_artifactList[ artifactRef.m_artifactId ].m_volume;
+
+			if ( playerData.m_playerShip.GetRemainingVolume() >= artifactVolume )
+			{
+				// add to ship
+				playerData.m_playerShip.AddArtifact( artifactRef.m_artifactId );
+
+				// remove from TV
+				playerData.m_terrainVehicle.RemoveArtifact( artifactRef.m_artifactId );
+
+				Debug.Log( "Transferred artifact " + artifactRef.m_artifactId + " from TV to ship." );
+			}
+		}
+
+		// play transporter sound if anything was transferred
+		if ( totalVolumeTransferred > 0 || artifactsToTransfer.Count > 0 )
+		{
+			SoundController.m_instance.PlaySound( SoundController.Sound.Transporter );
+		}
+
+		// recalculate volumes
+		playerData.m_terrainVehicle.RecalculateVolumeUsed();
+		playerData.m_playerShip.RecalculateVolumeUsed();
 	}
 }

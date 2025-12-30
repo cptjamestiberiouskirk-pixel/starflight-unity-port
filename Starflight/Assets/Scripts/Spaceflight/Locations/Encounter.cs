@@ -902,8 +902,77 @@ public class Encounter : MonoBehaviour
 			}
 		}
 
+		// handle combat if aliens are hostile
+		UpdateAlienCombat();
+
 		// let the caller know if the aliens said something
 		return aliensSaidSomething;
+	}
+
+	// update alien combat behavior
+	void UpdateAlienCombat()
+	{
+		// only attack if hostile stance
+		if ( m_pdEncounter.m_alienStance != GD_Comm.Stance.Hostile )
+		{
+			return;
+		}
+
+		// check if CombatController exists
+		if ( CombatController.m_instance == null )
+		{
+			return;
+		}
+
+		// get game data
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+
+		// update combat timer
+		m_pdEncounter.m_combatTimer -= Time.deltaTime;
+
+		// time to attack?
+		if ( m_pdEncounter.m_combatTimer <= 0.0f )
+		{
+			// reset timer based on alien vessel fire delay
+			m_pdEncounter.m_combatTimer = Random.Range( 2.0f, 5.0f );
+
+			// pick a random alien ship to fire
+			var alienShipList = m_pdEncounter.GetAlienShipList();
+			var eligibleShips = new System.Collections.Generic.List<int>();
+
+			for ( int i = 0; i < alienShipList.Length; i++ )
+			{
+				var alienShip = alienShipList[ i ];
+
+				// skip dead or not in encounter
+				if ( alienShip.m_isDead || !alienShip.m_addedToEncounter )
+				{
+					continue;
+				}
+
+				// check range
+				float distance = Vector3.Distance( alienShip.m_coordinates, playerData.m_general.m_coordinates );
+				if ( distance < 1000.0f )
+				{
+					eligibleShips.Add( i );
+				}
+			}
+
+			// fire from a random eligible ship
+			if ( eligibleShips.Count > 0 )
+			{
+				int attackerIndex = eligibleShips[ Random.Range( 0, eligibleShips.Count ) ];
+				var attackerShip = alienShipList[ attackerIndex ];
+				var vessel = gameData.m_vesselList[ attackerShip.m_vesselId ];
+
+				// adjust fire delay based on vessel
+				m_pdEncounter.m_combatTimer = vessel.m_fireDelay * 0.5f + Random.Range( 1.0f, 3.0f );
+
+				// fire at player
+				CombatController.m_instance.AlienFiresAtPlayer( attackerShip, vessel );
+			}
+		}
 	}
 
 	// mechan ship movement
@@ -1551,6 +1620,9 @@ public class Encounter : MonoBehaviour
 		// have we connected already?
 		if ( !m_pdEncounter.m_connected )
 		{
+			// play communication chirp sound
+			SoundController.m_instance.PlaySound( SoundController.Sound.CommChirp );
+
 			// no - send the hail (responding or hailing)
 			AddComm( responding ? GD_Comm.Subject.GreetingResponse : GD_Comm.Subject.GreetingHail, true );
 		}
@@ -1668,17 +1740,19 @@ public class Encounter : MonoBehaviour
 			// is the alien ship dead?
 			if ( alienShipList[ currentSelection - 1 ].m_isDead )
 			{
-				// yes - scanning of debris not implemented yet
-				SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+				// yes - scan the debris for salvage
+				var scanType = SensorsDisplay.ScanType.Debris;
 
-				SpaceflightController.m_instance.m_messages.Clear();
-				SpaceflightController.m_instance.m_messages.AddText( "<color=red>Not yet implemented.</color>" );
+				// get the vessel data for the destroyed ship
+				var gameData = DataController.m_instance.m_gameData;
+				var vesselId = alienShipList[ currentSelection - 1 ].m_vesselId;
+				var vessel = gameData.m_vesselList[ vesselId ];
 
-				// deactivate the sensor button
-				SpaceflightController.m_instance.m_buttonController.DeactivateButton();
+				// calculate salvage value based on vessel type (mineral density represents salvage potential)
+				var salvageDensity = UnityEngine.Mathf.Clamp( vessel.m_mass / 5, 10, 80 );
 
-				// show the status display
-				SpaceflightController.m_instance.m_displayController.ChangeDisplay( SpaceflightController.m_instance.m_displayController.m_statusDisplay );
+				// start the debris scan
+				SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.StartScanning( scanType, 1, vessel.m_mass, 0, salvageDensity );
 			}
 			else
 			{

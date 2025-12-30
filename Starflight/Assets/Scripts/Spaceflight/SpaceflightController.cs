@@ -29,6 +29,7 @@ public class SpaceflightController : MonoBehaviour
 	public Messages m_messages;
 	public TerrainVehicle m_terrainVehicle;
 	public ShipsLog m_shipsLog;
+	public CombatController m_combatController;
 
 	// some settings
 	public float m_alienHyperspaceRadarDistance;

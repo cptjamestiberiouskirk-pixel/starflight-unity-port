@@ -8,12 +8,17 @@ public class WeaponButton : ShipButton
 
 	public override bool Execute()
 	{
-		SoundController.m_instance.PlaySound( SoundController.Sound.Error );
-
 		SpaceflightController.m_instance.m_messages.Clear();
 
-		SpaceflightController.m_instance.m_messages.AddText( "<color=red>Not yet implemented.</color>" );
+		// check for hostile lifeforms (currently none implemented)
+		// in the future, this would check for nearby hostile creatures
+		SpaceflightController.m_instance.m_messages.AddText(
+			"<color=yellow>Weapon Systems:</color>\n" +
+			"<color=white>No hostile lifeforms detected.\n" +
+			"Terrain vehicle weapons standing by.</color>"
+		);
 
+		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 		SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
 
 		return false;

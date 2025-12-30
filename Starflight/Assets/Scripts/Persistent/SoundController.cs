@@ -31,6 +31,19 @@ public class SoundController : MonoBehaviour
 		Update,
 		WarbleLong,
 		WarbleShort,
+		LaserFire,
+		LaserFireAlt,
+		MissileLaunch,
+		Explosion,
+		TorpedoFire,
+		PhaserFire,
+		CommChirp,
+		TorpedoExplosion,
+		Transporter,
+		ShipExplosion,
+		ShieldHit,
+		EnergyWeapon,
+		RedAlert,
 		Count
 	};
 
@@ -67,6 +80,19 @@ public class SoundController : MonoBehaviour
 	public AudioClip m_update;
 	public AudioClip m_warbleLong;
 	public AudioClip m_warbleShort;
+	public AudioClip m_laserFire;
+	public AudioClip m_laserFireAlt;
+	public AudioClip m_missileLaunch;
+	public AudioClip m_explosion;
+	public AudioClip m_torpedoFire;
+	public AudioClip m_phaserFire;
+	public AudioClip m_commChirp;
+	public AudioClip m_torpedoExplosion;
+	public AudioClip m_transporter;
+	public AudioClip m_shipExplosion;
+	public AudioClip m_shieldHit;
+	public AudioClip m_energyWeapon;
+	public AudioClip m_redAlert;
 
 	// the sound list (to use with the enum)
 	AudioClip[] m_soundList;
@@ -117,6 +143,19 @@ public class SoundController : MonoBehaviour
 		m_soundList[ (int) Sound.Update ] = m_update;
 		m_soundList[ (int) Sound.WarbleLong ] = m_warbleLong;
 		m_soundList[ (int) Sound.WarbleShort ] = m_warbleShort;
+		m_soundList[ (int) Sound.LaserFire ] = m_laserFire;
+		m_soundList[ (int) Sound.LaserFireAlt ] = m_laserFireAlt;
+		m_soundList[ (int) Sound.MissileLaunch ] = m_missileLaunch;
+		m_soundList[ (int) Sound.Explosion ] = m_explosion;
+		m_soundList[ (int) Sound.TorpedoFire ] = m_torpedoFire;
+		m_soundList[ (int) Sound.PhaserFire ] = m_phaserFire;
+		m_soundList[ (int) Sound.CommChirp ] = m_commChirp;
+		m_soundList[ (int) Sound.TorpedoExplosion ] = m_torpedoExplosion;
+		m_soundList[ (int) Sound.Transporter ] = m_transporter;
+		m_soundList[ (int) Sound.ShipExplosion ] = m_shipExplosion;
+		m_soundList[ (int) Sound.ShieldHit ] = m_shieldHit;
+		m_soundList[ (int) Sound.EnergyWeapon ] = m_energyWeapon;
+		m_soundList[ (int) Sound.RedAlert ] = m_redAlert;
 	}
 
 	// unity fixed update

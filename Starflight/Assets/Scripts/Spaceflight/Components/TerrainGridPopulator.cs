@@ -14,6 +14,9 @@ public class TerrainGridPopulator : MonoBehaviour
 
 	static List<Vector3>[,] m_spawnLists;
 
+	// delegate for object spawned callback
+	public delegate void ObjectSpawnedCallback( GameObject spawnedObject, int templateIndex );
+
 	public static void ResetSpawnLists( PlanetGenerator planetGenerator )
 	{
 		// remember the planet generator
@@ -32,7 +35,7 @@ public class TerrainGridPopulator : MonoBehaviour
 	}
 
 	// populate the planet
-	protected void Initialize( float elevationScale, GameObject[] templates, int numObjects, int randomSeed, bool favorHigherElevations, float minScale, float maxScale )
+	protected void Initialize( float elevationScale, GameObject[] templates, int numObjects, int randomSeed, bool favorHigherElevations, float minScale, float maxScale, ObjectSpawnedCallback onObjectSpawned = null )
 	{
 		Debug.Log( "Placing " + numObjects + " objects under " + transform.name + " with using a random seed of " + randomSeed + "..." );
 
@@ -172,7 +175,19 @@ public class TerrainGridPopulator : MonoBehaviour
 
 			// add object to the spawn list
 			AddToSpawnList( position );
+
+			// call the callback if one was provided
+			if ( onObjectSpawned != null )
+			{
+				onObjectSpawned( clonedObject, i % numTemplateObjects );
+			}
 		}
+	}
+
+	// populate the planet with a callback for each spawned object
+	protected void InitializeWithCallback( float elevationScale, GameObject[] templates, int numObjects, int randomSeed, bool favorHigherElevations, float minScale, float maxScale, ObjectSpawnedCallback callback )
+	{
+		Initialize( elevationScale, templates, numObjects, randomSeed, favorHigherElevations, minScale, maxScale, callback );
 	}
 
 	static void AddToSpawnList( Vector3 position )

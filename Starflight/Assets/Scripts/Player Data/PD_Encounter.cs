@@ -39,6 +39,10 @@ public class PD_Encounter : IComparable
 	public int m_numCorrectAnswers;
 	public bool m_mechan9NoHumansWarningDone;
 
+	// combat timer for alien attacks
+	public float m_combatTimer;
+	public bool m_inCombat;
+
 	public void Reset( int encounterId )
 	{
 		// get access to the game data

@@ -29,6 +29,7 @@ public class PD_PlayerShip
 
 	public int m_shieldPoints;
 	public int m_armorPoints;
+	public int m_missilesRemaining;
 
 	public void Reset()
 	{
@@ -196,7 +197,7 @@ public class PD_PlayerShip
 		RecalculateAcceleration();
 	}
 
-	public int GetRemainingVolme()
+	public int GetRemainingVolume()
 	{
 		// calculate and return the amount of space remaining in the cargo hold
 		return m_volume - m_volumeUsed;

@@ -554,7 +554,7 @@ public class TradeDepotPanel : Panel
 							return;
 						}
 
-						int remainingVolume = playerData.m_playerShip.GetRemainingVolme();
+						int remainingVolume = playerData.m_playerShip.GetRemainingVolume();
 
 						if ( remainingVolume == 0 )
 						{
@@ -997,7 +997,7 @@ public class TradeDepotPanel : Panel
 					PlayerData playerData = DataController.m_instance.m_playerData;
 
 					// check if the ship has room in the cargo hold
-					if ( desiredAmount > playerData.m_playerShip.GetRemainingVolme() )
+					if ( desiredAmount > playerData.m_playerShip.GetRemainingVolume() )
 					{
 						SwitchToErrorMessageState( "Insufficient cargo space" );
 					}
@@ -1080,7 +1080,7 @@ public class TradeDepotPanel : Panel
 				Debug.Log( "playerData.m_bankPlayerData.m_currentBalance = " + playerData.m_bank.m_currentBalance );
 				Debug.Log( "artifactGameData.m_starportPrice = " + artifactGameData.m_starportPrice );
 			}
-			else if ( artifactGameData.m_volume > playerData.m_playerShip.GetRemainingVolme() )
+			else if ( artifactGameData.m_volume > playerData.m_playerShip.GetRemainingVolume() )
 			{
 				// player's ship has no room for it - show an error message
 				SwitchToErrorMessageState( "Insufficient cargo space" );

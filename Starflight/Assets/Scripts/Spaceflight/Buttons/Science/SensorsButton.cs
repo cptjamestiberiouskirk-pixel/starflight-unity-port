@@ -71,13 +71,55 @@ public class SensorsButton : ShipButton
 
 				return true;
 
+			case PD_General.Location.Hyperspace:
+
+				// sensors can't penetrate hyperspace
+				SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+				SpaceflightController.m_instance.m_messages.Clear();
+				SpaceflightController.m_instance.m_messages.AddText( "<color=white>Sensors cannot penetrate hyperspace.</color>" );
+
+				SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
+				break;
+
+			case PD_General.Location.StarSystem:
+
+				// scan the star system
+				SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+
+				SpaceflightController.m_instance.m_messages.Clear();
+
+				// get the star
+				var star = gameData.m_starList[ playerData.m_general.m_currentStarId ];
+
+				// count planets
+				var numPlanets = 0;
+				var planetList = star.GetPlanetList();
+				foreach ( var p in planetList )
+				{
+					if ( p != null && p.m_id != -1 )
+						numPlanets++;
+				}
+
+				SpaceflightController.m_instance.m_messages.AddText(
+					"<color=yellow>Star System Scan:</color>\n" +
+					"Coordinates: <color=white>" + star.m_xCoordinate + ", " + star.m_yCoordinate + "</color>\n" +
+					"Spectral Class: <color=white>" + star.m_class + "</color>\n" +
+					"Planets: <color=white>" + numPlanets + "</color>"
+				);
+
+				SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
+				break;
+
 			default:
 
 				SoundController.m_instance.PlaySound( SoundController.Sound.Error );
 
 				SpaceflightController.m_instance.m_messages.Clear();
 
-				SpaceflightController.m_instance.m_messages.AddText( "<color=red>Not yet implemented.</color>" );
+				SpaceflightController.m_instance.m_messages.AddText( "<color=white>Nothing to scan here.</color>" );
 
 				SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
 

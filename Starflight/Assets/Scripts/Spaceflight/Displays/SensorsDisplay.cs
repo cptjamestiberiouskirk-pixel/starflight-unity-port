@@ -200,6 +200,21 @@ public class SensorsDisplay : ShipDisplay
 					break;
 				}
 
+				case ScanType.Debris:
+				{
+					// debris scanning shows salvageable materials
+					SpaceflightController.m_instance.m_messages.Clear();
+
+					string text = "<color=yellow>Debris Analysis:</color>\n";
+					text += "<color=white>Wreckage detected.</color>\n";
+					text += "Salvage potential: <color=white>" + m_mineralDensity + "%</color>\n";
+					text += "<color=gray>Debris may contain recoverable materials.</color>";
+
+					SpaceflightController.m_instance.m_messages.AddText( text );
+
+					break;
+				}
+
 				default:
 				{
 					// display the ship information

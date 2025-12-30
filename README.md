@@ -26,6 +26,47 @@ The codebase has been refactored to utilize modern Unity architecture, removing 
 
 ---
 
+## ⚔️ Combat System (New!)
+
+A fully functional **combat system** has been implemented with the following features:
+
+### Visual Effects
+* **Laser/Phaser Beams:** LineRenderer-based energy weapons with customizable materials
+* **Torpedo/Missile Projectiles:** Homing projectiles with particle trails
+* **Explosions:** Multi-layer particle explosions (fire, smoke, sparks, shockwave)
+* **Shield Hit Effects:** Expanding energy sphere when shields absorb damage
+* **Hull Hit Effects:** Spark and debris effects for armor damage
+
+### Combat Mechanics
+* **Target Acquisition:** Select and cycle through alien ships
+* **Weapon Systems:** Phaser/laser cannons and torpedo/missile launchers
+* **Damage Model:** Shield absorption followed by armor damage
+* **AI Combat:** Aliens fire back with lasers, plasma bolts, and missiles
+* **Critical Warnings:** Red alert when hull integrity is critically low
+
+### Audio Integration
+* Phaser/torpedo firing sounds
+* Energy weapon and explosion effects
+* Shield hit feedback
+* Ship destruction sounds
+* Communication channel chirps
+* Red alert warnings
+* Transporter sounds for cargo operations
+* Warp entry/exit sounds
+
+---
+
+## 🪨 Element/Mineral Collection System
+
+The terrain vehicle cargo system has been enhanced:
+
+* **Element Pickup:** Collect elements and minerals from planetary surfaces
+* **Cargo Transfer:** Automatic transfer from terrain vehicle to ship upon return
+* **Transporter Sound Effects:** Audio feedback for cargo operations
+* **Volume Tracking:** Real-time cargo capacity management
+
+---
+
 ## 🛠 Getting Started
 
 We are using **Unity 6** with a clean dependency list managed via the Unity Package Manager. No external manual downloads are required.
@@ -37,7 +78,7 @@ We are using **Unity 6** with a clean dependency list managed via the Unity Pack
 ### Installation
 1.  Clone this repository:
     ```bash
-    git clone [https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port.git](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port.git)
+    git clone https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port.git
     ```
 2.  Open **Unity Hub** and click **Add Project from Disk**.
 3.  Select the `Starflight` folder.
@@ -52,12 +93,36 @@ We are using **Unity 6** with a clean dependency list managed via the Unity Pack
 
 ---
 
+## 📁 Project Structure
+
+`
+Assets/
+├── _MyCombatAssets/       # Custom combat sounds and materials
+│   └── Sounds/            # Phaser, torpedo, explosion, warp sounds
+├── 3rd Party/             # Third-party assets (Fire & Explosion Effects)
+├── Scripts/
+│   ├── Spaceflight/
+│   │   ├── Buttons/Combat/    # Combat UI buttons
+│   │   ├── Effects/           # Visual effects (LaserBeam, Explosion, etc.)
+│   │   └── CombatController.cs
+│   └── Persistent/
+│       └── SoundController.cs
+└── Scenes/
+    ├── Intro.unity
+    ├── Persistent.unity
+    └── Spaceflight.unity
+`
+
+---
+
 ## 🤝 Contributions
 
-Contributions are welcome! If you find bugs related to the Unity 6 migration (such as UI artifacts or shader glitches), please feel free to open an Issue or a Pull Request.
+Contributions are welcome! If you find bugs related to the Unity 6 migration or the new combat system, please feel free to open an Issue or a Pull Request.
 
-### Known Issues
-* **Solar System View:** Minor text artifacting (z-fighting) on the status display.
+### Recent Fixes
+* **Text Z-Fighting:** Resolved status display text artifacting in Solar System view
+* **Typo Fixes:** Corrected `GetRemainingVolme` → `GetRemainingVolume` across codebase
+* **Array Access:** Fixed `.Count` → `.Length` for array access
 
 ---
 

@@ -36,6 +36,7 @@ using System.Collections.Generic;
 
 	[SerializeField] public List<Entry> m_starportNotices;
 	[SerializeField] public List<Entry> m_foundMessages;
+	[SerializeField] public List<Entry> m_planetLogs;
 	[SerializeField] public List<Entry>[] m_alienComms;
 
 	public void Reset()
@@ -43,6 +44,7 @@ using System.Collections.Generic;
 		// allocate memory
 		m_starportNotices = new List<Entry>();
 		m_foundMessages = new List<Entry>();
+		m_planetLogs = new List<Entry>();
 
 		m_alienComms = new List<Entry>[ (int) AlienComm.Count ];
 
@@ -50,6 +52,31 @@ using System.Collections.Generic;
 		{
 			m_alienComms[ (int) i ] = new List<Entry>();
 		}
+	}
+
+	public bool AddPlanetLog( int planetId, string stardate, string header, string message )
+	{
+		// ensure m_planetLogs is initialized (for existing save files)
+		if ( m_planetLogs == null )
+		{
+			m_planetLogs = new List<Entry>();
+		}
+
+		// check if this planet has already been logged
+		foreach ( var entry in m_planetLogs )
+		{
+			if ( entry.m_id == planetId )
+			{
+				// already logged
+				return false;
+			}
+		}
+
+		// add new planet log entry
+		var newEntry = new Entry( planetId, stardate, header, message );
+		m_planetLogs.Add( newEntry );
+
+		return true;
 	}
 
 	public void AddStarportNotice( int noticeId )

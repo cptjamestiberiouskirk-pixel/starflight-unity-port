@@ -6678,7 +6678,7 @@ MonoBehaviour:
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 0
-  m_textAlignment: 65535
+  m_textAlignment: 257
   m_characterSpacing: 0
   m_wordSpacing: 0
   m_lineSpacing: 0
@@ -25524,6 +25524,7 @@ MonoBehaviour:
   - {fileID: 1108657174}
   - {fileID: 1214280941}
   m_maxNumElements: 5000
+  m_terrainVehicle: {fileID: 1059254677}
 --- !u!1 &737748974
 GameObject:
   m_ObjectHideFlags: 0
@@ -79438,7 +79439,7 @@ MonoBehaviour:
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 0
-  m_textAlignment: 65535
+  m_textAlignment: 260
   m_characterSpacing: 0
   m_wordSpacing: 0
   m_lineSpacing: 0
