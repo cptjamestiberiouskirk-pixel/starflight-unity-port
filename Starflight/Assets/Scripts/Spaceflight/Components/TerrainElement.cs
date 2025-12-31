@@ -36,9 +36,15 @@ public class TerrainElement : MonoBehaviour
 	// check if this element is close enough to the terrain vehicle to pick up
 	public bool IsInPickupRange()
 	{
+		// get the terrain vehicle dynamically if we don't have a reference
 		if ( m_terrainVehicle == null )
 		{
-			return false;
+			m_terrainVehicle = SpaceflightController.m_instance?.m_terrainVehicle;
+
+			if ( m_terrainVehicle == null )
+			{
+				return false;
+			}
 		}
 
 		// calculate distance to terrain vehicle
@@ -65,8 +71,16 @@ public class TerrainElement : MonoBehaviour
 	{
 		var volumePickedUp = m_volume;
 
-		// destroy this object
-		Destroy( gameObject );
+		// hide any label on this object
+		var label = GetComponent<TerrainObjectLabel>();
+		if ( label != null )
+		{
+			label.HideLabel();
+		}
+
+		// add transporter effect and destroy when complete
+		var effect = gameObject.AddComponent<TransporterEffect>();
+		effect.Play();
 
 		return volumePickedUp;
 	}

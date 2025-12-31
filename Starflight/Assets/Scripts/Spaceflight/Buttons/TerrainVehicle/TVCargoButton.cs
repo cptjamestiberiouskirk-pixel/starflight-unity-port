@@ -22,6 +22,18 @@ public class TVCargoButton : ShipButton
 
 		if ( elementsInRange.Count == 0 )
 		{
+			// check if there's a non-pickable object nearby and provide feedback
+			var nearbyObjectName = FindNearbyNonPickableObject();
+
+			if ( nearbyObjectName != null )
+			{
+				// there's something nearby but it can't be picked up
+				SpaceflightController.m_instance.m_messages.Clear();
+				SpaceflightController.m_instance.m_messages.AddText( "<color=yellow>" + nearbyObjectName + " detected nearby.</color>\n<color=#808080>This object cannot be collected.</color>" );
+				SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+				return false;
+			}
+
 			// no elements nearby - show cargo contents
 			ShowCargoContents();
 			return false;
@@ -48,6 +60,9 @@ public class TVCargoButton : ShipButton
 
 		return false;
 	}
+
+	// detection range for non-pickable objects (slightly larger than pickup range)
+	const float c_detectionDistance = 15.0f;
 
 	// find all TerrainElement objects within pickup range
 	List<TerrainElement> FindElementsInRange()
@@ -76,6 +91,53 @@ public class TVCargoButton : ShipButton
 		}
 
 		return elementsInRange;
+	}
+
+	// find the closest non-pickable object (rock or tree) within detection range
+	string FindNearbyNonPickableObject()
+	{
+		var terrainGrid = SpaceflightController.m_instance.m_disembarked.m_terrainGrid;
+		var terrainVehicle = SpaceflightController.m_instance.m_terrainVehicle;
+
+		if ( terrainGrid == null || terrainVehicle == null )
+		{
+			return null;
+		}
+
+		float closestDistance = float.MaxValue;
+		string closestObjectName = null;
+
+		// check rocks
+		if ( terrainGrid.m_terrainRocks != null )
+		{
+			foreach ( Transform child in terrainGrid.m_terrainRocks.transform )
+			{
+				var distance = Vector3.Distance( child.position, terrainVehicle.transform.position );
+
+				if ( distance <= c_detectionDistance && distance < closestDistance )
+				{
+					closestDistance = distance;
+					closestObjectName = "Rock";
+				}
+			}
+		}
+
+		// check trees
+		if ( terrainGrid.m_terrainTrees != null )
+		{
+			foreach ( Transform child in terrainGrid.m_terrainTrees.transform )
+			{
+				var distance = Vector3.Distance( child.position, terrainVehicle.transform.position );
+
+				if ( distance <= c_detectionDistance && distance < closestDistance )
+				{
+					closestDistance = distance;
+					closestObjectName = "Vegetation";
+				}
+			}
+		}
+
+		return closestObjectName;
 	}
 
 	// get the closest element from a list
@@ -113,8 +175,21 @@ public class TVCargoButton : ShipButton
 		// clamp to available cargo space
 		var volumeToPickup = Mathf.Min( volumeAvailable, remainingVolume );
 
+		// DEBUG: Log pickup attempt
+		Debug.Log($"[PickupElement] Attempting pickup: elementId={elementId}, name={elementName}, volumeAvailable={volumeAvailable}, volumeToPickup={volumeToPickup}, remainingCargo={remainingVolume}");
+
 		// add to terrain vehicle cargo
 		playerData.m_terrainVehicle.AddElement( elementId, volumeToPickup );
+
+		// DEBUG: Log cargo state after pickup
+		var cargoList = playerData.m_terrainVehicle.m_elementStorage?.m_elementList;
+		if (cargoList != null)
+		{
+			foreach (var elem in cargoList)
+			{
+				Debug.Log($"[PickupElement] Cargo: elementId={elem.m_elementId}, volume={elem.m_volume}");
+			}
+		}
 
 		// remove the element from the planet
 		element.Pickup();
@@ -144,7 +219,11 @@ public class TVCargoButton : ShipButton
 		var elementStorage = playerData.m_terrainVehicle.m_elementStorage;
 		var artifactStorage = playerData.m_terrainVehicle.m_artifactStorage;
 
-		if ( elementStorage.m_elementList.Count == 0 && artifactStorage.m_artifactList.Count == 0 )
+		// null-safe count checks
+		int elementCount = ( elementStorage?.m_elementList?.Count ) ?? 0;
+		int artifactCount = ( artifactStorage?.m_artifactList?.Count ) ?? 0;
+
+		if ( elementCount == 0 && artifactCount == 0 )
 		{
 			SpaceflightController.m_instance.m_messages.AddText( "<color=yellow>Terrain Vehicle Cargo:</color>\n<color=white>Empty</color>" );
 		}
@@ -153,23 +232,29 @@ public class TVCargoButton : ShipButton
 			var text = "<color=yellow>Terrain Vehicle Cargo:</color>\n";
 
 			// list elements
-			foreach ( var elementRef in elementStorage.m_elementList )
+			if ( elementStorage != null && elementStorage.m_elementList != null )
 			{
-				var elementName = gameData.m_elementList[ elementRef.m_elementId ].m_name;
-				text += "<color=white>" + elementName + ": " + elementRef.m_volume + " m³</color>\n";
+				foreach ( var elementRef in elementStorage.m_elementList )
+				{
+					var elementName = gameData.m_elementList[ elementRef.m_elementId ].m_name;
+					text += "<color=white>" + elementName + ": " + elementRef.m_volume + " m³</color>\n";
+				}
 			}
 
 			// list artifacts
-			foreach ( var artifactRef in artifactStorage.m_artifactList )
+			if ( artifactStorage != null && artifactStorage.m_artifactList != null )
 			{
-				var artifactName = gameData.m_artifactList[ artifactRef.m_artifactId ].m_name;
-				text += "<color=cyan>" + artifactName + "</color>\n";
+				foreach ( var artifactRef in artifactStorage.m_artifactList )
+				{
+					var artifactName = gameData.m_artifactList[ artifactRef.m_artifactId ].m_name;
+					text += "<color=cyan>" + artifactName + "</color>\n";
+				}
 			}
 
 			// show remaining capacity
 			var remaining = playerData.m_terrainVehicle.GetRemainingVolume();
 			var total = gameData.m_misc.m_terrainVehicleVolume;
-			text += "\n<color=gray>Capacity: " + ( total - remaining ) + "/" + total + " m³</color>";
+			text += "\n<color=#808080>Capacity: " + ( total - remaining ) + "/" + total + " m³</color>";
 
 			SpaceflightController.m_instance.m_messages.AddText( text );
 		}

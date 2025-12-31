@@ -24,6 +24,9 @@ public class TerrainVehicle : MonoBehaviour
 	// the maximum speed of the player
 	public float m_maximumSpeed;
 
+	// speed multiplier (increase this to make the vehicle faster)
+	public float m_speedMultiplier = 3.0f;
+
 	// the time to reach the maximum speed
 	public float m_timeToReachMaximumSpeed;
 
@@ -92,8 +95,11 @@ public class TerrainVehicle : MonoBehaviour
 			// calculate the acceleration
 			var acceleration = Time.deltaTime * playerData.m_playerShip.m_acceleration / ( m_timeToReachMaximumSpeed * 25.0f );
 
+			// calculate effective maximum speed with multiplier
+			var effectiveMaxSpeed = m_maximumSpeed * m_speedMultiplier;
+
 			// increase the current speed
-			playerData.m_general.m_currentSpeed = Mathf.Lerp( playerData.m_general.m_currentSpeed, m_maximumSpeed, acceleration );
+			playerData.m_general.m_currentSpeed = Mathf.Lerp( playerData.m_general.m_currentSpeed, effectiveMaxSpeed, acceleration );
 
 			// use up fuel
 			var fuelAmount = Time.deltaTime * ( m_fuelConsumptionRate * playerData.m_general.m_currentSpeed / m_fuelEfficiency );
@@ -107,7 +113,8 @@ public class TerrainVehicle : MonoBehaviour
 		}
 
 		// update the diesel engine sound
-		var enginePitch = Mathf.Lerp( 1.0f, 1.5f, playerData.m_general.m_currentSpeed / m_maximumSpeed );
+		var effectiveMaxSpeedForSound = m_maximumSpeed * m_speedMultiplier;
+		var enginePitch = Mathf.Lerp( 1.0f, 1.5f, playerData.m_general.m_currentSpeed / effectiveMaxSpeedForSound );
 
 		SoundController.m_instance.SetFrequency( SoundController.Sound.DieselEngine, enginePitch );
 

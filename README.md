@@ -67,6 +67,34 @@ The terrain vehicle cargo system has been enhanced:
 
 ---
 
+## 🔬 Terrain Scanning & Visual Feedback System (New!)
+
+Enhanced planetary exploration with comprehensive scanning capabilities:
+
+### Scan Button Features
+* **Nearby Object Detection:** Scans for mineral deposits, rocks, and vegetation within 50m range
+* **Object Counting:** Reports counts grouped by type (e.g., "Lead deposits: 3")
+* **Color-Coded Results:** Green for collectible minerals, gray for non-collectible objects
+* **Planet Information:** Displays mineral density, bio density, and available elements
+
+### Floating Labels
+* **3D World-Space Labels:** Scanned objects display floating text labels above them
+* **Billboard Effect:** Labels always face the camera for optimal readability
+* **Auto-Hide:** Labels automatically disappear after 30 seconds
+* **Color Coding:** Green for minerals, gray for rocks, muted green for vegetation
+
+### Transporter Dematerialization Effect
+* **Smooth Shrink Animation:** Objects smoothly shrink when collected using quadratic easing
+* **Sparkle Particles:** Blue sparkle particles float upward during pickup
+* **Visual Polish:** Creates a satisfying Star Trek-style transporter beam effect
+
+### Quality of Life Improvements
+* **Non-Collectible Feedback:** Cargo button now informs you when near rocks/vegetation that cannot be collected
+* **Terrain Vehicle Speed Boost:** Vehicle speed increased 3x for faster planetary exploration
+* **Audio Listener Fix:** Resolved Unity warning about missing audio listeners
+
+---
+
 ## 🛠 Getting Started
 
 We are using **Unity 6** with a clean dependency list managed via the Unity Package Manager. No external manual downloads are required.
@@ -102,7 +130,15 @@ Assets/
 ├── 3rd Party/             # Third-party assets (Fire & Explosion Effects)
 ├── Scripts/
 │   ├── Spaceflight/
-│   │   ├── Buttons/Combat/    # Combat UI buttons
+│   │   ├── Buttons/
+│   │   │   ├── Combat/            # Combat UI buttons
+│   │   │   └── TerrainVehicle/    # TV controls (ScanButton, TVCargoButton)
+│   │   ├── Components/
+│   │   │   ├── TerrainElement.cs      # Mineral deposit tracking
+│   │   │   ├── TerrainObjectLabel.cs  # Floating 3D labels
+│   │   │   ├── TerrainVehicle.cs      # Vehicle movement & speed
+│   │   │   ├── TransporterEffect.cs   # Pickup dematerialization VFX
+│   │   │   └── PlayerCamera.cs        # Camera follow & audio
 │   │   ├── Effects/           # Visual effects (LaserBeam, Explosion, etc.)
 │   │   └── CombatController.cs
 │   └── Persistent/
@@ -120,6 +156,9 @@ Assets/
 Contributions are welcome! If you find bugs related to the Unity 6 migration or the new combat system, please feel free to open an Issue or a Pull Request.
 
 ### Recent Fixes
+* **Mineral Pickup Bug:** Fixed null reference preventing collection of subsequent mineral deposits
+* **Terrain Vehicle Reference:** Dynamic terrain vehicle lookup in TerrainElement.IsInPickupRange()
+* **Audio Listener Warning:** Added automatic AudioListener creation in PlayerCamera
 * **Text Z-Fighting:** Resolved status display text artifacting in Solar System view
 * **Typo Fixes:** Corrected `GetRemainingVolme` → `GetRemainingVolume` across codebase
 * **Array Access:** Fixed `.Count` → `.Length` for array access

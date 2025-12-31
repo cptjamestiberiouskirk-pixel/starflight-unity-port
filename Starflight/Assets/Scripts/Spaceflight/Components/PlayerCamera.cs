@@ -35,6 +35,30 @@ public class PlayerCamera : MonoBehaviour
 	{
 		// get the animator component
 		m_animator = GetComponent<Animator>();
+
+		// ensure the camera has an audio listener
+		EnsureAudioListener();
+	}
+
+	// make sure there's an audio listener on the camera
+	void EnsureAudioListener()
+	{
+		// check if there's already an audio listener in the scene
+		var existingListener = FindFirstObjectByType<AudioListener>();
+
+		if ( existingListener == null )
+		{
+			// no audio listener found - add one to the camera
+			if ( m_camera != null )
+			{
+				m_camera.gameObject.AddComponent<AudioListener>();
+			}
+			else
+			{
+				// fallback: add to this game object
+				gameObject.AddComponent<AudioListener>();
+			}
+		}
 	}
 
 	// unity late update (because we want to do this after the follow game object has moved in update)
