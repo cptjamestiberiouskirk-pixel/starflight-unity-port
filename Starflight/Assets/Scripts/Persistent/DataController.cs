@@ -1,11 +1,6 @@
-﻿
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.EventSystems;
-
-using System.IO;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Diagnostics;
 
 public class DataController : MonoBehaviour
@@ -38,11 +33,17 @@ public class DataController : MonoBehaviour
 	// set this to switch to a different save game slot
 	int m_targetSaveGameSlotNumber;
 
+	// the save system
+	private ISaveSystem _saveSystem;
+
 	// unity awake
 	void Awake()
 	{
 		// remember this instance to this
 		m_instance = this;
+
+		// initialize the save system
+		_saveSystem = new JsonSaveSystem();
 	}
 
 	// unity start
@@ -127,37 +128,26 @@ public class DataController : MonoBehaviour
 		// go through each save game slot
 		for ( var i = 0; i < c_numSaveGameSlots; i++ )
 		{
-			// get the path to the player data file
-			var filePath = Application.persistentDataPath + "/" + m_playerDataFileName + i + ".bin";
-
 			// keep track of whether or not we were able to load the player data file
 			var loadSucceeded = false;
 
 			// check if the file exists
-			if ( File.Exists( filePath ) )
+			if ( _saveSystem.Exists( m_playerDataFileName, i ) )
 			{
 				try
 				{
-					// try to load the save game file now
-					var file = File.Open( filePath, FileMode.Open );
-
-					// create the binary formatter
-					var binaryFormatter = new BinaryFormatter();
-
-					// add support for serializing / deserializing Unity.Vector3
-					var surrogateSelector = new SurrogateSelector();
-					var vector3SerializationSurrogate = new Vector3SerializationSurrogate();
-					surrogateSelector.AddSurrogate( typeof( Vector3 ), new StreamingContext( StreamingContextStates.All ), vector3SerializationSurrogate );
-					binaryFormatter.SurrogateSelector = surrogateSelector;
-
 					// load and deserialize the player data file
-					m_playerDataList[ i ] = (PlayerData) binaryFormatter.Deserialize( file );
+					m_playerDataList[ i ] = _saveSystem.Load<PlayerData>( m_playerDataFileName, i );
 
-					// we were able to load the save game slots from file (version checking is next)
-					loadSucceeded = true;
+					if ( m_playerDataList[ i ] != null )
+					{
+						// we were able to load the save game slots from file (version checking is next)
+						loadSucceeded = true;
+					}
 				}
 				catch
 				{
+					UnityEngine.Debug.LogWarning( "Failed to load save slot " + i );
 				}
 			}
 
@@ -214,31 +204,15 @@ public class DataController : MonoBehaviour
 
 		stopwatch.Start();
 
-		// get the path to the player data file
-		var filePath = Application.persistentDataPath + "/" + m_playerDataFileName + saveGameSlotNumber + ".bin";
-
 		try
 		{
-			// try to save the player data file
-			using ( var file = File.Create( filePath ) )
-			{
-				// create the binary formatter
-				var binaryFormatter = new BinaryFormatter();
+			// serialize and save the player data file
+			_saveSystem.Save( m_playerDataFileName, saveGameSlotNumber, m_playerDataList[ saveGameSlotNumber ] );
 
-				// add support for serializing / deserializing Unity.Vector3
-				var surrogateSelector = new SurrogateSelector();
-				var vector3SerializationSurrogate = new Vector3SerializationSurrogate();
-				surrogateSelector.AddSurrogate( typeof( Vector3 ), new StreamingContext( StreamingContextStates.All ), vector3SerializationSurrogate );
-				binaryFormatter.SurrogateSelector = surrogateSelector;
-
-				// serialize and save the player data file
-				binaryFormatter.Serialize( file, m_playerDataList[ saveGameSlotNumber ] );
-
-				// report how long it took
-				UnityEngine.Debug.Log( "Saving the player data took " + stopwatch.ElapsedMilliseconds + " milliseconds." );
-			}
+			// report how long it took
+			UnityEngine.Debug.Log( "Saving the player data took " + stopwatch.ElapsedMilliseconds + " milliseconds." );
 		}
-		catch ( IOException exception )
+		catch ( System.Exception exception )
 		{
 			// report if we got an exception
 			UnityEngine.Debug.Log( "Saving player data failed - " + exception.Message );

@@ -1,47 +1,33 @@
 # Starflight Unity Port - Project Context
 
-## Overview
-This project is a Unity-based port of the classic space exploration game *Starflight*. It aims to recreate the original mechanics, including space travel, planet exploration, crew management, and alien encounters, within the Unity engine.
+## Core Architectural Patterns
+- **Singleton Managers**: Most persistent systems use a static `m_instance` reference (e.g., `DataController`, `PanelController`, `CombatController`, `SoundController`).
+- **Persistent Root**: A `Persistent` component ensures core managers survive scene changes via `DontDestroyOnLoad`.
+- **Data-Driven Design**: 
+    - `GameData`: Immutable data loaded from JSON (Resources) containing static game definitions (Vessels, Planets, etc.).
+    - `PlayerData`: Serializable state representing the player's progress, saved/loaded via `BinaryFormatter`.
+- **Command/Panel UI Pattern**: UI is organized into "Panels" managed by a `PanelController`. Panels use `Animator` components for transitions and `Tick()` for logic.
+- **Pooling**: `CombatController` implements object pooling for projectiles and hit effects to minimize runtime allocations.
 
-## Architecture & Key Systems
+## Major Systems
+- **Persistence & Save/Load**: `DataController` manages multiple save slots, versioning, and scene transitions based on player location.
+- **Spaceflight**: 
+    - **Navigation**: Different locations (StarSystem, Hyperspace, InOrbit, Planetside) handled as states within the "Spaceflight" scene.
+    - **Planet Generation**: Procedural generation of planet textures (Albedo, Specular, Normal, WaterMask) using a dedicated `PlanetGenerator` class.
+- **Combat**: Managed by `CombatController`, handling cooldowns, ranges, damage calculations (Shields vs. Armor), and visual effects.
+- **UI System**: Abstract `Panel` class provides a foundation for complex menus (Inventory, Banking, Personnel).
 
-### 1. Persistence & Central Control
-The game relies on a set of singleton-like controllers that persist across scenes (managed by [`Persistent.cs`](Assets/Scripts/Persistent/Persistent.cs)).
-- **[`DataController`](Assets/Scripts/Persistent/DataController.cs)**: The primary manager. It handles:
-    - Loading static game data from `Starflight Game Data.json`.
-    - Managing player save slots (up to 5) using binary serialization.
-    - Scene transitions based on the player's current game state.
-- **[`InputController`](Assets/Scripts/Persistent/InputController.cs)**: Manages player input.
-- **[`PanelController`](Assets/Scripts/Persistent/PanelController.cs)**: Manages UI panels and navigation.
-- **[`SoundController`](Assets/Scripts/Persistent/SoundController.cs) / [`MusicController`](Assets/Scripts/Persistent/MusicController.cs)**: Handle audio playback.
+## Known "Code Smells" & TODOs
+- **BinaryFormatter**: `DataController.cs` uses `BinaryFormatter` for save games, which is deprecated and poses security risks. It should eventually be replaced with a safer serializer like JSON or MessagePack.
+- **TODOs found in comments**:
+    - `CombatController.cs:496`: `// TODO: handle game over state` - Ship destruction logic is incomplete.
+    - `DataController.cs:161`: Empty catch block during player data loading.
+- **Tight Coupling**: Many classes depend directly on `DataController.m_instance.m_playerData`, making it difficult to test systems in isolation.
+- **Procedural Map Generation**: `Planet.cs` processes map generation in the main thread (or via a custom `Process()` loop), which might cause frame spikes if not carefully managed.
 
-### 2. Data Structures
-The game distinguishes between static world data and dynamic player state.
-- **Game Data ([`GameData.cs`](Assets/Scripts/Game Data/GameData.cs))**: Read-only data representing the universe (stars, planets, races, items). Loaded at startup.
-- **Player Data ([`PlayerData.cs`](Assets/Scripts/Player Data/PlayerData.cs))**: The mutable state of the player's current game (ship upgrades, crew stats, logs, bank balance). This is what gets saved and loaded.
-
-### 3. Relationships: Managers and the Player
-- The **[`DataController`](Assets/Scripts/Persistent/DataController.cs)** acts as the bridge. It holds the active `PlayerData` instance.
-- Other managers (like `PanelController` or `CombatController`) query `DataController.m_instance.m_playerData` to display information or update the player's state.
-- **Player-Centric Systems**:
-    - **[`PD_PlayerShip`](Assets/Scripts/Player Data/PD_PlayerShip.cs)**: Tracks ship components and status.
-    - **[`PD_Personnel`](Assets/Scripts/Player Data/PD_Personnel.cs)**: Tracks the roster of available crew.
-    - **[`PD_CrewAssignment`](Assets/Scripts/Player Data/PD_CrewAssignment.cs)**: Tracks which crew members are in which bridge positions.
-
-### 4. Gameplay Modules
-- **Spaceflight**: Logic for navigating star systems and hyperspace.
-- **Planet Exploration**: Includes procedural planet generation and terrain vehicle mechanics.
-- **Starport**: A menu-driven interface for ship maintenance and crew management.
-- **Combat**: Tactical ship-to-ship combat.
-
-## Key Files for Reference
-- [`DataController.cs`](Assets/Scripts/Persistent/DataController.cs): Entry point for data and scene management.
-- [`GameData.cs`](Assets/Scripts/Game Data/GameData.cs): Schema for the game world.
-- [`PlayerData.cs`](Assets/Scripts/Player Data/PlayerData.cs): Schema for the player's progress.
-- [`Starflight Game Data.json`](Assets/Resources/Starflight Game Data.json): The actual database of the game world.
-
-## Current Functionality
-- Save/Load system is implemented.
-- Scene switching between Starport and Spaceflight is operational.
-- Basic UI framework (Panels) is in place.
-- Procedural planet generation systems are present.
+## File Structure Highlights
+- `Assets/Scripts/Persistent/`: Core engine managers.
+- `Assets/Scripts/Game Data/`: Data structures for static game content.
+- `Assets/Scripts/Player Data/`: Data structures for save-game state.
+- `Assets/Scripts/Spaceflight/`: Game-world interaction and combat.
+- `Assets/Scripts/Panel/`: UI implementation.
