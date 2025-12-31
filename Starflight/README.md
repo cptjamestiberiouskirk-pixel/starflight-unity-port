@@ -1,5 +1,8 @@
 # Starflight Unity Port
 
+![Unity 6](https://img.shields.io/badge/Unity-6-blue.svg)
+![Status: Active Development](https://img.shields.io/badge/Status-Active%20Development-green.svg)
+
 A modern port of the classic space exploration game *Starflight*, built with Unity 6.
 
 ## Features
