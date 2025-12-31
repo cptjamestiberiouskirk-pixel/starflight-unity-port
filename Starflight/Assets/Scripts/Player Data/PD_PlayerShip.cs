@@ -205,6 +205,13 @@ public class PD_PlayerShip
 
 	public void AddElement( int elementId, int volume )
 	{
+		// ensure storage exists
+		if ( m_elementStorage == null )
+		{
+			m_elementStorage = new PD_ElementStorage();
+			m_elementStorage.Reset();
+		}
+
 		// add the element to storage
 		m_elementStorage.Add( elementId, volume );
 
@@ -214,6 +221,12 @@ public class PD_PlayerShip
 
 	public void RemoveElement( int elementId, int volume )
 	{
+		// ensure storage exists
+		if ( m_elementStorage == null )
+		{
+			return; // nothing to remove if storage doesn't exist
+		}
+
 		// remove the element from storage
 		m_elementStorage.Remove( elementId, volume );
 
@@ -223,6 +236,13 @@ public class PD_PlayerShip
 
 	public void AddArtifact( int artifactId )
 	{
+		// ensure storage exists
+		if ( m_artifactStorage == null )
+		{
+			m_artifactStorage = new PD_ArtifactStorage();
+			m_artifactStorage.Reset();
+		}
+
 		// add the artifact to storage
 		m_artifactStorage.Add( artifactId );
 
@@ -232,6 +252,12 @@ public class PD_PlayerShip
 
 	public void RemoveArtifact( int artifactId )
 	{
+		// ensure storage exists
+		if ( m_artifactStorage == null )
+		{
+			return; // nothing to remove if storage doesn't exist
+		}
+
 		// remove the artifact from storage
 		m_artifactStorage.Remove( artifactId );
 
@@ -241,8 +267,10 @@ public class PD_PlayerShip
 
 	public void RecalculateVolumeUsed()
 	{
-		// get total volume used up for artifacts and elements
-		m_volumeUsed = m_artifactStorage.m_volumeUsed + m_elementStorage.m_volumeUsed;
+		// get total volume used up for artifacts and elements (with null checks)
+		int artifactVolume = ( m_artifactStorage != null ) ? m_artifactStorage.m_volumeUsed : 0;
+		int elementVolume = ( m_elementStorage != null ) ? m_elementStorage.m_volumeUsed : 0;
+		m_volumeUsed = artifactVolume + elementVolume;
 	}
 
 	public void RaiseShields()

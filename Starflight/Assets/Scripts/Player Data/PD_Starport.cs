@@ -8,6 +8,31 @@ public class PD_Starport
 	public string m_lastReadNoticeStardate;
 	public PD_ArtifactStorage m_artifactStorage;
 
+	// ensure artifact storage exists (lazy initialization)
+	void EnsureArtifactStorage()
+	{
+		if ( m_artifactStorage == null )
+		{
+			m_artifactStorage = new PD_ArtifactStorage();
+			m_artifactStorage.Reset();
+		}
+	}
+
+	public void AddArtifact( int artifactId )
+	{
+		EnsureArtifactStorage();
+		m_artifactStorage.Add( artifactId );
+	}
+
+	public void RemoveArtifact( int artifactId )
+	{
+		if ( m_artifactStorage == null )
+		{
+			return; // nothing to remove if storage doesn't exist
+		}
+		m_artifactStorage.Remove( artifactId );
+	}
+
 	public void Reset()
 	{
 		// reset the last read notice stardate

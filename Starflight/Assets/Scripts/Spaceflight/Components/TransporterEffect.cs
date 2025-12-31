@@ -4,15 +4,19 @@ using System.Collections.Generic;
 
 // This component creates a Star Trek-style transporter dematerialization effect.
 // It makes the object shimmer and fade out with sparkle particles.
+// This effect is designed to match the transporter effect used in the docking bay.
 public class TransporterEffect : MonoBehaviour
 {
 	// duration of the effect in seconds
 	const float c_effectDuration = 1.5f;
 
-	// particle settings
+	// particle settings (used as fallback if prefab not found)
 	const int c_particleCount = 50;
 	const float c_particleSpeed = 2.0f;
 	const float c_particleSize = 0.15f;
+
+	// path to the starport transporter prefab
+	const string c_transporterPrefabPath = "Starport Transporter Light";
 
 	// effect state
 	float m_effectTimer;
@@ -26,8 +30,11 @@ public class TransporterEffect : MonoBehaviour
 	// original scale for shrink effect
 	Vector3 m_originalScale;
 
-	// particle system for sparkles
+	// particle system for sparkles (either from prefab or created programmatically)
 	ParticleSystem m_particleSystem;
+
+	// the instantiated prefab (if using prefab)
+	GameObject m_particlePrefabInstance;
 
 	// callback when effect completes
 	System.Action m_onComplete;
@@ -88,8 +95,66 @@ public class TransporterEffect : MonoBehaviour
 			SetMaterialsToTransparent( renderer );
 		}
 
-		// create particle system for sparkles
-		CreateParticleSystem();
+		// try to use the starport transporter prefab, fall back to programmatic particles
+		if ( !TryLoadTransporterPrefab() )
+		{
+			// create particle system for sparkles as fallback
+			CreateParticleSystem();
+		}
+	}
+
+	// try to load and instantiate the starport transporter prefab
+	// Note: To use the same prefab as the docking bay, move "Starport Transporter Light.prefab"
+	// to a Resources folder, or set up a reference through a singleton like SpaceflightController.
+	// Currently falls back to programmatic particles which provide similar visual effect.
+	bool TryLoadTransporterPrefab()
+	{
+		// try to load the prefab from Resources folder
+		var prefab = Resources.Load<GameObject>( c_transporterPrefabPath );
+
+		if ( prefab != null )
+		{
+			// calculate the center of the object
+			Vector3 center = transform.position;
+
+			if ( m_renderers.Count > 0 )
+			{
+				var bounds = m_renderers[ 0 ].bounds;
+
+				foreach ( var renderer in m_renderers )
+				{
+					bounds.Encapsulate( renderer.bounds );
+				}
+
+				center = bounds.center;
+			}
+
+			// instantiate the prefab at the object's center
+			m_particlePrefabInstance = Instantiate( prefab, center, Quaternion.identity );
+
+			// get the particle system from the prefab
+			m_particleSystem = m_particlePrefabInstance.GetComponent<ParticleSystem>();
+
+			if ( m_particleSystem == null )
+			{
+				m_particleSystem = m_particlePrefabInstance.GetComponentInChildren<ParticleSystem>();
+			}
+
+			if ( m_particleSystem != null )
+			{
+				// start playing the particle system
+				m_particleSystem.Play();
+				return true;
+			}
+			else
+			{
+				// prefab didn't have a particle system, clean it up
+				Destroy( m_particlePrefabInstance );
+				m_particlePrefabInstance = null;
+			}
+		}
+
+		return false;
 	}
 
 	// switch a renderer's materials to transparent rendering mode
@@ -286,8 +351,13 @@ public class TransporterEffect : MonoBehaviour
 
 	void OnDestroy()
 	{
-		// clean up particle system if it exists
-		if ( m_particleSystem != null )
+		// clean up prefab instance if it exists
+		if ( m_particlePrefabInstance != null )
+		{
+			Destroy( m_particlePrefabInstance );
+		}
+		// clean up programmatically created particle system if it exists
+		else if ( m_particleSystem != null )
 		{
 			Destroy( m_particleSystem.gameObject );
 		}

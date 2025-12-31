@@ -25,11 +25,15 @@ public class ShipCargoButton : ShipButton
 		string itemColumn = "ITEM\n";
 		string volumeColumn = "VOLUME\n";
 		string valueColumn = "VALUE\n";
-		foreach (PD_ElementReference elementRef in DataController.m_instance.m_playerData.m_playerShip.m_elementStorage.m_elementList)
-        {
-			itemColumn += "   " + elementRef.GetElementGameData().m_name + "\n";
-			volumeColumn += elementRef.GetVolume() + "\n";
-			valueColumn += elementRef.GetElementGameData().m_actualValue + "\n";
+		var elementStorage = DataController.m_instance.m_playerData.m_playerShip.m_elementStorage;
+		if ( elementStorage != null && elementStorage.m_elementList != null )
+		{
+			foreach (PD_ElementReference elementRef in elementStorage.m_elementList)
+			{
+				itemColumn += "   " + elementRef.GetElementGameData().m_name + "\n";
+				volumeColumn += elementRef.GetVolume() + "\n";
+				valueColumn += elementRef.GetElementGameData().m_actualValue + "\n";
+			}
 		}
 		return new string[] { itemColumn, volumeColumn, valueColumn };
     }

@@ -37,6 +37,9 @@ public class PD_ElementStorage
 	// add the specified amount of the element to storage
 	public void Add( int elementId, int volume )
 	{
+		// DEBUG: Log add attempt
+		UnityEngine.Debug.Log($"[PD_ElementStorage.Add] Adding elementId={elementId}, volume={volume}");
+
 		var elementReference = Find( elementId );
 
 		if ( elementReference == null )
@@ -46,11 +49,13 @@ public class PD_ElementStorage
 
 			// add the element to the storage
 			m_elementList.Add( elementReference );
+			UnityEngine.Debug.Log($"[PD_ElementStorage.Add] Created new elementRef for elementId={elementId}, volume={volume}");
 		}
 		else
 		{
 			// we found it - update the volume of the element already in storage
 			elementReference.AddVolume( volume );
+			UnityEngine.Debug.Log($"[PD_ElementStorage.Add] Stacked onto existing elementId={elementId}, newVolume={elementReference.m_volume}");
 		}
 
 		// update the volume used

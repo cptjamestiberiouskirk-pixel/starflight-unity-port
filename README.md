@@ -84,9 +84,11 @@ Enhanced planetary exploration with comprehensive scanning capabilities:
 * **Color Coding:** Green for minerals, gray for rocks, muted green for vegetation
 
 ### Transporter Dematerialization Effect
+* **Shared Prefab System:** Uses the same transporter particle effect as the docking bay for visual consistency
 * **Smooth Shrink Animation:** Objects smoothly shrink when collected using quadratic easing
 * **Sparkle Particles:** Blue sparkle particles float upward during pickup
 * **Visual Polish:** Creates a satisfying Star Trek-style transporter beam effect
+* **Fallback Support:** Programmatic particle generation if prefab not available
 
 ### Quality of Life Improvements
 * **Non-Collectible Feedback:** Cargo button now informs you when near rocks/vegetation that cannot be collected
@@ -128,6 +130,8 @@ Assets/
 ├── _MyCombatAssets/       # Custom combat sounds and materials
 │   └── Sounds/            # Phaser, torpedo, explosion, warp sounds
 ├── 3rd Party/             # Third-party assets (Fire & Explosion Effects)
+├── Resources/             # Runtime-loadable assets
+│   └── Starport Transporter Light.prefab  # Shared transporter particle effect
 ├── Scripts/
 │   ├── Spaceflight/
 │   │   ├── Buttons/
@@ -156,6 +160,10 @@ Assets/
 Contributions are welcome! If you find bugs related to the Unity 6 migration or the new combat system, please feel free to open an Issue or a Pull Request.
 
 ### Recent Fixes
+* **Shared Transporter Effect:** Unified cargo pickup effect with docking bay transporter animation
+* **Null-Safe Storage Access:** Added null checks for artifact/element storage in Trade Depot
+* **Starport Data Helpers:** Added `AddArtifact`/`RemoveArtifact` methods to PD_Starport
+* **Player Data Robustness:** Null-safe element and artifact storage initialization
 * **Mineral Pickup Bug:** Fixed null reference preventing collection of subsequent mineral deposits
 * **Terrain Vehicle Reference:** Dynamic terrain vehicle lookup in TerrainElement.IsInPickupRange()
 * **Audio Listener Warning:** Added automatic AudioListener creation in PlayerCamera

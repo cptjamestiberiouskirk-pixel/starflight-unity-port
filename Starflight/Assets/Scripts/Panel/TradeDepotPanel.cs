@@ -688,19 +688,22 @@ public class TradeDepotPanel : Panel
 
 					m_rowCount++;
 
-					// get access to the starport data for artifacts
+					// get access to the starport data for artifacts (with null check)
 					PD_ArtifactStorage artifactStorage = playerData.m_starport.m_artifactStorage;
 
 					// add all artifacts available to buy in starport
-					foreach (  PD_ArtifactReference artifactReference in artifactStorage.m_artifactList )
+					if ( artifactStorage != null && artifactStorage.m_artifactList != null )
 					{
-						GD_Artifact artifactGameData = artifactReference.GetArtifactGameData();
+						foreach (  PD_ArtifactReference artifactReference in artifactStorage.m_artifactList )
+						{
+							GD_Artifact artifactGameData = artifactReference.GetArtifactGameData();
 
-						m_itemListText.text += artifactGameData.m_name + Environment.NewLine;
-						m_volumeListText.text += ( artifactGameData.m_volume / 10 ) + "." + ( artifactGameData.m_volume % 10 ) + Environment.NewLine;
-						m_unitValueListText.text += artifactGameData.m_starportPrice + Environment.NewLine;
+							m_itemListText.text += artifactGameData.m_name + Environment.NewLine;
+							m_volumeListText.text += ( artifactGameData.m_volume / 10 ) + "." + ( artifactGameData.m_volume % 10 ) + Environment.NewLine;
+							m_unitValueListText.text += artifactGameData.m_starportPrice + Environment.NewLine;
 
-						m_itemList.Add( new Item( m_rowCount++, 1, artifactReference.m_artifactId, 0 ) );
+							m_itemList.Add( new Item( m_rowCount++, 1, artifactReference.m_artifactId, 0 ) );
+						}
 					}
 				}
 				
@@ -839,8 +842,11 @@ public class TradeDepotPanel : Panel
 		// get access to the player data
 		PlayerData playerData = DataController.m_instance.m_playerData;
 
-		// check if the player has something to sell
-		if ( ( playerData.m_playerShip.m_artifactStorage.m_artifactList.Count == 0 ) && ( playerData.m_playerShip.m_elementStorage.m_elementList.Count == 0 ) )
+		// check if the player has something to sell (with null-safe checks)
+		int artifactCount = ( playerData.m_playerShip.m_artifactStorage?.m_artifactList?.Count ) ?? 0;
+		int elementCount = ( playerData.m_playerShip.m_elementStorage?.m_elementList?.Count ) ?? 0;
+
+		if ( artifactCount == 0 && elementCount == 0 )
 		{
 			// the player has nothing to sell - block the action
 			SwitchToErrorMessageState( "Starship hold is empty" );
@@ -863,8 +869,12 @@ public class TradeDepotPanel : Panel
 		// get access to the player data
 		PlayerData playerData = DataController.m_instance.m_playerData;
 
-		// check if the player has something to analyze
-		if ( ( playerData.m_playerShip.m_artifactStorage.m_artifactList.Count == 0 ) && ( playerData.m_playerShip.m_elementStorage.m_elementList.Count == 0 ) && ( playerData.m_starport.m_artifactStorage.m_artifactList.Count == 0 ) )
+		// check if the player has something to analyze (with null-safe checks)
+		int shipArtifactCount = ( playerData.m_playerShip.m_artifactStorage?.m_artifactList?.Count ) ?? 0;
+		int shipElementCount = ( playerData.m_playerShip.m_elementStorage?.m_elementList?.Count ) ?? 0;
+		int starportArtifactCount = ( playerData.m_starport.m_artifactStorage?.m_artifactList?.Count ) ?? 0;
+
+		if ( shipArtifactCount == 0 && shipElementCount == 0 && starportArtifactCount == 0 )
 		{
 			// the player has nothing to analyze - block the action
 			SwitchToErrorMessageState( "There are no artifacts to analyze" );
@@ -1095,7 +1105,7 @@ public class TradeDepotPanel : Panel
 				playerData.m_bank.m_currentBalance -= gameData.m_artifactList[ item.m_id ].m_starportPrice;
 
 				// transfer the artifact from the starport to the ship
-				playerData.m_starport.m_artifactStorage.Remove( item.m_id );
+				playerData.m_starport.RemoveArtifact( item.m_id );
 				playerData.m_playerShip.AddArtifact( item.m_id );
 
 				// update the screen
@@ -1130,7 +1140,7 @@ public class TradeDepotPanel : Panel
 			playerData.m_bank.m_currentBalance += gameData.m_artifactList[ item.m_id ].m_actualValue;
 
 			// transfer the artifact from the ship to the starport
-			playerData.m_starport.m_artifactStorage.Add( item.m_id );
+			playerData.m_starport.AddArtifact( item.m_id );
 			playerData.m_playerShip.RemoveArtifact( item.m_id );
 
 			// update the screen

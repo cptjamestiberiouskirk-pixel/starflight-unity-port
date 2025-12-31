@@ -52,8 +52,8 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 		labels += "<color=yellow>CARGO</color>\n\n";
 		values += "\n\n";
 
-		// list elements
-		if ( elementStorage.m_elementList.Count > 0 )
+		// list elements (with null checks)
+		if ( elementStorage != null && elementStorage.m_elementList != null && elementStorage.m_elementList.Count > 0 )
 		{
 			foreach ( var elementRef in elementStorage.m_elementList )
 			{
@@ -63,8 +63,8 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 			}
 		}
 
-		// list artifacts
-		if ( artifactStorage.m_artifactList.Count > 0 )
+		// list artifacts (with null checks)
+		if ( artifactStorage != null && artifactStorage.m_artifactList != null && artifactStorage.m_artifactList.Count > 0 )
 		{
 			foreach ( var artifactRef in artifactStorage.m_artifactList )
 			{
@@ -74,8 +74,10 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 			}
 		}
 
-		// show empty message if nothing
-		if ( elementStorage.m_elementList.Count == 0 && artifactStorage.m_artifactList.Count == 0 )
+		// show empty message if nothing (with null checks)
+		int elementCount = ( elementStorage?.m_elementList?.Count ) ?? 0;
+		int artifactCount = ( artifactStorage?.m_artifactList?.Count ) ?? 0;
+		if ( elementCount == 0 && artifactCount == 0 )
 		{
 			labels += "<color=gray>Empty</color>\n";
 			values += "\n";
