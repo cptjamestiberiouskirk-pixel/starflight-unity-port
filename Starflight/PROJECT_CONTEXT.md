@@ -21,7 +21,11 @@
 - **Persistence & Save/Load**: `DataController` manages multiple save slots (JSON format), versioning, and scene transitions based on player location.
 - **Spaceflight**: 
     - **Navigation**: Different locations (StarSystem, Hyperspace, InOrbit, Planetside) handled as states within the "Spaceflight" scene.
-    - **Planet Generation**: Procedural generation of planet textures (Albedo, Specular, Normal, WaterMask) using a dedicated `PlanetGenerator` class.
+    - **Planet Generator**:
+        - Procedural generation of terrain using Unity Jobs and Burst.
+        - **Coloring System**: Implements vertex coloring via `TerrainJob` to assign biome colors based on height and temperature.
+        - **Dependencies**: Requires `VertexColor.shader` for rendering mesh vertex colors.
+        - **Data Control**: `PlanetData` manages biome color definitions and gradients.
 - **Combat**: Managed by `CombatController`, handling cooldowns, ranges, damage calculations (Shields vs. Armor), and visual effects.
 - **UI System**: Abstract `Panel` class provides a foundation for complex menus (Inventory, Banking, Personnel).
 
