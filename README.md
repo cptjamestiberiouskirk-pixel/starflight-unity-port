@@ -50,18 +50,31 @@ The project has been refactored to a clean, **root-directory architecture** to e
 
 ```text
 Assets/
-├── Scripts/
-│   ├── Persistent/       # Core engine managers (Sound, Data)
-│   ├── Systems/
-│   │   └── SaveSystem/   # Save system interfaces and implementations
-│   ├── Game Data/        # Static game content
-│   ├── Spaceflight/      # Game-world interaction, Combat, and UI Buttons
-│   └── Panel/            # UI stack implementation
-├── Game Objects/
-│   └── Aliens/           # Alien models (Thrynn, Spemin, etc.)
-├── _MyCombatAssets/      # Custom combat sounds and materials
-├── Resources/            # Runtime-loadable prefabs
-└── Scenes/               # Game scenes (Intro, Spaceflight, Persistent)
+├── _MyCombatAssets/       # Custom combat audio, materials, and weapon VFX
+├── 3rd Party/             # External plugins and legacy effect packages
+├── Exported/              # Debug textures and terrain/heightmap exports
+├── Fonts/                 # Global project typography
+├── Game Objects/          # Prefab categories and 3D models
+│   └── Aliens/            # High-fidelity alien assets (Thrynn, Spemin, etc.)
+├── Music/                 # Game music and atmospheric tracks
+├── Planet Generator/      # Deterministic generation data and editor-only tools
+├── Resources/             # Runtime loadable assets (Required for deterministic system)
+│   ├── Planets/           # Legacy binary planet data files (0.bytes - 810.bytes)
+│   ├── Prefabs/           # Critical managers (PlanetManager, Atmosphere)
+│   └── Starflight Game Data.json # Primary project configuration
+├── Scenes/                # Game scenes (Intro, Spaceflight, Starport, Persistent)
+├── Scripts/               # Core game logic and system architecture
+│   ├── Game Data/         # C# Data Classes/Models (GD_Planet, GD_Star, GD_Vessel)
+│   ├── Persistent/        # Global managers (DataController, SoundController)
+│   └── Spaceflight/       # Combat, Navigation, and UI interaction logic
+├── Shaders/               # Custom Unity 6 shaders (Atmosphere, Clouds, Skybox)
+├── Shared/                # Common materials, global colors, and noise textures
+├── Sounds/                # UI feedback and environmental sound effects
+├── TextMesh Pro/          # TMP Font assets and style definitions
+├── Tools/                 # Editor utilities and mass-generation tools
+├── UI/                    # Bridge graphics and UI specific sprite assets
+├── UI Toolkit/            # Unity 6 UI Toolkit themes and UXML documents
+└── Unity Player/          # Build-specific assets (Icons and Splash screens)
 ```
 
 ---
