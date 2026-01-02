@@ -52,7 +52,7 @@ Assets/
 │   ├── Game Data/        # Static game content
 │   ├── Player Data/      # Save-game state
 │   ├── Spaceflight/      # Game-world interaction and combat
-│   └── Panel/            # UI implementation
+│   └── Panel/            # UI implementation.
 ```
 
 ### Save System
