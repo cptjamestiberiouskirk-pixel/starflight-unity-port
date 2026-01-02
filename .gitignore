@@ -55,3 +55,14 @@ Thumbs.db.meta
 
 # Log files
 *.log
+
+# AI and IDE Junk
+.claude/
+.roo/
+.clinerules
+.roomodes
+.collabignore
+AGENTS.md
+.vscode/
+/[Uu]ser[Ss]ettings/
+*.slnx
