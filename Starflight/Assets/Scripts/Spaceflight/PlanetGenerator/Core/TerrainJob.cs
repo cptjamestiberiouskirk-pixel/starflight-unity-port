@@ -19,6 +19,9 @@ public struct TerrainJob : IJobParallelFor
     public Color32 landColor;
     public Color32 mountainColor;
 
+    public float seaLevel;
+    public float mountainLevel;
+
     public void Execute(int index)
     {
         float3 pos = baseVertices[index];
@@ -49,11 +52,11 @@ public struct TerrainJob : IJobParallelFor
         // A simple normalization for 0.0 to 1.0 based on height (normalized by heightMultiplier)
         float normalizedHeight = (noiseValue + 1f) * 0.5f;
 
-        if (normalizedHeight < 0.45f)
+        if (normalizedHeight < seaLevel)
         {
             colors[index] = oceanColor;
         }
-        else if (normalizedHeight < 0.75f)
+        else if (normalizedHeight < mountainLevel)
         {
             colors[index] = landColor;
         }

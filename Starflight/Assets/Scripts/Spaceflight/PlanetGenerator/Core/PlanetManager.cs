@@ -17,9 +17,14 @@ public class PlanetManager : MonoBehaviour
     private Color _landColor;
     private Color _mountainColor;
 
+    [SerializeField, Range(0f, 1f)] private float _seaLevel = 0.45f;
+    [SerializeField, Range(0f, 1f)] private float _mountainLevel = 0.75f;
+
     public Color OceanColor { get => _oceanColor; set => _oceanColor = value; }
     public Color LandColor { get => _landColor; set => _landColor = value; }
     public Color MountainColor { get => _mountainColor; set => _mountainColor = value; }
+    public float SeaLevel { get => _seaLevel; set => _seaLevel = value; }
+    public float MountainLevel { get => _mountainLevel; set => _mountainLevel = value; }
 
     private void Awake()
     {
@@ -144,7 +149,9 @@ public class PlanetManager : MonoBehaviour
                 noiseSettings = _planetData.NoiseSettings,
                 oceanColor = _oceanColor,
                 landColor = _landColor,
-                mountainColor = _mountainColor
+                mountainColor = _mountainColor,
+                seaLevel = _seaLevel,
+                mountainLevel = _mountainLevel
             };
 
             JobHandle handle = job.Schedule(verticesArray.Length, 64);
