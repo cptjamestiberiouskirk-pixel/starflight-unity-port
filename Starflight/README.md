@@ -41,6 +41,20 @@ The project follows a singleton manager pattern for core systems:
 - `PanelController`: Manages the UI stack and menu transitions.
 - `CombatController`: Handles space combat and object pooling.
 
+### File Structure
+
+```text
+Assets/
+├── Scripts/
+│   ├── Persistent/       # Core engine managers
+│   ├── Systems/
+│   │   └── SaveSystem/   # Save system interfaces and implementations
+│   ├── Game Data/        # Static game content
+│   ├── Player Data/      # Save-game state
+│   ├── Spaceflight/      # Game-world interaction and combat
+│   └── Panel/            # UI implementation
+```
+
 ### Save System
 
 The save system is located in `Assets/Scripts/Systems/SaveSystem/`. It utilizes the `ISaveSystem` interface:
@@ -56,6 +70,18 @@ public interface ISaveSystem
 ```
 
 The default implementation is `JsonSaveSystem`, which uses `Newtonsoft.Json` for serialization.
+
+## Procedural Planet System
+
+The project features a real-time procedural planet generation system that creates terrain and maps dynamically.
+
+### Key Features
+- **Unity Jobs & Burst**: Utilizes Unity's Job System and Burst Compiler for high-performance terrain generation.
+- **Vertex Coloring**: Implements a custom coloring system using `TerrainJob` to assign biome colors based on height and temperature.
+- **Rendering**: Uses `VertexColor.shader` to correctly render mesh vertex colors, ensuring planets look as intended.
+
+### Testing
+- A test asset `Assets/TestPlanet.asset` is available to verify the procedural generation and rendering settings.
 
 ## License
 

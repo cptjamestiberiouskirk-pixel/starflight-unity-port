@@ -67,9 +67,6 @@ public class Planet : MonoBehaviour
 	// call this before you enable the planet
 	public void InitializePlanet( GD_Planet planet )
 	{
-		// get to the player data
-		var playerData = DataController.m_instance.m_playerData;
-
 		// check if we have a planet
 		if ( ( planet == null ) || ( planet.m_id == -1 ) )
 		{

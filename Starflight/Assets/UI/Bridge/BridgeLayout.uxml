@@ -1,0 +1,20 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi:schemaLocation="UnityEngine.UIElements ../../../../UIElementsSchema/UnityEngine.UIElements.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <ui:Style src="project:/Assets/UI/Bridge/BridgeStyles.uss" />
+    <ui:VisualElement class="bridge-container">
+        <!-- Top Bar -->
+        <ui:VisualElement class="status-bar">
+            <ui:Label text="Fuel: 100%" class="status-text" />
+            <ui:Label text="Hull: 100%" class="status-text" />
+        </ui:VisualElement>
+
+        <!-- Center Viewport -->
+        <ui:VisualElement class="viewport-frame" />
+
+        <!-- Bottom Dashboard -->
+        <ui:GroupBox class="dashboard">
+            <ui:Button name="Scan" text="Scan" class="sci-fi-button" />
+            <ui:Button name="Comm" text="Comm" class="sci-fi-button" />
+            <ui:Button name="Log" text="Log" class="sci-fi-button" />
+        </ui:GroupBox>
+    </ui:VisualElement>
+</ui:UXML>
