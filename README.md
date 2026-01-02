@@ -21,10 +21,10 @@ The project has been refactored to a clean, **root-directory architecture** to e
 
 ## 🎮 Features
 
-- **Deterministic Exploration**: Navigate a fixed map of thousands of predetermined planets, preserving the exact coordinates and data of the 1986 original.
+- **Deterministic Exploration**: Navigate a fixed map of **270 star systems and approximately 800 predetermined planets**, preserving the exact coordinates and data of the 1986 original.
 - **Data-Driven Architecture**: Uses JSON-based definitions for game assets and player progress via the `ISaveSystem`.
 - **Combat System**: Full implementation of phaser/laser cannons, torpedo launchers, shield absorption models, and AI combat behaviors.
-- **Terrain Scanning**: Enhanced exploration with 3D world-space labels, mineral detection, and "Star Trek-style" transporter effects.
+- **Terrain Scanning**: Enhanced exploration with 3D world-space labels, mineral detection, and Star Trek-style transporter effects.
 - **Cargo Management**: Real-time volume tracking for minerals and elements with automatic transfer to the ship.
 
 ---
@@ -53,13 +53,13 @@ Assets/
 ├── _MyCombatAssets/       # Custom combat audio, materials, and weapon VFX
 ├── 3rd Party/             # External plugins and legacy effect packages
 ├── Exported/              # Debug textures and terrain/heightmap exports
-├── Fonts/                 # Global project typography
+├── Fonts/                 # Project fonts
 ├── Game Objects/          # Prefab categories and 3D models
 │   └── Aliens/            # High-fidelity alien assets (Thrynn, Spemin, etc.)
 ├── Music/                 # Game music and atmospheric tracks
 ├── Planet Generator/      # Deterministic generation data and editor-only tools
 ├── Resources/             # Runtime loadable assets (Required for deterministic system)
-│   ├── Planets/           # Legacy binary planet data files (0.bytes - 810.bytes)
+│   ├── Planets/           # Legacy binary data for ~800 fixed planets (0.bytes - 810.bytes)
 │   ├── Prefabs/           # Critical managers (PlanetManager, Atmosphere)
 │   └── Starflight Game Data.json # Primary project configuration
 ├── Scenes/                # Game scenes (Intro, Spaceflight, Starport, Persistent)
