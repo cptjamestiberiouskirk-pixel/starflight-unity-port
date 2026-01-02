@@ -71,9 +71,9 @@ public interface ISaveSystem
 
 The default implementation is `JsonSaveSystem`, which uses `Newtonsoft.Json` for serialization.
 
-## Procedural Planet System
+## Planet Rendering Architecture
 
-The project features a real-time procedural planet generation system that creates terrain and maps dynamically.
+The project features a deterministic visualization system that renders planet meshes and textures at runtime. It preserves the original Starflight planet data, using procedural techniques solely for visual representation rather than random world generation.
 
 ### Key Features
 - **Unity Jobs & Burst**: Utilizes Unity's Job System and Burst Compiler for high-performance terrain generation.
