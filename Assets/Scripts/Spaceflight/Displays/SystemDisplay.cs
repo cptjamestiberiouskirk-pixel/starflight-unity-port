@@ -44,6 +44,13 @@ public class SystemDisplay : ShipDisplay
 		{
 			if ( ( planet != null ) && ( planet.m_id != -1 ) )
 			{
+				// validate orbit position is within bounds
+				int orbitIndex = planet.m_orbitPosition - 1;
+				if ( orbitIndex < 0 || orbitIndex >= m_orbitList.Length )
+				{
+					continue;
+				}
+
 				// get the orbit angle
 				float orbitAngle = planet.GetOrbitAngle();
 
@@ -51,7 +58,7 @@ public class SystemDisplay : ShipDisplay
 				Quaternion rotation = Quaternion.Euler( 0.0f, 0.0f, orbitAngle );
 
 				// set the new rotation on the orbit game object
-				m_orbitList[ planet.m_orbitPosition - 1 ].transform.rotation = rotation;
+				m_orbitList[ orbitIndex ].transform.rotation = rotation;
 			}
 		}
 

@@ -1670,10 +1670,7 @@ public class Encounter : MonoBehaviour
 						// fix case of word
 						garbledWord = garbledWord.ToLower();
 
-						if ( ( garbledCommText.Count == 0 ) || lastWordHadSpecialCharacter )
-						{
-							garbledWord = garbledWord[ 0 ].ToString().ToUpper() + garbledWord.Substring( 1 );
-						}
+							if ( garbledWord.Length > 0 && ( ( garbledCommText.Count == 0 ) || lastWordHadSpecialCharacter ) )
 
 						// add on the garbled word
 						garbledCommText.Add( garbledWord );

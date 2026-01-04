@@ -243,7 +243,12 @@ public class StarSystem : MonoBehaviour
 		{
 			if ( ( planet != null ) && ( planet.m_id != -1 ) )
 			{
-				m_planetController[ planet.m_orbitPosition - 1 ].EnablePlanet();
+				// validate orbit position is within bounds
+				int orbitIndex = planet.m_orbitPosition - 1;
+				if ( orbitIndex >= 0 && orbitIndex < m_planetController.Length )
+				{
+					m_planetController[ orbitIndex ].EnablePlanet();
+				}
 			}
 		}
 

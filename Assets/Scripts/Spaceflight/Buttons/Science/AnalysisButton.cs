@@ -54,14 +54,24 @@ public class AnalysisButton : ShipButton
 
 				case SensorsDisplay.ScanType.Minstrel:
 				{
-					// display the ship information
-					var vessel = gameData.m_vesselList[ (int) SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.m_scanType ];
+					// get scan type index and validate bounds
+					int minstrelIndex = (int) SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.m_scanType;
 
-					// object
-					text += "Object: <color=white>" + vessel.m_object + "</color>\n";
+					if ( minstrelIndex >= 0 && minstrelIndex < gameData.m_vesselList.Count )
+					{
+						// display the ship information
+						var vessel = gameData.m_vesselList[ minstrelIndex ];
 
-					// size
-					text += "Size: <color=white>" + ( vessel.m_mass / playerData.m_playerShip.m_mass ) + " times the size of our ship</color>\n";
+						// object
+						text += "Object: <color=white>" + vessel.m_object + "</color>\n";
+
+						// size
+						text += "Size: <color=white>" + ( vessel.m_mass / playerData.m_playerShip.m_mass ) + " times the size of our ship</color>\n";
+					}
+					else
+					{
+						text += "Object: <color=yellow>Unknown Vessel</color>\n";
+					}
 
 					break;
 				}
@@ -90,10 +100,20 @@ public class AnalysisButton : ShipButton
 
 				default:
 				{
-					// display the ship information
-					var vessel = gameData.m_vesselList[ (int) SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.m_scanType ];
+						// get scan type index and validate bounds
+						int scanTypeIndex = (int) SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.m_scanType;
 
-					// object
+						if ( scanTypeIndex < 0 || scanTypeIndex >= gameData.m_vesselList.Count )
+						{
+							// invalid scan type, show unknown
+							text += "Object: <color=yellow>Unknown</color>\n";
+							text += "Type: <color=yellow>Unidentified</color>\n";
+							text += "Status: <color=yellow>Insufficient data for analysis</color>\n";
+							break;
+						}
+
+						// display the ship information
+						var vessel = gameData.m_vesselList[ scanTypeIndex ];
 					text += "Object: <color=white>" + vessel.m_object + "</color>\n";
 
 					// type

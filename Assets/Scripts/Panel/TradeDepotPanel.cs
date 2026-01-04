@@ -771,14 +771,19 @@ public class TradeDepotPanel : Panel
 				// get the height of the item list viewport
 				float viewportHeight = m_itemListMask.GetComponent<RectTransform>().rect.height;
 
-				// calculate height of each text row
-				float rowHeight = m_itemListText.renderedHeight / m_rowCount;
+				// calculate height of each text row (guard against division by zero)
+				float rowHeight = ( m_rowCount > 0 ) ? ( m_itemListText.renderedHeight / m_rowCount ) : 1.0f;
 
 				// figure out the offset for the selection box
 				float selectionBoxOffset;
 
-				while ( true )
+				// safety counter to prevent infinite loop
+				int maxIterations = 100;
+				int iterations = 0;
+
+				while ( iterations < maxIterations )
 				{
+					iterations++;
 					selectionBoxOffset = ( row + m_currentRowOffset ) * rowHeight;
 
 					if ( ( selectionBoxOffset + rowHeight * 2 ) >= viewportHeight )
@@ -958,12 +963,12 @@ public class TradeDepotPanel : Panel
 			// player did enter a decimal point
 			string[] amountParts = m_amountInputField.text.Split( '.' );
 
-			if ( amountParts[ 0 ].Length > 0 )
+			if ( amountParts.Length > 0 && amountParts[ 0 ].Length > 0 )
 			{
 				desiredAmount = Convert.ToInt32( amountParts[ 0 ] ) * 10;
 			}
 
-			if ( amountParts[ 1 ].Length > 0 )
+			if ( amountParts.Length > 1 && amountParts[ 1 ].Length > 0 )
 			{
 				desiredAmount += Convert.ToInt32( amountParts[ 1 ] );
 			}
