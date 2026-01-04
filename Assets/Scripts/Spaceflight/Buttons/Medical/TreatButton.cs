@@ -56,7 +56,7 @@ public class TreatButton : ShipButton
 
 		if ( healedSomeone )
 		{
-			SpaceflightController.m_instance.m_messages.AddText( "<color=green>Treatment applied.</color>\nPatients: <color=white>" + healedNames + "</color>" );
+			SpaceflightController.m_instance.m_messages.AddText( "<color=#00FF00>Treatment applied.</color>\nPatients: <color=white>" + healedNames + "</color>" );
 			SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 		}
 		else

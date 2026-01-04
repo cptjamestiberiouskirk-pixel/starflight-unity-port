@@ -258,7 +258,17 @@ public class StarSystem : MonoBehaviour
 		}
 		else if ( timeToFlare <= 1.0f ) // are we flaring NOW?
 		{
-			// TODO: fuck up the player
+			// calculate damage based on how close we are to the flare peak
+			int damage = Mathf.RoundToInt( ( 1.0f - timeToFlare ) * 50.0f );
+
+			if ( damage > 0 )
+			{
+				// apply damage to the player
+				SpaceflightController.m_instance.m_combatController.ApplyDamageToPlayer( damage, Vector3.zero );
+
+				// let the player know
+				SpaceflightController.m_instance.m_messages.AddText( "<color=red>Radiation levels critical! Star is flaring!</color>" );
+			}
 		}
 		else
 		{

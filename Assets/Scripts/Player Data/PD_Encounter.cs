@@ -11,15 +11,17 @@ public class PD_Encounter : IComparable
 	const float c_alienHyperspaceMoveSpeed = 32.0f;
 	const float c_alienStarSystemMoveSpeed = 128.0f;
 
-	public int m_encounterId { get; private set; }
-	GD_Encounter m_encounter;
-	PD_General.Location m_location;
-	int m_starId;
-	Vector3 m_homeCoordinates;
-	public Vector3 m_currentCoordinates { get; private set; }
-	PD_AlienShip[] m_alienShipList;
+	// these fields must be public for JsonUtility serialization
+	public int m_encounterId;
+	public PD_General.Location m_location;
+	public int m_starId;
+	public Vector3 m_homeCoordinates;
+	public Vector3 m_currentCoordinates;
+	public PD_AlienShip[] m_alienShipList;
+	public float m_currentDistance;
 
-	float m_currentDistance;
+	// cached reference to game data (not serialized)
+	[NonSerialized] GD_Encounter m_encounter;
 
 	public List<int> m_shownCommList;
 	public bool m_connected;

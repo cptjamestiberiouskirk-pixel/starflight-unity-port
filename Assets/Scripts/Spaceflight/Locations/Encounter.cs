@@ -30,6 +30,9 @@ public class Encounter : MonoBehaviour
 	// template models that we will clone as needed (need 23)
 	public GameObject[] m_alienShipModelTemplate;
 
+	// debris template models - matches m_alienShipModelTemplate indices
+	public GameObject[] m_alienShipDebrisTemplate;
+
 	// the current encounter data (both player and game)
 	public PD_Encounter m_pdEncounter;
 	public GD_Encounter m_gdEncounter;
@@ -51,6 +54,68 @@ public class Encounter : MonoBehaviour
 		{
 			alienShipModelTemplate.SetActive( false );
 		}
+
+		// turn off all of the debris model templates
+		if ( m_alienShipDebrisTemplate != null )
+		{
+			foreach ( var debrisTemplate in m_alienShipDebrisTemplate )
+			{
+				if ( debrisTemplate != null )
+				{
+					debrisTemplate.SetActive( false );
+				}
+			}
+		}
+	}
+
+	/// <summary>
+	/// Spawn debris model at the location of a destroyed ship.
+	/// </summary>
+	public void SpawnDebrisForShip( int alienIndex, int vesselId, Vector3 position )
+	{
+		// check if we have debris templates
+		if ( m_alienShipDebrisTemplate == null || vesselId >= m_alienShipDebrisTemplate.Length )
+		{
+			Debug.Log( $"SpawnDebrisForShip: No debris template for vesselId {vesselId}" );
+			return;
+		}
+
+		var debrisTemplate = m_alienShipDebrisTemplate[ vesselId ];
+		if ( debrisTemplate == null )
+		{
+			Debug.Log( $"SpawnDebrisForShip: Debris template is null for vesselId {vesselId}" );
+			return;
+		}
+
+		// get the model container for this alien ship
+		if ( alienIndex >= m_alienShipModelList.Length )
+		{
+			return;
+		}
+
+		var alienShipModel = m_alienShipModelList[ alienIndex ];
+
+		// clear any existing children (the destroyed ship model)
+		Tools.DestroyChildrenOf( alienShipModel );
+
+		// spawn the debris model as a child
+		var debrisInstance = Instantiate( debrisTemplate, alienShipModel.transform );
+		debrisInstance.transform.localPosition = Vector3.zero;
+		debrisInstance.transform.localRotation = Quaternion.identity;
+		
+		// use the template's local scale directly - adjust in Unity Inspector if needed
+		debrisInstance.transform.localScale = debrisTemplate.transform.localScale;
+		debrisInstance.SetActive( true );
+		
+		Debug.Log( $"SpawnDebrisForShip: Spawned debris for vesselId {vesselId} at {position} with scale {debrisInstance.transform.localScale}" );
+
+		// position the container at the debris location
+		alienShipModel.transform.position = position;
+		alienShipModel.SetActive( true );
+
+		// add slow tumbling rotation to the debris
+		var tumble = debrisInstance.AddComponent<DebrisTumble>();
+		tumble.m_rotationSpeed = new Vector3( Random.Range( -10f, 10f ), Random.Range( -10f, 10f ), Random.Range( -10f, 10f ) );
 	}
 
 	// unity update
@@ -67,6 +132,34 @@ public class Encounter : MonoBehaviour
 
 		// get to the player data
 		var playerData = DataController.m_instance.m_playerData;
+
+		// check if all enemy ships are destroyed
+		if ( AllEnemyShipsDestroyed() )
+		{
+			// show victory message (only once)
+			HandleVictory( playerData );
+			
+			// still allow player to leave - check if player has left the encounter area
+			if ( playerData.m_general.m_coordinates.magnitude >= 4096.0f )
+			{
+				// calculate the normalized exit direction vector
+				var exitDirection = Vector3.Normalize( playerData.m_general.m_coordinates );
+
+				// was the last location in hyperspace?
+				if ( playerData.m_general.m_lastLocation == PD_General.Location.Hyperspace )
+				{
+					playerData.m_general.m_lastHyperspaceCoordinates += exitDirection * SpaceflightController.m_instance.m_encounterRange * 1.25f;
+				}
+				else
+				{
+					playerData.m_general.m_lastStarSystemCoordinates += exitDirection * SpaceflightController.m_instance.m_encounterRange * 1.25f;
+				}
+
+				// switch back to the last location
+				SpaceflightController.m_instance.SwitchLocation( playerData.m_general.m_lastLocation );
+			}
+			return;
+		}
 
 		// update race encounter
 		switch ( m_gdEncounter.m_race )
@@ -176,10 +269,91 @@ public class Encounter : MonoBehaviour
 		}
 	}
 
+	// check if all enemy ships in the encounter are destroyed
+	bool AllEnemyShipsDestroyed()
+	{
+		if ( m_pdEncounter == null )
+		{
+			return false;
+		}
+
+		var alienShipList = m_pdEncounter.GetAlienShipList();
+		if ( alienShipList == null )
+		{
+			return false;
+		}
+
+		// check if at least one ship was added to the encounter
+		bool anyShipWasAdded = false;
+
+		foreach ( var alienShip in alienShipList )
+		{
+			if ( alienShip.m_addedToEncounter )
+			{
+				anyShipWasAdded = true;
+
+				// if any added ship is still alive, return false
+				if ( !alienShip.m_isDead )
+				{
+					return false;
+				}
+			}
+		}
+
+		// return true only if ships were added and all are dead
+		return anyShipWasAdded;
+	}
+
+	// flag to prevent multiple victory messages
+	bool m_victoryHandled = false;
+
+	// handle victory when all enemies are destroyed
+	void HandleVictory( PlayerData playerData )
+	{
+		// only handle victory once per encounter
+		if ( m_victoryHandled )
+		{
+			return;
+		}
+
+		m_victoryHandled = true;
+
+		// show victory message - player can scan debris for salvage before leaving manually
+		SpaceflightController.m_instance.m_messages.AddText( "<color=#00FF00>All enemy ships destroyed!</color>" );
+		SpaceflightController.m_instance.m_messages.AddText( "<color=#FFFF00>Scan debris for salvage, then leave when ready.</color>" );
+	}
+
+	// leave the encounter after victory delay
+	void LeaveEncounterAfterVictory()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		// calculate exit direction (away from center)
+		var exitDirection = Vector3.Normalize( playerData.m_general.m_coordinates );
+		if ( exitDirection.magnitude < 0.1f )
+		{
+			exitDirection = Vector3.forward;
+		}
+
+		// update last location coordinates
+		if ( playerData.m_general.m_lastLocation == PD_General.Location.Hyperspace )
+		{
+			playerData.m_general.m_lastHyperspaceCoordinates += exitDirection * SpaceflightController.m_instance.m_encounterRange * 1.25f;
+		}
+		else
+		{
+			playerData.m_general.m_lastStarSystemCoordinates += exitDirection * SpaceflightController.m_instance.m_encounterRange * 1.25f;
+		}
+
+		// switch back to the last location
+		SpaceflightController.m_instance.SwitchLocation( playerData.m_general.m_lastLocation );
+	}
+
 	// call this to let us know we have just entered an encounter
 	public void JustEntered()
 	{
 		m_justEntered = true;
+		m_victoryHandled = false;
 	}
 
 	// call this to hide the encounter stuff
@@ -254,14 +428,22 @@ public class Encounter : MonoBehaviour
 		// get to the encounter game data
 		m_gdEncounter = gameData.m_encounterList[ encounterId ];
 
-		// find the encounter in the player data (the list is continually sorted by distance so we have to search)
-		foreach ( var encounter in playerData.m_encounterList )
+		// get the encounter directly by index (the encounter list is indexed by encounter ID)
+		// Note: m_encounterId is not serialized, so we use the array index directly
+		if ( encounterId >= 0 && encounterId < playerData.m_encounterList.Length )
 		{
-			if ( encounter.m_encounterId == encounterId )
+			m_pdEncounter = playerData.m_encounterList[ encounterId ];
+			Debug.Log( $"[Encounter.Show] Set m_pdEncounter from encounterList[{encounterId}], hashcode={m_pdEncounter.GetHashCode()}, stance={m_pdEncounter.m_alienStance}" );
+			
+			// ensure the encounter is properly initialized
+			if ( m_pdEncounter.GetAlienShipList() == null )
 			{
-				m_pdEncounter = encounter;
-				break;
+				m_pdEncounter.Reset( encounterId );
 			}
+		}
+		else
+		{
+			Debug.LogError( $"Invalid encounter ID: {encounterId}" );
 		}
 
 		// allocate array for alien ship list
@@ -273,6 +455,8 @@ public class Encounter : MonoBehaviour
 		// did we just enter this encounter from hyperspace?
 		if ( m_justEntered )
 		{
+			Debug.Log( $"[Encounter.Show] m_justEntered=true, will reset stance to Neutral" );
+
 			// yes - reset all of the alien ships
 			foreach ( var alienShip in alienShipList )
 			{
@@ -310,6 +494,7 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_scanTimer = 0.0f;
 			m_pdEncounter.m_conversationTimer = 0.0f;
 			m_pdEncounter.m_alienStance = GD_Comm.Stance.Neutral;
+			Debug.Log( $"[Encounter.Show] Set stance to Neutral (line ~473)" );
 			m_pdEncounter.m_playerStance = GD_Comm.Stance.Neutral;
 			m_pdEncounter.m_questionLikelihood = 50;
 			m_pdEncounter.m_numCorrectAnswers = 0;
@@ -377,8 +562,28 @@ public class Encounter : MonoBehaviour
 		}
 		else
 		{
-			// no - just reset the alien ship models
-			ResetAlienShipModels();
+			// resuming an encounter (e.g., from saved game)
+			// check if any ships are already added to the encounter
+			bool anyShipsAdded = false;
+			foreach ( var alienShip in alienShipList )
+			{
+				if ( alienShip.m_addedToEncounter && !alienShip.m_isDead )
+				{
+					anyShipsAdded = true;
+					break;
+				}
+			}
+
+			// if no ships are in the encounter, add them now
+			if ( !anyShipsAdded )
+			{
+				AddAlienShips();
+			}
+			else
+			{
+				// just reset the alien ship models
+				ResetAlienShipModels();
+			}
 		}
 
 		// are we are already connected to the aliens (from save game)?
@@ -492,7 +697,19 @@ public class Encounter : MonoBehaviour
 				alienShipModel.transform.SetPositionAndRotation( Vector3.zero, Quaternion.identity );
 
 				// clone the model
+				if ( alienShip.m_vesselId < 0 || alienShip.m_vesselId >= m_alienShipModelTemplate.Length )
+				{
+					Debug.LogError( $"Invalid vesselId {alienShip.m_vesselId} for alien ship (template array length={m_alienShipModelTemplate.Length})" );
+					continue;
+				}
+
 				var alienShipModelTemplate = m_alienShipModelTemplate[ alienShip.m_vesselId ];
+
+				if ( alienShipModelTemplate == null )
+				{
+					Debug.LogError( $"No ship model template assigned for vesselId {alienShip.m_vesselId}" );
+					continue;
+				}
 
 				var clonedAlienShipModel = Instantiate( alienShipModelTemplate, alienShipModelTemplate.transform.localPosition, alienShipModelTemplate.transform.localRotation, alienShipModel.transform );
 
@@ -915,12 +1132,24 @@ public class Encounter : MonoBehaviour
 		// only attack if hostile stance
 		if ( m_pdEncounter.m_alienStance != GD_Comm.Stance.Hostile )
 		{
+			// DEBUG: Log stance periodically
+			if ( Time.frameCount % 300 == 0 )
+			{
+				Debug.Log( $"UpdateAlienCombat: Aliens not hostile (stance={m_pdEncounter.m_alienStance}, m_pdEncounter hashcode={m_pdEncounter.GetHashCode()})" );
+			}
 			return;
+		}
+
+		// Log first time we detect hostile stance
+		if ( Time.frameCount % 60 == 0 )
+		{
+			Debug.Log( $"UpdateAlienCombat: ALIENS ARE HOSTILE! (m_pdEncounter hashcode={m_pdEncounter.GetHashCode()})" );
 		}
 
 		// check if CombatController exists
 		if ( CombatController.m_instance == null )
 		{
+			Debug.LogWarning( "UpdateAlienCombat: CombatController.m_instance is null!" );
 			return;
 		}
 
@@ -930,10 +1159,30 @@ public class Encounter : MonoBehaviour
 
 		// update combat timer
 		m_pdEncounter.m_combatTimer -= Time.deltaTime;
+		
+		// DEBUG: Log combat state periodically
+		if ( Time.frameCount % 120 == 0 )
+		{
+			var alienShipList = m_pdEncounter.GetAlienShipList();
+			int aliveCount = 0;
+			float closestDistance = float.MaxValue;
+			foreach ( var ship in alienShipList )
+			{
+				if ( !ship.m_isDead && ship.m_addedToEncounter )
+				{
+					aliveCount++;
+					float dist = Vector3.Distance( ship.m_coordinates, playerData.m_general.m_coordinates );
+					if ( dist < closestDistance ) closestDistance = dist;
+				}
+			}
+			Debug.Log( $"UpdateAlienCombat: HOSTILE! Timer={m_pdEncounter.m_combatTimer:F2}, AliveShips={aliveCount}, ClosestDist={closestDistance:F0}" );
+		}
 
 		// time to attack?
 		if ( m_pdEncounter.m_combatTimer <= 0.0f )
 		{
+			Debug.Log( "UpdateAlienCombat: Timer expired, attempting to fire!" );
+			
 			// reset timer based on alien vessel fire delay
 			m_pdEncounter.m_combatTimer = Random.Range( 2.0f, 5.0f );
 
@@ -957,7 +1206,13 @@ public class Encounter : MonoBehaviour
 				{
 					eligibleShips.Add( i );
 				}
+				else
+				{
+					Debug.Log( $"UpdateAlienCombat: Ship {i} out of range (distance={distance:F0})" );
+				}
 			}
+
+			Debug.Log( $"UpdateAlienCombat: Found {eligibleShips.Count} eligible ships to fire" );
 
 			// fire from a random eligible ship
 			if ( eligibleShips.Count > 0 )
@@ -968,6 +1223,8 @@ public class Encounter : MonoBehaviour
 
 				// adjust fire delay based on vessel
 				m_pdEncounter.m_combatTimer = vessel.m_fireDelay * 0.5f + Random.Range( 1.0f, 3.0f );
+
+				Debug.Log( $"UpdateAlienCombat: Ship {attackerIndex} ({vessel.m_name}) FIRING at player!" );
 
 				// fire at player
 				CombatController.m_instance.AlienFiresAtPlayer( attackerShip, vessel );
@@ -1159,6 +1416,12 @@ public class Encounter : MonoBehaviour
 		// if the subject is between 7 and 11 the comm is a response to a question, so show them in order
 		if ( ( subject >= GD_Comm.Subject.Themselves ) && ( subject <= GD_Comm.Subject.TheAncients ) )
 		{
+			// ensure m_lastCommIds is allocated (may be null from old save files)
+			if ( playerData.m_general.m_lastCommIds == null )
+			{
+				playerData.m_general.m_lastCommIds = new int[ 20, 16 ];
+			}
+
 			int lastCommId = playerData.m_general.m_lastCommIds[ (int) race, (int) subject ];
 
 			foreach ( var comm in possibleComms )

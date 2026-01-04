@@ -114,8 +114,35 @@ using System.Collections.Generic;
 		// get to the player data
 		var playerData = DataController.m_instance.m_playerData;
 
+		// ensure m_alienComms is initialized (for existing save files)
+		if ( m_alienComms == null )
+		{
+			m_alienComms = new List<Entry>[ (int) AlienComm.Count ];
+
+			for ( var i = AlienComm.First; i <= AlienComm.Last; i++ )
+			{
+				m_alienComms[ (int) i ] = new List<Entry>();
+			}
+		}
+
+		// calculate the index
+		int index = (int) comm.m_subject - (int) GD_Comm.Subject.Themselves;
+		
+		// validate index is in bounds
+		if ( index < 0 || index >= m_alienComms.Length )
+		{
+			Debug.LogWarning( $"AddAlienComm: Invalid subject index {index} for subject {comm.m_subject}" );
+			return;
+		}
+
+		// ensure the specific list is initialized
+		if ( m_alienComms[ index ] == null )
+		{
+			m_alienComms[ index ] = new List<Entry>();
+		}
+
 		// which subject?
-		var alienComms = m_alienComms[ (int) comm.m_subject - (int) GD_Comm.Subject.Themselves ];
+		var alienComms = m_alienComms[ index ];
 
 		// go through the alien comms the player has already seen
 		for ( var i = 0; i < alienComms.Count; i++ )

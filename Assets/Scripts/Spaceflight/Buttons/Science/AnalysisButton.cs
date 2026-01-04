@@ -66,6 +66,28 @@ public class AnalysisButton : ShipButton
 					break;
 				}
 
+				case SensorsDisplay.ScanType.Debris:
+				{
+					// display debris analysis
+					text += "Object: <color=white>Debris Field</color>\n";
+					text += "Type: <color=white>Destroyed Vessel Wreckage</color>\n";
+					text += "Status: <color=#FFFF00>Salvageable materials detected</color>\n";
+					text += "Recommendation: <color=white>Salvage collection not yet implemented</color>";
+
+					break;
+				}
+
+				case SensorsDisplay.ScanType.Unknown:
+				{
+					// display unknown object analysis
+					text += "Object: <color=yellow>Unknown</color>\n";
+					text += "Type: <color=yellow>Unidentified</color>\n";
+					text += "Status: <color=yellow>Insufficient data for analysis</color>\n";
+					text += "Recommendation: <color=white>Proceed with caution</color>";
+
+					break;
+				}
+
 				default:
 				{
 					// display the ship information

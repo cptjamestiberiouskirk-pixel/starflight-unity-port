@@ -11962,13 +11962,14 @@ MonoBehaviour:
   m_messages: {fileID: 392032226}
   m_terrainVehicle: {fileID: 1059254677}
   m_shipsLog: {fileID: 1965841463}
-  m_combatController: {fileID: 0}
+  m_combatController: {fileID: 2099609700}
   m_alienHyperspaceRadarDistance: 2176
   m_alienStarSystemRadarDistance: 4352
   m_encounterRange: 128
   m_planetRotationSpeed: 3
   m_starportRotationSpeedMultiplier: 2
   m_gameIsPaused: 0
+  m_gameOver: 0
 --- !u!114 &280970584
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -21114,7 +21115,7 @@ MonoBehaviour:
   - {fileID: 1247769687}
   - {fileID: 342838205}
   - {fileID: 1957425109}
-  - {fileID: 1643669681}
+  - {fileID: 100000, guid: bf0951af1f0aa3646bdd27986b12e37e, type: 3}
   - {fileID: 1669779261}
   - {fileID: 1669779261}
   - {fileID: 1669779261}
@@ -21134,7 +21135,39 @@ MonoBehaviour:
   - {fileID: 1669779261}
   - {fileID: 950839860}
   - {fileID: 1669779261}
+  m_alienShipDebrisTemplate:
+  - {fileID: 0}
+  - {fileID: 919132149155446097, guid: f2fbb6ab08732684787f33cde15dcaa1, type: 3}
+  - {fileID: 919132149155446097, guid: 713317ba027bac54ab5913efff1db543, type: 3}
+  - {fileID: 919132149155446097, guid: ce4240d020029d7439b7e685a5cb3823, type: 3}
+  - {fileID: 919132149155446097, guid: 229353cc6a2cb8e4da8d07770973ec7c, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 919132149155446097, guid: 95f19f0b88c5a6140a78e21b2023e313, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
   m_pdEncounter:
+    m_encounterId: 0
+    m_location: 0
+    m_starId: 0
+    m_homeCoordinates: {x: 0, y: 0, z: 0}
+    m_currentCoordinates: {x: 0, y: 0, z: 0}
+    m_alienShipList: []
+    m_currentDistance: 0
     m_shownCommList: 
     m_connected: 0
     m_disconnected: 0
@@ -52394,6 +52427,7 @@ MonoBehaviour:
   m_terrainRocks: {fileID: 0}
   m_terrainElements: {fileID: 0}
   m_terrainTrees: {fileID: 0}
+  m_terrainRuins: {fileID: 0}
 --- !u!23 &1341916093
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -54050,9 +54084,9 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 2800000, guid: 4df34ffeb3721df43989d450f463ebd0, type: 3}
   - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 2800000, guid: d4b780f448c4e834a8ecb13606919497, type: 3}
   - {fileID: 2800000, guid: 9a29a3da61be1e64e8ceaa84e2b38436, type: 3}
-  - {fileID: 2800000, guid: 3548162412063b042abef8931b8d03d2, type: 3}
+  - {fileID: 2800000, guid: 6cc35ae36c3b0214fb061d746ef20100, type: 3}
   m_maskTextures:
   - {fileID: 0}
   - {fileID: 2800000, guid: 24ed52c0312b1e649af5426b97395b6c, type: 3}
@@ -54078,9 +54112,9 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 2800000, guid: d8870cc568d5f2e49843235c4933342b, type: 3}
   - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 2800000, guid: 9269177d719951b4bb202201e2a19d9c, type: 3}
-  - {fileID: 2800000, guid: 761080609e3852a4ab1e8523250a3d35, type: 3}
+  - {fileID: 2800000, guid: 22c3d8bec7ee7fb4b95db2fabd0b887c, type: 3}
+  - {fileID: 2800000, guid: 5e66511911a628b4c883e1b489580123, type: 3}
+  - {fileID: 2800000, guid: 56737267aa8f924469d6b1857fdd059e, type: 3}
   m_colorCycleSpeed: 5
   m_minDuration: 2
   m_maxDuration: 8
@@ -59754,6 +59788,7 @@ MonoBehaviour:
   m_terrainRocks: {fileID: 898127028}
   m_terrainElements: {fileID: 737143566}
   m_terrainTrees: {fileID: 770522784}
+  m_terrainRuins: {fileID: 0}
 --- !u!23 &1442854011
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -89398,6 +89433,52 @@ MonoBehaviour:
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
+--- !u!1 &2099609699
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2099609701}
+  - component: {fileID: 2099609700}
+  m_Layer: 0
+  m_Name: Combat Controller
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2099609700
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2099609699}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 69ba2094b860ede45a686fedf6184c52, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CombatController
+  m_playerDebrisTemplate: {fileID: 919132149155446097, guid: ad44c4fe9c71318498c6670afc36fe82,
+    type: 3}
+--- !u!4 &2099609701
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2099609699}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &2108870739
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -91277,3 +91358,4 @@ SceneRoots:
   - {fileID: 2052193864}
   - {fileID: 206875330}
   - {fileID: 1871356016}
+  - {fileID: 2099609701}

@@ -44,8 +44,11 @@ public class CombatController : MonoBehaviour
 	// current target
 	int m_currentTargetIndex = -1;
 
-	// constructor
-	CombatController()
+	// player debris template (assign in inspector)
+	public GameObject m_playerDebrisTemplate;
+
+	// unity awake
+	void Awake()
 	{
 		m_instance = this;
 	}
@@ -54,6 +57,15 @@ public class CombatController : MonoBehaviour
 	void Start()
 	{
 		InitializeEffectPools();
+	}
+
+	// ensure pools are initialized
+	void EnsurePoolsInitialized()
+	{
+		if ( m_explosionPool == null )
+		{
+			InitializeEffectPools();
+		}
 	}
 
 	// initialize the effect pools
@@ -394,7 +406,7 @@ public class CombatController : MonoBehaviour
 				hullHit.Play( targetShip.m_coordinates );
 			}
 
-			SpaceflightController.m_instance.m_messages.AddText( $"<color=green>Hit! Target damaged.</color>" );
+			SpaceflightController.m_instance.m_messages.AddText( $"<color=#00FF00>Hit! Target damaged.</color>" );
 		}
 		else
 		{
@@ -411,13 +423,10 @@ public class CombatController : MonoBehaviour
 			// play ship explosion sound
 			SoundController.m_instance.PlaySound( SoundController.Sound.ShipExplosion );
 
-			// hide the model
-			if ( targetModel != null )
-			{
-				targetModel.SetActive( false );
-			}
+			// replace ship model with debris
+			encounter.SpawnDebrisForShip( alienIndex, targetShip.m_vesselId, targetShip.m_coordinates );
 
-			SpaceflightController.m_instance.m_messages.AddText( $"<color=green>{vessel.m_name} destroyed!</color>" );
+			SpaceflightController.m_instance.m_messages.AddText( $"<color=#00FF00>{vessel.m_name} destroyed!</color>" );
 
 			// clear target
 			m_currentTargetIndex = -1;
@@ -474,7 +483,7 @@ public class CombatController : MonoBehaviour
 			if ( playerData.m_playerShip.m_armorPoints > 0 && playerData.m_playerShip.m_armorPoints < 250 )
 			{
 				SoundController.m_instance.PlaySound( SoundController.Sound.RedAlert );
-				SpaceflightController.m_instance.m_messages.AddText( "<color=orange>WARNING: Hull breach imminent!</color>" );
+				SpaceflightController.m_instance.m_messages.AddText( "<color=#FFA500>WARNING: Hull breach imminent!</color>" );
 			}
 
 			// check for destruction
@@ -485,19 +494,81 @@ public class CombatController : MonoBehaviour
 				// play ship explosion sound
 				SoundController.m_instance.PlaySound( SoundController.Sound.ShipExplosion );
 
+				// spawn player debris
+				SpawnPlayerDebris( playerPosition );
+
 				// show explosion
 				var explosion = GetAvailableExplosion();
 				if ( explosion != null )
 				{
 					explosion.Play( playerPosition, () =>
 					{
-						// game over!
-						SpaceflightController.m_instance.m_messages.AddText( "<color=red>Ship destroyed! Game Over.</color>" );
-						// TODO: handle game over state
+						ShowGameOver();
 					} );
+				}
+				else
+				{
+					// no explosion available, show game over immediately
+					ShowGameOver();
 				}
 			}
 		}
+	}
+
+	/// <summary>
+	/// Spawn debris at the player's position when destroyed.
+	/// </summary>
+	void SpawnPlayerDebris( Vector3 position )
+	{
+		if ( m_playerDebrisTemplate == null )
+		{
+			Debug.Log( "SpawnPlayerDebris: No debris template assigned!" );
+			return;
+		}
+
+		// get the player ship
+		var playerShip = SpaceflightController.m_instance.m_playerShip;
+
+		// hide the player ship model
+		if ( playerShip.m_ship != null )
+		{
+			playerShip.m_ship.gameObject.SetActive( false );
+		}
+
+		// spawn debris at the player's position with proper scale
+		var debrisInstance = Instantiate( m_playerDebrisTemplate, position, Quaternion.identity );
+		
+		// use the template's local scale directly - adjust in Unity Inspector if needed
+		debrisInstance.transform.localScale = m_playerDebrisTemplate.transform.localScale;
+		debrisInstance.SetActive( true );
+
+		Debug.Log( $"SpawnPlayerDebris: Spawned debris at {position} with scale {debrisInstance.transform.localScale}" );
+
+		// add slow tumbling rotation
+		var tumble = debrisInstance.AddComponent<DebrisTumble>();
+		tumble.m_rotationSpeed = new Vector3( Random.Range( -10f, 10f ), Random.Range( -10f, 10f ), Random.Range( -10f, 10f ) );
+	}
+
+	/// <summary>
+	/// Shows the game over screen using the button system.
+	/// </summary>
+	void ShowGameOver()
+	{
+		Debug.Log( "ShowGameOver called!" );
+		
+		// clear messages so game over text is visible
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		// game over!
+		SpaceflightController.m_instance.m_messages.AddText( "<color=#FF0000>Ship destroyed!</color>" );
+		SpaceflightController.m_instance.m_messages.AddText( "<color=#FFFF00>GAME OVER</color>" );
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Press ESC to return to title screen.</color>" );
+
+		// pause the game
+		SpaceflightController.m_instance.m_gameIsPaused = true;
+		
+		// set a flag so pressing ESC will restart
+		SpaceflightController.m_instance.m_gameOver = true;
 	}
 
 	/// <summary>
@@ -615,6 +686,13 @@ public class CombatController : MonoBehaviour
 	// get available explosion from pool
 	ExplosionEffect GetAvailableExplosion()
 	{
+		EnsurePoolsInitialized();
+		
+		if ( m_explosionPool == null )
+		{
+			return null;
+		}
+
 		foreach ( var explosion in m_explosionPool )
 		{
 			if ( !explosion.IsPlaying() )

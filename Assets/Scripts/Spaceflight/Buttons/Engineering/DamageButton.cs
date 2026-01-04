@@ -25,12 +25,12 @@ public class DamageButton : ShipButton
 		var shieldPercent = maxShield > 0 ? ( ship.m_shieldPoints * 100 / maxShield ) : 0;
 		var armorPercent = maxArmor > 0 ? ( ship.m_armorPoints * 100 / maxArmor ) : 0;
 
-		// determine status colors
-		string shieldColor = shieldPercent >= 75 ? "green" : ( shieldPercent >= 25 ? "yellow" : "red" );
-		string armorColor = armorPercent >= 75 ? "green" : ( armorPercent >= 25 ? "yellow" : "red" );
+		// determine status colors (using hex codes for TextMeshPro compatibility)
+		string shieldColor = shieldPercent >= 75 ? "#00FF00" : ( shieldPercent >= 25 ? "#FFFF00" : "#FF0000" );
+		string armorColor = armorPercent >= 75 ? "#00FF00" : ( armorPercent >= 25 ? "#FFFF00" : "#FF0000" );
 
 		// build report
-		var report = "<color=yellow>Damage Report:</color>\n";
+		var report = "<color=#FFFF00>Damage Report:</color>\n";
 
 		if ( maxShield > 0 )
 		{
@@ -38,7 +38,7 @@ public class DamageButton : ShipButton
 		}
 		else
 		{
-			report += "Shields: <color=gray>None installed</color>\n";
+			report += "Shields: <color=#808080>None installed</color>\n";
 		}
 
 		if ( maxArmor > 0 )
@@ -47,10 +47,10 @@ public class DamageButton : ShipButton
 		}
 		else
 		{
-			report += "Armor: <color=gray>None installed</color>\n";
+			report += "Armor: <color=#808080>None installed</color>\n";
 		}
 
-		report += "Hull: <color=green>Operational</color>";
+		report += "Hull: <color=#00FF00>Operational</color>";
 
 		SpaceflightController.m_instance.m_messages.AddText( report );
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );

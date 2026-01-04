@@ -12,6 +12,13 @@ public class PopupController : MonoBehaviour
 	public TextMeshProUGUI m_popupMessage;
 	public RectTransform m_popupFill;
 
+	// the button
+	public GameObject m_button;
+	public TextMeshProUGUI m_buttonLabel;
+
+	// the callback
+	System.Action m_callback;
+
 	// unity awake
 	void Awake()
 	{
@@ -32,7 +39,7 @@ public class PopupController : MonoBehaviour
 	}
 
 	// show the pop up dialog
-	public void ShowPopup( string message, float progress )
+	public void ShowPopup( string message, float progress, string buttonLabel = null, System.Action callback = null )
 	{
 		// make it visible
 		m_popup.SetActive( true );
@@ -42,6 +49,28 @@ public class PopupController : MonoBehaviour
 
 		// update the progress bar
 		m_popupFill.anchorMax = new Vector2( progress, 1.0f );
+
+		// update the button
+		if ( buttonLabel != null && m_button != null )
+		{
+			m_button.SetActive( true );
+			m_buttonLabel.text = buttonLabel;
+			m_callback = callback;
+		}
+		else if ( m_button != null )
+		{
+			m_button.SetActive( false );
+			m_callback = null;
+		}
+	}
+
+	// call this when the button is clicked
+	public void OnButtonClick()
+	{
+		if ( m_callback != null )
+		{
+			m_callback();
+		}
 	}
 
 	// hide the pop up dialog

@@ -37,7 +37,7 @@ public class LookButton : ShipButton
 			gravityDesc = "Crushing";
 
 		// build observation report
-		var report = "<color=yellow>You observe your surroundings:</color>\n";
+		var report = "<color=#FFFF00>You observe your surroundings:</color>\n";
 		report += "Surface: <color=white>" + surface + "</color>\n";
 		report += "Weather: <color=white>" + weather + "</color>\n";
 		report += "Atmosphere: <color=white>" + atmosphere + "</color>\n";

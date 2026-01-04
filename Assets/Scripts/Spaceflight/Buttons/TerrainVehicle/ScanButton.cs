@@ -44,7 +44,7 @@ public class ScanButton : ShipButton
 		var nearbyReport = ScanNearbyObjects();
 
 		// build scan report
-		var report = "<color=yellow>Local Scan Results:</color>\n";
+		var report = "<color=#FFFF00>Local Scan Results:</color>\n";
 		report += "Mineral Density: <color=white>" + planet.m_mineralDensity + "%</color>\n";
 		report += "Bio Density: <color=white>" + planet.m_bioDensity + "%</color>\n";
 		report += "Elements: <color=white>" + elementsText + "</color>";
@@ -52,7 +52,7 @@ public class ScanButton : ShipButton
 		// add nearby objects if any found
 		if ( nearbyReport.Length > 0 )
 		{
-			report += "\n\n<color=yellow>Nearby Objects:</color>\n" + nearbyReport;
+			report += "\n\n<color=#FFFF00>Nearby Objects:</color>\n" + nearbyReport;
 		}
 		else
 		{
@@ -151,7 +151,7 @@ public class ScanButton : ShipButton
 		// list mineral deposits (pickable)
 		foreach ( var deposit in mineralDeposits )
 		{
-			report += "<color=green>" + deposit.Key + " deposit" + ( deposit.Value > 1 ? "s" : "" ) + ": " + deposit.Value + "</color>\n";
+			report += "<color=#00FF00>" + deposit.Key + " deposit" + ( deposit.Value > 1 ? "s" : "" ) + ": " + deposit.Value + "</color>\n";
 		}
 
 		// list rocks (not pickable)

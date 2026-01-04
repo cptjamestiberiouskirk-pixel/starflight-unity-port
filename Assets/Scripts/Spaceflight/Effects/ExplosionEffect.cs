@@ -220,7 +220,8 @@ public class ExplosionEffect : MonoBehaviour
 	{
 		if ( m_isPlaying )
 		{
-			m_timer += Time.deltaTime;
+			// use unscaled delta time so explosion finishes even when game is paused
+			m_timer += Time.unscaledDeltaTime;
 			if ( m_timer >= m_duration )
 			{
 				m_isPlaying = false;

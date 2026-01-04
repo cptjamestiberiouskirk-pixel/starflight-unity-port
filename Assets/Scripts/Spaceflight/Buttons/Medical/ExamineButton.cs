@@ -13,7 +13,7 @@ public class ExamineButton : ShipButton
 
 		SpaceflightController.m_instance.m_messages.Clear();
 
-		var report = "<color=yellow>Crew Health Report:</color>\n";
+		var report = "<color=#FFFF00>Crew Health Report:</color>\n";
 		var hasAnyCrew = false;
 
 		// go through each crew role and report their health
@@ -28,13 +28,13 @@ public class ExamineButton : ShipButton
 				// color code based on health status
 				string statusColor;
 				if ( personnel.m_vitality <= 0 )
-					statusColor = "<color=gray>";
+					statusColor = "<color=#808080>";
 				else if ( personnel.m_vitality >= 75 )
-					statusColor = "<color=green>";
+					statusColor = "<color=#00FF00>";
 				else if ( personnel.m_vitality >= 25 )
-					statusColor = "<color=yellow>";
+					statusColor = "<color=#FFFF00>";
 				else
-					statusColor = "<color=red>";
+					statusColor = "<color=#FF0000>";
 
 				report += personnel.m_name + ": " + statusColor + vitality + "%</color>\n";
 			}

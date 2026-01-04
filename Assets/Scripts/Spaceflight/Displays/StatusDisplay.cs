@@ -53,13 +53,21 @@ public class StatusDisplay : ShipDisplay
 		// update the date
 		m_values.text = playerData.m_general.m_currentStardateDHMY + "\n";
 
-		// TODO: do actual damage text
-		m_values.text += "None\n";
+		// update the damage text
+		if ( playerData.m_playerShip.m_armorPoints < 1500 )
+		{
+			float damagePercent = ( 1.0f - (float) playerData.m_playerShip.m_armorPoints / 1500.0f ) * 100.0f;
+			m_values.text += "<color=red>" + damagePercent.ToString( "N0" ) + "% Hull Damage</color>\n";
+		}
+		else
+		{
+			m_values.text += "None\n";
+		}
 
 		// update the cargo usage
-		// TODO: change the color depending on how full the storage is
 		float cargoUsage = (float) playerData.m_playerShip.m_volumeUsed / (float) playerData.m_playerShip.m_volume * 100.0f;
-		m_values.text += cargoUsage.ToString( "N1" ) + "% Full\n";
+		string cargoColor = ( cargoUsage > 90.0f ) ? "red" : ( ( cargoUsage > 75.0f ) ? "yellow" : "white" );
+		m_values.text += "<color=" + cargoColor + ">" + cargoUsage.ToString( "N1" ) + "% Full</color>\n";
 
 		// get to the endurium in the ship storage
 		PD_ElementReference elementReference = playerData.m_playerShip.m_elementStorage.Find( 5 );
@@ -67,14 +75,13 @@ public class StatusDisplay : ShipDisplay
 		// update the amount of energy remaining
 		if ( elementReference == null )
 		{
-			m_values.text += "None\n";
+			m_values.text += "<color=red>None</color>\n";
 		}
 		else
 		{
 			float energyAmount = (float) elementReference.m_volume / 10.0f;
-
-			// TODO: change the color depending on the amount remaining
-			m_values.text += energyAmount.ToString( "N1" ) + "M<sup>3</sup>\n";
+			string energyColor = ( energyAmount < 5.0f ) ? "red" : ( ( energyAmount < 15.0f ) ? "yellow" : "white" );
+			m_values.text += "<color=" + energyColor + ">" + energyAmount.ToString( "N1" ) + "M<sup>3</sup></color>\n";
 		}
 
 		// do we have shields?

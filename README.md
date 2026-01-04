@@ -23,9 +23,12 @@ The project has been refactored to a clean, **root-directory architecture** to e
 
 - **Deterministic Exploration**: Navigate a fixed map of **270 star systems and approximately 800 predetermined planets**, preserving the exact coordinates and data of the 1986 original.
 - **Data-Driven Architecture**: Uses JSON-based definitions for game assets and player progress via the `ISaveSystem`.
-- **Combat System**: Full implementation of phaser/laser cannons, torpedo launchers, shield absorption models, and AI combat behaviors.
+- **Combat System**: Full implementation of laser cannons, missile launchers, shield absorption, armor damage, and AI combat behaviors with victory/defeat detection.
+- **Ship Destruction**: Complete death sequences with explosion effects, debris spawning, and salvage opportunities.
+- **Game Over System**: Player ship destruction triggers game over screen with restart to title functionality.
 - **Terrain Scanning**: Enhanced exploration with 3D world-space labels, mineral detection, and Star Trek-style transporter effects.
 - **Cargo Management**: Real-time volume tracking for minerals and elements with automatic transfer to the ship.
+- **Debris Scanning**: Scan destroyed vessel wreckage for salvage analysis.
 
 ---
 
@@ -90,6 +93,28 @@ The project features a **deterministic visualization system** that renders plane
 
 ## 👽 Alien Asset Status
 - **Thrynn.fbx**: Currently ~74MB. Requires manual extraction of materials and potential polygon reduction to optimize performance.
+
+---
+
+## 🎯 Current Development Status (v0.9.0)
+
+### ✅ Completed Features
+- Full starport operations (Personnel, Ship Config, Trading, Banking)
+- Hyperspace navigation and star system exploration
+- Planetary landing and terrain vehicle exploration
+- 10 alien races with unique encounter behaviors
+- Complete combat system with lasers, missiles, shields, armor
+- Ship destruction with debris spawning
+- Game over and restart functionality
+- Save/load system with JSON persistence
+
+### 🔧 In Progress
+- Salvage collection from debris fields
+- Additional alien ship 3D models (Veloxi ships)
+
+### 📊 Completion: ~95%
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
 ---
 

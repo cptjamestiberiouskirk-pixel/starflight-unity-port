@@ -49,7 +49,7 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 		var values = "";
 
 		// header
-		labels += "<color=yellow>CARGO</color>\n\n";
+		labels += "<color=#FFFF00>CARGO</color>\n\n";
 		values += "\n\n";
 
 		// list elements (with null checks)
@@ -69,7 +69,7 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 			foreach ( var artifactRef in artifactStorage.m_artifactList )
 			{
 				var artifactName = gameData.m_artifactList[ artifactRef.m_artifactId ].m_name;
-				labels += "<color=cyan>" + artifactName + "</color>\n";
+				labels += "<color=#00FFFF>" + artifactName + "</color>\n";
 				values += "\n";
 			}
 		}
@@ -79,7 +79,7 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 		int artifactCount = ( artifactStorage?.m_artifactList?.Count ) ?? 0;
 		if ( elementCount == 0 && artifactCount == 0 )
 		{
-			labels += "<color=gray>Empty</color>\n";
+			labels += "<color=#808080>Empty</color>\n";
 			values += "\n";
 		}
 
@@ -88,8 +88,8 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 		var total = gameData.m_misc.m_terrainVehicleVolume;
 		var used = total - remaining;
 
-		labels += "\n<color=gray>Capacity:</color>";
-		values += "\n<color=gray>" + used + "/" + total + " m³</color>";
+		labels += "\n<color=#808080>Capacity:</color>";
+		values += "\n<color=#808080>" + used + "/" + total + " m³</color>";
 
 		m_labelsText.text = labels;
 		m_valuesText.text = values;

@@ -23,10 +23,36 @@ public class TargetButton : ShipButton
 
 		// get the encounter
 		var encounter = SpaceflightController.m_instance.m_encounter;
+		
+		// check if encounter data is valid
+		if ( encounter.m_pdEncounter == null )
+		{
+			SpaceflightController.m_instance.m_messages.AddText( "<color=red>No encounter data available.</color>" );
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+			return false;
+		}
+
 		var alienShipList = encounter.m_pdEncounter.GetAlienShipList();
 
+		// check if alien ship list is valid
+		if ( alienShipList == null || alienShipList.Length == 0 )
+		{
+			SpaceflightController.m_instance.m_messages.AddText( "<color=yellow>No targets in range.</color>" );
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+			return false;
+		}
+
+		// get combat controller
+		var combatController = CombatController.m_instance ?? SpaceflightController.m_instance.m_combatController;
+		if ( combatController == null )
+		{
+			SpaceflightController.m_instance.m_messages.AddText( "<color=red>Combat system unavailable.</color>" );
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+			return false;
+		}
+
 		// find next valid target
-		int currentTarget = CombatController.m_instance.GetTargetIndex();
+		int currentTarget = combatController.GetTargetIndex();
 		int newTarget = -1;
 
 		// cycle through targets
@@ -59,7 +85,7 @@ public class TargetButton : ShipButton
 		}
 
 		// set the target
-		CombatController.m_instance.SetTarget( newTarget );
+		combatController.SetTarget( newTarget );
 
 		// get target info
 		var gameData = DataController.m_instance.m_gameData;

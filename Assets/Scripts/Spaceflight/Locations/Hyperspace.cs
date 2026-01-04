@@ -18,11 +18,17 @@ public class Hyperspace : MonoBehaviour
 	// flux travel duration
 	float m_fluxTravelDuration;
 
-	// the starting point
+	// starting point
 	Vector3 m_fluxTravelStartPosition;
 
-	// the ending point
+	// ending point
 	Vector3 m_fluxTravelEndPosition;
+
+	// true if we are currently flashing the screen (for continuum flux)
+	bool m_flashingScreen;
+
+	// flash timer
+	float m_flashTimer;
 
 	// remember the maximum speed of the player before flux travel
 	float m_oldMaximumSpeed;
@@ -101,6 +107,31 @@ public class Hyperspace : MonoBehaviour
 
 			// update the ship position
 			playerData.m_general.m_coordinates = SpaceflightController.m_instance.m_playerShip.transform.position = newPosition;
+
+			// are we flashing the screen?
+			if ( m_flashingScreen )
+			{
+				m_flashTimer += Time.deltaTime;
+
+				// flash the viewport with random colors
+				if ( Random.Range( 0, 100 ) < 50 )
+				{
+					SpaceflightController.m_instance.m_viewport.m_fadeImage.color = new Color( Random.value, Random.value, Random.value, 0.5f );
+					SpaceflightController.m_instance.m_viewport.m_fadeImage.enabled = true;
+				}
+				else
+				{
+					SpaceflightController.m_instance.m_viewport.m_fadeImage.enabled = false;
+				}
+
+				// stop flashing after a while
+				if ( m_flashTimer >= 2.0f )
+				{
+					m_flashingScreen = false;
+					SpaceflightController.m_instance.m_viewport.m_fadeImage.color = Color.black;
+					SpaceflightController.m_instance.m_viewport.m_fadeImage.enabled = false;
+				}
+			}
 
 			// have we arrived?
 			if ( m_timer >= m_fluxTravelDuration )
@@ -205,6 +236,15 @@ public class Hyperspace : MonoBehaviour
 
 					// play the enter warp sound
 					SoundController.m_instance.PlaySound( SoundController.Sound.EnterWarp );
+
+					// is this a continuum flux? (random chance for now, or check flux properties if available)
+					if ( Random.Range( 0, 100 ) < 25 )
+					{
+						m_flashingScreen = true;
+						m_flashTimer = 0.0f;
+
+						SpaceflightController.m_instance.m_messages.AddText( "<color=cyan>Continuum flux detected! Navigational sensors offline!</color>" );
+					}
 				}
 			}
 

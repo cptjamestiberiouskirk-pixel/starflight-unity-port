@@ -14,6 +14,7 @@ public class TerrainGrid : MonoBehaviour
 	public TerrainRocks m_terrainRocks;
 	public TerrainElements m_terrainElements;
 	public TerrainTrees m_terrainTrees;
+	public TerrainRuins m_terrainRuins;
 
 	Mesh m_mesh;
 	MeshFilter m_meshFilter;
@@ -138,6 +139,12 @@ public class TerrainGrid : MonoBehaviour
 		if ( m_terrainTrees != null )
 		{
 			m_terrainTrees.Initialize( m_planetGenerator, m_elevationScale, planet.m_id + 3 );
+		}
+
+		// populate the ruins
+		if ( m_terrainRuins != null )
+		{
+			m_terrainRuins.Initialize( m_planetGenerator, m_elevationScale, planet.m_id + 4 );
 		}
 	}
 

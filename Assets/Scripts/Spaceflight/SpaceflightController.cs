@@ -41,6 +41,9 @@ public class SpaceflightController : MonoBehaviour
 	// true if the game is paused
 	public bool m_gameIsPaused;
 
+	// true if the game is over (player destroyed)
+	public bool m_gameOver;
+
 	// save game timer
 	float m_timer;
 
@@ -144,6 +147,13 @@ public class SpaceflightController : MonoBehaviour
 			}
 		}
 
+		// handle ESC key for game over (must check BEFORE the pause return!)
+		if ( Input.GetKeyDown( KeyCode.Escape ) && m_gameOver )
+		{
+			RestartGame();
+			return;
+		}
+
 		// don't do anything if the game is paused
 		if ( m_gameIsPaused )
 		{
@@ -184,6 +194,30 @@ public class SpaceflightController : MonoBehaviour
 				m_gameIsPaused = true;
 			}
 		}
+
+#if UNITY_EDITOR
+		// DEBUG: Press F9 to spawn a test encounter (Spemin - weak enemy)
+		if ( Input.GetKeyDown( KeyCode.F9 ) )
+		{
+			SpawnTestEncounter();
+		}
+
+		// DEBUG: Press F10 to instantly destroy player ship (test game over)
+		if ( Input.GetKeyDown( KeyCode.F10 ) )
+		{
+			playerData.m_playerShip.m_shieldPoints = 0;
+			playerData.m_playerShip.m_armorPoints = 0;
+			var combatController = m_combatController ?? CombatController.m_instance;
+			if ( combatController != null )
+			{
+				combatController.ApplyDamageToPlayer( 1, Vector3.forward );
+			}
+			else
+			{
+				m_messages.AddText( "<color=#FF0000>DEBUG: Combat controller not available.</color>" );
+			}
+		}
+#endif
 	}
 
 	// call this to hide everything
@@ -263,9 +297,14 @@ public class SpaceflightController : MonoBehaviour
 					break;
 
 				case PD_General.Location.JustLaunched:
-					m_viewport.StartFade( 0.0f, 0.0f );
+					// show the star system (starfield background) but hide the radar
+					m_starSystem.Initialize();
+					m_starSystem.Show();
+					m_playerShip.Show();
+					m_radar.Hide(); // hide the radar for JustLaunched - player hasn't entered the system yet
 					m_messages.Clear();
-					m_messages.AddText( "<color=white>Starport clear.\nStanding by to maneuver.</color>" );
+					m_messages.AddText( "<color=white>Starport clear.</color>" );
+					m_messages.AddText( "<color=#FFFF00>Select Navigation → Maneuver to enter the star system.</color>" );
 					break;
 
 				case PD_General.Location.StarSystem:
@@ -317,6 +356,19 @@ public class SpaceflightController : MonoBehaviour
 
 		// unpause the game
 		m_gameIsPaused = false;
+	}
+
+	// call this to restart the game (e.g. after game over)
+	public void RestartGame()
+	{
+		// unpause the game
+		m_gameIsPaused = false;
+		
+		// reset game over flag
+		m_gameOver = false;
+
+		// go to the intro screen (not Persistent, which would load the save)
+		SceneManager.LoadScene( "Intro" );
 	}
 
 	// updates the encounters (call only from hyperspace or starsystem locations)
@@ -530,6 +582,118 @@ public class SpaceflightController : MonoBehaviour
 				}
 			}
 		}
+	}
+
+	// DEBUG: Spawn a test encounter near the player
+	void SpawnTestEncounter()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+
+		// only works in hyperspace or star system
+		if ( playerData.m_general.m_location != PD_General.Location.Hyperspace &&
+			 playerData.m_general.m_location != PD_General.Location.StarSystem )
+		{
+			m_messages.AddText( "<color=yellow>DEBUG: Can only spawn encounter in hyperspace or star system.</color>" );
+			return;
+		}
+
+		// determine what location type we need (0 = hyperspace, 1 = star system in game data)
+		int requiredLocationCode = playerData.m_general.m_location == PD_General.Location.Hyperspace ? 0 : 1;
+
+		// find an encounter that matches our current location
+		int testEncounterId = -1;
+		
+		// first try to find a Spemin encounter that matches location
+		for ( int i = 0; i < gameData.m_encounterList.Length; i++ )
+		{
+			var gdEnc = gameData.m_encounterList[ i ];
+			
+			if ( gdEnc.m_location == requiredLocationCode && gdEnc.m_race == GameData.Race.Spemin )
+			{
+				// for star system encounters, also check we're at the right star
+				if ( requiredLocationCode == 1 )
+				{
+					// find if any star matches this encounter's coordinates
+					bool starMatches = false;
+					foreach ( var star in gameData.m_starList )
+					{
+						if ( star.m_xCoordinate == gdEnc.m_xCoordinate && 
+							 star.m_yCoordinate == gdEnc.m_yCoordinate &&
+							 star.m_id == playerData.m_general.m_currentStarId )
+						{
+							starMatches = true;
+							break;
+						}
+					}
+					if ( !starMatches ) continue;
+				}
+				
+				testEncounterId = i;
+				break;
+			}
+		}
+
+		// fallback: find any encounter that matches location (hyperspace only for simplicity)
+		if ( testEncounterId < 0 && requiredLocationCode == 0 )
+		{
+			for ( int i = 0; i < gameData.m_encounterList.Length; i++ )
+			{
+				var gdEnc = gameData.m_encounterList[ i ];
+				if ( gdEnc.m_location == 0 ) // hyperspace
+				{
+					testEncounterId = i;
+					break;
+				}
+			}
+		}
+
+		if ( testEncounterId < 0 )
+		{
+			m_messages.AddText( "<color=yellow>DEBUG: No encounter for this location. Try hyperspace.</color>" );
+			return;
+		}
+
+		// reset the encounter to ensure it's properly initialized
+		playerData.m_encounterList[ testEncounterId ].Reset( testEncounterId );
+
+		// get the encounter
+		var pdEncounter = playerData.m_encounterList[ testEncounterId ];
+
+		// teleport the encounter right next to the player
+		Vector3 playerCoords = playerData.m_general.m_location == PD_General.Location.Hyperspace
+			? playerData.m_general.m_lastHyperspaceCoordinates
+			: playerData.m_general.m_coordinates;
+
+		pdEncounter.SetCoordinates( playerCoords );
+		pdEncounter.SetDistance( 0.0f );
+
+		// set up the encounter
+		playerData.m_general.m_currentEncounterId = testEncounterId;
+		playerData.m_general.m_lastEncounterCoordinates = Vector3.zero;
+
+		// let the encounter system know we are entering
+		m_encounter.JustEntered();
+
+		Debug.Log( $"[F9] pdEncounter hashcode = {pdEncounter.GetHashCode()}" );
+		Debug.Log( $"[F9] BEFORE SwitchLocation: pdEncounter.m_alienStance = {pdEncounter.m_alienStance}" );
+
+		// switch to the encounter location
+		SwitchLocation( PD_General.Location.Encounter );
+
+		Debug.Log( $"[F9] AFTER SwitchLocation: pdEncounter.m_alienStance = {pdEncounter.m_alienStance}" );
+		Debug.Log( $"[F9] m_encounter.m_pdEncounter hashcode = {m_encounter.m_pdEncounter?.GetHashCode()}" );
+		Debug.Log( $"[F9] m_encounter.m_pdEncounter reference = {(m_encounter.m_pdEncounter == pdEncounter ? "SAME" : "DIFFERENT!")}" );
+		Debug.Log( $"[F9] m_encounter.m_pdEncounter.m_alienStance = {m_encounter.m_pdEncounter?.m_alienStance}" );
+
+		// make them hostile for testing combat - set AFTER SwitchLocation so it doesn't get reset
+		pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+
+		Debug.Log( $"[F9] AFTER setting Hostile: pdEncounter.m_alienStance = {pdEncounter.m_alienStance}" );
+		Debug.Log( $"[F9] AFTER setting Hostile: m_encounter.m_pdEncounter.m_alienStance = {m_encounter.m_pdEncounter?.m_alienStance}" );
+
+		var raceName = gameData.m_encounterList[ testEncounterId ].m_race.ToString();
+		m_messages.AddText( $"<color=#00FF00>DEBUG: Spawned {raceName} encounter! (HOSTILE)</color>" );
 	}
 
 #endif // UNITY_EDITOR
