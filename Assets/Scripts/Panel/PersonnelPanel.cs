@@ -890,8 +890,8 @@ public class PersonnelPanel : Panel
 
 			for ( int skillIndex = 0; skillIndex < c_numSkills; skillIndex++ )
 			{
-				maxTotalPoints = race.GetMaximumSkill( skillIndex );
-				currentTotalPoints = personnelFile.GetSkill( skillIndex );
+				maxTotalPoints += race.GetMaximumSkill( skillIndex );
+				currentTotalPoints += personnelFile.GetSkill( skillIndex );
 			}
 
 			// check if we are maxxed out
@@ -955,6 +955,9 @@ public class PersonnelPanel : Panel
 
 		// get to the personnel player data
 		PD_Personnel personnel = DataController.m_instance.m_playerData.m_personnel;
+
+		// unassign the crewmember from any roles they have (otherwise the roles point at a file that no longer exists)
+		DataController.m_instance.m_playerData.m_crewAssignment.Unassign( personnel.m_personnelList[ m_currentFileIndex ].m_fileId );
 
 		// delete the crewmember
 		personnel.m_personnelList.RemoveAt( m_currentFileIndex );

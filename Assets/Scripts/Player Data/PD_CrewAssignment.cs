@@ -70,6 +70,30 @@ public class PD_CrewAssignment
 		}
 	}
 
+	// unassign this personnel file from every role it has (call this before deleting the file)
+	public void Unassign( int fileId )
+	{
+		for ( var role = Role.First; role < Role.Count; role++ )
+		{
+			if ( GetFileId( role ) == fileId )
+			{
+				Assign( role, -1 );
+			}
+		}
+	}
+
+	// unassign roles that point at personnel files that no longer exist (deleting crew used to leave them behind)
+	public void UnassignMissingCrew( PD_Personnel personnel )
+	{
+		for ( var role = Role.First; role < Role.Count; role++ )
+		{
+			if ( IsAssigned( role ) && !personnel.HasPersonnelFile( GetFileId( role ) ) )
+			{
+				Assign( role, -1 );
+			}
+		}
+	}
+
 	public PD_Personnel.PD_PersonnelFile GetPersonnelFile( Role role )
 	{
 		var fileId = GetFileId( role );

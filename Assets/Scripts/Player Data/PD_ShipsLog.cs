@@ -34,10 +34,16 @@ using System.Collections.Generic;
 		}
 	}
 
+	// JsonUtility can't serialize an array of lists, so each alien comm subject's list is wrapped in a serializable class
+	[Serializable] public class EntryList
+	{
+		public List<Entry> m_entryList;
+	}
+
 	[SerializeField] public List<Entry> m_starportNotices;
 	[SerializeField] public List<Entry> m_foundMessages;
 	[SerializeField] public List<Entry> m_planetLogs;
-	[SerializeField] public List<Entry>[] m_alienComms;
+	[SerializeField] public EntryList[] m_alienComms;
 
 	public void Reset()
 	{
@@ -46,11 +52,38 @@ using System.Collections.Generic;
 		m_foundMessages = new List<Entry>();
 		m_planetLogs = new List<Entry>();
 
-		m_alienComms = new List<Entry>[ (int) AlienComm.Count ];
+		m_alienComms = null;
+
+		ValidateAlienComms();
+	}
+
+	// get the alien comms the player has seen for this subject
+	public List<Entry> GetAlienComms( AlienComm alienComm )
+	{
+		ValidateAlienComms();
+
+		return m_alienComms[ (int) alienComm ].m_entryList;
+	}
+
+	// make sure there is a list for every alien comm subject (save files from before they were saved don't have them)
+	void ValidateAlienComms()
+	{
+		if ( ( m_alienComms == null ) || ( m_alienComms.Length != (int) AlienComm.Count ) )
+		{
+			m_alienComms = new EntryList[ (int) AlienComm.Count ];
+		}
 
 		for ( var i = AlienComm.First; i <= AlienComm.Last; i++ )
 		{
-			m_alienComms[ (int) i ] = new List<Entry>();
+			if ( m_alienComms[ (int) i ] == null )
+			{
+				m_alienComms[ (int) i ] = new EntryList();
+			}
+
+			if ( m_alienComms[ (int) i ].m_entryList == null )
+			{
+				m_alienComms[ (int) i ].m_entryList = new List<Entry>();
+			}
 		}
 	}
 
@@ -114,35 +147,18 @@ using System.Collections.Generic;
 		// get to the player data
 		var playerData = DataController.m_instance.m_playerData;
 
-		// ensure m_alienComms is initialized (for existing save files)
-		if ( m_alienComms == null )
-		{
-			m_alienComms = new List<Entry>[ (int) AlienComm.Count ];
-
-			for ( var i = AlienComm.First; i <= AlienComm.Last; i++ )
-			{
-				m_alienComms[ (int) i ] = new List<Entry>();
-			}
-		}
-
 		// calculate the index
 		int index = (int) comm.m_subject - (int) GD_Comm.Subject.Themselves;
-		
+
 		// validate index is in bounds
-		if ( index < 0 || index >= m_alienComms.Length )
+		if ( index < 0 || index >= (int) AlienComm.Count )
 		{
 			Debug.LogWarning( $"AddAlienComm: Invalid subject index {index} for subject {comm.m_subject}" );
 			return;
 		}
 
-		// ensure the specific list is initialized
-		if ( m_alienComms[ index ] == null )
-		{
-			m_alienComms[ index ] = new List<Entry>();
-		}
-
 		// which subject?
-		var alienComms = m_alienComms[ index ];
+		var alienComms = GetAlienComms( (AlienComm) index );
 
 		// go through the alien comms the player has already seen
 		for ( var i = 0; i < alienComms.Count; i++ )

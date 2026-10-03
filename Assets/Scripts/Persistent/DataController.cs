@@ -162,6 +162,9 @@ public class DataController : MonoBehaviour
 				m_playerDataList[ i ].Reset();
 			}
 
+			// repair save files where a deleted crewmember was left assigned to a role
+			m_playerDataList[ i ].m_crewAssignment.UnassignMissingCrew( m_playerDataList[ i ].m_personnel );
+
 			// check if this is the active save game slot
 			if ( m_playerDataList[ i ].m_isCurrentGame )
 			{
@@ -188,6 +191,24 @@ public class DataController : MonoBehaviour
 
 		// set the target save game slot number to be the same as the active one
 		m_targetSaveGameSlotNumber = m_activeSaveGameSlotNumber;
+	}
+
+	// save the active game when the player closes the game (otherwise everything since the last location change is lost)
+	void OnApplicationQuit()
+	{
+		// nothing to save if the player data was never loaded
+		if ( m_playerData == null )
+		{
+			return;
+		}
+
+		// don't save a destroyed ship (the save on disk still has the game from before the ship was lost)
+		if ( m_playerData.m_playerShip.m_armorPoints <= 0 )
+		{
+			return;
+		}
+
+		SaveActiveGame();
 	}
 
 	// this saves our current save game slot to disk

@@ -43,6 +43,8 @@ Saves go through `ISaveSystem` → `JsonSaveSystem`, writing `Application.persis
 - Only Unity-serializable fields persist. Dictionaries, properties, and multi-dimensional arrays are silently dropped (e.g. `PD_General.m_lastCommIds` used to be `int[,]` and lost its data on every load; it's now a flat `int[]` behind `GetLastCommId()` / `SetLastCommId()`).
 - `PlayerData.c_currentVersion`: any slot with a different version is **reset to a new game** on load. Bump it only for intentionally breaking `PD_*` changes; otherwise add backward-compat null/length checks for fields missing from older saves.
 - Enums are stored as ints — append new values, never reorder.
+- Nested containers (arrays or lists of lists) are dropped too; wrap the inner list in a `[Serializable]` class (see `PD_ShipsLog.EntryList`). Game data JSON keys must match field names exactly, since a misspelled key is silently ignored.
+- `Radar` sorts `PlayerData.m_encounterList` by distance every frame, so never index it by encounter id; use `PlayerData.FindEncounter()`.
 
 ### Location state machine
 `PD_General.Location` (`Starport, DockingBay, JustLaunched, StarSystem, Hyperspace, InOrbit, Planetside, Encounter, Disembarked`) drives everything. `DataController.GetCurrentSceneName()` maps `Starport` → Starport scene, everything else → Spaceflight scene.

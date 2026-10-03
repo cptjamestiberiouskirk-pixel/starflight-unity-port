@@ -62,6 +62,20 @@ public class PlayerData
 		}
 	}
 
+	// find an encounter by its id (Radar keeps m_encounterList sorted by distance, so the array index is not the encounter id)
+	public PD_Encounter FindEncounter( int encounterId )
+	{
+		foreach ( var encounter in m_encounterList )
+		{
+			if ( encounter.m_encounterId == encounterId )
+			{
+				return encounter;
+			}
+		}
+
+		return null;
+	}
+
 	// returns true if the player data version is current
 	public bool IsCurrentVersion()
 	{

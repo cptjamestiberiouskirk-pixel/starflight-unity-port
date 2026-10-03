@@ -1,6 +1,7 @@
 ﻿
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
@@ -947,31 +948,16 @@ public class TradeDepotPanel : Panel
 	{
 		InputController.m_instance.Debounce();
 
-		// get the amount to transfer
+		// get the amount to transfer (in tenths of a cubic meter)
 		int desiredAmount = 0;
 
-		if ( m_amountInputField.text.IndexOf( '.' ) == -1 )
-		{
-			// player did not enter a decimal point
-			if ( m_amountInputField.text.Length > 0 )
-			{
-				desiredAmount = Convert.ToInt32( m_amountInputField.text ) * 10;
-			}
-		}
-		else
-		{
-			// player did enter a decimal point
-			string[] amountParts = m_amountInputField.text.Split( '.' );
+		// parse what the player typed (invariant culture with a comma also accepted as the decimal point, and no sign allowed)
+		decimal amount;
 
-			if ( amountParts.Length > 0 && amountParts[ 0 ].Length > 0 )
-			{
-				desiredAmount = Convert.ToInt32( amountParts[ 0 ] ) * 10;
-			}
-
-			if ( amountParts.Length > 1 && amountParts[ 1 ].Length > 0 )
-			{
-				desiredAmount += Convert.ToInt32( amountParts[ 1 ] );
-			}
+		if ( decimal.TryParse( m_amountInputField.text.Replace( ',', '.' ), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out amount ) )
+		{
+			// convert to tenths of a cubic meter (anything past the first decimal place is dropped)
+			desiredAmount = (int) Math.Min( Math.Floor( amount * 10 ), int.MaxValue );
 		}
 
 		// if the desired amount was zero then that's the same as hitting escape
@@ -1043,23 +1029,33 @@ public class TradeDepotPanel : Panel
 				// get access to the player data
 				PlayerData playerData = DataController.m_instance.m_playerData;
 
-				// get access to the game data
-				GameData gameData = DataController.m_instance.m_gameData;
+				// check if the ship has that much of the element in the cargo hold
+				PD_ElementReference elementReference = playerData.m_playerShip.m_elementStorage.Find( elementId );
 
-				// get the sell price of this element
-				int sellPrice = gameData.m_elementList[ elementId ].m_actualValue;
+				if ( ( elementReference == null ) || ( desiredAmount > elementReference.m_volume ) )
+				{
+					SwitchToErrorMessageState( "Not enough in cargo hold" );
+				}
+				else
+				{
+					// get access to the game data
+					GameData gameData = DataController.m_instance.m_gameData;
 
-				// add the sell price of the artifact to the player's bank balance
-				playerData.m_bank.m_currentBalance += sellPrice * desiredAmount / 10;
+					// get the sell price of this element
+					int sellPrice = gameData.m_elementList[ elementId ].m_actualValue;
 
-				// transfer the element to starport
-				playerData.m_playerShip.RemoveElement( elementId, desiredAmount );
+					// add the sell price of the artifact to the player's bank balance
+					playerData.m_bank.m_currentBalance += sellPrice * desiredAmount / 10;
 
-				// switch back to the sell item state
-				SwitchToSellItemState( false );
+					// transfer the element to starport
+					playerData.m_playerShip.RemoveElement( elementId, desiredAmount );
 
-				// play a ui sound
-				SoundController.m_instance.PlaySound( SoundController.Sound.Update );
+					// switch back to the sell item state
+					SwitchToSellItemState( false );
+
+					// play a ui sound
+					SoundController.m_instance.PlaySound( SoundController.Sound.Update );
+				}
 			}
 		}
 	}

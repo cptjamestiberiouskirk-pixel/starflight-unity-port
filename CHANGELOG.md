@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Alien Comm Progress Lost on Load**: `PD_General.m_lastCommIds` was an `int[,]`, which `JsonUtility` does not serialize, so per-race question/answer progress was never written to the save file and reset on every load. It's now a flat `int[]` (20 races x 16 subjects) accessed through `GetLastCommId()` / `SetLastCommId()`. Older saves without the field still load (the table is re-allocated on first use) and the save version is unchanged
 - **Compiler Errors from 0.9.0 Bug-Fix Pass**: `AnalysisButton` bounds checks used `.Count` on the `GD_Vessel[]` vessel list (now `.Length`), and the iteration cap added to the `TradeDepotPanel` selection-box loop left `selectionBoxOffset` not definitely assigned (CS0165; now initialized, behavior unchanged). Found by the new compile check
+- **Wrong Encounter Loaded**: `Radar` keeps `PlayerData.m_encounterList` sorted by distance, but `Encounter.Show` (since b9727c5) picked the encounter by array index, so most encounters loaded another encounter's ships, stance and position and saved kills to the wrong record. Encounters are found by `m_encounterId` again through `PlayerData.FindEncounter()`
+- **Alien Comms Missing from Ship's Log After Load**: `PD_ShipsLog.m_alienComms` was a `List<Entry>[]`, which `JsonUtility` does not serialize, so the entries were never saved and the Alien Comms buttons threw a NullReferenceException after loading. It's now an array of serializable `EntryList` wrappers read through `GetAlienComms()`
+- **Save Locked After Deleting Assigned Crew**: deleting a personnel file left crew roles pointing at it, so Crew Assignment and the Docking Bay threw on every open and the ship could never launch. Deleting now unassigns the crewmember, and loading repairs saves already in that state
+- **Trade Depot Sell Exploit**: selling didn't check the amount against the cargo hold, so any amount could be sold for money and the element volume went negative. Selling more than you have now shows an error, and `PD_ElementStorage.Remove` refuses to go below zero
+- **Trade Depot Amount Parsing**: the decimal part was added as a raw integer (`5.25` became 7.5) and a lone `-` threw `FormatException`. Amounts are parsed as tenths with the invariant culture, accept a comma as the decimal point, and reject signs
+- **Garbled Alien Words Dropped**: 70445da left the capitalization `if` without a body, so it guarded adding the word and most garbled words disappeared from alien messages. The capitalization block is restored
+- **Missile Immunity Never Loaded**: the game data key was spelled `m_immuneToMissles`, so `GD_Vessel.m_immuneToMissiles` was always false. The key is renamed (no values changed); Gazurtoid ships and the Mysterion are immune again
+- **Training Blocked Once Medicine Was Maxed**: the Train check compared only the last skill. It now compares the totals across all skills
+- **Raising Shields With No Fuel**: shields could be raised with no Endurium, then every game hour fuel use threw a NullReferenceException. Raising shields now requires Endurium
+- **Progress Lost on Quit**: the game only saved on location changes and panel closes. It now also saves when the application quits, except when the ship has been destroyed
 
 ## [0.9.0] - 2026-01-04
 
