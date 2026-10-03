@@ -68,6 +68,22 @@ public class PD_ElementStorage
 		// find the element in storage
 		var elementReference = Find( elementId );
 
+		// we can't remove an element that isn't in storage
+		if ( elementReference == null )
+		{
+			UnityEngine.Debug.LogWarning( $"[PD_ElementStorage.Remove] elementId={elementId} is not in storage" );
+
+			return;
+		}
+
+		// we can't remove more than we have (the volume would go negative)
+		if ( volume > elementReference.m_volume )
+		{
+			UnityEngine.Debug.LogWarning( $"[PD_ElementStorage.Remove] elementId={elementId} has volume={elementReference.m_volume}, can't remove {volume}" );
+
+			volume = elementReference.m_volume;
+		}
+
 		// check if we want to remove it all or just some of it
 		if ( elementReference.m_volume == volume )
 		{

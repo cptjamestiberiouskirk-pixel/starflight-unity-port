@@ -98,6 +98,20 @@ public class PD_Personnel
 		throw new ArgumentException();
 	}
 
+	// this returns true if there is a personnel file with this file id
+	public bool HasPersonnelFile( int fileId )
+	{
+		for ( var personnelId = 0; personnelId < m_personnelList.Count; personnelId++ )
+		{
+			if ( m_personnelList[ personnelId ].m_fileId == fileId )
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	// this gets the personnel file using the file id
 	public PD_PersonnelFile GetPersonnelFile( int fileId )
 	{

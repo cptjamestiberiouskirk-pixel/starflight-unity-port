@@ -654,11 +654,11 @@ public class SpaceflightController : MonoBehaviour
 			return;
 		}
 
-		// reset the encounter to ensure it's properly initialized
-		playerData.m_encounterList[ testEncounterId ].Reset( testEncounterId );
+		// get the encounter (search by id, the list is kept sorted by distance)
+		var pdEncounter = playerData.FindEncounter( testEncounterId );
 
-		// get the encounter
-		var pdEncounter = playerData.m_encounterList[ testEncounterId ];
+		// reset the encounter to ensure it's properly initialized
+		pdEncounter.Reset( testEncounterId );
 
 		// teleport the encounter right next to the player
 		Vector3 playerCoords = playerData.m_general.m_location == PD_General.Location.Hyperspace

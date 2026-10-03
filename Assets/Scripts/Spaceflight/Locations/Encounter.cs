@@ -428,13 +428,13 @@ public class Encounter : MonoBehaviour
 		// get to the encounter game data
 		m_gdEncounter = gameData.m_encounterList[ encounterId ];
 
-		// get the encounter directly by index (the encounter list is indexed by encounter ID)
-		// Note: m_encounterId is not serialized, so we use the array index directly
-		if ( encounterId >= 0 && encounterId < playerData.m_encounterList.Length )
+		// find the encounter in the player data (Radar keeps the list sorted by distance, so we have to search by id)
+		m_pdEncounter = playerData.FindEncounter( encounterId );
+
+		if ( m_pdEncounter != null )
 		{
-			m_pdEncounter = playerData.m_encounterList[ encounterId ];
-			Debug.Log( $"[Encounter.Show] Set m_pdEncounter from encounterList[{encounterId}], hashcode={m_pdEncounter.GetHashCode()}, stance={m_pdEncounter.m_alienStance}" );
-			
+			Debug.Log( $"[Encounter.Show] Found encounter {encounterId}, stance={m_pdEncounter.m_alienStance}" );
+
 			// ensure the encounter is properly initialized
 			if ( m_pdEncounter.GetAlienShipList() == null )
 			{
@@ -1664,7 +1664,10 @@ public class Encounter : MonoBehaviour
 						// fix case of word
 						garbledWord = garbledWord.ToLower();
 
-							if ( garbledWord.Length > 0 && ( ( garbledCommText.Count == 0 ) || lastWordHadSpecialCharacter ) )
+						if ( garbledWord.Length > 0 && ( ( garbledCommText.Count == 0 ) || lastWordHadSpecialCharacter ) )
+						{
+							garbledWord = garbledWord[ 0 ].ToString().ToUpper() + garbledWord.Substring( 1 );
+						}
 
 						// add on the garbled word
 						garbledCommText.Add( garbledWord );
@@ -1680,11 +1683,8 @@ public class Encounter : MonoBehaviour
 						// no - just add on the word
 						garbledCommText.Add( commWord );
 
-						// check if this word has a special character at the end
-						if ( !System.Char.IsLetter( commWord[ commWord.Length - 1 ] ) )
-						{
-							lastWordHadSpecialCharacter = true;
-						}
+						// check if this word has a special character at the end (so the next garbled word starts a new sentence)
+						lastWordHadSpecialCharacter = !System.Char.IsLetter( commWord[ commWord.Length - 1 ] );
 
 						// this isn't a garbled word
 						lastWordWasGarbled = false;

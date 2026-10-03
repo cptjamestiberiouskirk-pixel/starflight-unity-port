@@ -325,8 +325,11 @@ public class PD_PlayerShip
 		// have we used up more than 0.1 units?
 		if ( m_fuelUsed >= 0.1f )
 		{
-			// yes - deduct 0.1 unit from storage
-			m_elementStorage.Remove( 5, 1 );
+			// yes - deduct 0.1 unit from storage (if there is any left)
+			if ( m_elementStorage.Find( 5 ) != null )
+			{
+				m_elementStorage.Remove( 5, 1 );
+			}
 
 			// recalculate the volume used up in the cargo bays
 			RecalculateVolumeUsed();

@@ -15,7 +15,7 @@ public class ACTheAncientsButton : ShipButton
 		SpaceflightController.m_instance.m_viewport.UpdateLabel( "Ships Log - The Ancients" );
 
 		// show the ships log
-		SpaceflightController.m_instance.m_shipsLog.Show( playerData.m_shipsLog.m_alienComms[ (int) PD_ShipsLog.AlienComm.TheAncients ] );
+		SpaceflightController.m_instance.m_shipsLog.Show( playerData.m_shipsLog.GetAlienComms( PD_ShipsLog.AlienComm.TheAncients ) );
 
 		return false;
 	}
