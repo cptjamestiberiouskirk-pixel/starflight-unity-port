@@ -88,3 +88,15 @@ jobs:
           testMode: editmode
           # pull requests and pushes have no inputs, so they always use the project's version
           unityVersion: ${{ inputs.unityVersion || 'auto' }}
+
+      # list committed files Unity rewrote during the run (for example
+      # Packages/packages-lock.json after a manifest change, or ProjectSettings
+      # after an editor upgrade) so the regenerated versions can be committed
+      # (Unity runs as root in the container, so mark the workspace safe for git;
+      # this step only reports and never fails the job)
+      - name: Report files changed by Unity
+        if: always()
+        continue-on-error: true
+        run: |
+          git -c safe.directory='*' status --porcelain --untracked-files=no
+          git -c safe.directory='*' diff -- Packages ProjectSettings
