@@ -22,6 +22,8 @@ on:
 
 permissions:
   contents: read
+  # unity-test-runner posts its results as a "Test Results" check run
+  checks: write
 
 concurrency:
   group: compile-check-${{ github.ref }}
