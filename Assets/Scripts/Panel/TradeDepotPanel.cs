@@ -774,8 +774,8 @@ public class TradeDepotPanel : Panel
 				// calculate height of each text row (guard against division by zero)
 				float rowHeight = ( m_rowCount > 0 ) ? ( m_itemListText.renderedHeight / m_rowCount ) : 1.0f;
 
-				// figure out the offset for the selection box
-				float selectionBoxOffset;
+				// figure out the offset for the selection box (initialized so the compiler accepts the bounded loop below)
+				float selectionBoxOffset = 0.0f;
 
 				// safety counter to prevent infinite loop
 				int maxIterations = 100;

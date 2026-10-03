@@ -1,0 +1,83 @@
+name: Compile check
+
+# Headless Unity compile check using GameCI. The project has no test
+# assemblies, so the EditMode test run only has to compile Assembly-CSharp
+# and Assembly-CSharp-Editor. A compiler error fails the job.
+#
+# Needs repo secrets (Settings > Secrets and variables > Actions):
+#   UNITY_EMAIL     Unity account email
+#   UNITY_PASSWORD  Unity account password
+# plus one of:
+#   UNITY_SERIAL    Pro or Student plan: the license serial number
+#   UNITY_LICENSE   Personal plan: contents of Unity_lic.ulf from a machine
+#                   where Unity Hub has activated the license
+# UnityEntitlementLicense.xml is not a .ulf and won't work as UNITY_LICENSE.
+# See https://game.ci/docs/github/activation
+
+on:
+  pull_request:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # unity-test-runner posts its results as a "Test Results" check run
+  checks: write
+
+concurrency:
+  group: compile-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      # fail fast with a readable message instead of an opaque activation error
+      - name: Check Unity license secrets
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          missing=""
+          for name in UNITY_EMAIL UNITY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              missing="$missing $name"
+            fi
+          done
+          if [ -z "$UNITY_SERIAL" ] && [ -z "$UNITY_LICENSE" ]; then
+            missing="$missing UNITY_SERIAL(Pro/Student)-or-UNITY_LICENSE(Personal)"
+          fi
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repo secrets:$missing. Add them under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          # Unity logs the serial with only its last group masked (SC-...-XXXX),
+          # which GitHub's exact-match secret masking misses, so mask the rest too
+          if [ -n "$UNITY_SERIAL" ]; then
+            echo "::add-mask::${UNITY_SERIAL%-*}"
+          fi
+
+      - uses: actions/checkout@v4
+
+      # Library holds the imported asset cache, so later runs skip the full import
+      - uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-
+
+      # Unity version comes from ProjectSettings/ProjectVersion.txt
+      - name: Compile (EditMode test run)
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          testMode: editmode

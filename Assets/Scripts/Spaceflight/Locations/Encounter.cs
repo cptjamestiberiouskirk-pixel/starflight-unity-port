@@ -1416,26 +1416,20 @@ public class Encounter : MonoBehaviour
 		// if the subject is between 7 and 11 the comm is a response to a question, so show them in order
 		if ( ( subject >= GD_Comm.Subject.Themselves ) && ( subject <= GD_Comm.Subject.TheAncients ) )
 		{
-			// ensure m_lastCommIds is allocated (may be null from old save files)
-			if ( playerData.m_general.m_lastCommIds == null )
-			{
-				playerData.m_general.m_lastCommIds = new int[ 20, 16 ];
-			}
-
-			int lastCommId = playerData.m_general.m_lastCommIds[ (int) race, (int) subject ];
+			int lastCommId = playerData.m_general.GetLastCommId( race, subject );
 
 			foreach ( var comm in possibleComms )
 			{
 				if ( comm.m_id > lastCommId )
 				{
-					playerData.m_general.m_lastCommIds[ (int) m_gdEncounter.m_race, (int) subject ] = comm.m_id;
+					playerData.m_general.SetLastCommId( m_gdEncounter.m_race, subject, comm.m_id );
 
 					return comm;
 				}
 			}
 
 			// they have run out of answers to this question so reset the list
-			playerData.m_general.m_lastCommIds[ (int) m_gdEncounter.m_race, (int) subject ] = 0;
+			playerData.m_general.SetLastCommId( m_gdEncounter.m_race, subject, 0 );
 
 			// return an "i dont know" response
 			return FindComm( GD_Comm.Subject.NoMoreInformation, false );

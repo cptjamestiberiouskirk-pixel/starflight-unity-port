@@ -47,6 +47,9 @@ The project has been refactored to a clean, **root-directory architecture** to e
 3. Select the **root folder** of the repository (where this README is located).
 4. Open the `Intro` scene (found in `Assets/Scenes/`) to start.
 
+### Continuous Integration
+Every pull request and push to `master` runs a headless Unity compile check (`.github/workflows/compile-check.yml`, via [GameCI](https://game.ci)). It needs repo secrets under **Settings > Secrets and variables > Actions**: `UNITY_EMAIL` and `UNITY_PASSWORD`, plus either `UNITY_SERIAL` (Pro or Student plan serial number) or `UNITY_LICENSE` (Personal plan: the contents of `Unity_lic.ulf` after activating in Unity Hub; `UnityEntitlementLicense.xml` is a different format and won't work). See the [GameCI activation guide](https://game.ci/docs/github/activation).
+
 ---
 
 ## 📂 Project Structure
