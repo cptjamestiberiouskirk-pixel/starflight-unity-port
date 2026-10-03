@@ -9,7 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Compile Check CI**: `.github/workflows/compile-check.yml` runs a headless Unity 6000.3.2f1 compile on every pull request and push to `master` using GameCI (`game-ci/unity-test-runner`, EditMode). Needs the `UNITY_EMAIL` and `UNITY_PASSWORD` repo secrets, plus `UNITY_SERIAL` (Pro/Student) or `UNITY_LICENSE` (Personal)
+- **Compile Check CI**: `.github/workflows/compile-check.yml` runs a headless compile with the project's Unity version on every pull request and push to `master` using GameCI (`game-ci/unity-test-runner`, EditMode). Needs the `UNITY_EMAIL` and `UNITY_PASSWORD` repo secrets, plus `UNITY_SERIAL` (Pro/Student) or `UNITY_LICENSE` (Personal). Running it by hand (`workflow_dispatch`) takes an optional `unityVersion` to compile against a different editor. A final step lists any committed `Packages/` or `ProjectSettings/` files Unity rewrote during the run
+
+### Changed
+
+- **Unity Editor 6000.3.13f1**: `ProjectSettings/ProjectVersion.txt` moves from 6000.3.2f1 to 6000.3.13f1 (8c4f11e4fb20). The project compiles on 6000.3.13f1 in CI with no errors
+
+### Removed
+
+- **Unused AI Packages**: `com.unity.ai.generators` (deprecated by Unity in favour of `com.unity.ai.assistant`) and `com.unity.2d.enhancers`, which depends on it. Nothing in the project used either one. Their dependencies `com.unity.2d.common` and `com.unity.settings-manager` go with them
 
 ### Fixed
 
