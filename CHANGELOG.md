@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Compile Check CI**: `.github/workflows/compile-check.yml` runs a headless compile with the project's Unity version on every pull request and push to `master` using GameCI (`game-ci/unity-test-runner`, EditMode). Needs the `UNITY_EMAIL` and `UNITY_PASSWORD` repo secrets, plus `UNITY_SERIAL` (Pro/Student) or `UNITY_LICENSE` (Personal). Running it by hand (`workflow_dispatch`) takes an optional `unityVersion` to compile against a different editor. A final step lists any committed `Packages/` or `ProjectSettings/` files Unity rewrote during the run
+- **Unity CLI Editor Bridge**: `com.unity.pipeline` 0.8.0-exp.1 (experimental) lets the Unity CLI drive an Editor that has the project open: `unity status` to see it, then `unity command console`, `recompile`, `editor_play`, `eval` and about 160 others. Tools such as Claude Code can read the console and check compiles through it. Its server listens on 127.0.0.1 only and needs a per-Editor token. It is compiled out of release builds, and in development builds it stays off unless switched on in its settings. Brings `com.unity.nuget.mono-cecil` back as a dependency
 
 ### Changed
 
