@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Training Blocked Once Medicine Was Maxed**: the Train check compared only the last skill. It now compares the totals across all skills
 - **Raising Shields With No Fuel**: shields could be raised with no Endurium, then every game hour fuel use threw a NullReferenceException. Raising shields now requires Endurium
 - **Progress Lost on Quit**: the game only saved on location changes and panel closes. It now also saves when the application quits, except when the ship has been destroyed
+- **Debris and Missiles Used the Wrong Alien Ship Model**: combat used a ship's position in the encounter's ship list as its model slot, but the model slots are packed so that only living ships get one. After leaving and re-entering an encounter with ships already destroyed, a kill spawned its debris into another ship's slot or an empty one, and an empty slot made `Encounter.Update` throw every frame so the player could not leave. `Encounter` now keeps a ship-to-slot map behind `GetAlienShipModel()`, used for debris and for missile homing
 
 ## [0.9.0] - 2026-01-04
 
