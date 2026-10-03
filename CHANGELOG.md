@@ -17,8 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- **Unused AI Packages**: `com.unity.ai.generators` (deprecated by Unity in favour of `com.unity.ai.assistant`) and `com.unity.2d.enhancers`, which depends on it. Nothing in the project used either one. Their dependencies `com.unity.2d.common` and `com.unity.settings-manager` go with them
 - **Stale Crash-Recovery Scene Copy**: `Assets/_Recovery/0.unity`, its `.meta` and the folder's `.meta`. It was Unity's crash-recovery copy of `Assets/Scenes/Spaceflight.unity`, committed with the combat work in b9727c5. Nothing referenced it and it was not a build scene. It differed from the real scene in two lines: the `ScanType.Unknown` slot of the `SensorsDisplay` background and mask texture arrays pointed at the Spemin Scout textures instead of the Spemin Warship debris textures. `Assets/_Recovery/` and `Assets/_Recovery.meta` are now in `.gitignore`
+- **Unused AI Packages**: `com.unity.ai.generators` (deprecated by Unity in favour of `com.unity.ai.assistant`) and `com.unity.2d.enhancers`, which depends on it. Nothing in the project used either one. Their dependencies `com.unity.2d.common` and `com.unity.settings-manager` go with them
 
 ### Fixed
 
