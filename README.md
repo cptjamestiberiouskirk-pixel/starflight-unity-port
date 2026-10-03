@@ -12,7 +12,7 @@ A modern port of the 1986 classic space exploration game *Starflight*, built wit
 The project has been refactored to a clean, **root-directory architecture** to eliminate legacy "zombie" assets and streamline development.
 
 ### Key Engineering Changes
-- **Engine Upgrade**: Fully migrated to Unity 6 (6000.3.2f1).
+- **Engine Upgrade**: Fully migrated to Unity 6 (6000.3.13f1).
 - **Dependency Management**: Removed deprecated third-party libraries (`JsonDotNet`, legacy `FbxExporters`) in favor of official Unity Registry packages.
 - **UI System**: Migrated to official Unity UI & TextMeshPro packages.
 - **Input Handling**: Restored and configured the EventSystem to support modern input modules.
@@ -35,7 +35,7 @@ The project has been refactored to a clean, **root-directory architecture** to e
 ## 🛠 Getting Started
 
 ### Prerequisites
-- **Unity 6 (6000.3.2f1 or later)**: This project utilizes Unity 6 features like `Awaitable`.
+- **Unity 6 (6000.3.13f1 or later)**: This project utilizes Unity 6 features like `Awaitable`.
 - **VS Code**: Recommended Editor with the "C# Dev Kit" installed.
 
 ### Installation
@@ -48,7 +48,7 @@ The project has been refactored to a clean, **root-directory architecture** to e
 4. Open the `Intro` scene (found in `Assets/Scenes/`) to start.
 
 ### Continuous Integration
-Every pull request and push to `master` runs a headless Unity compile check (`.github/workflows/compile-check.yml`, via [GameCI](https://game.ci)). It needs repo secrets under **Settings > Secrets and variables > Actions**: `UNITY_EMAIL` and `UNITY_PASSWORD`, plus either `UNITY_SERIAL` (Pro or Student plan serial number) or `UNITY_LICENSE` (Personal plan: the contents of `Unity_lic.ulf` after activating in Unity Hub; `UnityEntitlementLicense.xml` is a different format and won't work). See the [GameCI activation guide](https://game.ci/docs/github/activation).
+Every pull request and push to `master` runs a headless Unity compile check (`.github/workflows/compile-check.yml`, via [GameCI](https://game.ci)). It needs repo secrets under **Settings > Secrets and variables > Actions**: `UNITY_EMAIL` and `UNITY_PASSWORD`, plus either `UNITY_SERIAL` (Pro or Student plan serial number) or `UNITY_LICENSE` (Personal plan: the contents of `Unity_lic.ulf` after activating in Unity Hub; `UnityEntitlementLicense.xml` is a different format and won't work). See the [GameCI activation guide](https://game.ci/docs/github/activation). To check a different editor before upgrading, run the workflow by hand from the **Actions** tab and enter a `unityVersion`.
 
 ---
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Unity 6 (**6000.3.2f1**) port of the 1986 space RPG *Starflight*. All gameplay C# lives in `Assets/Scripts/` (~225 files). There are **no assembly definitions** (everything compiles into `Assembly-CSharp` / `Assembly-CSharp-Editor`) and **no automated tests**.
+Unity 6 (**6000.3.13f1**) port of the 1986 space RPG *Starflight*. All gameplay C# lives in `Assets/Scripts/` (~225 files). There are **no assembly definitions** (everything compiles into `Assembly-CSharp` / `Assembly-CSharp-Editor`) and **no automated tests**.
 
 The 270 stars / ~811 planets are fixed data from the original game, not random generation — preserve original values when touching game data.
 
@@ -15,7 +15,7 @@ The project is normally driven from the Unity Editor. Press Play in **any** of t
 Headless compile check (fails if the project is already open in an Editor; a fresh worktree has no `Library/` so the first run does a full import and is slow):
 
 ```bash
-"/c/Program Files/Unity/Hub/Editor/6000.3.2f1/Editor/Unity.exe" -batchmode -nographics -quit -projectPath . -logFile -
+"/c/Program Files/Unity/Hub/Editor/6000.3.13f1/Editor/Unity.exe" -batchmode -nographics -quit -projectPath . -logFile -
 ```
 
 CI runs the same compile check headless on every PR and push to `master` (`.github/workflows/compile-check.yml`, GameCI EditMode test run; needs `UNITY_EMAIL`, `UNITY_PASSWORD`, and either `UNITY_SERIAL` (Pro/Student) or `UNITY_LICENSE` (Personal `.ulf` contents) as repo secrets).

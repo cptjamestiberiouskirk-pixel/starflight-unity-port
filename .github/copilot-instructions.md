@@ -2,7 +2,7 @@
 
 ## 1. Project Context & Architecture
 **Project:** Starflight Port (1986 EA Space Exploration RPG)
-**Engine Version:** Unity 6 (6000.3.2f1)
+**Engine Version:** Unity 6 (6000.3.13f1)
 
 ### Key Architectural Pillars
 - **SpaceflightController:** Main game controller singleton. Use `m_instance` pattern strictly.
