@@ -19,6 +19,11 @@ on:
   push:
     branches: [ master ]
   workflow_dispatch:
+    inputs:
+      unityVersion:
+        description: Unity editor version to compile with (auto = ProjectSettings/ProjectVersion.txt)
+        required: false
+        default: auto
 
 permissions:
   contents: read
@@ -81,3 +86,5 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           testMode: editmode
+          # pull requests and pushes have no inputs, so they always use the project's version
+          unityVersion: ${{ inputs.unityVersion || 'auto' }}
