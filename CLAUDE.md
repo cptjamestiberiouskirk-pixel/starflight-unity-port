@@ -18,6 +18,8 @@ Headless compile check (fails if the project is already open in an Editor; a fre
 "/c/Program Files/Unity/Hub/Editor/6000.3.2f1/Editor/Unity.exe" -batchmode -nographics -quit -projectPath . -logFile -
 ```
 
+CI runs the same compile check headless on every PR and push to `master` (`.github/workflows/compile-check.yml`, GameCI EditMode test run; needs the `UNITY_LICENSE`, `UNITY_EMAIL`, `UNITY_PASSWORD` repo secrets).
+
 `com.unity.test-framework` is installed but no test assemblies exist. If tests are added (they will need an `.asmdef` referencing the test framework), run them with `-runTests -testPlatform EditMode -testResults results.xml` and narrow to one test with `-testFilter <FullyQualifiedName>` (omit `-quit`).
 
 Editor tooling is under the **`Starflight Remake/`** menu (`Assets/Tools/Editor/`, `Assets/Planet Generator/Editor/`). Notably `Starflight Remake/Planet Generator` regenerates `Assets/Resources/Planets/{planetId}.bytes` from the images in `Assets/Planet Generator/Data/`.
@@ -38,7 +40,7 @@ Each scene controller (`IntroController`, `StarportController`, `SpaceflightCont
 - **PlayerData** (`Scripts/Player Data/`, `PD_*` classes): save state. Access via `DataController.m_instance.m_playerData`. Each `PD_*` has a `Reset()` that builds new-game state (and reads GameData, so DataController must exist).
 
 Saves go through `ISaveSystem` → `JsonSaveSystem`, writing `Application.persistentDataPath/{fileName}{slot}.json` (5 slots) with **`JsonUtility`**. Consequences:
-- Only Unity-serializable fields persist. Dictionaries, properties, and multi-dimensional arrays are silently dropped (e.g. `PD_General.m_lastCommIds` is `int[,]` and does not survive a save).
+- Only Unity-serializable fields persist. Dictionaries, properties, and multi-dimensional arrays are silently dropped (e.g. `PD_General.m_lastCommIds` used to be `int[,]` and lost its data on every load; it's now a flat `int[]` behind `GetLastCommId()` / `SetLastCommId()`).
 - `PlayerData.c_currentVersion`: any slot with a different version is **reset to a new game** on load. Bump it only for intentionally breaking `PD_*` changes; otherwise add backward-compat null/length checks for fields missing from older saves.
 - Enums are stored as ints — append new values, never reorder.
 

@@ -1,0 +1,68 @@
+name: Compile check
+
+# Headless Unity compile check using GameCI. The project has no test
+# assemblies, so the EditMode test run only has to compile Assembly-CSharp
+# and Assembly-CSharp-Editor. A compiler error fails the job.
+#
+# Needs three repo secrets (Settings > Secrets and variables > Actions):
+#   UNITY_LICENSE   contents of Unity_lic.ulf from a machine where Unity Hub
+#                   has activated the license
+#   UNITY_EMAIL     Unity account email
+#   UNITY_PASSWORD  Unity account password
+# See https://game.ci/docs/github/activation
+
+on:
+  pull_request:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compile-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      # fail fast with a readable message instead of an opaque activation error
+      - name: Check Unity license secrets
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          missing=""
+          for name in UNITY_LICENSE UNITY_EMAIL UNITY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              missing="$missing $name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repo secrets:$missing. Add them under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      # Library holds the imported asset cache, so later runs skip the full import
+      - uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-
+
+      # Unity version comes from ProjectSettings/ProjectVersion.txt
+      - name: Compile (EditMode test run)
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          testMode: editmode
