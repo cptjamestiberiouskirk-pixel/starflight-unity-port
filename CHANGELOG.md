@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Compile Check CI**: `.github/workflows/compile-check.yml` runs a headless Unity 6000.3.2f1 compile on every pull request and push to `master` using GameCI (`game-ci/unity-test-runner`, EditMode). Needs the `UNITY_LICENSE`, `UNITY_EMAIL` and `UNITY_PASSWORD` repo secrets
+- **Compile Check CI**: `.github/workflows/compile-check.yml` runs a headless Unity 6000.3.2f1 compile on every pull request and push to `master` using GameCI (`game-ci/unity-test-runner`, EditMode). Needs the `UNITY_EMAIL` and `UNITY_PASSWORD` repo secrets, plus `UNITY_SERIAL` (Pro/Student) or `UNITY_LICENSE` (Personal)
 
 ### Fixed
 
