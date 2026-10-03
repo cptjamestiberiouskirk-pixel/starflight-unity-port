@@ -482,6 +482,12 @@ public class Encounter : MonoBehaviour
 			Debug.LogError( $"Invalid encounter ID: {encounterId}" );
 		}
 
+		// forget the combat target (a target picked in another encounter, or before leaving this one, does not carry over)
+		if ( CombatController.m_instance != null )
+		{
+			CombatController.m_instance.SetTarget( -1 );
+		}
+
 		// allocate array for alien ship list
 		m_alienShipList = new PD_AlienShip[ m_alienShipModelList.Length ];
 

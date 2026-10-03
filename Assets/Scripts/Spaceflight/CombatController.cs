@@ -153,6 +153,37 @@ public class CombatController : MonoBehaviour
 	}
 
 	/// <summary>
+	/// Get the current target if it is a living ship in the current encounter.
+	/// Otherwise the target is forgotten and this returns null.
+	/// </summary>
+	PD_AlienShip GetValidTarget()
+	{
+		// get the alien ships in the current encounter
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var alienShipList = ( encounter.m_pdEncounter != null ) ? encounter.m_pdEncounter.GetAlienShipList() : null;
+
+		// is the target one of them?
+		if ( ( alienShipList != null ) && ( m_currentTargetIndex >= 0 ) && ( m_currentTargetIndex < alienShipList.Length ) )
+		{
+			var targetShip = alienShipList[ m_currentTargetIndex ];
+
+			// is it alive and in the encounter?
+			if ( !targetShip.m_isDead && targetShip.m_addedToEncounter )
+			{
+				// yes
+				return targetShip;
+			}
+		}
+
+		// no - forget the target and let the player know
+		m_currentTargetIndex = -1;
+
+		SpaceflightController.m_instance.m_messages.AddText( "<color=yellow>Target lost. Select a new target.</color>" );
+
+		return null;
+	}
+
+	/// <summary>
 	/// Check if player can fire laser.
 	/// </summary>
 	public bool CanFireLaser()
@@ -227,16 +258,14 @@ public class CombatController : MonoBehaviour
 		var playerData = DataController.m_instance.m_playerData;
 		var gameData = DataController.m_instance.m_gameData;
 
-		// get target alien ship
-		var encounter = SpaceflightController.m_instance.m_encounter;
-		var alienShipList = encounter.m_pdEncounter.GetAlienShipList();
+		// get target alien ship (it has to be a living ship in this encounter)
+		var targetShip = GetValidTarget();
 
-		if ( m_currentTargetIndex >= alienShipList.Length )
+		if ( targetShip == null )
 		{
 			return false;
 		}
 
-		var targetShip = alienShipList[ m_currentTargetIndex ];
 		var targetVessel = gameData.m_vesselList[ targetShip.m_vesselId ];
 
 		// check range
@@ -296,16 +325,15 @@ public class CombatController : MonoBehaviour
 		var playerData = DataController.m_instance.m_playerData;
 		var gameData = DataController.m_instance.m_gameData;
 
-		// get target
+		// get target (it has to be a living ship in this encounter)
 		var encounter = SpaceflightController.m_instance.m_encounter;
-		var alienShipList = encounter.m_pdEncounter.GetAlienShipList();
+		var targetShip = GetValidTarget();
 
-		if ( m_currentTargetIndex >= alienShipList.Length )
+		if ( targetShip == null )
 		{
 			return false;
 		}
 
-		var targetShip = alienShipList[ m_currentTargetIndex ];
 		var targetVessel = gameData.m_vesselList[ targetShip.m_vesselId ];
 
 		// check range
