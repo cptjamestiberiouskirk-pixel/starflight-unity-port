@@ -53,6 +53,11 @@ jobs:
             echo "::error::Missing repo secrets:$missing. Add them under Settings > Secrets and variables > Actions."
             exit 1
           fi
+          # Unity logs the serial with only its last group masked (SC-...-XXXX),
+          # which GitHub's exact-match secret masking misses, so mask the rest too
+          if [ -n "$UNITY_SERIAL" ]; then
+            echo "::add-mask::${UNITY_SERIAL%-*}"
+          fi
 
       - uses: actions/checkout@v4
 
