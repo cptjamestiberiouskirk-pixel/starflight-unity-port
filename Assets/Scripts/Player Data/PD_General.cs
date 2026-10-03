@@ -74,8 +74,14 @@ public class PD_General
 	// various game play variables
 	public bool m_mechan9Unlocked;
 
+	// dimensions of the last comm ids table (race x subject)
+	public const int c_numLastCommRaces = 20;
+	public const int c_numLastCommSubjects = 16;
+
 	// keep track of responses to questions on a per race basis
-	public int[,] m_lastCommIds;
+	// stored flat ( race * c_numLastCommSubjects + subject ) because JsonUtility does not serialize multi-dimensional arrays
+	// always go through GetLastCommId / SetLastCommId
+	public int[] m_lastCommIds;
 
 	// lines of messages
 	public List<string> m_messageList;
@@ -122,12 +128,68 @@ public class PD_General
 		m_currentMaximumSpeed = 10.0f;
 
 		// allocate memory for last comms
-		m_lastCommIds = new int[ 20, 16 ];
+		m_lastCommIds = new int[ c_numLastCommRaces * c_numLastCommSubjects ];
 
 		// message list
 		m_messageList = new List<string>();
 	}
-	
+
+	// get the id of the last comm used to answer a question about this subject for this race
+	public int GetLastCommId( GameData.Race race, GD_Comm.Subject subject )
+	{
+		var index = GetLastCommIndex( race, subject );
+
+		if ( index < 0 )
+		{
+			return 0;
+		}
+
+		ValidateLastCommIds();
+
+		return m_lastCommIds[ index ];
+	}
+
+	// set the id of the last comm used to answer a question about this subject for this race
+	public void SetLastCommId( GameData.Race race, GD_Comm.Subject subject, int commId )
+	{
+		var index = GetLastCommIndex( race, subject );
+
+		if ( index < 0 )
+		{
+			return;
+		}
+
+		ValidateLastCommIds();
+
+		m_lastCommIds[ index ] = commId;
+	}
+
+	// convert race and subject to an index into m_lastCommIds (returns -1 if out of range)
+	int GetLastCommIndex( GameData.Race race, GD_Comm.Subject subject )
+	{
+		var raceIndex = (int) race;
+		var subjectIndex = (int) subject;
+
+		// check each dimension separately so a bad subject can't spill over into the next race
+		if ( ( raceIndex < 0 ) || ( raceIndex >= c_numLastCommRaces ) || ( subjectIndex < 0 ) || ( subjectIndex >= c_numLastCommSubjects ) )
+		{
+			Debug.LogWarning( "Last comm id out of range (" + race + ", " + subject + ")" );
+
+			return -1;
+		}
+
+		return ( raceIndex * c_numLastCommSubjects ) + subjectIndex;
+	}
+
+	// make sure m_lastCommIds is allocated (save files from before it was serialized do not have it)
+	void ValidateLastCommIds()
+	{
+		if ( ( m_lastCommIds == null ) || ( m_lastCommIds.Length != c_numLastCommRaces * c_numLastCommSubjects ) )
+		{
+			m_lastCommIds = new int[ c_numLastCommRaces * c_numLastCommSubjects ];
+		}
+	}
+
 	// this updates the game time
 	public void UpdateGameTime( float deltaTime )
 	{
