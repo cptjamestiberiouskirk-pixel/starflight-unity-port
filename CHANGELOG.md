@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - **Unused AI Packages**: `com.unity.ai.generators` (deprecated by Unity in favour of `com.unity.ai.assistant`) and `com.unity.2d.enhancers`, which depends on it. Nothing in the project used either one. Their dependencies `com.unity.2d.common` and `com.unity.settings-manager` go with them
+- **Unity AI Assistant and Inference Packages**: `com.unity.ai.assistant` and `com.unity.ai.inference`. No script, scene or prefab used either one. Six packages that only they pulled in go with them (`com.unity.ai.toolkit`, `com.unity.serialization`, `com.unity.dt.app-ui`, `com.unity.collections`, `com.unity.nuget.mono-cecil`, `com.unity.test-framework.performance`), along with what App UI had left in `ProjectSettings`: its entry in `EditorBuildSettings.asset` and the `APP_UI_EDITOR_ONLY` scripting define
 
 ### Fixed
 
