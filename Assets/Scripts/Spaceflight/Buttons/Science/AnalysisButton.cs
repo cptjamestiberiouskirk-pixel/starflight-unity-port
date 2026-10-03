@@ -57,7 +57,7 @@ public class AnalysisButton : ShipButton
 					// get scan type index and validate bounds
 					int minstrelIndex = (int) SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.m_scanType;
 
-					if ( minstrelIndex >= 0 && minstrelIndex < gameData.m_vesselList.Count )
+					if ( minstrelIndex >= 0 && minstrelIndex < gameData.m_vesselList.Length )
 					{
 						// display the ship information
 						var vessel = gameData.m_vesselList[ minstrelIndex ];
@@ -103,7 +103,7 @@ public class AnalysisButton : ShipButton
 						// get scan type index and validate bounds
 						int scanTypeIndex = (int) SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.m_scanType;
 
-						if ( scanTypeIndex < 0 || scanTypeIndex >= gameData.m_vesselList.Count )
+						if ( scanTypeIndex < 0 || scanTypeIndex >= gameData.m_vesselList.Length )
 						{
 							// invalid scan type, show unknown
 							text += "Object: <color=yellow>Unknown</color>\n";
