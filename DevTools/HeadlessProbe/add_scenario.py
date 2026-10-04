@@ -32,7 +32,7 @@ if not snippet.endswith('\n\n'):
     snippet = snippet.rstrip('\n') + '\n\n'
 s = s.replace(section_anchor, snippet + section_anchor, 1)
 
-assert '—' not in s
+assert '\u2014' not in s
 
 io.open(probe, 'w', encoding='utf-8', newline='').write(s.replace('\n', nl))
 print('added scenario', name, '- lines now', len(s.splitlines()))
