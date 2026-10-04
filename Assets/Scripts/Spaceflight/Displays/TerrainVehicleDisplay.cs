@@ -97,6 +97,14 @@ public class TerrainVehicleDisplay : ShipDisplay
 		}
 	}
 
+	// what the status text was last built from (building it takes memory, and this runs every frame, so the text is only built again when one of these changes)
+	string m_shownStardate;
+	int m_shownPercentFuelRemaining = int.MinValue;
+	int m_shownFuelEfficiency;
+	int m_shownPercentFull;
+	int m_shownDistanceInKm;
+	int m_shownDirection;
+
 	public override void Update()
 	{
 		// get to the player data
@@ -124,38 +132,56 @@ public class TerrainVehicleDisplay : ShipDisplay
 		// convert euler angles to cardinal directions
 		var index = Mathf.FloorToInt( ( eulerAngles.y - 22.5f ) / 45.0f ) + 1;
 
-		var direction = c_cardinalDirections[ index ];
-
-		// date and time
-		m_statusValues.text = playerData.m_general.m_currentStardateDHMY + "\n";
-
 		// get the amount of fuel remaining as a percent
 		var percentFuelRemaining = playerData.m_terrainVehicle.GetPercentFuelRemaining();
 
-		if ( percentFuelRemaining <= -3 )
+		// get the current terrain vehicle efficiency at this elevation (as a percent)
+		var fuelEfficiency = Mathf.RoundToInt( SpaceflightController.m_instance.m_terrainVehicle.GetFuelEfficiency() * 100.0f );
+
+		// get the amount of cargo space used as a percentage
+		var percentFull = 100 - playerData.m_terrainVehicle.GetPercentRemainingVolume();
+
+		// the distance as it is shown
+		var roundedDistanceInKm = Mathf.RoundToInt( distanceInKm );
+
+		// has anything the text shows changed since we last built it?
+		if ( ( m_shownStardate != playerData.m_general.m_currentStardateDHMY ) || ( m_shownPercentFuelRemaining != percentFuelRemaining ) || ( m_shownFuelEfficiency != fuelEfficiency ) || ( m_shownPercentFull != percentFull ) || ( m_shownDistanceInKm != roundedDistanceInKm ) || ( m_shownDirection != index ) )
 		{
-			m_statusValues.text += "<color=yellow>None</color>\n";
+			// yes - remember what the text is built from this time
+			m_shownStardate = playerData.m_general.m_currentStardateDHMY;
+			m_shownPercentFuelRemaining = percentFuelRemaining;
+			m_shownFuelEfficiency = fuelEfficiency;
+			m_shownPercentFull = percentFull;
+			m_shownDistanceInKm = roundedDistanceInKm;
+			m_shownDirection = index;
+
+			// date and time
+			var text = playerData.m_general.m_currentStardateDHMY + "\n";
+
+			// the fuel that is left
+			if ( percentFuelRemaining <= -3 )
+			{
+				text += "<color=yellow>None</color>\n";
+			}
+			else if ( percentFuelRemaining <= 0 )
+			{
+				text += "<color=red>Reserve</color>\n";
+			}
+			else
+			{
+				text += percentFuelRemaining + "%\n";
+			}
+
+			// the efficiency, the cargo, and the way back to the ship
+			text += fuelEfficiency + "%\n";
+
+			text += percentFull + "% Full\n";
+
+			text += roundedDistanceInKm + " KM. " + c_cardinalDirections[ index ];
+
+			// put the text on the display (it used to be put there five times a frame, a piece at a time)
+			m_statusValues.text = text;
 		}
-		else if ( percentFuelRemaining <= 0 )
-		{
-			m_statusValues.text += "<color=red>Reserve</color>\n";
-		}
-		else
-		{
-			m_statusValues.text += percentFuelRemaining + "%\n";
-		}
-
-		// get the current terrain vehicle efficiency at this elevation
-		var fuelEfficiency = SpaceflightController.m_instance.m_terrainVehicle.GetFuelEfficiency();
-
-		m_statusValues.text += Mathf.RoundToInt( fuelEfficiency * 100.0f ) + "%\n";
-
-		// get the amount of cargo space left as a percentage
-		var percentRemainingVolume = playerData.m_terrainVehicle.GetPercentRemainingVolume();
-
-		m_statusValues.text += ( 100 - percentRemainingVolume ) + "% Full\n";
-
-		m_statusValues.text += Mathf.RoundToInt( distanceInKm ) + " KM. " + direction;
 
 		m_debugVectors[ 0 ] = shipCoordinates;
 		m_debugVectors[ 1 ] = playerData.m_general.m_lastDisembarkedCoordinates;
