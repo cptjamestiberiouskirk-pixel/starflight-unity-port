@@ -70,6 +70,7 @@ What the probe does:
 | `starport-ledger` | what the bank ledger says after the Trade Depot and Ship Configuration panels close with more or less money than they opened with, and the most of an element the player can afford with a very large balance |
 | `cargo` | volumes in cubic meters in the ship's cargo list, in the terrain vehicle's pickup message and cargo list; a deposit that does not fit into the hold; the size of a scanned vessel in the sensor analysis |
 | `savedata` | the scene a saved game is loaded into for every location, the save panel's description of a game saved in the terrain vehicle, the terrain vehicle of a new game, and the stardate with the computer set to the Thai, Saudi Arabian, Persian and German cultures |
+| `combat` | a missile in the air while the game is paused, the size of an explosion that is used again, a launch with every missile of the pool in the air, and a ship that is fired at and hit again while it explodes |
 
 Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (about 9 minutes; one summary block per scenario with the failed checks and exceptions).
 

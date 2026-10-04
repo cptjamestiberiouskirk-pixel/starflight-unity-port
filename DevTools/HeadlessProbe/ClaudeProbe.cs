@@ -443,6 +443,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSaveData();
 				break;
 
+			case "combat":
+				yield return ScenarioCombat();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -2469,6 +2473,13 @@ public class ClaudeProbe : MonoBehaviour
 			combat.SetTarget( target );
 
 			SetField( combat, missile ? "m_playerMissileCooldown" : "m_playerLaserCooldown", 0.0f );
+
+			// only eight missiles can be in the air at once, and a launch with none free does nothing (it used to cost fuel all the same) -
+			// so the last missile is taken out of the air before the next one is launched
+			if ( missile )
+			{
+				combat.ClearMissiles();
+			}
 
 			if ( missile ? combat.FirePlayerMissile() : combat.FirePlayerLaser() )
 			{
@@ -5141,6 +5152,224 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "save and data: the stardate is the same whatever calendar the computer uses", ( invariant == c_expected ) && ( thai == c_expected ) && ( saudi == c_expected ) && ( persian == c_expected ) && ( german == c_expected ), "invariant " + invariant + " | th-TH " + thai + " | ar-SA " + saudi + " | fa-IR " + persian + " | de-DE " + german );
 
 		Finish( "scenario=savedata terrainVehicleScene=" + disembarkedScene + " panelTags=" + opened + "/" + closed + " newVehicleFuel=" + freshVehicle.m_fuelRemaining.ToString( "F1" ) + " stardate=[" + thai + " | " + saudi + " | " + persian + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: combat (a paused missile, the size of a pooled explosion, a launch with no missile free, a ship destroyed twice)
+
+	static int s_gameOverCalls;
+
+	static void CountGameOverCalls( string condition, string stackTrace, LogType type )
+	{
+		if ( condition.StartsWith( "ShowGameOver called" ) )
+		{
+			s_gameOverCalls++;
+		}
+	}
+
+	IEnumerator ScenarioCombat()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var ship = playerData.m_playerShip;
+		var combat = CombatController.m_instance;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// a ship with both weapons that survives whatever hits it
+		ship.m_laserCannonClass = 1;
+		ship.m_missileLauncherClass = 1;
+		ship.m_armorPoints = 100000;
+		ship.m_shieldsAreUp = false;
+
+		if ( Endurium() < 50 )
+		{
+			ship.AddElement( 5, 50 );
+		}
+
+		var missiles = GetField( combat, "m_missilePool" ) as List<MissileProjectile>;
+
+		// ---- 1. a missile in the air while the game is paused (the save panel, the starmap and the ship's log all pause it with this flag):
+		//         it is on its way to a point 3000 units off, at 500 units a second
+		var missile = missiles[ 0 ];
+		var launchPoint = playerData.m_general.m_coordinates + Vector3.up * 500.0f;
+		var arrived = false;
+
+		missile.Fire( launchPoint, launchPoint + Vector3.forward * 3000.0f, ( position, didHit ) => { arrived = true; } );
+
+		yield return new WaitForSecondsRealtime( 0.5f );
+
+		var travelledBeforePause = Vector3.Distance( missile.transform.position, launchPoint );
+
+		controller.m_gameIsPaused = true;
+
+		var positionAtPause = missile.transform.position;
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		var travelledWhilePaused = Vector3.Distance( missile.transform.position, positionAtPause );
+		var positionAfterPause = missile.transform.position;
+
+		controller.m_gameIsPaused = false;
+
+		yield return new WaitForSecondsRealtime( 0.5f );
+
+		var travelledAfterPause = Vector3.Distance( missile.transform.position, positionAfterPause );
+		var inTheAirAfterPause = missile.IsActive();
+
+		missile.Cancel();
+
+		Log( "combat: a missile flew " + travelledBeforePause.ToString( "F0" ) + " units in half a second, " + travelledWhilePaused.ToString( "F0" ) + " in one second of pause, " + travelledAfterPause.ToString( "F0" ) + " in half a second after it (still in the air " + inTheAirAfterPause + ", arrived " + arrived + ")" );
+
+		Check( "combat: a missile stands still while the game is paused and flies on afterwards", ( travelledBeforePause > 100.0f ) && ( travelledWhilePaused < 1.0f ) && ( travelledAfterPause > 100.0f ) && inTheAirAfterPause, "before " + travelledBeforePause.ToString( "F0" ) + ", paused " + travelledWhilePaused.ToString( "F0" ) + ", after " + travelledAfterPause.ToString( "F0" ) );
+
+		// ---- 2. a pooled explosion that a missile hit played at half size is at full size for whoever gets it next
+		var small = Call( combat, "GetAvailableExplosion" ) as ExplosionEffect;
+
+		small.SetScale( 0.5f );
+		small.Play( launchPoint );
+
+		var waited = 0.0f;
+
+		while ( small.IsPlaying() && ( waited < 10.0f ) )
+		{
+			waited += Time.unscaledDeltaTime;
+
+			yield return null;
+		}
+
+		var next = Call( combat, "GetAvailableExplosion" ) as ExplosionEffect;
+		var sameObject = ReferenceEquals( next, small );
+		var nextScale = next.transform.localScale.x;
+
+		Log( "combat: the explosion played at half size took " + waited.ToString( "F1" ) + " s; the next one handed out is " + ( sameObject ? "the same object" : "another object" ) + " at scale " + nextScale.ToString( "F2" ) );
+
+		Check( "combat: an explosion is handed out at full size", sameObject && Mathf.Approximately( nextScale, 1.0f ), ( sameObject ? "same object" : "another object" ) + ", scale " + nextScale.ToString( "F2" ) );
+
+		// ---- 3. a launch when every missile of the pool is in the air: nothing is launched, so no fuel is used and the aliens stay as they are
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		// all spemin scouts: lasers only, so the only missiles in the air are the ones this scenario puts there
+		ForceVessel( speminId, 2 );
+
+		EnterEncounter( speminId );
+		yield return Frames( 10 );
+
+		BringAliensClose();
+
+		var pdEncounter = controller.m_encounter.m_pdEncounter;
+		var from = playerData.m_general.m_coordinates;
+
+		// every missile of the pool goes off to a far point (they are in the air for five seconds)
+		foreach ( var pooled in missiles )
+		{
+			pooled.Fire( from, from + Vector3.up * 100000.0f, ( position, didHit ) => { } );
+		}
+
+		var inTheAirBeforeLaunch = MissilesInFlight();
+
+		combat.SetTarget( FirstLivingAlien() );
+
+		SetField( combat, "m_playerMissileCooldown", 0.0f );
+
+		var fuelUsedBefore = ship.m_fuelUsed;
+		var enduriumBefore = Endurium();
+		var attackedBefore = pdEncounter.m_attackedByPlayer;
+
+		controller.m_messages.Clear();
+
+		var launchedWithNoMissileFree = combat.FirePlayerMissile();
+
+		var fuelUsed = ( ship.m_fuelUsed - fuelUsedBefore ) + ( enduriumBefore - Endurium() ) * 0.1f;
+		var attacked = pdEncounter.m_attackedByPlayer;
+		var messageWithNoMissileFree = MessageList();
+
+		// with missiles free again the same launch works
+		foreach ( var pooled in missiles )
+		{
+			pooled.Cancel();
+		}
+
+		SetField( combat, "m_playerMissileCooldown", 0.0f );
+
+		BringAliensClose();
+
+		combat.SetTarget( FirstLivingAlien() );
+
+		var fuelUsedBeforeSecond = ship.m_fuelUsed;
+		var enduriumBeforeSecond = Endurium();
+
+		var launchedWithMissilesFree = combat.FirePlayerMissile();
+
+		var fuelUsedBySecond = ( ship.m_fuelUsed - fuelUsedBeforeSecond ) + ( enduriumBeforeSecond - Endurium() ) * 0.1f;
+		var inTheAirAfterLaunch = MissilesInFlight();
+
+		Log( "combat: launch with " + inTheAirBeforeLaunch + " of " + missiles.Count + " missiles in the air: launched " + launchedWithNoMissileFree + ", fuel used " + fuelUsed.ToString( "F3" ) + ", aliens attacked " + attackedBefore + " -> " + attacked + ", message: " + messageWithNoMissileFree + " | with missiles free: launched " + launchedWithMissilesFree + ", fuel used " + fuelUsedBySecond.ToString( "F3" ) + ", in the air " + inTheAirAfterLaunch + ", aliens attacked " + pdEncounter.m_attackedByPlayer );
+
+		Check( "combat: a launch with no missile free does nothing and costs nothing", ( inTheAirBeforeLaunch == missiles.Count ) && !attackedBefore && !launchedWithNoMissileFree && ( Mathf.Abs( fuelUsed ) < 0.0001f ) && !attacked && !messageWithNoMissileFree.Contains( "Missile launched" ), "launched " + launchedWithNoMissileFree + ", fuel used " + fuelUsed.ToString( "F3" ) + ", aliens attacked " + attacked + ", message: " + messageWithNoMissileFree );
+		Check( "combat: a launch with a missile free still works", launchedWithMissilesFree && ( Mathf.Abs( fuelUsedBySecond - 0.02f ) < 0.0001f ) && ( inTheAirAfterLaunch == 1 ) && pdEncounter.m_attackedByPlayer, "launched " + launchedWithMissilesFree + ", fuel used " + fuelUsedBySecond.ToString( "F3" ) + ", in the air " + inTheAirAfterLaunch + ", aliens attacked " + pdEncounter.m_attackedByPlayer );
+
+		// ---- 4. the ship is destroyed, and hit again while it explodes: it is only destroyed once, and nothing fires at it or from it afterwards
+		foreach ( var pooled in missiles )
+		{
+			pooled.Cancel();
+		}
+
+		var target = FirstLivingAlien();
+		var alienShip = EncounterShip( target );
+		var alienVessel = gameData.m_vesselList[ alienShip.m_vesselId ];
+
+		BringAliensClose();
+
+		combat.SetTarget( target );
+
+		SetField( combat, "m_playerLaserCooldown", 0.0f );
+		SetField( combat, "m_playerMissileCooldown", 0.0f );
+
+		var couldFireBefore = combat.CanFireLaser() && combat.CanFireMissile();
+
+		// one missile is on its way when the ship goes
+		missiles[ 0 ].Fire( from, from + Vector3.up * 100000.0f, ( position, didHit ) => { } );
+
+		ship.m_armorPoints = 100;
+
+		s_gameOverCalls = 0;
+
+		Application.logMessageReceived += CountGameOverCalls;
+
+		var wrecksBefore = FindObjectsByType<DebrisTumble>( FindObjectsInactive.Include, FindObjectsSortMode.None ).Length;
+
+		// the hit that destroys the ship
+		combat.ApplyDamageToPlayer( 5000, Vector3.forward );
+
+		var inTheAirAfterDestruction = MissilesInFlight();
+		var canFireLaserAfter = combat.CanFireLaser();
+		var canFireMissileAfter = combat.CanFireMissile();
+
+		// an alien fires at the wreck (its laser used to destroy the ship a second time)
+		controller.m_messages.Clear();
+
+		combat.AlienFiresAtPlayer( alienShip, alienVessel );
+
+		var alienFireMessages = MessageList();
+
+		// and one more hit that does not come from an alien weapon (a missile that was already on its way, a flare)
+		combat.ApplyDamageToPlayer( 5000, Vector3.forward );
+
+		// the explosion of the ship is what calls the game over screen
+		yield return new WaitForSecondsRealtime( 4.0f );
+
+		Application.logMessageReceived -= CountGameOverCalls;
+
+		var wrecks = FindObjectsByType<DebrisTumble>( FindObjectsInactive.Include, FindObjectsSortMode.None ).Length - wrecksBefore;
+
+		Log( "combat: the ship was destroyed, fired at by a " + alienVessel.m_name + " (laser class " + alienVessel.m_laserClass + ") and hit for 5000 again: wrecks spawned " + wrecks + ", game over called " + s_gameOverCalls + " times, armor " + ship.m_armorPoints + ", game over flag " + controller.m_gameOver + " | missiles in the air right after the destruction " + inTheAirAfterDestruction + " | could fire before " + couldFireBefore + ", laser after " + canFireLaserAfter + ", missile after " + canFireMissileAfter + " | messages from the alien's shot: [" + alienFireMessages + "]" );
+
+		Check( "combat: a destroyed ship is only destroyed once", ( wrecks == 1 ) && ( s_gameOverCalls == 1 ) && ( ship.m_armorPoints == 0 ) && controller.m_gameOver, "wrecks " + wrecks + ", game over called " + s_gameOverCalls + " times, armor " + ship.m_armorPoints );
+		Check( "combat: no missile stays in the air once the ship is destroyed", inTheAirAfterDestruction == 0, inTheAirAfterDestruction + " in the air right after the ship was destroyed" );
+		Check( "combat: a destroyed ship does not fire and is not fired at", couldFireBefore && !canFireLaserAfter && !canFireMissileAfter && ( alienFireMessages.Length == 0 ), "could fire before " + couldFireBefore + ", laser after " + canFireLaserAfter + ", missile after " + canFireMissileAfter + ", messages from the alien's shot: [" + alienFireMessages + "]" );
+
+		Finish( "scenario=combat paused=" + travelledWhilePaused.ToString( "F0" ) + " explosionScale=" + nextScale.ToString( "F2" ) + " noMissileFree=" + launchedWithNoMissileFree + "/" + fuelUsed.ToString( "F3" ) + "/" + attacked + " destroyed=" + wrecks + "/" + s_gameOverCalls + "/" + inTheAirAfterDestruction + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

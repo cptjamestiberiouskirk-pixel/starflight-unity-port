@@ -124,6 +124,12 @@ public class MissileProjectile : MonoBehaviour
 			return;
 		}
 
+		// a missile does not fly on while the game is paused (it used to arrive and do its damage behind the save panel)
+		if ( ( SpaceflightController.m_instance != null ) && SpaceflightController.m_instance.m_gameIsPaused )
+		{
+			return;
+		}
+
 		m_lifetime += Time.deltaTime;
 
 		// check for timeout
