@@ -1,6 +1,6 @@
 # Code review, 2026-10-03
 
-Review of `master` at 4648ce3. Items fixed since then are listed under "Fixed since the review"; everything else in this file is still open as of PR #26 (2026-10-03).
+Review of `master` at 4648ce3. Items fixed since then are listed under "Fixed since the review"; everything else in this file is still open as of PR #30 (2026-10-04).
 
 **Scope:** all of `Assets/Scripts` (225 files, about 32k lines), plus `Assets/Planet Generator/Editor`, `Assets/Tools/Editor` and `Assets/Shaders/Editor`.
 
@@ -54,6 +54,9 @@ Fixed in PR #3 (bf0b1a7) unless noted. None of these changed the save version.
 | M12 (PR #24) | Only Mechans ever turned hostile, and the Uhlek had no update at all. Firing on an alien makes the encounter hostile until the player leaves it (`PD_Encounter.m_attackedByPlayer`), the Uhlek attack on sight and never talk, and a race with no update of its own shoots back |
 | M20 (PR #25) | Repair and Treat were instant and free, and Treat healed everyone who was hired. Both take time now (0.02 points a second per point of skill, never less than 0.5), and Treat handles one patient at a time from the crew on board |
 | H8 (PR #26) | `m_missilesRemaining` was never stocked, so a missile launcher could not fire. Missiles are no longer counted: a launch uses 0.02 m³ of Endurium and a laser shot 0.01, and neither fires without Endurium |
+| M10 (PR #28) | A mineral deposit stayed pickable during the 1.5 s of its transporter effect, so pressing Cargo twice put it in the hold twice; `TerrainElement` now remembers that it has been picked up |
+| M23 (PR #29) | `DescendButton.Update` returned false, so the console stayed live for the whole landing (35 s, not the 12 s first estimated) and Abort brought the bridge buttons back in the middle of the descent; it returns true now, as the launch does |
+| (PR #30) | The Descend button printed "Autopilot engaged. Descending..." and "Safe landing, captain." on a 12 s timer, on top of the landing animation's own messages, so the first appeared twice and the second 23 s before the ship was down; the button now only prints "Topography net locked on." |
 | Low (PR #14) | `Viewport` fade wrote into the shared `Black.mat` asset on every play session in the Editor |
 | (PR #2) | `PD_General.m_lastCommIds` (`int[,]`) was never saved; three compile errors from 70445da |
 | (PR #4) | `com.unity.ai.generators` (deprecated) and `com.unity.2d.enhancers` removed |
@@ -67,6 +70,7 @@ On 2026-10-03 the fixes were run in a headless play-mode probe: the real Spacefl
 - **PR #3 (batch 1):** H1, H2, H3, H4, M2, M3, M4, M6, M9 and the `m_lastCommIds` fix from PR #2 passed 17 checks. M1 was checked by reading the code only.
 - **PR #7 onward:** H6, M15, M13, M14, M7, M22, M24, M5, M21 and the `Viewport` fix were each run before and after the change; the bug reproduced on the old code and was gone with the fix. M8 was run after the change only, because the old class could only write to the real save folder.
 - **PR #21 to #26 (batch 2):** H5, M19, H7, M12, M20 and H8 were each run before and after the change, through the real buttons or the real fire and damage methods. The design of each was decided by the project owner on 2026-10-03. Where the original design notes give no number (hit points per class, the repair and treatment rates, the fuel per shot), the number is a named constant in the code.
+- **PR #28 to #30 (2026-10-04):** M10, M23 and the landing messages were each run before and after the change through the real flow: into orbit, down to the surface, the Disembark and Cargo buttons, and the button controller with the stick or the fire button held for one frame.
 - **Not done:** nothing was played by hand in the GUI Editor, and the probe has no graphics.
 
 ## Regressions from earlier "fix" commits
@@ -85,12 +89,10 @@ None open. H1 to H8 are all under "Fixed since the review".
 
 | # | Where | Problem and failure | Fix | Label | Checked |
 |---|---|---|---|---|---|
-| M10 | `TerrainElement.cs:70-86`, `TVCargoButton.cs:83-91` | A deposit stays pickable for 1.5 s during the transporter effect, so double-pressing Cargo adds it twice. | Add a picked-up flag. | CONFIRMED (2 reviewers) | no |
 | M11 | `StatusDisplay.cs:57-60, 138-141`; `DamageButton`, `RepairButton` | The gauges use hard-coded maxima of 1500/2500. A new ship shows "83% Hull Damage", and class-0 armor (250 points) shows "None installed" and can't be repaired. | One source of truth for max armor and shields. | CONFIRMED | no |
 | M16 | `Planet.cs:93`, `PlanetGenerator.cs:517-616` | The old generator's runtime textures are never destroyed: roughly 40 MB or more leaked per star system until docking. | `PlanetGenerator.Release()` plus `Resources.UnloadAsset`. | CONFIRMED (2 reviewers) | no |
 | M17 | `PlanetGenerator.cs:139-223` | No try/catch in the async task, and the version-mismatch path falls through. A bad or corrupt planet file soft-locks the game on the penetration popup, and the auto-save makes it permanent. Latent: all 811 shipped files are valid. | Catch, then abort and return; poll `IsCompleted`. | CONFIRMED path / INFERRED trigger | no |
 | M18 | `PlanetGenerator.cs:146` | `Task.Wait()` runs on the main thread the next frame, so all planet processing blocks it and the progress bar freezes. | Poll `IsCompleted`. | CONFIRMED | no |
-| M23 | `DescendButton.cs:60` | `Update()` returns false, so input stays live during the roughly 12 s landing animation (Abort, Descend again, Select Site). | Return true. | CONFIRMED input / INFERRED effects | no |
 | M25 | `PG_AlbedoMap.cs:120, 128-146` | The x blur's `x0 == x1`, so it's asymmetric. The y blur allocates 32 MB, then its result is thrown away. | Fix x0 and delete the y blur (slight visual change). | CONFIRMED | no |
 | M26 | `PG_EditorWindow.cs:766-768` (editor) | The south-pole padding reads the north row's heights. This is baked into every generated `.bytes` file. | Use row `c_height - 1`. Takes effect only after regenerating the files. | CONFIRMED | no |
 | M27 | `PG_EditorWindow.cs:228-297`, `PG_HydraulicErosion.cs:180` (editor) | The progress bar isn't cleared on exceptions, so the editor looks hung. Erosion has an unbounded loop when evaporation is 0, and a write race between threads. Zero-valued sliders produce NaN. | try/finally, iteration caps, validate settings. | CONFIRMED / INFERRED loop | no |
@@ -121,7 +123,7 @@ Grouped. All are CONFIRMED unless marked otherwise.
 - In-orbit encounters can never start: `SpaceflightController.cs:401-405`.
 - No guard against dying more than once, and missiles keep moving while paused (`MissileProjectile.Update` has no pause check, so a missile can hit while the save panel is open): `CombatController.ApplyDamageToPlayer`.
 - Pooled explosion scale leaks, and a missile launch uses its fuel before the pool check, so a launch with no free missile object costs fuel and does nothing: `CombatController.FirePlayerMissile`.
-- Missiles in flight are not cleared when an encounter ends: the missile pool belongs to `CombatController` and nothing deactivates it on a location change. A missile that arrives after the player has left still applies its damage, to the player or to the ship with the same index in whatever encounter is current (found 2026-10-03 by reading; whether a missile can still reach its target after the switch was not run, INFERRED).
+- Missiles in flight are not cleared when an encounter ends: the missile pool belongs to `CombatController` and nothing deactivates it on a location change. A missile that arrives after the player has left still applies its damage. CONFIRMED in a probe run on 2026-10-04: an Uhlek missile fired just before the player left did 200 points of damage in the encounter the player entered next. The other direction (a player missile landing on the ship with the same index in the next encounter) is INFERRED from the code and was not run.
 - After the player has fired on Mechans, five correct answers still set `m_mechan9Unlocked`, although the stance is put back to Hostile: `Encounter.UpdateMechanEncounter` (found 2026-10-03, INFERRED, not run).
 - Nothing in the game lowers crew vitality. The only writes to `m_vitality` are crew creation and Treat, so Examine always reports 100% and Treat never has a patient (found 2026-10-03 by searching the scripts).
 - A missile that times out never reports a miss: `MissileProjectile.cs:264-271`.
@@ -132,6 +134,8 @@ Grouped. All are CONFIRMED unless marked otherwise.
 - `AddToSpawnList` can index 32 when `Random.Range` returns its maximum: `TerrainGridPopulator.cs:197-200` (INFERRED).
 - Disembarking reseeds the global `Random`: `TerrainGridPopulator.cs:52`.
 - Scan labels survive leaving Disembarked: `TerrainObjectLabel.cs:66-70`.
+- A Scan during the 1.5 s of a deposit's transporter effect still counts and labels the deposit that was just picked up: `ScanButton.ScanNearbyObjects` (found 2026-10-04 by reading).
+- The Escape key opens the save panel during the landing and launch animations, and the animation and its events carry on behind the panel: `SpaceflightController.Update` (found 2026-10-04 by reading, not run).
 - `PG_Craters` re-initializes on every Spaceflight start, about 6M `GetPixel` calls: `PG_Craters.cs:11-32`.
 - Abort leaves a null elevation map that landing then dereferences: `Planet.cs:179-181` (INFERRED).
 
