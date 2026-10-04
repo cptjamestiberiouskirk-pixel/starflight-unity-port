@@ -1,6 +1,6 @@
 # Code review, 2026-10-03
 
-Review of `master` at 4648ce3. Items fixed since then are listed under "Fixed since the review"; everything else in this file is still open as of PR #40 (2026-10-04).
+Review of `master` at 4648ce3. Items fixed since then are listed under "Fixed since the review"; everything else in this file is still open as of PR #42 (2026-10-04).
 
 **Scope:** all of `Assets/Scripts` (225 files, about 32k lines), plus `Assets/Planet Generator/Editor`, `Assets/Tools/Editor` and `Assets/Shaders/Editor`.
 
@@ -62,6 +62,8 @@ Fixed in PR #3 (bf0b1a7) unless noted. None of these changed the save version.
 | M18 (PR #36) | `PlanetGenerator.Process` called `Task.Wait()` on the main thread, so the game stood still while each planet was processed and the progress bar moved once per planet; it looks at `IsCompleted` each frame now |
 | M17 (PR #37) | A planet file that could not be read made `Process` throw on every frame, which left the game paused for good in the middle of generating the star system, and a file cut off inside its difference buffer was accepted with no error. A failed task now aborts that planet with an error in the log, and `ReadPlanetData` checks the version, the map size, that all of the data is there and nothing more, and the checksum. The review had the trigger as INFERRED; it was reproduced with bad files made in memory |
 | M16 (PR #39) | The textures of every planet of every star system visited stayed in memory, with the planet files, and the maps of the last system outlived even the scene change. `PlanetGenerator.Release()` destroys them: `Planet` calls it once the maps of the next planet are on the material, at once for an orbit that is empty in the new system, and in `OnDestroy`. The planet file is unloaded as soon as its bytes are copied |
+| M25 (PR #41) | The blur of a planet's colour map took a quarter from the right neighbour and nothing from the left (`x0` was `x1`), and a second blur from row to row built a 32 MB map that was thrown away. The x blur is symmetric now and the y blur is gone. This changes the look of planets slightly: on planet 90, 7% of the pixels, by 1.4 of 255 on average. Not looked at in the GUI Editor |
+| M26 (PR #42) | The planet generator tool padded the south pole with heights taken from the top row. The tool reads the bottom row now. **The planet files were not generated again**, so the 811 files in the project still carry the old padding (see "Assets" in the Low list) |
 | Low (PR #40) | A planet whose maps could not be generated has no elevation data, and Descend ran into that with a `NullReferenceException` after "Computing descent profile..." (INFERRED in the review, reproduced). Land and Disembark now refuse such a planet with a message (`Planet.HasMaps()`), and the two `UpdateTerrainGridNow` methods do nothing for it |
 | Low (PR #14) | `Viewport` fade wrote into the shared `Black.mat` asset on every play session in the Editor |
 | (PR #2) | `PD_General.m_lastCommIds` (`int[,]`) was never saved; three compile errors from 70445da |
@@ -78,7 +80,9 @@ On 2026-10-03 the fixes were run in a headless play-mode probe: the real Spacefl
 - **PR #21 to #26 (batch 2):** H5, M19, H7, M12, M20 and H8 were each run before and after the change, through the real buttons or the real fire and damage methods. The design of each was decided by the project owner on 2026-10-03. Where the original design notes give no number (hit points per class, the repair and treatment rates, the fuel per shot), the number is a named constant in the code.
 - **PR #28 to #30 (2026-10-04):** M10, M23 and the landing messages were each run before and after the change through the real flow: into orbit, down to the surface, the Disembark and Cargo buttons, and the button controller with the stick or the fire button held for one frame.
 - **PR #32 (2026-10-04):** the missile fix was run before and after in both directions (an alien missile and a player missile in the air when the player leaves), together with a check that missiles still hit inside their own encounter.
-- **PR #33 to #40 (2026-10-04):** M11, M18, M17, M16 and the landing on a planet without maps were each run before and after the change with a scenario of their own (`m11`, `m18`, `m17`, `m16`, `nomaps`), which are in the probe in the repository.
+- **PR #33 to #42 (2026-10-04):** M11, M18, M17, M16, the landing on a planet without maps, M25 and M26 were each run before and after the change with a scenario of their own (`m11`, `m18`, `m17`, `m16`, `nomaps`, `m25`, `m26`), which are in the probe in the repository.
+  - M25 was run on a black map with single white pixels, which shows what each neighbour takes. The change to a real planet was measured by comparing the albedo map of planet 90 pixel by pixel between the two runs.
+  - M26 is editor code. Its scenario runs the tool's own methods on the source images of all 811 planets by reflection and compares the result with the planet files: the unchanged tool rebuilds every file's prepared height map exactly, the fixed one differs in the south pole rows of 273 planets and nowhere else.
   - M18 was measured from a coroutine while a planet was being processed: 5 frames for 5 planets before, more than 1000 after.
   - M17 was run with eight kinds of bad file made in memory from a real one, and with one of them given to a planet of the real star system. All 811 planet files of the project pass the stricter reader.
   - M16 was flown through four changes of star system: the textures made at runtime went from 22 MB to 69 MB before and stayed at 22 MB after. The probe has no graphics device, so graphics memory is not in those numbers.
@@ -102,8 +106,6 @@ None open. H1 to H8 are all under "Fixed since the review".
 
 | # | Where | Problem and failure | Fix | Label | Checked |
 |---|---|---|---|---|---|
-| M25 | `PG_AlbedoMap.cs:120, 128-146` | The x blur's `x0 == x1`, so it's asymmetric. The y blur allocates 32 MB, then its result is thrown away. | Fix x0 and delete the y blur (slight visual change). | CONFIRMED | no |
-| M26 | `PG_EditorWindow.cs:766-768` (editor) | The south-pole padding reads the north row's heights. This is baked into every generated `.bytes` file. Checked against the files on 2026-10-04: in all 811 the south pole row is what this code computes, and the fix would change it for 273 planets, by 0.21 of the height range at the median and 0.86 at the most (planet 349). | Use row `c_height - 1`. Takes effect only after regenerating the files. | CONFIRMED | yes |
 | M27 | `PG_EditorWindow.cs:228-297`, `PG_HydraulicErosion.cs:180` (editor) | The progress bar isn't cleared on exceptions, so the editor looks hung. Erosion has an unbounded loop when evaporation is 0, and a write race between threads. Zero-valued sliders produce NaN. | try/finally, iteration caps, validate settings. | CONFIRMED / INFERRED loop | no |
 
 ## Low
@@ -158,6 +160,7 @@ Grouped. All are CONFIRMED unless marked otherwise.
 - `SpaceflightController.m_instance` is a static that is never cleared, so the objects of the Spaceflight scene stay reachable after the scene is unloaded, until the next Spaceflight scene replaces it. The planet maps are destroyed in `Planet.OnDestroy` since PR #39; anything else those objects hold on to still stays (found 2026-10-04 with the `m16` scenario: 9 planet maps were alive after the scene change on the old code. How many of them were held by the game and how many by the probe's own variables was not taken apart).
 
 **Assets**
+- The 811 planet files still carry the south pole padding of the code before PR #42 (M26). In all of them the south pole row is exactly what the old code computes. Generated again, 273 planets would get a different south pole height: by 0.21 of the height range at the median, by more than 0.1 for 203 of them, and by 0.86 at the most (planet 349). Whether to generate them again, patch only those rows, or leave them is the project owner's call: a full regeneration also changes every planet with an atmosphere, because the erosion pass is not reproducible (M27).
 - 80 asset references in scenes, prefabs and materials point at assets that are not in the repository (found by cross-referencing GUIDs, 2026-10-03). Examples: the Debris mask in `SensorsDisplay.m_maskTextures` (index 24) in `Spaceflight.unity`, textures on several ship and planet materials, and objects in `Test.unity` and `Ecosystem.unity`. Most are harmless empty slots; none has been checked one by one.
 
 **Visual**

@@ -104,4 +104,4 @@ From `.github/copilot-instructions.md` (project rules):
 - `.claude/` and `AGENTS.md` are gitignored.
 - Commits use conventional-commit messages. Feature changes also update `CHANGELOG.md` (Keep a Changelog format) and `README.md` (see `.github/prompts/commitall.prompt.md`).
 - `PROJECT_ANALYSIS_REPORT.md` is a point-in-time report; several bugs it lists were fixed in later commits, so re-verify line numbers before acting on it.
-- `CODE_REVIEW_2026-10-03.md` is the newer full review: open findings by id (M25-M27 and a Low list), what has been fixed since and how each fix was checked, and the status of each `PROJECT_ANALYSIS_REPORT.md` item. Re-verify line numbers there too.
+- `CODE_REVIEW_2026-10-03.md` is the newer full review: open findings by id (M27 and a Low list), what has been fixed since and how each fix was checked, and the status of each `PROJECT_ANALYSIS_REPORT.md` item. Re-verify line numbers there too.
