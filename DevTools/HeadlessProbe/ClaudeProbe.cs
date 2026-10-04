@@ -423,6 +423,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioM25();
 				break;
 
+			case "m26":
+				yield return ScenarioM26();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -4294,6 +4298,202 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "M25 albedo map of planet " + c_planetId + " (" + planetWidth + " by " + planetHeight + ", processed in " + seconds.ToString( "F2" ) + " s): average channel value " + ( sum / ( planetWidth * planetHeight * 3 ) * 255.0 ).ToString( "F3" ) + " of 255, written to " + dumpPath );
 
 		Finish( "scenario=m25 pixel=" + left.ToString( "F3" ) + "/" + center.ToString( "F3" ) + "/" + right.ToString( "F3" ) + " wrap=" + wrapLeft.ToString( "F3" ) + "/" + wrapCenter.ToString( "F3" ) + "/" + wrapRight.ToString( "F3" ) + " rows=" + above.ToString( "F3" ) + "/" + below.ToString( "F3" ) + " planetSeconds=" + seconds.ToString( "F2" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- M26: the south pole padding of the prepared height map (planet generator tool)
+
+	IEnumerator ScenarioM26()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		// the planet generator tool lives in the editor assembly, which this file cannot name at compile time
+		var windowType = Type.GetType( "PG_EditorWindow, Assembly-CSharp-Editor" );
+		var planetType = Type.GetType( "PG_Planet, Assembly-CSharp-Editor" );
+
+		if ( ( windowType == null ) || ( planetType == null ) )
+		{
+			Finish( "scenario=m26 abort: the planet generator tool was not found in the editor assembly", 2 );
+			yield break;
+		}
+
+		var prepareColorMap = windowType.GetMethod( "PrepareColorMap", c_any );
+		var prepareHeightMap = windowType.GetMethod( "PrepareHeightMap", c_any );
+		var planetConstructor = planetType.GetConstructor( new Type[] { typeof( GameData ), typeof( string ), typeof( int ) } );
+		var mapIsValidProperty = planetType.GetProperty( "m_mapIsValid" );
+		var heightProperty = planetType.GetProperty( "m_height" );
+		var colorProperty = planetType.GetProperty( "m_color" );
+		var waterColorField = planetType.GetField( "m_waterColor" );
+
+		// the tool as the planet files of the project were made with it: four padding rows at each pole
+		const int c_paddingRows = 4;
+		const int c_rows = 24;
+		const int c_columns = 48;
+
+		// an instance of the tool's window that unity knows nothing about: creating it the normal way would run OnEnable and OnDisable, and those read and write the
+		// settings the tool keeps in the editor preferences of this computer (the two methods used here only need the three fields they are given)
+		var window = System.Runtime.Serialization.FormatterServices.GetUninitializedObject( windowType );
+
+		SetField( window, "m_numPolePaddingRows", c_paddingRows );
+
+		var planets = 0;
+		var invalid = 0;
+		var sameAsFile = 0;
+		var onlySouthPaddingDiffers = 0;
+		var somethingElseDiffers = 0;
+		var southPoleIsBottomRowMaximum = 0;
+		var largestChange = 0.0f;
+		var largestChangePlanet = -1;
+		var firstOther = "none";
+
+		foreach ( var gdPlanet in gameData.m_planetList )
+		{
+			object pgPlanet = null;
+
+			try
+			{
+				pgPlanet = planetConstructor.Invoke( new object[] { gameData, "Assets/Planet Generator/Data", gdPlanet.m_id } );
+			}
+			catch ( TargetInvocationException exception )
+			{
+				Log( "M26 planet " + gdPlanet.m_id + ": " + exception.InnerException.GetType().Name + ": " + exception.InnerException.Message );
+			}
+
+			if ( ( pgPlanet == null ) || !(bool) mapIsValidProperty.GetValue( pgPlanet ) )
+			{
+				invalid++;
+
+				continue;
+			}
+
+			planets++;
+
+			// the tool prepares the colour map first (that is where it picks the padding colours) and then the height map
+			prepareColorMap.Invoke( window, new object[] { pgPlanet } );
+
+			var prepared = prepareHeightMap.Invoke( window, new object[] { pgPlanet } ) as float[,];
+
+			var heights = heightProperty.GetValue( pgPlanet ) as float[,];
+			var colors = colorProperty.GetValue( pgPlanet ) as Color[,];
+			var waterColor = (Color) waterColorField.GetValue( pgPlanet );
+			var bottomPaddingColor = (Color) GetField( window, "m_bottomPaddingColor" );
+
+			// what the south pole should rise to: the highest point of the bottom row among the columns that have the padding colour (sea level if that colour is water)
+			var bottomRowMaximum = 0.0f;
+
+			for ( var x = 0; x < c_columns; x++ )
+			{
+				if ( colors[ c_rows - 1, x ] == bottomPaddingColor )
+				{
+					bottomRowMaximum = Mathf.Max( bottomRowMaximum, heights[ c_rows - 1, x ] );
+				}
+			}
+
+			if ( bottomPaddingColor == waterColor )
+			{
+				bottomRowMaximum = 0.0f;
+			}
+
+			var lastRow = c_rows + c_paddingRows * 2 - 1;
+			var isBottomRowMaximum = true;
+
+			for ( var x = 0; x < c_columns; x++ )
+			{
+				if ( Mathf.Abs( prepared[ lastRow, x ] - bottomRowMaximum ) > 0.000001f )
+				{
+					isBottomRowMaximum = false;
+				}
+			}
+
+			if ( isBottomRowMaximum )
+			{
+				southPoleIsBottomRowMaximum++;
+			}
+
+			// the prepared height map that is in the planet file of the project
+			var asset = Resources.Load<TextAsset>( "Planets/" + gdPlanet.m_id );
+			var plain = Decompress( asset.bytes );
+
+			Resources.UnloadAsset( asset );
+
+			var offset = 4 + 4 * 3 + 4 * 9;
+			var fileWidth = BitConverter.ToInt32( plain, offset );
+			var fileHeight = BitConverter.ToInt32( plain, offset + 4 );
+
+			offset += 8;
+
+			var rowsThatDiffer = 0;
+			var southPaddingRowsThatDiffer = 0;
+
+			if ( ( fileWidth == c_columns ) && ( fileHeight == lastRow + 1 ) )
+			{
+				for ( var y = 0; y <= lastRow; y++ )
+				{
+					var rowDiffers = false;
+
+					for ( var x = 0; x < c_columns; x++ )
+					{
+						var inFile = BitConverter.ToSingle( plain, offset + ( y * c_columns + x ) * 4 );
+						var difference = Mathf.Abs( inFile - prepared[ y, x ] );
+
+						if ( difference > 0.000001f )
+						{
+							rowDiffers = true;
+
+							if ( ( y == lastRow ) && ( difference > largestChange ) )
+							{
+								largestChange = difference;
+								largestChangePlanet = gdPlanet.m_id;
+							}
+						}
+					}
+
+					if ( rowDiffers )
+					{
+						rowsThatDiffer++;
+
+						if ( y >= c_rows + c_paddingRows )
+						{
+							southPaddingRowsThatDiffer++;
+						}
+					}
+				}
+			}
+			else
+			{
+				rowsThatDiffer = -1;
+			}
+
+			if ( rowsThatDiffer == 0 )
+			{
+				sameAsFile++;
+			}
+			else if ( ( rowsThatDiffer > 0 ) && ( rowsThatDiffer == southPaddingRowsThatDiffer ) )
+			{
+				onlySouthPaddingDiffers++;
+			}
+			else
+			{
+				somethingElseDiffers++;
+
+				if ( somethingElseDiffers == 1 )
+				{
+					firstOther = "planet " + gdPlanet.m_id + " (" + rowsThatDiffer + " rows differ, " + southPaddingRowsThatDiffer + " of them south padding, file map " + fileWidth + " by " + fileHeight + ")";
+				}
+			}
+
+			if ( ( planets % 50 ) == 0 )
+			{
+				yield return null;
+			}
+		}
+
+		Log( "M26 the tool prepared the height maps of " + planets + " planets (" + invalid + " without a source image): the same as in the planet file " + sameAsFile + ", only the south pole padding differs " + onlySouthPaddingDiffers + ", something else differs " + somethingElseDiffers + " (first: " + firstOther + ")" );
+		Log( "M26 the south pole rises to the highest point of the bottom row for " + southPoleIsBottomRowMaximum + " of " + planets + " planets; the largest difference to a planet file at the south pole is " + largestChange.ToString( "F3" ) + " (planet " + largestChangePlanet + ")" );
+
+		Check( "M26 the south pole padding rises to the highest point of the bottom row", ( planets > 0 ) && ( southPoleIsBottomRowMaximum == planets ), southPoleIsBottomRowMaximum + " of " + planets + " planets" );
+		Check( "M26 nothing but the south pole padding differs from the planet files of the project", somethingElseDiffers == 0, "the same " + sameAsFile + ", only the south pole padding " + onlySouthPaddingDiffers + ", something else " + somethingElseDiffers + " (first: " + firstOther + ")" );
+
+		Finish( "scenario=m26 planets=" + planets + " sameAsFile=" + sameAsFile + " onlySouthPaddingDiffers=" + onlySouthPaddingDiffers + " somethingElseDiffers=" + somethingElseDiffers + " southPoleIsBottomRowMaximum=" + southPoleIsBottomRowMaximum + " largestChange=" + largestChange.ToString( "F3" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
