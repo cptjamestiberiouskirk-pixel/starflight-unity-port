@@ -29,6 +29,8 @@ Prints Unity's exit code, any `error CS`, the `Tundra build` line, the package c
 
 Copies `ClaudeProbe.cs` into `Assets/`, launches Unity with `-executeMethod ClaudeProbe.Run -probeScenario <name>`, prints the lines the probe logged (`[ClaudeProbe] ...`), then deletes the probe and its `.meta` again. A run takes 20 to 30 seconds. The copy in `Assets/` is ignored by git.
 
+Unity is stopped if it has not come back after 420 seconds. `-TimeoutSeconds 100` shortens that, for a scenario that is expected to hang on the old code: a hang on the main thread also stops the probe's own 120 second watchdog.
+
 What the probe does:
 
 - Opens `Spaceflight.unity` (or `Starport.unity` for scenarios whose name starts with `starport`) and enters play mode.
@@ -78,6 +80,8 @@ What the probe does:
 | `visual` | a floating object when its timer starts again, when an explosion is switched off, and how far the landing site crosshair moves in a second |
 | `perframe` | how much memory a frame of the status display and of the terrain vehicle display takes when nothing changes, with a control that shows the measurement works, and that both still follow what changes |
 | `starport-transport` | the docking bay transporter: how much memory an update of the astronaut's opacity takes, that the fade reaches the astronaut, and that the material assets are left alone |
+| `shipslog` | a ship's log of forty entries scrolled to its end, then an empty log, then the first one again: that it opens (the review thought it could hang) and where it is scrolled to |
+| `leaks` | the materials in memory before, during and after a deposit's transporter effect, and whether the spaceflight controller and the maps of two planets are still in memory after the scene has been left (weak references, after the save panel has been used) |
 
 Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (about 9 minutes; one summary block per scenario with the failed checks and exceptions).
 

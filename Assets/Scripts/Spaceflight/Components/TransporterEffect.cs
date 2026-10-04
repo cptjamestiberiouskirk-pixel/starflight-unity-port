@@ -36,6 +36,9 @@ public class TransporterEffect : MonoBehaviour
 	// the instantiated prefab (if using prefab)
 	GameObject m_particlePrefabInstance;
 
+	// the material we made for the sparkles (ours to destroy)
+	Material m_particleMaterial;
+
 	// callback when effect completes
 	System.Action m_onComplete;
 
@@ -71,17 +74,20 @@ public class TransporterEffect : MonoBehaviour
 
 			m_renderers.Add( renderer );
 
+			// get the renderer's own copies of its materials (asking for them makes the copies, and they are ours to destroy when the effect is over)
+			var materials = renderer.materials;
+
 			// store original materials
-			m_originalMaterials.Add( renderer.materials );
+			m_originalMaterials.Add( materials );
 
 			// store original colors
-			var colors = new Color[ renderer.materials.Length ];
+			var colors = new Color[ materials.Length ];
 
-			for ( int i = 0; i < renderer.materials.Length; i++ )
+			for ( int i = 0; i < materials.Length; i++ )
 			{
-				if ( renderer.materials[ i ].HasProperty( "_Color" ) )
+				if ( materials[ i ].HasProperty( "_Color" ) )
 				{
-					colors[ i ] = renderer.materials[ i ].color;
+					colors[ i ] = materials[ i ].color;
 				}
 				else
 				{
@@ -92,7 +98,7 @@ public class TransporterEffect : MonoBehaviour
 			m_originalColors.Add( colors );
 
 			// switch materials to transparent rendering mode so alpha changes work
-			SetMaterialsToTransparent( renderer );
+			SetMaterialsToTransparent( materials );
 		}
 
 		// try to use the starport transporter prefab, fall back to programmatic particles
@@ -158,9 +164,9 @@ public class TransporterEffect : MonoBehaviour
 	}
 
 	// switch a renderer's materials to transparent rendering mode
-	void SetMaterialsToTransparent( Renderer renderer )
+	void SetMaterialsToTransparent( Material[] materials )
 	{
-		foreach ( var material in renderer.materials )
+		foreach ( var material in materials )
 		{
 			// for Standard shader and URP Lit shader
 			if ( material.HasProperty( "_Surface" ) )
@@ -292,8 +298,11 @@ public class TransporterEffect : MonoBehaviour
 
 		if ( shader != null )
 		{
-			particleRenderer.material = new Material( shader );
-			particleRenderer.material.color = new Color( 0.7f, 0.85f, 1.0f, 1.0f );
+			// make the material, colour it, then give it to the renderer as it is (reading renderer.material back made a second copy, and both were left behind)
+			m_particleMaterial = new Material( shader );
+			m_particleMaterial.color = new Color( 0.7f, 0.85f, 1.0f, 1.0f );
+
+			particleRenderer.sharedMaterial = m_particleMaterial;
 		}
 
 		// start playing
@@ -360,6 +369,25 @@ public class TransporterEffect : MonoBehaviour
 		else if ( m_particleSystem != null )
 		{
 			Destroy( m_particleSystem.gameObject );
+		}
+
+		// the copies of the materials we asked the renderers for, and the sparkle material, do not go away with the object - they are ours to destroy
+		foreach ( var materials in m_originalMaterials )
+		{
+			foreach ( var material in materials )
+			{
+				if ( material != null )
+				{
+					Destroy( material );
+				}
+			}
+		}
+
+		m_originalMaterials.Clear();
+
+		if ( m_particleMaterial != null )
+		{
+			Destroy( m_particleMaterial );
 		}
 	}
 }

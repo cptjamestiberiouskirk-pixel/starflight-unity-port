@@ -77,6 +77,20 @@ public class SpaceflightController : MonoBehaviour
 		}
 	}
 
+	// unity on destroy
+	void OnDestroy()
+	{
+		// let go of this controller when its scene is unloaded, unless the controller of a new spaceflight scene has already taken over.
+		// The static kept the controller, and through it every object of the scene and the maps of its planets, in memory in the other scenes
+		if ( ReferenceEquals( m_instance, this ) )
+		{
+			m_instance = null;
+		}
+
+		// the planet the terrain vehicle was last on is held by a static as well
+		TerrainGridPopulator.ForgetPlanet();
+	}
+
 	// unity start
 	void Start()
 	{

@@ -97,6 +97,10 @@ public class SaveGamePanel : Panel
 			// invoke the method
 			method.Invoke( m_callbackObject, null );
 		}
+
+		// forget who opened the panel (whoever opens it next says so first). This panel outlives the scenes, and holding
+		// on to the spaceflight controller here kept the whole spaceflight scene in memory after the player had left it
+		m_callbackObject = null;
 	}
 
 	// called when player clicks on switch
