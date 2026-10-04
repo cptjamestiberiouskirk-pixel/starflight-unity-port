@@ -115,6 +115,7 @@ Pitfalls:
 - **A scenario that changes scenes** works: the probe object is `DontDestroyOnLoad`. Wait with `WaitForScene`.
 - The watchdog ends a run after 120 s, so keep the real-time waits of one scenario under about 60 s.
 - **A failed check is not always the change under test.** Missiles in flight survive the end of an encounter, so one fired in the last encounter can hit the player in the next. The `m12` scenario calls `ClearMissiles()` before it leaves an encounter for that reason. Read the log around a failure before blaming the change.
+- **A run can leave a font asset modified.** A run that shows the "Starport clear" message can leave `Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset` modified, with no change in content. Restore it with `git checkout` before staging, and stage files by name after a run.
 - **Console input without real input:** `SetInput( "m_south", true )` sets an `InputController` property by reflection, and `ConsoleFrameWith( "m_submit" )` runs one `ButtonController.Update` with it held. `InputController.Update` overwrites the property on the next frame, so set it and call the update in the same step.
 
 `changelog_add.py "<title of an existing bullet>" <file with the new bullet>` inserts a CHANGELOG bullet after an existing one (run it from the project root).
