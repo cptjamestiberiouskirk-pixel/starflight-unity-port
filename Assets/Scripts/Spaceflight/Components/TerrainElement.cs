@@ -8,7 +8,7 @@ public class TerrainElement : MonoBehaviour
 	// the element id (index into gameData.m_elementList)
 	public int m_elementId;
 
-	// how many cubic meters this deposit contains
+	// how much this deposit contains, in tenths of a cubic meter (the unit the cargo holds count in)
 	public int m_volume;
 
 	// reference to the terrain vehicle for pickup detection

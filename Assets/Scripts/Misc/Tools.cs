@@ -190,6 +190,14 @@ class Tools
 		children.ForEach( child => GameObject.Destroy( child ) );
 	}
 
+	// the cargo holds count in tenths of a cubic meter - this is the text for such a volume in cubic meters (25 becomes "2.5")
+	public static string VolumeToText( int volumeInTenths )
+	{
+		var tenths = Mathf.Abs( volumeInTenths );
+
+		return ( ( volumeInTenths < 0 ) ? "-" : "" ) + ( tenths / 10 ) + "." + ( tenths % 10 );
+	}
+
 	// saves a texture map to file as a png image
 	public static void SaveAsPNG( Texture2D textureMap, string filename )
 	{
