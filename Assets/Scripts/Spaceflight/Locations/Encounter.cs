@@ -1047,8 +1047,9 @@ public class Encounter : MonoBehaviour
 					// yes - add to the number of correct answers
 					m_pdEncounter.m_numCorrectAnswers++;
 
-					// did the player answer enough questions correctly?
-					if ( m_pdEncounter.m_numCorrectAnswers == 5 )
+					// did the player answer enough questions correctly? (mechans that have been fired on stay hostile until the player
+					// leaves, whatever the answers are - without this they still unlocked mechan 9 for every later encounter)
+					if ( ( m_pdEncounter.m_numCorrectAnswers == 5 ) && !m_pdEncounter.m_attackedByPlayer )
 					{
 						// yes - yay! we are are friends!
 						playerData.m_general.m_mechan9Unlocked = true;
@@ -1720,8 +1721,9 @@ public class Encounter : MonoBehaviour
 		}
 		else
 		{
-			// get the comm text
-			var commText = comm.m_text;
+			// get the comm text, with the name of the captain and of the ship filled in (this started again from the text
+			// in the game data, so what the aliens said still had the * and the & in it)
+			var commText = text;
 
 			// get possible garble words for this race
 			var possibleGarbles = new List<GD_Garble>();
@@ -1762,6 +1764,13 @@ public class Encounter : MonoBehaviour
 
 				foreach ( var commWord in splitCommText )
 				{
+					// two spaces in a row leave an empty word between them (the captain's name is used as it was typed, and can have them) -
+					// there is nothing to show for it, and the code below looks at the last character of every word
+					if ( commWord.Length == 0 )
+					{
+						continue;
+					}
+
 					commWordIndex++;
 
 					// get the difficulty level of this word
