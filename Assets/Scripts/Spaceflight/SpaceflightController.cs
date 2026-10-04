@@ -392,6 +392,14 @@ public class SpaceflightController : MonoBehaviour
 		// get the current player location
 		var location = playerData.m_general.m_location;
 
+		// a ship that has just launched has not entered the star system yet, and nothing comes after it there. The star system location is on
+		// screen then and calls this too, and every location that was not the star system used to be taken for hyperspace - so the hyperspace
+		// encounters were measured against the ship's place in the star system, came after it, and could begin above starport
+		if ( ( location != PD_General.Location.StarSystem ) && ( location != PD_General.Location.Hyperspace ) )
+		{
+			return;
+		}
+
 		// get the current star id
 		var starId = playerData.m_general.m_currentStarId;
 
@@ -400,6 +408,11 @@ public class SpaceflightController : MonoBehaviour
 
 		// get the correct alien radar distance
 		var alienRadarDistance = ( location == PD_General.Location.Hyperspace ) ? m_alienHyperspaceRadarDistance : m_alienStarSystemRadarDistance;
+
+		// the encounter the player has run into in this frame (the nearest one, if more than one is within range)
+		PD_Encounter encounterToBegin = null;
+
+		var distanceToEncounterToBegin = float.MaxValue;
 
 		// go through each potential encounter
 		foreach ( var encounter in playerData.m_encounterList )
@@ -458,20 +471,30 @@ public class SpaceflightController : MonoBehaviour
 			}
 
 			// are the aliens and the player within encounter range?
-			if ( distance < m_encounterRange )
+			if ( ( distance < m_encounterRange ) && ( distance < distanceToEncounterToBegin ) )
 			{
-				// yes - save encounter information in the player data
-				playerData.m_general.m_currentEncounterId = encounter.m_encounterId;
+				// yes - remember this encounter. It begins after the loop, so that only one can begin in a frame (beginning it in here
+				// let a second encounter within range begin as well, on top of the first)
+				encounterToBegin = encounter;
 
-				// put the player in the middle of the encounter
-				playerData.m_general.m_lastEncounterCoordinates = Vector3.zero;
-
-				// let the encounter system know we are now entering this encounter
-				m_encounter.JustEntered();
-
-				// switch to the encounter location
-				SwitchLocation( PD_General.Location.Encounter );
+				distanceToEncounterToBegin = distance;
 			}
+		}
+
+		// did the player run into an encounter?
+		if ( encounterToBegin != null )
+		{
+			// yes - save encounter information in the player data
+			playerData.m_general.m_currentEncounterId = encounterToBegin.m_encounterId;
+
+			// put the player in the middle of the encounter
+			playerData.m_general.m_lastEncounterCoordinates = Vector3.zero;
+
+			// let the encounter system know we are now entering this encounter
+			m_encounter.JustEntered();
+
+			// switch to the encounter location
+			SwitchLocation( PD_General.Location.Encounter );
 		}
 	}
 

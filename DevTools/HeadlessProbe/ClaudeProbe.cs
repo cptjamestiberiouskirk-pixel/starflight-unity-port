@@ -447,6 +447,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCombat();
 				break;
 
+			case "encounters":
+				yield return ScenarioEncounters();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -5370,6 +5374,315 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "combat: a destroyed ship does not fire and is not fired at", couldFireBefore && !canFireLaserAfter && !canFireMissileAfter && ( alienFireMessages.Length == 0 ), "could fire before " + couldFireBefore + ", laser after " + canFireLaserAfter + ", missile after " + canFireMissileAfter + ", messages from the alien's shot: [" + alienFireMessages + "]" );
 
 		Finish( "scenario=combat paused=" + travelledWhilePaused.ToString( "F0" ) + " explosionScale=" + nextScale.ToString( "F2" ) + " noMissileFree=" + launchedWithNoMissileFree + "/" + fuelUsed.ToString( "F3" ) + "/" + attacked + " destroyed=" + wrecks + "/" + s_gameOverCalls + "/" + inTheAirAfterDestruction + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: how encounters start (a ship that has just launched, the direction the aliens come from, two encounters in one frame, the radar dead astern)
+
+	// how many ships of an encounter have been added to it
+	static int ShipsAdded( PD_Encounter pdEncounter )
+	{
+		var count = 0;
+
+		if ( pdEncounter.GetAlienShipList() != null )
+		{
+			foreach ( var alienShip in pdEncounter.GetAlienShipList() )
+			{
+				count += alienShip.m_addedToEncounter ? 1 : 0;
+			}
+		}
+
+		return count;
+	}
+
+	// take every ship of an encounter out of it again
+	static void ForgetShipsAdded( PD_Encounter pdEncounter )
+	{
+		if ( pdEncounter.GetAlienShipList() != null )
+		{
+			foreach ( var alienShip in pdEncounter.GetAlienShipList() )
+			{
+				alienShip.m_addedToEncounter = false;
+			}
+		}
+	}
+
+	// how often a text contains another
+	static int CountOf( string text, string part )
+	{
+		var count = 0;
+
+		for ( var index = text.IndexOf( part, StringComparison.Ordinal ); index >= 0; index = text.IndexOf( part, index + part.Length, StringComparison.Ordinal ) )
+		{
+			count++;
+		}
+
+		return count;
+	}
+
+	// true if the radar has a blip for this encounter
+	static bool RadarShows( PD_Encounter pdEncounter )
+	{
+		var detections = GetField( SpaceflightController.m_instance.m_radar, "m_detectionList" ) as Array;
+
+		if ( detections != null )
+		{
+			foreach ( var detection in detections )
+			{
+				if ( ReferenceEquals( GetField( detection, "m_encounter" ), pdEncounter ) )
+				{
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	// two encounters come within range of the player in the same frame: which one begins, and what happens to the other
+	IEnumerator TwoEncountersInOneFrame( PD_Encounter near, PD_Encounter far, string[] result )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var nearStar = near.m_starId;
+		var farStar = far.m_starId;
+
+		ForgetShipsAdded( near );
+		ForgetShipsAdded( far );
+
+		controller.m_messages.Clear();
+
+		// both are in the player's star system, 60 and 90 away (the encounter range is 128)
+		near.m_starId = far.m_starId = playerData.m_general.m_currentStarId;
+
+		near.SetCoordinates( playerData.m_general.m_coordinates + Vector3.right * 60.0f );
+		far.SetCoordinates( playerData.m_general.m_coordinates + Vector3.back * 90.0f );
+
+		yield return WaitForLocation( PD_General.Location.Encounter, 3.0f );
+
+		var began = playerData.m_general.m_location == PD_General.Location.Encounter;
+		var entered = playerData.m_general.m_currentEncounterId;
+		var announcements = CountOf( MessageList(), "Scanners indicate unidentified object!" );
+		var nearAdded = ShipsAdded( near );
+		var farAdded = ShipsAdded( far );
+
+		// back to the star system, with both encounters out of it again
+		if ( began )
+		{
+			LeaveEncounter();
+		}
+
+		near.m_starId = nearStar;
+		far.m_starId = farStar;
+
+		near.SetCoordinates( near.m_homeCoordinates );
+		far.SetCoordinates( far.m_homeCoordinates );
+
+		yield return Frames( 5 );
+
+		result[ 0 ] = "began " + began + ", entered " + entered + " (the nearer one is " + near.m_encounterId + ", the other " + far.m_encounterId + "), announced " + announcements + " times, ships added to the nearer one " + nearAdded + ", to the other " + farAdded;
+		result[ 1 ] = ( began && ( entered == near.m_encounterId ) && ( announcements == 1 ) && ( nearAdded > 0 ) && ( farAdded == 0 ) ) ? "ok" : "wrong";
+	}
+
+	IEnumerator ScenarioEncounters()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// ---- 1. a ship that has just launched from starport: the hyperspace encounters have nothing to do with it
+		var launchPoint = gameData.m_planetList[ gameData.m_misc.m_arthPlanetId ].GetPosition();
+
+		launchPoint.y = 0.0f;
+		launchPoint.z += 128.0f;
+
+		// the same thing the end of the launch animation does
+		playerData.m_general.m_currentStarId = gameData.m_misc.m_arthStarId;
+		playerData.m_general.m_lastStarSystemCoordinates = launchPoint;
+
+		controller.SwitchLocation( PD_General.Location.JustLaunched );
+
+		yield return Frames( 5 );
+
+		var before = new Dictionary<int, Vector3>();
+		var seenFromTheLaunchPoint = 0;
+		PD_Encounter nearestHyperspaceEncounter = null;
+
+		foreach ( var pdEncounter in playerData.m_encounterList )
+		{
+			if ( pdEncounter.GetLocation() == PD_General.Location.Hyperspace )
+			{
+				before[ pdEncounter.m_encounterId ] = pdEncounter.m_currentCoordinates;
+
+				var distance = Vector3.Distance( pdEncounter.m_currentCoordinates, playerData.m_general.m_coordinates );
+
+				if ( distance < controller.m_alienStarSystemRadarDistance )
+				{
+					seenFromTheLaunchPoint++;
+				}
+
+				if ( ( nearestHyperspaceEncounter == null ) || ( distance < Vector3.Distance( nearestHyperspaceEncounter.m_currentCoordinates, playerData.m_general.m_coordinates ) ) )
+				{
+					nearestHyperspaceEncounter = pdEncounter;
+				}
+			}
+		}
+
+		var nearestDistance = Vector3.Distance( nearestHyperspaceEncounter.m_currentCoordinates, playerData.m_general.m_coordinates );
+
+		yield return new WaitForSecondsRealtime( 2.0f );
+
+		var moved = 0;
+		var furthestMove = 0.0f;
+
+		foreach ( var pdEncounter in playerData.m_encounterList )
+		{
+			if ( before.TryGetValue( pdEncounter.m_encounterId, out var coordinates ) )
+			{
+				var distance = Vector3.Distance( coordinates, pdEncounter.m_currentCoordinates );
+
+				moved += ( distance > 0.01f ) ? 1 : 0;
+				furthestMove = Mathf.Max( furthestMove, distance );
+			}
+		}
+
+		var locationAfterWaiting = playerData.m_general.m_location;
+
+		Log( "encounters: just launched at " + playerData.m_general.m_coordinates + " (game time " + playerData.m_general.m_gameTime.ToString( "F2" ) + "): " + seenFromTheLaunchPoint + " hyperspace encounters have coordinates within " + controller.m_alienStarSystemRadarDistance + " of that point, the nearest (" + nearestHyperspaceEncounter.m_encounterId + ") at " + nearestDistance.ToString( "F0" ) + ". In 2 s " + moved + " of them moved, by up to " + furthestMove.ToString( "F1" ) + " (location " + locationAfterWaiting + ")" );
+
+		Check( "encounters: no hyperspace encounter moves while the ship has just launched", ( seenFromTheLaunchPoint > 0 ) && ( moved == 0 ) && ( locationAfterWaiting == PD_General.Location.JustLaunched ), seenFromTheLaunchPoint + " within the radar distance, " + moved + " moved, by up to " + furthestMove.ToString( "F1" ) );
+
+		// where the nearest one is after it has come all the way (at 32 units a second that takes it the distance above divided by 32 in seconds)
+		nearestHyperspaceEncounter.SetCoordinates( playerData.m_general.m_coordinates + Vector3.right * 100.0f );
+
+		yield return WaitForLocation( PD_General.Location.Encounter, 1.0f );
+
+		var locationWithOneNextToTheShip = playerData.m_general.m_location;
+
+		if ( locationWithOneNextToTheShip == PD_General.Location.Encounter )
+		{
+			LeaveEncounter();
+		}
+
+		// put everything back where it belongs
+		foreach ( var pdEncounter in playerData.m_encounterList )
+		{
+			if ( pdEncounter.GetLocation() == PD_General.Location.Hyperspace )
+			{
+				pdEncounter.SetCoordinates( pdEncounter.m_homeCoordinates );
+			}
+		}
+
+		yield return Frames( 5 );
+
+		Log( "encounters: with hyperspace encounter " + nearestHyperspaceEncounter.m_encounterId + " 100 away from the ship that has just launched the location became " + locationWithOneNextToTheShip );
+
+		Check( "encounters: a hyperspace encounter does not begin above starport", locationWithOneNextToTheShip == PD_General.Location.JustLaunched, "location " + locationWithOneNextToTheShip );
+
+		// ---- 2. the direction the aliens come from in a star system: the maneuver button takes the ship into the star system
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+
+		var first = playerData.FindEncounter( FindEncounter( 1, 6, 3, 0 ) );
+		var second = playerData.FindEncounter( FindEncounter( 1, 6, 3, 1 ) );
+		var firstStar = first.m_starId;
+
+		// the old code took the direction from the ship's last place in hyperspace to the aliens' place in the star system, two unrelated spaces.
+		// the aliens come from the opposite side here, so the two cannot be mistaken for one another
+		var unrelatedDirection = Vector3.Normalize( playerData.m_general.m_coordinates - playerData.m_general.m_lastHyperspaceCoordinates );
+		var approachDirection = -unrelatedDirection;
+
+		ForgetShipsAdded( first );
+
+		first.m_starId = playerData.m_general.m_currentStarId;
+
+		first.SetCoordinates( playerData.m_general.m_coordinates + approachDirection * 100.0f );
+
+		yield return WaitForLocation( PD_General.Location.Encounter, 3.0f );
+
+		var encounterBegan = playerData.m_general.m_location == PD_General.Location.Encounter;
+		var centroid = Vector3.zero;
+		var shipsInTheEncounter = 0;
+
+		foreach ( var alienShip in first.GetAlienShipList() )
+		{
+			if ( alienShip.m_addedToEncounter )
+			{
+				centroid += alienShip.m_coordinates;
+
+				shipsInTheEncounter++;
+			}
+		}
+
+		centroid /= Mathf.Max( 1, shipsInTheEncounter );
+
+		var alignment = Vector3.Dot( Vector3.Normalize( centroid ), approachDirection );
+
+		if ( encounterBegan )
+		{
+			LeaveEncounter();
+		}
+
+		first.m_starId = firstStar;
+
+		first.SetCoordinates( first.m_homeCoordinates );
+
+		yield return Frames( 5 );
+
+		Log( "encounters: the aliens came from direction " + approachDirection + " in the star system: " + shipsInTheEncounter + " ships appeared around " + centroid + ", " + centroid.magnitude.ToString( "F0" ) + " away, alignment with the direction they came from " + alignment.ToString( "F2" ) + " (began " + encounterBegan + ")" );
+
+		Check( "encounters: in a star system the aliens appear on the side they came from", encounterBegan && ( shipsInTheEncounter > 0 ) && ( alignment > 0.9f ), shipsInTheEncounter + " ships, alignment " + alignment.ToString( "F2" ) + " (1 is the side they came from, -1 the opposite side)" );
+
+		// ---- 3. two encounters reach the ship in the same frame: one of them begins, the nearer one
+		var firstNearer = new string[ 2 ];
+		var secondNearer = new string[ 2 ];
+
+		yield return TwoEncountersInOneFrame( first, second, firstNearer );
+		yield return TwoEncountersInOneFrame( second, first, secondNearer );
+
+		Log( "encounters: two in range in one frame, " + first.m_encounterId + " nearer: " + firstNearer[ 0 ] );
+		Log( "encounters: two in range in one frame, " + second.m_encounterId + " nearer: " + secondNearer[ 0 ] );
+
+		Check( "encounters: of two encounters that reach the ship in one frame only the nearer one begins", ( firstNearer[ 1 ] == "ok" ) && ( secondNearer[ 1 ] == "ok" ), firstNearer[ 0 ] + " | " + secondNearer[ 0 ] );
+
+		// ---- 4. the radar: one encounter dead astern (180 degrees) and one abeam (90 degrees), for a little more than one sweep of six seconds
+		var secondStar = second.m_starId;
+
+		first.m_starId = second.m_starId = playerData.m_general.m_currentStarId;
+
+		var shipAtStart = playerData.m_general.m_coordinates;
+
+		first.SetCoordinates( shipAtStart + Vector3.back * 3000.0f );
+		second.SetCoordinates( shipAtStart + Vector3.right * 3000.0f );
+
+		var asternSeen = false;
+		var abeamSeen = false;
+		var end = Time.realtimeSinceStartup + 7.0f;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			asternSeen |= RadarShows( first );
+			abeamSeen |= RadarShows( second );
+
+			yield return null;
+		}
+
+		var asternAngle = Vector3.SignedAngle( Vector3.forward, first.m_currentCoordinates - playerData.m_general.m_coordinates, Vector3.up );
+		var abeamAngle = Vector3.SignedAngle( Vector3.forward, second.m_currentCoordinates - playerData.m_general.m_coordinates, Vector3.up );
+		var shipMoved = Vector3.Distance( shipAtStart, playerData.m_general.m_coordinates );
+
+		Log( "encounters: radar in 7 s: astern (angle " + asternAngle.ToString( "F3" ) + ", now " + first.GetDistance().ToString( "F0" ) + " away) seen " + asternSeen + ", abeam (angle " + abeamAngle.ToString( "F3" ) + ", now " + second.GetDistance().ToString( "F0" ) + " away) seen " + abeamSeen + ", the ship moved " + shipMoved.ToString( "F1" ) + ", location " + playerData.m_general.m_location );
+
+		Check( "encounters: the radar sees an encounter that is dead astern", asternSeen && abeamSeen && ( Mathf.Abs( asternAngle ) > 179.99f ), "astern seen " + asternSeen + " (angle " + asternAngle.ToString( "F3" ) + "), abeam seen " + abeamSeen );
+
+		first.m_starId = firstStar;
+		second.m_starId = secondStar;
+
+		Finish( "scenario=encounters justLaunched=" + moved + "/" + locationWithOneNextToTheShip + " approach=" + alignment.ToString( "F2" ) + " twoInOneFrame=" + firstNearer[ 1 ] + "/" + secondNearer[ 1 ] + " radarAstern=" + asternSeen + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

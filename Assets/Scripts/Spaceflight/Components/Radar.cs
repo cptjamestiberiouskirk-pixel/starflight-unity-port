@@ -108,8 +108,12 @@ public class Radar : MonoBehaviour
 			// calculate the angle of the encounter
 			var angle = Vector3.SignedAngle( Vector3.forward, encounterDirection, Vector3.up );
 
+			// how far the sweep is past the encounter, the short way around the circle (plain subtraction goes wrong where the angles
+			// jump from 180 to -180, which left the radar blind dead astern)
+			var sweepPastEncounter = Mathf.DeltaAngle( angle, m_sweepAngle );
+
 			// is it close to our current sweep direction for this frame?
-			if ( ( angle > m_sweepAngle - 15.0f ) && ( angle < m_sweepAngle ) )
+			if ( ( sweepPastEncounter > 0.0f ) && ( sweepPastEncounter < 15.0f ) )
 			{
 				// yes - go through detection list
 				bool ignoreEncounter = false;
