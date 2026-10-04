@@ -411,6 +411,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioM17();
 				break;
 
+			case "m16":
+				yield return ScenarioM16();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -3699,6 +3703,303 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		Finish( "scenario=m17 badFiles=" + real + " abortedCleanly=" + aborted + " threw=" + threw + " realFileGenerated=" + results[ real ].m_mapsGenerated + " allFiles=[read " + filesRead + " refused " + filesRefused + "] system=[finished " + finished + " exceptions " + exceptions + " errors " + errors + " maps " + planetsWithMaps + "/" + planetsInSystem + " paused " + paused + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- M16: the maps of a star system's planets are destroyed when the system is left
+
+	// the textures that were made while the game ran and are still alive: how many, how many of them have the size of a planet's albedo map, and the memory they hold
+	static void RuntimeTextures( out int count, out int planetSized, out long bytes )
+	{
+		count = 0;
+		planetSized = 0;
+		bytes = 0;
+
+		foreach ( var texture in Resources.FindObjectsOfTypeAll<Texture2D>() )
+		{
+			// an asset of the project is not made at runtime
+			if ( EditorUtility.IsPersistent( texture ) )
+			{
+				continue;
+			}
+
+			count++;
+			bytes += UnityEngine.Profiling.Profiler.GetRuntimeMemorySizeLong( texture );
+
+			if ( ( texture.width == 2048 ) && ( texture.height == 1024 ) )
+			{
+				planetSized++;
+			}
+		}
+	}
+
+	// the planet files that are loaded right now (they are text assets named after the id of their planet)
+	static int LoadedPlanetFiles()
+	{
+		var count = 0;
+
+		foreach ( var textAsset in Resources.FindObjectsOfTypeAll<TextAsset>() )
+		{
+			if ( int.TryParse( textAsset.name, out _ ) )
+			{
+				count++;
+			}
+		}
+
+		return count;
+	}
+
+	// the planets of a star that are not gas giants (their albedo map is 2048 by 1024, a gas giant's is 256 by 128)
+	static int RockyPlanets( GD_Star star )
+	{
+		var count = 0;
+
+		foreach ( var planet in star.GetPlanetList() )
+		{
+			if ( ( planet != null ) && ( planet.m_id != -1 ) && !planet.IsGasGiant() )
+			{
+				count++;
+			}
+		}
+
+		return count;
+	}
+
+	// put the ship into another star system, the way flying into it from hyperspace does
+	static void EnterStarSystem( int starId )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		playerData.m_general.m_currentStarId = starId;
+
+		// just inside the edge of the system, away from its planets
+		playerData.m_general.m_coordinates = new Vector3( 7900.0f, 0.0f, 0.0f );
+		playerData.m_general.m_lastStarSystemCoordinates = playerData.m_general.m_coordinates;
+
+		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.StarSystem );
+	}
+
+	static int s_errorsLogged;
+
+	// counts the errors the game logs, and shows the first few
+	static void CountErrors( string condition, string stackTrace, LogType type )
+	{
+		if ( type == LogType.Error )
+		{
+			s_errorsLogged++;
+
+			if ( s_errorsLogged <= 5 )
+			{
+				var newline = condition.IndexOf( '\n' );
+
+				Log( "error logged by the game: " + ( ( newline > 0 ) ? condition.Substring( 0, newline ) : condition ) );
+			}
+		}
+	}
+
+	IEnumerator ScenarioM16()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var starSystem = SpaceflightController.m_instance.m_starSystem;
+
+		EnsureCrew();
+
+		// let the generation that began with the scene run to its end
+		var deadline = Time.realtimeSinceStartup + 45.0f;
+
+		while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup < deadline ) )
+		{
+			yield return null;
+		}
+
+		if ( starSystem.GeneratingPlanets() )
+		{
+			Finish( "scenario=m16 abort: the first generation never finished", 2 );
+			yield break;
+		}
+
+		yield return Frames( 3 );
+
+		var arth = gameData.m_starList[ playerData.m_general.m_currentStarId ];
+
+		// three other stars with at least three planets that are not gas giants, and then back to arth
+		var stars = new List<GD_Star>();
+
+		foreach ( var star in gameData.m_starList )
+		{
+			if ( ( star.m_id != arth.m_id ) && ( RockyPlanets( star ) >= 3 ) )
+			{
+				stars.Add( star );
+
+				if ( stars.Count == 3 )
+				{
+					break;
+				}
+			}
+		}
+
+		stars.Add( arth );
+
+		RuntimeTextures( out var countAtStart, out var planetSizedAtStart, out var bytesAtStart );
+
+		var filesAtStart = LoadedPlanetFiles();
+
+		Log( "M16 at the start, star " + arth.m_id + " (" + RockyPlanets( arth ) + " planets that are not gas giants): " + countAtStart + " runtime textures holding " + ( bytesAtStart >> 20 ) + " MB, " + planetSizedAtStart + " of them the size of a planet map, " + filesAtStart + " planet files loaded" );
+
+		// runtime textures of that size that are not planet maps (the planet maps have no name)
+		var otherPlanetSized = 0;
+		var otherNames = "";
+
+		foreach ( var texture in Resources.FindObjectsOfTypeAll<Texture2D>() )
+		{
+			if ( !EditorUtility.IsPersistent( texture ) && ( texture.width == 2048 ) && ( texture.height == 1024 ) && ( texture.name != "" ) )
+			{
+				otherPlanetSized++;
+				otherNames += " '" + texture.name + "' (" + texture.format + ")";
+			}
+		}
+
+		Log( "M16 runtime textures of the size of a planet map that are something else: " + otherPlanetSized + otherNames );
+
+		// the most textures of the size of a planet map there were beyond those of the planets of the current system
+		var mostLeftOver = planetSizedAtStart - RockyPlanets( arth ) - otherPlanetSized;
+		var mostFilesLoaded = filesAtStart;
+		var everyPlanetHasItsMaps = true;
+		var bytesAtEnd = bytesAtStart;
+		var visits = "";
+
+		// an elevation map as a landing makes it, to see that it goes too
+		Texture2D elevationTexture = null;
+		var elevationTextureWasMade = false;
+		var elevationTextureOutlivedItsSystem = false;
+
+		foreach ( var star in stars )
+		{
+			EnterStarSystem( star.m_id );
+
+			var start = Time.realtimeSinceStartup;
+
+			while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 30.0f ) )
+			{
+				yield return null;
+			}
+
+			if ( starSystem.GeneratingPlanets() )
+			{
+				Finish( "scenario=m16 abort: the planets of star " + star.m_id + " never finished generating", 2 );
+				yield break;
+			}
+
+			// a destroyed object goes at the end of its frame
+			yield return Frames( 3 );
+
+			if ( playerData.m_general.m_location != PD_General.Location.StarSystem )
+			{
+				Finish( "scenario=m16 abort: something took the ship out of the star system of star " + star.m_id + " (" + playerData.m_general.m_location + ")", 2 );
+				yield break;
+			}
+
+			// the elevation map of a planet of the system before this one
+			if ( elevationTextureWasMade && ( elevationTexture != null ) )
+			{
+				elevationTextureOutlivedItsSystem = true;
+			}
+
+			RuntimeTextures( out var count, out var planetSized, out var bytes );
+
+			var files = LoadedPlanetFiles();
+			var rocky = RockyPlanets( star );
+
+			// do the planets of this system have their maps, and are those on their materials?
+			var planets = 0;
+			var planetsWithMaps = 0;
+
+			foreach ( var planetController in starSystem.m_planetController )
+			{
+				if ( planetController.m_planet == null )
+				{
+					continue;
+				}
+
+				planets++;
+
+				var generator = planetController.GetPlanetGenerator();
+
+				if ( ( generator != null ) && ( generator.m_albedoTexture != null ) && ( generator.m_normalTexture != null ) && ( planetController.GetMaterial().GetTexture( "_MainTex" ) == generator.m_albedoTexture ) )
+				{
+					planetsWithMaps++;
+				}
+
+				// make an elevation map for one planet of the first system (a landing does that)
+				if ( !elevationTextureWasMade && ( generator != null ) && !planetController.m_planet.IsGasGiant() )
+				{
+					elevationTexture = generator.CreateElevationTexture();
+					elevationTextureWasMade = true;
+				}
+			}
+
+			Log( "M16 star " + star.m_id + " (" + planets + " planets, " + rocky + " not gas giants): " + count + " runtime textures holding " + ( bytes >> 20 ) + " MB, " + planetSized + " of them the size of a planet map, " + files + " planet files loaded, planets with their maps on their material " + planetsWithMaps );
+
+			// (the textures were counted before the elevation map was made, so that one only counts if it outlives its system)
+			mostLeftOver = Mathf.Max( mostLeftOver, planetSized - rocky - otherPlanetSized );
+			mostFilesLoaded = Mathf.Max( mostFilesLoaded, files );
+			everyPlanetHasItsMaps &= ( planetsWithMaps == planets );
+			bytesAtEnd = bytes;
+			visits += ( ( visits.Length > 0 ) ? " " : "" ) + star.m_id + ":" + planetSized + "/" + rocky + "/" + ( bytes >> 20 ) + "MB";
+		}
+
+		// back in the arth system: go down to a planet, which uses the maps and the elevation data
+		var exceptionsBeforeLanding = s_exceptionCount;
+
+		yield return EnterOrbit( 90 );
+
+		SpaceflightController.m_instance.m_planetside.UpdateTerrainGridNow();
+		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		var landed = ( playerData.m_general.m_location == PD_General.Location.Planetside );
+		var landingExceptions = s_exceptionCount - exceptionsBeforeLanding;
+
+		var terrainGrid = GetField( SpaceflightController.m_instance.m_planetside, "m_terrainGrid" ) as TerrainGrid;
+		var terrainMaterial = ( terrainGrid == null ) ? null : GetField( terrainGrid, "m_material" ) as Material;
+		var terrainHasItsMap = ( terrainMaterial != null ) && ( terrainMaterial.GetTexture( "_MainTex" ) != null );
+
+		Log( "M16 landing on planet 90 after four changes of star system: landed " + landed + ", exceptions " + landingExceptions + ", the terrain has its albedo map " + terrainHasItsMap );
+		Log( "M16 the elevation map made for a planet of star " + stars[ 0 ].m_id + ": made " + elevationTextureWasMade + ", still alive after its system was left " + elevationTextureOutlivedItsSystem );
+
+		Check( "M16 only the planets of the current star system have maps", mostLeftOver == 0, "the most textures of the size of a planet map beyond those of the current system: " + mostLeftOver + " (" + visits + ")" );
+		Check( "M16 the planets of the current star system keep their maps", everyPlanetHasItsMaps, visits );
+		Check( "M16 an elevation map goes with its star system", elevationTextureWasMade && !elevationTextureOutlivedItsSystem, "made " + elevationTextureWasMade + ", outlived its system " + elevationTextureOutlivedItsSystem );
+		Check( "M16 back at the first star the textures hold no more memory than at the start", bytesAtEnd <= bytesAtStart + ( 4L << 20 ), ( bytesAtStart >> 20 ) + " MB at the start, " + ( bytesAtEnd >> 20 ) + " MB at the end" );
+		Check( "M16 no planet file stays loaded", mostFilesLoaded == 0, "the most planet files loaded after a system had been generated: " + mostFilesLoaded );
+		Check( "M16 a landing still works after the changes of star system", landed && ( landingExceptions == 0 ) && terrainHasItsMap, "landed " + landed + ", exceptions " + landingExceptions + ", terrain has its albedo map " + terrainHasItsMap );
+
+		// ---- leave the spaceflight scene: the planets destroy their maps as they go, and that must not log an error
+		// (unity clears out unused assets on a scene change, but a map is in use for as long as anything still refers to its generator - the scene objects stay
+		// reachable through the static of the spaceflight controller, and through this scenario - so without the fix the maps of the last system stay)
+		s_errorsLogged = 0;
+
+		Application.logMessageReceived += CountErrors;
+
+		var exceptionsBeforeLeaving = s_exceptionCount;
+
+		SceneManager.LoadScene( "Intro" );
+
+		yield return WaitForScene( "Intro" );
+		yield return Frames( 5 );
+
+		Application.logMessageReceived -= CountErrors;
+
+		RuntimeTextures( out var countAfterLeaving, out var planetSizedAfterLeaving, out var bytesAfterLeaving );
+
+		var leavingExceptions = s_exceptionCount - exceptionsBeforeLeaving;
+
+		Log( "M16 after leaving the spaceflight scene (now in " + SceneManager.GetActiveScene().name + "): " + countAfterLeaving + " runtime textures holding " + ( bytesAfterLeaving >> 20 ) + " MB, " + ( planetSizedAfterLeaving - otherPlanetSized ) + " planet maps left, errors logged " + s_errorsLogged + ", exceptions " + leavingExceptions );
+
+		Check( "M16 leaving the spaceflight scene leaves no planet map behind and logs no error", ( planetSizedAfterLeaving - otherPlanetSized == 0 ) && ( s_errorsLogged == 0 ) && ( leavingExceptions == 0 ), ( planetSizedAfterLeaving - otherPlanetSized ) + " planet maps left, errors " + s_errorsLogged + ", exceptions " + leavingExceptions );
+
+		Finish( "scenario=m16 visits=[" + visits + "] mostLeftOver=" + mostLeftOver + " memory=" + ( bytesAtStart >> 20 ) + "MB->" + ( bytesAtEnd >> 20 ) + "MB filesLoaded=" + mostFilesLoaded + " elevationMapOutlived=" + elevationTextureOutlivedItsSystem + " landed=" + landed + " afterLeaving=" + ( planetSizedAfterLeaving - otherPlanetSized ) + "maps/" + s_errorsLogged + "errors checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

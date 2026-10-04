@@ -109,6 +109,26 @@ public class PlanetGenerator
 		return m_planet;
 	}
 
+	// destroys the texture maps this generator has made - unity never frees a texture that was made at runtime by itself, so call this once nothing shows them any more (calling it again does nothing)
+	public void Release()
+	{
+		DestroyTexture( ref m_albedoTexture );
+		DestroyTexture( ref m_specularTexture );
+		DestroyTexture( ref m_normalTexture );
+		DestroyTexture( ref m_waterMaskTexture );
+		DestroyTexture( ref m_elevationTexture );
+	}
+
+	static void DestroyTexture( ref Texture2D texture )
+	{
+		if ( texture != null )
+		{
+			Object.Destroy( texture );
+		}
+
+		texture = null;
+	}
+
 	public float Process()
 	{
 		switch ( m_step )
@@ -137,6 +157,11 @@ public class PlanetGenerator
 
 						// can't get bytes asynchronously - stupid unity
 						var bytes = compressedPlanetData.bytes;
+
+						// we have our own copy of the data now, so unity can let go of the file (it would stay in memory until the next scene is loaded)
+						Resources.UnloadAsset( compressedPlanetData );
+
+						m_resourceRequest = null;
 
 						// the secret sauce
 						m_asyncTask = Task.Run( () => AsyncProcess( bytes ) );
