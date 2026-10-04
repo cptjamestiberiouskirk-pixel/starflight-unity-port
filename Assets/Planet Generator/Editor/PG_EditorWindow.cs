@@ -221,14 +221,75 @@ public class PG_EditorWindow : EditorWindow
 		}
 	}
 
+	// returns what is wrong with the settings (null if nothing is) - some of them end in a division by zero that fills the maps with NaN, and one in a rain drop that never stops
+	string GetSettingsProblem()
+	{
+		// the game reads planet files of one size only (and the filters need a power of two: they wrap around the map with a bit mask)
+		if ( m_textureMapHeight != PlanetGenerator.c_nonGasGiantTextureMapHeight )
+		{
+			return "Texture Map Height has to be " + PlanetGenerator.c_nonGasGiantTextureMapHeight + ". The game reads planet files with a difference buffer of " + PlanetGenerator.c_nonGasGiantTextureMapWidth + " by " + PlanetGenerator.c_nonGasGiantTextureMapHeight + " and aborts a planet whose file has any other size.";
+		}
+
+		// the mountain noise divides by the scale of each octave, and the lacunarity is what the scale is multiplied by from octave to octave
+		if ( m_mountainScale <= 0.0f )
+		{
+			return "Mountain Scale has to be more than zero (the noise divides by it).";
+		}
+
+		if ( m_mountainLacunarity <= 0.0f )
+		{
+			return "Mountain Lacunarity has to be more than zero (the noise divides by the scale it leads to).";
+		}
+
+		// a rain drop only ends for certain when its water has evaporated
+		if ( m_doHydraulicErosionPass && ( m_evaporationConstant <= 0.0f ) )
+		{
+			return "Evaporation Constant has to be more than zero while the hydraulic erosion is enabled. A rain drop whose water never evaporates may never stop.";
+		}
+
+		return null;
+	}
+
 	// generate maps and show them on the planet game object
 	void MakeSomeMagic()
+	{
+		// don't start with settings the generator cannot work with
+		var problem = GetSettingsProblem();
+
+		if ( problem != null )
+		{
+			EditorUtility.DisplayDialog( "Planet Generator", problem, "OK" );
+
+			return;
+		}
+
+		try
+		{
+			GenerateDeltaMaps();
+		}
+		finally
+		{
+			// always take the progress bar away again - when something threw and it stayed up, the editor looked like it had hung
+			EditorUtility.ClearProgressBar();
+		}
+	}
+
+	// generates the delta map of every planet that does not have a planet file yet (or of the debug planet)
+	void GenerateDeltaMaps()
 	{
 		// show progress bar
 		EditorUtility.DisplayProgressBar( "Planet Generator", "Initializing...", 0.0f );
 
 		// load the game data
 		var textAsset = Resources.Load( m_gameDataFileName ) as TextAsset;
+
+		// nothing can be generated without the game data
+		if ( textAsset == null )
+		{
+			Debug.LogError( "Planet Generator: could not load the game data file \"" + m_gameDataFileName + "\" from a Resources folder." );
+
+			return;
+		}
 
 		// convert it from the json string to our game data class
 		var gameData = JsonUtility.FromJson<GameData>( textAsset.text );
@@ -503,8 +564,10 @@ public class PG_EditorWindow : EditorWindow
 				}
 			}
 
-			// rescale float deltas to 0 to 255
-			var elevationScale = 255.0f / ( maximumDifference - minimumDifference );
+			// rescale float deltas to 0 to 255 (a planet with no atmosphere gets no mountains and no erosion, so all of its deltas are zero - there is nothing to rescale then, and nothing to divide by)
+			var differenceRange = maximumDifference - minimumDifference;
+
+			var elevationScale = ( differenceRange > 0.0f ) ? ( 255.0f / differenceRange ) : 0.0f;
 
 			differenceBuffer = new byte[ m_textureMapWidth * m_textureMapHeight ];
 
