@@ -1,6 +1,6 @@
 # Code review, 2026-10-03
 
-Review of `master` at 4648ce3. Items fixed since then are listed under "Fixed since the review"; everything else in this file is still open as of PR #39 (2026-10-04).
+Review of `master` at 4648ce3. Items fixed since then are listed under "Fixed since the review"; everything else in this file is still open as of PR #40 (2026-10-04).
 
 **Scope:** all of `Assets/Scripts` (225 files, about 32k lines), plus `Assets/Planet Generator/Editor`, `Assets/Tools/Editor` and `Assets/Shaders/Editor`.
 
@@ -62,6 +62,7 @@ Fixed in PR #3 (bf0b1a7) unless noted. None of these changed the save version.
 | M18 (PR #36) | `PlanetGenerator.Process` called `Task.Wait()` on the main thread, so the game stood still while each planet was processed and the progress bar moved once per planet; it looks at `IsCompleted` each frame now |
 | M17 (PR #37) | A planet file that could not be read made `Process` throw on every frame, which left the game paused for good in the middle of generating the star system, and a file cut off inside its difference buffer was accepted with no error. A failed task now aborts that planet with an error in the log, and `ReadPlanetData` checks the version, the map size, that all of the data is there and nothing more, and the checksum. The review had the trigger as INFERRED; it was reproduced with bad files made in memory |
 | M16 (PR #39) | The textures of every planet of every star system visited stayed in memory, with the planet files, and the maps of the last system outlived even the scene change. `PlanetGenerator.Release()` destroys them: `Planet` calls it once the maps of the next planet are on the material, at once for an orbit that is empty in the new system, and in `OnDestroy`. The planet file is unloaded as soon as its bytes are copied |
+| Low (PR #40) | A planet whose maps could not be generated has no elevation data, and Descend ran into that with a `NullReferenceException` after "Computing descent profile..." (INFERRED in the review, reproduced). Land and Disembark now refuse such a planet with a message (`Planet.HasMaps()`), and the two `UpdateTerrainGridNow` methods do nothing for it |
 | Low (PR #14) | `Viewport` fade wrote into the shared `Black.mat` asset on every play session in the Editor |
 | (PR #2) | `PD_General.m_lastCommIds` (`int[,]`) was never saved; three compile errors from 70445da |
 | (PR #4) | `com.unity.ai.generators` (deprecated) and `com.unity.2d.enhancers` removed |
@@ -77,7 +78,7 @@ On 2026-10-03 the fixes were run in a headless play-mode probe: the real Spacefl
 - **PR #21 to #26 (batch 2):** H5, M19, H7, M12, M20 and H8 were each run before and after the change, through the real buttons or the real fire and damage methods. The design of each was decided by the project owner on 2026-10-03. Where the original design notes give no number (hit points per class, the repair and treatment rates, the fuel per shot), the number is a named constant in the code.
 - **PR #28 to #30 (2026-10-04):** M10, M23 and the landing messages were each run before and after the change through the real flow: into orbit, down to the surface, the Disembark and Cargo buttons, and the button controller with the stick or the fire button held for one frame.
 - **PR #32 (2026-10-04):** the missile fix was run before and after in both directions (an alien missile and a player missile in the air when the player leaves), together with a check that missiles still hit inside their own encounter.
-- **PR #33 to #39 (2026-10-04):** M11, M18, M17 and M16 were each run before and after the change with a scenario of their own (`m11`, `m18`, `m17`, `m16`), which are in the probe in the repository.
+- **PR #33 to #40 (2026-10-04):** M11, M18, M17, M16 and the landing on a planet without maps were each run before and after the change with a scenario of their own (`m11`, `m18`, `m17`, `m16`, `nomaps`), which are in the probe in the repository.
   - M18 was measured from a coroutine while a planet was being processed: 5 frames for 5 planets before, more than 1000 after.
   - M17 was run with eight kinds of bad file made in memory from a real one, and with one of them given to a planet of the real star system. All 811 planet files of the project pass the stricter reader.
   - M16 was flown through four changes of star system: the textures made at runtime went from 22 MB to 69 MB before and stayed at 22 MB after. The probe has no graphics device, so graphics memory is not in those numbers.
@@ -145,8 +146,8 @@ Grouped. All are CONFIRMED unless marked otherwise.
 - A Scan during the 1.5 s of a deposit's transporter effect still counts and labels the deposit that was just picked up: `ScanButton.ScanNearbyObjects` (found 2026-10-04 by reading).
 - The Escape key opens the save panel during the landing and launch animations, and the animation and its events carry on behind the panel: `SpaceflightController.Update` (found 2026-10-04 by reading, not run).
 - `PG_Craters` re-initializes on every Spaceflight start, about 6M `GetPixel` calls: `PG_Craters.cs:11-32`.
-- Abort leaves a null elevation map that landing then dereferences: `Planet.cs:179-181` (INFERRED). Since PR #37 a planet whose file cannot be read takes this path as well, so this is what a damaged planet file leads to now.
-- A planet whose maps could not be generated keeps the maps of the planet that was in its orbit in the star system before, and can be orbited as if nothing were wrong (found 2026-10-04 by reading).
+- A planet whose maps could not be generated keeps the maps of the planet that was in its orbit in the star system before, and can be orbited as if nothing were wrong (found 2026-10-04 by reading). It cannot be landed on since PR #40.
+- A saved game that is already in the terrain vehicle on a planet whose file was damaged afterwards has no way out: the terrain vehicle asks for the elevation every frame (found 2026-10-04 by reading, not run. Getting out of it means moving the player, which is a design decision).
 
 **Leaks and per-frame cost**
 - `TransporterEffect` materials are never destroyed.
