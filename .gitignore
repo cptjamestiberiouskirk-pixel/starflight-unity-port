@@ -70,3 +70,7 @@ AGENTS.md
 .vscode/
 /[Uu]ser[Ss]ettings/
 *.slnx
+
+# The headless probe copies itself here for one run (see DevTools/HeadlessProbe)
+/Assets/ClaudeProbe.cs
+/Assets/ClaudeProbe.cs.meta
