@@ -95,7 +95,8 @@ public class ScanButton : ShipButton
 				{
 					var terrainElement = child.GetComponent<TerrainElement>();
 
-					if ( terrainElement != null )
+					// a deposit that has just been picked up is still there while its transporter effect plays - it is not a deposit any more
+					if ( ( terrainElement != null ) && !terrainElement.HasBeenPickedUp() )
 					{
 						var elementName = terrainElement.GetElementName();
 

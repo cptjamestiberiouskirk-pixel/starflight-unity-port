@@ -10,25 +10,37 @@ public class PG_Craters
 
 	public static void Initialize()
 	{
-		// load crater texture maps
-		m_craterTextureMaps = new float[ 3 ][,];
+		// the crater texture maps never change, and they stay with us from one spaceflight scene to the next - so they are
+		// only read the first time (this ran again on every start of the scene, about six million pixels each time)
+		if ( m_craterTextureMaps != null )
+		{
+			return;
+		}
 
-		for ( var i = 0; i < m_craterTextureMaps.Length; i++ )
+		// load crater texture maps
+		var craterTextureMaps = new float[ 3 ][,];
+
+		for ( var i = 0; i < craterTextureMaps.Length; i++ )
 		{
 			var texture = Resources.Load<Texture2D>( "Craters " + ( i + 1 ) );
 
-			m_craterTextureMaps[ i ] = new float[ texture.height, texture.width ];
+			craterTextureMaps[ i ] = new float[ texture.height, texture.width ];
 
+			// one pixel at a time on purpose: GetPixels is faster, but for about one pixel in a hundred of these 16 bit textures
+			// it gives a number that differs in the last bit, and every planet is worked out from these numbers
 			for ( var y = 0; y < texture.height; y++ )
 			{
 				for ( var x = 0; x < texture.width; x++ )
 				{
 					var color = texture.GetPixel( x, y );
 
-					m_craterTextureMaps[ i ][ y, x ] = color.r;
+					craterTextureMaps[ i ][ y, x ] = color.r;
 				}
 			}
 		}
+
+		// everything has been read, so the maps can be used now
+		m_craterTextureMaps = craterTextureMaps;
 	}
 
 	public float[,] Process( float[,] sourceElevation, int planetId, float craterGain, float waterElevation )

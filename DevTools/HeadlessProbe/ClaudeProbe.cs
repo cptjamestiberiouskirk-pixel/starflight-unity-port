@@ -455,6 +455,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioComms();
 				break;
 
+			case "terrain":
+				yield return ScenarioTerrain();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -5934,6 +5938,249 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "comms: a press with nothing in its way is carried out", sentByAPlainPress.Contains( "Transmitting" ) && !sentByAPlainPress.Contains( "ERROR" ), "sent: [" + sentByAPlainPress + "]" );
 
 		Finish( "scenario=comms tokens=" + withToken + " twoSpacesThrew=" + threw + " garbledWords=" + garbledWords + "/" + plainWords + " mechan9=" + unlockedInPeace + "/" + unlockedAfterFiring + " press=[" + consoleAfterThePress + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: terrain (the crater maps, the random numbers after a landing, an object at the edge of the map, a scan of a deposit that is being picked up, labels after leaving)
+
+	// how many objects a populator has put on the planet, and a number that changes when any of them is somewhere else
+	static string Placed( Component populator )
+	{
+		var count = 0;
+		var sum = 0.0;
+
+		if ( populator != null )
+		{
+			foreach ( Transform child in populator.transform )
+			{
+				count++;
+
+				sum += child.localPosition.x + child.localPosition.y * 3.0 + child.localPosition.z * 7.0;
+			}
+		}
+
+		return count + "@" + sum.ToString( "F1" );
+	}
+
+	// how many scan labels are showing
+	static int LabelsShowing()
+	{
+		var count = 0;
+
+		foreach ( var textMesh in FindObjectsByType<TextMesh>( FindObjectsSortMode.None ) )
+		{
+			count += ( textMesh.gameObject.name == "Label" ) ? 1 : 0;
+		}
+
+		return count;
+	}
+
+	IEnumerator ScenarioTerrain()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// ---- 1. the crater maps are read from three 2048 by 1024 textures when the spaceflight scene starts. They are kept in a static, so a second start has nothing to read
+		var mapsField = typeof( PG_Craters ).GetField( "m_craterTextureMaps", c_any );
+		var mapsAtStart = mapsField.GetValue( null ) as float[][,];
+
+		var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+		PG_Craters.Initialize();
+
+		var secondStart = stopwatch.Elapsed.TotalMilliseconds;
+		var keptTheMaps = ReferenceEquals( mapsAtStart, mapsField.GetValue( null ) );
+
+		// the first start of a session: nothing has been read yet
+		mapsField.SetValue( null, null );
+
+		stopwatch.Restart();
+
+		PG_Craters.Initialize();
+
+		var firstStart = stopwatch.Elapsed.TotalMilliseconds;
+		var maps = mapsField.GetValue( null ) as float[][,];
+
+		// the maps against the textures, read one pixel at a time (every fifth column of every seventh row)
+		var compared = 0;
+		var different = 0;
+		var largestDifference = 0.0f;
+
+		for ( var i = 0; i < maps.Length; i++ )
+		{
+			var texture = Resources.Load<Texture2D>( "Craters " + ( i + 1 ) );
+
+			for ( var y = 0; y < texture.height; y += 7 )
+			{
+				for ( var x = 0; x < texture.width; x += 5 )
+				{
+					var fromTheTexture = texture.GetPixel( x, y ).r;
+
+					compared++;
+
+					different += ( maps[ i ][ y, x ] != fromTheTexture ) ? 1 : 0;
+
+					largestDifference = Mathf.Max( largestDifference, Mathf.Abs( maps[ i ][ y, x ] - fromTheTexture ) );
+				}
+			}
+		}
+
+		Log( "terrain: crater maps: a first start reads them in " + firstStart.ToString( "F0" ) + " ms, a second start takes " + secondStart.ToString( "F0" ) + " ms (kept the maps it had: " + keptTheMaps + "). " + different + " of " + compared + " values differ from the textures, by " + largestDifference.ToString( "E2" ) + " at the most" );
+
+		Check( "terrain: the crater maps are read once", keptTheMaps && ( secondStart < 50.0 ), "second start " + secondStart.ToString( "F0" ) + " ms, kept the maps: " + keptTheMaps );
+		Check( "terrain: the crater maps hold what the textures hold", ( different == 0 ) && ( compared > 100000 ), different + " of " + compared + " values differ" );
+
+		// ---- into the terrain vehicle on planet 90 (arth system, mineral density 43%), the way the m10 scenario does it
+		yield return EnterOrbit( 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		PressButton( ButtonController.ButtonSet.CommandA, 1 );
+
+		yield return WaitForLocation( PD_General.Location.Disembarked, 15.0f );
+		yield return Frames( 10 );
+
+		if ( playerData.m_general.m_location != PD_General.Location.Disembarked )
+		{
+			Finish( "scenario=terrain abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var terrainGrid = controller.m_disembarked.m_terrainGrid;
+		var terrainVehicle = controller.m_terrainVehicle;
+		var planetGenerator = controller.m_starSystem.GetPlanetController( 90 ).GetPlanetGenerator();
+
+		var placedByTheGame = "rocks " + Placed( terrainGrid.m_terrainRocks ) + " deposits " + Placed( terrainGrid.m_terrainElements ) + " trees " + Placed( terrainGrid.m_terrainTrees );
+
+		// ---- 2. putting the rocks on a planet must not disturb the random numbers of the game (it used to leave them at the same place after every landing on the same planet)
+		UnityEngine.Random.InitState( 4242 );
+
+		var nextNumber = UnityEngine.Random.value;
+
+		UnityEngine.Random.InitState( 4242 );
+
+		TerrainGridPopulator.ResetSpawnLists( planetGenerator );
+
+		terrainGrid.m_terrainRocks.Initialize( planetGenerator, terrainGrid.m_elevationScale, 90 + 1 );
+
+		var nextNumberAfterTheRocks = UnityEngine.Random.value;
+
+		// the same again from another place in the game's random numbers
+		UnityEngine.Random.InitState( 777 );
+
+		var otherNextNumber = UnityEngine.Random.value;
+
+		UnityEngine.Random.InitState( 777 );
+
+		TerrainGridPopulator.ResetSpawnLists( planetGenerator );
+
+		terrainGrid.m_terrainRocks.Initialize( planetGenerator, terrainGrid.m_elevationScale, 90 + 1 );
+
+		var otherNextNumberAfterTheRocks = UnityEngine.Random.value;
+
+		// the children that were replaced are destroyed at the end of the frame
+		yield return Frames( 2 );
+
+		var rocksAgain = Placed( terrainGrid.m_terrainRocks );
+
+		Log( "terrain: placed by the game: " + placedByTheGame + " | rocks placed again: " + rocksAgain );
+		Log( "terrain: the game's next random number was going to be " + nextNumber.ToString( "F6" ) + " and after the rocks it is " + nextNumberAfterTheRocks.ToString( "F6" ) + "; from another seed " + otherNextNumber.ToString( "F6" ) + " and " + otherNextNumberAfterTheRocks.ToString( "F6" ) );
+
+		Check( "terrain: placing objects leaves the game's random numbers alone", ( nextNumberAfterTheRocks == nextNumber ) && ( otherNextNumberAfterTheRocks == otherNextNumber ) && ( nextNumber != otherNextNumber ), "expected " + nextNumber.ToString( "F6" ) + " and " + otherNextNumber.ToString( "F6" ) + ", got " + nextNumberAfterTheRocks.ToString( "F6" ) + " and " + otherNextNumberAfterTheRocks.ToString( "F6" ) );
+		Check( "terrain: the rocks are in the same places every time", placedByTheGame.Contains( "rocks " + rocksAgain + " " ), "by the game: " + placedByTheGame + ", again: " + rocksAgain );
+
+		// ---- 3. an object at the very right edge of the map (Random.Range can return its upper limit, which is the width of the map)
+		var edge = Tools.MapToWorldCoordinates( planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight * 0.5f, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
+		var addToSpawnList = typeof( TerrainGridPopulator ).GetMethod( "AddToSpawnList", c_any );
+		var overlapsSomething = typeof( TerrainGridPopulator ).GetMethod( "OverlapsSomething", c_any );
+		var edgeResult = "added";
+
+		try
+		{
+			overlapsSomething.Invoke( null, new object[] { edge } );
+			addToSpawnList.Invoke( null, new object[] { edge } );
+
+			// it has to be found again by the next object that wants the same spot
+			edgeResult = (bool) overlapsSomething.Invoke( null, new object[] { edge } ) ? "added and found again" : "added but not found again";
+		}
+		catch ( TargetInvocationException exception )
+		{
+			edgeResult = "threw " + exception.InnerException.GetType().Name;
+		}
+
+		Log( "terrain: an object at map x " + planetGenerator.m_textureMapWidth + " of " + planetGenerator.m_textureMapWidth + ": " + edgeResult );
+
+		Check( "terrain: an object at the right edge of the map can be placed", edgeResult == "added and found again", edgeResult );
+
+		// ---- 4. a scan while a deposit is being picked up, and the labels of a scan after leaving the terrain vehicle
+		var deposits = terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true );
+
+		if ( deposits.Length < 2 )
+		{
+			Finish( "scenario=terrain abort: the planet has fewer than two deposits", 2 );
+			yield break;
+		}
+
+		// one deposit next to the terrain vehicle, one 20 away (a scan reaches 50, a pickup 10), every other deposit out of reach
+		var near = deposits[ 0 ];
+		var far = deposits[ 1 ];
+
+		foreach ( var other in deposits )
+		{
+			if ( ( other != near ) && ( other != far ) && ( Vector3.Distance( other.transform.position, terrainVehicle.transform.position ) < 60.0f ) )
+			{
+				other.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		near.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		far.transform.position = terrainVehicle.transform.position + Vector3.forward * 20.0f;
+
+		var nearName = near.GetElementName();
+		var farName = far.GetElementName();
+		var expectedBefore = ( nearName == farName ) ? ( nearName + " deposits: 2" ) : ( nearName + " deposit: 1" );
+
+		new ScanButton().Execute();
+
+		var scanBefore = MessageList();
+
+		// pick the near one up (its transporter effect takes a second and a half) and scan again at once
+		new TVCargoButton().Execute();
+
+		var pickupMessage = MessageList();
+
+		new ScanButton().Execute();
+
+		var scanDuring = MessageList();
+
+		yield return Frames( 3 );
+
+		var labelsInTheVehicle = LabelsShowing();
+
+		Log( "terrain: scan with " + nearName + " 2 away and " + farName + " 20 away: " + scanBefore );
+		Log( "terrain: pickup: " + pickupMessage + " | scan right after it: " + scanDuring );
+
+		var countedBefore = scanBefore.Contains( expectedBefore );
+		var countedDuring = ( nearName == farName ) ? !scanDuring.Contains( nearName + " deposit: 1" ) : scanDuring.Contains( nearName + " deposit" );
+
+		Check( "terrain: a scan does not count a deposit that has just been picked up", countedBefore && pickupMessage.Contains( "Picked up" ) && !countedDuring, "before: counted " + countedBefore + "; right after the pickup: still counted " + countedDuring );
+
+		// back into the ship
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+
+		var labelsAfterLeaving = LabelsShowing();
+
+		Log( "terrain: scan labels showing in the terrain vehicle " + labelsInTheVehicle + ", after going back into the ship " + labelsAfterLeaving + " (" + playerData.m_general.m_location + ")" );
+
+		Check( "terrain: no scan label is left showing after leaving the terrain vehicle", ( labelsInTheVehicle > 0 ) && ( labelsAfterLeaving == 0 ), "in the vehicle " + labelsInTheVehicle + ", after leaving " + labelsAfterLeaving );
+
+		Finish( "scenario=terrain craters=" + secondStart.ToString( "F0" ) + "ms/" + firstStart.ToString( "F0" ) + "ms/" + different + " random=" + ( nextNumberAfterTheRocks == nextNumber ) + " placed=[" + placedByTheGame + "] edge=[" + edgeResult + "] scan=" + countedDuring + " labels=" + labelsInTheVehicle + "/" + labelsAfterLeaving + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
