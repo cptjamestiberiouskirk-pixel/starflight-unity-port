@@ -294,6 +294,7 @@ public class DataController : MonoBehaviour
 			case PD_General.Location.JustLaunched:
 			case PD_General.Location.StarSystem:
 			case PD_General.Location.Encounter:
+			case PD_General.Location.Disembarked:
 				return "Spaceflight";
 
 			default:

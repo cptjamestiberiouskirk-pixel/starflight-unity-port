@@ -439,6 +439,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCargo();
 				break;
 
+			case "savedata":
+				yield return ScenarioSaveData();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -5013,6 +5017,130 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "cargo: nothing is taken from it with a full hold", ( cargoAfterFull == cargoAfterPartial ) && fullMessage.Contains( "full" ), "took " + ( cargoAfterFull - cargoAfterPartial ) + " | " + fullMessage );
 
 		Finish( "scenario=cargo shipList=[" + volumeColumn + "] size=" + expectedSmall + "/" + expectedLarge + " pickup=" + cargoAfterFirst + " partial=" + ( cargoAfterPartial - cargoBefore ) + "/" + secondIsStillThere + "/" + secondVolume + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: a game saved in the terrain vehicle, the terrain vehicle of a new game, the stardate on a computer with another calendar
+
+	// the stardate a scratch copy of the general player data works out while the computer is set to the given culture ("threw ..." if it cannot)
+	static string StardateIn( string cultureName )
+	{
+		var before = System.Globalization.CultureInfo.CurrentCulture;
+
+		try
+		{
+			System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo( cultureName );
+
+			var general = new PD_General();
+
+			general.Reset();
+
+			// ten days and five hours into the game
+			general.m_day = 10;
+			general.m_hour = 5;
+			general.m_lastHour = 5;
+
+			general.UpdateGameTime( 0.0f );
+
+			return general.m_currentStardateYMD + " / " + general.m_currentStardateDHMY;
+		}
+		catch ( Exception exception )
+		{
+			return "threw " + exception.GetType().Name;
+		}
+		finally
+		{
+			System.Globalization.CultureInfo.CurrentCulture = before;
+		}
+	}
+
+	IEnumerator ScenarioSaveData()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+
+		EnsureCrew();
+
+		yield return Frames( 2 );
+
+		// ---- 1. the scene a saved game is loaded into: every location but starport is in the spaceflight scene
+		var locationBefore = playerData.m_general.m_location;
+		var wrongScenes = "";
+		var disembarkedScene = "";
+
+		foreach ( PD_General.Location location in Enum.GetValues( typeof( PD_General.Location ) ) )
+		{
+			playerData.m_general.m_location = location;
+
+			var scene = dataController.GetCurrentSceneName();
+			var expected = ( location == PD_General.Location.Starport ) ? "Starport" : "Spaceflight";
+
+			if ( location == PD_General.Location.Disembarked )
+			{
+				disembarkedScene = scene;
+			}
+
+			if ( scene != expected )
+			{
+				wrongScenes += location + "->" + scene + " ";
+			}
+		}
+
+		playerData.m_general.m_location = locationBefore;
+
+		Log( "save and data: a game saved in the terrain vehicle is loaded into the " + disembarkedScene + " scene; locations with the wrong scene: " + ( ( wrongScenes == "" ) ? "none" : wrongScenes.Trim() ) );
+
+		Check( "save and data: a game saved in the terrain vehicle loads into the spaceflight scene", ( disembarkedScene == "Spaceflight" ) && ( wrongScenes == "" ), "terrain vehicle -> " + disembarkedScene + ", wrong: " + ( ( wrongScenes == "" ) ? "none" : wrongScenes.Trim() ) );
+
+		// ---- 2. the description of such a game in the save game panel (slot 1 is not the active slot, and the saves are in memory)
+		var saveGamePanel = PanelController.m_instance.m_saveGamePanel;
+		var otherSlot = dataController.m_playerDataList[ 1 ];
+		var otherLocationBefore = otherSlot.m_general.m_location;
+
+		otherSlot.m_general.m_location = PD_General.Location.Disembarked;
+
+		Call( saveGamePanel, "UpdateDescriptions" );
+
+		var descriptionTexts = GetField( saveGamePanel, "m_slotDescriptionText" ) as TMPro.TextMeshProUGUI[];
+		var description = descriptionTexts[ 1 ].text;
+
+		otherSlot.m_general.m_location = otherLocationBefore;
+
+		Call( saveGamePanel, "UpdateDescriptions" );
+
+		var opened = description.Split( new string[] { "<color=" }, StringSplitOptions.None ).Length - 1;
+		var closed = description.Split( new string[] { "</color>" }, StringSplitOptions.None ).Length - 1;
+		var locationLine = description.Split( '\n' )[ 1 ];
+
+		Log( "save and data: the save panel's line for a game in the terrain vehicle: " + locationLine + " (" + opened + " colour tags opened, " + closed + " closed)" );
+
+		Check( "save and data: the save panel names the location of a game in the terrain vehicle", ( opened == closed ) && locationLine.Contains( "Terrain Vehicle</color>" ), locationLine + " | opened " + opened + ", closed " + closed );
+
+		// ---- 3. the terrain vehicle of a new game
+		var fresh = new PlayerData();
+
+		fresh.Reset();
+
+		var freshVehicle = fresh.m_terrainVehicle;
+		var hasStorage = ( freshVehicle.m_elementStorage != null ) && ( freshVehicle.m_artifactStorage != null );
+
+		Log( "save and data: the terrain vehicle of a new game: fuel " + freshVehicle.m_fuelRemaining.ToString( "F1" ) + ", has its cargo holds " + hasStorage );
+
+		Check( "save and data: a new game has a fuelled terrain vehicle with its cargo holds", ( freshVehicle.m_fuelRemaining == 1.0f ) && hasStorage, "fuel " + freshVehicle.m_fuelRemaining.ToString( "F1" ) + ", cargo holds " + hasStorage );
+
+		// ---- 4. the stardate on computers with other calendars: thai (buddhist years), saudi arabian (a calendar that ends long before 4620), persian
+		var invariant = StardateIn( "" );
+		var thai = StardateIn( "th-TH" );
+		var saudi = StardateIn( "ar-SA" );
+		var persian = StardateIn( "fa-IR" );
+		var german = StardateIn( "de-DE" );
+
+		Log( "save and data: stardate after 10 days and 5 hours: invariant " + invariant + " | th-TH " + thai + " | ar-SA " + saudi + " | fa-IR " + persian + " | de-DE " + german );
+
+		const string c_expected = "4620-01-11 / 11.05-01-4620";
+
+		Check( "save and data: the stardate is the same whatever calendar the computer uses", ( invariant == c_expected ) && ( thai == c_expected ) && ( saudi == c_expected ) && ( persian == c_expected ) && ( german == c_expected ), "invariant " + invariant + " | th-TH " + thai + " | ar-SA " + saudi + " | fa-IR " + persian + " | de-DE " + german );
+
+		Finish( "scenario=savedata terrainVehicleScene=" + disembarkedScene + " panelTags=" + opened + "/" + closed + " newVehicleFuel=" + freshVehicle.m_fuelRemaining.ToString( "F1" ) + " stardate=[" + thai + " | " + saudi + " | " + persian + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
