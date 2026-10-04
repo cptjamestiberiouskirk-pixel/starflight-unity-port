@@ -76,20 +76,6 @@ public class Encounter : MonoBehaviour
 	/// </summary>
 	public void SpawnDebrisForShip( int alienIndex, int vesselId, Vector3 position )
 	{
-		// check if we have debris templates
-		if ( m_alienShipDebrisTemplate == null || vesselId >= m_alienShipDebrisTemplate.Length )
-		{
-			Debug.Log( $"SpawnDebrisForShip: No debris template for vesselId {vesselId}" );
-			return;
-		}
-
-		var debrisTemplate = m_alienShipDebrisTemplate[ vesselId ];
-		if ( debrisTemplate == null )
-		{
-			Debug.Log( $"SpawnDebrisForShip: Debris template is null for vesselId {vesselId}" );
-			return;
-		}
-
 		// get the model container for this alien ship (its model slot is not the same as its index in the alien ship list)
 		var alienShipModel = GetAlienShipModel( alienIndex );
 
@@ -101,6 +87,24 @@ public class Encounter : MonoBehaviour
 
 		// clear any existing children (the destroyed ship model)
 		Tools.DestroyChildrenOf( alienShipModel );
+
+		// check if we have a debris template for this vessel
+		GameObject debrisTemplate = null;
+
+		if ( ( m_alienShipDebrisTemplate != null ) && ( vesselId >= 0 ) && ( vesselId < m_alienShipDebrisTemplate.Length ) )
+		{
+			debrisTemplate = m_alienShipDebrisTemplate[ vesselId ];
+		}
+
+		if ( debrisTemplate == null )
+		{
+			// no - the ship is gone and there is no wreckage to show, so hide its model
+			Debug.Log( $"SpawnDebrisForShip: No debris template for vesselId {vesselId}" );
+
+			alienShipModel.SetActive( false );
+
+			return;
+		}
 
 		// spawn the debris model as a child
 		var debrisInstance = Instantiate( debrisTemplate, alienShipModel.transform );
@@ -259,6 +263,12 @@ public class Encounter : MonoBehaviour
 
 					// skip this model if there is no alien ship in its slot (this should never happen)
 					if ( alienShip == null )
+					{
+						continue;
+					}
+
+					// destroyed ships don't fly any more (the wreckage stays where the ship was destroyed)
+					if ( alienShip.m_isDead )
 					{
 						continue;
 					}
@@ -1392,6 +1402,12 @@ public class Encounter : MonoBehaviour
 
 				// set the position of the ship
 				alienShipModel.transform.position = alienShip.m_coordinates;
+
+				// the camera only has to keep living ships in view (wreckage stays behind when the player flies away from it)
+				if ( alienShip.m_isDead )
+				{
+					continue;
+				}
 
 				// figure out how far away from the player this alien ship is
 				var playerToShip = alienShip.m_coordinates - playerData.m_general.m_coordinates;
