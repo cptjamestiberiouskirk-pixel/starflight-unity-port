@@ -51,6 +51,9 @@ The project has been refactored to a clean, **root-directory architecture** to e
 ### Continuous Integration
 Every pull request and push to `master` runs a headless Unity compile check (`.github/workflows/compile-check.yml`, via [GameCI](https://game.ci)). It needs repo secrets under **Settings > Secrets and variables > Actions**: `UNITY_EMAIL` and `UNITY_PASSWORD`, plus either `UNITY_SERIAL` (Pro or Student plan serial number) or `UNITY_LICENSE` (Personal plan: the contents of `Unity_lic.ulf` after activating in Unity Hub; `UnityEntitlementLicense.xml` is a different format and won't work). See the [GameCI activation guide](https://game.ci/docs/github/activation). To check a different editor before upgrading, run the workflow by hand from the **Actions** tab and enter a `unityVersion`.
 
+### Local Checks
+`DevTools/HeadlessProbe/` holds a headless compile check and a play-mode probe for Windows. The probe runs the real Spaceflight or Starport scene in batch mode with an in-memory save system and checks game behaviour through scenarios, one for every fix made since 2026-10-03. It sits outside `Assets/`, so it is not part of the build. See its [README](DevTools/HeadlessProbe/README.md).
+
 ---
 
 ## 📂 Project Structure

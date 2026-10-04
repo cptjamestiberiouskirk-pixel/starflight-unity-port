@@ -20,6 +20,8 @@ Headless compile check (fails if the project is already open in an Editor; a fre
 
 CI runs the same compile check headless on every PR and push to `master` (`.github/workflows/compile-check.yml`, GameCI EditMode test run; needs `UNITY_EMAIL`, `UNITY_PASSWORD`, and either `UNITY_SERIAL` (Pro/Student) or `UNITY_LICENSE` (Personal `.ulf` contents) as repo secrets).
 
+**Headless play-mode probe:** `DevTools/HeadlessProbe/` (outside `Assets/`, not part of the build) runs the real Spaceflight or Starport scene headless in play mode, with an in-memory save system so no save file is touched, and checks behaviour through scenarios. From the project root in PowerShell: `& "DevTools\HeadlessProbe\compile-check.ps1"` is the compile check above with a summary, `& "DevTools\HeadlessProbe\probe.ps1" -Scenario <name>` runs one scenario and `& "DevTools\HeadlessProbe\run-all-scenarios.ps1"` runs them all (about 9 minutes). For a gameplay fix, run its scenario on the old code and on the new code, and add the scenario in the same PR. Its `README.md` lists the scenarios, the helpers and the pitfalls.
+
 `com.unity.test-framework` is installed but no test assemblies exist. If tests are added (they will need an `.asmdef` referencing the test framework), run them with `-runTests -testPlatform EditMode -testResults results.xml` and narrow to one test with `-testFilter <FullyQualifiedName>` (omit `-quit`).
 
 Editor tooling is under the **`Starflight Remake/`** menu (`Assets/Tools/Editor/`, `Assets/Planet Generator/Editor/`). Notably `Starflight Remake/Planet Generator` regenerates `Assets/Resources/Planets/{planetId}.bytes` from the images in `Assets/Planet Generator/Data/`.

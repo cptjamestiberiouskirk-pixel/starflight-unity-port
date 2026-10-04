@@ -66,7 +66,7 @@ Fixed in PR #3 (bf0b1a7) unless noted. None of these changed the save version.
 
 ### How the fixes were checked
 
-On 2026-10-03 the fixes were run in a headless play-mode probe: the real Spaceflight or Starport scene, new-game data, and an in-memory save system so no save file was touched. The probe is not in the repository.
+On 2026-10-03 the fixes were run in a headless play-mode probe: the real Spaceflight or Starport scene, new-game data, and an in-memory save system so no save file was touched. The probe is in the repository under `DevTools/HeadlessProbe/` (it was added after these runs).
 
 - **PR #3 (batch 1):** H1, H2, H3, H4, M2, M3, M4, M6, M9 and the `m_lastCommIds` fix from PR #2 passed 17 checks. M1 was checked by reading the code only.
 - **PR #7 onward:** H6, M15, M13, M14, M7, M22, M24, M5, M21 and the `Viewport` fix were each run before and after the change; the bug reproduced on the old code and was gone with the fix. M8 was run after the change only, because the old class could only write to the real save folder.
