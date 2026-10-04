@@ -45,11 +45,22 @@ public class Viewport : MonoBehaviour
 	// unity start
 	void Start()
 	{
-		// get the material from the fade mesh renderer
-		m_fadeMaterial = m_fadeImage.material;
+		// make a copy of the fade material so the material file doesn't get updated (a ui image gives us the shared material, not a copy of it)
+		m_fadeMaterial = new Material( m_fadeImage.material );
+		m_fadeImage.material = m_fadeMaterial;
 
 		// turn off the fade
 		m_fadeImage.enabled = false;
+	}
+
+	// unity on destroy
+	void OnDestroy()
+	{
+		// the fade material is our own copy so we have to clean it up
+		if ( m_fadeMaterial != null )
+		{
+			Destroy( m_fadeMaterial );
+		}
 	}
 
 	// unity update
