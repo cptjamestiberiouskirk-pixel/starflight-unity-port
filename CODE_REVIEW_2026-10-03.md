@@ -1,6 +1,6 @@
 # Code review, 2026-10-03
 
-Review of `master` at 4648ce3. Items fixed since then are listed under "Fixed since the review"; everything else in this file is still open as of the Unity 6000.3.13f1 upgrade (PR #4).
+Review of `master` at 4648ce3. Items fixed since then are listed under "Fixed since the review"; everything else in this file is still open as of PR #19 (2026-10-03).
 
 **Scope:** all of `Assets/Scripts` (225 files, about 32k lines), plus `Assets/Planet Generator/Editor`, `Assets/Tools/Editor` and `Assets/Shaders/Editor`.
 
@@ -40,8 +40,27 @@ Fixed in PR #3 (bf0b1a7) unless noted. None of these changed the save version.
 | M9 | Progress since the last location change was lost on quit; now saved in `OnApplicationQuit` (skipped for a destroyed ship) |
 | H6 (PR #7) | Combat used the target's position in the ship list as its model slot, but `ResetAlienShipModels` packs only living ships into the slots. After re-entering an encounter, debris landed in an empty slot and `Encounter.Update` threw every frame; now mapped through `Encounter.GetAlienShipModel()` |
 | M15 (PR #8) | The combat target carried over between encounters, and firing did not check that the target was alive and in the encounter, so a ship that was not on screen could be destroyed. The target is now cleared on entering an encounter and checked by `CombatController.GetValidTarget()` before firing |
+| M13 (PR #10) | A fully destroyed encounter kept moving toward the player, stayed on the radar and started again as an empty encounter; `UpdateEncounters` now skips encounters with no living ships |
+| M14 (PR #11) | Destroyed ships were still moved every frame, and ships with no debris template (all but vessels 1-4 and 20) kept their normal model; dead ships now stay put, a ship with no debris model is hidden, and the camera only frames living ships |
+| M7 (PR #12) | A missing sensor picture replaced the scan type with `Unknown` (15 of 23 vessel types, and debris); only the picture falls back now |
+| M8 (PR #13) | Saves overwrote the file in place and an unreadable save silently became a new game; saves now go through a `.tmp` file and keep a `.bak`, loading falls back to the backup, and an unreadable save is moved to `.corrupt` |
+| M24 (PR #15) | Gravity text dropped the leading zero of the hundredths (105 planets) |
+| M22 (PR #16) | Panels had no closing guard: a double Exit logged bank transactions twice and the buttons worked during the slide-out |
+| M5 (PR #17) | Selling armor kept the armor points; it now returns the ship to the bare hull's 250 (`PD_PlayerShip.c_bareHullArmorPoints`) |
+| M21 (PR #18) | A cargo pod could be sold while the cargo needed its space, leaving a negative free volume |
+| Low (PR #14) | `Viewport` fade wrote into the shared `Black.mat` asset on every play session in the Editor |
 | (PR #2) | `PD_General.m_lastCommIds` (`int[,]`) was never saved; three compile errors from 70445da |
 | (PR #4) | `com.unity.ai.generators` (deprecated) and `com.unity.2d.enhancers` removed |
+| (PR #5) | `com.unity.ai.assistant` and `com.unity.ai.inference` removed, with the App UI leftovers in `ProjectSettings` |
+| (PR #9, #19) | Unity CLI editor bridge `com.unity.pipeline` added; `com.coplaydev.unity-mcp` removed |
+
+### How the fixes were checked
+
+On 2026-10-03 the fixes were run in a headless play-mode probe: the real Spaceflight or Starport scene, new-game data, and an in-memory save system so no save file was touched. The probe is not in the repository.
+
+- **PR #3 (batch 1):** H1, H2, H3, H4, M2, M3, M4, M6, M9 and the `m_lastCommIds` fix from PR #2 passed 17 checks. M1 was checked by reading the code only.
+- **PR #7 onward:** H6, M15, M13, M14, M7, M22, M24, M5, M21 and the `Viewport` fix were each run before and after the change; the bug reproduced on the old code and was gone with the fix. M8 was run after the change only, because the old class could only write to the real save folder.
+- **Not done:** nothing was played by hand in the GUI Editor, and the probe has no graphics.
 
 ## Regressions from earlier "fix" commits
 
@@ -63,23 +82,15 @@ Fixed in PR #3 (bf0b1a7) unless noted. None of these changed the save version.
 
 | # | Where | Problem and failure | Fix | Label | Checked |
 |---|---|---|---|---|---|
-| M5 | `ShipConfigurationPanel.cs:817-832` | Selling armor resets the armor class but keeps `m_armorPoints`, so you can buy class 5 and sell it back for full armor at a 1,200 MU loss. | Reset the points when armor is removed. | CONFIRMED | no |
-| M7 | `SensorsDisplay.cs:361-373` | `m_scanType` is overwritten with `Unknown` when the texture slot is empty. Per the reviewer, the scene leaves slots 0, 5-17, 21 and 23 empty. Scanning Elowan, Thrynn, Veloxi, Gazurtoid or Uhlek ships (447 of 597 vessel slots) shows "Unknown", and Analysis shows "Insufficient data". | Keep the real scan type and use a separate texture index for the fallback. | CONFIRMED (reviewer) | part |
-| M8 | `JsonSaveSystem.cs:15`, `DataController.cs:148-163` | Saves overwrite the file in place, and on load any exception silently becomes a new game. A crash or full disk during a save (about 2.3 MB, written on every location change) wipes the slot. | Write to `.tmp` then replace, keep a `.bak`, and rename a corrupt file instead of resetting. | CONFIRMED (code) | no |
 | M10 | `TerrainElement.cs:70-86`, `TVCargoButton.cs:83-91` | A deposit stays pickable for 1.5 s during the transporter effect, so double-pressing Cargo adds it twice. | Add a picked-up flag. | CONFIRMED (2 reviewers) | no |
 | M11 | `StatusDisplay.cs:57-60, 138-141`; `DamageButton`, `RepairButton` | The gauges use hard-coded maxima of 1500/2500. A new ship shows "83% Hull Damage", and class-0 armor (250 points) shows "None installed" and can't be repaired. | One source of truth for max armor and shields. | CONFIRMED | no |
 | M12 | `Encounter.cs:165-216, 504-555` | Only Mechans (and the editor F9 key) ever turn hostile, and attacking doesn't change stance. Uhlek, Enterprise and Noah have no update case at all, so 67 Uhlek encounters never act. | Set Hostile on attack and add an Uhlek update (design call). | CONFIRMED | no |
-| M13 | `SpaceflightController.cs:393-456`; `Encounter.cs:287-304` | A fully destroyed encounter keeps moving toward the player and re-triggers as an empty encounter. | Skip encounters with no living ships. | CONFIRMED | no |
-| M14 | `Encounter.cs:222-243` | Debris from a destroyed ship keeps chasing the player. Also (seen while testing H6): only vessels 1-4 and 20 have a debris template, so a destroyed Elowan, Thrynn, Veloxi, Gazurtoid or Uhlek ship keeps its normal model and keeps flying. | Skip movement for dead ships, and hide the model when there is no debris template. | CONFIRMED | no |
 | M16 | `Planet.cs:93`, `PlanetGenerator.cs:517-616` | The old generator's runtime textures are never destroyed: roughly 40 MB or more leaked per star system until docking. | `PlanetGenerator.Release()` plus `Resources.UnloadAsset`. | CONFIRMED (2 reviewers) | no |
 | M17 | `PlanetGenerator.cs:139-223` | No try/catch in the async task, and the version-mismatch path falls through. A bad or corrupt planet file soft-locks the game on the penetration popup, and the auto-save makes it permanent. Latent: all 811 shipped files are valid. | Catch, then abort and return; poll `IsCompleted`. | CONFIRMED path / INFERRED trigger | no |
 | M18 | `PlanetGenerator.cs:146` | `Task.Wait()` runs on the main thread the next frame, so all planet processing blocks it and the progress bar freezes. | Poll `IsCompleted`. | CONFIRMED | no |
 | M19 | `DropShieldsButton`, `RaiseShieldsButton` | Dropping and raising shields refills them to full instantly, mid-combat. | Keep shield points across drop/raise (design call). | CONFIRMED | no |
 | M20 | `RepairButton.cs:41-59`, `TreatButton.cs:44-55` | Repair and Treat have no cost or cooldown. Treat also heals and lists every hired person, not just the crew on board. | Iterate the assigned roles; cost or cooldown is a design call. | CONFIRMED | no |
-| M21 | `ShipConfigurationPanel.cs:1032-1055` | A cargo pod can be sold when the remaining capacity is below the cargo already loaded. The negative remaining volume then breaks the trade depot. | Refuse the sale; check `<= 0` at `TradeDepotPanel.cs:559`. | CONFIRMED | no |
-| M22 | `Panel.cs:35-42` | No closing guard, so a double-click on Exit logs bank transactions twice, and Buy still works during the slide-out. | Add an `m_isClosing` flag. | CONFIRMED | no |
 | M23 | `DescendButton.cs:60` | `Update()` returns false, so input stays live during the roughly 12 s landing animation (Abort, Descend again, Select Site). | Return true. | CONFIRMED input / INFERRED effects | no |
-| M24 | `GD_Planet.cs:226` | Gravity drops the leading zero of the hundredths: 105 shows "1.5 G" instead of "1.05 G". 105 of 811 planets are affected. | `ToString( "D2" )`. | CONFIRMED | no |
 | M25 | `PG_AlbedoMap.cs:120, 128-146` | The x blur's `x0 == x1`, so it's asymmetric. The y blur allocates 32 MB, then its result is thrown away. | Fix x0 and delete the y blur (slight visual change). | CONFIRMED | no |
 | M26 | `PG_EditorWindow.cs:766-768` (editor) | The south-pole padding reads the north row's heights. This is baked into every generated `.bytes` file. | Use row `c_height - 1`. Takes effect only after regenerating the files. | CONFIRMED | no |
 | M27 | `PG_EditorWindow.cs:228-297`, `PG_HydraulicErosion.cs:180` (editor) | The progress bar isn't cleared on exceptions, so the editor looks hung. Erosion has an unbounded loop when evaporation is 0, and a write race between threads. Zero-valued sliders produce NaN. | try/finally, iteration caps, validate settings. | CONFIRMED / INFERRED loop | no |
@@ -123,10 +134,12 @@ Grouped. All are CONFIRMED unless marked otherwise.
 
 **Leaks and per-frame cost**
 - `TransporterEffect` materials are never destroyed.
-- `Viewport` fade mutates the shared material asset in the Editor.
 - `DockingBayPanel.UpdateOpacity` reads `.materials` every frame.
 - `StatusDisplay` and `TerrainVehicleDisplay` rebuild strings every frame.
 - `ShipsLog` row loops have no iteration cap (HYPOTHESIZED hang).
+
+**Assets**
+- 80 asset references in scenes, prefabs and materials point at assets that are not in the repository (found by cross-referencing GUIDs, 2026-10-03). Examples: the Debris mask in `SensorsDisplay.m_maskTextures` (index 24) in `Spaceflight.unity`, textures on several ship and planet materials, and objects in `Test.unity` and `Ecosystem.unity`. Most are harmless empty slots; none has been checked one by one.
 
 **Visual**
 - `Float.cs` wraps at 360 instead of 2π, so the object pops every few minutes.
