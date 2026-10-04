@@ -36,6 +36,14 @@ public class FireLaserButton : ShipButton
 			return false;
 		}
 
+		// check if we have fuel (every shot uses a little endurium)
+		if ( !playerData.m_playerShip.HasFuel() )
+		{
+			SpaceflightController.m_instance.m_messages.AddText( "<color=red>Insufficient fuel to fire the laser!</color>" );
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+			return false;
+		}
+
 		// check if we have a target
 		if ( CombatController.m_instance.GetTargetIndex() < 0 )
 		{

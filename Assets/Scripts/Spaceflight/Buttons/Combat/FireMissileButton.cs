@@ -13,7 +13,7 @@ public class FireMissileButton : ShipButton
 			return "Missile (N/A)";
 		}
 
-		return $"Missile ({playerData.m_playerShip.m_missilesRemaining})";
+		return "Missile";
 	}
 
 	public override bool Execute()
@@ -36,10 +36,10 @@ public class FireMissileButton : ShipButton
 			return false;
 		}
 
-		// check if we have missiles
-		if ( playerData.m_playerShip.m_missilesRemaining <= 0 )
+		// check if we have fuel (every launch uses a little endurium)
+		if ( !playerData.m_playerShip.HasFuel() )
 		{
-			SpaceflightController.m_instance.m_messages.AddText( "<color=red>Out of missiles!</color>" );
+			SpaceflightController.m_instance.m_messages.AddText( "<color=red>Insufficient fuel to launch a missile!</color>" );
 			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
 			return false;
 		}
@@ -59,7 +59,7 @@ public class FireMissileButton : ShipButton
 			return false;
 		}
 
-		// update button labels to show remaining missiles
+		// update the buttons
 		SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
 
 		return true;
