@@ -34,6 +34,15 @@ public class PD_PlayerShip
 	public int m_armorPoints;
 	public int m_missilesRemaining;
 
+	// how many seconds it takes the shields to regain one percent of their full charge
+	public const float c_shieldRechargeInterval = 5.0f;
+
+	// true once the shield charge is kept when the shields are lowered (false in save files from before that - see ValidateShieldCharge)
+	public bool m_shieldChargeIsKept;
+
+	// how long it has been since the shields last regained some charge
+	public float m_shieldRechargeTimer;
+
 	public void Reset()
 	{
 		// reset the ship name
@@ -58,6 +67,9 @@ public class PD_PlayerShip
 
 		m_shieldPoints = 0;
 		m_armorPoints = c_bareHullArmorPoints;
+
+		m_shieldChargeIsKept = true;
+		m_shieldRechargeTimer = 0.0f;
 
 		// recalculate the mass of the ship
 		RecalculateMass();
@@ -280,10 +292,10 @@ public class PD_PlayerShip
 	{
 		if ( !m_shieldsAreUp )
 		{
-			var shields = GetShielding();
+			// the shields come up with whatever charge they have (raising them does not recharge them)
+			ValidateShieldCharge();
 
 			m_shieldsAreUp = true;
-			m_shieldPoints = shields.m_points;
 
 			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Shields raised.</color>" );
 		}
@@ -293,10 +305,67 @@ public class PD_PlayerShip
 	{
 		if ( m_shieldsAreUp )
 		{
+			// the shields keep their charge while they are down
 			m_shieldsAreUp = false;
-			m_shieldPoints = 0;
 
 			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Shields dropped.</color>" );
+		}
+	}
+
+	// call this before using the shield charge - it makes sure the charge is one the installed shielding can have
+	public void ValidateShieldCharge()
+	{
+		// lowering the shields used to throw the charge away, so a save file from back then has none while its shields are down - give it a full charge once
+		if ( !m_shieldChargeIsKept )
+		{
+			m_shieldChargeIsKept = true;
+
+			if ( !m_shieldsAreUp )
+			{
+				m_shieldPoints = GetShielding().m_points;
+			}
+		}
+
+		// never less than nothing and never more than the installed shielding can hold
+		m_shieldPoints = Mathf.Clamp( m_shieldPoints, 0, GetShielding().m_points );
+	}
+
+	// put the shields back at full charge (starport does this while the ship is docked)
+	public void RechargeShieldsFully()
+	{
+		m_shieldChargeIsKept = true;
+		m_shieldPoints = GetShielding().m_points;
+		m_shieldRechargeTimer = 0.0f;
+	}
+
+	// call this every frame during spaceflight - the shields slowly regain their charge whether they are up or down
+	public void UpdateShields( float deltaTime )
+	{
+		ValidateShieldCharge();
+
+		// are the shields fully charged already?
+		var maximumPoints = GetShielding().m_points;
+
+		if ( m_shieldPoints >= maximumPoints )
+		{
+			// yes - nothing to do
+			m_shieldRechargeTimer = 0.0f;
+
+			return;
+		}
+
+		// no - update the timer
+		m_shieldRechargeTimer += deltaTime;
+
+		// is it time for the shields to regain some charge?
+		if ( m_shieldRechargeTimer >= c_shieldRechargeInterval )
+		{
+			// yes - one percent of the full charge for every interval that has passed
+			var intervals = Mathf.FloorToInt( m_shieldRechargeTimer / c_shieldRechargeInterval );
+
+			m_shieldRechargeTimer -= intervals * c_shieldRechargeInterval;
+
+			m_shieldPoints = Mathf.Min( maximumPoints, m_shieldPoints + intervals * Mathf.Max( 1, maximumPoints / 100 ) );
 		}
 	}
 
