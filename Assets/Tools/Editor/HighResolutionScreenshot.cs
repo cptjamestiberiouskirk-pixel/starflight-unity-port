@@ -38,10 +38,13 @@ public class Screenshot : EditorWindow
 
 		if ( GUILayout.Button( "Take Screenshot", GUILayout.MinHeight( 60 ) ) )
 		{
-			m_filename = EditorUtility.SaveFilePanel( "Image File Name", Path.GetDirectoryName( m_filename ), Path.GetFileName( m_filename ), "png" );
+			var filename = EditorUtility.SaveFilePanel( "Image File Name", Path.GetDirectoryName( m_filename ), Path.GetFileName( m_filename ), "png" );
 
-			if ( m_filename.Length > 0 )
+			// a cancelled dialog gives an empty name - keep the one we had (with an empty one the next click could not work out a folder and threw)
+			if ( filename.Length > 0 )
 			{
+				m_filename = filename;
+
 				ScreenCapture.CaptureScreenshot( m_filename, m_superSize );
 			}
 		}

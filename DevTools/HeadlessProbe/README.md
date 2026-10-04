@@ -83,6 +83,7 @@ What the probe does:
 | `shipslog` | a ship's log of forty entries scrolled to its end, then an empty log, then the first one again: that it opens (the review thought it could hang) and where it is scrolled to |
 | `leaks` | the materials in memory before, during and after a deposit's transporter effect, and whether the spaceflight controller and the maps of two planets are still in memory after the scene has been left (weak references, after the save panel has been used) |
 | `latent` | the message box slide with a duration of one and of two seconds, the experimental planet mesh at a resolution of 110 with no parent (its triangle indices read back, the mesh after its planet is destroyed), and the adapter switched off with no planet controller |
+| `editortools` | the textures in memory before and after the planet generator's four save functions, the shader inspector's compression test with a render texture in the normal map slot, and what an empty file name does to Path.GetDirectoryName |
 
 Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (about 9 minutes; one summary block per scenario with the failed checks and exceptions).
 

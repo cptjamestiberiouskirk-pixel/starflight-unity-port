@@ -45,7 +45,23 @@ public class MassCreateGameObjects : EditorWindow
 
 		if ( GUILayout.Button( "Mass Create GameObjects", GUILayout.MinHeight( 60 ) ) )
 		{
+			// we need something to copy from and something to put the copies under
+			if ( ( m_sourceGameObject == null ) || ( m_parentGameObject == null ) )
+			{
+				EditorUtility.DisplayDialog( "Mass Create GameObjects", "Select a source and a parent game object first.", "Ok" );
+
+				return;
+			}
+
 			var numSourceGameObjects = m_sourceGameObject.transform.childCount;
+
+			// the copies are made from the children of the source, in turn (with none there is nothing to copy, and the turn taking divided by zero)
+			if ( numSourceGameObjects == 0 )
+			{
+				EditorUtility.DisplayDialog( "Mass Create GameObjects", "The source game object has no children to copy.", "Ok" );
+
+				return;
+			}
 
 			for ( var i = 0; i < m_numberOfGameObjects; i++ )
 			{

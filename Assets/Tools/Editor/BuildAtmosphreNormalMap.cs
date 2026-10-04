@@ -34,10 +34,13 @@ public class BuildAtmosphereNormalMap : EditorWindow
 	{
 		if ( GUILayout.Button( "Build Atmosphere Normal Map", GUILayout.MinHeight( 60 ) ) )
 		{
-			m_filename = EditorUtility.SaveFilePanel( "Image File Name", Path.GetDirectoryName( m_filename ), Path.GetFileName( m_filename ), "png" );
+			var filename = EditorUtility.SaveFilePanel( "Image File Name", Path.GetDirectoryName( m_filename ), Path.GetFileName( m_filename ), "png" );
 
-			if ( m_filename.Length > 0 )
+			// a cancelled dialog gives an empty name - keep the one we had (with an empty one the next click could not work out a folder and threw)
+			if ( filename.Length > 0 )
 			{
+				m_filename = filename;
+
 				var baseFileName = Path.GetDirectoryName( m_filename ) + "/" + Path.GetFileNameWithoutExtension( m_filename );
 
 				Debug.Log( "baseFileName = " + baseFileName );
