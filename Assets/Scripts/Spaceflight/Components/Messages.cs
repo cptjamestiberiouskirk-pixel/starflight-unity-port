@@ -75,7 +75,10 @@ public class Messages : MonoBehaviour
 				m_isOut = !m_isOut;
 			}
 
-			var x = Mathf.SmoothStep( from, to, m_slideTime );
+			// how far through the slide we are, from 0 to 1 (the time in seconds went in here as it was, which is only the same thing for a slide of one second)
+			var slideAmount = ( m_slideDuration > 0.0f ) ? ( m_slideTime / m_slideDuration ) : 1.0f;
+
+			var x = Mathf.SmoothStep( from, to, slideAmount );
 
 			var offsetMin = m_frame.offsetMin;
 

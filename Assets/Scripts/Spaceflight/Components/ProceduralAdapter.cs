@@ -15,14 +15,8 @@ public class ProceduralAdapter : MonoBehaviour
         if (!EnableProceduralGeneration)
         {
             Cleanup(); // Remove any existing procedural planet
-            // Ensure legacy planet is visible
-            if (planetController.m_planetModel != null)
-            {
-                var renderer = planetController.m_planetModel.GetComponent<MeshRenderer>();
-                if (renderer != null) renderer.enabled = true;
-            }
-            var revertHostRenderer = planetController.GetComponent<MeshRenderer>();
-            if (revertHostRenderer != null) revertHostRenderer.enabled = true;            return;
+            ShowLegacyPlanet(planetController);
+            return;
         }
 
         // 2. PREFAB LOADER: Find the prefab automatically
@@ -35,14 +29,7 @@ public class ProceduralAdapter : MonoBehaviour
         if (_planetManagerPrefab == null)
         {
             Debug.LogError("ProceduralAdapter: Could not find 'PlanetManager' in Resources folder! Reverting to legacy.");
-            // Revert to legacy: ensure both renderers are visible
-            if (planetController.m_planetModel != null)
-            {
-                var renderer = planetController.m_planetModel.GetComponent<MeshRenderer>();
-                if (renderer != null) renderer.enabled = true;
-            }
-            var revertHostRenderer2 = planetController.GetComponent<MeshRenderer>();
-            if (revertHostRenderer2 != null) revertHostRenderer2.enabled = true;
+            ShowLegacyPlanet(planetController);
 
             return;
         }
@@ -106,6 +93,25 @@ public class ProceduralAdapter : MonoBehaviour
                 mainCam.backgroundColor = Color.black;
             }
         }
+    }
+
+    // Revert to legacy: make sure both renderers of the legacy planet are visible.
+    // The rest of Initialize allows for a missing planet controller, so this does too (it used to be dereferenced unchecked).
+    private void ShowLegacyPlanet(Planet planetController)
+    {
+        if (planetController == null)
+        {
+            return;
+        }
+
+        if (planetController.m_planetModel != null)
+        {
+            var modelRenderer = planetController.m_planetModel.GetComponent<MeshRenderer>();
+            if (modelRenderer != null) modelRenderer.enabled = true;
+        }
+
+        var hostRenderer = planetController.GetComponent<MeshRenderer>();
+        if (hostRenderer != null) hostRenderer.enabled = true;
     }
 
     private void ApplyBiomeData(PlanetManager manager, GD_Planet data)

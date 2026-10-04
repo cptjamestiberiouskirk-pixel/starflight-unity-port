@@ -135,7 +135,7 @@ public class InfiniteStarfield : MonoBehaviour
 					{
 						if ( position.y < minCorner.y )
 							position.y += bounds.y;
-						else if ( position.x > maxCorner.x )
+						else if ( position.y > maxCorner.y )
 							position.y -= bounds.y;
 					}
 					else
