@@ -395,6 +395,12 @@ public class SpaceflightController : MonoBehaviour
 			// assume this encounter is in a different location
 			encounter.SetDistance( float.MaxValue );
 
+			// skip encounters that have no living ships left (there is nobody to detect the player, chase the player, or meet the player)
+			if ( !encounter.HasLivingAlienShips() )
+			{
+				continue;
+			}
+
 			// get the encounter location
 			var encounterLocation = encounter.GetLocation();
 
