@@ -389,6 +389,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioM11();
 				break;
 
+			case "m18":
+				yield return ScenarioM18();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -3115,6 +3119,188 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "M11 class 5 armor warns below a quarter of its 1500 points", !class5AboveWarned && class5BelowWarned, "400 to 390 warned " + class5AboveWarned + ", 310 to 300 warned " + class5BelowWarned );
 
 		Finish( "scenario=m11 newShip=[" + newDamageLine + " gauge " + newArmorGauge.ToString( "F3" ) + "] bareHullRepair=" + repairsStarted + "/" + armorAfter10s + "/" + armorWhenDone + " class2=[" + class2FullDamageLine + " " + class2FullArmorGauge.ToString( "F3" ) + " | " + class2HurtArmorGauge.ToString( "F3" ) + "] shieldGauge=" + halfShieldGauge.ToString( "F3" ) + "/" + fullShieldGauge.ToString( "F3" ) + "/" + noShieldGauge.ToString( "F3" ) + " warned=" + bareScratchWarned + "/" + bareLowWarned + "/" + class5AboveWarned + "/" + class5BelowWarned + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- M18: generating the planet maps does not hold up the main thread
+
+	// make the star system generate the maps of its planets again, the way entering the system does
+	static void RegeneratePlanets()
+	{
+		var starSystem = SpaceflightController.m_instance.m_starSystem;
+
+		// the star system only generates maps when the star has changed, so make it forget which star it has
+		SetField( starSystem, "m_currentStar", null );
+
+		starSystem.Initialize();
+	}
+
+	// the background task of the planet that is being processed right now (null if no planet is)
+	static System.Threading.Tasks.Task RunningPlanetTask()
+	{
+		foreach ( var planetController in SpaceflightController.m_instance.m_starSystem.m_planetController )
+		{
+			var generator = planetController.GetPlanetGenerator();
+
+			if ( generator == null )
+			{
+				continue;
+			}
+
+			var task = GetField( generator, "m_asyncTask" ) as System.Threading.Tasks.Task;
+
+			if ( ( task != null ) && !task.IsCompleted )
+			{
+				return task;
+			}
+		}
+
+		return null;
+	}
+
+	IEnumerator ScenarioM18()
+	{
+		var starSystem = SpaceflightController.m_instance.m_starSystem;
+		var popup = PopupController.m_instance;
+
+		EnsureCrew();
+
+		// let the generation that began with the scene run to its end
+		var deadline = Time.realtimeSinceStartup + 45.0f;
+
+		while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup < deadline ) )
+		{
+			yield return null;
+		}
+
+		if ( starSystem.GeneratingPlanets() )
+		{
+			Finish( "scenario=m18 abort: the first generation never finished", 2 );
+			yield break;
+		}
+
+		// generate the maps of the same system again and watch the main thread while it happens
+		RegeneratePlanets();
+
+		var start = Time.realtimeSinceStartup;
+		var lastFrameTime = start;
+
+		var frames = 0;
+		var longestFrame = 0.0f;
+
+		// frames that began while a planet was being processed in the background
+		var framesWithProcessing = 0;
+		var longestFrameWithProcessing = 0.0f;
+		var secondsWithProcessing = 0.0f;
+
+		// the progress bar of the popup (in thousandths) at the end of each of those frames
+		var fillValues = new HashSet<int>();
+
+		var planetsProcessed = 0;
+
+		System.Threading.Tasks.Task runningTask = null;
+		System.Threading.Tasks.Task lastTask = null;
+
+		// how long the planet that is being processed has taken so far, and the longest any planet took
+		var planetSeconds = 0.0f;
+		var longestPlanetSeconds = 0.0f;
+
+		var taskStart = start;
+		var lastCollections = GC.CollectionCount( 0 );
+		var lastHeap = UnityEngine.Profiling.Profiler.GetMonoHeapSizeLong();
+		var lastUsed = UnityEngine.Profiling.Profiler.GetMonoUsedSizeLong();
+
+		Log( "M18 incremental garbage collector " + UnityEngine.Scripting.GarbageCollector.isIncremental + ", collections so far " + lastCollections + ", managed heap " + ( lastHeap >> 20 ) + " MB, used " + ( lastUsed >> 20 ) + " MB" );
+
+		while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 60.0f ) )
+		{
+			yield return null;
+
+			var now = Time.realtimeSinceStartup;
+			var frameTime = now - lastFrameTime;
+
+			lastFrameTime = now;
+
+			frames++;
+			longestFrame = Mathf.Max( longestFrame, frameTime );
+
+			var collections = GC.CollectionCount( 0 );
+
+			// was a planet being processed when this frame began?
+			if ( runningTask != null )
+			{
+				framesWithProcessing++;
+				secondsWithProcessing += frameTime;
+				longestFrameWithProcessing = Mathf.Max( longestFrameWithProcessing, frameTime );
+
+				planetSeconds += frameTime;
+				longestPlanetSeconds = Mathf.Max( longestPlanetSeconds, planetSeconds );
+
+				fillValues.Add( Mathf.RoundToInt( popup.m_popupFill.anchorMax.x * 1000.0f ) );
+
+				// say what the long frames are (the garbage collector stops every thread, and the processing allocates a lot)
+				if ( frameTime > 0.05f )
+				{
+					Log( "M18 long frame " + frames + " while planet " + planetsProcessed + " was being processed: " + frameTime.ToString( "F3" ) + " s, " + ( now - taskStart ).ToString( "F3" ) + " s after its task was seen, garbage collections during the frame " + ( collections - lastCollections ) + " (total " + collections + "), managed heap " + ( lastHeap >> 20 ) + " to " + ( UnityEngine.Profiling.Profiler.GetMonoHeapSizeLong() >> 20 ) + " MB, used " + ( lastUsed >> 20 ) + " to " + ( UnityEngine.Profiling.Profiler.GetMonoUsedSizeLong() >> 20 ) + " MB, progress bar " + popup.m_popupFill.anchorMax.x.ToString( "F3" ) + ", task done by the end of the frame " + runningTask.IsCompleted );
+				}
+			}
+
+			// say in which frame the collector counted a collection (to tell whether the long frames are its pauses)
+			if ( collections != lastCollections )
+			{
+				Log( "M18 garbage collection " + collections + " was counted in frame " + frames + " (" + frameTime.ToString( "F3" ) + " s, planet " + planetsProcessed + ( ( runningTask != null ) ? " being processed" : " not being processed" ) + "), used " + ( lastUsed >> 20 ) + " to " + ( UnityEngine.Profiling.Profiler.GetMonoUsedSizeLong() >> 20 ) + " MB" );
+			}
+
+			lastCollections = collections;
+			lastHeap = UnityEngine.Profiling.Profiler.GetMonoHeapSizeLong();
+			lastUsed = UnityEngine.Profiling.Profiler.GetMonoUsedSizeLong();
+
+			runningTask = RunningPlanetTask();
+
+			if ( ( runningTask != null ) && !ReferenceEquals( runningTask, lastTask ) )
+			{
+				lastTask = runningTask;
+				taskStart = now;
+				planetSeconds = 0.0f;
+				planetsProcessed++;
+			}
+		}
+
+		var seconds = Time.realtimeSinceStartup - start;
+		var finished = !starSystem.GeneratingPlanets();
+
+		// did every planet of the system get its maps?
+		var planetsWithMaps = 0;
+		var planetsInSystem = 0;
+
+		foreach ( var planetController in starSystem.m_planetController )
+		{
+			if ( planetController.m_planet == null )
+			{
+				continue;
+			}
+
+			planetsInSystem++;
+
+			var generator = planetController.GetPlanetGenerator();
+
+			if ( ( generator != null ) && generator.m_mapsGenerated && ( generator.m_albedoTexture != null ) && ( generator.m_normalTexture != null ) )
+			{
+				planetsWithMaps++;
+			}
+		}
+
+		var averageSecondsPerPlanet = ( planetsProcessed > 0 ) ? ( secondsWithProcessing / planetsProcessed ) : 0.0f;
+
+		Log( "M18 generating the maps of " + planetsInSystem + " planets took " + seconds.ToString( "F2" ) + " s and " + frames + " frames (longest frame " + longestFrame.ToString( "F3" ) + " s), finished " + finished + ", planets with maps " + planetsWithMaps + ", paused afterwards " + SpaceflightController.m_instance.m_gameIsPaused );
+		Log( "M18 while a planet was being processed in the background (" + planetsProcessed + " planets, " + secondsWithProcessing.ToString( "F2" ) + " s, " + averageSecondsPerPlanet.ToString( "F2" ) + " s a planet): " + framesWithProcessing + " frames, longest " + longestFrameWithProcessing.ToString( "F3" ) + " s, " + fillValues.Count + " different positions of the progress bar" );
+
+		Check( "M18 the generation finishes and every planet gets its maps", finished && ( planetsInSystem > 0 ) && ( planetsWithMaps == planetsInSystem ) && !SpaceflightController.m_instance.m_gameIsPaused, "finished " + finished + ", planets with maps " + planetsWithMaps + " of " + planetsInSystem + ", paused " + SpaceflightController.m_instance.m_gameIsPaused );
+		Check( "M18 the main thread keeps running frames while a planet is processed", ( planetsProcessed > 0 ) && ( framesWithProcessing >= planetsProcessed * 10 ), framesWithProcessing + " frames for " + planetsProcessed + " planets" );
+		// waiting for the task made one frame last as long as the whole planet, so the longest frame was the slowest planet (what is left with the fix are pauses of the garbage collector)
+		Check( "M18 no frame lasts as long as the processing of a planet", ( planetsProcessed > 0 ) && ( longestFrameWithProcessing < longestPlanetSeconds * 0.75f ), "longest frame " + longestFrameWithProcessing.ToString( "F3" ) + " s, the slowest planet took " + longestPlanetSeconds.ToString( "F3" ) + " s (" + averageSecondsPerPlanet.ToString( "F2" ) + " s on average)" );
+		Check( "M18 the progress bar moves while a planet is processed", fillValues.Count >= planetsProcessed * 3, fillValues.Count + " different positions for " + planetsProcessed + " planets" );
+
+		Finish( "scenario=m18 finished=" + finished + " planets=" + planetsWithMaps + "/" + planetsInSystem + " seconds=" + seconds.ToString( "F2" ) + " frames=" + frames + " processing=[planets " + planetsProcessed + " frames " + framesWithProcessing + " longestFrame " + longestFrameWithProcessing.ToString( "F3" ) + " perPlanet " + averageSecondsPerPlanet.ToString( "F2" ) + " barPositions " + fillValues.Count + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
