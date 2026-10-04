@@ -37,9 +37,6 @@ public class RepairButton : ShipButton
 			return false;
 		}
 
-		// calculate repair power based on engineering skill (5 points per skill level)
-		var repairPower = engineer.m_engineering * 5;
-
 		// get maximum armor points
 		var armor = ship.GetArmor();
 		var maxArmor = armor.m_points;
@@ -55,14 +52,18 @@ public class RepairButton : ShipButton
 
 		if ( ship.m_armorPoints < maxArmor )
 		{
-			var previousArmor = ship.m_armorPoints;
-			ship.m_armorPoints = Mathf.Min( maxArmor, ship.m_armorPoints + repairPower );
-			var repairedAmount = ship.m_armorPoints - previousArmor;
+			// repairs take time - the engineer keeps at it until the armor is whole again (the better the engineer the faster it goes)
+			var alreadyUnderWay = ship.m_repairsAreUnderWay;
+
+			if ( !alreadyUnderWay )
+			{
+				ship.StartRepairs();
+			}
 
 			SpaceflightController.m_instance.m_messages.AddText(
-				"<color=green>Repairs complete.</color>\n" +
-				"Repaired: <color=white>" + repairedAmount + " points</color>\n" +
-				"Armor: <color=white>" + ship.m_armorPoints + "/" + maxArmor + "</color>"
+				( alreadyUnderWay ? "<color=green>Still repairing the armor, Captain.</color>\n" : "<color=green>Beginning repairs on the armor, Captain.</color>\n" ) +
+				"Armor: <color=white>" + ship.m_armorPoints + "/" + maxArmor + "</color>\n" +
+				"Estimated time: <color=white>" + FormatDuration( ship.GetRepairTimeRemaining() ) + "</color>"
 			);
 			SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 		}

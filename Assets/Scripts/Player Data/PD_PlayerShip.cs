@@ -43,6 +43,16 @@ public class PD_PlayerShip
 	// how long it has been since the shields last regained some charge
 	public float m_shieldRechargeTimer;
 
+	// how many armor points the engineer repairs each second for every point of engineering skill, and the slowest an engineer ever works
+	public const float c_repairRatePerSkillPoint = 0.02f;
+	public const float c_minimumRepairRate = 0.5f;
+
+	// true while the engineer is repairing the armor (false in save files from before repairs took time)
+	public bool m_repairsAreUnderWay;
+
+	// the part of an armor point that has been repaired so far
+	public float m_repairProgress;
+
 	public void Reset()
 	{
 		// reset the ship name
@@ -70,6 +80,9 @@ public class PD_PlayerShip
 
 		m_shieldChargeIsKept = true;
 		m_shieldRechargeTimer = 0.0f;
+
+		m_repairsAreUnderWay = false;
+		m_repairProgress = 0.0f;
 
 		// recalculate the mass of the ship
 		RecalculateMass();
@@ -366,6 +379,113 @@ public class PD_PlayerShip
 			m_shieldRechargeTimer -= intervals * c_shieldRechargeInterval;
 
 			m_shieldPoints = Mathf.Min( maximumPoints, m_shieldPoints + intervals * Mathf.Max( 1, maximumPoints / 100 ) );
+		}
+	}
+
+	// the number of armor points the engineer repairs each second (zero if there is no engineer who can work)
+	public float GetRepairRate()
+	{
+		// get to the player data
+		var playerData = DataController.m_instance.m_playerData;
+
+		// nothing gets repaired without an engineer
+		if ( !playerData.m_crewAssignment.IsAssigned( PD_CrewAssignment.Role.Engineer ) )
+		{
+			return 0.0f;
+		}
+
+		var engineer = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Engineer );
+
+		// or with one who is incapacitated
+		if ( engineer.m_vitality <= 0 )
+		{
+			return 0.0f;
+		}
+
+		// the better the engineer the faster the repairs
+		return Mathf.Max( c_minimumRepairRate, engineer.m_engineering * c_repairRatePerSkillPoint );
+	}
+
+	// the number of seconds it will take to finish repairing the armor (zero if there is nothing to repair or nobody to do it)
+	public float GetRepairTimeRemaining()
+	{
+		var repairRate = GetRepairRate();
+		var pointsToRepair = GetArmor().m_points - m_armorPoints;
+
+		if ( ( repairRate <= 0.0f ) || ( pointsToRepair <= 0 ) )
+		{
+			return 0.0f;
+		}
+
+		return Mathf.Max( 0.0f, pointsToRepair - m_repairProgress ) / repairRate;
+	}
+
+	// call this to have the engineer start repairing the armor
+	public void StartRepairs()
+	{
+		m_repairsAreUnderWay = true;
+		m_repairProgress = 0.0f;
+	}
+
+	// call this every frame during spaceflight - the engineer repairs the armor a little at a time
+	public void UpdateRepairs( float deltaTime )
+	{
+		// nothing to do unless the engineer has been told to repair the armor
+		if ( !m_repairsAreUnderWay )
+		{
+			return;
+		}
+
+		// a destroyed ship is beyond repair (and it has to stay destroyed, a destroyed ship is never saved)
+		if ( m_armorPoints <= 0 )
+		{
+			m_repairsAreUnderWay = false;
+
+			return;
+		}
+
+		// is there anything left to repair? (the armor may have been replaced or sold at starport in the meantime)
+		var maximumPoints = GetArmor().m_points;
+
+		if ( m_armorPoints >= maximumPoints )
+		{
+			// no - the engineer is done
+			m_repairsAreUnderWay = false;
+			m_repairProgress = 0.0f;
+
+			return;
+		}
+
+		// the repairs stop if the engineer is gone or incapacitated
+		var repairRate = GetRepairRate();
+
+		if ( repairRate <= 0.0f )
+		{
+			m_repairsAreUnderWay = false;
+
+			SpaceflightController.m_instance.m_messages.AddText( "<color=red>Repairs have stopped. No engineer is available!</color>" );
+
+			return;
+		}
+
+		// repair a little more
+		m_repairProgress += repairRate * deltaTime;
+
+		// move the whole armor points that have been repaired over to the armor
+		var pointsRepaired = Mathf.FloorToInt( m_repairProgress );
+
+		m_repairProgress -= pointsRepaired;
+
+		m_armorPoints = Mathf.Min( maximumPoints, m_armorPoints + pointsRepaired );
+
+		// is the armor whole again?
+		if ( m_armorPoints >= maximumPoints )
+		{
+			// yes - the engineer is done
+			m_repairsAreUnderWay = false;
+			m_repairProgress = 0.0f;
+
+			SpaceflightController.m_instance.m_messages.AddText( "<color=green>Repairs on the armor all completed, sir.</color>" );
 		}
 	}
 
