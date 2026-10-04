@@ -487,6 +487,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLatent();
 				break;
 
+			case "editortools":
+				yield return ScenarioEditorTools();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -7060,6 +7064,134 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "latent: the adapter does nothing without a planet controller", adapterThrew == "nothing", "threw " + adapterThrew );
 
 		Finish( "scenario=latent oneSecond=" + oneSecond[ 0 ].ToString( "F0" ) + "/" + oneSecond[ 1 ].ToString( "F0" ) + " twoSeconds=" + twoSeconds[ 0 ].ToString( "F0" ) + "/" + twoSeconds[ 1 ].ToString( "F0" ) + " planet=" + generateThrew + "/" + vertices + "/" + triangles + "/" + ( meshesAfter - meshesBefore ) + " adapter=" + adapterThrew + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: editor tools (the textures the planet generator's save functions make, the shader inspector with a texture that is not 2D, an empty path)
+
+	// call a method of the editor assembly and say what it threw (nothing, if it worked)
+	static string InvokeAndCatch( MethodInfo method, object target, object[] arguments, out object result )
+	{
+		result = null;
+
+		try
+		{
+			result = method.Invoke( target, arguments );
+
+			return "nothing";
+		}
+		catch ( TargetInvocationException exception )
+		{
+			return exception.InnerException.GetType().Name;
+		}
+	}
+
+	IEnumerator ScenarioEditorTools()
+	{
+		// ---- 1. the four save functions of the planet generator tool each make a texture for the picture they save
+		var tools = Type.GetType( "PG_Tools, Assembly-CSharp-Editor" );
+		var folder = System.IO.Path.Combine( Application.temporaryCachePath, "ClaudeProbeEditorTools" );
+		var floats = new float[ 16, 16 ];
+		var colors = new Color[ 16, 16 ];
+
+		var saves = new MethodInfo[]
+		{
+			tools.GetMethod( "SaveAsPNG", new Type[] { typeof( float[,] ), typeof( string ) } ),
+			tools.GetMethod( "SaveAsPNG", new Type[] { typeof( Color[,] ), typeof( string ), typeof( bool ) } ),
+			tools.GetMethod( "SaveAsEXR", new Type[] { typeof( float[,] ), typeof( string ) } ),
+			tools.GetMethod( "SaveAsEXR", new Type[] { typeof( Color[,] ), typeof( string ) } ),
+		};
+
+		var arguments = new object[][]
+		{
+			new object[] { floats, System.IO.Path.Combine( folder, "floats.png" ) },
+			new object[] { colors, System.IO.Path.Combine( folder, "colors.png" ), false },
+			new object[] { floats, System.IO.Path.Combine( folder, "floats.exr" ) },
+			new object[] { colors, System.IO.Path.Combine( folder, "colors.exr" ) },
+		};
+
+		var texturesBefore = Resources.FindObjectsOfTypeAll<Texture2D>().Length;
+		var saveThrew = "";
+		var filesWritten = 0;
+
+		for ( var i = 0; i < saves.Length; i++ )
+		{
+			saveThrew += InvokeAndCatch( saves[ i ], null, arguments[ i ], out _ ) + " ";
+
+			filesWritten += System.IO.File.Exists( (string) arguments[ i ][ 1 ] ) ? 1 : 0;
+		}
+
+		var texturesAfter = Resources.FindObjectsOfTypeAll<Texture2D>().Length;
+
+		if ( System.IO.Directory.Exists( folder ) )
+		{
+			System.IO.Directory.Delete( folder, true );
+		}
+
+		Log( "editortools: four saves: threw [" + saveThrew.Trim() + "], files written " + filesWritten + ", textures in memory " + texturesBefore + " before and " + texturesAfter + " after" );
+
+		Check( "editortools: the save functions of the planet generator leave no texture behind", ( filesWritten == 4 ) && ( texturesAfter == texturesBefore ), filesWritten + " files, textures " + texturesBefore + " -> " + texturesAfter );
+
+		// ---- 2. the shader inspector asks whether a normal map is DXT5 compressed. A texture that is not a 2D texture (a render texture here) has no format to ask for
+		var shaderGUIType = Type.GetType( "SFShaderGUI, Assembly-CSharp-Editor" );
+		var shaderGUI = Activator.CreateInstance( shaderGUIType, true );
+		var textureIsCompressed = shaderGUIType.GetMethod( "TextureIsCompressed", c_any );
+
+		Material template = null;
+
+		foreach ( var candidate in Resources.FindObjectsOfTypeAll<Material>() )
+		{
+			if ( candidate.HasProperty( "SF_NormalMap" ) )
+			{
+				template = candidate;
+				break;
+			}
+		}
+
+		var material = new Material( template );
+		var renderTexture = new RenderTexture( 16, 16, 0 );
+		var compressedTexture = new Texture2D( 16, 16, TextureFormat.DXT5, false );
+		var plainTexture = new Texture2D( 16, 16, TextureFormat.RGBA32, false );
+
+		material.SetTexture( "SF_NormalMap", renderTexture );
+
+		var withRenderTexture = InvokeAndCatch( textureIsCompressed, shaderGUI, new object[] { material, "SF_NormalMap" }, out var renderTextureAnswer );
+
+		material.SetTexture( "SF_NormalMap", compressedTexture );
+
+		InvokeAndCatch( textureIsCompressed, shaderGUI, new object[] { material, "SF_NormalMap" }, out var compressedAnswer );
+
+		material.SetTexture( "SF_NormalMap", plainTexture );
+
+		InvokeAndCatch( textureIsCompressed, shaderGUI, new object[] { material, "SF_NormalMap" }, out var plainAnswer );
+
+		Destroy( material );
+		Destroy( renderTexture );
+		Destroy( compressedTexture );
+		Destroy( plainTexture );
+
+		Log( "editortools: shader inspector (shader " + template.shader.name + "): a render texture as normal map threw " + withRenderTexture + " (answer " + renderTextureAnswer + "), a DXT5 texture is compressed: " + compressedAnswer + ", an RGBA32 texture is compressed: " + plainAnswer );
+
+		Check( "editortools: the shader inspector takes a normal map that is not a 2D texture", ( withRenderTexture == "nothing" ) && Equals( renderTextureAnswer, false ) && Equals( compressedAnswer, true ) && Equals( plainAnswer, false ), "render texture threw " + withRenderTexture + ", DXT5 " + compressedAnswer + ", RGBA32 " + plainAnswer );
+
+		// ---- 3. what a cancelled save dialog leaves behind: an empty file name. The two tool windows give its directory to the next dialog
+		var emptyPath = "nothing";
+
+		try
+		{
+			var directory = System.IO.Path.GetDirectoryName( "" );
+
+			emptyPath = "returned " + ( ( directory == null ) ? "null" : ( "\"" + directory + "\"" ) );
+		}
+		catch ( Exception exception )
+		{
+			emptyPath = "threw " + exception.GetType().Name;
+		}
+
+		Log( "editortools: Path.GetDirectoryName of an empty file name " + emptyPath );
+
+		yield return null;
+
+		Finish( "scenario=editortools textures=" + texturesBefore + "/" + texturesAfter + " shaderGUI=" + withRenderTexture + " emptyPath=[" + emptyPath + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

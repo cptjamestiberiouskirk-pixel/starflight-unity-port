@@ -23,7 +23,11 @@ public class EditorUtilitySaveFilePanel : MonoBehaviour
 		{
 			Texture2D readableTexture = null;
 
-			if ( ( texture.format == TextureFormat.ARGB32 ) || ( texture.format == TextureFormat.RGB24 ) )
+			// the copy we make when the texture cannot be read as it is (it is ours to destroy again)
+			Texture2D temporaryTexture = null;
+
+			// a texture can only be turned into a png as it is if its pixels can be read and it is in a format a png can be made from
+			if ( texture.isReadable && ( ( texture.format == TextureFormat.ARGB32 ) || ( texture.format == TextureFormat.RGB24 ) ) )
 			{
 				readableTexture = texture;
 			}
@@ -37,15 +41,17 @@ public class EditorUtilitySaveFilePanel : MonoBehaviour
 
 				RenderTexture.active = renderTexture;
 
-				readableTexture = new Texture2D( texture.width, texture.height );
+				temporaryTexture = new Texture2D( texture.width, texture.height );
 
-				readableTexture.ReadPixels( new Rect( 0, 0, renderTexture.width, renderTexture.height ), 0, 0 );
+				temporaryTexture.ReadPixels( new Rect( 0, 0, renderTexture.width, renderTexture.height ), 0, 0 );
 
-				readableTexture.Apply();
+				temporaryTexture.Apply();
 
 				RenderTexture.active = previous;
 
 				RenderTexture.ReleaseTemporary( renderTexture );
+
+				readableTexture = temporaryTexture;
 			}
 
 			var pngData = readableTexture.EncodeToPNG();
@@ -53,6 +59,12 @@ public class EditorUtilitySaveFilePanel : MonoBehaviour
 			if ( pngData != null )
 			{
 				File.WriteAllBytes( path, pngData );
+			}
+
+			// the copy has done its job
+			if ( temporaryTexture != null )
+			{
+				DestroyImmediate( temporaryTexture );
 			}
 		}
 	}

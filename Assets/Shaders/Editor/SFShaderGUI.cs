@@ -139,7 +139,7 @@ class SFShaderGUI : ShaderGUI
 
 		if ( m_firstTimeApply )
 		{
-			MaterialChanged( material );
+			MaterialsChanged( materialEditor );
 
 			m_firstTimeApply = false;
 		}
@@ -389,7 +389,22 @@ class SFShaderGUI : ShaderGUI
 		// call material changed function if something was updated
 		if ( EditorGUI.EndChangeCheck() )
 		{
-			MaterialChanged( material );
+			MaterialsChanged( materialEditor );
+		}
+	}
+
+	// update the keywords of every material that is selected (only the first one was updated, so with several
+	// materials selected the others got the new values but kept their old keywords)
+	void MaterialsChanged( MaterialEditor materialEditor )
+	{
+		foreach ( var target in materialEditor.targets )
+		{
+			var material = target as Material;
+
+			if ( material != null )
+			{
+				MaterialChanged( material );
+			}
 		}
 	}
 
@@ -611,7 +626,8 @@ class SFShaderGUI : ShaderGUI
 		{
 			Texture2D texture = material.GetTexture( propertyName ) as Texture2D;
 
-			if ( texture.format == TextureFormat.DXT5 )
+			// only a 2d texture has a format to look at (with a cubemap or a render texture in this slot this ended in a null reference)
+			if ( ( texture != null ) && ( texture.format == TextureFormat.DXT5 ) )
 			{
 				return true;
 			}

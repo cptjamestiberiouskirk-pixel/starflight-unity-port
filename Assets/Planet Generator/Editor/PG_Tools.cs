@@ -58,6 +58,9 @@ class PG_Tools
 		textureMap.Apply();
 
 		SaveAsPNG( textureMap, filename );
+
+		// the texture was only made to be saved (unity does not clear away textures made in code by itself)
+		Object.DestroyImmediate( textureMap );
 	}
 
 	// saves a color array to file as a png image
@@ -79,6 +82,9 @@ class PG_Tools
 		textureMap.Apply();
 
 		SaveAsPNG( textureMap, filename );
+
+		// the texture was only made to be saved
+		Object.DestroyImmediate( textureMap );
 	}
 
 	// saves a texture map to file as an exr images
@@ -114,6 +120,9 @@ class PG_Tools
 		textureMap.Apply();
 
 		SaveAsEXR( textureMap, filename );
+
+		// the texture was only made to be saved
+		Object.DestroyImmediate( textureMap );
 	}
 
 	// saves a color array to file as an exr image
@@ -135,5 +144,8 @@ class PG_Tools
 		textureMap.Apply();
 
 		SaveAsEXR( textureMap, filename );
+
+		// the texture was only made to be saved
+		Object.DestroyImmediate( textureMap );
 	}
 }
