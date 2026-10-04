@@ -142,6 +142,20 @@ public class PlayerCamera : MonoBehaviour
 		return animatorStateInfo.IsName( animationName );
 	}
 
+	// check if we are playing one of the launching or landing animations (the player is only watching while they run)
+	public bool IsLaunchingOrLanding()
+	{
+		// the camera is switched off while we are talking to aliens - nothing is launching or landing then
+		if ( !isActiveAndEnabled )
+		{
+			return false;
+		}
+
+		var animatorStateInfo = m_animator.GetCurrentAnimatorStateInfo( 0 );
+
+		return animatorStateInfo.IsName( "Launching (Docking Bay)" ) || animatorStateInfo.IsName( "Landing (Docking Bay)" ) || animatorStateInfo.IsName( "Launching (Planetside)" ) || animatorStateInfo.IsName( "Landing (Planetside)" );
+	}
+
 	// start a camera animation
 	public void StartAnimation( string animationName )
 	{

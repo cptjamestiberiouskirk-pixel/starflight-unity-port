@@ -459,6 +459,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioTerrain();
 				break;
 
+			case "savepanel":
+				yield return ScenarioSavePanel();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -6181,6 +6185,147 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "terrain: no scan label is left showing after leaving the terrain vehicle", ( labelsInTheVehicle > 0 ) && ( labelsAfterLeaving == 0 ), "in the vehicle " + labelsInTheVehicle + ", after leaving " + labelsAfterLeaving );
 
 		Finish( "scenario=terrain craters=" + secondStart.ToString( "F0" ) + "ms/" + firstStart.ToString( "F0" ) + "ms/" + different + " random=" + ( nextNumberAfterTheRocks == nextNumber ) + " placed=[" + placedByTheGame + "] edge=[" + edgeResult + "] scan=" + countedDuring + " labels=" + labelsInTheVehicle + "/" + labelsAfterLeaving + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: the Escape key (the save panel) during the landing and while the ship explodes
+
+	// one frame of the spaceflight controller with the Escape key held down
+	static void PressEscape()
+	{
+		SetInput( "m_cancel", true );
+
+		Call( SpaceflightController.m_instance, "Update" );
+
+		SetInput( "m_cancel", false );
+	}
+
+	// close the save panel if it is open, and wait for it to slide away
+	IEnumerator CloseTheSavePanel()
+	{
+		if ( PanelController.m_instance.HasActivePanel() )
+		{
+			PanelController.m_instance.Close();
+
+			var end = Time.realtimeSinceStartup + 5.0f;
+
+			while ( ( Time.realtimeSinceStartup < end ) && PanelController.m_instance.HasActivePanel() )
+			{
+				yield return null;
+			}
+		}
+	}
+
+	IEnumerator ScenarioSavePanel()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+
+		EnsureCrew();
+
+		// ---- 1. Escape in space opens the save panel and pauses the game (so that the checks below are not passed by a panel that never opens)
+		PressEscape();
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var opensInSpace = PanelController.m_instance.HasActivePanel() && controller.m_gameIsPaused;
+
+		yield return CloseTheSavePanel();
+
+		var pausedAfterClosing = controller.m_gameIsPaused;
+
+		Check( "savepanel: Escape opens the save panel in space, and closing it carries on with the game", opensInSpace && !pausedAfterClosing, "opened and paused " + opensInSpace + ", paused after closing " + pausedAfterClosing );
+
+		// ---- 2. Escape two seconds into a landing (planet 94 is a small rock planet in the arth system; Land, then Descend)
+		yield return EnterOrbit( 94 );
+
+		PressButton( ButtonController.ButtonSet.CommandB, 0 );
+
+		yield return Frames( 5 );
+
+		PressButton( ButtonController.ButtonSet.Land, 1 );
+
+		yield return new WaitForSecondsRealtime( 2.0f );
+
+		var cameraBefore = controller.m_playerCamera.m_camera.transform.position;
+
+		PressEscape();
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var openedDuringLanding = PanelController.m_instance.HasActivePanel();
+		var pausedDuringLanding = controller.m_gameIsPaused;
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var cameraMoved = Vector3.Distance( cameraBefore, controller.m_playerCamera.m_camera.transform.position );
+
+		Log( "savepanel: Escape 2 s into the landing: panel open " + openedDuringLanding + ", game paused " + pausedDuringLanding + ", the camera moved " + cameraMoved.ToString( "F0" ) + " in the 3 s after it (" + Console() + ")" );
+
+		Check( "savepanel: Escape does not open the save panel during the landing", !openedDuringLanding && !pausedDuringLanding && ( cameraMoved > 1.0f ), "panel open " + openedDuringLanding + ", paused " + pausedDuringLanding + ", camera moved " + cameraMoved.ToString( "F0" ) );
+
+		yield return CloseTheSavePanel();
+
+		// wait for the ship to be down
+		var end = Time.realtimeSinceStartup + 50.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !( ( playerData.m_general.m_location == PD_General.Location.Planetside ) && ( buttonController.GetCurrentButtonSet() == ButtonController.ButtonSet.CommandA ) ) )
+		{
+			yield return null;
+		}
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		var locationAfterLanding = playerData.m_general.m_location;
+
+		// on the ground Escape works again
+		PressEscape();
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var opensOnTheGround = PanelController.m_instance.HasActivePanel() && controller.m_gameIsPaused;
+
+		yield return CloseTheSavePanel();
+
+		Log( "savepanel: after the landing (" + locationAfterLanding + ") Escape opens the panel: " + opensOnTheGround + ", paused after closing it: " + controller.m_gameIsPaused );
+
+		Check( "savepanel: Escape opens the save panel again once the ship is down", ( locationAfterLanding == PD_General.Location.Planetside ) && opensOnTheGround && !controller.m_gameIsPaused, locationAfterLanding + ", opened " + opensOnTheGround + ", paused after closing " + controller.m_gameIsPaused );
+
+		// ---- 3. Escape while the ship explodes (the explosion takes a second and a half, then the game over screen pauses the game for good)
+		playerData.m_playerShip.m_shieldsAreUp = false;
+
+		EnterEncounter( FindEncounter( 1, 6, 3, 0 ) );
+
+		yield return Frames( 10 );
+
+		playerData.m_playerShip.m_armorPoints = 100;
+
+		CombatController.m_instance.ApplyDamageToPlayer( 5000, Vector3.forward );
+
+		yield return Frames( 5 );
+
+		PressEscape();
+
+		yield return new WaitForSecondsRealtime( 3.0f );
+
+		var openedDuringExplosion = PanelController.m_instance.HasActivePanel();
+		var gameOver = controller.m_gameOver;
+
+		yield return CloseTheSavePanel();
+
+		var pausedAfterGameOver = controller.m_gameIsPaused;
+
+		// the game over screen has to keep the game paused whoever tells the controller that a panel was closed
+		controller.PanelWasClosed();
+
+		var pausedAfterAPanelClosed = controller.m_gameIsPaused;
+
+		Log( "savepanel: Escape while the ship explodes: panel open " + openedDuringExplosion + ", game over " + gameOver + ", paused after closing the panel " + pausedAfterGameOver + ", paused after a panel reports that it closed " + pausedAfterAPanelClosed );
+
+		Check( "savepanel: Escape does not open the save panel while the ship explodes", gameOver && !openedDuringExplosion, "game over " + gameOver + ", panel open " + openedDuringExplosion );
+		Check( "savepanel: a game that is over stays paused", gameOver && pausedAfterGameOver && pausedAfterAPanelClosed, "game over " + gameOver + ", paused " + pausedAfterGameOver + ", paused after a panel closed " + pausedAfterAPanelClosed );
+
+		Finish( "scenario=savepanel space=" + opensInSpace + " landing=" + openedDuringLanding + "/" + pausedDuringLanding + " ground=" + opensOnTheGround + " explosion=" + openedDuringExplosion + "/" + pausedAfterGameOver + "/" + pausedAfterAPanelClosed + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

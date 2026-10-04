@@ -170,6 +170,14 @@ public class CombatController : MonoBehaviour
 	}
 
 	/// <summary>
+	/// True once the player ship has been destroyed (its explosion may still be playing, and the game over screen follows it).
+	/// </summary>
+	public bool PlayerIsDestroyed()
+	{
+		return m_playerIsDestroyed;
+	}
+
+	/// <summary>
 	/// Get the current target index.
 	/// </summary>
 	public int GetTargetIndex()
