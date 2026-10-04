@@ -279,6 +279,9 @@ public class CombatController : MonoBehaviour
 			return false;
 		}
 
+		// firing on the aliens makes them hostile for the rest of the encounter (whether or not the shot does any damage)
+		SpaceflightController.m_instance.m_encounter.PlayerAttacked();
+
 		// check if target is immune
 		if ( targetVessel.m_immuneToLasers )
 		{
@@ -346,6 +349,9 @@ public class CombatController : MonoBehaviour
 			SpaceflightController.m_instance.m_messages.AddText( "<color=yellow>Target out of missile range.</color>" );
 			return false;
 		}
+
+		// firing on the aliens makes them hostile for the rest of the encounter (whether or not the missile hits)
+		encounter.PlayerAttacked();
 
 		// use a missile
 		playerData.m_playerShip.m_missilesRemaining--;

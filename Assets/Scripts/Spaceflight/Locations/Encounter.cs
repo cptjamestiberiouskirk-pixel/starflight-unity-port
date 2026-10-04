@@ -195,6 +195,12 @@ public class Encounter : MonoBehaviour
 			return;
 		}
 
+		// aliens that have been fired on stay hostile until the player leaves the encounter
+		if ( m_pdEncounter.m_attackedByPlayer )
+		{
+			m_pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+		}
+
 		// update race encounter
 		switch ( m_gdEncounter.m_race )
 		{
@@ -246,6 +252,17 @@ public class Encounter : MonoBehaviour
 			case GameData.Race.Minstrel:
 
 				UpdateMinstrelEncounter();
+				break;
+
+			case GameData.Race.Uhlek:
+
+				UpdateUhlekEncounter();
+				break;
+
+			default:
+
+				// everyone else has nothing to say, but they do shoot back once they have been fired on
+				UpdateAlienCombat();
 				break;
 		}
 
@@ -393,6 +410,22 @@ public class Encounter : MonoBehaviour
 
 		// switch back to the last location
 		SpaceflightController.m_instance.SwitchLocation( playerData.m_general.m_lastLocation );
+	}
+
+	// call this when the player fires on the aliens - they turn hostile and stay hostile until the player leaves the encounter
+	public void PlayerAttacked()
+	{
+		// there is no one to turn hostile if we are not in an encounter
+		if ( m_pdEncounter == null )
+		{
+			return;
+		}
+
+		// remember the attack (this is what keeps the aliens hostile for the rest of the encounter)
+		m_pdEncounter.m_attackedByPlayer = true;
+
+		// the aliens are hostile now
+		m_pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
 	}
 
 	// call this to let us know we have just entered an encounter
@@ -551,6 +584,7 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_questionLikelihood = 50;
 			m_pdEncounter.m_numCorrectAnswers = 0;
 			m_pdEncounter.m_mechan9NoHumansWarningDone = false;
+			m_pdEncounter.m_attackedByPlayer = false;
 
 			// initialize race encounter
 			switch ( m_gdEncounter.m_race )
@@ -603,6 +637,11 @@ public class Encounter : MonoBehaviour
 				case GameData.Race.Minstrel:
 
 					InitializeMinstrelEncounter();
+					break;
+
+				case GameData.Race.Uhlek:
+
+					InitializeUhlekEncounter();
 					break;
 			}
 
@@ -907,6 +946,13 @@ public class Encounter : MonoBehaviour
 		DefaultEncounterInitialize();
 	}
 
+	// initialize encounter with uhlek
+	void InitializeUhlekEncounter()
+	{
+		// the uhlek attack on sight
+		m_pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+	}
+
 	// the default encounter initialization
 	void DefaultEncounterInitialize()
 	{
@@ -1067,6 +1113,16 @@ public class Encounter : MonoBehaviour
 	void UpdateMinstrelEncounter()
 	{
 		DefaultEncounterUpdate();
+	}
+
+	// update encounter with uhlek
+	void UpdateUhlekEncounter()
+	{
+		// the uhlek are always hostile (this also covers a game that was saved in the middle of an uhlek encounter before they attacked on sight)
+		m_pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+
+		// they never talk (there is nothing for them to say in the game data) - they just attack
+		UpdateAlienCombat();
 	}
 
 	// default encounter update

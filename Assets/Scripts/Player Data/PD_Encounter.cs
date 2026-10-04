@@ -45,6 +45,9 @@ public class PD_Encounter : IComparable
 	public float m_combatTimer;
 	public bool m_inCombat;
 
+	// set when the player fires on the aliens - they stay hostile until the player leaves the encounter (false in older save files)
+	public bool m_attackedByPlayer;
+
 	public void Reset( int encounterId )
 	{
 		// get access to the game data
