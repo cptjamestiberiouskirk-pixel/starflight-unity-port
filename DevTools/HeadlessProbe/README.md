@@ -85,7 +85,7 @@ What the probe does:
 | `latent` | the message box slide with a duration of one and of two seconds, the experimental planet mesh at a resolution of 110 with no parent (its triangle indices read back, the mesh after its planet is destroyed), and the adapter switched off with no planet controller |
 | `editortools` | the textures in memory before and after the planet generator's four save functions, the shader inspector's compression test with a render texture in the normal map slot, and what an empty file name does to Path.GetDirectoryName |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (about 9 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (43 scenarios, about 15 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
