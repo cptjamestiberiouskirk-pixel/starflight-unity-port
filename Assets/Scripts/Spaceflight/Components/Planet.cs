@@ -274,6 +274,12 @@ public class Planet : MonoBehaviour
 		return m_planetGenerator;
 	}
 
+	// true if this planet has its maps and its elevation data (false while they are being generated, and for good if the planet data could not be read)
+	public bool HasMaps()
+	{
+		return ( m_planetGenerator != null ) && m_planetGenerator.m_mapsGenerated;
+	}
+
 	// sets up the clouds based on planet properties
 	public void SetupClouds( MeshRenderer planetClouds, GameObject planetAtmosphere, bool updateSkybox, bool enableFog )
 	{

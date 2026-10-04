@@ -132,6 +132,12 @@ public class Planetside : MonoBehaviour
 		// get the planet controller
 		var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( playerData.m_general.m_currentPlanetId );
 
+		// there is no elevation to bake in if the maps of this planet could not be generated (a saved game can be on such a planet if its planet file was damaged later)
+		if ( ( planetController == null ) || !planetController.HasMaps() )
+		{
+			return;
+		}
+
 		// get the planet generator
 		var planetGenerator = planetController.GetPlanetGenerator();
 

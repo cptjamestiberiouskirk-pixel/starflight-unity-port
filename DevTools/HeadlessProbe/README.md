@@ -62,7 +62,8 @@ What the probe does:
 | `m11` | the maximum armor and shield points come from the ship: the damage line and the gauges of the status display, the Damage report, the repair of a bare hull, the hull breach warning below a quarter of the maximum |
 | `m18` | generating the planet maps does not hold up the main thread: the frames and the positions of the progress bar while a planet is processed in the background. It also logs the long frames that remain and the garbage collections around them |
 | `m17` | a planet file that cannot be read aborts that planet and nothing else: eight kinds of bad file made in memory from a real one (garbage, another version, cut off, wrong checksum, one flipped bit, too long, empty), a star system with one such planet, and all 811 planet files of the project through the reader (about 35 s on the code before the fix, which throws every frame for 12 s) |
-| `m16` | the maps of a star system's planets are destroyed when the system is left: the textures made at runtime and the planet files loaded after each of four changes of star system, an elevation map, and a landing at the end |
+| `m16` | the maps of a star system's planets are destroyed when the system is left: the textures made at runtime and the planet files loaded after each of four changes of star system, an elevation map, a landing at the end, and what is left after the Spaceflight scene is gone |
+| `nomaps` | a planet whose maps could not be generated (planet 90 is given a file that cannot be read): Land refuses it with a message, a planet with maps can still be landed on, and Disembark refuses on the surface of a planet without maps |
 
 Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (about 9 minutes; one summary block per scenario with the failed checks and exceptions).
 

@@ -27,6 +27,22 @@ public class LandButton : ShipButton
 
 			case PD_General.Location.InOrbit:
 
+				// a planet whose maps could not be generated has no surface we could go down to (the planet generator has aborted it and logged why)
+				var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( playerData.m_general.m_currentPlanetId );
+
+				if ( ( planetController == null ) || !planetController.HasMaps() )
+				{
+					SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+					SpaceflightController.m_instance.m_messages.Clear();
+
+					SpaceflightController.m_instance.m_messages.AddText( "<color=white>We can't land here.\nThe surface of this planet could not be mapped.</color>" );
+
+					SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
+					break;
+				}
+
 				// show the terrian map display
 				SpaceflightController.m_instance.m_displayController.ChangeDisplay( SpaceflightController.m_instance.m_displayController.m_terrainMapDisplay );
 

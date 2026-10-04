@@ -61,6 +61,22 @@ public class DisembarkButton : ShipButton
 
 			case PD_General.Location.Planetside:
 
+				// the terrain vehicle has nothing to drive on if the maps of this planet could not be generated (a saved game can be on such a planet if its planet file was damaged later)
+				var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( playerData.m_general.m_currentPlanetId );
+
+				if ( ( planetController == null ) || !planetController.HasMaps() )
+				{
+					SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+					SpaceflightController.m_instance.m_messages.Clear();
+
+					SpaceflightController.m_instance.m_messages.AddText( "<color=white>We can't disembark here.\nThe surface of this planet could not be mapped.</color>" );
+
+					SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
+					break;
+				}
+
 				// move the player to the arth ship coordinates on the surface
 				playerData.m_general.m_lastDisembarkedCoordinates = Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude );
 
