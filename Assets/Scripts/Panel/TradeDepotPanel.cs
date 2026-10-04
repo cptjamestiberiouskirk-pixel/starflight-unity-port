@@ -557,9 +557,9 @@ public class TradeDepotPanel : Panel
 
 						int remainingVolume = playerData.m_playerShip.GetRemainingVolume();
 
-						if ( remainingVolume == 0 )
+						if ( remainingVolume <= 0 )
 						{
-							// the cargo hold is full and the player cannot buy anything - so immediately block the player
+							// the cargo hold is full (or over full, in a save from before cargo pods checked their cargo) and the player cannot buy anything - so immediately block the player
 							m_currentState = State.BuyItem;
 							SwitchToErrorMessageState( "Insufficient cargo space" );
 							return;

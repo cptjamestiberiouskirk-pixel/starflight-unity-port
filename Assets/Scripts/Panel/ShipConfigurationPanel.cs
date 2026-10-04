@@ -1037,20 +1037,29 @@ public class ShipConfigurationPanel : Panel
 		// get to the player data
 		var playerData = DataController.m_instance.m_playerData;
 
-		// check if we have room for another cargo pod
+		// check if we have a cargo pod to sell
 		if ( playerData.m_playerShip.m_numCargoPods > 0 )
 		{
-			// pay for the cargo pod into the player's bank balance
-			playerData.m_bank.m_currentBalance += gameData.m_misc.m_cargoPodSellPrice;
+			// check if the cargo already in the hold would still fit without this cargo pod
+			if ( playerData.m_playerShip.GetRemainingVolume() < gameData.m_misc.m_cargoPodVolume )
+			{
+				// nope - the player has to get rid of some cargo first
+				SwitchToErrorMessageState( "Unload cargo first" );
+			}
+			else
+			{
+				// pay for the cargo pod into the player's bank balance
+				playerData.m_bank.m_currentBalance += gameData.m_misc.m_cargoPodSellPrice;
 
-			// remove one cargo pod from the ship
-			playerData.m_playerShip.RemoveCargoPod();
+				// remove one cargo pod from the ship
+				playerData.m_playerShip.RemoveCargoPod();
 
-			// update the screen
-			UpdateScreen();
+				// update the screen
+				UpdateScreen();
 
-			// play a ui sound
-			SoundController.m_instance.PlaySound( SoundController.Sound.Update );
+				// play a ui sound
+				SoundController.m_instance.PlaySound( SoundController.Sound.Update );
+			}
 		}
 	}
 }
