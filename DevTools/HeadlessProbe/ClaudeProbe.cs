@@ -299,6 +299,20 @@ public class ClaudeProbe : MonoBehaviour
 			yield return null;
 		}
 
+		// a scenario starts with the planets of the first star system generated and the game running - the game is paused while they are being generated,
+		// and since the main thread no longer waits for each planet (M18) thirty frames are over long before that is done
+		if ( ( TargetScene() == "Spaceflight" ) && ( SpaceflightController.m_instance != null ) )
+		{
+			var generationStart = Time.realtimeSinceStartup;
+
+			while ( SpaceflightController.m_instance.m_starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - generationStart < 60.0f ) )
+			{
+				yield return null;
+			}
+
+			Log( "the planets of the first star system were generated " + ( Time.realtimeSinceStartup - generationStart ).ToString( "F2" ) + " s after the start up frames (still generating: " + SpaceflightController.m_instance.m_starSystem.GeneratingPlanets() + ")" );
+		}
+
 		var scenario = GetArg( "-probeScenario", "h6" );
 
 		Log( "scenario=" + scenario + " frame=" + Time.frameCount + " location=" + DataController.m_instance.m_playerData.m_general.m_location + " exceptionsSoFar=" + s_exceptionCount );
