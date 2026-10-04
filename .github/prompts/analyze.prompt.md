@@ -1,6 +1,5 @@
 ---
 agent: 'agent'
-model: 'Claude Opus 4.5'
 tools:
   - codebase
   - githubRepo
@@ -16,7 +15,7 @@ Perform comprehensive analysis of the Unity project to identify implemented feat
 - Identify incomplete implementations
 
 ## Output Format
-Generate PROJECT_ANALYSIS_REPORT.md with:
+Write the report to `Research/PROJECT_ANALYSIS_REPORT_<YYYY-MM-DD>.md`, with the date of the analysis. Never overwrite `PROJECT_ANALYSIS_REPORT.md` at the project root: it is a historical report. The report has:
 
 ### 1. Implemented Features
 | Feature | File | Status |

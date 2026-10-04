@@ -1,6 +1,5 @@
 ---
 agent: 'agent'
-model: 'Claude Opus 4.5'
 tools:
   - codebase
   - editFiles
@@ -26,7 +25,7 @@ Scan all C# files in the workspace for Unity compilation errors, identify all er
 - Verify GetComponent<T>() patterns are correct
 
 Constraints:
-- Maintain Unity naming conventions (PascalCase public, camelCase private)
+- Maintain Unity naming conventions (match the file you are editing: `m_` fields and `c_` constants in legacy code, `_camelCase` private fields in the newer code; see `.github/copilot-instructions.md`)
 - Don't modify Unity-generated files in Library/ or Temp/
 - Preserve existing code architecture and patterns
 - Keep fixes minimal and targeted to the specific error

@@ -1,3 +1,5 @@
+> **Historical** (generated 2026-01-04): many items below were fixed later and several no longer match the code. See `CLAUDE.md` and `CODE_REVIEW_2026-10-03.md` for the current state.
+
 # Starflight Unity Port - Comprehensive Project Analysis Report
 
 **Generated:** January 4, 2026  
