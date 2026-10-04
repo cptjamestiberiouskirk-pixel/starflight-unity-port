@@ -3778,6 +3778,24 @@ public class ClaudeProbe : MonoBehaviour
 		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.StarSystem );
 	}
 
+	static int s_errorsLogged;
+
+	// counts the errors the game logs, and shows the first few
+	static void CountErrors( string condition, string stackTrace, LogType type )
+	{
+		if ( type == LogType.Error )
+		{
+			s_errorsLogged++;
+
+			if ( s_errorsLogged <= 5 )
+			{
+				var newline = condition.IndexOf( '\n' );
+
+				Log( "error logged by the game: " + ( ( newline > 0 ) ? condition.Substring( 0, newline ) : condition ) );
+			}
+		}
+	}
+
 	IEnumerator ScenarioM16()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -3957,7 +3975,31 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "M16 no planet file stays loaded", mostFilesLoaded == 0, "the most planet files loaded after a system had been generated: " + mostFilesLoaded );
 		Check( "M16 a landing still works after the changes of star system", landed && ( landingExceptions == 0 ) && terrainHasItsMap, "landed " + landed + ", exceptions " + landingExceptions + ", terrain has its albedo map " + terrainHasItsMap );
 
-		Finish( "scenario=m16 visits=[" + visits + "] mostLeftOver=" + mostLeftOver + " memory=" + ( bytesAtStart >> 20 ) + "MB->" + ( bytesAtEnd >> 20 ) + "MB filesLoaded=" + mostFilesLoaded + " elevationMapOutlived=" + elevationTextureOutlivedItsSystem + " landed=" + landed + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+		// ---- leave the spaceflight scene: the planets destroy their maps as they go, and that must not log an error
+		// (unity clears out unused assets on a scene change, but a map is in use for as long as anything still refers to its generator - the scene objects stay
+		// reachable through the static of the spaceflight controller, and through this scenario - so without the fix the maps of the last system stay)
+		s_errorsLogged = 0;
+
+		Application.logMessageReceived += CountErrors;
+
+		var exceptionsBeforeLeaving = s_exceptionCount;
+
+		SceneManager.LoadScene( "Intro" );
+
+		yield return WaitForScene( "Intro" );
+		yield return Frames( 5 );
+
+		Application.logMessageReceived -= CountErrors;
+
+		RuntimeTextures( out var countAfterLeaving, out var planetSizedAfterLeaving, out var bytesAfterLeaving );
+
+		var leavingExceptions = s_exceptionCount - exceptionsBeforeLeaving;
+
+		Log( "M16 after leaving the spaceflight scene (now in " + SceneManager.GetActiveScene().name + "): " + countAfterLeaving + " runtime textures holding " + ( bytesAfterLeaving >> 20 ) + " MB, " + ( planetSizedAfterLeaving - otherPlanetSized ) + " planet maps left, errors logged " + s_errorsLogged + ", exceptions " + leavingExceptions );
+
+		Check( "M16 leaving the spaceflight scene leaves no planet map behind and logs no error", ( planetSizedAfterLeaving - otherPlanetSized == 0 ) && ( s_errorsLogged == 0 ) && ( leavingExceptions == 0 ), ( planetSizedAfterLeaving - otherPlanetSized ) + " planet maps left, errors " + s_errorsLogged + ", exceptions " + leavingExceptions );
+
+		Finish( "scenario=m16 visits=[" + visits + "] mostLeftOver=" + mostLeftOver + " memory=" + ( bytesAtStart >> 20 ) + "MB->" + ( bytesAtEnd >> 20 ) + "MB filesLoaded=" + mostFilesLoaded + " elevationMapOutlived=" + elevationTextureOutlivedItsSystem + " landed=" + landed + " afterLeaving=" + ( planetSizedAfterLeaving - otherPlanetSized ) + "maps/" + s_errorsLogged + "errors checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
