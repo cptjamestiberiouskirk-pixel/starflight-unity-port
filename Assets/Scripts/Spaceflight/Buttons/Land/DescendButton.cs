@@ -41,19 +41,10 @@ public class DescendButton : ShipButton
 	{
 		m_timer += Time.deltaTime;
 
-		if ( m_timer >= 1.0f && m_step == 0 )
-		{
-			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Autopilot engaged. Descending...</color>" );
-			m_step++;
-		}
-		else if ( m_timer >= 6.0f && m_step == 1 )
+		// the landing animation reports the start of the descent and the landing itself (see PlayerCamera.StartingDescent and PlayerHasLanded) - this is the one message in between
+		if ( m_timer >= 6.0f && m_step == 0 )
 		{
 			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Topography net locked on.</color>" );
-			m_step++;
-		}
-		else if ( m_timer >= 12.0f && m_step == 2 )
-		{
-			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Safe landing, captain.</color>" );
 			m_step++;
 		}
 
