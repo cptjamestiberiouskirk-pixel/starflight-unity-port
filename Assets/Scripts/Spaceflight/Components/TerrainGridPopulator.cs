@@ -48,6 +48,9 @@ public class TerrainGridPopulator : MonoBehaviour
 			return;
 		}
 
+		// remember where the game's random numbers are, so that they can carry on from there when we are done
+		var randomState = Random.state;
+
 		// reset random number generator to a deterministic value (so objects are always in the same place for each planet)
 		Random.InitState( randomSeed );
 
@@ -182,6 +185,10 @@ public class TerrainGridPopulator : MonoBehaviour
 				onObjectSpawned( clonedObject, i % numTemplateObjects );
 			}
 		}
+
+		// give the game its random numbers back (the seed is the same every time for a planet, so without this everything
+		// random that came after a landing - what the aliens do and say, for one - went the same way after every landing there)
+		Random.state = randomState;
 	}
 
 	// populate the planet with a callback for each spawned object
@@ -190,28 +197,37 @@ public class TerrainGridPopulator : MonoBehaviour
 		Initialize( elevationScale, templates, numObjects, randomSeed, favorHigherElevations, minScale, maxScale, callback );
 	}
 
-	static void AddToSpawnList( Vector3 position )
+	// figure out which of the spawn lists a position on the planet belongs to
+	static void GetSpawnList( Vector3 position, out int listX, out int listY )
 	{
 		Tools.WorldToMapCoordinates( position, out var mapX, out var mapY, m_planetGenerator.m_textureMapWidth, m_planetGenerator.m_textureMapHeight );
 
-		var listX = Mathf.FloorToInt( (float) mapX / (float) m_planetGenerator.m_textureMapWidth * (float) c_spawnListWidth );
-		var listY = Mathf.FloorToInt( (float) mapY / (float) m_planetGenerator.m_textureMapHeight * (float) c_spawnListHeight );
+		listX = Mathf.FloorToInt( (float) mapX / (float) m_planetGenerator.m_textureMapWidth * (float) c_spawnListWidth );
+		listY = Mathf.FloorToInt( (float) mapY / (float) m_planetGenerator.m_textureMapHeight * (float) c_spawnListHeight );
+
+		// a position on the very edge of the map belongs to the last list, not to one past it (Random.Range can
+		// return its upper limit, which is the width of the map, and that is one list too far)
+		listX = Mathf.Clamp( listX, 0, c_spawnListWidth - 1 );
+		listY = Mathf.Clamp( listY, 0, c_spawnListHeight - 1 );
+	}
+
+	static void AddToSpawnList( Vector3 position )
+	{
+		GetSpawnList( position, out var listX, out var listY );
 
 		m_spawnLists[ listY, listX ].Add( position );
 	}
 
 	static bool OverlapsSomething( Vector3 position )
 	{
-		Tools.WorldToMapCoordinates( position, out var mapX, out var mapY, m_planetGenerator.m_textureMapWidth, m_planetGenerator.m_textureMapHeight );
-
-		var listX = Mathf.FloorToInt( (float) mapX / (float) m_planetGenerator.m_textureMapWidth * (float) c_spawnListWidth );
-		var listY = Mathf.FloorToInt( (float) mapY / (float) m_planetGenerator.m_textureMapHeight * (float) c_spawnListHeight );
+		GetSpawnList( position, out var listX, out var listY );
 
 		for ( var y = -1; y <= 1; y++ )
 		{
 			var listYOffset = listY + y;
 
-			if ( ( listY < 0 ) || ( listY >= c_spawnListHeight ) )
+			// there are no lists above the top row or below the bottom row (this tested listY, which is always inside)
+			if ( ( listYOffset < 0 ) || ( listYOffset >= c_spawnListHeight ) )
 			{
 				continue;
 			}

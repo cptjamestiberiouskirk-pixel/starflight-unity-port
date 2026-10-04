@@ -62,6 +62,12 @@ public class TerrainElement : MonoBehaviour
 		return distance <= c_pickupDistance;
 	}
 
+	// true once this deposit has been picked up (it is still there for a moment while its transporter effect plays)
+	public bool HasBeenPickedUp()
+	{
+		return m_pickedUp;
+	}
+
 	// get the name of this element
 	public string GetElementName()
 	{

@@ -138,6 +138,13 @@ public class TerrainObjectLabel : MonoBehaviour
 		}
 	}
 
+	void OnDisable()
+	{
+		// the label is not a child of this object, so it does not go away with it - hide it when this object is hidden
+		// (labels used to stay in the air after the player had left the terrain vehicle, and nothing counted their time down any more)
+		HideLabel();
+	}
+
 	void OnDestroy()
 	{
 		// clean up the label when the object is destroyed
