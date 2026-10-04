@@ -13,6 +13,9 @@ public class PanelController : MonoBehaviour
 	// the currently active panel (null if none)
 	Panel m_activePanel;
 
+	// true while the active panel is animating to the closed position
+	bool m_isClosing;
+
 	// unity awake
 	void Awake()
 	{
@@ -29,7 +32,8 @@ public class PanelController : MonoBehaviour
 	// unity update
 	void Update()
 	{
-		if ( m_activePanel != null )
+		// a panel that is on its way out doesn't get to handle input any more
+		if ( ( m_activePanel != null ) && !m_isClosing )
 		{
 			m_activePanel.Tick();
 		}
@@ -56,6 +60,9 @@ public class PanelController : MonoBehaviour
 			{
 				// the panel has opened - so remember this panel
 				m_activePanel = panel;
+
+				// it is not closing
+				m_isClosing = false;
 			}
 		}
 	}
@@ -68,8 +75,15 @@ public class PanelController : MonoBehaviour
 		{
 			Debug.Log( "Whoops - trying to close the active panel when we don't have one!" );
 		}
+		else if ( m_isClosing )
+		{
+			// the panel is already closing (a second click on exit, for example) - closing it again would repeat whatever it does when it closes
+		}
 		else
 		{
+			// remember that this panel is on its way out
+			m_isClosing = true;
+
 			// turn off controller navigation of the UI
 			EventSystem.current.sendNavigationEvents = false;
 
@@ -96,5 +110,8 @@ public class PanelController : MonoBehaviour
 
 		// forget this panel
 		m_activePanel = null;
+
+		// nothing is closing any more
+		m_isClosing = false;
 	}
 }
