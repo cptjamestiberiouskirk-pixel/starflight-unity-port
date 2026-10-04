@@ -42,8 +42,14 @@ public class TargetButton : ShipButton
 			return false;
 		}
 
-		// get combat controller
-		var combatController = CombatController.m_instance ?? SpaceflightController.m_instance.m_combatController;
+		// get combat controller (tested with == null - the ?? operator does not see that a unity object has been destroyed)
+		var combatController = CombatController.m_instance;
+
+		if ( combatController == null )
+		{
+			combatController = SpaceflightController.m_instance.m_combatController;
+		}
+
 		if ( combatController == null )
 		{
 			SpaceflightController.m_instance.m_messages.AddText( "<color=red>Combat system unavailable.</color>" );
