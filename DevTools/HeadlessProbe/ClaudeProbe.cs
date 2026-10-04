@@ -451,6 +451,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioEncounters();
 				break;
 
+			case "comms":
+				yield return ScenarioComms();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -5683,6 +5687,253 @@ public class ClaudeProbe : MonoBehaviour
 		second.m_starId = secondStar;
 
 		Finish( "scenario=encounters justLaunched=" + moved + "/" + locationWithOneNextToTheShip + " approach=" + alignment.ToString( "F2" ) + " twoInOneFrame=" + firstNearer[ 1 ] + "/" + secondNearer[ 1 ] + " radarAstern=" + asternSeen + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: comms and the console (the captain's name in alien messages, mechan 9 after firing on the mechans, a press that lands on other buttons)
+
+	// the first encounter with ships of the given race (-1 if there is none)
+	static int FindEncounterOfRace( GameData.Race race )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		for ( var i = 0; i < gameData.m_encounterList.Length; i++ )
+		{
+			if ( gameData.m_encounterList[ i ].m_race == race )
+			{
+				return i;
+			}
+		}
+
+		return -1;
+	}
+
+	// make the aliens of the current encounter speak about a subject the given number of times, and collect what the message box shows each time
+	static List<string> AlienComms( GD_Comm.Subject subject, int count )
+	{
+		var lines = new List<string>();
+
+		for ( var i = 0; i < count; i++ )
+		{
+			SpaceflightController.m_instance.m_messages.Clear();
+
+			try
+			{
+				SpaceflightController.m_instance.m_encounter.AddComm( subject, false );
+
+				lines.Add( MessageList() );
+			}
+			catch ( Exception exception )
+			{
+				lines.Add( "threw " + exception.GetType().Name );
+			}
+		}
+
+		return lines;
+	}
+
+	// the mechans ask a question and the player gives the right answer, the given number of times
+	IEnumerator AnswerMechanQuestions( int questionId, int count )
+	{
+		var pdEncounter = SpaceflightController.m_instance.m_encounter.m_pdEncounter;
+
+		for ( var i = 0; i < count; i++ )
+		{
+			pdEncounter.m_lastQuestionFromAliens = questionId;
+			pdEncounter.m_lastSubjectFromPlayer = GD_Comm.Subject.Yes;
+
+			yield return Frames( 3 );
+		}
+	}
+
+	IEnumerator ScenarioComms()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+
+		EnsureCrew();
+
+		playerData.m_playerShip.m_armorPoints = 100000;
+		playerData.m_playerShip.m_shieldsAreUp = false;
+
+		// a communications officer who understands every word, so that nothing in the messages is garbled
+		var captain = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Captain );
+		var commOfficer = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer );
+
+		commOfficer.m_communications = 250;
+
+		// ---- 1. the spemin use the captain's name in one of their questions and in one of their answers about other races
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		EnterEncounter( speminId );
+		yield return Frames( 10 );
+
+		var questions = AlienComms( GD_Comm.Subject.Question, 40 );
+		var answers = AlienComms( GD_Comm.Subject.OtherRaces, 40 );
+
+		// the same question with a captain whose name has two spaces in a row (names are used as they were typed): the message is
+		// split into words at the spaces, which leaves an empty word, and the code looks at the last character of every word
+		var nameBefore = captain.m_name;
+
+		captain.m_name = "Jean  Luc";
+
+		var withTwoSpaces = AlienComms( GD_Comm.Subject.Question, 40 );
+
+		captain.m_name = nameBefore;
+
+		// and with a communications officer who understands nothing: every word is garbled (the question with the captain's name in it is comm 203)
+		commOfficer.m_communications = 0;
+
+		var garbledQuestion = "(not shown)";
+
+		for ( var i = 0; ( i < 40 ) && ( garbledQuestion == "(not shown)" ); i++ )
+		{
+			var lines = AlienComms( GD_Comm.Subject.Question, 1 );
+
+			if ( controller.m_encounter.m_pdEncounter.m_lastQuestionFromAliens == 203 )
+			{
+				garbledQuestion = lines[ 0 ];
+			}
+		}
+
+		commOfficer.m_communications = 250;
+
+		controller.m_encounter.m_pdEncounter.m_lastQuestionFromAliens = 0;
+
+		buttonController.SetBridgeButtons();
+
+		var question = questions.Find( line => line.Contains( "self defense captain" ) ) ?? "(not shown)";
+		var answer = answers.Find( line => line.Contains( "pretending to worship you" ) ) ?? "(not shown)";
+		var withToken = 0;
+
+		foreach ( var line in questions )
+		{
+			withToken += line.Contains( "*" ) ? 1 : 0;
+		}
+
+		foreach ( var line in answers )
+		{
+			withToken += line.Contains( "*" ) ? 1 : 0;
+		}
+
+		Log( "comms: captain \"" + captain.m_name + "\". The spemin question: " + question );
+		Log( "comms: the spemin answer about other races: " + answer );
+
+		Check( "comms: alien messages name the captain", question.Contains( "self defense captain " + captain.m_name + "," ) && answer.Contains( "worship you, " + captain.m_name + "." ) && ( withToken == 0 ), withToken + " of " + ( questions.Count + answers.Count ) + " messages still have the * in them. " + question );
+
+		var threw = withTwoSpaces.FindAll( line => line.StartsWith( "threw" ) ).Count;
+		var questionWithTwoSpaces = withTwoSpaces.Find( line => line.Contains( "self defense captain" ) ) ?? "(not shown)";
+
+		Log( "comms: with the captain called \"Jean  Luc\" (two spaces) " + threw + " of " + withTwoSpaces.Count + " alien messages threw. The question: " + questionWithTwoSpaces );
+
+		Check( "comms: a captain's name with two spaces in it does not break an alien message", ( threw == 0 ) && questionWithTwoSpaces.Contains( "self defense captain Jean Luc," ), threw + " of " + withTwoSpaces.Count + " threw. " + questionWithTwoSpaces );
+
+		var separators = new char[] { ' ', '/' };
+		var plainWords = System.Text.RegularExpressions.Regex.Replace( question, "<[^>]+>", " " ).Split( separators, StringSplitOptions.RemoveEmptyEntries ).Length;
+		var garbledWords = System.Text.RegularExpressions.Regex.Replace( garbledQuestion, "<[^>]+>", " " ).Split( separators, StringSplitOptions.RemoveEmptyEntries ).Length;
+
+		Log( "comms: the same question with nothing understood (" + garbledWords + " words, " + plainWords + " when understood): " + garbledQuestion );
+
+		Check( "comms: a garbled alien message has as many words as the message", ( garbledWords == plainWords ) && ( plainWords > 20 ) && !garbledQuestion.Contains( "captain" ) && !garbledQuestion.Contains( captain.m_name ), garbledWords + " words, " + plainWords + " when understood. " + garbledQuestion );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 2. the mechans: five right answers unlock mechan 9, but not once the player has fired on them
+		var mechanId = FindEncounterOfRace( GameData.Race.Mechan );
+		var questionId = 0;
+
+		// a mechan question that is answered with yes (101, 102, 103 and 105 are answered with no)
+		foreach ( var comm in gameData.m_commList )
+		{
+			if ( ( comm.m_race == GameData.Race.Mechan ) && ( comm.m_subject == GD_Comm.Subject.Question ) && ( comm.m_id != 101 ) && ( comm.m_id != 102 ) && ( comm.m_id != 103 ) && ( comm.m_id != 105 ) )
+			{
+				questionId = comm.m_id;
+				break;
+			}
+		}
+
+		playerData.m_general.m_mechan9Unlocked = false;
+
+		EnterEncounter( mechanId );
+		yield return Frames( 10 );
+
+		var stanceAtStart = Stance();
+
+		yield return AnswerMechanQuestions( questionId, 5 );
+
+		var unlockedInPeace = playerData.m_general.m_mechan9Unlocked;
+		var stanceInPeace = Stance();
+
+		// the same again, in a new visit, after firing on them
+		playerData.m_general.m_mechan9Unlocked = false;
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		EnterEncounter( mechanId );
+		yield return Frames( 10 );
+
+		controller.m_encounter.PlayerAttacked();
+
+		yield return AnswerMechanQuestions( questionId, 5 );
+
+		var unlockedAfterFiring = playerData.m_general.m_mechan9Unlocked;
+		var stanceAfterFiring = Stance();
+		var answersCounted = controller.m_encounter.m_pdEncounter.m_numCorrectAnswers;
+
+		playerData.m_general.m_mechan9Unlocked = false;
+
+		Log( "comms: mechan encounter " + mechanId + ", question " + questionId + ", stance at the start " + stanceAtStart + ". Five right answers: unlocked " + unlockedInPeace + ", stance " + stanceInPeace + ". Five right answers after firing on them: unlocked " + unlockedAfterFiring + ", stance " + stanceAfterFiring + ", answers counted " + answersCounted );
+
+		Check( "comms: five right answers unlock mechan 9", ( questionId != 0 ) && ( stanceAtStart == "Neutral" ) && unlockedInPeace && ( stanceInPeace == "Friendly" ), "stance at the start " + stanceAtStart + ", unlocked " + unlockedInPeace + ", stance " + stanceInPeace );
+		Check( "comms: mechans that have been fired on do not unlock mechan 9", !unlockedAfterFiring && ( stanceAfterFiring == "Hostile" ), "unlocked " + unlockedAfterFiring + ", stance " + stanceAfterFiring );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 3. the fire button is pressed on Statement, and before the press is carried out (0.35 s) the aliens ask a question, which puts Yes and No on the console
+		EnterEncounter( speminId );
+		yield return Frames( 10 );
+
+		// the comm buttons are only on the console after a hail, and a hail gives the player a posture (there is nothing to say without one)
+		controller.m_encounter.m_pdEncounter.m_playerStance = GD_Comm.Stance.Friendly;
+
+		buttonController.ChangeButtonSet( ButtonController.ButtonSet.Comm );
+
+		ConsoleFrameWith( "m_submit" );
+
+		controller.m_encounter.AddComm( GD_Comm.Subject.Question, false );
+
+		controller.m_messages.Clear();
+
+		var consoleAtTheQuestion = Console();
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		var consoleAfterThePress = Console();
+		var sentAfterThePress = MessageList();
+
+		// a press with nothing in its way is carried out
+		controller.m_encounter.m_pdEncounter.m_lastQuestionFromAliens = 0;
+
+		buttonController.ChangeButtonSet( ButtonController.ButtonSet.Comm );
+
+		controller.m_messages.Clear();
+
+		ConsoleFrameWith( "m_submit" );
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		var sentByAPlainPress = MessageList();
+
+		Log( "comms: fire button on Statement, then a question from the aliens: console " + consoleAtTheQuestion + ", one second later " + consoleAfterThePress + ", sent: [" + sentAfterThePress + "] | a press with nothing in its way sent: [" + sentByAPlainPress + "]" );
+
+		Check( "comms: a press on Statement does not answer a question that came after it", ( consoleAtTheQuestion == "AnswerQuestion selected 0 running nothing" ) && ( consoleAfterThePress == "AnswerQuestion selected 0 running nothing" ) && !sentAfterThePress.Contains( "Transmitting" ), "console " + consoleAfterThePress + ", sent: [" + sentAfterThePress + "]" );
+		Check( "comms: a press with nothing in its way is carried out", sentByAPlainPress.Contains( "Transmitting" ) && !sentByAPlainPress.Contains( "ERROR" ), "sent: [" + sentByAPlainPress + "]" );
+
+		Finish( "scenario=comms tokens=" + withToken + " twoSpacesThrew=" + threw + " garbledWords=" + garbledWords + "/" + plainWords + " mechan9=" + unlockedInPeace + "/" + unlockedAfterFiring + " press=[" + consoleAfterThePress + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

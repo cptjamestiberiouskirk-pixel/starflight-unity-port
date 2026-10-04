@@ -72,6 +72,7 @@ What the probe does:
 | `savedata` | the scene a saved game is loaded into for every location, the save panel's description of a game saved in the terrain vehicle, the terrain vehicle of a new game, and the stardate with the computer set to the Thai, Saudi Arabian, Persian and German cultures |
 | `combat` | a missile in the air while the game is paused, the size of an explosion that is used again, a launch with every missile of the pool in the air, and a ship that is fired at and hit again while it explodes |
 | `encounters` | a ship that has just launched and the hyperspace encounters, the side the aliens appear on in a star system, two encounters that reach the ship in the same frame, and the radar with an encounter dead astern |
+| `comms` | the captain's name in what the aliens say, Mechan 9 after five right answers with and without having fired on the Mechans, and a press of the fire button when the aliens ask a question before the press is carried out |
 
 Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (about 9 minutes; one summary block per scenario with the failed checks and exceptions).
 

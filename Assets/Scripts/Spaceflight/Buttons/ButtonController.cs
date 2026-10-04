@@ -49,6 +49,9 @@ public class ButtonController : MonoBehaviour
 	private ShipButton[] m_buttonList;
 	private ShipButton m_currentButton;
 
+	// the button the fire button was pressed on (it is activated a moment later, and the buttons can change in between)
+	private ShipButton m_buttonBeingActivated;
+
 	// private stuff we don't want the editor to see
 	int m_selectedButtonIndex;
 	bool m_activatingButton;
@@ -132,7 +135,15 @@ public class ButtonController : MonoBehaviour
 				m_activatingButton = false;
 				m_activatingButtonTimer = 0.0f;
 
-				ActivateButton();
+				// the buttons may have changed since the fire button was pressed (the aliens asked a question, an encounter began) - the press
+				// was for a button that is not there any more, and it must not activate whatever has taken its place (a press on Statement
+				// used to answer Yes to a question the player had not seen yet)
+				if ( m_buttonList[ m_selectedButtonIndex ] == m_buttonBeingActivated )
+				{
+					ActivateButton();
+				}
+
+				m_buttonBeingActivated = null;
 			}
 
 			return;
@@ -204,6 +215,9 @@ public class ButtonController : MonoBehaviour
 				// set the activate button flag and reset the timer
 				m_activatingButton = true;
 				m_activatingButtonTimer = 0.0f;
+
+				// remember which button this press is for
+				m_buttonBeingActivated = m_buttonList[ m_selectedButtonIndex ];
 
 				// update the button sprite for the currently selected button
 				m_buttonImageList[ m_selectedButtonIndex ].sprite = m_buttonActiveSprite;
