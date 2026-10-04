@@ -72,9 +72,6 @@ public class SensorsDisplay : ShipDisplay
 	// what are we currently scanning
 	public ScanType m_scanType;
 
-	// the original scan type (before it might be changed to Unknown)
-	ScanType m_originalScanType;
-
 	// the background material
 	Material m_backgroundMaterial;
 
@@ -220,31 +217,27 @@ public class SensorsDisplay : ShipDisplay
 
 				case ScanType.Unknown:
 				{
-					// Unknown is used when there's no mask texture - handle based on original scan type
 					SpaceflightController.m_instance.m_messages.Clear();
-
-					if ( m_originalScanType == ScanType.Debris )
-					{
-						// debris scanning shows salvageable materials
-						string text = "<color=#FFFF00>Debris Analysis:</color>\n";
-						text += "<color=white>Wreckage detected.</color>\n";
-						text += "Salvage potential: <color=white>" + m_mineralDensity + "%</color>\n";
-						text += "<color=#808080>Debris may contain recoverable materials.</color>";
-
-						SpaceflightController.m_instance.m_messages.AddText( text );
-					}
-					else
-					{
-						SpaceflightController.m_instance.m_messages.AddText( "<color=#FFFF00>Unknown object detected.</color>" );
-					}
+					SpaceflightController.m_instance.m_messages.AddText( "<color=#FFFF00>Unknown object detected.</color>" );
 
 					break;
 				}
 
 				default:
 				{
+					// the scan type is the vessel id - make sure it is one we have data for
+					var vesselId = (int) m_scanType;
+
+					if ( ( vesselId < 0 ) || ( vesselId >= gameData.m_vesselList.Length ) )
+					{
+						SpaceflightController.m_instance.m_messages.Clear();
+						SpaceflightController.m_instance.m_messages.AddText( "<color=#FFFF00>Unknown object detected.</color>" );
+
+						break;
+					}
+
 					// display the ship information
-					var vessel = gameData.m_vesselList[ (int) m_scanType ];
+					var vessel = gameData.m_vesselList[ vesselId ];
 
 					string text = "Object Constituents:";
 
@@ -348,6 +341,17 @@ public class SensorsDisplay : ShipDisplay
 		m_hasSensorData = false;
 	}
 
+	// returns true if we have both a background and a mask texture for this scan type
+	bool HasTextures( int scanTypeIndex )
+	{
+		if ( ( scanTypeIndex < 0 ) || ( scanTypeIndex >= m_maskTextures.Length ) || ( scanTypeIndex >= m_backgroundTextures.Length ) )
+		{
+			return false;
+		}
+
+		return ( m_maskTextures[ scanTypeIndex ] != null ) && ( m_backgroundTextures[ scanTypeIndex ] != null );
+	}
+
 	// call this to start the scanning cinematics
 	public void StartScanning( ScanType scanType, int massPowerBase, int mass, int bioDensity, int mineralDensity )
 	{
@@ -357,16 +361,13 @@ public class SensorsDisplay : ShipDisplay
 		// get to the player data
 		var playerData = DataController.m_instance.m_playerData;
 
-		// remember the original scan type before potential change to Unknown
-		m_originalScanType = scanType;
+		// if we don't have a mask or background for this scan type then show the unknown ones instead
+		// (only the picture changes - the scan type stays what it is, so the readout and the analysis are for the real object)
+		int textureIndex = (int) scanType;
 
-		// if we don't have a mask or background for this scan type then change it to the unknown mask
-		// also check bounds to prevent IndexOutOfRangeException
-		int scanIndex = (int) scanType;
-		if ( scanIndex >= m_maskTextures.Length || m_maskTextures[ scanIndex ] == null ||
-		     scanIndex >= m_backgroundTextures.Length || m_backgroundTextures[ scanIndex ] == null )
+		if ( !HasTextures( textureIndex ) )
 		{
-			scanType = ScanType.Unknown;
+			textureIndex = (int) ScanType.Unknown;
 		}
 
 		// remember the scan type, mass, bio density, and mineral density
@@ -383,11 +384,13 @@ public class SensorsDisplay : ShipDisplay
 		m_isDoingCinematics = true;
 		m_soundStopped = false;
 
-		// set the correct background texture for the scan type
-		m_backgroundMaterial.SetTexture( "_MainTex", m_backgroundTextures[ (int) m_scanType ] );
+		// set the correct background and mask textures for the scan type (if even the unknown ones are missing we keep whatever is there)
+		if ( HasTextures( textureIndex ) )
+		{
+			m_backgroundMaterial.SetTexture( "_MainTex", m_backgroundTextures[ textureIndex ] );
 
-		// set the correct mask texture for the scan type
-		m_maskMaterial.SetTexture( "_MaskTex", m_maskTextures[ (int) m_scanType ] );
+			m_maskMaterial.SetTexture( "_MaskTex", m_maskTextures[ textureIndex ] );
+		}
 
 		// reset background and mask image scale
 		m_maskImage.transform.localScale = m_backgroundImage.transform.localScale = Vector3.one;
@@ -401,7 +404,7 @@ public class SensorsDisplay : ShipDisplay
 			// change the size of the background and mask images based on the size of the planet
 			m_backgroundImage.transform.localScale = m_maskImage.transform.localScale = planet.GetScale() / 320.0f * 0.5f + new Vector3( 0.5f, 0.5f, 0.5f );
 		}
-		else if ( m_scanType == ScanType.Debris || m_originalScanType == ScanType.Debris )
+		else if ( m_scanType == ScanType.Debris )
 		{
 			// scale debris to fill the display area properly
 			m_backgroundImage.transform.localScale = m_maskImage.transform.localScale = new Vector3( 1.0f, 1.0f, 1.0f );
