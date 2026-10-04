@@ -27,9 +27,6 @@ Editor tooling is under the **`Starflight Remake/`** menu (`Assets/Tools/Editor/
 Root-level asset scripts (not part of the Unity build): `process_ship_debris.py` is a Blender script (`blender --background --python process_ship_debris.py -- --help`); `process_texture_debris.py` uses Pillow (`python process_texture_debris.py --help`).
 
 **Editor bridge:** `com.unity.pipeline` (experimental) is installed, so the Unity CLI can drive an Editor that has this project open. `unity status` shows whether one is reachable and `unity list` shows what it exposes; the useful ones are `unity command console`, `recompile` / `recompile_status`, `editor_play` / `editor_stop`, `eval` (C# against the project's assemblies) and `run_tests`. Pass `--project-path` when more than one Editor is open. The server only listens on 127.0.0.1 and does not load while the Editor is in Safe Mode, so a failed connection can mean compile errors. For a worktree the GUI Editor does not have open, start a headless one (the compile check command without `-quit`), drive it with `--project-path`, and stop it by PID afterwards (`unity command quit` fails outside play mode in 0.8.0-exp.1).
-
-`com.coplaydev.unity-mcp` (MCP for Unity) is also still in the manifest, but its server is not set up. Use one bridge, not both.
-
 ## Architecture
 
 ### Scene bootstrap and singletons
