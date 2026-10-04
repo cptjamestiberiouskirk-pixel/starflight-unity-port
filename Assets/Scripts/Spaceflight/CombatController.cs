@@ -333,12 +333,13 @@ public class CombatController : MonoBehaviour
 		var missile = GetAvailableMissile();
 		if ( missile != null )
 		{
-			// find target model transform
-			var targetModel = encounter.m_alienShipModelList[ m_currentTargetIndex ];
+			// find target model (its model slot is not the same as the target index, so ask the encounter for it)
+			var targetModel = encounter.GetAlienShipModel( m_currentTargetIndex );
 			int targetIndex = m_currentTargetIndex;
 			int damage = c_missileDamage[ Mathf.Clamp( playerData.m_playerShip.m_missileLauncherClass, 0, c_missileDamage.Length - 1 ) ];
 
-			missile.Fire( playerPosition, targetModel.transform, ( hitPosition, didHit ) =>
+			// this is called when the missile reaches the target
+			System.Action<Vector3, bool> onMissileHit = ( hitPosition, didHit ) =>
 			{
 				if ( didHit && !isImmune )
 				{
@@ -355,7 +356,18 @@ public class CombatController : MonoBehaviour
 
 				// play torpedo explosion sound
 				SoundController.m_instance.PlaySound( SoundController.Sound.TorpedoExplosion );
-			} );
+			};
+
+			if ( targetModel != null )
+			{
+				// home in on the target model
+				missile.Fire( playerPosition, targetModel.transform, onMissileHit );
+			}
+			else
+			{
+				// the target has no model so fly to its current position instead
+				missile.Fire( playerPosition, targetPosition, onMissileHit );
+			}
 		}
 
 		// set cooldown
@@ -383,7 +395,6 @@ public class CombatController : MonoBehaviour
 		}
 
 		var targetShip = alienShipList[ alienIndex ];
-		var targetModel = encounter.m_alienShipModelList[ alienIndex ];
 
 		// already dead?
 		if ( targetShip.m_isDead )

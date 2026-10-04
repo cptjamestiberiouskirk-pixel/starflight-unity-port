@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **Stale Crash-Recovery Scene Copy**: `Assets/_Recovery/0.unity`, its `.meta` and the folder's `.meta`. It was Unity's crash-recovery copy of `Assets/Scenes/Spaceflight.unity`, committed with the combat work in b9727c5. Nothing referenced it and it was not a build scene. It differed from the real scene in two lines: the `ScanType.Unknown` slot of the `SensorsDisplay` background and mask texture arrays pointed at the Spemin Scout textures instead of the Spemin Warship debris textures. `Assets/_Recovery/` and `Assets/_Recovery.meta` are now in `.gitignore`
 - **Unused AI Packages**: `com.unity.ai.generators` (deprecated by Unity in favour of `com.unity.ai.assistant`) and `com.unity.2d.enhancers`, which depends on it. Nothing in the project used either one. Their dependencies `com.unity.2d.common` and `com.unity.settings-manager` go with them
 - **Unity AI Assistant and Inference Packages**: `com.unity.ai.assistant` and `com.unity.ai.inference`. No script, scene or prefab used either one. Six packages that only they pulled in go with them (`com.unity.ai.toolkit`, `com.unity.serialization`, `com.unity.dt.app-ui`, `com.unity.collections`, `com.unity.nuget.mono-cecil`, `com.unity.test-framework.performance`), along with what App UI had left in `ProjectSettings`: its entry in `EditorBuildSettings.asset` and the `APP_UI_EDITOR_ONLY` scripting define
 
@@ -35,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Training Blocked Once Medicine Was Maxed**: the Train check compared only the last skill. It now compares the totals across all skills
 - **Raising Shields With No Fuel**: shields could be raised with no Endurium, then every game hour fuel use threw a NullReferenceException. Raising shields now requires Endurium
 - **Progress Lost on Quit**: the game only saved on location changes and panel closes. It now also saves when the application quits, except when the ship has been destroyed
+- **Debris and Missiles Used the Wrong Alien Ship Model**: combat used a ship's position in the encounter's ship list as its model slot, but the model slots are packed so that only living ships get one. After leaving and re-entering an encounter with ships already destroyed, a kill spawned its debris into another ship's slot or an empty one, and an empty slot made `Encounter.Update` throw every frame so the player could not leave. `Encounter` now keeps a ship-to-slot map behind `GetAlienShipModel()`, used for debris and for missile homing
 
 ## [0.9.0] - 2026-01-04
 
