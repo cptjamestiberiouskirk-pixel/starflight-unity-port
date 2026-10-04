@@ -57,7 +57,8 @@ public class DescendButton : ShipButton
 			m_step++;
 		}
 
-		return false;
+		// don't let the default ship button update run - the controls stay locked until the landing animation changes the buttons (see PlayerCamera.PlayerHasLanded)
+		return true;
 	}
 
 	float m_timer;
