@@ -64,7 +64,10 @@ Inside Spaceflight, `SpaceflightController.SwitchLocation()` hides every locatio
 `InputController` wraps the **legacy Input Manager** with custom axes (`N`, `NE`, … `NW`, `Submit`, `Cancel`) defined in `ProjectSettings/InputManager.asset` (active input handler is "Both"). Call `InputController.m_instance.Debounce()` after consuming a press. Editor-only debug keys in `SpaceflightController.Update()`: **F9** spawns a hostile Spemin encounter, **F10** destroys the player ship.
 
 ### Planet rendering
-- **Production path**: `Planet` component → `PlanetGenerator` (`Scripts/Planet Generator/`) loads `Resources/Planets/{id}.bytes` asynchronously, decompresses on `Task.Run`, then runs `PG_*` filters (scale, blur, craters, albedo, specular, normal, water mask) as a step machine; `Process()` returns progress and is pumped from `SpaceflightController.Update()` while the "Commencing System Penetration" popup shows.
+- **Production path**: `Planet` component → `PlanetGenerator` (`Scripts/Planet Generator/`) loads `Resources/Planets/{id}.bytes` asynchronously, decompresses on `Task.Run`, then runs `PG_*` filters (scale, blur, craters, albedo, specular, normal, water mask) as a step machine; `Process()` returns progress and is pumped from `SpaceflightController.Update()` while the "Commencing System Penetration" popup shows. Three rules it relies on:
+  - `Process()` runs on the main thread and never waits for the task: it looks at `IsCompleted` each frame. Only the main thread changes the step and the abort flag; the task only writes the progress and its own buffers.
+  - A planet file that cannot be read (damaged, cut off, another version, wrong checksum: `ReadPlanetData` throws) fails the task, and `Process()` turns that into an abort of that one planet with an error in the log. An aborted planet has no maps and no elevation data: check `Planet.HasMaps()` before using its generator (Land and Disembark refuse such a planet). Never let an exception out of `Process()`: `SpaceflightController.Update` calls it first thing every frame, so the game would stay paused for good.
+  - The textures a generator makes are never freed by Unity. `Planet` keeps the generator whose maps are on its material and calls `PlanetGenerator.Release()` once the next planet's maps are on it, when the orbit is empty in the new system, and in `OnDestroy`.
 - **Experimental path**: `PlanetManager` + Burst `TerrainJob` + `PlanetData` ScriptableObject (`Spaceflight/PlanetGenerator/`), bridged by `ProceduralAdapter` (kill switch `ProceduralAdapter.EnableProceduralGeneration`). Currently wired only into `Test.unity`.
 
 ### Coordinates
@@ -79,6 +82,7 @@ Rules that came out of the 2026-10-03 design decisions:
 - Alien fire is only reached through the race switch in `Encounter.Update`. A race without its own case gets the `default` case, which only shoots back.
 - Player weapons have no ammunition. Every shot uses Endurium through `PD_PlayerShip.UseUpFuel` and needs `HasFuel()`.
 - Shields keep their charge when lowered and recharge slowly. Repair and Treat start work that takes time; the buttons do not change armor or vitality themselves.
+- The most armor and shield points the player ship can have come from `PD_PlayerShip.GetMaximumArmorPoints()` and `GetMaximumShieldPoints()`: the points of the installed equipment, or the bare hull's 250 with no armor plating (`HasArmorPlating()`). Displays, the engineering buttons, repairs and the hull breach warning all use them; never hard-code a maximum.
 - An encounter forgets the combat target when it begins, and takes every missile out of the air when it begins and when it ends (`CombatController.ClearMissiles`). The other pooled effects are left to finish: the explosion of the player ship is what calls the game over screen.
 
 ## Conventions
@@ -100,4 +104,4 @@ From `.github/copilot-instructions.md` (project rules):
 - `.claude/` and `AGENTS.md` are gitignored.
 - Commits use conventional-commit messages. Feature changes also update `CHANGELOG.md` (Keep a Changelog format) and `README.md` (see `.github/prompts/commitall.prompt.md`).
 - `PROJECT_ANALYSIS_REPORT.md` is a point-in-time report; several bugs it lists were fixed in later commits, so re-verify line numbers before acting on it.
-- `CODE_REVIEW_2026-10-03.md` is the newer full review: open findings by id (M11, M16-M18, M25-M27 and a Low list), what has been fixed since and how each fix was checked, and the status of each `PROJECT_ANALYSIS_REPORT.md` item. Re-verify line numbers there too.
+- `CODE_REVIEW_2026-10-03.md` is the newer full review: open findings by id (M27 and a Low list), what has been fixed since and how each fix was checked, and the status of each `PROJECT_ANALYSIS_REPORT.md` item. Re-verify line numbers there too.
