@@ -173,6 +173,10 @@ public class SpaceflightController : MonoBehaviour
 		// the shields slowly regain their charge
 		playerData.m_playerShip.UpdateShields( Time.deltaTime );
 
+		// the engineer and the doctor carry on with the repairs and the treatment they were told to do
+		playerData.m_playerShip.UpdateRepairs( Time.deltaTime );
+		playerData.m_crewAssignment.UpdateTreatment( Time.deltaTime );
+
 		// save the game once in a while
 		m_timer += Time.deltaTime;
 

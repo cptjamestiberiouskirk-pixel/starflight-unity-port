@@ -1,5 +1,6 @@
 ﻿
 using System;
+using UnityEngine;
 
 [Serializable]
 
@@ -24,6 +25,14 @@ public class PD_CrewAssignment
 	public int m_communicationsOfficerFileId;
 	public int m_doctorFileId;
 
+	// how much vitality the doctor restores each second for every point of medicine skill, and the slowest a doctor ever works
+	public const float c_treatmentRatePerSkillPoint = 0.02f;
+	public const float c_minimumTreatmentRate = 0.5f;
+
+	// true while the doctor is treating someone, and the personnel file of that patient (false in save files from before treatment took time)
+	public bool m_treatmentIsUnderWay;
+	public int m_patientFileId;
+
 	public void Reset()
 	{
 		// unassign all crew member roles
@@ -33,6 +42,10 @@ public class PD_CrewAssignment
 		m_engineerFileId = -1;
 		m_communicationsOfficerFileId = -1;
 		m_doctorFileId = -1;
+
+		// the doctor is not treating anyone
+		m_treatmentIsUnderWay = false;
+		m_patientFileId = -1;
 	}
 
 	public int GetFileId( Role role )
@@ -101,6 +114,139 @@ public class PD_CrewAssignment
 		var playerData = DataController.m_instance.m_playerData;
 
 		return playerData.m_personnel.GetPersonnelFile( fileId );
+	}
+
+	// returns true if this personnel file has at least one role (in other words this person is on board the ship)
+	public bool IsOnBoard( int fileId )
+	{
+		// an unassigned role is not a person
+		if ( fileId == -1 )
+		{
+			return false;
+		}
+
+		for ( var role = Role.First; role < Role.Count; role++ )
+		{
+			if ( GetFileId( role ) == fileId )
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	// the living crew member on board who is hurt the most (null if nobody on board needs treatment)
+	public PD_Personnel.PD_PersonnelFile FindMostInjuredCrewMember()
+	{
+		PD_Personnel.PD_PersonnelFile mostInjured = null;
+
+		// go through each role (only the crew on board can be treated)
+		for ( var role = Role.First; role < Role.Count; role++ )
+		{
+			if ( IsAssigned( role ) )
+			{
+				var personnelFile = GetPersonnelFile( role );
+
+				// only the living can be treated
+				if ( ( personnelFile.m_vitality > 0 ) && ( personnelFile.m_vitality < 100 ) )
+				{
+					if ( ( mostInjured == null ) || ( personnelFile.m_vitality < mostInjured.m_vitality ) )
+					{
+						mostInjured = personnelFile;
+					}
+				}
+			}
+		}
+
+		return mostInjured;
+	}
+
+	// the amount of vitality the doctor restores each second (zero if there is no doctor who can work)
+	public float GetTreatmentRate()
+	{
+		// nobody gets treated without a doctor
+		if ( !IsAssigned( Role.Doctor ) )
+		{
+			return 0.0f;
+		}
+
+		var doctor = GetPersonnelFile( Role.Doctor );
+
+		// or with one who is incapacitated
+		if ( doctor.m_vitality <= 0 )
+		{
+			return 0.0f;
+		}
+
+		// the better the doctor the faster the patient recovers
+		return Mathf.Max( c_minimumTreatmentRate, doctor.m_medicine * c_treatmentRatePerSkillPoint );
+	}
+
+	// the crew member the doctor is treating (null if the doctor is not treating anyone)
+	public PD_Personnel.PD_PersonnelFile GetPatient()
+	{
+		// the patient has to be on board
+		if ( !m_treatmentIsUnderWay || !IsOnBoard( m_patientFileId ) )
+		{
+			return null;
+		}
+
+		// get to the player data
+		var playerData = DataController.m_instance.m_playerData;
+
+		return playerData.m_personnel.GetPersonnelFile( m_patientFileId );
+	}
+
+	// call this to have the doctor start treating a crew member
+	public void StartTreatment( PD_Personnel.PD_PersonnelFile patient )
+	{
+		m_treatmentIsUnderWay = true;
+		m_patientFileId = patient.m_fileId;
+	}
+
+	// call this every frame during spaceflight - the patient recovers a little at a time
+	public void UpdateTreatment( float deltaTime )
+	{
+		// nothing to do unless the doctor has been told to treat someone
+		if ( !m_treatmentIsUnderWay )
+		{
+			return;
+		}
+
+		// the treatment is over if the patient is not on board any more or has died
+		var patient = GetPatient();
+
+		if ( ( patient == null ) || ( patient.m_vitality <= 0 ) )
+		{
+			m_treatmentIsUnderWay = false;
+
+			return;
+		}
+
+		// the treatment stops if the doctor is gone or incapacitated
+		var treatmentRate = GetTreatmentRate();
+
+		if ( treatmentRate <= 0.0f )
+		{
+			m_treatmentIsUnderWay = false;
+
+			SpaceflightController.m_instance.m_messages.AddText( "<color=red>Treatment has stopped. No doctor is available!</color>" );
+
+			return;
+		}
+
+		// the patient recovers a little more
+		patient.m_vitality = Mathf.Min( 100.0f, patient.m_vitality + treatmentRate * deltaTime );
+
+		// has the patient fully recovered?
+		if ( patient.m_vitality >= 100.0f )
+		{
+			// yes - the doctor is done
+			m_treatmentIsUnderWay = false;
+
+			SpaceflightController.m_instance.m_messages.AddText( "<color=#00FF00>" + patient.m_name + " has fully recovered.</color>" );
+		}
 	}
 
 	// return true if there is at least one (living) human crew member

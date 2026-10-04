@@ -34,29 +34,34 @@ public class TreatButton : ShipButton
 			return false;
 		}
 
-		// calculate healing power based on medicine skill (0.5% per skill point)
-		var healingPower = doctor.m_medicine * 0.5f;
+		// the doctor treats one patient at a time - is someone still being treated?
+		var patient = playerData.m_crewAssignment.GetPatient();
 
-		// find injured crew and heal them
-		bool healedSomeone = false;
-		string healedNames = "";
+		var alreadyUnderWay = ( patient != null ) && ( patient.m_vitality > 0 ) && ( patient.m_vitality < 100 );
 
-		foreach ( var personnel in playerData.m_personnel.m_personnelList )
+		if ( !alreadyUnderWay )
 		{
-			// only heal living crew members who are injured
-			if ( personnel.m_vitality > 0 && personnel.m_vitality < 100 )
+			// no - treat the living crew member on board who is hurt the most (people who were left at starport are not on the ship)
+			patient = playerData.m_crewAssignment.FindMostInjuredCrewMember();
+
+			if ( patient != null )
 			{
-				personnel.m_vitality = UnityEngine.Mathf.Min( 100f, personnel.m_vitality + healingPower );
-				healedSomeone = true;
-				if ( healedNames.Length > 0 )
-					healedNames += ", ";
-				healedNames += personnel.m_name;
+				playerData.m_crewAssignment.StartTreatment( patient );
 			}
 		}
 
-		if ( healedSomeone )
+		if ( patient != null )
 		{
-			SpaceflightController.m_instance.m_messages.AddText( "<color=#00FF00>Treatment applied.</color>\nPatients: <color=white>" + healedNames + "</color>" );
+			// treatment takes time - the patient recovers a little at a time (the better the doctor the faster it goes)
+			var treatmentRate = playerData.m_crewAssignment.GetTreatmentRate();
+
+			var timeRemaining = ( treatmentRate > 0.0f ) ? ( ( 100.0f - patient.m_vitality ) / treatmentRate ) : 0.0f;
+
+			SpaceflightController.m_instance.m_messages.AddText(
+				( alreadyUnderWay ? "<color=#00FF00>Still treating " : "<color=#00FF00>Beginning treatment of " ) + patient.m_name + ", Captain.</color>\n" +
+				"Vitality: <color=white>" + UnityEngine.Mathf.CeilToInt( patient.m_vitality ) + "%</color>\n" +
+				"Estimated time: <color=white>" + FormatDuration( timeRemaining ) + "</color>"
+			);
 			SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 		}
 		else
