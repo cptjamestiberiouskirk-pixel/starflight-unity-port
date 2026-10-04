@@ -497,8 +497,8 @@ public class CombatController : MonoBehaviour
 		var playerData = DataController.m_instance.m_playerData;
 		var playerPosition = playerData.m_general.m_coordinates;
 
-		// first absorb with shields
-		if ( playerData.m_playerShip.m_shieldPoints > 0 )
+		// first absorb with shields (lowered shields keep their charge now, so they have to be up to absorb anything)
+		if ( playerData.m_playerShip.m_shieldsAreUp && ( playerData.m_playerShip.m_shieldPoints > 0 ) )
 		{
 			int shieldAbsorb = Mathf.Min( damage, playerData.m_playerShip.m_shieldPoints );
 			playerData.m_playerShip.m_shieldPoints -= shieldAbsorb;

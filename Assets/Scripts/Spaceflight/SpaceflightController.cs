@@ -170,6 +170,9 @@ public class SpaceflightController : MonoBehaviour
 			playerData.m_general.UpdateGameTime( Time.deltaTime );
 		}
 
+		// the shields slowly regain their charge
+		playerData.m_playerShip.UpdateShields( Time.deltaTime );
+
 		// save the game once in a while
 		m_timer += Time.deltaTime;
 
@@ -278,6 +281,9 @@ public class SpaceflightController : MonoBehaviour
 			playerData.m_playerShip.DropShields();
 			playerData.m_playerShip.DisarmWeapons();
 
+			// starport recharges the shields while the ship is docked
+			playerData.m_playerShip.RechargeShieldsFully();
+
 			// start fading out the spaceflight scene
 			SceneFadeController.m_instance.FadeOut( "Starport" );
 		}
@@ -293,6 +299,8 @@ public class SpaceflightController : MonoBehaviour
 			switch ( playerData.m_general.m_location )
 			{
 				case PD_General.Location.DockingBay:
+					// the ship is still docked, so the shields leave with a full charge (and with the charge of any shielding that was just installed)
+					playerData.m_playerShip.RechargeShieldsFully();
 					m_dockingBay.Show();
 					break;
 
