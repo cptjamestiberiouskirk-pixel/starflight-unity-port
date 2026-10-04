@@ -210,6 +210,20 @@ public class MissileProjectile : MonoBehaviour
 	}
 
 	/// <summary>
+	/// Take the missile out of the air without it hitting anything (the hit callback is not called).
+	/// </summary>
+	public void Cancel()
+	{
+		if ( m_isActive )
+		{
+			// forget who was waiting for this missile to arrive
+			m_onHitCallback = null;
+
+			Deactivate();
+		}
+	}
+
+	/// <summary>
 	/// Check if the missile is active.
 	/// </summary>
 	public bool IsActive()

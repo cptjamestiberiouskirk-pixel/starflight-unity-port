@@ -1,6 +1,6 @@
 # Code review, 2026-10-03
 
-Review of `master` at 4648ce3. Items fixed since then are listed under "Fixed since the review"; everything else in this file is still open as of PR #30 (2026-10-04).
+Review of `master` at 4648ce3. Items fixed since then are listed under "Fixed since the review"; everything else in this file is still open as of PR #32 (2026-10-04).
 
 **Scope:** all of `Assets/Scripts` (225 files, about 32k lines), plus `Assets/Planet Generator/Editor`, `Assets/Tools/Editor` and `Assets/Shaders/Editor`.
 
@@ -57,6 +57,7 @@ Fixed in PR #3 (bf0b1a7) unless noted. None of these changed the save version.
 | M10 (PR #28) | A mineral deposit stayed pickable during the 1.5 s of its transporter effect, so pressing Cargo twice put it in the hold twice; `TerrainElement` now remembers that it has been picked up |
 | M23 (PR #29) | `DescendButton.Update` returned false, so the console stayed live for the whole landing (35 s, not the 12 s first estimated) and Abort brought the bridge buttons back in the middle of the descent; it returns true now, as the launch does |
 | (PR #30) | The Descend button printed "Autopilot engaged. Descending..." and "Safe landing, captain." on a 12 s timer, on top of the landing animation's own messages, so the first appeared twice and the second 23 s before the ship was down; the button now only prints "Topography net locked on." |
+| Low (PR #32) | Missiles in flight outlived the encounter they were fired in and still did their damage on arrival: an alien missile hit the player in the next encounter, and a player missile damaged the ship with the same index there. The encounter now takes every missile out of the air when it begins and when it ends (`CombatController.ClearMissiles`) |
 | Low (PR #14) | `Viewport` fade wrote into the shared `Black.mat` asset on every play session in the Editor |
 | (PR #2) | `PD_General.m_lastCommIds` (`int[,]`) was never saved; three compile errors from 70445da |
 | (PR #4) | `com.unity.ai.generators` (deprecated) and `com.unity.2d.enhancers` removed |
@@ -71,6 +72,7 @@ On 2026-10-03 the fixes were run in a headless play-mode probe: the real Spacefl
 - **PR #7 onward:** H6, M15, M13, M14, M7, M22, M24, M5, M21 and the `Viewport` fix were each run before and after the change; the bug reproduced on the old code and was gone with the fix. M8 was run after the change only, because the old class could only write to the real save folder.
 - **PR #21 to #26 (batch 2):** H5, M19, H7, M12, M20 and H8 were each run before and after the change, through the real buttons or the real fire and damage methods. The design of each was decided by the project owner on 2026-10-03. Where the original design notes give no number (hit points per class, the repair and treatment rates, the fuel per shot), the number is a named constant in the code.
 - **PR #28 to #30 (2026-10-04):** M10, M23 and the landing messages were each run before and after the change through the real flow: into orbit, down to the surface, the Disembark and Cargo buttons, and the button controller with the stick or the fire button held for one frame.
+- **PR #32 (2026-10-04):** the missile fix was run before and after in both directions (an alien missile and a player missile in the air when the player leaves), together with a check that missiles still hit inside their own encounter.
 - **Not done:** nothing was played by hand in the GUI Editor, and the probe has no graphics.
 
 ## Regressions from earlier "fix" commits
@@ -123,7 +125,6 @@ Grouped. All are CONFIRMED unless marked otherwise.
 - In-orbit encounters can never start: `SpaceflightController.cs:401-405`.
 - No guard against dying more than once, and missiles keep moving while paused (`MissileProjectile.Update` has no pause check, so a missile can hit while the save panel is open): `CombatController.ApplyDamageToPlayer`.
 - Pooled explosion scale leaks, and a missile launch uses its fuel before the pool check, so a launch with no free missile object costs fuel and does nothing: `CombatController.FirePlayerMissile`.
-- Missiles in flight are not cleared when an encounter ends: the missile pool belongs to `CombatController` and nothing deactivates it on a location change. A missile that arrives after the player has left still applies its damage. CONFIRMED in a probe run on 2026-10-04: an Uhlek missile fired just before the player left did 200 points of damage in the encounter the player entered next. The other direction (a player missile landing on the ship with the same index in the next encounter) is INFERRED from the code and was not run.
 - After the player has fired on Mechans, five correct answers still set `m_mechan9Unlocked`, although the stance is put back to Hostile: `Encounter.UpdateMechanEncounter` (found 2026-10-03, INFERRED, not run).
 - Nothing in the game lowers crew vitality. The only writes to `m_vitality` are crew creation and Treat, so Examine always reports 100% and Treat never has a patient (found 2026-10-03 by searching the scripts).
 - A missile that times out never reports a miss: `MissileProjectile.cs:264-271`.

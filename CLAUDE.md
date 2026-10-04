@@ -77,6 +77,7 @@ Rules that came out of the 2026-10-03 design decisions:
 - Alien fire is only reached through the race switch in `Encounter.Update`. A race without its own case gets the `default` case, which only shoots back.
 - Player weapons have no ammunition. Every shot uses Endurium through `PD_PlayerShip.UseUpFuel` and needs `HasFuel()`.
 - Shields keep their charge when lowered and recharge slowly. Repair and Treat start work that takes time; the buttons do not change armor or vitality themselves.
+- An encounter forgets the combat target when it begins, and takes every missile out of the air when it begins and when it ends (`CombatController.ClearMissiles`). The other pooled effects are left to finish: the explosion of the player ship is what calls the game over screen.
 
 ## Conventions
 
