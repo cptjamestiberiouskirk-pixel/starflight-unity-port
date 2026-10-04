@@ -6,6 +6,9 @@ using System;
 
 public class PD_PlayerShip
 {
+	// the armor points of a ship with no armor plating installed (the bare hull)
+	public const int c_bareHullArmorPoints = 250;
+
 	public string m_name;
 
 	public int m_numCargoPods;
@@ -54,7 +57,7 @@ public class PD_PlayerShip
 		m_weaponsAreArmed = false;
 
 		m_shieldPoints = 0;
-		m_armorPoints = 250;
+		m_armorPoints = c_bareHullArmorPoints;
 
 		// recalculate the mass of the ship
 		RecalculateMass();

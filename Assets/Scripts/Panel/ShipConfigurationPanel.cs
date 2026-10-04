@@ -827,6 +827,12 @@ public class ShipConfigurationPanel : Panel
 					case 5: playerData.m_playerShip.m_laserCannonClass = 0; break;
 				}
 
+				// if we just sold the armor then the ship is back to its bare hull - it can't keep the points of the plating that was sold (but it does keep any damage)
+				if ( m_currentPartIndex == 3 )
+				{
+					playerData.m_playerShip.m_armorPoints = Mathf.Min( playerData.m_playerShip.m_armorPoints, PD_PlayerShip.c_bareHullArmorPoints );
+				}
+
 				// recalculate the ship mass and acceleration
 				playerData.m_playerShip.RecalculateMass();
 				playerData.m_playerShip.RecalculateAcceleration();
