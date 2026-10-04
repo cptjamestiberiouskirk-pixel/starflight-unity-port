@@ -34,7 +34,8 @@ public class PG_GaussianBlurColor
 
 		for ( var i = 0; i < kernelWidth; i++ )
 		{
-			scale += kernel[ i ] = 1.0f * Mathf.Exp( -Mathf.Pow( i - xBlurRadius, 2.0f ) / ( 2.0f * Mathf.Pow( xBlurRadius / 3.2f, 2.0f ) ) );
+			// (a radius of zero means no blur - the formula divides by the radius, so it must not be used then)
+			scale += kernel[ i ] = ( xBlurRadius > 0 ) ? ( 1.0f * Mathf.Exp( -Mathf.Pow( i - xBlurRadius, 2.0f ) / ( 2.0f * Mathf.Pow( xBlurRadius / 3.2f, 2.0f ) ) ) ) : 1.0f;
 		}
 
 		scale = 1.0f / scale;
@@ -70,7 +71,8 @@ public class PG_GaussianBlurColor
 
 		for ( var i = 0; i < kernelWidth; i++ )
 		{
-			scale += kernel[ i ] = 1.0f * Mathf.Exp( -Mathf.Pow( i - yBlurRadius, 2.0f ) / ( 2.0f * Mathf.Pow( yBlurRadius / 3.2f, 2.0f ) ) );
+			// (a radius of zero means no blur - the formula divides by the radius, so it must not be used then)
+			scale += kernel[ i ] = ( yBlurRadius > 0 ) ? ( 1.0f * Mathf.Exp( -Mathf.Pow( i - yBlurRadius, 2.0f ) / ( 2.0f * Mathf.Pow( yBlurRadius / 3.2f, 2.0f ) ) ) ) : 1.0f;
 		}
 
 		scale = 1.0f / scale;

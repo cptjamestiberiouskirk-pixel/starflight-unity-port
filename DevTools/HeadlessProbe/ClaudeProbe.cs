@@ -427,6 +427,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioM26();
 				break;
 
+			case "m27":
+				yield return ScenarioM27();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -4494,6 +4498,275 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "M26 nothing but the south pole padding differs from the planet files of the project", somethingElseDiffers == 0, "the same " + sameAsFile + ", only the south pole padding " + onlySouthPaddingDiffers + ", something else " + somethingElseDiffers + " (first: " + firstOther + ")" );
 
 		Finish( "scenario=m26 planets=" + planets + " sameAsFile=" + sameAsFile + " onlySouthPaddingDiffers=" + onlySouthPaddingDiffers + " somethingElseDiffers=" + somethingElseDiffers + " southPoleIsBottomRowMaximum=" + southPoleIsBottomRowMaximum + " largestChange=" + largestChange.ToString( "F3" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- M27: the planet generator tool (editor assembly): settings, rain drops, the blur
+
+	// the settings the planet generator tool starts out with
+	static void SetToolDefaults( object window )
+	{
+		SetField( window, "m_gameDataFileName", "Starflight Game Data" );
+		SetField( window, "m_planetImagesPath", "Assets/Planet Generator/Data" );
+		SetField( window, "m_resourcesPath", "Resources" );
+		SetField( window, "m_debugMode", false );
+		SetField( window, "m_textureMapHeight", 1024 );
+		SetField( window, "m_textureMapWidth", 2048 );
+		SetField( window, "m_numPolePaddingRows", 4 );
+		SetField( window, "m_octaves", 10 );
+		SetField( window, "m_mountainScale", 0.1f );
+		SetField( window, "m_mountainLacunarity", 2.0f );
+		SetField( window, "m_mountainPersistence", 0.5f );
+		SetField( window, "m_mountainGain", 0.075f );
+		SetField( window, "m_craterGain", 0.25f );
+		SetField( window, "m_doHydraulicErosionPass", true );
+		SetField( window, "m_xyScaleToMeters", 10.0f );
+		SetField( window, "m_zScaleToMeters", 400.0f );
+		SetField( window, "m_rainWaterAmount", 1.0f );
+		SetField( window, "m_sedimentCapacity", 100.0f );
+		SetField( window, "m_gravityConstant", -9.8f );
+		SetField( window, "m_frictionConstant", 0.5f );
+		SetField( window, "m_evaporationConstant", 1.0f );
+		SetField( window, "m_depositionConstant", 5.0f );
+		SetField( window, "m_dissolvingConstant", 4.0f );
+		SetField( window, "m_stepDeltaTime", 0.005f );
+		SetField( window, "m_finalBlurRadius", 3 );
+	}
+
+	// what the tool says is wrong with its settings after one of them was changed ("no check" if this code has none, "fine" if it finds nothing)
+	static string SettingsProblem( object window, MethodInfo check, string field, object value )
+	{
+		if ( check == null )
+		{
+			return "no check";
+		}
+
+		SetToolDefaults( window );
+
+		if ( field != null )
+		{
+			SetField( window, field, value );
+		}
+
+		var problem = check.Invoke( window, null ) as string;
+
+		return ( problem == null ) ? "fine" : problem;
+	}
+
+	// a bowl: the ground falls from the rim to the middle of the map (heights from 0 to 1)
+	static float[,] Bowl( int width, int height )
+	{
+		var map = new float[ height, width ];
+
+		for ( var y = 0; y < height; y++ )
+		{
+			for ( var x = 0; x < width; x++ )
+			{
+				var dx = ( x - width * 0.5f ) / ( width * 0.5f );
+				var dy = ( y - height * 0.5f ) / ( height * 0.5f );
+
+				map[ y, x ] = 0.25f + 0.5f * Mathf.Clamp01( Mathf.Sqrt( dx * dx + dy * dy ) );
+			}
+		}
+
+		return map;
+	}
+
+	// let one rain drop run on the erosion's current map and count its steps (the map and the constants are statics of the erosion class)
+	static int DropSteps( Type erosionType, float evaporationFactor, float frictionFactor, float[,] mapInMeters, int limit )
+	{
+		var dropType = erosionType.GetNestedType( "Drop", c_any );
+
+		erosionType.GetField( "m_evaporationConstant", c_any ).SetValue( null, evaporationFactor );
+		erosionType.GetField( "m_frictionConstant", c_any ).SetValue( null, frictionFactor );
+		erosionType.GetField( "m_outputElevation", c_any ).SetValue( null, mapInMeters.Clone() );
+
+		var drop = Activator.CreateInstance( dropType, c_any, null, new object[] { 20.0f, 12.0f, 1.0f, 0.0f, Vector3.zero }, null );
+		var update = (Func<bool>) Delegate.CreateDelegate( typeof( Func<bool> ), drop, dropType.GetMethod( "Update", c_any ) );
+
+		var steps = 0;
+
+		while ( ( steps < limit ) && update() )
+		{
+			steps++;
+		}
+
+		return steps;
+	}
+
+	IEnumerator ScenarioM27()
+	{
+		var windowType = Type.GetType( "PG_EditorWindow, Assembly-CSharp-Editor" );
+		var erosionType = Type.GetType( "PG_HydraulicErosion, Assembly-CSharp-Editor" );
+
+		if ( ( windowType == null ) || ( erosionType == null ) )
+		{
+			Finish( "scenario=m27 abort: the planet generator tool was not found in the editor assembly", 2 );
+			yield break;
+		}
+
+		yield return Frames( 2 );
+
+		// ---- 1. a blur with a radius of zero is no blur (the tool's Final Blur Radius slider starts at zero)
+		var bumps = new float[ 64, 128 ];
+
+		for ( var y = 0; y < 64; y++ )
+		{
+			for ( var x = 0; x < 128; x++ )
+			{
+				bumps[ y, x ] = ( ( x * 7 + y * 13 ) % 32 ) / 32.0f;
+			}
+		}
+
+		var unblurred = new PG_GaussianBlurElevation().Process( bumps, 0, 0 );
+
+		var notANumber = 0;
+		var changed = 0;
+
+		for ( var y = 0; y < 64; y++ )
+		{
+			for ( var x = 0; x < 128; x++ )
+			{
+				if ( float.IsNaN( unblurred[ y, x ] ) )
+				{
+					notANumber++;
+				}
+				else if ( Mathf.Abs( unblurred[ y, x ] - bumps[ y, x ] ) > 0.000001f )
+				{
+					changed++;
+				}
+			}
+		}
+
+		// a blur with a radius of three still spreads a single point the way it did (the weights, worked out here the way the filter does it)
+		var point = new float[ 64, 128 ];
+
+		point[ 32, 64 ] = 1.0f;
+
+		var blurred = new PG_GaussianBlurElevation().Process( point, 3, 3 );
+
+		var weights = new float[ 7 ];
+		var weightSum = 0.0f;
+
+		for ( var i = 0; i < 7; i++ )
+		{
+			weightSum += weights[ i ] = Mathf.Exp( -Mathf.Pow( i - 3, 2.0f ) / ( 2.0f * Mathf.Pow( 3 / 3.2f, 2.0f ) ) );
+		}
+
+		var expectedCenter = ( weights[ 3 ] / weightSum ) * ( weights[ 3 ] / weightSum );
+		var expectedSide = ( weights[ 2 ] / weightSum ) * ( weights[ 3 ] / weightSum );
+
+		Log( "M27 blur with radius 0 of a 128 by 64 map: " + notANumber + " values are not a number, " + changed + " changed | blur with radius 3 of one point: centre " + blurred[ 32, 64 ].ToString( "F5" ) + " (expected " + expectedCenter.ToString( "F5" ) + "), next to it " + blurred[ 32, 65 ].ToString( "F5" ) + " (expected " + expectedSide.ToString( "F5" ) + ")" );
+
+		Check( "M27 a blur with a radius of zero leaves the map as it is", ( notANumber == 0 ) && ( changed == 0 ), notANumber + " values are not a number, " + changed + " changed" );
+		Check( "M27 a blur with a radius of three still gives the same weights", ( Mathf.Abs( blurred[ 32, 64 ] - expectedCenter ) < 0.00001f ) && ( Mathf.Abs( blurred[ 32, 65 ] - expectedSide ) < 0.00001f ), "centre " + blurred[ 32, 64 ].ToString( "F5" ) + " / " + expectedCenter.ToString( "F5" ) + ", side " + blurred[ 32, 65 ].ToString( "F5" ) + " / " + expectedSide.ToString( "F5" ) );
+
+		// ---- 2. the tool checks its settings before it starts
+		// (an instance of the window that unity knows nothing about, so that the tool's settings in the editor preferences of this computer are neither read nor written)
+		var window = System.Runtime.Serialization.FormatterServices.GetUninitializedObject( windowType );
+		var check = windowType.GetMethod( "GetSettingsProblem", c_any );
+
+		var defaults = SettingsProblem( window, check, null, null );
+		var noEvaporation = SettingsProblem( window, check, "m_evaporationConstant", 0.0f );
+		var noMountainScale = SettingsProblem( window, check, "m_mountainScale", 0.0f );
+		var noLacunarity = SettingsProblem( window, check, "m_mountainLacunarity", 0.0f );
+		var oddHeight = SettingsProblem( window, check, "m_textureMapHeight", 1000 );
+		var otherHeight = SettingsProblem( window, check, "m_textureMapHeight", 512 );
+
+		Log( "M27 settings: defaults -> " + defaults );
+		Log( "M27 settings: evaporation 0 -> " + noEvaporation );
+		Log( "M27 settings: mountain scale 0 -> " + noMountainScale );
+		Log( "M27 settings: mountain lacunarity 0 -> " + noLacunarity );
+		Log( "M27 settings: texture map height 1000 -> " + oddHeight );
+		Log( "M27 settings: texture map height 512 -> " + otherHeight );
+
+		Check( "M27 the tool accepts its default settings", defaults == "fine", defaults );
+		Check( "M27 the tool refuses settings that end in a division by zero or an endless drop", noEvaporation.Contains( "Evaporation" ) && noMountainScale.Contains( "Mountain Scale" ) && noLacunarity.Contains( "Lacunarity" ) && oddHeight.Contains( "Texture Map Height" ) && otherHeight.Contains( "Texture Map Height" ), "evaporation 0: " + noEvaporation + " | scale 0: " + noMountainScale + " | lacunarity 0: " + noLacunarity + " | height 1000: " + oddHeight + " | height 512: " + otherHeight );
+
+		// ---- 3. a game data file that is not there: the tool must say so and stop, not throw (nothing is generated either way: it never gets to the planets)
+		SetToolDefaults( window );
+		SetField( window, "m_gameDataFileName", "No Such Game Data File" );
+
+		var magicThrew = "nothing";
+
+		s_errorsLogged = 0;
+
+		Application.logMessageReceived += CountErrors;
+
+		try
+		{
+			windowType.GetMethod( "MakeSomeMagic", c_any ).Invoke( window, null );
+		}
+		catch ( TargetInvocationException exception )
+		{
+			magicThrew = exception.InnerException.GetType().Name;
+		}
+
+		yield return null;
+
+		Application.logMessageReceived -= CountErrors;
+
+		Log( "M27 the tool with a game data file that is not there: threw " + magicThrew + ", errors logged " + s_errorsLogged );
+
+		Check( "M27 a missing game data file is reported and does not throw", ( magicThrew == "nothing" ) && ( s_errorsLogged == 1 ), "threw " + magicThrew + ", errors logged " + s_errorsLogged );
+
+		// ---- 4. rain drops. Run the erosion once on a map too small to get any drops (128 by 64), which sets up its statics, then let single drops run on a bowl
+		var erosion = Activator.CreateInstance( erosionType );
+		var process = erosionType.GetMethod( "Process", c_any );
+
+		const float c_zScale = 400.0f;
+		const float c_stepDeltaTime = 0.005f;
+
+		object[] Arguments( float[,] map, float evaporation, float friction )
+		{
+			// source, minimum elevation, xy scale, z scale, rain, sediment capacity, gravity, friction, evaporation, deposition, dissolving, step delta time, final blur radius
+			return new object[] { map, 0.0f, 10.0f, c_zScale, 1.0f, 100.0f, -9.8f, friction, evaporation, 5.0f, 4.0f, c_stepDeltaTime, 3 };
+		}
+
+		process.Invoke( erosion, Arguments( Bowl( 128, 64 ), 1.0f, 0.5f ) );
+
+		var bowlInMeters = Bowl( 128, 64 );
+
+		for ( var y = 0; y < 64; y++ )
+		{
+			for ( var x = 0; x < 128; x++ )
+			{
+				bowlInMeters[ y, x ] *= c_zScale;
+			}
+		}
+
+		const int c_limit = 2000000;
+
+		var stepsWithEvaporation = DropSteps( erosionType, 1.0f - 1.0f * c_stepDeltaTime, 1.0f - 0.5f * c_stepDeltaTime, bowlInMeters, c_limit );
+		var stepsWithoutEvaporation = DropSteps( erosionType, 1.0f, 1.0f - 0.5f * c_stepDeltaTime, bowlInMeters, c_limit );
+		var stepsWithoutEvaporationOrFriction = DropSteps( erosionType, 1.0f, 1.0f, bowlInMeters, c_limit );
+
+		Log( "M27 one drop on a bowl (stopped after " + c_limit + " steps): with the default evaporation " + stepsWithEvaporation + " steps, with no evaporation " + stepsWithoutEvaporation + ", with no evaporation and no friction " + stepsWithoutEvaporationOrFriction );
+
+		// the whole erosion pass with no evaporation, on a map large enough to get drops (256 by 128: 32768 of them) - only on code that limits the steps of a drop
+		var limitField = erosionType.GetField( "c_maximumDropStepsWithoutEvaporation", c_any );
+		var passSeconds = -1.0f;
+		var passReturned = false;
+
+		if ( limitField != null )
+		{
+			var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+			var result = process.Invoke( erosion, Arguments( Bowl( 256, 128 ), 0.0f, 0.0f ) ) as float[,];
+
+			passSeconds = stopwatch.ElapsedMilliseconds / 1000.0f;
+			passReturned = ( result != null ) && !float.IsNaN( result[ 64, 128 ] );
+
+			Log( "M27 the erosion pass with no evaporation and no friction on a 256 by 128 bowl came back after " + passSeconds.ToString( "F1" ) + " s (a drop is given " + limitField.GetValue( null ) + " steps at the most)" );
+		}
+		else
+		{
+			Log( "M27 this code does not limit the steps of a drop, so the erosion pass with no evaporation was not run (it would never come back if a drop does not end)" );
+		}
+
+		Check( "M27 with evaporation a drop ends by itself", ( stepsWithEvaporation > 0 ) && ( stepsWithEvaporation < 3000 ), stepsWithEvaporation + " steps" );
+		Check( "M27 the erosion pass comes back even when no drop ends by itself", passReturned, ( limitField == null ) ? "not run: no limit in this code" : ( "came back after " + passSeconds.ToString( "F1" ) + " s" ) );
+
+		Finish( "scenario=m27 blur0=" + notANumber + "NaN/" + changed + "changed settings=[" + defaults + "] refused=" + ( ( check == null ) ? "no check" : "yes" ) + " missingGameData=" + magicThrew + " dropSteps=" + stepsWithEvaporation + "/" + stepsWithoutEvaporation + "/" + stepsWithoutEvaporationOrFriction + " pass=" + ( passReturned ? passSeconds.ToString( "F1" ) + "s" : "not run" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

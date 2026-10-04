@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 public class PG_HydraulicErosion
 {
+	// the most steps a drop is given when its water never evaporates (enough to cross the map several times)
+	const int c_maximumDropStepsWithoutEvaporation = 10000;
+
 	static float m_minimumElevation;
 	static float m_xyScaleToMeters;
 	static float m_zScaleToMeters;
@@ -151,6 +154,20 @@ public class PG_HydraulicErosion
 
 		stopwatch.Restart();
 
+		// work out the most steps a drop can take. A drop ends when its water is down to 0.001 (see Drop.Update), and it loses the same share of its water with every step,
+		// so with evaporation that is a known number of steps. Without evaporation there is no such number, and a drop can go on for good - it gets a fixed limit then.
+		var maximumDropSteps = c_maximumDropStepsWithoutEvaporation;
+
+		if ( ( m_evaporationConstant > 0.0f ) && ( m_evaporationConstant < 1.0f ) && ( m_rainWaterAmount > 0.001f ) )
+		{
+			var stepsToEvaporate = Mathf.Min( 100000000.0f, Mathf.Log( 0.001f / m_rainWaterAmount ) / Mathf.Log( m_evaporationConstant ) );
+
+			// twice as many and a few more, so that rounding can never cut a drop short
+			maximumDropSteps = Mathf.CeilToInt( stepsToEvaporate ) * 2 + 16;
+		}
+
+		UnityEngine.Debug.Log( "A drop is given " + maximumDropSteps + " steps at the most" );
+
 		// do erosion steps
 		var snapshotInterval = 2048;
 		var snapshotSteps = randomXYSizeSquared / snapshotInterval;
@@ -177,7 +194,8 @@ public class PG_HydraulicErosion
 
 					var drop = new Drop( x, y, m_rainWaterAmount, 0.0f, Vector3.zero );
 
-					while ( drop.Update() ) { }
+					// let the drop run until it ends by itself, but never for more steps than its water can last
+					for ( var dropStep = 0; ( dropStep < maximumDropSteps ) && drop.Update(); dropStep++ ) { }
 				}
 			} );
 		}

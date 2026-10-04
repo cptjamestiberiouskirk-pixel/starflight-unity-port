@@ -11,9 +11,9 @@ public class PlanetGenerator
 	// version number
 	const int c_versionNumber = 4;
 
-	// generator constants
-	const int c_nonGasGiantTextureMapWidth = 2048;
-	const int c_nonGasGiantTextureMapHeight = 1024;
+	// generator constants (the planet generator tool in the editor has to make its planet files for this size, so these two are public)
+	public const int c_nonGasGiantTextureMapWidth = 2048;
+	public const int c_nonGasGiantTextureMapHeight = 1024;
 
 	const int c_gasGiantTextureMapWidth = 256;
 	const int c_gasGiantTextureMapHeight = 128;
