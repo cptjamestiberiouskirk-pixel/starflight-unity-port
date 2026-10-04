@@ -148,6 +148,7 @@ What is still open after PR #57. Everything else that was on this list is under 
 - The Statement button transmits "ERROR" when the player's posture is Neutral: the game data has no neutral statement. Not reachable through the console as far as read, because the comm buttons only come after a hail, which sets a posture (found 2026-10-04 in a probe scenario).
 
 **Terrain and planets**
+- A mineral deposit holds 1 to 5 units (`TerrainElement`), and the cargo holds count a unit as a tenth of a cubic meter. So a deposit is 0.1 to 0.5 cubic meters, and the terrain vehicle's hold of 50.0 cubic meters takes 100 to 500 deposits to fill. PR #45 made the texts say what the player really gets and did not touch the amounts. Needs a decision: if a deposit was meant to be 1 to 5 cubic meters, that is one multiplication in `TVCargoButton.PickupElement`, and ten times the minerals.
 - A planet whose maps could not be generated keeps the maps of the planet that was in its orbit in the star system before, and can be orbited as if nothing were wrong (found 2026-10-04 by reading). It cannot be landed on since PR #40. Needs a decision on what such a planet should look like.
 - A saved game that is already in the terrain vehicle on a planet whose file was damaged afterwards has no way out: the terrain vehicle asks for the elevation every frame (found 2026-10-04 by reading, not run). Getting out of it means moving the player, which is a design decision.
 
