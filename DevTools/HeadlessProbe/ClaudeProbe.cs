@@ -431,6 +431,14 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioM27();
 				break;
 
+			case "starport-ledger":
+				yield return ScenarioStarportLedger();
+				break;
+
+			case "cargo":
+				yield return ScenarioCargo();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -4767,6 +4775,244 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "M27 the erosion pass comes back even when no drop ends by itself", passReturned, ( limitField == null ) ? "not run: no limit in this code" : ( "came back after " + passSeconds.ToString( "F1" ) + " s" ) );
 
 		Finish( "scenario=m27 blur0=" + notANumber + "NaN/" + changed + "changed settings=[" + defaults + "] refused=" + ( ( check == null ) ? "no check" : "yes" ) + " missingGameData=" + magicThrew + " dropSteps=" + stepsWithEvaporation + "/" + stepsWithoutEvaporation + "/" + stepsWithoutEvaporationOrFriction + " pass=" + ( passReturned ? passSeconds.ToString( "F1" ) + "s" : "not run" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: the bank ledger and the most the player can buy (starport)
+
+	// open a panel, change the bank balance as if something had been bought or sold in it, close it, and return what the ledger says about it
+	IEnumerator LedgerEntry( Panel panel, string label, int balanceChange, string[] result )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		yield return OpenPanel( panel, label );
+
+		playerData.m_bank.m_currentBalance += balanceChange;
+
+		var before = playerData.m_bank.m_transactionList.Count;
+
+		yield return ClosePanel( panel, label );
+
+		var transactions = playerData.m_bank.m_transactionList;
+
+		result[ 0 ] = ( transactions.Count > before ) ? transactions[ transactions.Count - 1 ].m_amount : "nothing logged";
+	}
+
+	IEnumerator ScenarioStarportLedger()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var depot = FindPanel<TradeDepotPanel>();
+		var shipConfiguration = FindPanel<ShipConfigurationPanel>();
+
+		var result = new string[ 1 ];
+
+		// money that came in and money that went out, in both panels that write to the ledger this way
+		yield return LedgerEntry( depot, "trade depot", 1400, result );
+
+		var depotIncome = result[ 0 ];
+
+		yield return LedgerEntry( depot, "trade depot", -500, result );
+
+		var depotSpending = result[ 0 ];
+
+		yield return LedgerEntry( shipConfiguration, "ship configuration", 1400, result );
+
+		var shipIncome = result[ 0 ];
+
+		yield return LedgerEntry( shipConfiguration, "ship configuration", -500, result );
+
+		var shipSpending = result[ 0 ];
+
+		Log( "ledger: trade depot +1400 reads '" + depotIncome + "', -500 reads '" + depotSpending + "' | ship configuration +1400 reads '" + shipIncome + "', -500 reads '" + shipSpending + "'" );
+
+		Check( "ledger: money that came in reads 1400+", ( depotIncome == "1400+" ) && ( shipIncome == "1400+" ), "trade depot '" + depotIncome + "', ship configuration '" + shipIncome + "'" );
+		Check( "ledger: money that went out reads 500-", ( depotSpending == "500-" ) && ( shipSpending == "500-" ), "trade depot '" + depotSpending + "', ship configuration '" + shipSpending + "'" );
+
+		// ---- the most of an element the player can afford, in tenths of a cubic meter: lead costs 80 a cubic meter
+		var gameData = DataController.m_instance.m_gameData;
+		var lead = -1;
+
+		for ( var i = 0; i < gameData.m_elementList.Length; i++ )
+		{
+			if ( gameData.m_elementList[ i ].m_name == "Lead" )
+			{
+				lead = i;
+			}
+		}
+
+		var price = gameData.m_elementList[ lead ].m_starportPrice;
+		var balanceBefore = playerData.m_bank.m_currentBalance;
+
+		playerData.m_bank.m_currentBalance = 1000000;
+
+		var affordableWithAMillion = (int) Call( depot, "GetMaximumBuyAmountDueToCurrentBalance", lead );
+
+		playerData.m_bank.m_currentBalance = 300000000;
+
+		var affordableWith300Million = (int) Call( depot, "GetMaximumBuyAmountDueToCurrentBalance", lead );
+
+		playerData.m_bank.m_currentBalance = int.MaxValue;
+
+		var affordableWithTheMost = (int) Call( depot, "GetMaximumBuyAmountDueToCurrentBalance", lead );
+
+		playerData.m_bank.m_currentBalance = balanceBefore;
+
+		var expectedWith300Million = (int) ( 300000000L * 10L / price );
+		var expectedWithTheMost = (int) ( (long) int.MaxValue * 10L / price );
+
+		Log( "buy maximum of lead at " + price + " MU: with 1,000,000 MU " + affordableWithAMillion + " tenths, with 300,000,000 MU " + affordableWith300Million + " (should be " + expectedWith300Million + "), with " + int.MaxValue + " MU " + affordableWithTheMost + " (should be " + expectedWithTheMost + ")" );
+
+		Check( "buy maximum: a million MU buys what it did", affordableWithAMillion == 1000000 * 10 / price, affordableWithAMillion + " tenths of a cubic meter" );
+		Check( "buy maximum: it does not overflow with a large balance", ( affordableWith300Million == expectedWith300Million ) && ( affordableWithTheMost == expectedWithTheMost ), "300,000,000 MU: " + affordableWith300Million + " (should be " + expectedWith300Million + "), " + int.MaxValue + " MU: " + affordableWithTheMost + " (should be " + expectedWithTheMost + ")" );
+
+		Finish( "scenario=starport-ledger depot=" + depotIncome + "/" + depotSpending + " ship=" + shipIncome + "/" + shipSpending + " buyMaximum=" + affordableWithAMillion + "/" + affordableWith300Million + "/" + affordableWithTheMost + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: cargo volumes in cubic meters, a deposit that does not fit, the size of a scanned vessel
+
+	IEnumerator ScenarioCargo()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var messages = SpaceflightController.m_instance.m_messages;
+		var sensors = SpaceflightController.m_instance.m_displayController.m_sensorsDisplay;
+
+		EnsureCrew();
+
+		// ---- 1. the cargo list of the ship: a new game has 200 tenths of a cubic meter of endurium, which is 20.0 cubic meters
+		var columns = Call( new ShipCargoButton(), "GetCargoDataTable" ) as string[];
+		var volumeColumn = columns[ 1 ].Replace( '\n', '/' );
+
+		Log( "cargo: the volume column of the ship's cargo list: " + volumeColumn + " (endurium in the hold: " + Endurium() + " tenths)" );
+
+		Check( "cargo: the ship's cargo list shows cubic meters", volumeColumn.Contains( "/" + ( Endurium() / 10 ) + "." + ( Endurium() % 10 ) + "/" ), volumeColumn );
+
+		// ---- 2. the size of a scanned vessel next to our ship: vessel 6 has a mass of 50, vessel 1 a mass of 800
+		var shipMass = playerData.m_playerShip.m_mass;
+
+		var hadSensorData = sensors.m_hasSensorData;
+		var scanType = sensors.m_scanType;
+
+		sensors.m_hasSensorData = true;
+
+		sensors.m_scanType = (SensorsDisplay.ScanType) 6;
+
+		new AnalysisButton().Execute();
+
+		var smallVessel = MessageList();
+
+		sensors.m_scanType = (SensorsDisplay.ScanType) 1;
+
+		new AnalysisButton().Execute();
+
+		var largeVessel = MessageList();
+
+		sensors.m_hasSensorData = hadSensorData;
+		sensors.m_scanType = scanType;
+
+		var expectedSmall = ( (float) gameData.m_vesselList[ 6 ].m_mass / shipMass ).ToString( "F1", System.Globalization.CultureInfo.InvariantCulture );
+		var expectedLarge = ( (float) gameData.m_vesselList[ 1 ].m_mass / shipMass ).ToString( "F1", System.Globalization.CultureInfo.InvariantCulture );
+
+		Log( "cargo: our ship has a mass of " + shipMass + "; analysis of a vessel of mass " + gameData.m_vesselList[ 6 ].m_mass + ": " + smallVessel );
+		Log( "cargo: analysis of a vessel of mass " + gameData.m_vesselList[ 1 ].m_mass + ": " + largeVessel );
+
+		Check( "cargo: the analysis gives the size of a vessel with one decimal", smallVessel.Contains( ">" + expectedSmall + " times the size" ) && largeVessel.Contains( ">" + expectedLarge + " times the size" ), "expected " + expectedSmall + " and " + expectedLarge + " | " + smallVessel + " | " + largeVessel );
+
+		// ---- 3. down to planet 90 and into the terrain vehicle
+		yield return EnterOrbit( 90 );
+
+		SpaceflightController.m_instance.m_planetside.UpdateTerrainGridNow();
+		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		PressButton( ButtonController.ButtonSet.CommandA, 1 );
+
+		yield return WaitForLocation( PD_General.Location.Disembarked, 15.0f );
+		yield return Frames( 10 );
+
+		if ( playerData.m_general.m_location != PD_General.Location.Disembarked )
+		{
+			Finish( "scenario=cargo abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var terrainVehicle = SpaceflightController.m_instance.m_terrainVehicle;
+		var container = SpaceflightController.m_instance.m_disembarked.m_terrainGrid.m_terrainElements.transform;
+		var deposits = container.GetComponentsInChildren<TerrainElement>( true );
+
+		if ( deposits.Length < 2 )
+		{
+			Finish( "scenario=cargo abort: the planet has fewer than two deposits", 2 );
+			yield break;
+		}
+
+		// everything out of reach, then one deposit of 3 tenths next to the vehicle
+		foreach ( var other in deposits )
+		{
+			if ( Vector3.Distance( other.transform.position, terrainVehicle.transform.position ) < 50.0f )
+			{
+				other.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		var first = deposits[ 0 ];
+
+		first.m_volume = 3;
+		first.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+
+		new TVCargoButton().Execute();
+
+		var pickupMessage = MessageList();
+		var cargoAfterFirst = TerrainVehicleCargo( first.m_elementId );
+
+		// the transporter effect of the first deposit takes 1.5 seconds
+		yield return new WaitForSecondsRealtime( 2.5f );
+
+		messages.Clear();
+
+		Call( new TVCargoButton(), "ShowCargoContents" );
+
+		var contents = MessageList();
+
+		Log( "cargo: picking up a deposit of 3 tenths of a cubic meter: " + pickupMessage + " (in the hold now: " + cargoAfterFirst + " tenths)" );
+		Log( "cargo: the cargo list of the terrain vehicle: " + contents );
+
+		Check( "cargo: the pickup message gives the volume in cubic meters", ( cargoAfterFirst == 3 ) && pickupMessage.Contains( "Picked up 0.3 cubic meters" ), "in the hold " + cargoAfterFirst + " tenths | " + pickupMessage );
+		Check( "cargo: the terrain vehicle's cargo list shows cubic meters", contents.Contains( ": 0.3 m" ) && contents.Contains( "Capacity: 0.3/" + ( gameData.m_misc.m_terrainVehicleVolume / 10 ) + "." + ( gameData.m_misc.m_terrainVehicleVolume % 10 ) + " m" ), contents );
+
+		// ---- 4. a deposit that does not fit: fill the hold up to its last tenth of a cubic meter, then try a deposit of 4 tenths
+		var second = deposits[ 1 ];
+
+		playerData.m_terrainVehicle.AddElement( second.m_elementId, playerData.m_terrainVehicle.GetRemainingVolume() - 1 );
+
+		second.m_volume = 4;
+		second.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+
+		var cargoBefore = TerrainVehicleCargo( second.m_elementId );
+
+		new TVCargoButton().Execute();
+
+		var partialMessage = MessageList();
+		var cargoAfterPartial = TerrainVehicleCargo( second.m_elementId );
+
+		yield return new WaitForSecondsRealtime( 2.5f );
+
+		var secondIsStillThere = ( second != null );
+		var secondVolume = secondIsStillThere ? second.m_volume : -1;
+
+		// and once more with the hold full
+		new TVCargoButton().Execute();
+
+		var fullMessage = MessageList();
+		var cargoAfterFull = TerrainVehicleCargo( second.m_elementId );
+
+		Log( "cargo: a deposit of 4 tenths with room for 1: took " + ( cargoAfterPartial - cargoBefore ) + ", free afterwards " + playerData.m_terrainVehicle.GetRemainingVolume() + ", deposit still there " + secondIsStillThere + " with " + secondVolume + " tenths | " + partialMessage );
+		Log( "cargo: the same deposit with a full hold: took " + ( cargoAfterFull - cargoAfterPartial ) + " | " + fullMessage );
+
+		Check( "cargo: a deposit that does not fit is left with what the hold could not take", ( cargoAfterPartial - cargoBefore == 1 ) && secondIsStillThere && ( secondVolume == 3 ) && partialMessage.Contains( "0.3 cubic meters are left" ), "took " + ( cargoAfterPartial - cargoBefore ) + ", still there " + secondIsStillThere + " with " + secondVolume + " tenths | " + partialMessage );
+		Check( "cargo: nothing is taken from it with a full hold", ( cargoAfterFull == cargoAfterPartial ) && fullMessage.Contains( "full" ), "took " + ( cargoAfterFull - cargoAfterPartial ) + " | " + fullMessage );
+
+		Finish( "scenario=cargo shipList=[" + volumeColumn + "] size=" + expectedSmall + "/" + expectedLarge + " pickup=" + cargoAfterFirst + " partial=" + ( cargoAfterPartial - cargoBefore ) + "/" + secondIsStillThere + "/" + secondVolume + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

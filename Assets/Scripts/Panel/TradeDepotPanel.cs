@@ -112,7 +112,8 @@ public class TradeDepotPanel : Panel
 		{
 			string sign = ( deltaBalance > 0 ) ? "-" : "+";
 
-			PD_Bank.Transaction transaction = new PD_Bank.Transaction( DataController.m_instance.m_playerData.m_general.m_currentStardateYMD, "Trade depot", deltaBalance.ToString() + sign );
+			// the amount without its own sign, the sign goes behind it (money that came in used to read "-1400+")
+			PD_Bank.Transaction transaction = new PD_Bank.Transaction( DataController.m_instance.m_playerData.m_general.m_currentStardateYMD, "Trade depot", Mathf.Abs( deltaBalance ).ToString() + sign );
 
 			DataController.m_instance.m_playerData.m_bank.m_transactionList.Add( transaction );
 		}
@@ -1200,7 +1201,15 @@ public class TradeDepotPanel : Panel
 		// get the player's current bank balance
 		int currentBalance = playerData.m_bank.m_currentBalance;
 
-		// calculate and return the maximum amount the player can buy
-		return currentBalance * 10 / starportPrice;
+		// something that costs nothing can be bought without limit (no element is free, but never divide by zero)
+		if ( starportPrice <= 0 )
+		{
+			return int.MaxValue;
+		}
+
+		// calculate and return the maximum amount the player can buy (with 64 bits - ten times the balance does not fit into 32 bits once the balance is above 214 million)
+		long maximumAmount = (long) currentBalance * 10L / starportPrice;
+
+		return (int) Math.Min( maximumAmount, (long) int.MaxValue );
 	}
 }

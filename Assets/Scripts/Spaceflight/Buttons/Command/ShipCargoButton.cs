@@ -31,7 +31,7 @@ public class ShipCargoButton : ShipButton
 			foreach (PD_ElementReference elementRef in elementStorage.m_elementList)
 			{
 				itemColumn += "   " + elementRef.GetElementGameData().m_name + "\n";
-				volumeColumn += elementRef.GetVolume() + "\n";
+				volumeColumn += Tools.VolumeToText( elementRef.GetVolume() ) + "\n";
 				valueColumn += elementRef.GetElementGameData().m_actualValue + "\n";
 			}
 		}

@@ -6,6 +6,26 @@ public class AnalysisButton : ShipButton
 		return "Analysis";
 	}
 
+	// how many times the mass of our ship something has, with one decimal (dividing the two whole numbers made everything smaller than our ship "0 times the size")
+	static string GetSizeText( int mass, int shipMass )
+	{
+		// never divide by zero (our ship always has the mass of its hull)
+		if ( shipMass <= 0 )
+		{
+			return "?";
+		}
+
+		var ratio = (float) mass / (float) shipMass;
+
+		// something that has a mass is never "0.0 times" our size
+		if ( ( mass > 0 ) && ( ratio < 0.05f ) )
+		{
+			return "less than 0.1";
+		}
+
+		return ratio.ToString( "F1", System.Globalization.CultureInfo.InvariantCulture );
+	}
+
 	public override bool Execute()
 	{
 		// get to the game data
@@ -66,7 +86,7 @@ public class AnalysisButton : ShipButton
 						text += "Object: <color=white>" + vessel.m_object + "</color>\n";
 
 						// size
-						text += "Size: <color=white>" + ( vessel.m_mass / playerData.m_playerShip.m_mass ) + " times the size of our ship</color>\n";
+						text += "Size: <color=white>" + GetSizeText( vessel.m_mass, playerData.m_playerShip.m_mass ) + " times the size of our ship</color>\n";
 					}
 					else
 					{
@@ -120,7 +140,7 @@ public class AnalysisButton : ShipButton
 					text += "Type: <color=white>" + vessel.m_type + "</color>\n";
 
 					// size
-					text += "Size: <color=white>" + ( vessel.m_mass / playerData.m_playerShip.m_mass ) + " times the size of our ship</color>\n";
+					text += "Size: <color=white>" + GetSizeText( vessel.m_mass, playerData.m_playerShip.m_mass ) + " times the size of our ship</color>\n";
 
 					// shields
 					text += "Shields: <color=yellow>Not certain</color>\n";

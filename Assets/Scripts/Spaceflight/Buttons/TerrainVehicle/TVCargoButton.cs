@@ -191,12 +191,26 @@ public class TVCargoButton : ShipButton
 			}
 		}
 
-		// remove the element from the planet
-		element.Pickup();
+		// the volumes are in tenths of a cubic meter, as the cargo holds count them
+		var pickupText = "<color=green>Picked up " + Tools.VolumeToText( volumeToPickup ) + " cubic meters of " + elementName + ".</color>";
+
+		// did all of the deposit fit into the cargo hold?
+		if ( volumeToPickup < volumeAvailable )
+		{
+			// no - the rest of the deposit stays where it is
+			element.m_volume = volumeAvailable - volumeToPickup;
+
+			pickupText += "\n<color=yellow>The cargo hold is full. " + Tools.VolumeToText( element.m_volume ) + " cubic meters are left behind.</color>";
+		}
+		else
+		{
+			// yes - remove the element from the planet
+			element.Pickup();
+		}
 
 		// show pickup message
 		SpaceflightController.m_instance.m_messages.Clear();
-		SpaceflightController.m_instance.m_messages.AddText( "<color=green>Picked up " + volumeToPickup + " cubic meter" + ( volumeToPickup > 1 ? "s" : "" ) + " of " + elementName + ".</color>" );
+		SpaceflightController.m_instance.m_messages.AddText( pickupText );
 
 		// play transporter sound for cargo pickup
 		SoundController.m_instance.PlaySound( SoundController.Sound.Transporter );
@@ -237,7 +251,7 @@ public class TVCargoButton : ShipButton
 				foreach ( var elementRef in elementStorage.m_elementList )
 				{
 					var elementName = gameData.m_elementList[ elementRef.m_elementId ].m_name;
-					text += "<color=white>" + elementName + ": " + elementRef.m_volume + " m³</color>\n";
+					text += "<color=white>" + elementName + ": " + Tools.VolumeToText( elementRef.m_volume ) + " m³</color>\n";
 				}
 			}
 
@@ -254,7 +268,7 @@ public class TVCargoButton : ShipButton
 			// show remaining capacity
 			var remaining = playerData.m_terrainVehicle.GetRemainingVolume();
 			var total = gameData.m_misc.m_terrainVehicleVolume;
-			text += "\n<color=#808080>Capacity: " + ( total - remaining ) + "/" + total + " m³</color>";
+			text += "\n<color=#808080>Capacity: " + Tools.VolumeToText( total - remaining ) + "/" + Tools.VolumeToText( total ) + " m³</color>";
 
 			SpaceflightController.m_instance.m_messages.AddText( text );
 		}
