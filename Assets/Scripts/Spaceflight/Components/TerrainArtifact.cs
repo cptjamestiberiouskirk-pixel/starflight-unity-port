@@ -27,7 +27,7 @@ public class TerrainArtifact : MonoBehaviour
 		// get the terrain vehicle dynamically if we don't have a reference
 		if ( m_terrainVehicle == null )
 		{
-			m_terrainVehicle = SpaceflightController.m_instance?.m_terrainVehicle;
+			m_terrainVehicle = ( SpaceflightController.m_instance != null ) ? SpaceflightController.m_instance.m_terrainVehicle : null;
 
 			if ( m_terrainVehicle == null )
 			{
