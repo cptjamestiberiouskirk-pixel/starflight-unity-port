@@ -186,4 +186,24 @@ public class PD_Encounter : IComparable
 	{
 		return m_alienShipList;
 	}
+
+	// returns true if this encounter still has at least one living alien ship (whether or not it has shown up in the encounter yet)
+	public bool HasLivingAlienShips()
+	{
+		// an encounter that has not been set up yet still has all of its ships
+		if ( m_alienShipList == null )
+		{
+			return true;
+		}
+
+		foreach ( var alienShip in m_alienShipList )
+		{
+			if ( !alienShip.m_isDead )
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
 }
