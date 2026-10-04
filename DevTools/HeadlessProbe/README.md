@@ -76,6 +76,8 @@ What the probe does:
 | `terrain` | the crater maps (read once, the same values as the textures), the game's random numbers after rocks are placed, an object on the right edge of the map, a scan while a deposit is being picked up, and scan labels after going back into the ship |
 | `savepanel` | the Escape key in space, two seconds into a landing, after the landing and while the ship explodes, and whether a game that is over stays paused |
 | `visual` | a floating object when its timer starts again, when an explosion is switched off, and how far the landing site crosshair moves in a second |
+| `perframe` | how much memory a frame of the status display and of the terrain vehicle display takes when nothing changes, with a control that shows the measurement works, and that both still follow what changes |
+| `starport-transport` | the docking bay transporter: how much memory an update of the astronaut's opacity takes, that the fade reaches the astronaut, and that the material assets are left alone |
 
 Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (about 9 minutes; one summary block per scenario with the failed checks and exceptions).
 

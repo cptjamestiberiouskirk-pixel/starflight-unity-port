@@ -467,6 +467,14 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioVisual();
 				break;
 
+			case "perframe":
+				yield return ScenarioPerFrame();
+				break;
+
+			case "starport-transport":
+				yield return ScenarioStarportTransport();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -6471,6 +6479,206 @@ public class ClaudeProbe : MonoBehaviour
 		playerData.m_general.m_selectedLatitude = 0.0f;
 
 		Finish( "scenario=visual floatStep=" + largestStep.ToString( "F2" ) + " explosion=" + toldAfter.ToString( "F2" ) + "/" + onAt18 + "/" + onAt26 + " crosshair=" + movedInOneSecond.ToString( "F1" ) + "/" + speedAtTheEnd.ToString( "F1" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: what the displays cost every frame (the status display, the terrain vehicle display)
+
+	// something for the control measurement to hold on to
+	static byte[] s_garbage;
+
+	// how many calls a measurement is made of. The heap in use is only known to the nearest block of a few kilobytes,
+	// so it takes many calls for the number to mean something: one byte per call is 20 kilobytes
+	const int c_meterCalls = 20000;
+
+	// how many bytes of memory a number of calls take from the heap (0 if they take none, -1 if it could not be measured). The heap in use
+	// is read before and after. If the garbage collector ran in between, the number says nothing, and it is measured again
+	static long Allocated( Action call, int count )
+	{
+		// once before measuring, so that whatever is only done the first time has been done
+		call();
+
+		for ( var attempt = 0; attempt < 5; attempt++ )
+		{
+			var collections = GC.CollectionCount( 0 );
+			var before = GC.GetTotalMemory( false );
+
+			for ( var i = 0; i < count; i++ )
+			{
+				call();
+			}
+
+			var bytes = GC.GetTotalMemory( false ) - before;
+
+			if ( ( GC.CollectionCount( 0 ) == collections ) && ( bytes >= 0 ) )
+			{
+				return bytes;
+			}
+		}
+
+		return -1;
+	}
+
+	// the measurement itself has to be shown to work: an array of 256 bytes per call must come out as at least 256 bytes per call
+	static long AllocatedByTheControl()
+	{
+		return Allocated( () => { s_garbage = new byte[ 256 ]; }, c_meterCalls ) / c_meterCalls;
+	}
+
+	IEnumerator ScenarioPerFrame()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+
+		// ---- 1. the status display, 100 frames in which nothing changes (a laser cannon on board, so that the weapons line has something to say)
+		var statusDisplay = controller.m_displayController.m_statusDisplay;
+
+		ship.m_laserCannonClass = 1;
+
+		controller.m_displayController.ChangeDisplay( statusDisplay );
+
+		yield return Frames( 5 );
+
+		var controlBytes = AllocatedByTheControl();
+
+		Log( "perframe: control: an array of 256 bytes per call measures as " + controlBytes + " bytes per call" );
+
+		Check( "perframe: the measurement sees memory being taken", controlBytes >= 256, controlBytes + " bytes per call for an array of 256 bytes" );
+
+		var statusText = statusDisplay.m_values.text;
+		var statusBytes = Allocated( statusDisplay.Update, c_meterCalls ) / c_meterCalls;
+		var statusTextAfter = statusDisplay.m_values.text;
+
+		// it still has to follow the ship: half the armor gone, the shields up, and back
+		var armorBefore = ship.m_armorPoints;
+
+		ship.m_armorPoints = ship.GetMaximumArmorPoints() / 2;
+
+		statusDisplay.Update();
+
+		var damagedText = statusDisplay.m_values.text;
+
+		ship.m_armorPoints = armorBefore;
+		ship.m_weaponsAreArmed = !ship.m_weaponsAreArmed;
+
+		statusDisplay.Update();
+
+		var armedText = statusDisplay.m_values.text;
+
+		ship.m_weaponsAreArmed = !ship.m_weaponsAreArmed;
+
+		statusDisplay.Update();
+
+		var statusTextAtTheEnd = statusDisplay.m_values.text;
+
+		Log( "perframe: status display: a frame in which nothing changes takes " + statusBytes + " bytes. Text: " + statusText.Replace( '\n', '/' ) );
+		Log( "perframe: status display with half the armor gone: " + damagedText.Replace( '\n', '/' ) );
+
+		Check( "perframe: the status display takes no memory while nothing changes", ( statusBytes == 0 ) && ( statusText == statusTextAfter ) && ( statusText.Length > 20 ), statusBytes + " bytes per frame" );
+		Check( "perframe: the status display still shows what changes", damagedText.Contains( "50% Hull Damage" ) && ( armedText != statusText ) && ( statusTextAtTheEnd == statusText ), "damaged: " + damagedText.Replace( '\n', '/' ) + " | back to: " + statusTextAtTheEnd.Replace( '\n', '/' ) );
+
+		// ---- 2. the terrain vehicle display (planet 90 in the arth system, the way the m10 scenario gets there)
+		yield return EnterOrbit( 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		PressButton( ButtonController.ButtonSet.CommandA, 1 );
+
+		yield return WaitForLocation( PD_General.Location.Disembarked, 15.0f );
+		yield return Frames( 10 );
+
+		if ( playerData.m_general.m_location != PD_General.Location.Disembarked )
+		{
+			Finish( "scenario=perframe abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var vehicleDisplay = controller.m_displayController.m_terrainVehicleDisplay;
+
+		var vehicleText = vehicleDisplay.m_statusValues.text;
+		var vehicleBytes = Allocated( vehicleDisplay.Update, c_meterCalls ) / c_meterCalls;
+		var vehicleTextAfter = vehicleDisplay.m_statusValues.text;
+
+		// it still has to follow the vehicle: three kilometers further from the ship (2048 units are 225 km)
+		var coordinates = playerData.m_general.m_lastDisembarkedCoordinates;
+
+		playerData.m_general.m_lastDisembarkedCoordinates = coordinates + Vector3.right * ( 3.0f * 2048.0f / 225.0f );
+
+		vehicleDisplay.Update();
+
+		var vehicleTextFurtherAway = vehicleDisplay.m_statusValues.text;
+
+		playerData.m_general.m_lastDisembarkedCoordinates = coordinates;
+
+		vehicleDisplay.Update();
+
+		var vehicleTextAtTheEnd = vehicleDisplay.m_statusValues.text;
+
+		Log( "perframe: terrain vehicle display: a frame in which nothing changes takes " + vehicleBytes + " bytes. Text: " + vehicleText.Replace( '\n', '/' ) + " | three kilometers further away: " + vehicleTextFurtherAway.Replace( '\n', '/' ) );
+
+		Check( "perframe: the terrain vehicle display takes no memory while nothing changes", ( vehicleBytes == 0 ) && ( vehicleText == vehicleTextAfter ) && ( vehicleText.Length > 20 ), vehicleBytes + " bytes per frame" );
+		Check( "perframe: the terrain vehicle display still shows what changes", ( vehicleTextFurtherAway != vehicleText ) && ( vehicleTextAtTheEnd == vehicleText ), "further away: " + vehicleTextFurtherAway.Replace( '\n', '/' ) + " | back to: " + vehicleTextAtTheEnd.Replace( '\n', '/' ) );
+
+		Finish( "scenario=perframe status=" + statusBytes + " vehicle=" + vehicleBytes + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: what the docking bay transporter costs every frame (the astronaut fading out)
+
+	IEnumerator ScenarioStarportTransport()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		// everything the docking bay asks for before it lets the crew aboard: a crew, a name for the ship, engines, fuel
+		EnsureCrew();
+
+		playerData.m_playerShip.m_name = "Probe";
+		playerData.m_playerShip.m_enginesClass = 1;
+
+		if ( playerData.m_playerShip.m_elementStorage.Find( 5 ) == null )
+		{
+			playerData.m_playerShip.AddElement( 5, 50 );
+		}
+
+		var panel = FindPanel<DockingBayPanel>();
+
+		if ( panel == null )
+		{
+			Finish( "scenario=starport-transport abort: no docking bay panel", 2 );
+			yield break;
+		}
+
+		// the materials the astronaut fades out with are assets - what the fade does to them must stay in the scene
+		var assetAlphaBefore = panel.m_fadeAstronautMaterials[ 0 ].GetColor( "SF_AlbedoColor" ).a;
+
+		PanelController.m_instance.Open( panel );
+
+		var transporting = panel.IsTransporting();
+
+		// half way through the fade
+		yield return new WaitForSecondsRealtime( panel.m_fadeStartTime + panel.m_fadeDuration * 0.5f );
+
+		var updateOpacity = (Action<float>) Delegate.CreateDelegate( typeof( Action<float> ), panel, typeof( DockingBayPanel ).GetMethod( "UpdateOpacity", c_any ) );
+
+		var controlBytes = AllocatedByTheControl();
+		var bytes = Allocated( () => updateOpacity( 0.25f ), c_meterCalls ) / c_meterCalls;
+
+		var shownMaterials = panel.m_astronautRenderer.sharedMaterials;
+		var alpha = shownMaterials[ 0 ].GetColor( "SF_AlbedoColor" ).a;
+		var expectedAlpha = Mathf.GammaToLinearSpace( 0.25f );
+		var assetAlphaAfter = panel.m_fadeAstronautMaterials[ 0 ].GetColor( "SF_AlbedoColor" ).a;
+
+		Log( "starport-transport: transporting " + transporting + ". An opacity update takes " + bytes + " bytes (the control: " + controlBytes + " bytes per call). " + shownMaterials.Length + " materials on the astronaut, the first now has alpha " + alpha.ToString( "F4" ) + " (wanted " + expectedAlpha.ToString( "F4" ) + "); the material asset had " + assetAlphaBefore.ToString( "F4" ) + " and has " + assetAlphaAfter.ToString( "F4" ) );
+
+		Check( "starport-transport: the measurement sees memory being taken", controlBytes >= 256, controlBytes + " bytes per call for an array of 256 bytes" );
+		Check( "starport-transport: fading the astronaut takes no memory", transporting && ( bytes == 0 ), bytes + " bytes per update" );
+		Check( "starport-transport: the fade reaches the astronaut and leaves the material assets alone", Mathf.Approximately( alpha, expectedAlpha ) && Mathf.Approximately( assetAlphaAfter, assetAlphaBefore ), "alpha " + alpha.ToString( "F4" ) + " (wanted " + expectedAlpha.ToString( "F4" ) + "), asset " + assetAlphaBefore.ToString( "F4" ) + " -> " + assetAlphaAfter.ToString( "F4" ) );
+
+		Finish( "scenario=starport-transport bytes=" + bytes + " alpha=" + alpha.ToString( "F4" ) + " asset=" + assetAlphaAfter.ToString( "F4" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

@@ -38,6 +38,9 @@ public class DockingBayPanel : Panel
 	// our timer (for the transporting effect)
 	float m_timer;
 
+	// the materials the astronaut is fading out with (the renderer's own copies of the fade materials)
+	Material[] m_astronautMaterials;
+
 	// call this to transport the astronaut to the ship
 	public override bool Open()
 	{
@@ -116,6 +119,9 @@ public class DockingBayPanel : Panel
 
 			// update the renderer with the new list of materials
 			m_astronautRenderer.materials = astronautMaterials;
+
+			// get the renderer's own copies of them once (asking for them makes a new list every time, and the fade asked nine times a frame)
+			m_astronautMaterials = m_astronautRenderer.materials;
 
 			// return false because we did not open the panel
 			return false;
@@ -203,14 +209,17 @@ public class DockingBayPanel : Panel
 	// this updates the opacity of the astronaut
 	void UpdateOpacity( float opacity )
 	{
-		// go through all the materials on the astronaut
-		for ( var i = 0; i < m_astronautRenderer.materials.Length; i++ )
+		// the fade materials are only on the astronaut once the transport has started
+		if ( m_astronautMaterials == null )
 		{
-			// get the material
-			var material = m_astronautRenderer.materials[ i ];
+			return;
+		}
 
+		// go through all the materials on the astronaut
+		for ( var i = 0; i < m_astronautMaterials.Length; i++ )
+		{
 			// update the material opacity
-			Tools.SetOpacity( material, opacity );
+			Tools.SetOpacity( m_astronautMaterials[ i ], opacity );
 		}
 	}
 
