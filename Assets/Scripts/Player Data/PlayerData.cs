@@ -52,6 +52,7 @@ public class PlayerData
 		m_bank.Reset();
 		m_playerShip.Reset();
 		m_knownArtifacts.Reset();
+		m_terrainVehicle.Reset();
 		m_shipsLog.Reset();
 
 		for ( var i = 0; i < gameData.m_encounterList.Length; i++ )

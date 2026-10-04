@@ -347,6 +347,13 @@ public class SaveGamePanel : Panel
 				case PD_General.Location.Encounter:
 					description += "In Encounter</color>\n";
 					break;
+				case PD_General.Location.Disembarked:
+					description += "Terrain Vehicle</color>\n";
+					break;
+				default:
+					// a location this list does not know yet - the colour tag still has to be closed, or the rest of the description runs on in this line
+					description += playerData.m_general.m_location + "</color>\n";
+					break;
 			}
 
 			// the ship name and cargo

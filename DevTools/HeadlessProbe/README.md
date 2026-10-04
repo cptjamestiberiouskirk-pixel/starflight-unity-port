@@ -69,6 +69,7 @@ What the probe does:
 | `m27` | the planet generator tool again: a blur with a radius of zero, the tool's check of its settings, a game data file that is not there, how many steps a single rain drop takes with and without evaporation and friction, and the whole erosion pass with neither on a small map. The tool is never started on the real planets |
 | `starport-ledger` | what the bank ledger says after the Trade Depot and Ship Configuration panels close with more or less money than they opened with, and the most of an element the player can afford with a very large balance |
 | `cargo` | volumes in cubic meters in the ship's cargo list, in the terrain vehicle's pickup message and cargo list; a deposit that does not fit into the hold; the size of a scanned vessel in the sensor analysis |
+| `savedata` | the scene a saved game is loaded into for every location, the save panel's description of a game saved in the terrain vehicle, the terrain vehicle of a new game, and the stardate with the computer set to the Thai, Saudi Arabian, Persian and German cultures |
 
 Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (about 9 minutes; one summary block per scenario with the failed checks and exceptions).
 

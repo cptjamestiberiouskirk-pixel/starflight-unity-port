@@ -219,8 +219,9 @@ public class PD_General
 		var dateTime = new DateTime( 4620, 1, 1 );
 		dateTime = dateTime.AddDays( m_day );
 		dateTime = dateTime.AddHours( m_hour );
-		m_currentStardateYMD = dateTime.ToString( "yyyy-MM-dd" );
-		m_currentStardateDHMY = dateTime.ToString( "dd.HH-MM-yyyy" );
+		// (always with the invariant culture - a computer set to another calendar would get another year, or an exception for a year its calendar does not have)
+		m_currentStardateYMD = dateTime.ToString( "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture );
+		m_currentStardateDHMY = dateTime.ToString( "dd.HH-MM-yyyy", System.Globalization.CultureInfo.InvariantCulture );
 
 		// if the player has shields up then deplete it every "star" hour
 		if ( m_lastHour != m_hour )
