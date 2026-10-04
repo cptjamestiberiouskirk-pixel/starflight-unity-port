@@ -415,6 +415,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioM16();
 				break;
 
+			case "nomaps":
+				yield return ScenarioNoMaps();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -4000,6 +4004,165 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "M16 leaving the spaceflight scene leaves no planet map behind and logs no error", ( planetSizedAfterLeaving - otherPlanetSized == 0 ) && ( s_errorsLogged == 0 ) && ( leavingExceptions == 0 ), ( planetSizedAfterLeaving - otherPlanetSized ) + " planet maps left, errors " + s_errorsLogged + ", exceptions " + leavingExceptions );
 
 		Finish( "scenario=m16 visits=[" + visits + "] mostLeftOver=" + mostLeftOver + " memory=" + ( bytesAtStart >> 20 ) + "MB->" + ( bytesAtEnd >> 20 ) + "MB filesLoaded=" + mostFilesLoaded + " elevationMapOutlived=" + elevationTextureOutlivedItsSystem + " landed=" + landed + " afterLeaving=" + ( planetSizedAfterLeaving - otherPlanetSized ) + "maps/" + s_errorsLogged + "errors checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- a planet whose maps could not be generated cannot be landed on
+
+	// press a console button and say what it threw (nothing, if it worked)
+	static string PressAndCatch( ButtonController.ButtonSet buttonSet, int buttonIndex )
+	{
+		try
+		{
+			PressButton( buttonSet, buttonIndex );
+		}
+		catch ( Exception exception )
+		{
+			s_exceptionCount++;
+
+			return exception.GetType().Name;
+		}
+
+		return "nothing";
+	}
+
+	IEnumerator ScenarioNoMaps()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var starSystem = SpaceflightController.m_instance.m_starSystem;
+		var buttonController = SpaceflightController.m_instance.m_buttonController;
+		var messages = SpaceflightController.m_instance.m_messages;
+
+		EnsureCrew();
+
+		// generate the star system again, and give planet 90 a file that cannot be read: its maps are not generated
+		var garbage = new byte[ 4096 ];
+
+		new System.Random( 12345 ).NextBytes( garbage );
+
+		RegeneratePlanets();
+
+		var badPlanet = starSystem.GetPlanetController( 90 );
+
+		StartProcessing( badPlanet.GetPlanetGenerator(), garbage );
+
+		var start = Time.realtimeSinceStartup;
+
+		while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 30.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 3 );
+
+		var generator = badPlanet.GetPlanetGenerator();
+
+		Log( "no maps: planet 90 after the generation: aborted " + generator.m_abort + ", maps generated " + generator.m_mapsGenerated + ", still generating " + starSystem.GeneratingPlanets() );
+
+		if ( starSystem.GeneratingPlanets() || !generator.m_abort )
+		{
+			Finish( "scenario=nomaps abort: planet 90 was not left without maps (this needs the fix for M17)", 2 );
+			yield break;
+		}
+
+		// ---- into orbit around it, then the land button of the command officer, then descend
+		var exceptionsBefore = s_exceptionCount;
+
+		yield return EnterOrbit( 90 );
+
+		var locationInOrbit = playerData.m_general.m_location;
+		var orbitExceptions = s_exceptionCount - exceptionsBefore;
+
+		messages.Clear();
+
+		var landThrew = PressAndCatch( ButtonController.ButtonSet.CommandB, 0 );
+
+		yield return Frames( 3 );
+
+		var consoleAfterLand = Console();
+		var landingMenuIsUp = ( buttonController.GetCurrentButtonSet() == ButtonController.ButtonSet.Land );
+		var messageAfterLand = MessageList();
+
+		var descendThrew = "not pressed";
+		var messageAfterDescend = "";
+
+		if ( landingMenuIsUp )
+		{
+			descendThrew = PressAndCatch( ButtonController.ButtonSet.Land, 1 );
+
+			yield return Frames( 3 );
+
+			messageAfterDescend = MessageList();
+
+			// back out of the landing menu
+			PressAndCatch( ButtonController.ButtonSet.Land, 2 );
+
+			yield return Frames( 3 );
+		}
+
+		var locationAfter = playerData.m_general.m_location;
+		var exceptions = s_exceptionCount - exceptionsBefore;
+
+		Log( "no maps: in orbit around planet 90 (" + locationInOrbit + ", exceptions getting there " + orbitExceptions + "): Land threw " + landThrew + ", console " + consoleAfterLand + ", message: " + messageAfterLand );
+		Log( "no maps: Descend threw " + descendThrew + ", message: " + messageAfterDescend + " | location afterwards " + locationAfter + ", exceptions in all " + exceptions );
+
+		Check( "no maps: the land button refuses a planet whose maps could not be generated and says why", !landingMenuIsUp && ( landThrew == "nothing" ) && messageAfterLand.Contains( "can't land" ), "landing menu up " + landingMenuIsUp + ", Land threw " + landThrew + ", message: " + messageAfterLand );
+		Check( "no maps: nothing throws on the way, and the ship stays in orbit", ( exceptions == 0 ) && ( locationAfter == PD_General.Location.InOrbit ), "exceptions " + exceptions + " (Descend threw " + descendThrew + "), location " + locationAfter );
+
+		// ---- a planet of the same system that has its maps can still be landed on
+		yield return EnterOrbit( 94 );
+
+		var goodLandThrew = PressAndCatch( ButtonController.ButtonSet.CommandB, 0 );
+
+		yield return Frames( 3 );
+
+		var goodLandingMenuIsUp = ( buttonController.GetCurrentButtonSet() == ButtonController.ButtonSet.Land );
+		var goodConsole = Console();
+
+		// descend without the 35 second landing: bake the terrain and switch, which is what the descend button and its animation do between them
+		var bakeThrew = "nothing";
+
+		try
+		{
+			SpaceflightController.m_instance.m_planetside.UpdateTerrainGridNow();
+		}
+		catch ( Exception exception )
+		{
+			bakeThrew = exception.GetType().Name;
+		}
+
+		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		var goodLocation = playerData.m_general.m_location;
+
+		Log( "no maps: planet 94 has its maps: Land threw " + goodLandThrew + ", console " + goodConsole + ", baking the terrain threw " + bakeThrew + ", location " + goodLocation );
+
+		Check( "no maps: a planet with maps can still be landed on", goodLandingMenuIsUp && ( goodLandThrew == "nothing" ) && ( bakeThrew == "nothing" ) && ( goodLocation == PD_General.Location.Planetside ), "landing menu up " + goodLandingMenuIsUp + ", Land threw " + goodLandThrew + ", baking threw " + bakeThrew + ", location " + goodLocation );
+
+		// ---- on the surface of a planet that has no maps (a saved game can be there if its planet file was damaged later): the disembark button refuses.
+		// The ship is on planet 94 now, so say that its maps were not generated for as long as the button is pressed
+		var surfaceGenerator = starSystem.GetPlanetController( 94 ).GetPlanetGenerator();
+
+		surfaceGenerator.m_mapsGenerated = false;
+
+		messages.Clear();
+
+		var disembarkThrew = PressAndCatch( ButtonController.ButtonSet.CommandA, 1 );
+
+		yield return Frames( 3 );
+
+		var consoleAfterDisembark = Console();
+		var messageAfterDisembark = MessageList();
+		var disembarkStarted = consoleAfterDisembark.Contains( "DisembarkButton" );
+
+		surfaceGenerator.m_mapsGenerated = true;
+
+		Log( "no maps: Disembark on a planet without maps threw " + disembarkThrew + ", console " + consoleAfterDisembark + ", message: " + messageAfterDisembark );
+
+		Check( "no maps: the disembark button refuses a planet without maps and says why", !disembarkStarted && ( disembarkThrew == "nothing" ) && messageAfterDisembark.Contains( "can't disembark" ), "started " + disembarkStarted + ", threw " + disembarkThrew + ", message: " + messageAfterDisembark );
+
+		Finish( "scenario=nomaps landRefused=" + !landingMenuIsUp + " landThrew=" + landThrew + " descendThrew=" + descendThrew + " exceptions=" + exceptions + " location=" + locationAfter + " goodPlanet=" + goodLandingMenuIsUp + "/" + goodLocation + " disembarkRefused=" + !disembarkStarted + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

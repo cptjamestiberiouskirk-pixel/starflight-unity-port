@@ -168,6 +168,12 @@ public class Disembarked : MonoBehaviour
 		// get the planet controller
 		var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( playerData.m_general.m_currentPlanetId );
 
+		// there is no terrain to set up if the maps of this planet could not be generated (a saved game can be on such a planet if its planet file was damaged later)
+		if ( ( planetController == null ) || !planetController.HasMaps() )
+		{
+			return;
+		}
+
 		// save the planet generator
 		m_planetGenerator = planetController.GetPlanetGenerator();
 
