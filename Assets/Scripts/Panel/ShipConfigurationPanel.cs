@@ -830,7 +830,7 @@ public class ShipConfigurationPanel : Panel
 				// if we just sold the armor then the ship is back to its bare hull - it can't keep the points of the plating that was sold (but it does keep any damage)
 				if ( m_currentPartIndex == 3 )
 				{
-					playerData.m_playerShip.m_armorPoints = Mathf.Min( playerData.m_playerShip.m_armorPoints, PD_PlayerShip.c_bareHullArmorPoints );
+					playerData.m_playerShip.m_armorPoints = Mathf.Min( playerData.m_playerShip.m_armorPoints, playerData.m_playerShip.GetMaximumArmorPoints() );
 				}
 
 				// recalculate the ship mass and acceleration
@@ -897,9 +897,7 @@ public class ShipConfigurationPanel : Panel
 			// if we just bought armor then update the armor points on the ship
 			if ( m_currentPartIndex == 3 )
 			{
-				var armor = playerData.m_playerShip.GetArmor();
-
-				playerData.m_playerShip.m_armorPoints = armor.m_points;
+				playerData.m_playerShip.m_armorPoints = playerData.m_playerShip.GetMaximumArmorPoints();
 			}
 
 			// switch back to the buy part state

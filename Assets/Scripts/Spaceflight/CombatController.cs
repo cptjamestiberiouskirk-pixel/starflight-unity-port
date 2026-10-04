@@ -571,9 +571,9 @@ public class CombatController : MonoBehaviour
 
 			SpaceflightController.m_instance.m_messages.AddText( $"<color=red>Hull takes {damage} damage!</color>" );
 
-			// play red alert if armor is critically low (below 25%)
-			int maxArmor = playerData.m_playerShip.m_armorPoints + damage; // approximate original value
-			if ( playerData.m_playerShip.m_armorPoints > 0 && playerData.m_playerShip.m_armorPoints < 250 )
+			// play red alert if armor is critically low (below 25% of the most this ship can have)
+			int maxArmor = playerData.m_playerShip.GetMaximumArmorPoints();
+			if ( playerData.m_playerShip.m_armorPoints > 0 && playerData.m_playerShip.m_armorPoints * 4 < maxArmor )
 			{
 				SoundController.m_instance.PlaySound( SoundController.Sound.RedAlert );
 				SpaceflightController.m_instance.m_messages.AddText( "<color=#FFA500>WARNING: Hull breach imminent!</color>" );

@@ -144,6 +144,30 @@ public class PD_PlayerShip
 		return gameData.m_armorList[ m_armorClass ];
 	}
 
+	// true if armor plating is installed (a ship without any still has the armor points of its bare hull)
+	public bool HasArmorPlating()
+	{
+		return GetArmor().m_points > 0;
+	}
+
+	// the most armor points this ship can have - those of the armor plating that is installed, or those of the bare hull if there is none (so this is never zero)
+	public int GetMaximumArmorPoints()
+	{
+		return HasArmorPlating() ? GetArmor().m_points : c_bareHullArmorPoints;
+	}
+
+	// the most shield points this ship can have - the full charge of the shielding that is installed (zero if there is none)
+	public int GetMaximumShieldPoints()
+	{
+		return Mathf.Max( 0, GetShielding().m_points );
+	}
+
+	// what the armor points belong to, for the messages - the armor plating, or the hull itself if no plating is installed
+	public string GetArmorName()
+	{
+		return HasArmorPlating() ? "armor" : "hull";
+	}
+
 	public GD_MissileLauncher GetMissileLauncher()
 	{
 		// get access to the game data
@@ -334,19 +358,19 @@ public class PD_PlayerShip
 
 			if ( !m_shieldsAreUp )
 			{
-				m_shieldPoints = GetShielding().m_points;
+				m_shieldPoints = GetMaximumShieldPoints();
 			}
 		}
 
 		// never less than nothing and never more than the installed shielding can hold
-		m_shieldPoints = Mathf.Clamp( m_shieldPoints, 0, GetShielding().m_points );
+		m_shieldPoints = Mathf.Clamp( m_shieldPoints, 0, GetMaximumShieldPoints() );
 	}
 
 	// put the shields back at full charge (starport does this while the ship is docked)
 	public void RechargeShieldsFully()
 	{
 		m_shieldChargeIsKept = true;
-		m_shieldPoints = GetShielding().m_points;
+		m_shieldPoints = GetMaximumShieldPoints();
 		m_shieldRechargeTimer = 0.0f;
 	}
 
@@ -356,7 +380,7 @@ public class PD_PlayerShip
 		ValidateShieldCharge();
 
 		// are the shields fully charged already?
-		var maximumPoints = GetShielding().m_points;
+		var maximumPoints = GetMaximumShieldPoints();
 
 		if ( m_shieldPoints >= maximumPoints )
 		{
@@ -409,7 +433,7 @@ public class PD_PlayerShip
 	public float GetRepairTimeRemaining()
 	{
 		var repairRate = GetRepairRate();
-		var pointsToRepair = GetArmor().m_points - m_armorPoints;
+		var pointsToRepair = GetMaximumArmorPoints() - m_armorPoints;
 
 		if ( ( repairRate <= 0.0f ) || ( pointsToRepair <= 0 ) )
 		{
@@ -443,8 +467,8 @@ public class PD_PlayerShip
 			return;
 		}
 
-		// is there anything left to repair? (the armor may have been replaced or sold at starport in the meantime)
-		var maximumPoints = GetArmor().m_points;
+		// is there anything left to repair? (the armor may have been replaced or sold at starport in the meantime - a ship with no armor plating is repaired up to the points of its bare hull)
+		var maximumPoints = GetMaximumArmorPoints();
 
 		if ( m_armorPoints >= maximumPoints )
 		{
@@ -484,7 +508,7 @@ public class PD_PlayerShip
 			m_repairsAreUnderWay = false;
 			m_repairProgress = 0.0f;
 
-			SpaceflightController.m_instance.m_messages.AddText( "<color=green>Repairs on the armor all completed, sir.</color>" );
+			SpaceflightController.m_instance.m_messages.AddText( "<color=green>Repairs on the " + GetArmorName() + " all completed, sir.</color>" );
 		}
 	}
 

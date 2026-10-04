@@ -53,10 +53,14 @@ public class StatusDisplay : ShipDisplay
 		// update the date
 		m_values.text = playerData.m_general.m_currentStardateDHMY + "\n";
 
+		// get the most armor and shield points this ship can have (the armor is never zero - a ship with no armor plating has the points of its bare hull)
+		int maximumArmorPoints = playerData.m_playerShip.GetMaximumArmorPoints();
+		int maximumShieldPoints = playerData.m_playerShip.GetMaximumShieldPoints();
+
 		// update the damage text
-		if ( playerData.m_playerShip.m_armorPoints < 1500 )
+		if ( playerData.m_playerShip.m_armorPoints < maximumArmorPoints )
 		{
-			float damagePercent = ( 1.0f - (float) playerData.m_playerShip.m_armorPoints / 1500.0f ) * 100.0f;
+			float damagePercent = ( 1.0f - (float) playerData.m_playerShip.m_armorPoints / (float) maximumArmorPoints ) * 100.0f;
 			m_values.text += "<color=red>" + damagePercent.ToString( "N0" ) + "% Hull Damage</color>\n";
 		}
 		else
@@ -134,11 +138,12 @@ public class StatusDisplay : ShipDisplay
 			}
 		}
 
-		// update the shield gauge
-		m_shieldGauge.anchorMax = new Vector2( 1.0f, Mathf.Lerp( 0.0f, 1.0f, playerData.m_playerShip.m_shieldPoints / 2500.0f ) );
+		// update the shield gauge (how much of its full charge the installed shielding has - empty if there is no shielding)
+		float shieldCharge = ( maximumShieldPoints > 0 ) ? ( (float) playerData.m_playerShip.m_shieldPoints / (float) maximumShieldPoints ) : 0.0f;
+		m_shieldGauge.anchorMax = new Vector2( 1.0f, Mathf.Clamp01( shieldCharge ) );
 
-		// update the armor gauge
-		m_armorGauge.anchorMax = new Vector2( 1.0f, Mathf.Lerp( 0.0f, 1.0f, playerData.m_playerShip.m_armorPoints / 1500.0f ) );
+		// update the armor gauge (how much of its armor points the ship has left)
+		m_armorGauge.anchorMax = new Vector2( 1.0f, Mathf.Clamp01( (float) playerData.m_playerShip.m_armorPoints / (float) maximumArmorPoints ) );
 	}
 
 	// the status display label

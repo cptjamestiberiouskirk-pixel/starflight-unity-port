@@ -14,12 +14,9 @@ public class DamageButton : ShipButton
 
 		SpaceflightController.m_instance.m_messages.Clear();
 
-		// get max values from ship components
-		var shielding = ship.GetShielding();
-		var armor = ship.GetArmor();
-
-		var maxShield = shielding.m_points;
-		var maxArmor = armor.m_points;
+		// get max values from the ship (a ship with no armor plating still has the armor points of its bare hull)
+		var maxShield = ship.GetMaximumShieldPoints();
+		var maxArmor = ship.GetMaximumArmorPoints();
 
 		// calculate percentages
 		var shieldPercent = maxShield > 0 ? ( ship.m_shieldPoints * 100 / maxShield ) : 0;
@@ -41,16 +38,20 @@ public class DamageButton : ShipButton
 			report += "Shields: <color=#808080>None installed</color>\n";
 		}
 
-		if ( maxArmor > 0 )
+		var armorStatus = "<color=" + armorColor + ">" + armorPercent + "% (" + ship.m_armorPoints + "/" + maxArmor + ")</color>";
+
+		if ( ship.HasArmorPlating() )
 		{
-			report += "Armor: <color=" + armorColor + ">" + armorPercent + "% (" + ship.m_armorPoints + "/" + maxArmor + ")</color>\n";
+			// the armor plating is what takes the damage
+			report += "Armor: " + armorStatus + "\n";
+			report += "Hull: <color=#00FF00>Operational</color>";
 		}
 		else
 		{
+			// no armor plating - the damage goes to the hull itself
 			report += "Armor: <color=#808080>None installed</color>\n";
+			report += "Hull: " + armorStatus;
 		}
-
-		report += "Hull: <color=#00FF00>Operational</color>";
 
 		SpaceflightController.m_instance.m_messages.AddText( report );
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
