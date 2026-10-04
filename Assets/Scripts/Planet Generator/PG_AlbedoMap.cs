@@ -52,7 +52,6 @@ public class PG_AlbedoMap
 
 		var numParallelThreads = 32;
 		var rowsPerThread = outputColorHeight / numParallelThreads;
-		var columnsPerThread = outputColorWidth / numParallelThreads;
 
 		Parallel.For( 0, numParallelThreads, parallelOptions, j =>
 		{
@@ -117,7 +116,8 @@ public class PG_AlbedoMap
 
 				for ( var x1 = 0; x1 < outputColorWidth; x1++ )
 				{
-					var x0 = ( x1 + outputColorWidth ) & outputColorWidthMask;
+					// the pixel to the left and the pixel to the right (the map wraps around at its left and right edges)
+					var x0 = ( x1 - 1 + outputColorWidth ) & outputColorWidthMask;
 					var x2 = ( x1 + 1 ) & outputColorWidthMask;
 
 					xBlurBuffer[ y, x1 ] = outputColor[ y, x0 ] * 0.25f + outputColor[ y, x1 ] * 0.5f + outputColor[ y, x2 ] * 0.25f;
@@ -125,24 +125,7 @@ public class PG_AlbedoMap
 			}
 		} );
 
-		var yBlurBuffer = new Color[ outputColorHeight, outputColorWidth ];
-
-		Parallel.For( 0, numParallelThreads, parallelOptions, j =>
-		{
-			for ( var column = 0; column < columnsPerThread; column++ )
-			{
-				var x = j * columnsPerThread + column;
-
-				for ( var y1 = 8; y1 < outputColorHeight - 8; y1++ )
-				{
-					var y0 = y1 - 1;
-					var y2 = y1 + 1;
-
-					yBlurBuffer[ y1, x ] = xBlurBuffer[ y0, x ] * 0.25f + outputColor[ y1, x ] * 0.5f + outputColor[ y2, x ] * 0.25f;
-				}
-			}
-		} );
-
+		// (there is no blur from row to row - there used to be one here, but its result was never used)
 		outputColor = xBlurBuffer;
 
 		// UnityEngine.Debug.Log( "Blur - " + stopwatch.ElapsedMilliseconds + " milliseconds" );

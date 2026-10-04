@@ -419,6 +419,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioNoMaps();
 				break;
 
+			case "m25":
+				yield return ScenarioM25();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -4163,6 +4167,133 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "no maps: the disembark button refuses a planet without maps and says why", !disembarkStarted && ( disembarkThrew == "nothing" ) && messageAfterDisembark.Contains( "can't disembark" ), "started " + disembarkStarted + ", threw " + disembarkThrew + ", message: " + messageAfterDisembark );
 
 		Finish( "scenario=nomaps landRefused=" + !landingMenuIsUp + " landThrew=" + landThrew + " descendThrew=" + descendThrew + " exceptions=" + exceptions + " location=" + locationAfter + " goodPlanet=" + goodLandingMenuIsUp + "/" + goodLocation + " disembarkRefused=" + !disembarkStarted + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- M25: the blur of the albedo map takes as much from the left as from the right
+
+	// run the albedo map filter on flat ground above the water with nothing scattered, on a black map with single white pixels
+	static Color[,] AlbedoOfWhitePixels( int width, int height, int[] xs, int[] ys )
+	{
+		var elevation = new float[ height, width ];
+		var color = new Color[ height, width ];
+
+		for ( var y = 0; y < height; y++ )
+		{
+			for ( var x = 0; x < width; x++ )
+			{
+				elevation[ y, x ] = 0.5f;
+				color[ y, x ] = Color.black;
+			}
+		}
+
+		for ( var i = 0; i < xs.Length; i++ )
+		{
+			color[ ys[ i ], xs[ i ] ] = Color.white;
+		}
+
+		// a water colour that is not in the map, and water far below the ground
+		return new PG_AlbedoMap().Process( elevation, color, 0.0f, new Color( 1.0f, 0.0f, 1.0f ), Color.black );
+	}
+
+	IEnumerator ScenarioM25()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		var randomPointsField = typeof( PG_AlbedoMap ).GetField( "m_randomPoints", c_any );
+
+		yield return Frames( 2 );
+
+		// ---- 1. the blur by itself: the filter scatters the colours with a table of random points, so give it a table of zeros
+		var savedPoints = randomPointsField.GetValue( null );
+
+		randomPointsField.SetValue( null, new Vector2[ ( (Vector2[]) savedPoints ).Length ] );
+
+		const int c_width = 2048;
+		const int c_height = 1024;
+
+		// one white pixel in the middle of the map and one in the first column (its left neighbour is the last column, the map wraps around)
+		var albedo = AlbedoOfWhitePixels( c_width, c_height, new int[] { 1000, 0 }, new int[] { 500, 300 } );
+
+		randomPointsField.SetValue( null, savedPoints );
+
+		var left = albedo[ 500, 999 ].r;
+		var center = albedo[ 500, 1000 ].r;
+		var right = albedo[ 500, 1001 ].r;
+		var above = albedo[ 499, 1000 ].r;
+		var below = albedo[ 501, 1000 ].r;
+
+		var wrapLeft = albedo[ 300, c_width - 1 ].r;
+		var wrapCenter = albedo[ 300, 0 ].r;
+		var wrapRight = albedo[ 300, 1 ].r;
+
+		Log( "M25 a white pixel at column 1000: left " + left.ToString( "F3" ) + ", itself " + center.ToString( "F3" ) + ", right " + right.ToString( "F3" ) + ", the rows above and below " + above.ToString( "F3" ) + " and " + below.ToString( "F3" ) );
+		Log( "M25 a white pixel at column 0: the last column " + wrapLeft.ToString( "F3" ) + ", itself " + wrapCenter.ToString( "F3" ) + ", column 1 " + wrapRight.ToString( "F3" ) );
+
+		Check( "M25 the blur takes a quarter from each side and half from the pixel itself", Mathf.Approximately( left, 0.25f ) && Mathf.Approximately( center, 0.5f ) && Mathf.Approximately( right, 0.25f ), "left " + left.ToString( "F3" ) + ", itself " + center.ToString( "F3" ) + ", right " + right.ToString( "F3" ) );
+		Check( "M25 the blur wraps around the edge of the map on both sides", Mathf.Approximately( wrapLeft, 0.25f ) && Mathf.Approximately( wrapCenter, 0.5f ) && Mathf.Approximately( wrapRight, 0.25f ), "last column " + wrapLeft.ToString( "F3" ) + ", column 0 " + wrapCenter.ToString( "F3" ) + ", column 1 " + wrapRight.ToString( "F3" ) );
+		Check( "M25 there is no blur from row to row", ( above == 0.0f ) && ( below == 0.0f ), "above " + above.ToString( "F3" ) + ", below " + below.ToString( "F3" ) );
+
+		// ---- 2. a real planet, always scattered the same way, so that two runs can be compared pixel by pixel
+		UnityEngine.Random.InitState( 20261004 );
+
+		PG_AlbedoMap.Initialize();
+
+		const int c_planetId = 90;
+
+		GD_Planet planet = null;
+
+		foreach ( var candidate in gameData.m_planetList )
+		{
+			if ( candidate.m_id == c_planetId )
+			{
+				planet = candidate;
+			}
+		}
+
+		var generator = new PlanetGenerator();
+
+		generator.Start( planet );
+
+		var bytes = Resources.Load<TextAsset>( "Planets/" + c_planetId ).bytes;
+
+		var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+		generator.AsyncProcess( bytes );
+
+		var seconds = stopwatch.ElapsedMilliseconds / 1000.0f;
+
+		var planetAlbedo = GetField( generator, "m_albedoMap" ) as Color[,];
+
+		var planetWidth = planetAlbedo.GetLength( 1 );
+		var planetHeight = planetAlbedo.GetLength( 0 );
+
+		// write it out as three bytes a pixel
+		var dump = new byte[ planetWidth * planetHeight * 3 ];
+		var sum = 0.0;
+		var index = 0;
+
+		for ( var y = 0; y < planetHeight; y++ )
+		{
+			for ( var x = 0; x < planetWidth; x++ )
+			{
+				var pixel = planetAlbedo[ y, x ];
+
+				dump[ index++ ] = (byte) Mathf.RoundToInt( Mathf.Clamp01( pixel.r ) * 255.0f );
+				dump[ index++ ] = (byte) Mathf.RoundToInt( Mathf.Clamp01( pixel.g ) * 255.0f );
+				dump[ index++ ] = (byte) Mathf.RoundToInt( Mathf.Clamp01( pixel.b ) * 255.0f );
+
+				sum += pixel.r + pixel.g + pixel.b;
+			}
+		}
+
+		var dumpPath = System.IO.Path.Combine( System.IO.Path.GetTempPath(), "starflight-probe", "m25-albedo-planet-" + c_planetId + ".bin" );
+
+		System.IO.Directory.CreateDirectory( System.IO.Path.GetDirectoryName( dumpPath ) );
+		System.IO.File.WriteAllBytes( dumpPath, dump );
+
+		Log( "M25 albedo map of planet " + c_planetId + " (" + planetWidth + " by " + planetHeight + ", processed in " + seconds.ToString( "F2" ) + " s): average channel value " + ( sum / ( planetWidth * planetHeight * 3 ) * 255.0 ).ToString( "F3" ) + " of 255, written to " + dumpPath );
+
+		Finish( "scenario=m25 pixel=" + left.ToString( "F3" ) + "/" + center.ToString( "F3" ) + "/" + right.ToString( "F3" ) + " wrap=" + wrapLeft.ToString( "F3" ) + "/" + wrapCenter.ToString( "F3" ) + "/" + wrapRight.ToString( "F3" ) + " rows=" + above.ToString( "F3" ) + "/" + below.ToString( "F3" ) + " planetSeconds=" + seconds.ToString( "F2" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
