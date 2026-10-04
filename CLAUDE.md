@@ -6,11 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Unity 6 (**6000.3.13f1**) port of the 1986 space RPG *Starflight*. All gameplay C# lives in `Assets/Scripts/` (~225 files). There are **no assembly definitions** (everything compiles into `Assembly-CSharp` / `Assembly-CSharp-Editor`) and **no automated tests**.
 
-The 270 stars / ~811 planets are fixed data from the original game, not random generation — preserve original values when touching game data.
+The 270 stars / ~811 planets are fixed data from the original game, not random generation: preserve original values when touching game data.
 
 ## Commands
 
-The project is normally driven from the Unity Editor. Press Play in **any** of the four build scenes (`Persistent`, `Intro`, `Starport`, `Spaceflight` in `Assets/Scenes/`) — see "Scene bootstrap" below.
+The project is normally driven from the Unity Editor. Press Play in **any** of the four build scenes (`Persistent`, `Intro`, `Starport`, `Spaceflight` in `Assets/Scenes/`): see "Scene bootstrap" below.
 
 Headless compile check (fails if the project is already open in an Editor; a fresh worktree has no `Library/` so the first run does a full import and is slow):
 
@@ -41,14 +41,15 @@ Each scene controller (`IntroController`, `StarportController`, `SpaceflightCont
 Saves go through `ISaveSystem` → `JsonSaveSystem`, writing `Application.persistentDataPath/{fileName}{slot}.json` (5 slots) with **`JsonUtility`**. A save is written to `.tmp` and swapped in, the save it replaces is kept as `.bak`, loading falls back to the backup, and a save that can't be read is moved to `.corrupt`. `JsonSaveSystem` takes an optional directory, so it can be exercised away from the real saves. Consequences:
 - Only Unity-serializable fields persist. Dictionaries, properties, and multi-dimensional arrays are silently dropped (e.g. `PD_General.m_lastCommIds` used to be `int[,]` and lost its data on every load; it's now a flat `int[]` behind `GetLastCommId()` / `SetLastCommId()`).
 - `PlayerData.c_currentVersion`: any slot with a different version is **reset to a new game** on load. Bump it only for intentionally breaking `PD_*` changes; otherwise add backward-compat null/length checks for fields missing from older saves.
-- Enums are stored as ints — append new values, never reorder.
+- Enums are stored as ints: append new values, never reorder.
 - Nested containers (arrays or lists of lists) are dropped too; wrap the inner list in a `[Serializable]` class (see `PD_ShipsLog.EntryList`). Game data JSON keys must match field names exactly, since a misspelled key is silently ignored.
 - `Radar` sorts `PlayerData.m_encounterList` by distance every frame, so never index it by encounter id; use `PlayerData.FindEncounter()`.
+- A destroyed ship (`m_armorPoints <= 0`) is never saved: `DataController.SavePlayerData` refuses it, and game over reloads the active slot from its last save (`ReloadActiveGame`). Nothing may bring the armor of a destroyed ship back above 0 (see the guard in `PD_PlayerShip.UpdateRepairs`), or the lost game becomes saveable again.
 
 ### Location state machine
 `PD_General.Location` (`Starport, DockingBay, JustLaunched, StarSystem, Hyperspace, InOrbit, Planetside, Encounter, Disembarked`) drives everything. `DataController.GetCurrentSceneName()` maps `Starport` → Starport scene, everything else → Spaceflight scene.
 
-Inside Spaceflight, `SpaceflightController.SwitchLocation()` hides every location then shows one. Each location is a MonoBehaviour in `Spaceflight/Locations/` with `Show()`/`Hide()` that toggle its GameObject. Changing location auto-saves. Per-frame logic early-outs on `SpaceflightController.m_instance.m_gameIsPaused`.
+Inside Spaceflight, `SpaceflightController.SwitchLocation()` hides every location then shows one. Each location is a MonoBehaviour in `Spaceflight/Locations/` with `Show()`/`Hide()` that toggle its GameObject. Changing location auto-saves. Per-frame logic early-outs on `SpaceflightController.m_instance.m_gameIsPaused`. `SpaceflightController.Update` also ticks the background work that is kept in the player data: shield recharge, armor repairs and medical treatment (`PD_PlayerShip.UpdateShields` and `UpdateRepairs`, `PD_CrewAssignment.UpdateTreatment`).
 
 ### Ship console (Spaceflight UI)
 - `ShipButton` (`Spaceflight/Buttons/`) is a **plain C# class, not a MonoBehaviour** (`GetLabel()`, `Execute()`, `Update()`). `ButtonController.Awake()` instantiates every button into sets keyed by the `ButtonSet` enum (max 6 per set). To add a button, subclass `ShipButton` and add it to a set there; to add a menu, add a `ButtonSet` value before `Count`. `Execute()` typically calls `SpaceflightController.m_instance.m_buttonController.ChangeButtonSet(...)`.
@@ -70,6 +71,13 @@ Inside Spaceflight, `SpaceflightController.SwitchLocation()` hides every locatio
 ### Combat and encounters
 `CombatController` (Spaceflight scene singleton) owns weapon cooldowns, damage (shields then armor), and object pools for lasers, missiles, and hit/explosion effects. `Encounter.cs` (~2,000 lines) runs alien AI, comms, stance, and calls into `CombatController`. `SensorsDisplay.ScanType` order matches vessel IDs and **indexes Inspector arrays** (`Encounter.m_alienShipModelTemplate`, debris templates, sensor textures), so never reorder it and bounds-check those lookups.
 
+Rules that came out of the 2026-10-03 design decisions:
+- Alien ships have saved armor and shield points, 100 per vessel class (`PD_AlienShip`). Shields absorb first.
+- Firing on any alien calls `Encounter.PlayerAttacked()`, which keeps that encounter hostile until the player leaves it (`PD_Encounter.m_attackedByPlayer`). The Uhlek are hostile on sight and never talk: the game data has no comm lines for them.
+- Alien fire is only reached through the race switch in `Encounter.Update`. A race without its own case gets the `default` case, which only shoots back.
+- Player weapons have no ammunition. Every shot uses Endurium through `PD_PlayerShip.UseUpFuel` and needs `HasFuel()`.
+- Shields keep their charge when lowered and recharge slowly. Repair and Treat start work that takes time; the buttons do not change armor or vitality themselves.
+
 ## Conventions
 
 Match the style of the file you are editing:
@@ -85,8 +93,8 @@ From `.github/copilot-instructions.md` (project rules):
 
 ## Repo notes
 
-- `Max/`, `Illustrator/`, `Photoshop/`, `Research/` (incl. the original manual), `Planets/`, `Spacescape-0.5.1/`, `Music/` at the root are source art and reference material outside `Assets/` — Unity does not import them.
+- `Max/`, `Illustrator/`, `Photoshop/`, `Research/` (incl. the original manual), `Planets/`, `Spacescape-0.5.1/`, `Music/` at the root are source art and reference material outside `Assets/`: Unity does not import them.
 - `.claude/` and `AGENTS.md` are gitignored.
 - Commits use conventional-commit messages. Feature changes also update `CHANGELOG.md` (Keep a Changelog format) and `README.md` (see `.github/prompts/commitall.prompt.md`).
 - `PROJECT_ANALYSIS_REPORT.md` is a point-in-time report; several bugs it lists were fixed in later commits, so re-verify line numbers before acting on it.
-- `CODE_REVIEW_2026-10-03.md` is the newer full review: open findings by id (H5, H7, H8, M10-M12, M16-M20, M23, M25-M27 and a Low list), what has been fixed since and how each fix was checked, and the status of each `PROJECT_ANALYSIS_REPORT.md` item. Re-verify line numbers there too.
+- `CODE_REVIEW_2026-10-03.md` is the newer full review: open findings by id (M10, M11, M16-M18, M23, M25-M27 and a Low list), what has been fixed since and how each fix was checked, and the status of each `PROJECT_ANALYSIS_REPORT.md` item. Re-verify line numbers there too.
