@@ -75,8 +75,8 @@ public class PlanetGenerator
 	// the async task
 	Task m_asyncTask;
 
-	// generation progress from 0.0 to 1.0
-	public float m_progress;
+	// generation progress from 0.0 to 1.0 (the async task updates this while the main thread reads it for the progress bar, so it is volatile)
+	public volatile float m_progress;
 
 	// remember if we are done
 	public bool m_mapsGenerated;
@@ -143,7 +143,17 @@ public class PlanetGenerator
 				break;
 
 			case 2:
-				m_asyncTask.Wait();
+
+				// the planet data is being processed on another thread - never wait for it here (this is the main thread, and waiting would freeze the game and the progress bar until the planet is done)
+				if ( m_asyncTask.IsCompleted )
+				{
+					// the processing is over - this throws what the processing threw if it failed (as waiting for it did)
+					m_asyncTask.Wait();
+
+					// carry on with the steps that have to be done on the main thread
+					m_step = 20;
+				}
+
 				break;
 
 			// the stuff below cannot be done asynchronously - stupid unity.
@@ -509,7 +519,7 @@ public class PlanetGenerator
 			}
 		}
 
-		m_step = 20;
+		// all done - the main thread sees that this task has completed and goes on to the next step by itself (the current step is only ever changed by the main thread)
 	}
 
 	void CreateAlbedoTexture()
