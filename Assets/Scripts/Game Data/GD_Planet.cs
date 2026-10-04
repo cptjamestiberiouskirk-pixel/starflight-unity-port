@@ -223,7 +223,8 @@ public class GD_Planet
 	// get the gravity text
 	public string GetGravityText()
 	{
-		return ( m_gravity / 100 ) + "." + ( m_gravity % 100 ) + " G";
+		// gravity is in hundredths of a g, so the fraction always needs two digits (105 is 1.05 G, not 1.5 G)
+		return ( m_gravity / 100 ) + "." + ( m_gravity % 100 ).ToString( "D2" ) + " G";
 	}
 
 	// get the atmospheric density text
