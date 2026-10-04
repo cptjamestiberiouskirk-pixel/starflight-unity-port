@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "deny": [
+      "Edit(/Assets/Resources/Planets/**)",
+      "Edit(/Assets/Planet Generator/Data/**)"
+    ],
+    "ask": [
+      "Edit(/Assets/Resources/Starflight Game Data.json)"
+    ]
+  }
+}
