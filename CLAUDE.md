@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Unity 6 (**6000.3.13f1**) port of the 1986 space RPG *Starflight*. All gameplay C# lives in `Assets/Scripts/` (~225 files). There are **no assembly definitions** (everything compiles into `Assembly-CSharp` / `Assembly-CSharp-Editor`) and **no automated tests**.
+Unity 6 (**6000.3.13f1**) port of the 1986 space RPG *Starflight*. All gameplay C# lives in `Assets/Scripts/`. There are **no assembly definitions** (everything compiles into `Assembly-CSharp` / `Assembly-CSharp-Editor`) and **no automated tests**.
 
 The 270 stars / ~811 planets are fixed data from the original game, not random generation: preserve original values when touching game data.
 
@@ -20,7 +20,7 @@ Headless compile check (fails if the project is already open in an Editor; a fre
 
 CI runs the same compile check headless on every PR and push to `master` (`.github/workflows/compile-check.yml`, GameCI EditMode test run; needs `UNITY_EMAIL`, `UNITY_PASSWORD`, and either `UNITY_SERIAL` (Pro/Student) or `UNITY_LICENSE` (Personal `.ulf` contents) as repo secrets).
 
-**Headless play-mode probe:** `DevTools/HeadlessProbe/` (outside `Assets/`, not part of the build) runs the real Spaceflight or Starport scene headless in play mode, with an in-memory save system so no save file is touched, and checks behaviour through scenarios. From the project root in PowerShell: `& "DevTools\HeadlessProbe\compile-check.ps1"` is the compile check above with a summary, `& "DevTools\HeadlessProbe\probe.ps1" -Scenario <name>` runs one scenario and `& "DevTools\HeadlessProbe\run-all-scenarios.ps1"` runs them all (43 scenarios, about 15 minutes). For a gameplay fix, run its scenario on the old code and on the new code, and add the scenario in the same PR. A scenario that has to pass on the new code must be seen to fail on the old code first: two checks of 2026-10-04 could not fail at all (an allocation meter that always read 0, a mesh that was accepted without an error but was wrong), and only the run on the old code showed it. Its `README.md` lists the scenarios, the helpers and the pitfalls. A probe run that shows the "Starport clear" message can leave `Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset` modified, with no change in content: restore it before staging and stage files by name after a run (whether to commit it once in the current format is an open entry of the code review).
+**Headless play-mode probe:** `DevTools/HeadlessProbe/` (outside `Assets/`, not part of the build) runs the real Spaceflight or Starport scene headless in play mode, with an in-memory save system so no save file is touched, and checks behaviour through scenarios. From the project root in PowerShell: `& "DevTools\HeadlessProbe\compile-check.ps1"` is the compile check above with a summary, `& "DevTools\HeadlessProbe\probe.ps1" -Scenario <name>` runs one scenario and `& "DevTools\HeadlessProbe\run-all-scenarios.ps1"` runs them all. For a gameplay fix, run its scenario on the old code and on the new code, and add the scenario in the same PR. A scenario that has to pass on the new code must be seen to fail on the old code first. Its `README.md` lists the scenarios, the helpers and the pitfalls. A probe run that shows the "Starport clear" message can leave `Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset` modified, with no change in content: restore it before staging and stage files by name after a run.
 
 `com.unity.test-framework` is installed but no test assemblies exist. If tests are added (they will need an `.asmdef` referencing the test framework), run them with `-runTests -testPlatform EditMode -testResults results.xml` and narrow to one test with `-testFilter <FullyQualifiedName>` (omit `-quit`).
 
@@ -28,7 +28,7 @@ Editor tooling is under the **`Starflight Remake/`** menu (`Assets/Tools/Editor/
 
 Root-level asset scripts (not part of the Unity build): `process_ship_debris.py` is a Blender script (`blender --background --python process_ship_debris.py -- --help`); `process_texture_debris.py` uses Pillow (`python process_texture_debris.py --help`).
 
-**Editor bridge:** `com.unity.pipeline` (experimental) is installed, so the Unity CLI can drive an Editor that has this project open. `unity status` shows whether one is reachable and `unity list` shows what it exposes; the useful ones are `unity command console`, `recompile` / `recompile_status`, `editor_play` / `editor_stop`, `eval` (C# against the project's assemblies) and `run_tests`. Pass `--project-path` when more than one Editor is open. The server only listens on 127.0.0.1 and does not load while the Editor is in Safe Mode, so a failed connection can mean compile errors. For a worktree the GUI Editor does not have open, start a headless one (the compile check command without `-quit`), drive it with `--project-path`, and stop it by PID afterwards (`unity command quit` fails outside play mode in 0.8.0-exp.1).
+**Editor bridge:** the `com.unity.pipeline` package (0.8.0-exp.1, experimental; that is the package version, not the version of the Unity CLI) is installed, so the Unity CLI can drive an Editor that has this project open. The commands useful here are `unity command console`, `recompile` / `recompile_status`, `editor_play` / `editor_stop`, `eval` (C# against the project's assemblies) and `run_tests`. The server only listens on 127.0.0.1 and does not load while the Editor is in Safe Mode, so a failed connection can mean compile errors. Stop a headless Editor started for a worktree by its PID: `unity command quit` fails outside play mode in this package version.
 ## Architecture
 
 ### Scene bootstrap and singletons
@@ -46,7 +46,7 @@ Saves go through `ISaveSystem` → `JsonSaveSystem`, writing `Application.persis
 - Enums are stored as ints: append new values, never reorder.
 - Nested containers (arrays or lists of lists) are dropped too; wrap the inner list in a `[Serializable]` class (see `PD_ShipsLog.EntryList`). Game data JSON keys must match field names exactly, since a misspelled key is silently ignored.
 - `Radar` sorts `PlayerData.m_encounterList` by distance every frame, so never index it by encounter id; use `PlayerData.FindEncounter()`.
-- A destroyed ship (`m_armorPoints <= 0`) is never saved: `DataController.SavePlayerData` refuses it, and game over reloads the active slot from its last save (`ReloadActiveGame`). Nothing may bring the armor of a destroyed ship back above 0 (see the guard in `PD_PlayerShip.UpdateRepairs`), or the lost game becomes saveable again.
+- A destroyed ship (`m_armorPoints <= 0`) is never saved: `DataController.SavePlayerData` refuses it, and game over reloads the active slot from its last save (`ReloadActiveGame`). Nothing may bring the armor of a destroyed ship back above 0 (see the guard in `PD_PlayerShip.UpdateRepairs`), or the lost game becomes saveable again. The one exception is the repair in `DataController.LoadPlayerData`, which sets the armor of a save written with a destroyed ship to 1 when it is loaded.
 
 ### Location state machine
 `PD_General.Location` (`Starport, DockingBay, JustLaunched, StarSystem, Hyperspace, InOrbit, Planetside, Encounter, Disembarked`) drives everything. `DataController.GetCurrentSceneName()` maps `Starport` → Starport scene, everything else → Spaceflight scene.
@@ -73,7 +73,7 @@ In the Spaceflight scene the Cancel input (the Escape key) opens the save panel,
   - A planet file that cannot be read (damaged, cut off, another version, wrong checksum: `ReadPlanetData` throws) fails the task, and `Process()` turns that into an abort of that one planet with an error in the log. An aborted planet has no maps and no elevation data: check `Planet.HasMaps()` before using its generator (Land and Disembark refuse such a planet). Never let an exception out of `Process()`: `SpaceflightController.Update` calls it first thing every frame, so the game would stay paused for good.
   - The textures a generator makes are never freed by Unity. `Planet` keeps the generator whose maps are on its material and calls `PlanetGenerator.Release()` once the next planet's maps are on it, when the orbit is empty in the new system, and in `OnDestroy`.
 - **Objects on the surface**: `TerrainGridPopulator` places a planet's rocks, deposits and trees with `Random` seeded from the planet, so that they are in the same places every time, and puts the game's `Random.state` back afterwards. Anything else that needs repeatable random numbers has to do the same. `PG_Craters.Initialize` reads the crater textures once per session, and with `GetPixel` on purpose: `GetPixels` gives values that differ in the last bit for these 16 bit textures, and every planet is worked out from them.
-- **Experimental path**: `PlanetManager` + Burst `TerrainJob` + `PlanetData` ScriptableObject (`Spaceflight/PlanetGenerator/`), bridged by `ProceduralAdapter` (kill switch `ProceduralAdapter.EnableProceduralGeneration`). Currently wired only into `Test.unity`.
+- **Experimental path**: `PlanetManager` + Burst `TerrainJob` + `PlanetData` ScriptableObject (`Spaceflight/PlanetGenerator/`), bridged by `ProceduralAdapter` (kill switch `ProceduralAdapter.EnableProceduralGeneration`).
 
 ### Coordinates
 `Tools` (`Scripts/Misc/Tools.cs`) converts between original game coordinates (0–255 grid) and world space (`(game - 128) * 256`), plus lat/long and map conversions for planet surfaces. `Notes.txt` documents original-game constants (comm subject IDs, stance values, landing sequence, disembark move scale).
@@ -81,7 +81,7 @@ In the Spaceflight scene the Cancel input (the Escape key) opens the save panel,
 ### Combat and encounters
 `CombatController` (Spaceflight scene singleton) owns weapon cooldowns, damage (shields then armor), and object pools for lasers, missiles, and hit/explosion effects. `Encounter.cs` (~2,000 lines) runs alien AI, comms, stance, and calls into `CombatController`. `SensorsDisplay.ScanType` order matches vessel IDs and **indexes Inspector arrays** (`Encounter.m_alienShipModelTemplate`, debris templates, sensor textures), so never reorder it and bounds-check those lookups.
 
-Rules that came out of the 2026-10-03 design decisions:
+Combat rules:
 - Alien ships have saved armor and shield points, 100 per vessel class (`PD_AlienShip`). Shields absorb first.
 - Firing on any alien calls `Encounter.PlayerAttacked()`, which keeps that encounter hostile until the player leaves it (`PD_Encounter.m_attackedByPlayer`). The Uhlek are hostile on sight and never talk: the game data has no comm lines for them.
 - Alien fire is only reached through the race switch in `Encounter.Update`. A race without its own case gets the `default` case, which only shoots back.
@@ -91,7 +91,7 @@ Rules that came out of the 2026-10-03 design decisions:
 - An encounter forgets the combat target when it begins, and takes every missile out of the air when it begins and when it ends (`CombatController.ClearMissiles`). The other pooled effects are left to finish: the explosion of the player ship is what calls the game over screen.
 - The player ship is destroyed once. From then on `CombatController.PlayerIsDestroyed()` is true: `ApplyDamageToPlayer` and `AlienFiresAtPlayer` do nothing, and the player's weapons do not fire. An explosion calls its callback after 1.5 s and is switched off after 2.2 s, when its particles are gone; `GetAvailableExplosion` hands it out at full size. A missile stands still while the game is paused. A player launch that finds no free missile in the pool does nothing: no fuel, no `PlayerAttacked()`.
 - Five right answers unlock Mechan 9 (`PD_General.m_mechan9Unlocked`, saved), but not in an encounter in which the player has fired on the Mechans.
-- What the aliens say goes through `Encounter.AddComm`, which fills in the name of the player's captain (`*`) and of the player's ship (`&`) before the words are garbled. Names are stored as they were typed, so the text can hold empty words (two spaces in a row), and the word loop skips them. The aliens' own names (`%` and `+` in the game data) are not filled in: the game data has none.
+- What the aliens say goes through `Encounter.AddComm`, which fills in the name of the player's captain (`*`) and of the player's ship (`&`) before the words are garbled. Names are stored as they were typed, so the text can hold empty words (two spaces in a row), and the word loop skips them.
 
 ## Conventions
 
@@ -109,7 +109,14 @@ From `.github/copilot-instructions.md` (project rules):
 ## Repo notes
 
 - `Max/`, `Illustrator/`, `Photoshop/`, `Research/` (incl. the original manual), `Planets/`, `Spacescape-0.5.1/`, `Music/` at the root are source art and reference material outside `Assets/`: Unity does not import them.
-- `.claude/` and `AGENTS.md` are gitignored.
-- Commits use conventional-commit messages. Feature changes also update `CHANGELOG.md` (Keep a Changelog format) and `README.md` (see `.github/prompts/commitall.prompt.md`).
-- `PROJECT_ANALYSIS_REPORT.md` is a point-in-time report; several bugs it lists were fixed in later commits, so re-verify line numbers before acting on it.
-- `CODE_REVIEW_2026-10-03.md` is the newer full review: what is still open (no High or Medium finding since PR #57; a Low list, most of which waits for a decision by the project owner), what has been fixed since and how each fix was checked, and the status of each `PROJECT_ANALYSIS_REPORT.md` item. Re-verify line numbers there too.
+- Under `.claude/` only `settings.json`, `rules/`, `agents/` and `skills/` are tracked; the rest of `.claude/` and `AGENTS.md` are gitignored.
+- `CODE_REVIEW_2026-10-03.md` is the current review (open findings, fixes and how they were checked); re-verify line numbers there. `PROJECT_CONTEXT.md` and `PROJECT_ANALYSIS_REPORT.md` are historical.
+
+## Working rules
+
+- Label claims CONFIRMED (seen in code, logs or the console), INFERRED (one link unverified: name it) or HYPOTHESIZED. Say what was not tested. Nothing is fixed until it has compiled; say so when a fix only masks a symptom.
+- No em dashes anywhere: code, comments, docs, commit messages, PR titles and bodies.
+- One small PR per change, on its own branch from the current `origin/master`. Stage files by name, use conventional-commit messages, add a `CHANGELOG.md` bullet under `## [Unreleased]` for every change and update `README.md` for features (`.github/prompts/commitall.prompt.md` has the steps). Do not implement a design-dependent item before the project owner has made the call.
+- Squash-merge (`gh pr merge <n> --squash`, without `--delete-branch`) only once the `compile` check of the PR's head commit is SUCCESS, never on a red or pending check. `master` has no branch protection, so do not use GitHub auto-merge.
+- Before pushing a branch that edits `CHANGELOG.md`, trial-merge it against every open PR branch (`git merge-tree --write-tree --name-only HEAD origin/<branch>`); on a conflict, move the new bullet so an unchanged line separates the two insertions.
+- Unity package updates: one per branch, compile-checked before the commit, never in bulk. The CI report lists `com.unity.sdk.linux-x86_64`, `com.unity.toolchain.linux-x86_64-linux` and `com.unity.sysroot.base` as added: container noise, never commit them.

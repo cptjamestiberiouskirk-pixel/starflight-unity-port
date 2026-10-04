@@ -164,6 +164,9 @@ What is still open after PR #57. Everything else that was on this list is under 
 - The seam in the perlin noise texture (from the review's editor tools list). An image; not looked at.
 
 **Test.unity only**
+
+The experimental planet path (`PlanetManager`, `TerrainJob`, `PlanetData`, bridged by `ProceduralAdapter`) is wired only into `Test.unity`.
+
 - `PlanetManager.GeneratePlanet` copies the three colours from the `PlanetData` asset every time, which throws away the colours `ProceduralAdapter.ApplyBiomeData` has just set. Which of the two should win is a decision about the experimental planets.
 
 **Editor tools**
