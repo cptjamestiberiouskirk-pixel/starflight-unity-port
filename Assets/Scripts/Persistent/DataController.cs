@@ -71,6 +71,12 @@ public class DataController : MonoBehaviour
 			// report the change
 			UnityEngine.Debug.Log( "Switching to save game slot number " + m_targetSaveGameSlotNumber );
 
+			// a lost game is never saved - put the slot we are leaving back to its last save first
+			if ( IsLost( m_playerData ) )
+			{
+				ReloadActiveGame();
+			}
+
 			// make the current slot not the current game
 			m_playerData.m_isCurrentGame = false;
 
@@ -128,42 +134,8 @@ public class DataController : MonoBehaviour
 		// go through each save game slot
 		for ( var i = 0; i < c_numSaveGameSlots; i++ )
 		{
-			// keep track of whether or not we were able to load the player data file
-			var loadSucceeded = false;
-
-			// check if the file exists
-			if ( _saveSystem.Exists( m_playerDataFileName, i ) )
-			{
-				try
-				{
-					// load and deserialize the player data file
-					m_playerDataList[ i ] = _saveSystem.Load<PlayerData>( m_playerDataFileName, i );
-
-					if ( m_playerDataList[ i ] != null )
-					{
-						// we were able to load the save game slots from file (version checking is next)
-						loadSucceeded = true;
-					}
-				}
-				catch
-				{
-					UnityEngine.Debug.LogWarning( "Failed to load save slot " + i );
-				}
-			}
-
-			// if the player data is from an old version then we have to start over
-			if ( !loadSucceeded || !m_playerDataList[ i ].IsCurrentVersion() )
-			{
-				// debug info
-				UnityEngine.Debug.Log( "Creating and resetting player data " + i );
-
-				m_playerDataList[ i ] = new PlayerData();
-
-				m_playerDataList[ i ].Reset();
-			}
-
-			// repair save files where a deleted crewmember was left assigned to a role
-			m_playerDataList[ i ].m_crewAssignment.UnassignMissingCrew( m_playerDataList[ i ].m_personnel );
+			// load this slot (or start a new game in it if there is nothing usable on disk)
+			m_playerDataList[ i ] = LoadPlayerData( i );
 
 			// check if this is the active save game slot
 			if ( m_playerDataList[ i ].m_isCurrentGame )
@@ -193,6 +165,72 @@ public class DataController : MonoBehaviour
 		m_targetSaveGameSlotNumber = m_activeSaveGameSlotNumber;
 	}
 
+	// this loads one save game slot from disk - if there is nothing usable there it gives back a new game
+	PlayerData LoadPlayerData( int saveGameSlotNumber )
+	{
+		PlayerData playerData = null;
+
+		// check if the file exists
+		if ( _saveSystem.Exists( m_playerDataFileName, saveGameSlotNumber ) )
+		{
+			try
+			{
+				// load and deserialize the player data file
+				playerData = _saveSystem.Load<PlayerData>( m_playerDataFileName, saveGameSlotNumber );
+			}
+			catch
+			{
+				UnityEngine.Debug.LogWarning( "Failed to load save slot " + saveGameSlotNumber );
+
+				playerData = null;
+			}
+		}
+
+		// if we could not load the player data or it is from an old version then we have to start over
+		if ( ( playerData == null ) || !playerData.IsCurrentVersion() )
+		{
+			// debug info
+			UnityEngine.Debug.Log( "Creating and resetting player data " + saveGameSlotNumber );
+
+			playerData = new PlayerData();
+
+			playerData.Reset();
+		}
+
+		// repair save files where a deleted crewmember was left assigned to a role
+		playerData.m_crewAssignment.UnassignMissingCrew( playerData.m_personnel );
+
+		// repair save files that were written with a destroyed ship (the game over screen used to let that happen) - without this they could never be saved again
+		if ( IsLost( playerData ) )
+		{
+			playerData.m_playerShip.m_armorPoints = 1;
+		}
+
+		return playerData;
+	}
+
+	// a game is lost once its ship has been destroyed - a lost game is never saved, the save on disk is the one the player goes back to
+	static bool IsLost( PlayerData playerData )
+	{
+		return ( playerData.m_playerShip.m_armorPoints <= 0 );
+	}
+
+	// call this to throw away the game in memory and go back to the last save of the active slot (after the ship has been lost)
+	public void ReloadActiveGame()
+	{
+		// debug info
+		UnityEngine.Debug.Log( "Reloading save game slot number " + m_activeSaveGameSlotNumber );
+
+		// load the active slot again
+		m_playerDataList[ m_activeSaveGameSlotNumber ] = LoadPlayerData( m_activeSaveGameSlotNumber );
+
+		// point the current player data to it
+		m_playerData = m_playerDataList[ m_activeSaveGameSlotNumber ];
+
+		// this is still the current game (a slot that had no save comes back as a new game)
+		m_playerData.m_isCurrentGame = true;
+	}
+
 	// save the active game when the player closes the game (otherwise everything since the last location change is lost)
 	void OnApplicationQuit()
 	{
@@ -202,12 +240,7 @@ public class DataController : MonoBehaviour
 			return;
 		}
 
-		// don't save a destroyed ship (the save on disk still has the game from before the ship was lost)
-		if ( m_playerData.m_playerShip.m_armorPoints <= 0 )
-		{
-			return;
-		}
-
+		// save the active game (this does nothing if the ship has been destroyed)
 		SaveActiveGame();
 	}
 
@@ -220,6 +253,14 @@ public class DataController : MonoBehaviour
 	// this saves a save game slot to disk
 	public void SavePlayerData( int saveGameSlotNumber )
 	{
+		// never save a lost game - the save on disk still has the game from before the ship was destroyed
+		if ( IsLost( m_playerDataList[ saveGameSlotNumber ] ) )
+		{
+			UnityEngine.Debug.Log( "Not saving slot " + saveGameSlotNumber + " because its ship has been destroyed." );
+
+			return;
+		}
+
 		// measure performance
 		var stopwatch = new Stopwatch();
 
@@ -270,6 +311,14 @@ public class DataController : MonoBehaviour
 	// call this top copy the active save game slot to another slot
 	public void CopyActiveSaveGameSlot( int targetSaveGameSlotNumber )
 	{
+		// a lost game cannot be copied (the copy would be a destroyed ship)
+		if ( IsLost( m_playerData ) )
+		{
+			UnityEngine.Debug.Log( "Not copying the active game because its ship has been destroyed." );
+
+			return;
+		}
+
 		// save the active game in the current slot
 		SaveActiveGame();
 

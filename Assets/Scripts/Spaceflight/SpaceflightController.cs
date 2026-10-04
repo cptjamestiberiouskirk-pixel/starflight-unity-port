@@ -369,11 +369,11 @@ public class SpaceflightController : MonoBehaviour
 	// call this to restart the game (e.g. after game over)
 	public void RestartGame()
 	{
-		// unpause the game
-		m_gameIsPaused = false;
-		
-		// reset game over flag
+		// reset game over flag (the game stays paused - this scene must not run against the reloaded player data in its last frame)
 		m_gameOver = false;
+
+		// throw away the lost game and go back to the last save (a destroyed ship is never saved)
+		DataController.m_instance.ReloadActiveGame();
 
 		// go to the intro screen (not Persistent, which would load the save)
 		SceneManager.LoadScene( "Intro" );
