@@ -34,6 +34,13 @@ public class TerrainGridPopulator : MonoBehaviour
 		}
 	}
 
+	// let go of the planet generator and the spawn lists (they are statics, so they would stay in memory after the spaceflight scene is gone)
+	public static void ForgetPlanet()
+	{
+		m_planetGenerator = null;
+		m_spawnLists = null;
+	}
+
 	// populate the planet
 	protected void Initialize( float elevationScale, GameObject[] templates, int numObjects, int randomSeed, bool favorHigherElevations, float minScale, float maxScale, ObjectSpawnedCallback onObjectSpawned = null )
 	{

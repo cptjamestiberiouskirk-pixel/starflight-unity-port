@@ -185,6 +185,10 @@ public class ShipsLog : MonoBehaviour
 			// select the first entry
 			m_currentIndex = 0;
 
+			// the list starts at the top (it was left where the log shown before had been scrolled to - usually the next
+			// update scrolled it back, but not after an empty log, and then the selected entry was out of sight)
+			m_currentEntriesOffset = 0.0f;
+
 			// update the display
 			UpdateDisplay();
 
@@ -207,7 +211,14 @@ public class ShipsLog : MonoBehaviour
 		// update the message
 		m_message.text = "<color=#0ff>" + entry.m_header + "</color>\n" + entry.m_message;
 
-		// calculate the height of each entry
+		// force the text object to update (so we can get the correct height)
+		m_entries.ForceMeshUpdate();
+
+		// force the canvas to update
+		Canvas.ForceUpdateCanvases();
+
+		// calculate the height of each entry (this was done before the text object was updated, so the first time a log
+		// was shown it used the height of the log shown before - which for an empty log is a large negative number)
 		var rowHeight = m_entries.renderedHeight / m_entryList.Count;
 
 		// show the up arrow only if the first item is not selected
@@ -218,12 +229,6 @@ public class ShipsLog : MonoBehaviour
 
 		// set the position of the selector
 		var selectorOffset = m_currentIndex * rowHeight;
-
-		// force the text object to update (so we can get the correct height)
-		m_entries.ForceMeshUpdate();
-
-		// force the canvas to update
-		Canvas.ForceUpdateCanvases();
 
 		// get the height of the entries mask
 		var entriesMaskHeight = m_entriesMask.GetComponent<RectTransform>().rect.height;

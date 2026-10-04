@@ -475,6 +475,14 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportTransport();
 				break;
 
+			case "shipslog":
+				yield return ScenarioShipsLog();
+				break;
+
+			case "leaks":
+				yield return ScenarioLeaks();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -6679,6 +6687,241 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-transport: the fade reaches the astronaut and leaves the material assets alone", Mathf.Approximately( alpha, expectedAlpha ) && Mathf.Approximately( assetAlphaAfter, assetAlphaBefore ), "alpha " + alpha.ToString( "F4" ) + " (wanted " + expectedAlpha.ToString( "F4" ) + "), asset " + assetAlphaBefore.ToString( "F4" ) + " -> " + assetAlphaAfter.ToString( "F4" ) );
 
 		Finish( "scenario=starport-transport bytes=" + bytes + " alpha=" + alpha.ToString( "F4" ) + " asset=" + assetAlphaAfter.ToString( "F4" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: the ship's log after an empty log (where the list is scrolled to, and the two loops that scroll it)
+
+	IEnumerator ScenarioShipsLog()
+	{
+		var shipsLog = SpaceflightController.m_instance.m_shipsLog;
+
+		EnsureCrew();
+
+		// a log with forty entries and a log with none
+		var longLog = new List<PD_ShipsLog.Entry>();
+
+		for ( var i = 0; i < 40; i++ )
+		{
+			longLog.Add( new PD_ShipsLog.Entry( i, "01.00-01-4620", "Entry " + i, "Message " + i ) );
+		}
+
+		var emptyLog = new List<PD_ShipsLog.Entry>();
+
+		// ---- 1. open the long log and go down to its last entry with the stick
+		shipsLog.Show( longLog );
+
+		yield return Frames( 5 );
+
+		var entries = GetField( shipsLog, "m_entries" ) as TMPro.TextMeshProUGUI;
+
+		for ( var i = 0; i < 39; i++ )
+		{
+			SetField( shipsLog, "m_ignoreControllerTimer", 0.0f );
+
+			SetAxis( "m_y", -1.0f );
+
+			Call( shipsLog, "Update" );
+
+			SetAxis( "m_y", 0.0f );
+		}
+
+		yield return Frames( 3 );
+
+		var selected = (int) GetField( shipsLog, "m_currentIndex" );
+		var scrolled = (float) GetField( shipsLog, "m_currentEntriesOffset" );
+		var heightOfTheLongLog = entries.renderedHeight;
+
+		shipsLog.Hide();
+
+		yield return Frames( 3 );
+
+		// ---- 2. open the empty log and close it again
+		shipsLog.Show( emptyLog );
+
+		yield return Frames( 5 );
+
+		var heightOfTheEmptyLog = entries.renderedHeight;
+
+		shipsLog.Hide();
+
+		yield return Frames( 3 );
+
+		var scrolledBefore = (float) GetField( shipsLog, "m_currentEntriesOffset" );
+
+		Log( "shipslog: long log: selected entry " + selected + " of 40, list scrolled by " + scrolled.ToString( "F1" ) + ", text height " + heightOfTheLongLog.ToString( "F1" ) + ". Empty log: text height " + heightOfTheEmptyLog.ToString( "F1" ) + ". The scroll position is still " + scrolledBefore.ToString( "F1" ) );
+		Log( "shipslog: opening the long log again (the review thought the two scroll loops could run for ever here - they would with a text height of 0)" );
+
+		// ---- 3. the long log again
+		var start = Time.realtimeSinceStartup;
+
+		shipsLog.Show( longLog );
+
+		var seconds = Time.realtimeSinceStartup - start;
+
+		yield return Frames( 5 );
+
+		var selectedAfter = (int) GetField( shipsLog, "m_currentIndex" );
+		var scrolledAfter = (float) GetField( shipsLog, "m_currentEntriesOffset" );
+
+		// and it still scrolls: down to the last entry again
+		for ( var i = 0; i < 39; i++ )
+		{
+			SetField( shipsLog, "m_ignoreControllerTimer", 0.0f );
+
+			SetAxis( "m_y", -1.0f );
+
+			Call( shipsLog, "Update" );
+
+			SetAxis( "m_y", 0.0f );
+		}
+
+		yield return Frames( 3 );
+
+		var selectedAtTheEnd = (int) GetField( shipsLog, "m_currentIndex" );
+		var scrolledAtTheEnd = (float) GetField( shipsLog, "m_currentEntriesOffset" );
+
+		shipsLog.Hide();
+
+		Log( "shipslog: opened in " + seconds.ToString( "F3" ) + " s: selected entry " + selectedAfter + ", list scrolled by " + scrolledAfter.ToString( "F1" ) + ". After going down again: entry " + selectedAtTheEnd + ", scrolled by " + scrolledAtTheEnd.ToString( "F1" ) );
+
+		Check( "shipslog: the test reached the state that matters", ( selected == 39 ) && ( scrolled > 0.0f ) && ( heightOfTheEmptyLog <= 0.0f ) && ( scrolledBefore > 0.0f ), "selected " + selected + ", scrolled " + scrolled.ToString( "F1" ) + ", height of the empty log " + heightOfTheEmptyLog.ToString( "F1" ) );
+		Check( "shipslog: a log opens without hanging after an empty log", seconds < 1.0f, "opened in " + seconds.ToString( "F3" ) + " s" );
+		Check( "shipslog: a log opens at its first entry after an empty log", ( selectedAfter == 0 ) && ( scrolledAfter == 0.0f ), "selected " + selectedAfter + ", scrolled " + scrolledAfter.ToString( "F1" ) );
+		Check( "shipslog: the list still scrolls to the last entry", ( selectedAtTheEnd == 39 ) && Mathf.Approximately( scrolledAtTheEnd, scrolled ), "selected " + selectedAtTheEnd + ", scrolled " + scrolledAtTheEnd.ToString( "F1" ) + " (the first time " + scrolled.ToString( "F1" ) + ")" );
+
+		Finish( "scenario=shipslog scrolled=" + scrolled.ToString( "F1" ) + " emptyHeight=" + heightOfTheEmptyLog.ToString( "F1" ) + " reopened=" + seconds.ToString( "F3" ) + "s/" + selectedAfter + "/" + scrolledAfter.ToString( "F1" ) + " again=" + selectedAtTheEnd + "/" + scrolledAtTheEnd.ToString( "F1" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: what stays in memory (the materials of a deposit that was picked up, the spaceflight scene after it has been left)
+
+	// how many materials there are in memory, the ones in the project included
+	static int MaterialCount()
+	{
+		return Resources.FindObjectsOfTypeAll<Material>().Length;
+	}
+
+	// put a deposit next to the terrain vehicle and everything else out of reach (the scenario itself must not keep hold of anything in the scene)
+	static bool PutADepositNextToTheVehicle()
+	{
+		var terrainVehicle = SpaceflightController.m_instance.m_terrainVehicle;
+		var deposits = SpaceflightController.m_instance.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true );
+
+		if ( deposits.Length == 0 )
+		{
+			return false;
+		}
+
+		foreach ( var other in deposits )
+		{
+			if ( ( other != deposits[ 0 ] ) && ( Vector3.Distance( other.transform.position, terrainVehicle.transform.position ) < 50.0f ) )
+			{
+				other.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		deposits[ 0 ].transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+
+		return true;
+	}
+
+	// weak references to three things in the spaceflight scene: the controller, which leads to everything else, the maps of the planet
+	// the terrain vehicle is on, and the maps of another planet of the system
+	static WeakReference[] WatchTheSpaceflightScene()
+	{
+		var controller = SpaceflightController.m_instance;
+
+		return new WeakReference[]
+		{
+			new WeakReference( controller ),
+			new WeakReference( controller.m_starSystem.GetPlanetController( 90 ).GetPlanetGenerator() ),
+			new WeakReference( controller.m_starSystem.GetPlanetController( 94 ).GetPlanetGenerator() ),
+		};
+	}
+
+	IEnumerator ScenarioLeaks()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		EnsureCrew();
+
+		// into the terrain vehicle on planet 90 (arth system), the way the m10 scenario does it
+		yield return EnterOrbit( 90 );
+
+		SpaceflightController.m_instance.m_planetside.UpdateTerrainGridNow();
+		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		PressButton( ButtonController.ButtonSet.CommandA, 1 );
+
+		yield return WaitForLocation( PD_General.Location.Disembarked, 15.0f );
+		yield return Frames( 10 );
+
+		if ( ( playerData.m_general.m_location != PD_General.Location.Disembarked ) || !PutADepositNextToTheVehicle() )
+		{
+			Finish( "scenario=leaks abort: no terrain vehicle or no deposit (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		// ---- 1. the materials of a deposit that is picked up: its transporter effect makes its own copies of them
+		yield return Frames( 5 );
+
+		var materialsBefore = MaterialCount();
+
+		new TVCargoButton().Execute();
+
+		yield return Frames( 5 );
+
+		var materialsDuring = MaterialCount();
+
+		// the effect takes a second and a half, then the deposit is destroyed
+		yield return new WaitForSecondsRealtime( 2.5f );
+
+		var materialsAfter = MaterialCount();
+
+		Log( "leaks: materials in memory: " + materialsBefore + " before the pickup, " + materialsDuring + " during the transporter effect, " + materialsAfter + " after the deposit is gone" );
+
+		Check( "leaks: the materials of a transporter effect go with it", ( materialsDuring > materialsBefore ) && ( materialsAfter <= materialsBefore ), materialsBefore + " before, " + materialsDuring + " during, " + materialsAfter + " after" );
+
+		// ---- 2. leaving the spaceflight scene. The save panel is opened and closed first, as a player who saves does (the panel lives in the persistent scene)
+		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+
+		PressEscape();
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var panelWasOpen = PanelController.m_instance.HasActivePanel();
+
+		yield return CloseTheSavePanel();
+
+		var watched = WatchTheSpaceflightScene();
+
+		SceneManager.LoadScene( "Intro" );
+
+		yield return WaitForScene( "Intro" );
+
+		// a few frames and a few collections (the collector also looks at what is left on the stack)
+		for ( var i = 0; i < 5; i++ )
+		{
+			yield return Frames( 3 );
+
+			GC.Collect();
+			GC.WaitForPendingFinalizers();
+		}
+
+		var controllerInMemory = watched[ 0 ].IsAlive;
+		var vehiclePlanetInMemory = watched[ 1 ].IsAlive;
+		var otherPlanetInMemory = watched[ 2 ].IsAlive;
+		var staticStillSet = !ReferenceEquals( SpaceflightController.m_instance, null );
+		var heapInMegabytes = GC.GetTotalMemory( false ) >> 20;
+
+		Log( "leaks: after leaving the spaceflight scene (now in " + SceneManager.GetActiveScene().name + ", save panel had been open: " + panelWasOpen + "): controller still in memory " + controllerInMemory + ", the maps of the planet the vehicle was on " + vehiclePlanetInMemory + ", the maps of another planet " + otherPlanetInMemory + ", the static still points at the old controller " + staticStillSet + ", managed heap in use " + heapInMegabytes + " MB" );
+
+		Check( "leaks: nothing of the spaceflight scene stays in memory after it is left", panelWasOpen && !controllerInMemory && !vehiclePlanetInMemory && !otherPlanetInMemory && !staticStillSet, "controller " + controllerInMemory + ", planet of the vehicle " + vehiclePlanetInMemory + ", other planet " + otherPlanetInMemory + ", static " + staticStillSet );
+
+		Finish( "scenario=leaks materials=" + materialsBefore + "/" + materialsDuring + "/" + materialsAfter + " afterLeaving=" + controllerInMemory + "/" + vehiclePlanetInMemory + "/" + otherPlanetInMemory + "/" + staticStillSet + " heap=" + heapInMegabytes + "MB checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

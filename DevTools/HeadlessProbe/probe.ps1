@@ -7,7 +7,9 @@
 # the probe again. The probe never touches the real save files. Logs go to %TEMP%\starflight-probe.
 param(
 	[string]$Scenario = 'h6',
-	[string]$Name = ''
+	[string]$Name = '',
+	# how long to wait for Unity before stopping it. A scenario that shows a hang on the old code never comes back, so give it a short limit.
+	[int]$TimeoutSeconds = 420
 )
 
 $proj = (Get-Location).Path
@@ -42,8 +44,8 @@ try {
 	$p = Start-Process -FilePath $unity -ArgumentList '-batchmode', '-nographics', '-projectPath', "`"$proj`"", '-logFile', "`"$log`"", '-executeMethod', 'ClaudeProbe.Run', '-probeScenario', $Scenario -PassThru
 
 	# the probe has its own 120 s watchdog; this is the outer limit
-	if (-not $p.WaitForExit(420000)) {
-		"unity still running after 420s, stopping pid $($p.Id)"
+	if (-not $p.WaitForExit($TimeoutSeconds * 1000)) {
+		"unity still running after ${TimeoutSeconds}s, stopping pid $($p.Id)"
 		Stop-Process -Id $p.Id -Force
 		$p.WaitForExit(30000) | Out-Null
 	}
