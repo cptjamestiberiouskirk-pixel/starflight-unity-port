@@ -58,6 +58,7 @@ What the probe does:
 | `m10` | a deposit can only be picked up once (orbit, surface, terrain vehicle through the real Disembark button) |
 | `m23` | the console is locked during the 35 s landing, and the landing prints each message once and in order (about 55 s) |
 | `missiles` | a missile in the air when the player leaves an encounter does not arrive in the next one (alien and player missiles), and missiles still hit inside their own encounter |
+| `m11` | the maximum armor and shield points come from the ship: the damage line and the gauges of the status display, the Damage report, the repair of a bare hull, the hull breach warning below a quarter of the maximum |
 
 Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (about 9 minutes; one summary block per scenario with the failed checks and exceptions).
 

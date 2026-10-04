@@ -385,6 +385,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioMissiles();
 				break;
 
+			case "m11":
+				yield return ScenarioM11();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -2283,7 +2287,7 @@ public class ClaudeProbe : MonoBehaviour
 
 			var destroyedArmor = ship.m_armorPoints;
 
-			// armor sold while the repairs were under way (the ship is back on its bare hull, and no armor means a maximum of 0)
+			// armor sold while the repairs were under way (the ship is back on its bare hull, and 250 is all a bare hull can have)
 			ship.m_armorClass = 0;
 			ship.m_armorPoints = 250;
 			repairsField.SetValue( ship, true );
@@ -2941,6 +2945,176 @@ public class ClaudeProbe : MonoBehaviour
 	static PD_AlienShip EncounterShip( int alienIndex )
 	{
 		return SpaceflightController.m_instance.m_encounter.m_pdEncounter.GetAlienShipList()[ alienIndex ];
+	}
+
+	// ---------------------------------------------------------------- M11: one source of truth for the maximum armor and shield points
+
+	// what the status display shows for the ship as it is right now: the damage line of its text and how full its two gauges are
+	static string StatusDamageLine( out float armorGauge, out float shieldGauge )
+	{
+		var display = SpaceflightController.m_instance.m_displayController.m_statusDisplay;
+
+		display.Update();
+
+		armorGauge = display.m_armorGauge.anchorMax.y;
+		shieldGauge = display.m_shieldGauge.anchorMax.y;
+
+		// the lines are: date, damage, cargo, energy, shields, weapons
+		var lines = display.m_values.text.Split( '\n' );
+
+		return ( lines.Length > 1 ) ? lines[ 1 ] : "";
+	}
+
+	// hit the hull (shields down) and tell whether the hull breach warning came with it
+	static bool HitWarns( int armorBefore, int damage )
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+
+		ship.m_shieldsAreUp = false;
+		ship.m_armorPoints = armorBefore;
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		CombatController.m_instance.ApplyDamageToPlayer( damage, Vector3.forward );
+
+		return MessageList().Contains( "Hull breach imminent" );
+	}
+
+	IEnumerator ScenarioM11()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var messages = SpaceflightController.m_instance.m_messages;
+
+		EnsureCrew();
+
+		yield return Frames( 5 );
+
+		// ---- 1. the ship of a new game: no armor plating (the bare hull has 250 points), no shields, nothing damaged
+		var newShip = "class " + ship.m_armorClass + " armor with " + ship.m_armorPoints + " points, class " + ship.m_shieldingClass + " shields with " + ship.m_shieldPoints;
+
+		var newDamageLine = StatusDamageLine( out var newArmorGauge, out var newShieldGauge );
+
+		messages.Clear();
+		new DamageButton().Execute();
+
+		var newReport = MessageList();
+
+		Log( "M11 new ship (" + newShip + "): status damage line '" + newDamageLine + "', armor gauge " + newArmorGauge.ToString( "F3" ) + ", shield gauge " + newShieldGauge.ToString( "F3" ) );
+		Log( "M11 new ship damage report: " + newReport );
+
+		Check( "M11 an undamaged new ship shows no damage", newDamageLine == "None", "status damage line '" + newDamageLine + "'" );
+		Check( "M11 an undamaged new ship has a full armor gauge and an empty shield gauge", Mathf.Approximately( newArmorGauge, 1.0f ) && ( newShieldGauge == 0.0f ), "armor gauge " + newArmorGauge.ToString( "F3" ) + ", shield gauge " + newShieldGauge.ToString( "F3" ) );
+		Check( "M11 the damage report gives the bare hull its 250 points", newReport.Contains( "(250/250)" ), newReport );
+
+		// ---- 2. the bare hull damaged: 200 of 250, and the engineer (skill 100, so 2 points a second) repairs it
+		ship.m_armorPoints = 200;
+
+		var hurtDamageLine = StatusDamageLine( out var hurtArmorGauge, out _ );
+
+		messages.Clear();
+		new RepairButton().Execute();
+
+		var repairMessage = MessageList();
+		var repairsStarted = ship.m_repairsAreUnderWay;
+
+		ship.UpdateRepairs( 10.0f );
+
+		var armorAfter10s = ship.m_armorPoints;
+
+		ship.UpdateRepairs( 10000.0f );
+
+		var armorWhenDone = ship.m_armorPoints;
+		var stillUnderWay = ship.m_repairsAreUnderWay;
+		var doneMessage = MessageList();
+
+		messages.Clear();
+		new RepairButton().Execute();
+
+		var nothingToRepairMessage = MessageList();
+		var startedWithNothingToRepair = ship.m_repairsAreUnderWay;
+
+		ship.m_repairsAreUnderWay = false;
+
+		Log( "M11 bare hull at 200/250: status damage line '" + hurtDamageLine + "', armor gauge " + hurtArmorGauge.ToString( "F3" ) + " | repair started " + repairsStarted + ", after 10 s " + armorAfter10s + ", when done " + armorWhenDone + " (still under way " + stillUnderWay + ")" );
+		Log( "M11 bare hull repair message: " + repairMessage );
+		Log( "M11 bare hull message when done: " + doneMessage );
+		Log( "M11 bare hull repair message with nothing to repair: " + nothingToRepairMessage );
+
+		Check( "M11 a bare hull at 200 of 250 shows 20% damage and a gauge at four fifths", hurtDamageLine.Contains( ">20% Hull Damage<" ) && Mathf.Approximately( hurtArmorGauge, 0.8f ), "status damage line '" + hurtDamageLine + "', armor gauge " + hurtArmorGauge.ToString( "F3" ) );
+		Check( "M11 the engineer repairs a bare hull", repairsStarted && ( armorAfter10s == 220 ), "repair started " + repairsStarted + ", armor after 10 s " + armorAfter10s + " (was 200) | " + repairMessage );
+		Check( "M11 the repair of a bare hull stops at its 250 points", ( armorWhenDone == 250 ) && !stillUnderWay && doneMessage.Contains( "completed" ), "armor when done " + armorWhenDone + ", still under way " + stillUnderWay + " | " + doneMessage );
+		Check( "M11 an undamaged bare hull needs no repairs", !startedWithNothingToRepair && nothingToRepairMessage.Contains( "No repairs needed" ), "started " + startedWithNothingToRepair + " | " + nothingToRepairMessage );
+
+		// ---- 3. class 2 armor (750 points): undamaged, then down to 300
+		ship.m_armorClass = 2;
+		ship.m_armorPoints = 750;
+
+		var class2FullDamageLine = StatusDamageLine( out var class2FullArmorGauge, out _ );
+
+		ship.m_armorPoints = 300;
+
+		var class2HurtDamageLine = StatusDamageLine( out var class2HurtArmorGauge, out _ );
+
+		messages.Clear();
+		new DamageButton().Execute();
+
+		var class2Report = MessageList();
+
+		Log( "M11 class 2 armor: at 750/750 status damage line '" + class2FullDamageLine + "', armor gauge " + class2FullArmorGauge.ToString( "F3" ) + " | at 300/750 '" + class2HurtDamageLine + "', armor gauge " + class2HurtArmorGauge.ToString( "F3" ) );
+		Log( "M11 class 2 armor damage report at 300/750: " + class2Report );
+
+		Check( "M11 undamaged class 2 armor shows no damage and a full gauge", ( class2FullDamageLine == "None" ) && Mathf.Approximately( class2FullArmorGauge, 1.0f ), "status damage line '" + class2FullDamageLine + "', armor gauge " + class2FullArmorGauge.ToString( "F3" ) );
+		Check( "M11 class 2 armor at 300 of 750 shows 60% damage and a gauge at two fifths", class2HurtDamageLine.Contains( ">60% Hull Damage<" ) && Mathf.Approximately( class2HurtArmorGauge, 0.4f ), "status damage line '" + class2HurtDamageLine + "', armor gauge " + class2HurtArmorGauge.ToString( "F3" ) );
+		Check( "M11 the damage report still gives installed armor its own points", class2Report.Contains( "40% (300/750)" ), class2Report );
+
+		// ---- 4. shields: class 1 (500 points) half charged, class 5 (2500 points) fully charged, and none
+		ship.m_shieldingClass = 1;
+		ship.m_shieldPoints = 250;
+
+		StatusDamageLine( out _, out var halfShieldGauge );
+
+		ship.m_shieldingClass = 5;
+		ship.m_shieldPoints = 2500;
+
+		StatusDamageLine( out _, out var fullShieldGauge );
+
+		messages.Clear();
+		new DamageButton().Execute();
+
+		var shieldReport = MessageList();
+
+		ship.m_shieldingClass = 0;
+		ship.m_shieldPoints = 0;
+
+		StatusDamageLine( out _, out var noShieldGauge );
+
+		Log( "M11 shield gauge: class 1 at 250/500 " + halfShieldGauge.ToString( "F3" ) + ", class 5 at 2500/2500 " + fullShieldGauge.ToString( "F3" ) + ", no shields " + noShieldGauge.ToString( "F3" ) );
+		Log( "M11 damage report with class 5 shields: " + shieldReport );
+
+		Check( "M11 the shield gauge shows the charge of the installed shielding", Mathf.Approximately( halfShieldGauge, 0.5f ) && Mathf.Approximately( fullShieldGauge, 1.0f ) && ( noShieldGauge == 0.0f ), "class 1 at 250/500 " + halfShieldGauge.ToString( "F3" ) + ", class 5 at 2500/2500 " + fullShieldGauge.ToString( "F3" ) + ", none " + noShieldGauge.ToString( "F3" ) );
+		Check( "M11 the damage report still gives installed shielding its own points", shieldReport.Contains( "100% (2500/2500)" ), shieldReport );
+
+		// ---- 5. the hull breach warning comes when less than a quarter of the armor points are left
+		ship.m_armorClass = 0;
+
+		var bareScratchWarned = HitWarns( 250, 10 );
+		var bareLowWarned = HitWarns( 70, 10 );
+
+		ship.m_armorClass = 5;
+
+		var class5AboveWarned = HitWarns( 400, 10 );
+		var class5BelowWarned = HitWarns( 310, 10 );
+
+		ship.m_armorClass = 0;
+		ship.m_armorPoints = 250;
+
+		Log( "M11 hull breach warning: bare hull 250 to 240 " + bareScratchWarned + ", bare hull 70 to 60 " + bareLowWarned + ", class 5 armor (1500) 400 to 390 " + class5AboveWarned + ", 310 to 300 " + class5BelowWarned );
+
+		Check( "M11 a scratch on a bare hull does not set off the hull breach warning", !bareScratchWarned && bareLowWarned, "250 to 240 warned " + bareScratchWarned + ", 70 to 60 warned " + bareLowWarned );
+		Check( "M11 class 5 armor warns below a quarter of its 1500 points", !class5AboveWarned && class5BelowWarned, "400 to 390 warned " + class5AboveWarned + ", 310 to 300 warned " + class5BelowWarned );
+
+		Finish( "scenario=m11 newShip=[" + newDamageLine + " gauge " + newArmorGauge.ToString( "F3" ) + "] bareHullRepair=" + repairsStarted + "/" + armorAfter10s + "/" + armorWhenDone + " class2=[" + class2FullDamageLine + " " + class2FullArmorGauge.ToString( "F3" ) + " | " + class2HurtArmorGauge.ToString( "F3" ) + "] shieldGauge=" + halfShieldGauge.ToString( "F3" ) + "/" + fullShieldGauge.ToString( "F3" ) + "/" + noShieldGauge.ToString( "F3" ) + " warned=" + bareScratchWarned + "/" + bareLowWarned + "/" + class5AboveWarned + "/" + class5BelowWarned + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
