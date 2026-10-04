@@ -34,6 +34,7 @@ What the probe does:
 - Opens `Spaceflight.unity` (or `Starport.unity` for scenarios whose name starts with `starport`) and enters play mode.
 - **Never touches the real saves.** Between `DataController.Awake` and `Start` it replaces the private `_saveSystem` with an in-memory one, and it refuses to continue unless `DataController` asked that one about every slot. All five slots are therefore new games.
 - Puts the player in hyperspace, from where the game drops into the Arth star system by itself. `EnsureCrew()` fills every crew role, as a launched ship always has.
+- Waits until the planets of that star system have been generated before it starts the scenario. The game is paused while they are being generated, so a scenario that started earlier would lose about two seconds of every real-time wait.
 - Counts exceptions (with their first stack frame), and un-pauses the Editor every tick, because the console's Error Pause preference pauses play mode on the first logged error even in batch mode.
 
 ### Scenarios that exist
@@ -88,7 +89,7 @@ Pitfalls:
 - **Write scenario snippets to a file with an editor, not through a shell heredoc.** An apostrophe in a comment breaks the heredoc, and `'\n'` in C# comes out as a real line break after a round trip through a Python string.
 - **The message box text is redrawn in `LateUpdate`.** `MessagesText()` right after a button press shows the old text. Use `MessageList()` (the list in the player data) or wait a few frames.
 - **Alien ship types are random.** Call `ForceVessel( encounterId, vesselId )` before entering when the test needs armed ships (a transport has no weapons).
-- **Real-time checks need tolerance.** Unity caps `Time.deltaTime` on slow frames and the scene is still generating planets when a scenario starts. For exact numbers call the update method directly with a time step.
+- **Real-time checks need tolerance.** Unity caps `Time.deltaTime` on slow frames, and the game is paused whenever a star system is generating its planets (a scenario that changes star system has to wait for `m_starSystem.GeneratingPlanets()` to be false itself). For exact numbers call the update method directly with a time step.
 - **A scenario that changes scenes** works: the probe object is `DontDestroyOnLoad`. Wait with `WaitForScene`.
 - The watchdog ends a run after 120 s, so keep the real-time waits of one scenario under about 60 s.
 - **A failed check is not always the change under test.** Missiles in flight survive the end of an encounter, so one fired in the last encounter can hit the player in the next. The `m12` scenario calls `ClearMissiles()` before it leaves an encounter for that reason. Read the log around a failure before blaming the change.
