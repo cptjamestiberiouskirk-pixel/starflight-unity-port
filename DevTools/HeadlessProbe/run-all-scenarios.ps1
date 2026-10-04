@@ -2,7 +2,7 @@
 #   & "<this folder>\run-all-scenarios.ps1" -Tag combined
 param(
 	[string]$Tag = 'all',
-	[string[]]$Scenarios = @('batch1', 'starport', 'h6', 'm15', 'm13', 'm14', 'm7', 'm8', 'm24', 'starport-m22', 'starport-ship', 'h5', 'm19', 'h7', 'm12', 'm20', 'h8', 'm10', 'm23', 'missiles', 'm11', 'm18', 'm17')
+	[string[]]$Scenarios = @('batch1', 'starport', 'h6', 'm15', 'm13', 'm14', 'm7', 'm8', 'm24', 'starport-m22', 'starport-ship', 'h5', 'm19', 'h7', 'm12', 'm20', 'h8', 'm10', 'm23', 'missiles', 'm11', 'm18', 'm17', 'm16')
 )
 
 $sk = $PSScriptRoot

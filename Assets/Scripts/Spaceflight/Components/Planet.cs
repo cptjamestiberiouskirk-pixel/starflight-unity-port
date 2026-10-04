@@ -30,6 +30,9 @@ public class Planet : MonoBehaviour
 	// the planet generator
 	PlanetGenerator m_planetGenerator;
 
+	// the planet generator whose maps are on the material right now (that of the planet this controller had before, until the maps of the new planet are ready)
+	PlanetGenerator m_shownPlanetGenerator;
+
 	// the current rotation
 	float m_currentRotationAngle;
 
@@ -64,9 +67,42 @@ public class Planet : MonoBehaviour
 		}
 	}
 
+	// unity on destroy
+	void OnDestroy()
+	{
+		// the maps would stay in memory until unity next clears out its unused assets
+		ReleaseUnshownMaps();
+		ReleaseShownMaps();
+	}
+
+	// destroys the maps of the current planet generator if they never made it onto the material (nothing shows them then)
+	void ReleaseUnshownMaps()
+	{
+		if ( ( m_planetGenerator != null ) && ( m_planetGenerator != m_shownPlanetGenerator ) )
+		{
+			m_planetGenerator.Release();
+		}
+	}
+
+	// destroys the maps that are on the material (call this when they have been replaced or the planet is no longer shown)
+	void ReleaseShownMaps()
+	{
+		if ( m_shownPlanetGenerator != null )
+		{
+			m_shownPlanetGenerator.Release();
+
+			m_shownPlanetGenerator = null;
+		}
+	}
+
 	// call this before you enable the planet
 	public void InitializePlanet( GD_Planet planet )
 	{
+		// we are done with the planet generator we had - the maps that are on the material stay until the maps of the new planet are ready (see GenerateMaps)
+		ReleaseUnshownMaps();
+
+		m_planetGenerator = null;
+
 		// check if we have a planet
 		if ( ( planet == null ) || ( planet.m_id == -1 ) )
 		{
@@ -75,6 +111,9 @@ public class Planet : MonoBehaviour
 
 			// we don't need to generate maps for this planet
 			m_mapsGenerated = true;
+
+			// nothing is shown in this orbit now, so the maps on the material can go right away
+			ReleaseShownMaps();
 
 			// don't do anything more here
 			return;
@@ -214,6 +253,14 @@ public class Planet : MonoBehaviour
 			}
 
 			m_meshRenderer.material = m_material;
+
+			// the maps of the planet that was shown before are off the material now, so destroy them (unity never frees a texture that was made at runtime by itself)
+			if ( m_shownPlanetGenerator != m_planetGenerator )
+			{
+				ReleaseShownMaps();
+
+				m_shownPlanetGenerator = m_planetGenerator;
+			}
 
 			SpaceflightController.m_instance.m_inOrbit.MaterialUpdated();
 		}
