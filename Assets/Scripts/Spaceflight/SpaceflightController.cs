@@ -194,11 +194,16 @@ public class SpaceflightController : MonoBehaviour
 			{
 				InputController.m_instance.Debounce();
 
-				PanelController.m_instance.m_saveGamePanel.SetCallbackObject( this );
+				// not while the ship is launching or landing: the camera animation and its events carry on behind the panel, so the player would miss
+				// the rest of it. And not while the ship is exploding: there is nothing left to save, and the game over screen is on its way
+				if ( !m_playerCamera.IsLaunchingOrLanding() && !PlayerShipIsDestroyed() )
+				{
+					PanelController.m_instance.m_saveGamePanel.SetCallbackObject( this );
 
-				PanelController.m_instance.Open( PanelController.m_instance.m_saveGamePanel );
+					PanelController.m_instance.Open( PanelController.m_instance.m_saveGamePanel );
 
-				m_gameIsPaused = true;
+					m_gameIsPaused = true;
+				}
 			}
 		}
 
@@ -366,8 +371,16 @@ public class SpaceflightController : MonoBehaviour
 		// save the player data in case something has been updated
 		DataController.m_instance.SaveActiveGame();
 
-		// unpause the game
-		m_gameIsPaused = false;
+		// unpause the game (a game that is over stays paused - the game over screen paused it for good)
+		m_gameIsPaused = m_gameOver;
+	}
+
+	// true once the player ship has been destroyed (its explosion may still be playing)
+	bool PlayerShipIsDestroyed()
+	{
+		var combatController = ( m_combatController != null ) ? m_combatController : CombatController.m_instance;
+
+		return ( combatController != null ) && combatController.PlayerIsDestroyed();
 	}
 
 	// call this to restart the game (e.g. after game over)
