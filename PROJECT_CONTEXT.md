@@ -1,3 +1,5 @@
+> **Historical** (last updated 2026-01-01): parts of this file no longer match the code. See `CLAUDE.md` and `CODE_REVIEW_2026-10-03.md` for the current state.
+
 # Starflight Unity Port - Project Context
 
 ## Core Architectural Patterns

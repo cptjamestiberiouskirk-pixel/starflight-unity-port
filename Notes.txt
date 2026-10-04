@@ -50,6 +50,7 @@ Communications
 		1 = friendly
 		2 = hostile
 		3 = obsequious
+		(original game values. The code and the game data use 0 to 4: GD_Comm.Stance is None = 0, Neutral = 1, Friendly = 2, Hostile = 3, Obsequious = 4)
 		
 Disembarking on Planets
 

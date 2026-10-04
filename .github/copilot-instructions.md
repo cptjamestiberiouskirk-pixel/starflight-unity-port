@@ -1,23 +1,26 @@
 # Unity Development Instructions (Starflight Port)
 
+`CLAUDE.md` at the project root is the fuller reference. Where the two differ, `CLAUDE.md` is the one kept current.
+
 ## 1. Project Context & Architecture
 **Project:** Starflight Port (1986 EA Space Exploration RPG)
 **Engine Version:** Unity 6 (6000.3.13f1)
 
 ### Key Architectural Pillars
 - **SpaceflightController:** Main game controller singleton. Use `m_instance` pattern strictly.
-- **Persistence (`PD_*`):** All persistent data resides in `PD_` classes (e.g., `PD_General`, `PD_Ship`, `PD_CrewRoster`).
+- **Persistence (`PD_*`):** All persistent data resides in `PD_` classes (e.g., `PD_General`, `PD_PlayerShip`, `PD_CrewAssignment`).
 - **State Machine:** Game flow is strictly driven by the `PD_General.Location` enum.
 - **Save System:** Uses `JsonSaveSystem`. Serializes to `Application.persistentDataPath`.
 
 ## 2. Core Coding Standards
-- **Naming Conventions:**
+- **Naming Conventions:** match the style of the file you are editing.
   - **Public/Properties:** `PascalCase`
-  - **Private Fields:** `m_camelCase` (e.g., `m_playerHealth`)
-  - **Constants:** `UPPER_SNAKE_CASE`
-- **Serialization:** Always use `[SerializeField] private` for exposed variables. Avoid `public` fields for Inspector exposure.
+  - **Fields, legacy code (most files):** `m_camelCase` (e.g., `m_playerHealth`)
+  - **Fields, newer code (`PlanetManager`, `ProceduralAdapter`):** `_camelCase`
+  - **Constants:** `c_camelCase` (e.g., `c_currentVersion`)
+- **Serialization:** Legacy files wire the Inspector through public `m_` fields; keep that pattern in those files. The newer files use `[SerializeField] private`.
 - **Null Checking:** Use `if (myObject != null)` explicitly for Unity Objects (overloads `==`). Use `?.` for standard C# objects.
-- **Documentation:** Add XML documentation (`///`) to all public methods and complex algorithms.
+- **Documentation:** Match the comments of the file you are editing. Legacy files have a comment above nearly every statement and little XML documentation (`///`).
 
 ## 3. Unity 6 & Performance Rules
 - **Modern API Usage:**
@@ -52,7 +55,7 @@ When fixing Unity compilation errors or runtime exceptions:
 ## 6. Composition & Style
 - **Composition over Inheritance:** Logic should reside in Components. Avoid deep inheritance trees for GameObjects.
 - **Separation of Concerns:** Keep logic (C# classes) distinct from data (ScriptableObjects or `PD_` classes).
-- **Coroutines/Async:** Prefer `UniTask` (if installed) or standard Coroutines. Avoid `async void` in Unity lifecycle methods.
+- **Coroutines/Async:** Use standard Coroutines (UniTask is not installed). Avoid `async void` in Unity lifecycle methods.
 
 ## 7. Documentation & Verification
 - **Online Verification:** If you are unsure of a Unity 6 specific API (e.g., `RenderGraph`, `UIToolkit`) or suspect a method is deprecated, you must **search the web** before generating code.

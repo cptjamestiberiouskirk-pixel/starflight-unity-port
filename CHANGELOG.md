@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Unity Editor 6000.3.13f1**: `ProjectSettings/ProjectVersion.txt` moves from 6000.3.2f1 to 6000.3.13f1 (8c4f11e4fb20). The project compiles on 6000.3.13f1 in CI with no errors
+- **Instruction Files Match the Code**: `.github/copilot-instructions.md` names the conventions the code uses (`m_` fields and `c_` constants in legacy files, public `m_` Inspector fields there, `_camelCase` in the newer files), real `PD_*` classes and no UniTask. The Copilot prompts lose their stale `model` line; `commitall` stages files by name and goes through a pull request; `fixunity` and `fixandverify` follow the same naming; `analyze` writes a dated report under `Research/`. `PROJECT_CONTEXT.md` and `PROJECT_ANALYSIS_REPORT.md` are marked historical, and `Notes.txt` gives the stance values the code uses next to the original ones.
 
 ### Removed
 
