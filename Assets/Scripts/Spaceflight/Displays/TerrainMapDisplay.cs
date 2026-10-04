@@ -135,6 +135,9 @@ public class TerrainMapDisplay : ShipDisplay
 		m_selectSiteLabel.SetActive( false );
 	}
 
+	// the crosshair velocity is in degrees per frame at this many frames per second (the values set in the editor were made for it)
+	const float c_crosshairFrameRate = 60.0f;
+
 	// move the crosshairs
 	public void MoveCrosshairs()
 	{
@@ -145,11 +148,14 @@ public class TerrainMapDisplay : ShipDisplay
 		var x = InputController.m_instance.m_x;
 		var y = InputController.m_instance.m_y;
 
+		// how far the crosshair moves in this frame (the velocity itself was added every frame, so the crosshair was faster the more frames there were in a second)
+		var crosshairStep = m_crosshairVelocity * Time.deltaTime * c_crosshairFrameRate;
+
 		if ( x < -0.5f )
 		{
 			crosshairsMoved = true;
 
-			playerData.m_general.m_selectedLatitude -= m_crosshairVelocity;
+			playerData.m_general.m_selectedLatitude -= crosshairStep;
 
 			playerData.m_general.m_selectedLatitude = Mathf.Max( -180.0f, playerData.m_general.m_selectedLatitude );
 		}
@@ -157,7 +163,7 @@ public class TerrainMapDisplay : ShipDisplay
 		{
 			crosshairsMoved = true;
 
-			playerData.m_general.m_selectedLatitude += m_crosshairVelocity;
+			playerData.m_general.m_selectedLatitude += crosshairStep;
 
 			playerData.m_general.m_selectedLatitude = Mathf.Min( 179.0f, playerData.m_general.m_selectedLatitude );
 		}
@@ -166,7 +172,7 @@ public class TerrainMapDisplay : ShipDisplay
 		{
 			crosshairsMoved = true;
 
-			playerData.m_general.m_selectedLongitude -= m_crosshairVelocity;
+			playerData.m_general.m_selectedLongitude -= crosshairStep;
 
 			playerData.m_general.m_selectedLongitude = Mathf.Max( -90.0f, playerData.m_general.m_selectedLongitude );
 		}
@@ -174,14 +180,15 @@ public class TerrainMapDisplay : ShipDisplay
 		{
 			crosshairsMoved = true;
 
-			playerData.m_general.m_selectedLongitude += m_crosshairVelocity;
+			playerData.m_general.m_selectedLongitude += crosshairStep;
 
 			playerData.m_general.m_selectedLongitude = Mathf.Min( 90.0f, playerData.m_general.m_selectedLongitude );
 		}
 
 		if ( crosshairsMoved )
 		{
-			m_crosshairVelocity += Time.deltaTime * m_crosshairMoveAcceleration;
+			// speed up, but not past the top speed (which was set in the editor and never used, so the crosshair kept getting faster)
+			m_crosshairVelocity = Mathf.Min( m_maxCrosshairMoveVelocity, m_crosshairVelocity + Time.deltaTime * m_crosshairMoveAcceleration );
 		}
 		else
 		{

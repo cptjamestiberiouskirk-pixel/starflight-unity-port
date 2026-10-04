@@ -17,6 +17,12 @@ public class ExplosionEffect : MonoBehaviour
 	float m_timer;
 	bool m_isPlaying;
 
+	// how long the explosion stays switched on: the debris and the smoke live for two seconds, and the smoke starts a tenth of a second in
+	const float c_particleTime = 2.2f;
+
+	// true once whoever is waiting for the explosion has been told that it is over
+	bool m_isComplete;
+
 	// callback when explosion finishes
 	System.Action m_onComplete;
 
@@ -222,10 +228,18 @@ public class ExplosionEffect : MonoBehaviour
 		{
 			// use unscaled delta time so explosion finishes even when game is paused
 			m_timer += Time.unscaledDeltaTime;
-			if ( m_timer >= m_duration )
+
+			// tell whoever is waiting that the explosion is over (once, and at the same time as before)
+			if ( !m_isComplete && ( m_timer >= m_duration ) )
+			{
+				m_isComplete = true;
+				m_onComplete?.Invoke();
+			}
+
+			// switch the explosion off once its last particles are gone (it was switched off with the callback, which cut the smoke and the debris off in mid air)
+			if ( m_timer >= c_particleTime )
 			{
 				m_isPlaying = false;
-				m_onComplete?.Invoke();
 				gameObject.SetActive( false );
 			}
 		}
@@ -239,6 +253,7 @@ public class ExplosionEffect : MonoBehaviour
 		transform.position = position;
 		m_timer = 0.0f;
 		m_isPlaying = true;
+		m_isComplete = false;
 		m_onComplete = onComplete;
 
 		gameObject.SetActive( true );

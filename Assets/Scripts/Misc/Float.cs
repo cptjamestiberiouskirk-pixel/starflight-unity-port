@@ -18,9 +18,11 @@ public class Float : MonoBehaviour
 	{
 		m_timer += Time.deltaTime * m_speed;
 
-		if ( m_timer > 360.0f )
+		// the timer goes into Mathf.Sin, so it is an angle in radians and a full turn is two pi (it started again at 360,
+		// which is not a whole number of turns, so the object jumped every time the timer got there)
+		if ( m_timer > Mathf.PI * 2.0f )
 		{
-			m_timer -= 360.0f;
+			m_timer -= Mathf.PI * 2.0f;
 		}
 
 		var offset = Mathf.Sin( m_timer ) * m_range;
