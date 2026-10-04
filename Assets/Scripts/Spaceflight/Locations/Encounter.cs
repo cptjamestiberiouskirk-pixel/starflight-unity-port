@@ -735,8 +735,12 @@ public class Encounter : MonoBehaviour
 
 				if ( m_justEntered )
 				{
+					// where the player was when the aliens arrived, in the space the encounter is in (this was always the place in hyperspace, which for an
+					// encounter inside a star system has nothing to do with where the aliens are, so they appeared on any side but the one they came from)
+					var playerCoordinates = ( m_pdEncounter.GetLocation() == PD_General.Location.Hyperspace ) ? playerData.m_general.m_lastHyperspaceCoordinates : playerData.m_general.m_lastStarSystemCoordinates;
+
 					// put alien ship in area approximately in the correct direction of approach
-					coordinates = new Vector3( randomPosition.x, 0.0f, randomPosition.y ) * 256.0f + Vector3.Normalize( m_pdEncounter.m_currentCoordinates - playerData.m_general.m_lastHyperspaceCoordinates ) * 4096.0f;
+					coordinates = new Vector3( randomPosition.x, 0.0f, randomPosition.y ) * 256.0f + Vector3.Normalize( m_pdEncounter.m_currentCoordinates - playerCoordinates ) * 4096.0f;
 				}
 				else
 				{
