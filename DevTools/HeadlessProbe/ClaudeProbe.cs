@@ -483,6 +483,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLeaks();
 				break;
 
+			case "latent":
+				yield return ScenarioLatent();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -6922,6 +6926,140 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "leaks: nothing of the spaceflight scene stays in memory after it is left", panelWasOpen && !controllerInMemory && !vehiclePlanetInMemory && !otherPlanetInMemory && !staticStillSet, "controller " + controllerInMemory + ", planet of the vehicle " + vehiclePlanetInMemory + ", other planet " + otherPlanetInMemory + ", static " + staticStillSet );
 
 		Finish( "scenario=leaks materials=" + materialsBefore + "/" + materialsDuring + "/" + materialsAfter + " afterLeaving=" + controllerInMemory + "/" + vehiclePlanetInMemory + "/" + otherPlanetInMemory + "/" + staticStillSet + " heap=" + heapInMegabytes + "MB checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: latent and Test.unity only (the message box slide with another duration, the experimental planet mesh)
+
+	// slide the message box out with the given duration and say where it is at half that time and at the end, then slide it back in
+	IEnumerator SlideTheMessageBox( float duration, float[] result )
+	{
+		var messages = SpaceflightController.m_instance.m_messages;
+		var sceneDuration = messages.m_slideDuration;
+
+		messages.m_slideDuration = duration;
+
+		messages.SlideOut();
+
+		yield return new WaitForSecondsRealtime( duration * 0.5f );
+
+		result[ 0 ] = messages.m_frame.offsetMin.x;
+
+		yield return new WaitForSecondsRealtime( duration * 0.5f + 0.3f );
+
+		result[ 1 ] = messages.m_frame.offsetMin.x;
+
+		messages.SlideIn();
+
+		yield return new WaitForSecondsRealtime( duration + 0.3f );
+
+		result[ 2 ] = messages.m_frame.offsetMin.x;
+
+		messages.m_slideDuration = sceneDuration;
+	}
+
+	IEnumerator ScenarioLatent()
+	{
+		EnsureCrew();
+
+		// ---- 1. the message box slides between -12 (in) and -524 (out). With the one second that is set in the scene it is half way after half a second
+		var oneSecond = new float[ 3 ];
+		var twoSeconds = new float[ 3 ];
+
+		yield return SlideTheMessageBox( 1.0f, oneSecond );
+		yield return SlideTheMessageBox( 2.0f, twoSeconds );
+
+		Log( "latent: message box slide of 1 s: at half time " + oneSecond[ 0 ].ToString( "F0" ) + ", at the end " + oneSecond[ 1 ].ToString( "F0" ) + ", back in " + oneSecond[ 2 ].ToString( "F0" ) + " | slide of 2 s: at half time " + twoSeconds[ 0 ].ToString( "F0" ) + ", at the end " + twoSeconds[ 1 ].ToString( "F0" ) + ", back in " + twoSeconds[ 2 ].ToString( "F0" ) );
+
+		Check( "latent: the message box slide of one second is as it was", ( Mathf.Abs( oneSecond[ 0 ] + 268.0f ) < 60.0f ) && ( Mathf.Abs( oneSecond[ 1 ] + 524.0f ) < 1.0f ) && ( Mathf.Abs( oneSecond[ 2 ] + 12.0f ) < 1.0f ), "half time " + oneSecond[ 0 ].ToString( "F0" ) + ", end " + oneSecond[ 1 ].ToString( "F0" ) + ", back in " + oneSecond[ 2 ].ToString( "F0" ) );
+		Check( "latent: a message box slide of two seconds is half way after one second", ( Mathf.Abs( twoSeconds[ 0 ] + 268.0f ) < 60.0f ) && ( Mathf.Abs( twoSeconds[ 1 ] + 524.0f ) < 1.0f ) && ( Mathf.Abs( twoSeconds[ 2 ] + 12.0f ) < 1.0f ), "half time " + twoSeconds[ 0 ].ToString( "F0" ) + ", end " + twoSeconds[ 1 ].ToString( "F0" ) + ", back in " + twoSeconds[ 2 ].ToString( "F0" ) );
+
+		// ---- 2. the experimental planet mesh (it is only used in Test.unity): a planet object with no parent, at a resolution of 110
+		//         (6 faces of 110 by 110 are 72600 vertices, more than the 65535 a mesh with 16 bit indices can have)
+		var planetData = ScriptableObject.CreateInstance<PlanetData>();
+
+		typeof( PlanetData ).GetField( "_resolution", c_any ).SetValue( planetData, 110 );
+
+		var meshesBefore = Resources.FindObjectsOfTypeAll<Mesh>().Length;
+
+		var planetObject = new GameObject( "Probe Planet" );
+		var planetManager = planetObject.AddComponent<PlanetManager>();
+
+		typeof( PlanetManager ).GetField( "_planetData", c_any ).SetValue( planetManager, planetData );
+
+		var generateThrew = "nothing";
+
+		Application.logMessageReceived += CountErrors;
+
+		s_errorsLogged = 0;
+
+		try
+		{
+			planetManager.GeneratePlanet();
+		}
+		catch ( Exception exception )
+		{
+			generateThrew = exception.GetType().Name;
+		}
+
+		Application.logMessageReceived -= CountErrors;
+
+		var mesh = planetObject.GetComponent<MeshFilter>().sharedMesh;
+		var vertices = ( mesh != null ) ? mesh.vertexCount : -1;
+		var triangles = ( mesh != null ) ? (int) ( mesh.GetIndexCount( 0 ) / 3 ) : -1;
+		var indexFormat = ( mesh != null ) ? mesh.indexFormat.ToString() : "no mesh";
+
+		// the largest vertex number any triangle uses, read back from the mesh (the last vertex is number 72599)
+		var largestIndex = -1;
+
+		if ( mesh != null )
+		{
+			foreach ( var index in mesh.triangles )
+			{
+				largestIndex = Mathf.Max( largestIndex, index );
+			}
+		}
+		var meshesWithThePlanet = Resources.FindObjectsOfTypeAll<Mesh>().Length;
+
+		Destroy( planetObject );
+
+		yield return Frames( 3 );
+
+		var meshesAfter = Resources.FindObjectsOfTypeAll<Mesh>().Length;
+
+		Destroy( planetData );
+
+		Log( "latent: planet mesh at resolution 110 with no parent: threw " + generateThrew + ", errors logged " + s_errorsLogged + ", " + vertices + " vertices (72600 wanted), " + triangles + " triangles (142572 wanted), index format " + indexFormat + ", largest vertex number in a triangle " + largestIndex + ". Meshes in memory: " + meshesBefore + " before, " + meshesWithThePlanet + " with the planet, " + meshesAfter + " after it was destroyed" );
+
+		Check( "latent: the triangles of a planet mesh with more than 65535 vertices reach all of them", ( s_errorsLogged == 0 ) && ( vertices == 72600 ) && ( triangles == 142572 ) && ( largestIndex == 72599 ), "errors " + s_errorsLogged + ", " + vertices + " vertices, " + triangles + " triangles, index format " + indexFormat + ", largest vertex number in a triangle " + largestIndex );
+		Check( "latent: a planet with no parent can be generated", generateThrew == "nothing", "threw " + generateThrew );
+		Check( "latent: the planet mesh goes with its planet", ( meshesWithThePlanet > meshesBefore ) && ( meshesAfter == meshesBefore ), meshesBefore + " before, " + meshesWithThePlanet + " with the planet, " + meshesAfter + " after" );
+
+		// ---- 3. the adapter with the procedural planets switched off and no planet to go back to
+		var adapterObject = new GameObject( "Probe Adapter" );
+		var adapter = adapterObject.AddComponent<ProceduralAdapter>();
+		var switchBefore = ProceduralAdapter.EnableProceduralGeneration;
+		var adapterThrew = "nothing";
+
+		ProceduralAdapter.EnableProceduralGeneration = false;
+
+		try
+		{
+			adapter.Initialize( null, DataController.m_instance.m_gameData.m_planetList[ 90 ] );
+		}
+		catch ( Exception exception )
+		{
+			adapterThrew = exception.GetType().Name;
+		}
+
+		ProceduralAdapter.EnableProceduralGeneration = switchBefore;
+
+		Destroy( adapterObject );
+
+		Log( "latent: the adapter, switched off, with no planet controller: threw " + adapterThrew );
+
+		Check( "latent: the adapter does nothing without a planet controller", adapterThrew == "nothing", "threw " + adapterThrew );
+
+		Finish( "scenario=latent oneSecond=" + oneSecond[ 0 ].ToString( "F0" ) + "/" + oneSecond[ 1 ].ToString( "F0" ) + " twoSeconds=" + twoSeconds[ 0 ].ToString( "F0" ) + "/" + twoSeconds[ 1 ].ToString( "F0" ) + " planet=" + generateThrew + "/" + vertices + "/" + triangles + "/" + ( meshesAfter - meshesBefore ) + " adapter=" + adapterThrew + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

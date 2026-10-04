@@ -46,6 +46,24 @@ public class PlanetManager : MonoBehaviour
         GeneratePlanet();
     }
 
+    private void OnDestroy()
+    {
+        // The mesh was made here, so it does not go away with the object. It is ours to destroy.
+        if (_mesh != null)
+        {
+            if (Application.isPlaying)
+            {
+                Destroy(_mesh);
+            }
+            else
+            {
+                DestroyImmediate(_mesh);
+            }
+
+            _mesh = null;
+        }
+    }
+
     public void Cleanup()
     {
         if (_mesh != null)
@@ -166,6 +184,11 @@ public class PlanetManager : MonoBehaviour
             }
 
             _mesh.Clear();
+
+            // A mesh numbers its vertices with 16 bits unless it is told otherwise. With more than 65535 vertices (a resolution of 105 and up)
+            // the triangles then point at the wrong vertices, and nothing reports it.
+            _mesh.indexFormat = (finalVertices.Length > 65535) ? UnityEngine.Rendering.IndexFormat.UInt32 : UnityEngine.Rendering.IndexFormat.UInt16;
+
             _mesh.vertices = finalVertices;
             _mesh.uv = uvs;         
             _mesh.colors32 = finalColors;
@@ -173,7 +196,11 @@ public class PlanetManager : MonoBehaviour
             _mesh.RecalculateNormals();
 
             // --- FIX: INHERIT LAYER FROM PARENT ---
-            gameObject.layer = transform.parent.gameObject.layer;
+            // A planet that was put into a scene by itself has no parent and keeps its own layer.
+            if (transform.parent != null)
+            {
+                gameObject.layer = transform.parent.gameObject.layer;
+            }
             // ------------------------------------
 
             // Add and configure the SphereCollider
