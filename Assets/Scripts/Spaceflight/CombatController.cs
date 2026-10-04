@@ -433,11 +433,19 @@ public class CombatController : MonoBehaviour
 		var gameData = DataController.m_instance.m_gameData;
 		var vessel = gameData.m_vesselList[ targetShip.m_vesselId ];
 
-		// apply damage (for aliens we use armor class as hit points)
-		float armorRemaining = vessel.m_armorClass - ( damage / 10.0f );
+		// make sure the ship has its hit points (ships from save files made before alien ships had hit points don't)
+		targetShip.EnsureHitPoints( vessel );
+
+		// the shields absorb what they can first
+		int shieldAbsorb = Mathf.Min( damage, targetShip.m_shieldPoints );
+
+		targetShip.m_shieldPoints -= shieldAbsorb;
+
+		// whatever gets through the shields comes off the armor
+		targetShip.m_armorPoints -= ( damage - shieldAbsorb );
 
 		// show hit effect
-		if ( armorRemaining > 0.0f )
+		if ( targetShip.m_armorPoints > 0 )
 		{
 			var hullHit = GetAvailableHullHit();
 			if ( hullHit != null )
@@ -445,11 +453,20 @@ public class CombatController : MonoBehaviour
 				hullHit.Play( targetShip.m_coordinates );
 			}
 
-			SpaceflightController.m_instance.m_messages.AddText( $"<color=#00FF00>Hit! Target damaged.</color>" );
+			// let the player know whether the hit got through the shields
+			if ( shieldAbsorb == damage )
+			{
+				SpaceflightController.m_instance.m_messages.AddText( $"<color=#00FF00>Hit! Target's shields absorbed it.</color>" );
+			}
+			else
+			{
+				SpaceflightController.m_instance.m_messages.AddText( $"<color=#00FF00>Hit! Target damaged.</color>" );
+			}
 		}
 		else
 		{
 			// ship destroyed!
+			targetShip.m_armorPoints = 0;
 			targetShip.m_isDead = true;
 
 			// show explosion
