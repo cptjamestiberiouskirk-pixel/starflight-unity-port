@@ -37,8 +37,11 @@ public class Encounter : MonoBehaviour
 	public PD_Encounter m_pdEncounter;
 	public GD_Encounter m_gdEncounter;
 
-	// alien ship data
+	// alien ship data for each model slot (same index as m_alienShipModelList - null if the slot is not in use)
 	PD_AlienShip[] m_alienShipList;
+
+	// the model slot of each alien ship (same index as the encounter's alien ship list - negative if the ship has no model)
+	int[] m_alienShipModelSlotList;
 
 	// did we just enter this encounter from hyperspace?
 	bool m_justEntered;
@@ -87,13 +90,14 @@ public class Encounter : MonoBehaviour
 			return;
 		}
 
-		// get the model container for this alien ship
-		if ( alienIndex >= m_alienShipModelList.Length )
+		// get the model container for this alien ship (its model slot is not the same as its index in the alien ship list)
+		var alienShipModel = GetAlienShipModel( alienIndex );
+
+		if ( alienShipModel == null )
 		{
+			Debug.Log( $"SpawnDebrisForShip: Alien ship {alienIndex} has no model" );
 			return;
 		}
-
-		var alienShipModel = m_alienShipModelList[ alienIndex ];
 
 		// clear any existing children (the destroyed ship model)
 		Tools.DestroyChildrenOf( alienShipModel );
@@ -116,6 +120,32 @@ public class Encounter : MonoBehaviour
 		// add slow tumbling rotation to the debris
 		var tumble = debrisInstance.AddComponent<DebrisTumble>();
 		tumble.m_rotationSpeed = new Vector3( Random.Range( -10f, 10f ), Random.Range( -10f, 10f ), Random.Range( -10f, 10f ) );
+	}
+
+	/// <summary>
+	/// Get the model for an alien ship, by its index in the encounter's alien ship list.
+	/// Returns null if the ship has no model (not added to the encounter yet, or already dead when the models were set up).
+	/// </summary>
+	public GameObject GetAlienShipModel( int alienIndex )
+	{
+		// do we know the model slots yet and is this a valid alien ship index?
+		if ( ( m_alienShipModelSlotList == null ) || ( alienIndex < 0 ) || ( alienIndex >= m_alienShipModelSlotList.Length ) )
+		{
+			// no
+			return null;
+		}
+
+		// get the model slot for this alien ship
+		var modelSlot = m_alienShipModelSlotList[ alienIndex ];
+
+		// does this alien ship have a model?
+		if ( ( modelSlot < 0 ) || ( modelSlot >= m_alienShipModelList.Length ) )
+		{
+			// no
+			return null;
+		}
+
+		return m_alienShipModelList[ modelSlot ];
 	}
 
 	// unity update
@@ -226,6 +256,12 @@ public class Encounter : MonoBehaviour
 				if ( alienShipModel.activeInHierarchy )
 				{
 					var alienShip = m_alienShipList[ alienShipIndex ];
+
+					// skip this model if there is no alien ship in its slot (this should never happen)
+					if ( alienShip == null )
+					{
+						continue;
+					}
 
 					var vessel = gameData.m_vesselList[ alienShip.m_vesselId ];
 
@@ -678,17 +714,40 @@ public class Encounter : MonoBehaviour
 			alienShipModel.SetActive( false );
 		}
 
-		// start adding alien ship models
-		var alienShipIndex = 0;
+		// forget which alien ship was in each model slot
+		for ( var modelSlot = 0; modelSlot < m_alienShipList.Length; modelSlot++ )
+		{
+			m_alienShipList[ modelSlot ] = null;
+		}
+
+		// no alien ship has a model slot yet
+		m_alienShipModelSlotList = new int[ alienShipList.Length ];
+
+		for ( var alienShipIndex = 0; alienShipIndex < m_alienShipModelSlotList.Length; alienShipIndex++ )
+		{
+			m_alienShipModelSlotList[ alienShipIndex ] = -1;
+		}
+
+		// start adding alien ship models (living ships are packed into the model slots, so a ship's model slot is not the same as its index in the alien ship list)
+		var nextModelSlot = 0;
 
 		// go through all of the alien ships in the encounter
-		foreach ( var alienShip in alienShipList )
+		for ( var alienShipIndex = 0; alienShipIndex < alienShipList.Length; alienShipIndex++ )
 		{
+			var alienShip = alienShipList[ alienShipIndex ];
+
 			// is this ship in the encounter and alive?
 			if ( alienShip.m_addedToEncounter && !alienShip.m_isDead )
 			{
+				// stop if we have run out of model slots
+				if ( nextModelSlot >= m_alienShipModelList.Length )
+				{
+					Debug.LogError( $"Not enough alien ship models for this encounter (have {m_alienShipModelList.Length})" );
+					break;
+				}
+
 				// get the model we will update
-				var alienShipModel = m_alienShipModelList[ alienShipIndex ];
+				var alienShipModel = m_alienShipModelList[ nextModelSlot ];
 
 				// remove old model
 				Tools.DestroyChildrenOf( alienShipModel );
@@ -719,10 +778,13 @@ public class Encounter : MonoBehaviour
 				alienShipModel.SetActive( true );
 
 				// remember the alien ship associated with this model
-				m_alienShipList[ alienShipIndex ] = alienShip;
+				m_alienShipList[ nextModelSlot ] = alienShip;
+
+				// remember the model slot associated with this alien ship
+				m_alienShipModelSlotList[ alienShipIndex ] = nextModelSlot;
 
 				// next!
-				alienShipIndex++;
+				nextModelSlot++;
 			}
 		}
 	}
@@ -1297,6 +1359,12 @@ public class Encounter : MonoBehaviour
 			{
 				// get to the alien ship
 				var alienShip = m_alienShipList[ alienShipIndex ];
+
+				// skip this model if there is no alien ship in its slot (this should never happen)
+				if ( alienShip == null )
+				{
+					continue;
+				}
 
 				// set the rotation of the ship
 				alienShipModel.transform.rotation = Quaternion.LookRotation( alienShip.m_currentDirection, Vector3.up );
