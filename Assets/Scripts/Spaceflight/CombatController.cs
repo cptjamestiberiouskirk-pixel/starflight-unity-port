@@ -149,6 +149,24 @@ public class CombatController : MonoBehaviour
 	}
 
 	/// <summary>
+	/// Take every missile out of the air. The encounter calls this when it begins and when it ends, because a missile
+	/// that arrives after the player has left would still do its damage, to the player or to a ship of the next encounter.
+	/// </summary>
+	public void ClearMissiles()
+	{
+		// the pools may not have been created yet
+		if ( m_missilePool == null )
+		{
+			return;
+		}
+
+		foreach ( var missile in m_missilePool )
+		{
+			missile.Cancel();
+		}
+	}
+
+	/// <summary>
 	/// Get the current target index.
 	/// </summary>
 	public int GetTargetIndex()

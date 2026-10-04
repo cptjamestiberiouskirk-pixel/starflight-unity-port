@@ -445,6 +445,12 @@ public class Encounter : MonoBehaviour
 
 		Debug.Log( "Hiding the encounter location." );
 
+		// take the missiles out of the air (the encounter is over - one that arrived later would still do its damage)
+		if ( CombatController.m_instance != null )
+		{
+			CombatController.m_instance.ClearMissiles();
+		}
+
 		// hide the encounter objects
 		gameObject.SetActive( false );
 
@@ -526,9 +532,11 @@ public class Encounter : MonoBehaviour
 		}
 
 		// forget the combat target (a target picked in another encounter, or before leaving this one, does not carry over)
+		// and make sure no missile from before is still in the air
 		if ( CombatController.m_instance != null )
 		{
 			CombatController.m_instance.SetTarget( -1 );
+			CombatController.m_instance.ClearMissiles();
 		}
 
 		// allocate array for alien ship list
