@@ -763,9 +763,10 @@ public class PG_EditorWindow : EditorWindow
 		{
 			if ( pgPlanet.m_color[ PG_Planet.c_height - 1, x ] == m_bottomPaddingColor )
 			{
-				if ( pgPlanet.m_height[ 0, x ] > maximumHeight )
+				// (the heights of the bottom row as well - this used to take them from the top row, and every planet file made before 2026-10-04 has its south pole padding from that)
+				if ( pgPlanet.m_height[ PG_Planet.c_height - 1, x ] > maximumHeight )
 				{
-					maximumHeight = pgPlanet.m_height[ 0, x ];
+					maximumHeight = pgPlanet.m_height[ PG_Planet.c_height - 1, x ];
 				}
 			}
 		}

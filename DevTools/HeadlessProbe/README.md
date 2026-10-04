@@ -65,6 +65,7 @@ What the probe does:
 | `m16` | the maps of a star system's planets are destroyed when the system is left: the textures made at runtime and the planet files loaded after each of four changes of star system, an elevation map, a landing at the end, and what is left after the Spaceflight scene is gone |
 | `nomaps` | a planet whose maps could not be generated (planet 90 is given a file that cannot be read): Land refuses it with a message, a planet with maps can still be landed on, and Disembark refuses on the surface of a planet without maps |
 | `m25` | the blur of the albedo map: a black map with single white pixels shows how much each neighbour takes, also across the edge where the map wraps around. It also writes the albedo map of planet 90, scattered with a fixed seed, to `%TEMP%\starflight-probe\m25-albedo-planet-90.bin` (three bytes a pixel), so that two runs can be compared pixel by pixel |
+| `m26` | the planet generator tool (editor assembly, reached by reflection): it prepares the height map of all 811 planets from their source images, checks that the south pole padding rises to the highest point of the bottom row, and compares every row with the prepared height map in the planet file. Nothing is written, and the tool's settings in the editor preferences are not touched |
 
 Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (about 9 minutes; one summary block per scenario with the failed checks and exceptions).
 
