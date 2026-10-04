@@ -75,6 +75,7 @@ What the probe does:
 | `comms` | the captain's name in what the aliens say, Mechan 9 after five right answers with and without having fired on the Mechans, and a press of the fire button when the aliens ask a question before the press is carried out |
 | `terrain` | the crater maps (read once, the same values as the textures), the game's random numbers after rocks are placed, an object on the right edge of the map, a scan while a deposit is being picked up, and scan labels after going back into the ship |
 | `savepanel` | the Escape key in space, two seconds into a landing, after the landing and while the ship explodes, and whether a game that is over stays paused |
+| `visual` | a floating object when its timer starts again, when an explosion is switched off, and how far the landing site crosshair moves in a second |
 
 Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (about 9 minutes; one summary block per scenario with the failed checks and exceptions).
 

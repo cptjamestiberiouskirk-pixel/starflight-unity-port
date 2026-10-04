@@ -463,6 +463,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSavePanel();
 				break;
 
+			case "visual":
+				yield return ScenarioVisual();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -6326,6 +6330,147 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "savepanel: a game that is over stays paused", gameOver && pausedAfterGameOver && pausedAfterAPanelClosed, "game over " + gameOver + ", paused " + pausedAfterGameOver + ", paused after a panel closed " + pausedAfterAPanelClosed );
 
 		Finish( "scenario=savepanel space=" + opensInSpace + " landing=" + openedDuringLanding + "/" + pausedDuringLanding + " ground=" + opensOnTheGround + " explosion=" + openedDuringExplosion + "/" + pausedAfterGameOver + "/" + pausedAfterAPanelClosed + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: visual (a floating object when its timer wraps, the end of an explosion, the speed of the landing site crosshair)
+
+	// set the stick position the input controller reports (it is a number from -1 to 1 for each axis)
+	static void SetAxis( string name, float value )
+	{
+		typeof( InputController ).GetProperty( name ).SetValue( InputController.m_instance, value );
+	}
+
+	IEnumerator ScenarioVisual()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var combat = CombatController.m_instance;
+
+		EnsureCrew();
+
+		// ---- 1. a floating object: its height is the sine of a timer that counts up, and the timer starts again at some point
+		var floatObject = new GameObject( "Probe Float" );
+		var floating = floatObject.AddComponent<Float>();
+
+		floating.m_speed = 1.0f;
+		floating.m_range = 45.0f;
+
+		yield return Frames( 2 );
+
+		// just before the place where the old code started the timer again (360), and then enough frames to get past it
+		SetField( floating, "m_timer", 359.99f );
+
+		var largestStep = 0.0f;
+		var heightAtTheLargestStep = 0.0f;
+
+		for ( var i = 0; i < 500; i++ )
+		{
+			var last = floatObject.transform.localPosition.y;
+
+			Call( floating, "Update" );
+
+			// the first call only puts the object where its timer says it is
+			if ( ( i > 0 ) && ( Mathf.Abs( floatObject.transform.localPosition.y - last ) > largestStep ) )
+			{
+				largestStep = Mathf.Abs( floatObject.transform.localPosition.y - last );
+				heightAtTheLargestStep = last;
+			}
+		}
+
+		var timerAfter = (float) GetField( floating, "m_timer" );
+
+		Destroy( floatObject );
+
+		Log( "visual: a floating object with a range of 45, its timer taken from 359.99 past 360 in 500 steps of " + Time.deltaTime.ToString( "F4" ) + ": the largest step in height was " + largestStep.ToString( "F2" ) + " (from " + heightAtTheLargestStep.ToString( "F2" ) + "), timer now " + timerAfter.ToString( "F3" ) );
+
+		Check( "visual: a floating object does not jump when its timer starts again", largestStep < 5.0f, "largest step " + largestStep.ToString( "F2" ) + " of a range of 45" );
+
+		// ---- 2. an explosion: whoever waits for it is told after a second and a half; its debris and smoke live for two seconds
+		var explosion = Call( combat, "GetAvailableExplosion" ) as ExplosionEffect;
+		var toldAfter = -1.0f;
+		var start = Time.realtimeSinceStartup;
+
+		explosion.Play( playerData.m_general.m_coordinates + Vector3.up * 500.0f, () => { toldAfter = Time.realtimeSinceStartup - start; } );
+
+		yield return new WaitForSecondsRealtime( 1.8f );
+
+		var onAt18 = explosion.gameObject.activeSelf;
+		var busyAt18 = explosion.IsPlaying();
+
+		yield return new WaitForSecondsRealtime( 0.8f );
+
+		var onAt26 = explosion.gameObject.activeSelf;
+		var busyAt26 = explosion.IsPlaying();
+
+		Log( "visual: explosion: the caller was told after " + toldAfter.ToString( "F2" ) + " s; at 1.8 s it is " + ( onAt18 ? "on" : "off" ) + " (busy " + busyAt18 + "), at 2.6 s it is " + ( onAt26 ? "on" : "off" ) + " (busy " + busyAt26 + ")" );
+
+		Check( "visual: an explosion is not switched off before its smoke and debris are gone", ( toldAfter > 1.4f ) && ( toldAfter < 1.7f ) && onAt18 && busyAt18 && !onAt26 && !busyAt26, "told after " + toldAfter.ToString( "F2" ) + " s, on at 1.8 s: " + onAt18 + ", on at 2.6 s: " + onAt26 );
+
+		// ---- 3. the crosshair of the landing site: the stick held to the right for one second
+		var terrainMapDisplay = controller.m_displayController.m_terrainMapDisplay;
+
+		playerData.m_general.m_selectedLatitude = 0.0f;
+		playerData.m_general.m_selectedLongitude = 0.0f;
+
+		// one call with the stick in the middle, as there is in the game before the stick is moved
+		terrainMapDisplay.MoveCrosshairs();
+
+		var frames = 0;
+		var end = Time.realtimeSinceStartup + 1.0f;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			SetAxis( "m_x", 1.0f );
+
+			terrainMapDisplay.MoveCrosshairs();
+
+			SetAxis( "m_x", 0.0f );
+
+			frames++;
+
+			yield return null;
+		}
+
+		var movedInOneSecond = playerData.m_general.m_selectedLatitude;
+
+		// and for two more seconds, by which time it has reached its top speed
+		end = Time.realtimeSinceStartup + 2.0f;
+
+		playerData.m_general.m_selectedLatitude = -180.0f;
+
+		var atTwoSeconds = float.NaN;
+		var held = 1.0f;
+		var lastTime = Time.realtimeSinceStartup;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			SetAxis( "m_x", 1.0f );
+
+			terrainMapDisplay.MoveCrosshairs();
+
+			SetAxis( "m_x", 0.0f );
+
+			held += Time.realtimeSinceStartup - lastTime;
+			lastTime = Time.realtimeSinceStartup;
+
+			if ( float.IsNaN( atTwoSeconds ) && ( held >= 2.0f ) )
+			{
+				atTwoSeconds = playerData.m_general.m_selectedLatitude;
+			}
+
+			yield return null;
+		}
+
+		var speedAtTheEnd = playerData.m_general.m_selectedLatitude - atTwoSeconds;
+
+		Log( "visual: crosshair: stick held right for one second (" + frames + " frames): moved " + movedInOneSecond.ToString( "F1" ) + " degrees. In the third second it moved " + speedAtTheEnd.ToString( "F1" ) + " degrees" );
+
+		Check( "visual: the crosshair moves the same distance at any frame rate", ( movedInOneSecond > 10.0f ) && ( movedInOneSecond < 20.0f ), "moved " + movedInOneSecond.ToString( "F1" ) + " degrees in one second over " + frames + " frames (15 at 60 frames a second)" );
+		Check( "visual: the crosshair has a top speed", ( speedAtTheEnd > 50.0f ) && ( speedAtTheEnd < 70.0f ), "moved " + speedAtTheEnd.ToString( "F1" ) + " degrees in the third second (the top speed is 60 a second)" );
+
+		playerData.m_general.m_selectedLatitude = 0.0f;
+
+		Finish( "scenario=visual floatStep=" + largestStep.ToString( "F2" ) + " explosion=" + toldAfter.ToString( "F2" ) + "/" + onAt18 + "/" + onAt26 + " crosshair=" + movedInOneSecond.ToString( "F1" ) + "/" + speedAtTheEnd.ToString( "F1" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
