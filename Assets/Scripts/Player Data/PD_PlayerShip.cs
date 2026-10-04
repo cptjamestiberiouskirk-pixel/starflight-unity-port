@@ -32,7 +32,6 @@ public class PD_PlayerShip
 
 	public int m_shieldPoints;
 	public int m_armorPoints;
-	public int m_missilesRemaining;
 
 	// how many seconds it takes the shields to regain one percent of their full charge
 	public const float c_shieldRechargeInterval = 5.0f;
@@ -507,6 +506,12 @@ public class PD_PlayerShip
 
 			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Weapons disarmed.</color>" );
 		}
+	}
+
+	// returns true if there is any endurium on board (the engines, the shields and the weapons all run on it)
+	public bool HasFuel()
+	{
+		return ( m_elementStorage != null ) && ( m_elementStorage.Find( 5 ) != null );
 	}
 
 	public void UseUpFuel( float amount )

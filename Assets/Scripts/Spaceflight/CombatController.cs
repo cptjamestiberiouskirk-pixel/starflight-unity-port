@@ -41,6 +41,10 @@ public class CombatController : MonoBehaviour
 	const float c_laserRange = 800.0f;
 	const float c_missileRange = 1500.0f;
 
+	// endurium used up by every shot, in cubic meters (a missile does twice the damage of a laser of the same class and uses twice the fuel)
+	const float c_laserFuelPerShot = 0.01f;
+	const float c_missileFuelPerShot = 0.02f;
+
 	// current target
 	int m_currentTargetIndex = -1;
 
@@ -196,6 +200,12 @@ public class CombatController : MonoBehaviour
 			return false;
 		}
 
+		// must have fuel (every shot uses a little endurium)
+		if ( !playerData.m_playerShip.HasFuel() )
+		{
+			return false;
+		}
+
 		// must be off cooldown
 		if ( m_playerLaserCooldown > 0.0f )
 		{
@@ -224,8 +234,8 @@ public class CombatController : MonoBehaviour
 			return false;
 		}
 
-		// must have missiles
-		if ( playerData.m_playerShip.m_missilesRemaining <= 0 )
+		// must have fuel (missiles are not counted - every launch uses a little endurium instead)
+		if ( !playerData.m_playerShip.HasFuel() )
 		{
 			return false;
 		}
@@ -306,6 +316,9 @@ public class CombatController : MonoBehaviour
 			ApplyDamageToAlien( m_currentTargetIndex, damage );
 		}
 
+		// the shot uses up a little endurium
+		playerData.m_playerShip.UseUpFuel( c_laserFuelPerShot );
+
 		// set cooldown
 		m_playerLaserCooldown = c_baseLaserCooldown / ( 1.0f + playerData.m_playerShip.m_laserCannonClass * 0.2f );
 
@@ -353,8 +366,8 @@ public class CombatController : MonoBehaviour
 		// firing on the aliens makes them hostile for the rest of the encounter (whether or not the missile hits)
 		encounter.PlayerAttacked();
 
-		// use a missile
-		playerData.m_playerShip.m_missilesRemaining--;
+		// the launch uses up a little endurium
+		playerData.m_playerShip.UseUpFuel( c_missileFuelPerShot );
 
 		// check if target is immune
 		bool isImmune = targetVessel.m_immuneToMissiles;
@@ -410,7 +423,7 @@ public class CombatController : MonoBehaviour
 		// play torpedo launch sound
 		SoundController.m_instance.PlaySound( SoundController.Sound.TorpedoFire );
 
-		SpaceflightController.m_instance.m_messages.AddText( $"<color=white>Missile launched! ({playerData.m_playerShip.m_missilesRemaining} remaining)</color>" );
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Missile launched!</color>" );
 
 		return true;
 	}
