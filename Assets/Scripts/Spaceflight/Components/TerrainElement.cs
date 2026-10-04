@@ -14,6 +14,9 @@ public class TerrainElement : MonoBehaviour
 	// reference to the terrain vehicle for pickup detection
 	TerrainVehicle m_terrainVehicle;
 
+	// true once this deposit has been picked up (the object stays around for a moment while its transporter effect plays)
+	bool m_pickedUp;
+
 	// the pickup distance threshold
 	const float c_pickupDistance = 10.0f;
 
@@ -36,6 +39,12 @@ public class TerrainElement : MonoBehaviour
 	// check if this element is close enough to the terrain vehicle to pick up
 	public bool IsInPickupRange()
 	{
+		// a deposit that has been picked up is gone - only its transporter effect is still there
+		if ( m_pickedUp )
+		{
+			return false;
+		}
+
 		// get the terrain vehicle dynamically if we don't have a reference
 		if ( m_terrainVehicle == null )
 		{
@@ -69,6 +78,14 @@ public class TerrainElement : MonoBehaviour
 	// call this when the element is picked up - returns the volume that was picked up
 	public int Pickup()
 	{
+		// a deposit can only be picked up once
+		if ( m_pickedUp )
+		{
+			return 0;
+		}
+
+		m_pickedUp = true;
+
 		var volumePickedUp = m_volume;
 
 		// hide any label on this object
