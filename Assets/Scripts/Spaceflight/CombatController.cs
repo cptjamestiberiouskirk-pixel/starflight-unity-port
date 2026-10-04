@@ -48,6 +48,9 @@ public class CombatController : MonoBehaviour
 	// current target
 	int m_currentTargetIndex = -1;
 
+	// true once the player ship has been destroyed (it can only be destroyed once)
+	bool m_playerIsDestroyed;
+
 	// player debris template (assign in inspector)
 	public GameObject m_playerDebrisTemplate;
 
@@ -212,6 +215,12 @@ public class CombatController : MonoBehaviour
 	{
 		var playerData = DataController.m_instance.m_playerData;
 
+		// a ship that has been destroyed does not fire
+		if ( m_playerIsDestroyed )
+		{
+			return false;
+		}
+
 		// must have laser cannon
 		if ( playerData.m_playerShip.m_laserCannonClass <= 0 )
 		{
@@ -245,6 +254,12 @@ public class CombatController : MonoBehaviour
 	public bool CanFireMissile()
 	{
 		var playerData = DataController.m_instance.m_playerData;
+
+		// a ship that has been destroyed does not fire
+		if ( m_playerIsDestroyed )
+		{
+			return false;
+		}
 
 		// must have missile launcher
 		if ( playerData.m_playerShip.m_missileLauncherClass <= 0 )
@@ -381,6 +396,15 @@ public class CombatController : MonoBehaviour
 			return false;
 		}
 
+		// is there a missile to launch? (the aliens' missiles come out of the same pool, and all of them can be in the air)
+		var missile = GetAvailableMissile();
+
+		if ( missile == null )
+		{
+			// no - nothing is launched, so it costs no fuel and the aliens have nothing to take offence at
+			return false;
+		}
+
 		// firing on the aliens makes them hostile for the rest of the encounter (whether or not the missile hits)
 		encounter.PlayerAttacked();
 
@@ -394,45 +418,40 @@ public class CombatController : MonoBehaviour
 			SpaceflightController.m_instance.m_messages.AddText( "<color=yellow>Target is immune to missiles!</color>" );
 		}
 
-		// fire the missile
-		var missile = GetAvailableMissile();
-		if ( missile != null )
+		// fire the missile - find target model (its model slot is not the same as the target index, so ask the encounter for it)
+		var targetModel = encounter.GetAlienShipModel( m_currentTargetIndex );
+		int targetIndex = m_currentTargetIndex;
+		int damage = c_missileDamage[ Mathf.Clamp( playerData.m_playerShip.m_missileLauncherClass, 0, c_missileDamage.Length - 1 ) ];
+
+		// this is called when the missile reaches the target
+		System.Action<Vector3, bool> onMissileHit = ( hitPosition, didHit ) =>
 		{
-			// find target model (its model slot is not the same as the target index, so ask the encounter for it)
-			var targetModel = encounter.GetAlienShipModel( m_currentTargetIndex );
-			int targetIndex = m_currentTargetIndex;
-			int damage = c_missileDamage[ Mathf.Clamp( playerData.m_playerShip.m_missileLauncherClass, 0, c_missileDamage.Length - 1 ) ];
-
-			// this is called when the missile reaches the target
-			System.Action<Vector3, bool> onMissileHit = ( hitPosition, didHit ) =>
+			if ( didHit && !isImmune )
 			{
-				if ( didHit && !isImmune )
-				{
-					ApplyDamageToAlien( targetIndex, damage );
-				}
-
-				// play explosion
-				var explosion = GetAvailableExplosion();
-				if ( explosion != null )
-				{
-					explosion.SetScale( 0.5f );
-					explosion.Play( hitPosition );
-				}
-
-				// play torpedo explosion sound
-				SoundController.m_instance.PlaySound( SoundController.Sound.TorpedoExplosion );
-			};
-
-			if ( targetModel != null )
-			{
-				// home in on the target model
-				missile.Fire( playerPosition, targetModel.transform, onMissileHit );
+				ApplyDamageToAlien( targetIndex, damage );
 			}
-			else
+
+			// play explosion
+			var explosion = GetAvailableExplosion();
+			if ( explosion != null )
 			{
-				// the target has no model so fly to its current position instead
-				missile.Fire( playerPosition, targetPosition, onMissileHit );
+				explosion.SetScale( 0.5f );
+				explosion.Play( hitPosition );
 			}
+
+			// play torpedo explosion sound
+			SoundController.m_instance.PlaySound( SoundController.Sound.TorpedoExplosion );
+		};
+
+		if ( targetModel != null )
+		{
+			// home in on the target model
+			missile.Fire( playerPosition, targetModel.transform, onMissileHit );
+		}
+		else
+		{
+			// the target has no model so fly to its current position instead
+			missile.Fire( playerPosition, targetPosition, onMissileHit );
 		}
 
 		// set cooldown
@@ -531,6 +550,12 @@ public class CombatController : MonoBehaviour
 	/// </summary>
 	public void ApplyDamageToPlayer( int damage, Vector3 hitDirection )
 	{
+		// a ship that has been destroyed cannot be hit again (it would explode once more and call the game over screen a second time)
+		if ( m_playerIsDestroyed )
+		{
+			return;
+		}
+
 		var playerData = DataController.m_instance.m_playerData;
 		var playerPosition = playerData.m_general.m_coordinates;
 
@@ -583,6 +608,12 @@ public class CombatController : MonoBehaviour
 			if ( playerData.m_playerShip.m_armorPoints <= 0 )
 			{
 				playerData.m_playerShip.m_armorPoints = 0;
+
+				// this only happens once
+				m_playerIsDestroyed = true;
+
+				// nothing that is still in the air has a ship left to hit
+				ClearMissiles();
 
 				// play ship explosion sound
 				SoundController.m_instance.PlaySound( SoundController.Sound.ShipExplosion );
@@ -669,6 +700,12 @@ public class CombatController : MonoBehaviour
 	/// </summary>
 	public void AlienFiresAtPlayer( PD_AlienShip alienShip, GD_Vessel vessel )
 	{
+		// there is nothing left to fire at once the player ship has been destroyed (a missile launched now would still be in the air when the game over screen pauses the game)
+		if ( m_playerIsDestroyed )
+		{
+			return;
+		}
+
 		var playerData = DataController.m_instance.m_playerData;
 		var playerPosition = playerData.m_general.m_coordinates;
 		var alienPosition = alienShip.m_coordinates;
@@ -790,6 +827,9 @@ public class CombatController : MonoBehaviour
 		{
 			if ( !explosion.IsPlaying() )
 			{
+				// back to full size - whoever used it last may have made it smaller (a missile hit plays it at half size)
+				explosion.SetScale( 1.0f );
+
 				return explosion;
 			}
 		}
