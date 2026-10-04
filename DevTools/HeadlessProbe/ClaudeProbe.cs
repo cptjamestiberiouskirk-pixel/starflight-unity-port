@@ -393,6 +393,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioM18();
 				break;
 
+			case "m17":
+				yield return ScenarioM17();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -3301,6 +3305,386 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "M18 the progress bar moves while a planet is processed", fillValues.Count >= planetsProcessed * 3, fillValues.Count + " different positions for " + planetsProcessed + " planets" );
 
 		Finish( "scenario=m18 finished=" + finished + " planets=" + planetsWithMaps + "/" + planetsInSystem + " seconds=" + seconds.ToString( "F2" ) + " frames=" + frames + " processing=[planets " + planetsProcessed + " frames " + framesWithProcessing + " longestFrame " + longestFrameWithProcessing.ToString( "F3" ) + " perPlanet " + averageSecondsPerPlanet.ToString( "F2" ) + " barPositions " + fillValues.Count + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- M17: a planet file that cannot be read aborts that planet and nothing else
+
+	static byte[] Decompress( byte[] bytes )
+	{
+		using ( var input = new System.IO.MemoryStream( bytes ) )
+		using ( var gzip = new System.IO.Compression.GZipStream( input, System.IO.Compression.CompressionMode.Decompress ) )
+		using ( var output = new System.IO.MemoryStream() )
+		{
+			gzip.CopyTo( output );
+
+			return output.ToArray();
+		}
+	}
+
+	static byte[] Compress( byte[] bytes )
+	{
+		using ( var output = new System.IO.MemoryStream() )
+		{
+			using ( var gzip = new System.IO.Compression.GZipStream( output, System.IO.Compression.CompressionMode.Compress ) )
+			{
+				gzip.Write( bytes, 0, bytes.Length );
+			}
+
+			return output.ToArray();
+		}
+	}
+
+	static byte[] FirstBytes( byte[] bytes, int count )
+	{
+		var result = new byte[ count ];
+
+		Array.Copy( bytes, result, count );
+
+		return result;
+	}
+
+	// what became of one planet generator that was given some bytes in place of its planet file
+	class PlanetBytesResult
+	{
+		public int m_calls;
+		public int m_throws;
+		public string m_firstException = "none";
+		public bool m_abort;
+		public bool m_mapsGenerated;
+		public bool m_hasTextures;
+		public float m_seconds;
+
+		public override string ToString()
+		{
+			return "threw " + m_throws + " times in " + m_calls + " calls (" + m_firstException + ") abort " + m_abort + " mapsGenerated " + m_mapsGenerated + " textures " + m_hasTextures + " in " + m_seconds.ToString( "F2" ) + " s";
+		}
+	}
+
+	// start the processing of a planet generator the way its step 1 does, but with the given bytes in place of the planet file
+	static void StartProcessing( PlanetGenerator generator, byte[] bytes )
+	{
+		SetField( generator, "m_step", 2 );
+		SetField( generator, "m_asyncTask", System.Threading.Tasks.Task.Run( () => generator.AsyncProcess( bytes ) ) );
+	}
+
+	// give a new planet generator these bytes and call it once a frame, the way the game does while the popup is up
+	IEnumerator ProcessBytes( GD_Planet planet, byte[] bytes, PlanetBytesResult result )
+	{
+		var generator = new PlanetGenerator();
+
+		generator.Start( planet );
+
+		StartProcessing( generator, bytes );
+
+		var task = GetField( generator, "m_asyncTask" ) as System.Threading.Tasks.Task;
+		var start = Time.realtimeSinceStartup;
+		var callsAfterTheTask = 0;
+
+		// give up 100 calls after the task has ended (a generator that has not made up its mind by then never will), or after 15 seconds
+		while ( ( callsAfterTheTask < 100 ) && ( Time.realtimeSinceStartup - start < 15.0f ) )
+		{
+			result.m_calls++;
+
+			if ( task.IsCompleted )
+			{
+				callsAfterTheTask++;
+			}
+
+			var threw = false;
+
+			try
+			{
+				generator.Process();
+			}
+			catch ( Exception exception )
+			{
+				threw = true;
+
+				result.m_throws++;
+
+				if ( result.m_throws == 1 )
+				{
+					var inner = exception.GetBaseException();
+
+					result.m_firstException = exception.GetType().Name + " / " + inner.GetType().Name + ": " + inner.Message;
+				}
+			}
+
+			// the game only looks at the generator when the call came back (an exception ends the frame of the spaceflight controller)
+			if ( !threw && ( generator.m_abort || generator.m_mapsGenerated ) )
+			{
+				break;
+			}
+
+			yield return null;
+		}
+
+		result.m_abort = generator.m_abort;
+		result.m_mapsGenerated = generator.m_mapsGenerated;
+		result.m_hasTextures = ( generator.m_albedoTexture != null ) && ( generator.m_normalTexture != null );
+		result.m_seconds = Time.realtimeSinceStartup - start;
+
+		// this generator was only for the test
+		foreach ( var texture in new Texture2D[] { generator.m_albedoTexture, generator.m_specularTexture, generator.m_normalTexture, generator.m_waterMaskTexture } )
+		{
+			if ( texture != null )
+			{
+				Destroy( texture );
+			}
+		}
+	}
+
+	static int s_planetErrors;
+
+	static void CountPlanetErrors( string condition, string stackTrace, LogType type )
+	{
+		if ( ( type == LogType.Error ) && condition.Contains( "planet" ) )
+		{
+			s_planetErrors++;
+
+			if ( s_planetErrors <= 8 )
+			{
+				var newline = condition.IndexOf( '\n' );
+
+				Log( "M17 error logged by the game: " + ( ( newline > 0 ) ? condition.Substring( 0, newline ) : condition ) );
+			}
+		}
+	}
+
+	IEnumerator ScenarioM17()
+	{
+		var starSystem = SpaceflightController.m_instance.m_starSystem;
+		var gameData = DataController.m_instance.m_gameData;
+
+		EnsureCrew();
+
+		// let the generation that began with the scene run to its end
+		var deadline = Time.realtimeSinceStartup + 45.0f;
+
+		while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup < deadline ) )
+		{
+			yield return null;
+		}
+
+		if ( starSystem.GeneratingPlanets() )
+		{
+			Finish( "scenario=m17 abort: the first generation never finished", 2 );
+			yield break;
+		}
+
+		Application.logMessageReceived += CountPlanetErrors;
+
+		// planet 90 is a frozen planet of the Arth system: it has a difference buffer after its two prepared maps
+		const int c_planetId = 90;
+
+		GD_Planet planet = null;
+
+		foreach ( var candidate in gameData.m_planetList )
+		{
+			if ( candidate.m_id == c_planetId )
+			{
+				planet = candidate;
+			}
+		}
+
+		var textAsset = Resources.Load<TextAsset>( "Planets/" + c_planetId );
+		var good = textAsset.bytes;
+		var plain = Decompress( good );
+
+		// not a planet file at all
+		var garbage = new byte[ 4096 ];
+
+		new System.Random( 12345 ).NextBytes( garbage );
+
+		// a file made by another version of the planet generator (the version is the first number in the file)
+		var otherVersion = (byte[]) plain.Clone();
+
+		otherVersion[ 0 ] = 3;
+
+		// a file that was cut off: half of the compressed bytes, and a complete archive that is missing the last million bytes of its difference buffer
+		var cutInHalf = FirstBytes( good, good.Length / 2 );
+		var shortBuffer = Compress( FirstBytes( plain, plain.Length - 1000000 ) );
+
+		// a file whose data is intact but does not match its checksum (a gzip file ends with the checksum and the length of its data, four bytes each)
+		var wrongChecksum = (byte[]) good.Clone();
+
+		wrongChecksum[ good.Length - 8 ] ^= 0x01;
+
+		// a file with one bit of its compressed data flipped
+		var bitFlipped = (byte[]) good.Clone();
+
+		bitFlipped[ good.Length / 2 ] ^= 0x10;
+
+		// a file with more data than the planet should have
+		var longer = new byte[ plain.Length + 100 ];
+
+		Array.Copy( plain, longer, plain.Length );
+
+		Log( "M17 planet " + c_planetId + " (" + planet.m_id + ", gas giant " + planet.IsGasGiant() + "): file " + good.Length + " bytes, " + plain.Length + " uncompressed, version " + BitConverter.ToInt32( plain, 0 ) );
+
+		// the real file comes last
+		var names = new string[] { "garbage", "from another version", "cut in half", "missing the end of its difference buffer", "empty", "carrying a wrong checksum", "damaged by one flipped bit", "longer than it should be", "the real file" };
+		var files = new byte[][] { garbage, Compress( otherVersion ), cutInHalf, shortBuffer, new byte[ 0 ], wrongChecksum, bitFlipped, Compress( longer ), good };
+		var results = new PlanetBytesResult[ files.Length ];
+		var real = files.Length - 1;
+
+		for ( var i = 0; i < files.Length; i++ )
+		{
+			var errorsBefore = s_planetErrors;
+
+			results[ i ] = new PlanetBytesResult();
+
+			yield return ProcessBytes( planet, files[ i ], results[ i ] );
+
+			Log( "M17 " + names[ i ] + " (" + files[ i ].Length + " bytes): " + results[ i ] + ", errors logged " + ( s_planetErrors - errorsBefore ) );
+		}
+
+		for ( var i = 0; i < real; i++ )
+		{
+			Check( "M17 a planet file that is " + names[ i ] + " aborts the planet and never throws", ( results[ i ].m_throws == 0 ) && results[ i ].m_abort && !results[ i ].m_mapsGenerated, results[ i ].ToString() );
+		}
+
+		Check( "M17 the real planet file still generates its maps", ( results[ real ].m_throws == 0 ) && !results[ real ].m_abort && results[ real ].m_mapsGenerated && results[ real ].m_hasTextures, results[ real ].ToString() );
+
+		// ---- every planet file in the project has to get through the reader, which is stricter than it was (code from before the fix has no reader of its own to call)
+		var readMethod = typeof( PlanetGenerator ).GetMethod( "ReadPlanetData", c_any );
+		var filesRead = 0;
+		var filesRefused = 0;
+		var firstRefusal = "none";
+
+		if ( readMethod != null )
+		{
+			foreach ( var candidate in gameData.m_planetList )
+			{
+				var asset = Resources.Load<TextAsset>( "Planets/" + candidate.m_id );
+
+				if ( asset == null )
+				{
+					filesRefused++;
+
+					if ( filesRefused == 1 )
+					{
+						firstRefusal = "planet " + candidate.m_id + " has no file";
+					}
+
+					continue;
+				}
+
+				var reader = new PlanetGenerator();
+
+				reader.Start( candidate );
+
+				try
+				{
+					readMethod.Invoke( reader, new object[] { asset.bytes } );
+
+					filesRead++;
+				}
+				catch ( TargetInvocationException exception )
+				{
+					filesRefused++;
+
+					if ( filesRefused == 1 )
+					{
+						firstRefusal = "planet " + candidate.m_id + ": " + exception.InnerException.GetType().Name + ": " + exception.InnerException.Message;
+					}
+				}
+
+				Resources.UnloadAsset( asset );
+
+				if ( ( ( filesRead + filesRefused ) % 50 ) == 0 )
+				{
+					yield return null;
+				}
+			}
+
+			Log( "M17 the reader was given all " + gameData.m_planetList.Length + " planet files of the project: read " + filesRead + ", refused " + filesRefused + " (first: " + firstRefusal + ")" );
+
+			Check( "M17 the reader accepts every planet file in the project", ( filesRead == gameData.m_planetList.Length ) && ( filesRefused == 0 ), "read " + filesRead + " of " + gameData.m_planetList.Length + ", refused " + filesRefused + " (first: " + firstRefusal + ")" );
+		}
+		else
+		{
+			Log( "M17 this code has no reader of its own for the planet data, so the " + gameData.m_planetList.Length + " planet files were not read one by one" );
+		}
+
+		// ---- the real thing: the first planet of the star system gets a file that cannot be read
+		var errorsBeforeSystem = s_planetErrors;
+		var exceptionsBeforeSystem = s_exceptionCount;
+
+		RegeneratePlanets();
+
+		Planet victim = null;
+
+		foreach ( var planetController in starSystem.m_planetController )
+		{
+			if ( planetController.m_planet != null )
+			{
+				victim = planetController;
+
+				break;
+			}
+		}
+
+		StartProcessing( victim.GetPlanetGenerator(), garbage );
+
+		var start = Time.realtimeSinceStartup;
+		var frames = 0;
+
+		while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 12.0f ) )
+		{
+			frames++;
+
+			yield return null;
+		}
+
+		var seconds = Time.realtimeSinceStartup - start;
+		var finished = !starSystem.GeneratingPlanets();
+
+		// the spaceflight controller takes the popup away in the frame after the last planet
+		yield return null;
+
+		var planetsInSystem = 0;
+		var planetsWithMaps = 0;
+
+		foreach ( var planetController in starSystem.m_planetController )
+		{
+			if ( planetController.m_planet == null )
+			{
+				continue;
+			}
+
+			planetsInSystem++;
+
+			var generator = planetController.GetPlanetGenerator();
+
+			if ( ( generator != null ) && generator.m_mapsGenerated && ( generator.m_albedoTexture != null ) )
+			{
+				planetsWithMaps++;
+			}
+		}
+
+		var victimAborted = victim.GetPlanetGenerator().m_abort;
+		var exceptions = s_exceptionCount - exceptionsBeforeSystem;
+		var errors = s_planetErrors - errorsBeforeSystem;
+		var paused = SpaceflightController.m_instance.m_gameIsPaused;
+
+		Application.logMessageReceived -= CountPlanetErrors;
+
+		Log( "M17 star system with an unreadable file for planet " + victim.m_planet.m_id + ": finished " + finished + " after " + seconds.ToString( "F2" ) + " s and " + frames + " frames, exceptions " + exceptions + ", errors logged " + errors + ", that planet aborted " + victimAborted + ", planets with maps " + planetsWithMaps + " of " + planetsInSystem + ", popup still up " + PopupController.m_instance.IsActive() + ", game paused " + paused );
+
+		Check( "M17 a star system with one unreadable planet file still finishes generating", finished && !paused && ( exceptions == 0 ), "finished " + finished + " after " + seconds.ToString( "F2" ) + " s, exceptions " + exceptions + ", paused " + paused );
+		Check( "M17 only the planet with the unreadable file goes without maps, and the game says so once", victimAborted && ( planetsWithMaps == planetsInSystem - 1 ) && ( errors == 1 ), "that planet aborted " + victimAborted + ", planets with maps " + planetsWithMaps + " of " + planetsInSystem + ", errors logged " + errors );
+
+		var aborted = 0;
+		var threw = 0;
+
+		for ( var i = 0; i < real; i++ )
+		{
+			aborted += ( results[ i ].m_abort && !results[ i ].m_mapsGenerated && ( results[ i ].m_throws == 0 ) ) ? 1 : 0;
+			threw += ( results[ i ].m_throws > 0 ) ? 1 : 0;
+		}
+
+		Finish( "scenario=m17 badFiles=" + real + " abortedCleanly=" + aborted + " threw=" + threw + " realFileGenerated=" + results[ real ].m_mapsGenerated + " allFiles=[read " + filesRead + " refused " + filesRefused + "] system=[finished " + finished + " exceptions " + exceptions + " errors " + errors + " maps " + planetsWithMaps + "/" + planetsInSystem + " paused " + paused + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

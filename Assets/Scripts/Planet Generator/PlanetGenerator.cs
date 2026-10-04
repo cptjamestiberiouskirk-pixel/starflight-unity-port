@@ -23,6 +23,9 @@ public class PlanetGenerator
 
 	const float c_normalScale = 256.0f;
 
+	// the largest prepared map a planet file may ask for (every file the planet generator has made so far has prepared maps of 48 by 32)
+	const int c_maximumPreparedMapSize = 4096;
+
 	// the planet
 	GD_Planet m_planet;
 
@@ -147,11 +150,28 @@ public class PlanetGenerator
 				// the planet data is being processed on another thread - never wait for it here (this is the main thread, and waiting would freeze the game and the progress bar until the planet is done)
 				if ( m_asyncTask.IsCompleted )
 				{
-					// the processing is over - this throws what the processing threw if it failed (as waiting for it did)
-					m_asyncTask.Wait();
+					// did the processing fail? (it throws when the planet data is damaged or was made by another version of the planet generator)
+					if ( m_asyncTask.Status != TaskStatus.RanToCompletion )
+					{
+						// yes - say what went wrong (nothing else would, an exception on another thread is not logged by itself)
+						var exception = ( m_asyncTask.Exception != null ) ? m_asyncTask.Exception.GetBaseException() : null;
 
-					// carry on with the steps that have to be done on the main thread
-					m_step = 20;
+						Debug.LogError( "The maps for planet " + m_planet.m_id + " could not be generated - " + ( ( exception != null ) ? exception.ToString() : "the processing was canceled" ) );
+
+						// abort - we have no usable planet data for this planet! (throwing here instead would stop the star system from ever finishing its planets)
+						m_step = -1;
+						m_abort = true;
+
+						// whatever the processing got done before it failed is of no use
+						FreeProcessingBuffers();
+
+						m_elevation = null;
+					}
+					else
+					{
+						// no - carry on with the steps that have to be done on the main thread
+						m_step = 20;
+					}
 				}
 
 				break;
@@ -191,20 +211,7 @@ public class PlanetGenerator
 				m_mapsGenerated = true;
 
 				// free up memory (but keep the elevation buffer)
-				m_preparedHeightMap = null;
-				m_preparedColorMap = null;
-
-				m_differenceBuffer = null;
-
-				m_albedoMap = null;
-				m_specularMap = null;
-				m_normalMap = null;
-				m_waterMaskMap = null;
-
-				m_albedoPixels = null;
-				m_specularPixels = null;
-				m_normalPixels = null;
-				m_waterMaskPixels = null;
+				FreeProcessingBuffers();
 
 				break;
 		}
@@ -212,12 +219,47 @@ public class PlanetGenerator
 		return m_progress;
 	}
 
-	public void AsyncProcess( byte[] bytes )
+	// lets go of everything that is only needed while the maps are being generated
+	void FreeProcessingBuffers()
 	{
-		var progressStepSize = 0.5f / 12.0f;
+		m_preparedHeightMap = null;
+		m_preparedColorMap = null;
 
-		m_progress += progressStepSize;
+		m_differenceBuffer = null;
 
+		m_albedoMap = null;
+		m_specularMap = null;
+		m_normalMap = null;
+		m_waterMaskMap = null;
+
+		m_albedoPixels = null;
+		m_specularPixels = null;
+		m_normalPixels = null;
+		m_waterMaskPixels = null;
+	}
+
+	// reads exactly the number of bytes asked for (a single read is allowed to come back with fewer) - this throws if the data ends first
+	static void ReadExactly( Stream stream, byte[] buffer, int count )
+	{
+		var offset = 0;
+
+		// every pass either reads at least one byte or throws, so this ends after at most count passes
+		while ( offset < count )
+		{
+			var bytesRead = stream.Read( buffer, offset, count - offset );
+
+			if ( bytesRead <= 0 )
+			{
+				throw new EndOfStreamException( "the planet data ends after " + offset + " of the " + count + " bytes of its difference buffer" );
+			}
+
+			offset += bytesRead;
+		}
+	}
+
+	// decompresses the planet data and reads it - this throws if the data is damaged or is not what this version of the planet generator expects for this planet
+	void ReadPlanetData( byte[] bytes )
+	{
 		// decompress the planet data
 		using ( var memoryStream = new MemoryStream( bytes ) )
 		{
@@ -229,7 +271,8 @@ public class PlanetGenerator
 
 				if ( version != c_versionNumber )
 				{
-					m_abort = true;
+					// this file was made by another version of the planet generator - nothing after this number can be trusted
+					throw new InvalidDataException( "the planet data is version " + version + " and this is version " + c_versionNumber + " of the planet generator" );
 				}
 				else
 				{
@@ -257,6 +300,12 @@ public class PlanetGenerator
 
 					var preparedMapWidth = binaryReader.ReadInt32();
 					var preparedMapHeight = binaryReader.ReadInt32();
+
+					// never allocate maps of a size that only damaged data can ask for
+					if ( ( preparedMapWidth < 1 ) || ( preparedMapWidth > c_maximumPreparedMapSize ) || ( preparedMapHeight < 1 ) || ( preparedMapHeight > c_maximumPreparedMapSize ) )
+					{
+						throw new InvalidDataException( "the prepared maps of the planet data are " + preparedMapWidth + " by " + preparedMapHeight );
+					}
 
 					m_preparedHeightMap = new float[ preparedMapHeight, preparedMapWidth ];
 
@@ -299,11 +348,28 @@ public class PlanetGenerator
 
 						m_differenceBuffer = new byte[ differenceBufferSize ];
 
-						gZipStream.Read( m_differenceBuffer, 0, differenceBufferSize );
+						// a file that was cut off must not leave the rest of the buffer empty without anybody noticing
+						ReadExactly( gZipStream, m_differenceBuffer, differenceBufferSize );
+					}
+
+					// that was everything, so the data has to end here - reading on to its end is also what makes the decompressor compare the data with the checksum at the end of the file (it throws if they differ)
+					if ( gZipStream.ReadByte() != -1 )
+					{
+						throw new InvalidDataException( "there is more planet data than this planet should have" );
 					}
 				}
 			}
 		}
+	}
+
+	public void AsyncProcess( byte[] bytes )
+	{
+		var progressStepSize = 0.5f / 12.0f;
+
+		m_progress += progressStepSize;
+
+		// decompress and read the planet data (if this or anything after it throws, the main thread sees the failed task and aborts this planet)
+		ReadPlanetData( bytes );
 
 		// gas giant or not?
 		if ( m_planet.IsGasGiant() )
