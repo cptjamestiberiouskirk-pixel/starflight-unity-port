@@ -41,7 +41,7 @@ Each scene controller (`IntroController`, `StarportController`, `SpaceflightCont
 - **GameData** (`Scripts/Game Data/`, `GD_*` classes): immutable definitions parsed with `JsonUtility` from `Assets/Resources/Starflight Game Data.json`, then post-processed by `GameData.Initialize()`. Access via `DataController.m_instance.m_gameData`.
 - **PlayerData** (`Scripts/Player Data/`, `PD_*` classes): save state. Access via `DataController.m_instance.m_playerData`. Each `PD_*` has a `Reset()` that builds new-game state (and reads GameData, so DataController must exist).
 
-Saves go through `ISaveSystem` → `JsonSaveSystem`, writing `Application.persistentDataPath/{fileName}{slot}.json` (5 slots) with **`JsonUtility`**. Consequences:
+Saves go through `ISaveSystem` → `JsonSaveSystem`, writing `Application.persistentDataPath/{fileName}{slot}.json` (5 slots) with **`JsonUtility`**. A save is written to `.tmp` and swapped in, the save it replaces is kept as `.bak`, loading falls back to the backup, and a save that can't be read is moved to `.corrupt`. `JsonSaveSystem` takes an optional directory, so it can be exercised away from the real saves. Consequences:
 - Only Unity-serializable fields persist. Dictionaries, properties, and multi-dimensional arrays are silently dropped (e.g. `PD_General.m_lastCommIds` used to be `int[,]` and lost its data on every load; it's now a flat `int[]` behind `GetLastCommId()` / `SetLastCommId()`).
 - `PlayerData.c_currentVersion`: any slot with a different version is **reset to a new game** on load. Bump it only for intentionally breaking `PD_*` changes; otherwise add backward-compat null/length checks for fields missing from older saves.
 - Enums are stored as ints — append new values, never reorder.
@@ -92,4 +92,4 @@ From `.github/copilot-instructions.md` (project rules):
 - `.claude/` and `AGENTS.md` are gitignored.
 - Commits use conventional-commit messages. Feature changes also update `CHANGELOG.md` (Keep a Changelog format) and `README.md` (see `.github/prompts/commitall.prompt.md`).
 - `PROJECT_ANALYSIS_REPORT.md` is a point-in-time report; several bugs it lists were fixed in later commits, so re-verify line numbers before acting on it.
-- `CODE_REVIEW_2026-10-03.md` is the newer full review: open findings by id (H5-H8, M5-M27 and a Low list), what has been fixed since, and the status of each `PROJECT_ANALYSIS_REPORT.md` item. Re-verify line numbers there too.
+- `CODE_REVIEW_2026-10-03.md` is the newer full review: open findings by id (H5, H7, H8, M10-M12, M16-M20, M23, M25-M27 and a Low list), what has been fixed since and how each fix was checked, and the status of each `PROJECT_ANALYSIS_REPORT.md` item. Re-verify line numbers there too.
