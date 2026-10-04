@@ -1,6 +1,6 @@
 # Code review, 2026-10-03
 
-Review of `master` at 4648ce3. Items fixed since then are listed under "Fixed since the review"; everything else in this file is still open as of PR #32 (2026-10-04).
+Review of `master` at 4648ce3. Items fixed since then are listed under "Fixed since the review"; everything else in this file is still open as of PR #39 (2026-10-04).
 
 **Scope:** all of `Assets/Scripts` (225 files, about 32k lines), plus `Assets/Planet Generator/Editor`, `Assets/Tools/Editor` and `Assets/Shaders/Editor`.
 
@@ -58,6 +58,10 @@ Fixed in PR #3 (bf0b1a7) unless noted. None of these changed the save version.
 | M23 (PR #29) | `DescendButton.Update` returned false, so the console stayed live for the whole landing (35 s, not the 12 s first estimated) and Abort brought the bridge buttons back in the middle of the descent; it returns true now, as the launch does |
 | (PR #30) | The Descend button printed "Autopilot engaged. Descending..." and "Safe landing, captain." on a 12 s timer, on top of the landing animation's own messages, so the first appeared twice and the second 23 s before the ship was down; the button now only prints "Topography net locked on." |
 | Low (PR #32) | Missiles in flight outlived the encounter they were fired in and still did their damage on arrival: an alien missile hit the player in the next encounter, and a player missile damaged the ship with the same index there. The encounter now takes every missile out of the air when it begins and when it ends (`CombatController.ClearMissiles`) |
+| M11 (PR #33) | The status display measured the armor against 1500 points and the shields against 2500, so an undamaged new ship read "83% Hull Damage". The Damage report and the Repair button took the maximum from the armor plating, which is 0 with none installed, so the bare hull's 250 points could not be repaired. `PD_PlayerShip.GetMaximumArmorPoints()` and `GetMaximumShieldPoints()` are the one source now, the engineer repairs a bare hull, and the hull breach warning comes below a quarter of the maximum instead of below a fixed 250 points |
+| M18 (PR #36) | `PlanetGenerator.Process` called `Task.Wait()` on the main thread, so the game stood still while each planet was processed and the progress bar moved once per planet; it looks at `IsCompleted` each frame now |
+| M17 (PR #37) | A planet file that could not be read made `Process` throw on every frame, which left the game paused for good in the middle of generating the star system, and a file cut off inside its difference buffer was accepted with no error. A failed task now aborts that planet with an error in the log, and `ReadPlanetData` checks the version, the map size, that all of the data is there and nothing more, and the checksum. The review had the trigger as INFERRED; it was reproduced with bad files made in memory |
+| M16 (PR #39) | The textures of every planet of every star system visited stayed in memory, with the planet files, and the maps of the last system outlived even the scene change. `PlanetGenerator.Release()` destroys them: `Planet` calls it once the maps of the next planet are on the material, at once for an orbit that is empty in the new system, and in `OnDestroy`. The planet file is unloaded as soon as its bytes are copied |
 | Low (PR #14) | `Viewport` fade wrote into the shared `Black.mat` asset on every play session in the Editor |
 | (PR #2) | `PD_General.m_lastCommIds` (`int[,]`) was never saved; three compile errors from 70445da |
 | (PR #4) | `com.unity.ai.generators` (deprecated) and `com.unity.2d.enhancers` removed |
@@ -73,6 +77,12 @@ On 2026-10-03 the fixes were run in a headless play-mode probe: the real Spacefl
 - **PR #21 to #26 (batch 2):** H5, M19, H7, M12, M20 and H8 were each run before and after the change, through the real buttons or the real fire and damage methods. The design of each was decided by the project owner on 2026-10-03. Where the original design notes give no number (hit points per class, the repair and treatment rates, the fuel per shot), the number is a named constant in the code.
 - **PR #28 to #30 (2026-10-04):** M10, M23 and the landing messages were each run before and after the change through the real flow: into orbit, down to the surface, the Disembark and Cargo buttons, and the button controller with the stick or the fire button held for one frame.
 - **PR #32 (2026-10-04):** the missile fix was run before and after in both directions (an alien missile and a player missile in the air when the player leaves), together with a check that missiles still hit inside their own encounter.
+- **PR #33 to #39 (2026-10-04):** M11, M18, M17 and M16 were each run before and after the change with a scenario of their own (`m11`, `m18`, `m17`, `m16`), which are in the probe in the repository.
+  - M18 was measured from a coroutine while a planet was being processed: 5 frames for 5 planets before, more than 1000 after.
+  - M17 was run with eight kinds of bad file made in memory from a real one, and with one of them given to a planet of the real star system. All 811 planet files of the project pass the stricter reader.
+  - M16 was flown through four changes of star system: the textures made at runtime went from 22 MB to 69 MB before and stayed at 22 MB after. The probe has no graphics device, so graphics memory is not in those numbers.
+  - The whole set of 24 scenarios was run on the final tree.
+  - Since M18 the probe waits for the first star system's planets before it starts a scenario (PR #38). Before that, scenarios started while the game was still paused for the generation, and two of them reported smaller numbers than they should have.
 - **Not done:** nothing was played by hand in the GUI Editor, and the probe has no graphics.
 
 ## Regressions from earlier "fix" commits
@@ -91,12 +101,8 @@ None open. H1 to H8 are all under "Fixed since the review".
 
 | # | Where | Problem and failure | Fix | Label | Checked |
 |---|---|---|---|---|---|
-| M11 | `StatusDisplay.cs:57-60, 138-141`; `DamageButton`, `RepairButton` | The gauges use hard-coded maxima of 1500/2500. A new ship shows "83% Hull Damage", and class-0 armor (250 points) shows "None installed" and can't be repaired. | One source of truth for max armor and shields. | CONFIRMED | no |
-| M16 | `Planet.cs:93`, `PlanetGenerator.cs:517-616` | The old generator's runtime textures are never destroyed: roughly 40 MB or more leaked per star system until docking. | `PlanetGenerator.Release()` plus `Resources.UnloadAsset`. | CONFIRMED (2 reviewers) | no |
-| M17 | `PlanetGenerator.cs:139-223` | No try/catch in the async task, and the version-mismatch path falls through. A bad or corrupt planet file soft-locks the game on the penetration popup, and the auto-save makes it permanent. Latent: all 811 shipped files are valid. | Catch, then abort and return; poll `IsCompleted`. | CONFIRMED path / INFERRED trigger | no |
-| M18 | `PlanetGenerator.cs:146` | `Task.Wait()` runs on the main thread the next frame, so all planet processing blocks it and the progress bar freezes. | Poll `IsCompleted`. | CONFIRMED | no |
 | M25 | `PG_AlbedoMap.cs:120, 128-146` | The x blur's `x0 == x1`, so it's asymmetric. The y blur allocates 32 MB, then its result is thrown away. | Fix x0 and delete the y blur (slight visual change). | CONFIRMED | no |
-| M26 | `PG_EditorWindow.cs:766-768` (editor) | The south-pole padding reads the north row's heights. This is baked into every generated `.bytes` file. | Use row `c_height - 1`. Takes effect only after regenerating the files. | CONFIRMED | no |
+| M26 | `PG_EditorWindow.cs:766-768` (editor) | The south-pole padding reads the north row's heights. This is baked into every generated `.bytes` file. Checked against the files on 2026-10-04: in all 811 the south pole row is what this code computes, and the fix would change it for 273 planets, by 0.21 of the height range at the median and 0.86 at the most (planet 349). | Use row `c_height - 1`. Takes effect only after regenerating the files. | CONFIRMED | yes |
 | M27 | `PG_EditorWindow.cs:228-297`, `PG_HydraulicErosion.cs:180` (editor) | The progress bar isn't cleared on exceptions, so the editor looks hung. Erosion has an unbounded loop when evaporation is 0, and a write race between threads. Zero-valued sliders produce NaN. | try/finally, iteration caps, validate settings. | CONFIRMED / INFERRED loop | no |
 
 ## Low
@@ -115,6 +121,7 @@ Grouped. All are CONFIRMED unless marked otherwise.
 - Encounters 144-146 match no star and default to star 0: `PD_Encounter.cs:67-80`.
 - `PlayerData.Reset` never calls `m_terrainVehicle.Reset()` (hidden by later refuels).
 - Stardate string depends on the culture: `PD_General.cs:222-223` (INFERRED).
+- A save made before PR #17 can hold more armor points than its armor allows (armor sold, points kept). The gauges of the status display clamp, but the Damage report then shows more than 100%, for example "Hull: 600% (1500/250)". Nothing cuts such a save back when it is loaded (found 2026-10-04 by reading, not run).
 
 **Encounters and combat**
 - Incoming messages show a raw `*` placeholder: `Encounter.cs:1566`.
@@ -138,13 +145,16 @@ Grouped. All are CONFIRMED unless marked otherwise.
 - A Scan during the 1.5 s of a deposit's transporter effect still counts and labels the deposit that was just picked up: `ScanButton.ScanNearbyObjects` (found 2026-10-04 by reading).
 - The Escape key opens the save panel during the landing and launch animations, and the animation and its events carry on behind the panel: `SpaceflightController.Update` (found 2026-10-04 by reading, not run).
 - `PG_Craters` re-initializes on every Spaceflight start, about 6M `GetPixel` calls: `PG_Craters.cs:11-32`.
-- Abort leaves a null elevation map that landing then dereferences: `Planet.cs:179-181` (INFERRED).
+- Abort leaves a null elevation map that landing then dereferences: `Planet.cs:179-181` (INFERRED). Since PR #37 a planet whose file cannot be read takes this path as well, so this is what a damaged planet file leads to now.
+- A planet whose maps could not be generated keeps the maps of the planet that was in its orbit in the star system before, and can be orbited as if nothing were wrong (found 2026-10-04 by reading).
 
 **Leaks and per-frame cost**
 - `TransporterEffect` materials are never destroyed.
 - `DockingBayPanel.UpdateOpacity` reads `.materials` every frame.
 - `StatusDisplay` and `TerrainVehicleDisplay` rebuild strings every frame.
 - `ShipsLog` row loops have no iteration cap (HYPOTHESIZED hang).
+- Generating the maps of one planet allocates roughly 170 MB of arrays on its background thread (the sum of the array sizes, not measured), and the managed heap was about 1.5 GB in the Editor while a star system was generated. With M18 fixed, two to four frames of 0.05 to 0.35 s are left per star system. In every run they coincided with a garbage collection, with the heap growing, or with a 32 MB allocation of the task (found 2026-10-04 by measuring with the `m18` scenario; that the collector is what stops the main thread is INFERRED, no profiler sample shows it).
+- `SpaceflightController.m_instance` is a static that is never cleared, so the objects of the Spaceflight scene stay reachable after the scene is unloaded, until the next Spaceflight scene replaces it. The planet maps are destroyed in `Planet.OnDestroy` since PR #39; anything else those objects hold on to still stays (found 2026-10-04 with the `m16` scenario: 9 planet maps were alive after the scene change on the old code. How many of them were held by the game and how many by the probe's own variables was not taken apart).
 
 **Assets**
 - 80 asset references in scenes, prefabs and materials point at assets that are not in the repository (found by cross-referencing GUIDs, 2026-10-03). Examples: the Debris mask in `SensorsDisplay.m_maskTextures` (index 24) in `Spaceflight.unity`, textures on several ship and planet materials, and objects in `Test.unity` and `Ecosystem.unity`. Most are harmless empty slots; none has been checked one by one.
@@ -178,6 +188,7 @@ Grouped. All are CONFIRMED unless marked otherwise.
 - `TerrainVehicle.cs:344` `if ( false && ... )`.
 - `Encounter.LeaveEncounterAfterVictory` has no callers.
 - `TerrainVehicleCargoDisplay`, `TerrainRuins` and `TerrainArtifact` aren't wired into any scene.
+- `PlanetGenerator.m_legendTexture` is never assigned (found 2026-10-04).
 
 ## Status of `PROJECT_ANALYSIS_REPORT.md` items
 
