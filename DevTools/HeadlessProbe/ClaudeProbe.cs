@@ -503,6 +503,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioDeposits();
 				break;
 
+			case "unmapped":
+				yield return ScenarioUnmapped();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -7859,6 +7863,206 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "deposits: the ship takes what fits and the rest stays in the terrain vehicle (control)", ( shipFreeAfter == shipFreeBefore - expectedMoved ) && ( shipFreeAfter >= 0 ) && ( leftInVehicle == holdSize - expectedMoved ), "moved " + ( shipFreeBefore - shipFreeAfter ) + " tenths (should be " + expectedMoved + "), left in the vehicle " + leftInVehicle );
 
 		Finish( "scenario=deposits count=" + deposits.Length + " sizes=" + smallest + ".." + largest + " total=" + total + " placement=" + placement + " first=" + firstVolume + "/" + cargoAfterFirst + " toFill=" + pickups + " hold=" + holdUsed + "/" + holdSize + " ship=" + shipFreeBefore + "->" + shipFreeAfter + " leftInVehicle=" + leftInVehicle + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- rulings of 2026-10-05: a planet whose maps could not be generated looks plain and says so, and a game loaded in the terrain vehicle on such a planet goes back into orbit
+
+	// "2048x1024" for a texture, "none" for no texture
+	static string SizeOf( Texture texture )
+	{
+		return ( texture == null ) ? "none" : ( texture.width + "x" + texture.height );
+	}
+
+	// what Planet.CouldNotBeMapped says about a planet ("no such method" on code that does not have it)
+	static string CouldNotBeMapped( Planet planetController )
+	{
+		var method = typeof( Planet ).GetMethod( "CouldNotBeMapped", c_any );
+
+		return ( method == null ) ? "no such method" : method.Invoke( planetController, null ).ToString();
+	}
+
+	IEnumerator ScenarioUnmapped()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var starSystem = controller.m_starSystem;
+		var messages = controller.m_messages;
+
+		EnsureCrew();
+
+		// the maps planet 90 has on its material now (the real ones, from when the star system was entered)
+		var realAlbedo = starSystem.GetPlanetController( 90 ).GetMaterial().GetTexture( "_MainTex" );
+		var realAlbedoSize = SizeOf( realAlbedo );
+
+		// ---- 1. the star system is generated again, and this time the file of planet 90 cannot be read
+		var garbage = new byte[ 4096 ];
+
+		new System.Random( 12345 ).NextBytes( garbage );
+
+		RegeneratePlanets();
+
+		var badPlanet = starSystem.GetPlanetController( 90 );
+
+		StartProcessing( badPlanet.GetPlanetGenerator(), garbage );
+
+		var start = Time.realtimeSinceStartup;
+
+		while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 30.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		if ( starSystem.GeneratingPlanets() || !badPlanet.GetPlanetGenerator().m_abort )
+		{
+			Finish( "scenario=unmapped abort: planet 90 was not left without maps", 2 );
+			yield break;
+		}
+
+		var material = badPlanet.GetMaterial();
+		var albedo = material.GetTexture( "_MainTex" );
+		var specular = material.GetTexture( "SF_SpecularMap" );
+		var normal = material.GetTexture( "SF_NormalMap" );
+		var waterMask = material.GetTexture( "SF_WaterMaskMap" );
+
+		var albedoSize = SizeOf( albedo );
+		var keepsTheOldMaps = ( albedo != null ) && ReferenceEquals( albedo, realAlbedo );
+		var oldMapsDestroyed = ( realAlbedo == null );
+		var albedoColor = "";
+
+		if ( ( albedo is Texture2D albedoTexture ) && albedoTexture.isReadable && ( albedoTexture.width <= 16 ) )
+		{
+			var pixel = albedoTexture.GetPixel( 1, 1 );
+
+			albedoColor = pixel.r.ToString( "F2" ) + "/" + pixel.g.ToString( "F2" ) + "/" + pixel.b.ToString( "F2" );
+		}
+
+		var goodAlbedoSize = SizeOf( starSystem.GetPlanetController( 94 ).GetMaterial().GetTexture( "_MainTex" ) );
+		var hasMaps = badPlanet.HasMaps();
+		var couldNotBeMapped = CouldNotBeMapped( badPlanet );
+		var goodCouldNotBeMapped = CouldNotBeMapped( starSystem.GetPlanetController( 94 ) );
+
+		Log( "unmapped: planet 90 had an albedo map of " + realAlbedoSize + "; with a file that cannot be read its material has: albedo " + albedoSize + ( ( albedoColor == "" ) ? "" : " (" + albedoColor + ")" ) + ", specular " + SizeOf( specular ) + ", normal " + SizeOf( normal ) + ", water mask " + SizeOf( waterMask ) + " | still the maps from before " + keepsTheOldMaps + ", those destroyed " + oldMapsDestroyed + " | HasMaps " + hasMaps + ", CouldNotBeMapped " + couldNotBeMapped + " | planet 94: albedo " + goodAlbedoSize + ", CouldNotBeMapped " + goodCouldNotBeMapped );
+
+		Check( "unmapped: a planet whose maps could not be generated gets plain maps, not the ones that were on its material", !keepsTheOldMaps && oldMapsDestroyed && ( albedoSize == "4x4" ) && ( SizeOf( specular ) == "4x4" ) && ( SizeOf( normal ) == "4x4" ) && ( SizeOf( waterMask ) == "4x4" ), "albedo " + albedoSize + " " + albedoColor + ", specular " + SizeOf( specular ) + ", normal " + SizeOf( normal ) + ", water mask " + SizeOf( waterMask ) + ", old maps kept " + keepsTheOldMaps + ", destroyed " + oldMapsDestroyed );
+		Check( "unmapped: it still has no maps to land on, and the other planets have theirs (control)", !hasMaps && ( goodAlbedoSize == "2048x1024" ), "HasMaps " + hasMaps + ", planet 94 albedo " + goodAlbedoSize );
+		Check( "unmapped: the planet says that it could not be mapped, the others do not", ( couldNotBeMapped == "True" ) && ( goodCouldNotBeMapped == "False" ), "planet 90 " + couldNotBeMapped + ", planet 94 " + goodCouldNotBeMapped );
+
+		// ---- 2. flying up to it in the star system
+		playerData.m_general.m_lastStarSystemCoordinates = badPlanet.transform.localPosition;
+
+		SetField( starSystem, "m_planetToOrbitId", -1 );
+
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+
+		var rangeMessage = MessageList();
+		var locationAtThePlanet = playerData.m_general.m_location;
+
+		// ---- 3. into orbit around it
+		yield return EnterOrbit( 90 );
+
+		var orbitMessage = MessageList();
+		var orbitAlbedoSize = SizeOf( controller.m_inOrbit.m_planetModel.material.GetTexture( "_MainTex" ) );
+
+		Log( "unmapped: next to planet 90 in the star system (" + locationAtThePlanet + "): " + rangeMessage );
+		Log( "unmapped: in orbit around planet 90 (" + playerData.m_general.m_location + "): " + orbitMessage + " | the albedo map of the planet model in orbit is " + orbitAlbedoSize );
+
+		Check( "unmapped: within orbital range the player is told that the planet could not be mapped", rangeMessage.Contains( "within orbital range" ) && rangeMessage.Contains( "could not be mapped" ), rangeMessage );
+		Check( "unmapped: in orbit the player is told so too, and the planet model has the plain maps", orbitMessage.Contains( "Orbit established" ) && orbitMessage.Contains( "could not be mapped" ) && ( orbitAlbedoSize == "4x4" ), orbitMessage + " | albedo " + orbitAlbedoSize );
+
+		// a planet with maps gets no such message (control)
+		yield return EnterOrbit( 94 );
+
+		var goodOrbitMessage = MessageList();
+
+		Check( "unmapped: in orbit around a planet with maps there is no such message (control)", goodOrbitMessage.Contains( "Orbit established" ) && !goodOrbitMessage.Contains( "could not be mapped" ), goodOrbitMessage );
+
+		// ---- 4. a game that was saved in the terrain vehicle on planet 90 is loaded after the planet's file has been damaged:
+		// the spaceflight scene switches to the saved location, which generates the planets and shows the disembarked location (done here by hand, with the file of planet 90 unreadable)
+		playerData.m_general.m_currentPlanetId = 90;
+		playerData.m_general.m_currentSpeed = 12.0f;
+
+		playerData.m_terrainVehicle.AddElement( 6, 30 );
+
+		var shipFreeBefore = playerData.m_playerShip.GetRemainingVolume();
+		var vehicleCargoBefore = TerrainVehicleCargo( 6 );
+		var exceptionsBefore = s_exceptionCount;
+
+		SetField( starSystem, "m_currentStar", null );
+
+		controller.SwitchLocation( PD_General.Location.Disembarked );
+
+		StartProcessing( starSystem.GetPlanetController( 90 ).GetPlanetGenerator(), garbage );
+
+		var locationWhileGenerating = playerData.m_general.m_location;
+
+		start = Time.realtimeSinceStartup;
+
+		while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 30.0f ) )
+		{
+			yield return null;
+		}
+
+		// a second of play after the load
+		yield return Frames( 60 );
+
+		var locationAfterLoad = playerData.m_general.m_location;
+		var exceptionsAfterLoad = s_exceptionCount - exceptionsBefore;
+		var messageAfterLoad = MessageList();
+		var vehicleCargoAfter = TerrainVehicleCargo( 6 );
+		var shipFreeAfter = playerData.m_playerShip.GetRemainingVolume();
+		var saved = Stored( dataController.m_activeSaveGameSlotNumber );
+		var savedLocation = ( saved == null ) ? "nothing saved" : saved.m_general.m_location.ToString();
+		var console = Console();
+		var followed = controller.m_playerCamera.GetCameraFollowGameObject();
+		var speedAfterLoad = playerData.m_general.m_currentSpeed;
+
+		// the plain maps of the first part were replaced by those of this generation (plain ones again) - they must not stay in memory
+		var firstPlainMapsDestroyed = ( albedo == null ) && ( specular == null ) && ( normal == null ) && ( waterMask == null );
+		var albedoAfterLoad = SizeOf( starSystem.GetPlanetController( 90 ).GetMaterial().GetTexture( "_MainTex" ) );
+
+		Log( "unmapped: the four maps planet 90 had on its material after the first part are destroyed now: " + firstPlainMapsDestroyed + " (its albedo map now: " + albedoAfterLoad + ")" );
+
+		Check( "unmapped: the plain maps are destroyed when the planet gets new ones", firstPlainMapsDestroyed && ( albedoAfterLoad == "4x4" ), "destroyed " + firstPlainMapsDestroyed + ", albedo now " + albedoAfterLoad );
+
+		Log( "unmapped: loaded in the terrain vehicle on planet 90 (" + locationWhileGenerating + " while the planets were generated): a second later the location is " + locationAfterLoad + ", exceptions " + exceptionsAfterLoad + ", the save says " + savedLocation + ", console " + console + ", the camera follows " + ( ( followed == null ) ? "nothing" : followed.name ) + ", speed " + speedAfterLoad.ToString( "F1" ) );
+		Log( "unmapped: messages after the load: " + messageAfterLoad );
+		Log( "unmapped: the terrain vehicle carried " + vehicleCargoBefore + " tenths and carries " + vehicleCargoAfter + " now; the ship had room for " + shipFreeBefore + " and has room for " + shipFreeAfter );
+
+		Check( "unmapped: a game loaded in the terrain vehicle on a planet without maps is put back in orbit, and nothing throws", ( locationWhileGenerating == PD_General.Location.Disembarked ) && ( locationAfterLoad == PD_General.Location.InOrbit ) && ( exceptionsAfterLoad == 0 ) && ( savedLocation == "InOrbit" ) && ( followed == null ), "location " + locationAfterLoad + ", exceptions " + exceptionsAfterLoad + ", saved as " + savedLocation + ", camera follows " + ( ( followed == null ) ? "nothing" : followed.name ) );
+		Check( "unmapped: the player is told why", messageAfterLoad.Contains( "could not be mapped" ) && messageAfterLoad.Contains( "returned to orbit" ), messageAfterLoad );
+		Check( "unmapped: the cargo of the terrain vehicle comes on board with it, and it stands still", ( vehicleCargoBefore == 30 ) && ( vehicleCargoAfter == 0 ) && ( shipFreeAfter == shipFreeBefore - 30 ) && ( speedAfterLoad == 0.0f ), "vehicle " + vehicleCargoBefore + " -> " + vehicleCargoAfter + ", ship room " + shipFreeBefore + " -> " + shipFreeAfter + ", speed " + speedAfterLoad.ToString( "F1" ) );
+
+		// ---- 5. a game loaded in the terrain vehicle on a planet that has its maps stays there (control) - planet 94, the star system generated again from its real files
+		playerData.m_general.m_currentPlanetId = 94;
+
+		exceptionsBefore = s_exceptionCount;
+
+		SetField( starSystem, "m_currentStar", null );
+
+		controller.SwitchLocation( PD_General.Location.Disembarked );
+
+		start = Time.realtimeSinceStartup;
+
+		while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 30.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 30 );
+
+		var goodLocationAfterLoad = playerData.m_general.m_location;
+		var goodExceptions = s_exceptionCount - exceptionsBefore;
+
+		Log( "unmapped: loaded in the terrain vehicle on planet 94, which has its maps: location " + goodLocationAfterLoad + ", exceptions " + goodExceptions );
+
+		Check( "unmapped: a game loaded in the terrain vehicle on a planet with maps stays in the terrain vehicle (control)", ( goodLocationAfterLoad == PD_General.Location.Disembarked ) && ( goodExceptions == 0 ), "location " + goodLocationAfterLoad + ", exceptions " + goodExceptions );
+
+		Finish( "scenario=unmapped albedo=" + realAlbedoSize + "->" + albedoSize + " oldMapsKept=" + keepsTheOldMaps + " couldNotBeMapped=" + couldNotBeMapped + " rangeMessage=" + rangeMessage.Contains( "could not be mapped" ) + " orbitMessage=" + orbitMessage.Contains( "could not be mapped" ) + " loaded=" + locationAfterLoad + "/exceptions" + exceptionsAfterLoad + "/saved" + savedLocation + " cargo=" + vehicleCargoBefore + "->" + vehicleCargoAfter + " control=" + goodLocationAfterLoad + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

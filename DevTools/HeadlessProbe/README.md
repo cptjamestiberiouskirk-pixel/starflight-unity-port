@@ -86,9 +86,10 @@ What the probe does:
 | `editortools` | the textures in memory before and after the planet generator's four save functions, the shader inspector's compression test with a render texture in the normal map slot, and what an empty file name does to Path.GetDirectoryName |
 | `commlink` | hostile aliens before, during and after a comm link (Spemin scouts through the real `Connect` and `Disconnect`; the Uhlek with the comm flag set by hand, since they never talk), a player missile and an alien missile that run out of time (an explosion, no damage) next to a missile that arrives, and that `Encounter.LeaveEncounterAfterVictory` is gone (about 65 s) |
 | `deposits` | the size of all 762 deposits of planet 90 (1 to 5 cubic meters) with a checksum of where they are, so that two runs can be compared, a pickup through the real button, how many deposits fill the terrain vehicle's hold, the cargo display that is not in any scene, and what the ship's hold takes on the way back |
+| `unmapped` | a planet whose maps could not be generated (planet 90 with a file that cannot be read): the four maps on its material before and after, whether the maps from before are destroyed, the messages within orbital range and in orbit, and a game that is loaded in the terrain vehicle on that planet (where it ends up, the exceptions of its first second, its cargo, what is saved), with a planet that has its maps as the control |
 | `starport-savedata` | a save with more armor points than its armor allows is cut back when it is loaded (and one written with a destroyed ship still loads with 1 point), the dates of the bank, of the Operations notices and of their ship's log entries with the computer set to the Thai calendar, a ship's log entry dated by an older build after a load, and the starting balance of a build and of the Editor |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (46 scenarios, about 17 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (47 scenarios, about 17 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

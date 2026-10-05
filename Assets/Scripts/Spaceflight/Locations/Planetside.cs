@@ -163,7 +163,7 @@ public class Planetside : MonoBehaviour
 	}
 
 	// transfer all cargo from terrain vehicle to ship and refuel the terrain vehicle
-	void TransferTerrainVehicleCargo()
+	public void TransferTerrainVehicleCargo()
 	{
 		var playerData = DataController.m_instance.m_playerData;
 		var gameData = DataController.m_instance.m_gameData;
