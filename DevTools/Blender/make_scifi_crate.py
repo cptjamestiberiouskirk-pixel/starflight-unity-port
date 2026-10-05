@@ -85,8 +85,8 @@ def make_material(suffix, color, metallic, roughness, emission_strength=0.0):
     material.metallic = metallic
     material.roughness = roughness
 
-    # Blender 5 always uses nodes and deprecates the switch
-    if hasattr(material, "use_nodes") and not material.use_nodes:
+    # Blender 5 always uses nodes and deprecates the switch; even reading it there logs a DeprecationWarning
+    if bpy.app.version < (5, 0, 0) and not material.use_nodes:
         material.use_nodes = True
 
     tree = material.node_tree
