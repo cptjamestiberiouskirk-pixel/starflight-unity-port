@@ -511,6 +511,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioOrbit();
 				break;
 
+			case "erosion":
+				yield return ScenarioErosion();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -8359,6 +8363,145 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "orbit: an encounter with no living ships does not begin, and nothing threw", ( locationWithNoShipsLeft == "InOrbit" ) && ( exceptions == 0 ), locationWithNoShipsLeft + ", exceptions " + exceptions );
 
 		Finish( "scenario=orbit inOrbitEncounters=" + inOrbitEncounters + " withAPlanet=" + withAPlanet + " control=" + locationAtOtherPlanet + " begun=" + locationAtGuardedPlanet + "/" + currentEncounter + "/from" + cameFrom + " side=" + sideOfThePlanet.ToString( "F2" ) + " left=" + locationAfterLeaving + "/" + movedBy.ToString( "F0" ) + " again=" + locationSecondTime + " launch=" + locationTwoSecondsLater + "->" + locationAfterLaunch + "@" + encounterAfter.ToString( "F0" ) + "s noShips=" + locationWithNoShipsLeft + " exceptions=" + exceptions + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- ruling of 2026-10-05: the erosion pass of the planet generator tool gives the same result every time
+
+	// a number made from every bit of a height map (two maps with the same number are taken to be the same)
+	static long MapChecksum( float[,] map )
+	{
+		if ( map == null )
+		{
+			return -1;
+		}
+
+		long checksum = 17;
+
+		foreach ( var value in map )
+		{
+			checksum = ( checksum * 31 + BitConverter.ToInt32( BitConverter.GetBytes( value ), 0 ) ) % 1000000007L;
+
+			if ( checksum < 0 )
+			{
+				checksum += 1000000007L;
+			}
+		}
+
+		return checksum;
+	}
+
+	IEnumerator ScenarioErosion()
+	{
+		var erosionType = Type.GetType( "PG_HydraulicErosion, Assembly-CSharp-Editor" );
+
+		if ( erosionType == null )
+		{
+			Finish( "scenario=erosion abort: the planet generator tool was not found in the editor assembly", 2 );
+			yield break;
+		}
+
+		yield return Frames( 2 );
+
+		var erosion = Activator.CreateInstance( erosionType );
+		var process = erosionType.GetMethod( "Process", c_any );
+
+		// the tool's default settings: source, minimum elevation, xy scale, z scale, rain, sediment capacity, gravity, friction, evaporation, deposition, dissolving, step delta time, final blur radius
+		object[] Arguments( float[,] map )
+		{
+			return new object[] { map, 0.0f, 10.0f, 400.0f, 1.0f, 100.0f, -9.8f, 0.5f, 1.0f, 5.0f, 4.0f, 0.005f, 3 };
+		}
+
+		// a bowl sends every drop towards the middle of the map. The tool rains on eight parts of the map, and when it does that at the same time
+		// all eight write to the same cells in the middle - that is where an update gets lost
+		const int c_runs = 6;
+
+		var checksums = new long[ c_runs ];
+		var seconds = new float[ c_runs ];
+		var distinct = new HashSet<long>();
+		var failed = 0;
+
+		for ( var run = 0; run < c_runs; run++ )
+		{
+			var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+			float[,] result = null;
+
+			try
+			{
+				result = process.Invoke( erosion, Arguments( Bowl( 256, 128 ) ) ) as float[,];
+			}
+			catch ( Exception exception )
+			{
+				Log( "erosion: run " + run + " threw " + ( ( exception.InnerException != null ) ? exception.InnerException.GetType().Name : exception.GetType().Name ) );
+			}
+
+			seconds[ run ] = stopwatch.ElapsedMilliseconds / 1000.0f;
+			checksums[ run ] = MapChecksum( result );
+
+			if ( result == null )
+			{
+				failed++;
+			}
+
+			distinct.Add( checksums[ run ] );
+
+			yield return null;
+		}
+
+		var checksumText = string.Join( " ", checksums );
+		var secondsText = "";
+		var total = 0.0f;
+
+		foreach ( var value in seconds )
+		{
+			secondsText += value.ToString( "F2" ) + " ";
+
+			total += value;
+		}
+
+		// the same once more on rough ground, where the drops go their own ways (a second kind of map, same question)
+		var rough = new float[ 128, 256 ];
+
+		var roughRandom = new System.Random( 4242 );
+
+		for ( var y = 0; y < 128; y++ )
+		{
+			for ( var x = 0; x < 256; x++ )
+			{
+				rough[ y, x ] = 0.3f + 0.4f * (float) roughRandom.NextDouble();
+			}
+		}
+
+		var roughDistinct = new HashSet<long>();
+
+		for ( var run = 0; run < 3; run++ )
+		{
+			float[,] result = null;
+
+			try
+			{
+				result = process.Invoke( erosion, Arguments( (float[,]) rough.Clone() ) ) as float[,];
+			}
+			catch ( Exception exception )
+			{
+				Log( "erosion: rough run " + run + " threw " + ( ( exception.InnerException != null ) ? exception.InnerException.GetType().Name : exception.GetType().Name ) );
+			}
+
+			if ( result == null )
+			{
+				failed++;
+			}
+
+			roughDistinct.Add( MapChecksum( result ) );
+
+			yield return null;
+		}
+
+		Log( "erosion: " + c_runs + " runs of the erosion pass on the same 256 by 128 bowl with the default settings: " + distinct.Count + " different results (checksums " + checksumText + "), seconds per run " + secondsText.Trim() + " (" + ( total / c_runs ).ToString( "F2" ) + " on average), runs that gave no result " + failed + " | 3 runs on rough ground: " + roughDistinct.Count + " different results | processors " + Environment.ProcessorCount );
+
+		Check( "erosion: the same map and the same settings give the same result every time", ( failed == 0 ) && ( distinct.Count == 1 ) && ( roughDistinct.Count == 1 ), distinct.Count + " different results in " + c_runs + " runs on a bowl, " + roughDistinct.Count + " in 3 on rough ground, " + failed + " runs with no result" );
+
+		Finish( "scenario=erosion runs=" + c_runs + " distinct=" + distinct.Count + " roughDistinct=" + roughDistinct.Count + " checksum=" + checksums[ 0 ] + " secondsPerRun=" + ( total / c_runs ).ToString( "F2" ) + " processors=" + Environment.ProcessorCount + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
