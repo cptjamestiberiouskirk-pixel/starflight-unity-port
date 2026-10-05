@@ -233,6 +233,30 @@ public class Disembarked : MonoBehaviour
 		m_terrainVehicle.Initialize();
 	}
 
+	// call this when a game was loaded into the terrain vehicle on a planet whose maps can not be generated any more (its planet file has been damaged since the game was saved)
+	// there is no ground to drive on and the terrain vehicle can not even find its way back to the ship - so it comes back on board and the ship goes back into orbit
+	public void ReturnToOrbit()
+	{
+		// get to the player data
+		var playerData = DataController.m_instance.m_playerData;
+
+		// the terrain vehicle stands still
+		m_terrainVehicle.TurnOffEngines();
+
+		playerData.m_general.m_currentSpeed = 0.0f;
+
+		// take its cargo on board and refuel it, as on every return to the ship
+		SpaceflightController.m_instance.m_planetside.TransferTerrainVehicleCargo();
+
+		// back into orbit (this also saves the game, so the next load is in orbit)
+		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.InOrbit );
+
+		// tell the player what happened (the in orbit location has just said why)
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>The terrain vehicle is back on board and the ship has returned to orbit.</color>" );
+
+		SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+	}
+
 	public Vector3 ApplyElevation( Vector3 worldCoordinates, bool updateWheelEfficiency )
 	{
 		if ( m_planetGenerator != null )

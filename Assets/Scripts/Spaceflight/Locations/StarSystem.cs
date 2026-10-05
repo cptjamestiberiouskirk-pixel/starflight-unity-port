@@ -91,6 +91,12 @@ public class StarSystem : MonoBehaviour
 					// let the player know
 					SpaceflightController.m_instance.m_messages.Clear();
 					SpaceflightController.m_instance.m_messages.AddText( "<color=white>Ship is within orbital range.</color>" );
+
+					// say so if this is a planet whose maps could not be generated (that is why it is a plain grey ball)
+					if ( orbitPlanetController.CouldNotBeMapped() )
+					{
+						SpaceflightController.m_instance.m_messages.AddText( Planet.c_couldNotBeMappedMessage );
+					}
 				}
 			}
 			else if ( m_planetToOrbitId != -1 )
@@ -307,6 +313,31 @@ public class StarSystem : MonoBehaviour
 		return null;
 	}
 
+	// the planet controller of the planet the ship is at (null if it is not at a planet, or if that planet is not in this star system)
+	Planet GetCurrentPlanetController()
+	{
+		// get to the player data
+		var playerData = DataController.m_instance.m_playerData;
+
+		// only these three locations are at a planet
+		var location = playerData.m_general.m_location;
+
+		if ( ( location != PD_General.Location.InOrbit ) && ( location != PD_General.Location.Planetside ) && ( location != PD_General.Location.Disembarked ) )
+		{
+			return null;
+		}
+
+		foreach ( var planetController in m_planetController )
+		{
+			if ( ( planetController.m_planet != null ) && ( planetController.m_planet.m_id == playerData.m_general.m_currentPlanetId ) )
+			{
+				return planetController;
+			}
+		}
+
+		return null;
+	}
+
 	// call this to get th nearest planet controller to the player
 	public Planet GetNearestPlanetController()
 	{
@@ -385,6 +416,11 @@ public class StarSystem : MonoBehaviour
 			// get to the player data
 			var playerData = DataController.m_instance.m_playerData;
 
+			// the planet the ship is at (in orbit, on the surface or with the terrain vehicle out) - only a game that was just loaded is in one of those places while the planets are generated
+			var currentPlanetController = GetCurrentPlanetController();
+
+			var currentPlanetCouldNotBeMapped = ( currentPlanetController != null ) && currentPlanetController.CouldNotBeMapped();
+
 			if ( playerData.m_general.m_location == PD_General.Location.Planetside )
 			{
 				// if we are currently planetside then go ahead and update the terraing grid now
@@ -392,8 +428,22 @@ public class StarSystem : MonoBehaviour
 			}
 			else if ( playerData.m_general.m_location == PD_General.Location.Disembarked )
 			{
-				// if we are currently disembarked then go ahead and update the terrain grid now
-				SpaceflightController.m_instance.m_disembarked.UpdateTerrainGridNow();
+				// was the game saved in the terrain vehicle on a planet whose maps can not be generated any more (its planet file has been damaged since)?
+				if ( currentPlanetCouldNotBeMapped )
+				{
+					// yes - there is no ground to drive on, so the terrain vehicle comes back on board and the ship goes back into orbit
+					SpaceflightController.m_instance.m_disembarked.ReturnToOrbit();
+				}
+				else
+				{
+					// no - if we are currently disembarked then go ahead and update the terrain grid now
+					SpaceflightController.m_instance.m_disembarked.UpdateTerrainGridNow();
+				}
+			}
+			else if ( ( playerData.m_general.m_location == PD_General.Location.InOrbit ) && currentPlanetCouldNotBeMapped )
+			{
+				// the game was loaded in orbit around a planet whose maps could not be generated - the in orbit location could not know that when it was shown
+				SpaceflightController.m_instance.m_messages.AddText( Planet.c_couldNotBeMappedMessage );
 			}
 		}
 

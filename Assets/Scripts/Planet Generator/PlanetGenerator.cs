@@ -26,6 +26,9 @@ public class PlanetGenerator
 	// the largest prepared map a planet file may ask for (every file the planet generator has made so far has prepared maps of 48 by 32)
 	const int c_maximumPreparedMapSize = 4096;
 
+	// the width and height of the plain texture maps a planet gets whose maps could not be generated
+	const int c_placeholderTextureMapSize = 4;
+
 	// the planet
 	GD_Planet m_planet;
 
@@ -127,6 +130,52 @@ public class PlanetGenerator
 		}
 
 		texture = null;
+	}
+
+	// makes plain texture maps for a planet whose maps could not be generated, so that it can be shown as a featureless grey ball - call this on the main thread once this generator has aborted
+	// (these are not maps of the planet - m_mapsGenerated stays false and there is still no elevation data - but Release destroys them like any others)
+	public void CreatePlaceholderTextures()
+	{
+		// do this only once
+		if ( m_albedoTexture != null )
+		{
+			return;
+		}
+
+		// plain grey ground
+		m_albedoTexture = CreatePlainTexture( TextureFormat.RGB24, false, new Color( 0.35f, 0.35f, 0.35f ) );
+
+		// nothing shines
+		m_specularTexture = CreatePlainTexture( TextureFormat.RGBA32, true, new Color( 0.0f, 0.0f, 0.0f, 0.25f ) );
+
+		// no water anywhere
+		m_waterMaskTexture = CreatePlainTexture( TextureFormat.RGB24, true, Color.black );
+
+		// a flat surface (stored the way CreateNormalTexture stores a normal map - x in the alpha channel and y in the green channel)
+		m_normalTexture = CreatePlainTexture( TextureFormat.RGBA32, true, new Color( 0.0f, 0.5f, 0.0f, 0.5f ) );
+	}
+
+	// makes a small texture map of one color (set up like the generated texture maps)
+	static Texture2D CreatePlainTexture( TextureFormat textureFormat, bool linear, Color color )
+	{
+		var texture = new Texture2D( c_placeholderTextureMapSize, c_placeholderTextureMapSize, textureFormat, true, linear );
+
+		var pixels = new Color[ c_placeholderTextureMapSize * c_placeholderTextureMapSize ];
+
+		for ( var i = 0; i < pixels.Length; i++ )
+		{
+			pixels[ i ] = color;
+		}
+
+		texture.SetPixels( pixels );
+
+		texture.filterMode = FilterMode.Trilinear;
+		texture.wrapModeU = TextureWrapMode.Repeat;
+		texture.wrapModeV = TextureWrapMode.Clamp;
+
+		texture.Apply();
+
+		return texture;
 	}
 
 	public float Process()

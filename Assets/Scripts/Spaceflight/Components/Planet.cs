@@ -3,6 +3,9 @@ using UnityEngine;
 
 public class Planet : MonoBehaviour
 {
+	// what the player is told about a planet whose maps could not be generated
+	public const string c_couldNotBeMappedMessage = "<color=white>The surface of this planet could not be mapped.</color>";
+
 	// the current planet this controller owns
 	public GD_Planet m_planet;
 
@@ -218,15 +221,19 @@ public class Planet : MonoBehaviour
 		if ( m_planetGenerator.m_abort )
 		{
 			m_mapsGenerated = true;
+
+			// the maps of this planet could not be generated - show it as a plain grey ball
+			// (it used to keep the maps of the planet that was in this orbit in the star system before, as if they were its own)
+			m_planetGenerator.CreatePlaceholderTextures();
+
+			// plain means no surface detail either
+			m_material.DisableKeyword( "SF_DETAILNORMALMAP_ON" );
+
+			ShowTextureMaps();
 		}
 		else if ( m_planetGenerator.m_mapsGenerated )
 		{
 			m_mapsGenerated = true;
-
-			m_material.SetTexture( "_MainTex", m_planetGenerator.m_albedoTexture );
-			m_material.SetTexture( "SF_SpecularMap", m_planetGenerator.m_specularTexture );
-			m_material.SetTexture( "SF_NormalMap", m_planetGenerator.m_normalTexture );
-			m_material.SetTexture( "SF_WaterMaskMap", m_planetGenerator.m_waterMaskTexture );
 
 			// is this a gas giant?
 			if ( m_planet.IsGasGiant() )
@@ -252,20 +259,31 @@ public class Planet : MonoBehaviour
 				m_material.SetFloat( "SF_DetailNormalMapStrength", 0.05f );
 			}
 
-			m_meshRenderer.material = m_material;
-
-			// the maps of the planet that was shown before are off the material now, so destroy them (unity never frees a texture that was made at runtime by itself)
-			if ( m_shownPlanetGenerator != m_planetGenerator )
-			{
-				ReleaseShownMaps();
-
-				m_shownPlanetGenerator = m_planetGenerator;
-			}
-
-			SpaceflightController.m_instance.m_inOrbit.MaterialUpdated();
+			ShowTextureMaps();
 		}
 
 		return progress;
+	}
+
+	// puts the texture maps of the current planet generator on the material and destroys the ones that were on it
+	void ShowTextureMaps()
+	{
+		m_material.SetTexture( "_MainTex", m_planetGenerator.m_albedoTexture );
+		m_material.SetTexture( "SF_SpecularMap", m_planetGenerator.m_specularTexture );
+		m_material.SetTexture( "SF_NormalMap", m_planetGenerator.m_normalTexture );
+		m_material.SetTexture( "SF_WaterMaskMap", m_planetGenerator.m_waterMaskTexture );
+
+		m_meshRenderer.material = m_material;
+
+		// the maps of the planet that was shown before are off the material now, so destroy them (unity never frees a texture that was made at runtime by itself)
+		if ( m_shownPlanetGenerator != m_planetGenerator )
+		{
+			ReleaseShownMaps();
+
+			m_shownPlanetGenerator = m_planetGenerator;
+		}
+
+		SpaceflightController.m_instance.m_inOrbit.MaterialUpdated();
 	}
 
 	// get the current planet generator
@@ -278,6 +296,13 @@ public class Planet : MonoBehaviour
 	public bool HasMaps()
 	{
 		return ( m_planetGenerator != null ) && m_planetGenerator.m_mapsGenerated;
+	}
+
+	// true once it is known that the maps of this planet cannot be generated (its planet data is missing or damaged) - it is shown as a plain grey ball and has no surface to go down to
+	// (this is false while the maps are still being generated, so it is not the opposite of HasMaps)
+	public bool CouldNotBeMapped()
+	{
+		return ( m_planetGenerator != null ) && m_planetGenerator.m_abort;
 	}
 
 	// sets up the clouds based on planet properties

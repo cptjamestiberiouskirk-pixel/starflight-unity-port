@@ -131,6 +131,12 @@ public class InOrbit : MonoBehaviour
 		SpaceflightController.m_instance.m_messages.Clear();
 		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Orbit established.</color>" );
 
+		// say so if this is a planet whose maps could not be generated (that is why it is a plain grey ball, and why we can't land on it)
+		if ( planetController.CouldNotBeMapped() )
+		{
+			SpaceflightController.m_instance.m_messages.AddText( Planet.c_couldNotBeMappedMessage );
+		}
+
 		// set up the clouds and atmosphere
 		planetController.SetupClouds( m_clouds, m_planetAtmosphere, true, false );
 
