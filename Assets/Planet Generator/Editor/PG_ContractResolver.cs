@@ -21,7 +21,8 @@ public class PG_ContractResolver : DefaultContractResolver
 
 	public void IncludeProperty( Type type, params string[] jsonPropertyNames )
 	{
-		if ( !m_ignores.ContainsKey( type ) )
+		// (this looked in the list of ignores - so a second call for a type threw away the first, and a type with ignores had no list here to add to)
+		if ( !m_includes.ContainsKey( type ) )
 		{
 			m_includes[ type ] = new HashSet<string>();
 		}

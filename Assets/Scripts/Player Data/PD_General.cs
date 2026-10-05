@@ -86,6 +86,10 @@ public class PD_General
 	// lines of messages
 	public List<string> m_messageList;
 
+	// the day and the hour the two stardate texts were last made for (not saved - they are made again in the first update after a load)
+	[NonSerialized] int m_stardateDay = -1;
+	[NonSerialized] int m_stardateHour = -1;
+
 	// this resets everything to initial game state
 	public void Reset()
 	{
@@ -228,13 +232,19 @@ public class PD_General
 		// update the game time (represented as days with fractional precision up to seconds)
 		m_gameTime = (float) m_day + ( (float) m_hour / 24 ) + ( (float) m_minute / ( 60 * 24 ) ) + ( (float) m_second / ( 60 * 60 * 24 ) );
 
-		// update the current stardate
-		var dateTime = new DateTime( 4620, 1, 1 );
-		dateTime = dateTime.AddDays( m_day );
-		dateTime = dateTime.AddHours( m_hour );
-		// (always with the invariant culture - a computer set to another calendar would get another year, or an exception for a year its calendar does not have)
-		m_currentStardateYMD = dateTime.ToString( "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture );
-		m_currentStardateDHMY = dateTime.ToString( "dd.HH-MM-yyyy", System.Globalization.CultureInfo.InvariantCulture );
+		// update the current stardate - only when the day or the hour has changed, which is all the two texts show (making them every frame made garbage every frame)
+		if ( ( m_stardateDay != m_day ) || ( m_stardateHour != m_hour ) )
+		{
+			m_stardateDay = m_day;
+			m_stardateHour = m_hour;
+
+			var dateTime = new DateTime( 4620, 1, 1 );
+			dateTime = dateTime.AddDays( m_day );
+			dateTime = dateTime.AddHours( m_hour );
+			// (always with the invariant culture - a computer set to another calendar would get another year, or an exception for a year its calendar does not have)
+			m_currentStardateYMD = dateTime.ToString( "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture );
+			m_currentStardateDHMY = dateTime.ToString( "dd.HH-MM-yyyy", System.Globalization.CultureInfo.InvariantCulture );
+		}
 
 		// if the player has shields up then deplete it every "star" hour
 		if ( m_lastHour != m_hour )

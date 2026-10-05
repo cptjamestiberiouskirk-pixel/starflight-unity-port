@@ -515,6 +515,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioErosion();
 				break;
 
+			case "smallfixes":
+				yield return ScenarioSmallFixes();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -8502,6 +8506,242 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "erosion: the same map and the same settings give the same result every time", ( failed == 0 ) && ( distinct.Count == 1 ) && ( roughDistinct.Count == 1 ), distinct.Count + " different results in " + c_runs + " runs on a bowl, " + roughDistinct.Count + " in 3 on rough ground, " + failed + " runs with no result" );
 
 		Finish( "scenario=erosion runs=" + c_runs + " distinct=" + distinct.Count + " roughDistinct=" + roughDistinct.Count + " checksum=" + checksums[ 0 ] + " secondsPerRun=" + ( total / c_runs ).ToString( "F2" ) + " processors=" + Environment.ProcessorCount + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- small entries of the review, approved on 2026-10-05: the stardate texts per frame, a statement in a neutral posture,
+	// the contract resolver of the planet generator tool, the system display with a planet in an orbit it has no place for, the legend texture, and the limits on the ship's log loops
+
+	IEnumerator ScenarioSmallFixes()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var encounter = controller.m_encounter;
+
+		EnsureCrew();
+
+		yield return Frames( 2 );
+
+		// ---- 1. the stardate texts: what a frame costs in which neither the day nor the hour changes, and that the texts still follow the time
+		var general = new PD_General();
+
+		general.Reset();
+
+		general.m_day = 10;
+		general.m_hour = 5;
+		general.m_lastHour = 5;
+
+		general.UpdateGameTime( 0.0f );
+
+		var controlBytes = AllocatedByTheControl();
+		var gameTimeBytes = Allocated( () => general.UpdateGameTime( 0.0f ), c_meterCalls );
+		var gameTimeBytesPerCall = ( gameTimeBytes < 0 ) ? -1 : gameTimeBytes / c_meterCalls;
+
+		var stardateAtFive = general.m_currentStardateYMD + " / " + general.m_currentStardateDHMY;
+
+		general.m_hour = 6;
+		general.m_lastHour = 6;
+
+		general.UpdateGameTime( 0.0f );
+
+		var stardateAtSix = general.m_currentStardateYMD + " / " + general.m_currentStardateDHMY;
+
+		general.m_day = 40;
+
+		general.UpdateGameTime( 0.0f );
+
+		var stardateOnDayForty = general.m_currentStardateYMD + " / " + general.m_currentStardateDHMY;
+
+		// a game that was loaded has its texts from the save and makes them again in its first update
+		var loaded = JsonUtility.FromJson<PD_General>( JsonUtility.ToJson( general ) );
+
+		loaded.m_currentStardateYMD = "stale";
+		loaded.m_currentStardateDHMY = "stale";
+		loaded.m_lastHour = loaded.m_hour;
+
+		loaded.UpdateGameTime( 0.0f );
+
+		var stardateAfterLoad = loaded.m_currentStardateYMD + " / " + loaded.m_currentStardateDHMY;
+
+		Log( "game time: an update in which the hour does not change takes " + gameTimeBytesPerCall + " bytes (the control, an array of 256 bytes, measures " + controlBytes + ") | the texts: " + stardateAtFive + " -> an hour later " + stardateAtSix + " -> on day 40 " + stardateOnDayForty + " | after a load " + stardateAfterLoad );
+
+		Check( "game time: the measurement works (control)", controlBytes >= 256, controlBytes + " bytes per call for an array of 256 bytes" );
+		Check( "game time: an update in which the hour does not change takes no memory", gameTimeBytesPerCall == 0, gameTimeBytesPerCall + " bytes per call" );
+		Check( "game time: the stardate texts follow the hour and the day, also after a load (control)", ( stardateAtFive == "4620-01-11 / 11.05-01-4620" ) && ( stardateAtSix == "4620-01-11 / 11.06-01-4620" ) && ( stardateOnDayForty == "4620-02-10 / 10.06-02-4620" ) && ( stardateAfterLoad == stardateOnDayForty ), stardateAtFive + " | " + stardateAtSix + " | " + stardateOnDayForty + " | loaded " + stardateAfterLoad );
+
+		// ---- 2. the statement button with a neutral posture (set by hand - the console only gets to the comm buttons after a hail, which sets a posture): the game data has no neutral statement
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		EnterEncounter( speminId );
+
+		yield return Frames( 5 );
+
+		encounter.Connect();
+
+		yield return Frames( 2 );
+
+		encounter.m_pdEncounter.m_playerStance = GD_Comm.Stance.Neutral;
+		encounter.m_pdEncounter.m_lastSubjectFromPlayer = GD_Comm.Subject.None;
+
+		controller.m_messages.Clear();
+
+		var statementThrew = "nothing";
+
+		try
+		{
+			new StatementButton().Execute();
+		}
+		catch ( Exception exception )
+		{
+			statementThrew = exception.GetType().Name;
+		}
+
+		var neutralStatement = MessageList();
+		var subjectAfterNeutral = encounter.m_pdEncounter.m_lastSubjectFromPlayer;
+
+		encounter.m_pdEncounter.m_playerStance = GD_Comm.Stance.Friendly;
+
+		controller.m_messages.Clear();
+
+		new StatementButton().Execute();
+
+		var friendlyStatement = MessageList();
+		var subjectAfterFriendly = encounter.m_pdEncounter.m_lastSubjectFromPlayer;
+
+		Log( "statement: in a neutral posture the button threw " + statementThrew + " and the message box says: [" + neutralStatement + "] (last subject from the player: " + subjectAfterNeutral + ") | in a friendly posture: [" + friendlyStatement + "] (" + subjectAfterFriendly + ")" );
+
+		Check( "statement: a neutral posture transmits nothing, and not the word ERROR", ( statementThrew == "nothing" ) && !neutralStatement.Contains( "ERROR" ) && !neutralStatement.Contains( "Transmitting" ) && ( subjectAfterNeutral == GD_Comm.Subject.None ), "[" + neutralStatement + "], last subject " + subjectAfterNeutral );
+		Check( "statement: a friendly posture still transmits a statement (control)", friendlyStatement.Contains( "Transmitting" ) && !friendlyStatement.Contains( "ERROR" ) && ( subjectAfterFriendly == GD_Comm.Subject.Statement ), "[" + friendlyStatement + "], last subject " + subjectAfterFriendly );
+
+		encounter.Disconnect();
+
+		ClearMissiles();
+		LeaveEncounter();
+
+		yield return Frames( 10 );
+
+		// ---- 3. the contract resolver of the planet generator tool (editor assembly, used by nothing): two includes for one type, and an include for a type that has ignores
+		var resolverType = Type.GetType( "PG_ContractResolver, Assembly-CSharp-Editor" );
+
+		var includesKept = -1;
+		var includeAfterIgnore = "not run";
+
+		if ( resolverType != null )
+		{
+			var resolver = Activator.CreateInstance( resolverType );
+			var include = resolverType.GetMethod( "IncludeProperty", c_any );
+			var ignore = resolverType.GetMethod( "IgnoreProperty", c_any );
+
+			include.Invoke( resolver, new object[] { typeof( string ), new string[] { "first" } } );
+			include.Invoke( resolver, new object[] { typeof( string ), new string[] { "second" } } );
+
+			var includes = GetField( resolver, "m_includes" ) as Dictionary<Type, HashSet<string>>;
+
+			includesKept = ( ( includes != null ) && includes.ContainsKey( typeof( string ) ) ) ? includes[ typeof( string ) ].Count : -1;
+
+			ignore.Invoke( resolver, new object[] { typeof( int ), new string[] { "ignored" } } );
+
+			try
+			{
+				include.Invoke( resolver, new object[] { typeof( int ), new string[] { "included" } } );
+
+				includeAfterIgnore = "worked";
+			}
+			catch ( TargetInvocationException exception )
+			{
+				includeAfterIgnore = "threw " + exception.InnerException.GetType().Name;
+			}
+		}
+
+		Log( "contract resolver: found " + ( resolverType != null ) + "; two includes for one type leave " + includesKept + " names; an include for a type that has ignores " + includeAfterIgnore );
+
+		Check( "contract resolver: a second include for a type keeps the first, and a type with ignores can have includes", ( includesKept == 2 ) && ( includeAfterIgnore == "worked" ), includesKept + " names kept, include after ignore " + includeAfterIgnore );
+
+		// ---- 4. the system display with a planet in an orbit it has no place for (orbit 9, set by hand - every planet of the game data is in orbit 1 to 8)
+		var systemDisplay = controller.m_displayController.m_systemDisplay;
+
+		GD_Planet somePlanet = null;
+
+		foreach ( var planetController in controller.m_starSystem.m_planetController )
+		{
+			if ( ( planetController.m_planet != null ) && ( planetController.m_planet.m_id != -1 ) )
+			{
+				somePlanet = planetController.m_planet;
+			}
+		}
+
+		var changeSystemThrew = "no planet found";
+
+		if ( somePlanet != null )
+		{
+			var orbitBefore = somePlanet.m_orbitPosition;
+
+			somePlanet.m_orbitPosition = 9;
+
+			try
+			{
+				systemDisplay.ChangeSystem();
+
+				changeSystemThrew = "nothing";
+			}
+			catch ( Exception exception )
+			{
+				changeSystemThrew = exception.GetType().Name;
+			}
+
+			somePlanet.m_orbitPosition = orbitBefore;
+
+			systemDisplay.ChangeSystem();
+		}
+
+		Log( "system display: with a planet in orbit 9, ChangeSystem threw " + changeSystemThrew );
+
+		Check( "system display: a planet in an orbit the display has no place for does not throw", changeSystemThrew == "nothing", changeSystemThrew );
+
+		// ---- 5. the legend texture of the planet generator, which nothing ever made
+		var legendField = typeof( PlanetGenerator ).GetField( "m_legendTexture", c_any );
+
+		Check( "planet generator: the legend texture that nothing made is gone", legendField == null, ( legendField == null ) ? "not there" : "still there" );
+
+		// ---- 6. the two scroll loops of the ship's log with a row height that scrolls nowhere. This comes last: the code without a limit never comes back from it.
+		// The state is set by hand: three entries with nothing to show for them (their text has no height), and a list that is already scrolled down.
+		// The game does not get there: since PR 55 a log is opened at its first entry, with the list at the top
+		var shipsLog = controller.m_shipsLog;
+
+		var blankLog = new List<PD_ShipsLog.Entry>();
+
+		for ( var i = 0; i < 3; i++ )
+		{
+			blankLog.Add( new PD_ShipsLog.Entry( i, "", "Entry " + i, "Message " + i ) );
+		}
+
+		shipsLog.Show( blankLog );
+
+		yield return Frames( 5 );
+
+		var entriesText = GetField( shipsLog, "m_entries" ) as TMPro.TextMeshProUGUI;
+		var rowHeight = entriesText.renderedHeight / blankLog.Count;
+
+		SetField( shipsLog, "m_currentIndex", 1 );
+		SetField( shipsLog, "m_currentEntriesOffset", 100.0f );
+
+		Log( "ships log: three entries with no text have a row height of " + rowHeight.ToString( "G4" ) + "; calling UpdateDisplay with the list scrolled down by 100 (code without a limit on its loops does not come back from this call)" );
+
+		var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+		Call( shipsLog, "UpdateDisplay" );
+
+		var cameBackAfter = stopwatch.ElapsedMilliseconds;
+
+		shipsLog.Hide();
+
+		yield return Frames( 3 );
+
+		Log( "ships log: UpdateDisplay came back after " + cameBackAfter + " ms" );
+
+		Check( "ships log: the scroll loops end with a row height that scrolls nowhere", cameBackAfter < 1000, "came back after " + cameBackAfter + " ms (row height " + rowHeight.ToString( "G4" ) + ")" );
+
+		Finish( "scenario=smallfixes gameTimeBytes=" + gameTimeBytesPerCall + " statement=" + ( neutralStatement.Contains( "ERROR" ) ? "ERROR" : "nothing" ) + " resolver=" + includesKept + "/" + includeAfterIgnore + " systemDisplay=" + changeSystemThrew + " legendTexture=" + ( legendField != null ) + " shipsLog=" + cameBackAfter + "ms checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

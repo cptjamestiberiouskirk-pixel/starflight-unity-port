@@ -150,8 +150,13 @@ public class SystemDisplay : ShipDisplay
 				// calculate the color of the planet from the surface color
 				color = new Color( surface.m_colorR / 255.0f, surface.m_colorG / 255.0f, surface.m_colorB / 255.0f );
 
-				// update the material with the new color
-				m_planetList[ planet.m_orbitPosition - 1 ].material.SetColor( "SF_AlbedoColor", color );
+				// update the material with the new color (every planet in the game data is in orbit 1 to 8 - skip one that is not, as the update does)
+				var orbitIndex = planet.m_orbitPosition - 1;
+
+				if ( ( orbitIndex >= 0 ) && ( orbitIndex < m_planetList.Length ) )
+				{
+					m_planetList[ orbitIndex ].material.SetColor( "SF_AlbedoColor", color );
+				}
 			}
 		}
 	}

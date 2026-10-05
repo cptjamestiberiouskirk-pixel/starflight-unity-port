@@ -340,41 +340,6 @@ public class TerrainVehicle : MonoBehaviour
 		{
 			Gizmos.DrawLine( m_debugVectors[ i ], m_debugVectors[ i + 1 ] );
 		}
-
-		if ( false && DataController.m_instance != null )
-		{
-			// get to the player data
-			var playerData = DataController.m_instance.m_playerData;
-
-			if ( ( playerData != null ) && ( m_planetGenerator != null ) )
-			{
-				for ( var z = -15; z <= 15; z++ )
-				{
-					for ( var x = -15; x <= 15; x++ )
-					{
-						var mapX = ( playerData.m_general.m_coordinates.x + x ) * 0.25f + m_planetGenerator.m_textureMapWidth * 0.5f - 0.5f;
-						var mapY = ( playerData.m_general.m_coordinates.z + z ) * 0.25f + m_planetGenerator.m_textureMapHeight * 0.5f - 0.5f;
-
-						var bilinearElevation = m_planetGenerator.GetBilinearSmoothedElevation( mapX, mapY ) * m_elevationScale;
-						var bicubicElevation = m_planetGenerator.GetBicubicSmoothedElevation( mapX, mapY ) * m_elevationScale;
-
-						var bilinearPosition = playerData.m_general.m_coordinates + new Vector3( x, 0.0f, z );
-						var bicubicPosition = bilinearPosition;
-
-						bilinearPosition.y = bilinearElevation;
-						bicubicPosition.y = bicubicElevation;
-
-						Gizmos.color = Color.blue;
-
-						Gizmos.DrawCube( bilinearPosition, Vector3.one * 0.25f );
-
-						Gizmos.color = Color.yellow;
-
-						Gizmos.DrawCube( bicubicPosition, Vector3.one * 0.20f );
-					}
-				}
-			}
-		}
 	}
 
 #endif
