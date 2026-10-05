@@ -156,6 +156,22 @@ public class PD_PlayerShip
 		return HasArmorPlating() ? GetArmor().m_points : c_bareHullArmorPoints;
 	}
 
+	// call this when a save file has been loaded - one from before selling the armor took its points away can hold more armor points than this ship can have
+	public void ValidateArmorPoints()
+	{
+		// get access to the game data
+		var gameData = DataController.m_instance.m_gameData;
+
+		// leave a save file alone whose armor class the game data does not have (there is no maximum to cut back to)
+		if ( ( m_armorClass < 0 ) || ( m_armorClass >= gameData.m_armorList.Length ) )
+		{
+			return;
+		}
+
+		// never more than the most this ship can have (this never adds points, so a destroyed ship stays destroyed)
+		m_armorPoints = Mathf.Min( m_armorPoints, GetMaximumArmorPoints() );
+	}
+
 	// the most shield points this ship can have - the full charge of the shielding that is installed (zero if there is none)
 	public int GetMaximumShieldPoints()
 	{

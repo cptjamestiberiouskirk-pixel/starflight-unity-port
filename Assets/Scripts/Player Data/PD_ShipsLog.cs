@@ -131,15 +131,40 @@ using System.Collections.Generic;
 		// get the notice to add from the game data
 		var noticeToAdd = gameData.m_noticeList[ noticeId ];
 
-		// convert the stardate into human readable format
-		DateTime messageDate = DateTime.ParseExact( noticeToAdd.m_stardate, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture );
-		var header = messageDate.ToLongDateString();
-		var stardate = messageDate.ToShortDateString();
+		// convert the stardate into the form the game shows (these two are saved, so they must not depend on the date format of the computer's region)
+		var stardate = PD_General.GetDisplayStardate( noticeToAdd.m_stardate );
+		var header = stardate;
 
 		// add this new notice to the ships log
 		var entry = new Entry( noticeId, stardate, header, noticeToAdd.m_message );
 
 		m_starportNotices.Add( entry );
+	}
+
+	// call this when a save file has been loaded - the starport notices in the ships log used to be dated in the date format of the computer's region, and those dates were saved
+	public void ValidateStarportNoticeDates()
+	{
+		// save files from before the ships log have no list
+		if ( m_starportNotices == null )
+		{
+			return;
+		}
+
+		// get to the game data
+		var gameData = DataController.m_instance.m_gameData;
+
+		foreach ( var entry in m_starportNotices )
+		{
+			// skip an entry whose notice the game data does not have
+			if ( ( entry == null ) || ( entry.m_id < 0 ) || ( entry.m_id >= gameData.m_noticeList.Length ) )
+			{
+				continue;
+			}
+
+			// date it again from the stardate of the notice
+			entry.m_stardate = PD_General.GetDisplayStardate( gameData.m_noticeList[ entry.m_id ].m_stardate );
+			entry.m_header = entry.m_stardate;
+		}
 	}
 
 	public void AddAlienComm( GD_Comm comm, string message )

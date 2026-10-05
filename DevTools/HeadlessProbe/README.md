@@ -84,8 +84,9 @@ What the probe does:
 | `leaks` | the materials in memory before, during and after a deposit's transporter effect, and whether the spaceflight controller and the maps of two planets are still in memory after the scene has been left (weak references, after the save panel has been used) |
 | `latent` | the message box slide with a duration of one and of two seconds, the experimental planet mesh at a resolution of 110 with no parent (its triangle indices read back, the mesh after its planet is destroyed), and the adapter switched off with no planet controller |
 | `editortools` | the textures in memory before and after the planet generator's four save functions, the shader inspector's compression test with a render texture in the normal map slot, and what an empty file name does to Path.GetDirectoryName |
+| `starport-savedata` | a save with more armor points than its armor allows is cut back when it is loaded (and one written with a destroyed ship still loads with 1 point), the dates of the bank, of the Operations notices and of their ship's log entries with the computer set to the Thai calendar, a ship's log entry dated by an older build after a load, and the starting balance of a build and of the Editor |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (43 scenarios, about 15 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (44 scenarios, about 15 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
@@ -126,7 +127,7 @@ Pitfalls:
 - Only vessels 1 to 4 (Spemin, Mechan) and 20 have a debris model. Encounters 115 and 116 are Spemin, 7 is Elowan.
 - Mechans are hostile to a ship with no human crew.
 - The Arth system (where a scenario starts) has four planets besides Arth: 90, 91 and 92 are frozen, 94 is a small rock planet. Planet 90 has a mineral density of 43% (762 deposits). Landing and disembarking work headless; the landing animation takes 35 s.
-- A new game has 20.0 cubic meters of Endurium (200 tenths), 1,000,000 MU and 250 armor points.
+- A new game has 20.0 cubic meters of Endurium (200 tenths), 250 armor points and, in the Editor, 1,000,000 MU (a build starts with the original 12,000 MU; the probe always runs in the Editor).
 
 ## Limits
 

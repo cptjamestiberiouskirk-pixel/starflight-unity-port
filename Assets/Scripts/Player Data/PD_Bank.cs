@@ -22,16 +22,25 @@ public class PD_Bank
 		}
 	}
 
+	// what the player has in the bank at the start of the game - the original game starts with 12,000 M.U. (the first starport notice says so)
+	public const int c_startingBalance = 12000;
+
+	// in the editor a new game starts rich, so that everything can be bought and tried out
+	public const int c_editorStartingBalance = 1000000;
+
 	public int m_currentBalance;
 	public List<Transaction> m_transactionList;
+
+	// the balance a new game starts with - a build gets the original balance, only the editor gets the rich one
+	public static int GetStartingBalance( bool inEditor )
+	{
+		return inEditor ? c_editorStartingBalance : c_startingBalance;
+	}
 
 	public void Reset()
 	{
 		// reset the bank balance
-		//m_currentBalance = 12000;
-
-		// hack - make the player rich for now
-		m_currentBalance = 1000000;
+		m_currentBalance = GetStartingBalance( UnityEngine.Application.isEditor );
 
 		// create a new transactions list
 		m_transactionList = new List<Transaction>

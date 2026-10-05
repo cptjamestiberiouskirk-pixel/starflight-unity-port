@@ -491,6 +491,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioEditorTools();
 				break;
 
+			case "starport-savedata":
+				yield return ScenarioStarportSaveData();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -7192,6 +7196,197 @@ public class ClaudeProbe : MonoBehaviour
 		yield return null;
 
 		Finish( "scenario=editortools textures=" + texturesBefore + "/" + texturesAfter + " shaderGUI=" + withRenderTexture + " emptyPath=[" + emptyPath + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- rulings of 2026-10-05: armor points of an old save, stardates in the bank, the notices and the ships log, the starting balance (starport)
+
+	// a year-month-day stardate the way the game shows it, worked out without any date class (so it does not depend on the code under test)
+	static string DayMonthYear( string stardateYMD )
+	{
+		var parts = stardateYMD.Split( '-' );
+
+		return ( parts.Length == 3 ) ? ( parts[ 2 ] + "-" + parts[ 1 ] + "-" + parts[ 0 ] ) : stardateYMD;
+	}
+
+	// put a game with these armor points into save slot 1 (in memory), load it the way the data controller does, and return the armor points it has then
+	static int ArmorPointsAfterLoad( int armorClass, int armorPoints )
+	{
+		var dataController = DataController.m_instance;
+
+		var saved = new PlayerData();
+
+		saved.Reset();
+
+		saved.m_playerShip.m_armorClass = armorClass;
+		saved.m_playerShip.m_armorPoints = armorPoints;
+
+		MemorySaveSystem.s_slots[ 1 ] = JsonUtility.ToJson( saved, true );
+
+		var loaded = Call( dataController, "LoadPlayerData", 1 ) as PlayerData;
+
+		MemorySaveSystem.s_slots.Remove( 1 );
+
+		return ( loaded == null ) ? int.MinValue : loaded.m_playerShip.m_armorPoints;
+	}
+
+	IEnumerator ScenarioStarportSaveData()
+	{
+		var dataController = DataController.m_instance;
+		var gameData = dataController.m_gameData;
+		var playerData = dataController.m_playerData;
+
+		// ---- 1. a save with more armor points than its armor allows is cut back when it is loaded
+		var bareHull = PD_PlayerShip.c_bareHullArmorPoints;
+		var class2Maximum = gameData.m_armorList[ 2 ].m_points;
+
+		var soldArmor = ArmorPointsAfterLoad( 0, 1500 );
+		var tooManyForClass2 = ArmorPointsAfterLoad( 2, class2Maximum + 700 );
+		var damagedClass2 = ArmorPointsAfterLoad( 2, class2Maximum - 10 );
+		var wholeBareHull = ArmorPointsAfterLoad( 0, bareHull );
+		var destroyed = ArmorPointsAfterLoad( 2, 0 );
+		var belowZero = ArmorPointsAfterLoad( 0, -50 );
+
+		Log( "old saves: armor points after loading: no armor with 1500 points -> " + soldArmor + " (bare hull " + bareHull + "), class 2 with " + ( class2Maximum + 700 ) + " -> " + tooManyForClass2 + " (its armor has " + class2Maximum + "), class 2 with " + ( class2Maximum - 10 ) + " -> " + damagedClass2 + ", a whole bare hull -> " + wholeBareHull + ", destroyed with 0 -> " + destroyed + ", with -50 -> " + belowZero );
+
+		Check( "old saves: armor points above the maximum are cut back to it on load", ( soldArmor == bareHull ) && ( tooManyForClass2 == class2Maximum ), "no armor: 1500 -> " + soldArmor + " (maximum " + bareHull + "), class 2: " + ( class2Maximum + 700 ) + " -> " + tooManyForClass2 + " (maximum " + class2Maximum + ")" );
+		Check( "old saves: armor points at or below the maximum are left alone", ( damagedClass2 == class2Maximum - 10 ) && ( wholeBareHull == bareHull ), "class 2 with " + ( class2Maximum - 10 ) + " -> " + damagedClass2 + ", bare hull with " + bareHull + " -> " + wholeBareHull );
+		Check( "old saves: a save written with a destroyed ship still loads with 1 armor point", ( destroyed == 1 ) && ( belowZero == 1 ), "0 -> " + destroyed + ", -50 -> " + belowZero );
+
+		// ---- 2. the bank shows its dates as stardates, whatever calendar the computer uses (thai: buddhist years)
+		var cultureBefore = System.Globalization.CultureInfo.CurrentCulture;
+
+		var bankPanel = FindPanel<BankPanel>();
+		var operationsPanel = FindPanel<OperationsPanel>();
+
+		playerData.m_bank.m_transactionList.Add( new PD_Bank.Transaction( "4620-03-26", "Trade depot", "1400+" ) );
+
+		var bankDates = "panel did not open";
+
+		System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo( "th-TH" );
+
+		try
+		{
+			PanelController.m_instance.Open( bankPanel );
+
+			bankDates = bankPanel.m_dateListText.text.Replace( "\r", "" ).Replace( "\n", " | " );
+		}
+		catch ( Exception exception )
+		{
+			bankDates = "threw " + exception.GetType().Name;
+		}
+		finally
+		{
+			System.Globalization.CultureInfo.CurrentCulture = cultureBefore;
+		}
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+		yield return ClosePanel( bankPanel, "bank" );
+
+		Log( "dates: the bank's date column with the thai calendar: " + bankDates );
+
+		Check( "dates: the bank shows stardates (day-month-year) with the thai calendar", bankDates == "01-01-4620 | 26-03-4620", bankDates );
+
+		// ---- 3. the notices in operations: today's date, the date of the notice, and the entry it leaves in the ships log
+		playerData.m_general.m_currentStardateYMD = "4620-03-26";
+
+		var today = "panel did not open";
+		var noticeDate = "";
+		var expectedNoticeDate = "";
+		var logStardate = "";
+		var logHeader = "";
+
+		System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo( "th-TH" );
+
+		try
+		{
+			PanelController.m_instance.Open( operationsPanel );
+
+			operationsPanel.ShowNotices();
+
+			today = operationsPanel.m_stardateText.text;
+			noticeDate = operationsPanel.m_messageText.text.Replace( "\r", "" ).Split( '\n' )[ 0 ];
+
+			var currentNoticeId = (int) GetField( operationsPanel, "m_currentNoticeId" );
+
+			expectedNoticeDate = DayMonthYear( gameData.m_noticeList[ currentNoticeId ].m_stardate );
+
+			foreach ( var entry in playerData.m_shipsLog.m_starportNotices )
+			{
+				if ( entry.m_id == currentNoticeId )
+				{
+					logStardate = entry.m_stardate;
+					logHeader = entry.m_header;
+				}
+			}
+		}
+		catch ( Exception exception )
+		{
+			today = "threw " + exception.GetType().Name + ": " + exception.Message;
+		}
+		finally
+		{
+			System.Globalization.CultureInfo.CurrentCulture = cultureBefore;
+		}
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+		yield return ClosePanel( operationsPanel, "operations" );
+
+		playerData.m_general.m_currentStardateYMD = "4620-01-01";
+
+		Log( "dates: operations with the thai calendar: '" + today + "', the notice is dated '" + noticeDate + "' (its stardate is " + expectedNoticeDate + "), its ships log entry '" + logStardate + "' with the heading '" + logHeader + "'" );
+
+		Check( "dates: operations shows today's stardate with the thai calendar", today == "Today is 26-03-4620", today );
+		Check( "dates: a notice is dated with its stardate with the thai calendar", ( expectedNoticeDate != "" ) && ( noticeDate == expectedNoticeDate ), "'" + noticeDate + "' (should be " + expectedNoticeDate + ")" );
+		Check( "dates: the ships log entry of a notice has its stardate with the thai calendar", ( expectedNoticeDate != "" ) && ( logStardate == expectedNoticeDate ) && ( logHeader == expectedNoticeDate ), "'" + logStardate + "' / '" + logHeader + "' (should be " + expectedNoticeDate + ")" );
+
+		// ---- 4. a ships log entry that an older build saved with the computer's date format is dated again when the save is loaded
+		var oldSave = new PlayerData();
+
+		oldSave.Reset();
+
+		oldSave.m_shipsLog.m_starportNotices.Add( new PD_ShipsLog.Entry( 0, "1/1/5163", "1 January 5163", gameData.m_noticeList[ 0 ].m_message ) );
+		oldSave.m_shipsLog.m_starportNotices.Add( new PD_ShipsLog.Entry( 99999, "kept", "kept", "an entry whose notice the game data does not have" ) );
+
+		MemorySaveSystem.s_slots[ 1 ] = JsonUtility.ToJson( oldSave, true );
+
+		var loadedOldSave = Call( dataController, "LoadPlayerData", 1 ) as PlayerData;
+
+		MemorySaveSystem.s_slots.Remove( 1 );
+
+		var repairedStardate = "not loaded";
+		var repairedHeader = "";
+		var unknownNotice = "";
+
+		if ( ( loadedOldSave != null ) && ( loadedOldSave.m_shipsLog.m_starportNotices.Count == 2 ) )
+		{
+			repairedStardate = loadedOldSave.m_shipsLog.m_starportNotices[ 0 ].m_stardate;
+			repairedHeader = loadedOldSave.m_shipsLog.m_starportNotices[ 0 ].m_header;
+			unknownNotice = loadedOldSave.m_shipsLog.m_starportNotices[ 1 ].m_stardate;
+		}
+
+		var firstNoticeDate = DayMonthYear( gameData.m_noticeList[ 0 ].m_stardate );
+
+		Log( "old saves: a ships log entry saved as '1/1/5163' / '1 January 5163' loads as '" + repairedStardate + "' / '" + repairedHeader + "' (the notice's stardate is " + firstNoticeDate + "); an entry for a notice that does not exist loads as '" + unknownNotice + "'" );
+
+		Check( "old saves: a notice in the ships log is dated again with its stardate on load", ( repairedStardate == firstNoticeDate ) && ( repairedHeader == firstNoticeDate ), "'" + repairedStardate + "' / '" + repairedHeader + "' (should be " + firstNoticeDate + ")" );
+		Check( "old saves: a ships log entry whose notice does not exist is left alone", unknownNotice == "kept", "'" + unknownNotice + "'" );
+
+		// ---- 5. the starting balance: a build starts with the original 12,000 MU, the editor stays rich (the probe always runs in the editor, so the build value is asked for directly)
+		var getStartingBalance = typeof( PD_Bank ).GetMethod( "GetStartingBalance", c_any );
+
+		var buildBalance = ( getStartingBalance == null ) ? -1 : (int) getStartingBalance.Invoke( null, new object[] { false } );
+		var editorBalance = ( getStartingBalance == null ) ? -1 : (int) getStartingBalance.Invoke( null, new object[] { true } );
+
+		var fresh = new PlayerData();
+
+		fresh.Reset();
+
+		Log( "starting balance: a build " + ( ( getStartingBalance == null ) ? "has no balance of its own (no PD_Bank.GetStartingBalance)" : buildBalance.ToString() ) + ", the editor " + editorBalance + ", a new game in this editor run " + fresh.m_bank.m_currentBalance + " (Application.isEditor " + Application.isEditor + ")" );
+
+		Check( "starting balance: a build starts with the original 12,000 MU", buildBalance == 12000, ( getStartingBalance == null ) ? "this code has one balance for the editor and for builds: " + fresh.m_bank.m_currentBalance : buildBalance.ToString() );
+		Check( "starting balance: a new game in the editor still has 1,000,000 MU", fresh.m_bank.m_currentBalance == 1000000, fresh.m_bank.m_currentBalance.ToString() );
+
+		Finish( "scenario=starport-savedata armor=" + soldArmor + "/" + tooManyForClass2 + "/" + damagedClass2 + "/" + destroyed + " bank=[" + bankDates + "] operations=[" + today + " | " + noticeDate + "] log=[" + logStardate + " | " + repairedStardate + "] balance=" + buildBalance + "/" + fresh.m_bank.m_currentBalance + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
