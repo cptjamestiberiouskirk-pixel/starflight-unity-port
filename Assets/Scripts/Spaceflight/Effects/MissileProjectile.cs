@@ -135,6 +135,8 @@ public class MissileProjectile : MonoBehaviour
 		// check for timeout
 		if ( m_lifetime >= m_maxLifetime )
 		{
+			// a missile that runs out of time has missed - tell whoever launched it (they show the explosion where the missile was and do no damage)
+			m_onHitCallback?.Invoke( transform.position, false );
 			Deactivate();
 			return;
 		}

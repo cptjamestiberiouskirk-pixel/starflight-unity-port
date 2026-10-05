@@ -386,32 +386,6 @@ public class Encounter : MonoBehaviour
 		SpaceflightController.m_instance.m_messages.AddText( "<color=#FFFF00>Scan debris for salvage, then leave when ready.</color>" );
 	}
 
-	// leave the encounter after victory delay
-	void LeaveEncounterAfterVictory()
-	{
-		var playerData = DataController.m_instance.m_playerData;
-
-		// calculate exit direction (away from center)
-		var exitDirection = Vector3.Normalize( playerData.m_general.m_coordinates );
-		if ( exitDirection.magnitude < 0.1f )
-		{
-			exitDirection = Vector3.forward;
-		}
-
-		// update last location coordinates
-		if ( playerData.m_general.m_lastLocation == PD_General.Location.Hyperspace )
-		{
-			playerData.m_general.m_lastHyperspaceCoordinates += exitDirection * SpaceflightController.m_instance.m_encounterRange * 1.25f;
-		}
-		else
-		{
-			playerData.m_general.m_lastStarSystemCoordinates += exitDirection * SpaceflightController.m_instance.m_encounterRange * 1.25f;
-		}
-
-		// switch back to the last location
-		SpaceflightController.m_instance.SwitchLocation( playerData.m_general.m_lastLocation );
-	}
-
 	// call this when the player fires on the aliens - they turn hostile and stay hostile until the player leaves the encounter
 	public void PlayerAttacked()
 	{
@@ -1276,6 +1250,13 @@ public class Encounter : MonoBehaviour
 	// update alien combat behavior
 	void UpdateAlienCombat()
 	{
+		// the aliens hold their fire for as long as the comm link is up (every alien fire rule in the original design notes needs "?IN-COMM FALSE")
+		// this is the one place all alien fire comes through, so it covers every race - the time to their next shot does not run down while they talk
+		if ( m_pdEncounter.m_connected )
+		{
+			return;
+		}
+
 		// only attack if hostile stance
 		if ( m_pdEncounter.m_alienStance != GD_Comm.Stance.Hostile )
 		{

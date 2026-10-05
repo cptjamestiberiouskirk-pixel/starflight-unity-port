@@ -495,6 +495,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportSaveData();
 				break;
 
+			case "commlink":
+				yield return ScenarioCommLink();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -7387,6 +7391,298 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starting balance: a new game in the editor still has 1,000,000 MU", fresh.m_bank.m_currentBalance == 1000000, fresh.m_bank.m_currentBalance.ToString() );
 
 		Finish( "scenario=starport-savedata armor=" + soldArmor + "/" + tooManyForClass2 + "/" + damagedClass2 + "/" + destroyed + " bank=[" + bankDates + "] operations=[" + today + " | " + noticeDate + "] log=[" + logStardate + " | " + repairedStardate + "] balance=" + buildBalance + "/" + fresh.m_bank.m_currentBalance + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- rulings of 2026-10-05: a comm link stops alien fire, a missile that times out reports a miss, the dead method of the encounter is gone
+
+	// how many explosions of the combat controller's pool are playing
+	static int ExplosionsPlaying()
+	{
+		var explosionPool = GetField( CombatController.m_instance, "m_explosionPool" ) as System.Collections.IEnumerable;
+		var count = 0;
+
+		if ( explosionPool != null )
+		{
+			foreach ( var explosion in explosionPool )
+			{
+				if ( (bool) Call( explosion, "IsPlaying" ) )
+				{
+					count++;
+				}
+			}
+		}
+
+		return count;
+	}
+
+	// how many missiles are in the air
+	static int MissilesInTheAir()
+	{
+		var missilePool = GetField( CombatController.m_instance, "m_missilePool" ) as System.Collections.IEnumerable;
+		var count = 0;
+
+		if ( missilePool != null )
+		{
+			foreach ( var missile in missilePool )
+			{
+				if ( (bool) Call( missile, "IsActive" ) )
+				{
+					count++;
+				}
+			}
+		}
+
+		return count;
+	}
+
+	// let every missile in the air run out of time (the next update of each one is its time out)
+	static void RunMissilesOutOfTime()
+	{
+		var missilePool = GetField( CombatController.m_instance, "m_missilePool" ) as System.Collections.IEnumerable;
+
+		if ( missilePool == null )
+		{
+			return;
+		}
+
+		foreach ( var missile in missilePool )
+		{
+			if ( (bool) Call( missile, "IsActive" ) )
+			{
+				SetField( missile, "m_lifetime", 1000.0f );
+			}
+		}
+	}
+
+	IEnumerator ScenarioCommLink()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var combat = CombatController.m_instance;
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		EnsureCrew();
+
+		// a ship that can launch missiles and that survives being shot at for the whole scenario
+		ship.m_laserCannonClass = 1;
+		ship.m_missileLauncherClass = 1;
+		ship.m_armorPoints = 100000;
+		ship.m_shieldsAreUp = false;
+
+		if ( ship.m_elementStorage.Find( 5 ) == null )
+		{
+			ship.AddElement( 5, 50 );
+		}
+
+		var damage = 0;
+
+		// ---- 1. spemin scouts (lasers) that have been fired on: they shoot, they hold their fire while the comm link is up, they shoot again after it
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		ForceVessel( speminId, 2 );
+
+		EnterEncounter( speminId );
+		yield return Frames( 10 );
+
+		encounter.PlayerAttacked();
+
+		yield return DamageTaken( 8.0f, value => damage = value );
+
+		var damageBeforeLink = damage;
+
+		ClearMissiles();
+
+		var connectThrew = "";
+
+		try
+		{
+			encounter.Connect();
+		}
+		catch ( Exception exception )
+		{
+			connectThrew = exception.GetType().Name;
+		}
+
+		yield return Frames( 2 );
+
+		var connectedAtStart = encounter.IsConnected();
+
+		yield return DamageTaken( 11.0f, value => damage = value );
+
+		var damageDuringLink = damage;
+		var connectedAtEnd = encounter.IsConnected();
+		var stanceDuringLink = Stance();
+
+		try
+		{
+			encounter.Disconnect();
+		}
+		catch ( Exception exception )
+		{
+			connectThrew += " disconnect " + exception.GetType().Name;
+		}
+
+		yield return DamageTaken( 8.0f, value => damage = value );
+
+		var damageAfterLink = damage;
+
+		Log( "comm link: hostile spemin scouts did " + damageBeforeLink + " damage in 8 s before the link, " + damageDuringLink + " in 11 s with the link up (connected at its start " + connectedAtStart + ", at its end " + connectedAtEnd + ", stance " + stanceDuringLink + "), " + damageAfterLink + " in 8 s after it" + ( ( connectThrew == "" ) ? "" : " | threw: " + connectThrew ) );
+
+		Check( "comm link: hostile aliens fire before the link (control)", damageBeforeLink > 0, damageBeforeLink + " damage in 8 s" );
+		Check( "comm link: the aliens hold their fire while the comm link is up", connectedAtStart && connectedAtEnd && ( stanceDuringLink == "Hostile" ) && ( damageDuringLink == 0 ), damageDuringLink + " damage in 11 s, connected " + connectedAtStart + "/" + connectedAtEnd + ", stance " + stanceDuringLink );
+		Check( "comm link: the aliens fire again once the link is down", damageAfterLink > 0, damageAfterLink + " damage in 8 s" );
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 2. the uhlek never talk, so they never have a comm link in play - the flag is set by hand here, to see that the rule holds for the races that reach alien fire by another way
+		var uhlekId = FindEncounter( 0, 1, 1, 0, GameData.Race.Uhlek );
+
+		EnterEncounter( uhlekId );
+		yield return Frames( 10 );
+
+		encounter.m_pdEncounter.m_connected = true;
+
+		ClearMissiles();
+
+		yield return DamageTaken( 7.0f, value => damage = value );
+
+		var uhlekDamageWithLink = damage;
+
+		encounter.m_pdEncounter.m_connected = false;
+
+		yield return DamageTaken( 6.0f, value => damage = value );
+
+		var uhlekDamageWithoutLink = damage;
+
+		Log( "comm link: the uhlek did " + uhlekDamageWithLink + " damage in 7 s with the comm flag set by hand, " + uhlekDamageWithoutLink + " in 6 s without it" );
+
+		Check( "comm link: the rule holds for a race that does not use the default update (uhlek, flag set by hand)", ( uhlekDamageWithLink == 0 ) && ( uhlekDamageWithoutLink > 0 ), uhlekDamageWithLink + " with the flag, " + uhlekDamageWithoutLink + " without" );
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 3. a player missile that runs out of time: an explosion where it was, and no damage (first a missile that arrives, to see that a hit is measured)
+		ship.m_armorPoints = 100000;
+
+		EnterEncounter( speminId );
+		yield return Frames( 10 );
+
+		var targetIndex = FirstLivingAlien();
+		var target = encounter.m_pdEncounter.GetAlienShipList()[ targetIndex ];
+
+		target.m_armorPoints = 5000;
+		target.m_shieldPoints = 0;
+
+		combat.SetTarget( targetIndex );
+
+		BringAliensClose();
+
+		var firstLaunched = combat.FirePlayerMissile();
+
+		var waitEnd = Time.realtimeSinceStartup + 3.0f;
+
+		while ( ( Time.realtimeSinceStartup < waitEnd ) && ( MissilesInTheAir() > 0 ) )
+		{
+			BringAliensClose();
+
+			yield return null;
+		}
+
+		var damageOfAHit = 5000 - target.m_armorPoints;
+
+		// wait for its explosion to end and for the launcher to be ready again
+		waitEnd = Time.realtimeSinceStartup + 3.0f;
+
+		while ( Time.realtimeSinceStartup < waitEnd )
+		{
+			BringAliensClose();
+
+			yield return null;
+		}
+
+		var explosionsBefore = ExplosionsPlaying();
+		var armorBefore = target.m_armorPoints;
+
+		combat.SetTarget( targetIndex );
+
+		BringAliensClose();
+
+		var secondLaunched = combat.FirePlayerMissile();
+		var inTheAir = MissilesInTheAir();
+
+		RunMissilesOutOfTime();
+
+		yield return Frames( 3 );
+
+		var explosionsAfterTimeOut = ExplosionsPlaying();
+		var damageOfATimeOut = armorBefore - target.m_armorPoints;
+		var inTheAirAfter = MissilesInTheAir();
+
+		Log( "missile time out: a player missile that arrives does " + damageOfAHit + " damage (launched " + firstLaunched + "); one that runs out of time (launched " + secondLaunched + ", " + inTheAir + " in the air, " + inTheAirAfter + " after) does " + damageOfATimeOut + " damage, explosions playing before " + explosionsBefore + " and after " + explosionsAfterTimeOut );
+
+		Check( "missile time out: a player missile that arrives still does its damage (control)", firstLaunched && ( damageOfAHit > 0 ), damageOfAHit + " damage" );
+		Check( "missile time out: a player missile that runs out of time explodes where it was and does no damage", secondLaunched && ( inTheAir > 0 ) && ( inTheAirAfter == 0 ) && ( explosionsBefore == 0 ) && ( explosionsAfterTimeOut == 1 ) && ( damageOfATimeOut == 0 ), "explosions " + explosionsBefore + " -> " + explosionsAfterTimeOut + ", damage " + damageOfATimeOut + ", in the air " + inTheAir + " -> " + inTheAirAfter );
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 4. an alien missile that runs out of time: the same, and the player ship is not damaged (elowan scouts only have missiles)
+		var secondId = FindEncounter( 1, 6, 3, 1 );
+
+		ForceVessel( secondId, 6 );
+
+		EnterEncounter( secondId );
+		yield return Frames( 10 );
+
+		// wait for the explosions of the encounter before to end
+		waitEnd = Time.realtimeSinceStartup + 3.0f;
+
+		while ( ( Time.realtimeSinceStartup < waitEnd ) && ( ExplosionsPlaying() > 0 ) )
+		{
+			yield return null;
+		}
+
+		ship.m_armorPoints = 100000;
+
+		encounter.PlayerAttacked();
+
+		// wait for their first missile
+		waitEnd = Time.realtimeSinceStartup + 8.0f;
+
+		while ( ( Time.realtimeSinceStartup < waitEnd ) && ( MissilesInTheAir() == 0 ) )
+		{
+			BringAliensClose();
+
+			yield return null;
+		}
+
+		var alienMissiles = MissilesInTheAir();
+		var alienExplosionsBefore = ExplosionsPlaying();
+		var playerArmorBefore = ship.m_armorPoints;
+
+		RunMissilesOutOfTime();
+
+		yield return Frames( 3 );
+
+		var alienExplosionsAfter = ExplosionsPlaying();
+		var playerDamage = playerArmorBefore - ship.m_armorPoints;
+
+		Log( "missile time out: an alien missile that runs out of time (" + alienMissiles + " in the air): explosions playing before " + alienExplosionsBefore + " and after " + alienExplosionsAfter + ", damage to the player " + playerDamage );
+
+		Check( "missile time out: an alien missile that runs out of time explodes where it was and does no damage", ( alienMissiles > 0 ) && ( alienExplosionsAfter > alienExplosionsBefore ) && ( playerDamage == 0 ), alienMissiles + " in the air, explosions " + alienExplosionsBefore + " -> " + alienExplosionsAfter + ", damage " + playerDamage );
+
+		ClearMissiles();
+
+		// ---- 5. the method of the encounter that nothing called is gone
+		var deadMethod = typeof( Encounter ).GetMethod( "LeaveEncounterAfterVictory", c_any );
+
+		Check( "dead code: Encounter.LeaveEncounterAfterVictory is gone", deadMethod == null, ( deadMethod == null ) ? "not there" : "still there" );
+
+		Finish( "scenario=commlink spemin=" + damageBeforeLink + "/" + damageDuringLink + "/" + damageAfterLink + " uhlek=" + uhlekDamageWithLink + "/" + uhlekDamageWithoutLink + " playerMissile=hit" + damageOfAHit + "/timeout" + damageOfATimeOut + "/explosions" + explosionsAfterTimeOut + " alienMissile=explosions" + alienExplosionsAfter + "/damage" + playerDamage + " deadMethod=" + ( deadMethod != null ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

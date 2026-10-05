@@ -84,9 +84,10 @@ What the probe does:
 | `leaks` | the materials in memory before, during and after a deposit's transporter effect, and whether the spaceflight controller and the maps of two planets are still in memory after the scene has been left (weak references, after the save panel has been used) |
 | `latent` | the message box slide with a duration of one and of two seconds, the experimental planet mesh at a resolution of 110 with no parent (its triangle indices read back, the mesh after its planet is destroyed), and the adapter switched off with no planet controller |
 | `editortools` | the textures in memory before and after the planet generator's four save functions, the shader inspector's compression test with a render texture in the normal map slot, and what an empty file name does to Path.GetDirectoryName |
+| `commlink` | hostile aliens before, during and after a comm link (Spemin scouts through the real `Connect` and `Disconnect`; the Uhlek with the comm flag set by hand, since they never talk), a player missile and an alien missile that run out of time (an explosion, no damage) next to a missile that arrives, and that `Encounter.LeaveEncounterAfterVictory` is gone (about 65 s) |
 | `starport-savedata` | a save with more armor points than its armor allows is cut back when it is loaded (and one written with a destroyed ship still loads with 1 point), the dates of the bank, of the Operations notices and of their ship's log entries with the computer set to the Thai calendar, a ship's log entry dated by an older build after a load, and the starting balance of a build and of the Editor |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (44 scenarios, about 15 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (45 scenarios, about 16 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
