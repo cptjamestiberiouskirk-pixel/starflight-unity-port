@@ -3,12 +3,13 @@ paths:
   - "Assets/Scripts/Player Data/**/*.cs"
   - "Assets/Scripts/Game Data/**/*.cs"
   - "Assets/Scripts/Persistent/DataController.cs"
+  - "Assets/Scripts/Systems/SaveSystem/**/*.cs"
   - "Assets/Resources/Starflight Game Data.json"
 ---
 
 # Save data and game data serialization
 
-Saves and the game data are read and written with `JsonUtility`. Do not break the `PD_*` persistence chain.
+Saves are read and written with `JsonUtility` (`JsonSaveSystem`). The game data is read with `JsonUtility` (`DataController.cs`) and never written. Do not break the `PD_*` persistence chain.
 
 - Only Unity-serializable fields persist. Dictionaries, properties and multi-dimensional arrays are silently dropped (`PD_General.m_lastCommIds` used to be `int[,]` and lost its data on every load; it is now a flat `int[]` behind `GetLastCommId()` / `SetLastCommId()`).
 - Nested containers (arrays or lists of lists) are dropped too: wrap the inner list in a `[Serializable]` class (see `PD_ShipsLog.EntryList`).
