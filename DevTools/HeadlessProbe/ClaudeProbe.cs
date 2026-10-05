@@ -499,6 +499,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCommLink();
 				break;
 
+			case "deposits":
+				yield return ScenarioDeposits();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -7683,6 +7687,178 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "dead code: Encounter.LeaveEncounterAfterVictory is gone", deadMethod == null, ( deadMethod == null ) ? "not there" : "still there" );
 
 		Finish( "scenario=commlink spemin=" + damageBeforeLink + "/" + damageDuringLink + "/" + damageAfterLink + " uhlek=" + uhlekDamageWithLink + "/" + uhlekDamageWithoutLink + " playerMissile=hit" + damageOfAHit + "/timeout" + damageOfATimeOut + "/explosions" + explosionsAfterTimeOut + " alienMissile=explosions" + alienExplosionsAfter + "/damage" + playerDamage + " deadMethod=" + ( deadMethod != null ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- ruling of 2026-10-05: a mineral deposit holds 1 to 5 cubic meters
+
+	IEnumerator ScenarioDeposits()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// down to planet 90 (43% mineral density) and into the terrain vehicle
+		yield return EnterOrbit( 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		PressButton( ButtonController.ButtonSet.CommandA, 1 );
+
+		yield return WaitForLocation( PD_General.Location.Disembarked, 15.0f );
+		yield return Frames( 10 );
+
+		if ( playerData.m_general.m_location != PD_General.Location.Disembarked )
+		{
+			Finish( "scenario=deposits abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var terrainVehicle = controller.m_terrainVehicle;
+		var container = controller.m_disembarked.m_terrainGrid.m_terrainElements.transform;
+		var deposits = container.GetComponentsInChildren<TerrainElement>( true );
+
+		if ( deposits.Length < 60 )
+		{
+			Finish( "scenario=deposits abort: the planet has only " + deposits.Length + " deposits", 2 );
+			yield break;
+		}
+
+		// ---- 1. the size of every deposit of the planet, in tenths of a cubic meter (and where the deposits are, to compare two runs: the size must not move them)
+		var smallest = int.MaxValue;
+		var largest = int.MinValue;
+		var total = 0;
+		var notWholeCubicMeters = 0;
+		var sizes = new int[ 6 ];
+		long placement = 0;
+
+		for ( var i = 0; i < deposits.Length; i++ )
+		{
+			var volume = deposits[ i ].m_volume;
+
+			smallest = Mathf.Min( smallest, volume );
+			largest = Mathf.Max( largest, volume );
+			total += volume;
+
+			if ( ( volume % 10 != 0 ) || ( volume < 10 ) || ( volume > 50 ) )
+			{
+				notWholeCubicMeters++;
+			}
+			else
+			{
+				sizes[ volume / 10 ]++;
+			}
+
+			var position = deposits[ i ].transform.position;
+
+			placement = ( placement * 31 + Mathf.RoundToInt( position.x ) * 7 + Mathf.RoundToInt( position.z ) * 3 + deposits[ i ].m_elementId ) % 1000000007L;
+		}
+
+		Log( "deposits: planet 90 has " + deposits.Length + " deposits, from " + Tools.VolumeToText( smallest ) + " to " + Tools.VolumeToText( largest ) + " cubic meters, " + Tools.VolumeToText( total ) + " in all; " + notWholeCubicMeters + " are not 1, 2, 3, 4 or 5 cubic meters; of each size: " + sizes[ 1 ] + "/" + sizes[ 2 ] + "/" + sizes[ 3 ] + "/" + sizes[ 4 ] + "/" + sizes[ 5 ] + "; placement checksum " + placement );
+
+		Check( "deposits: every deposit holds 1 to 5 cubic meters", ( notWholeCubicMeters == 0 ) && ( smallest == 10 ) && ( largest == 50 ), "from " + Tools.VolumeToText( smallest ) + " to " + Tools.VolumeToText( largest ) + " cubic meters, " + notWholeCubicMeters + " of " + deposits.Length + " outside 1 to 5" );
+
+		// ---- 2. pick one up with the real button: what the message says and what arrives in the hold
+		foreach ( var other in deposits )
+		{
+			if ( Vector3.Distance( other.transform.position, terrainVehicle.transform.position ) < 50.0f )
+			{
+				other.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		var first = deposits[ 0 ];
+		var firstVolume = first.m_volume;
+
+		first.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+
+		new TVCargoButton().Execute();
+
+		var pickupMessage = MessageList();
+		var cargoAfterFirst = TerrainVehicleCargo( first.m_elementId );
+
+		Log( "deposits: picking up a deposit of " + firstVolume + " tenths: " + pickupMessage + " (in the hold now: " + cargoAfterFirst + " tenths)" );
+
+		Check( "deposits: the pickup message and the hold agree on a whole number of cubic meters", ( firstVolume >= 10 ) && ( cargoAfterFirst == firstVolume ) && pickupMessage.Contains( "Picked up " + ( firstVolume / 10 ) + ".0 cubic meters of " ), "deposit " + firstVolume + " tenths, hold " + cargoAfterFirst + " tenths | " + pickupMessage );
+
+		// ---- 3. how many deposits it takes to fill the terrain vehicle's hold (one deposit after the other next to the vehicle, real button)
+		var holdSize = gameData.m_misc.m_terrainVehicleVolume;
+		var pickups = 1;
+		var lastMessage = "";
+
+		for ( var i = 1; ( i < deposits.Length ) && ( i < 700 ) && ( playerData.m_terrainVehicle.GetRemainingVolume() > 0 ); i++ )
+		{
+			deposits[ i ].transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+
+			new TVCargoButton().Execute();
+
+			lastMessage = MessageList();
+
+			pickups++;
+
+			// out of the way again (a deposit that did not fit stays on the surface with what is left of it)
+			deposits[ i ].transform.position += Vector3.right * 1000.0f;
+		}
+
+		var holdUsed = holdSize - playerData.m_terrainVehicle.GetRemainingVolume();
+
+		// one more press with the hold full and a fresh deposit in reach
+		deposits[ deposits.Length - 1 ].transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+
+		new TVCargoButton().Execute();
+
+		var fullMessage = MessageList();
+		var holdUsedAfterFull = holdSize - playerData.m_terrainVehicle.GetRemainingVolume();
+
+		deposits[ deposits.Length - 1 ].transform.position += Vector3.right * 1000.0f;
+
+		Log( "deposits: the hold of " + Tools.VolumeToText( holdSize ) + " cubic meters was full after " + pickups + " deposits (in it: " + Tools.VolumeToText( holdUsed ) + ") | last pickup: " + lastMessage + " | one more press: " + fullMessage );
+
+		Check( "deposits: the terrain vehicle's hold is full after 10 to 50 deposits, and never over full", ( holdUsed == holdSize ) && ( holdUsedAfterFull == holdSize ) && ( pickups >= 10 ) && ( pickups <= 50 ) && fullMessage.Contains( "full" ), pickups + " deposits, " + Tools.VolumeToText( holdUsed ) + " of " + Tools.VolumeToText( holdSize ) + " cubic meters, after one more press " + Tools.VolumeToText( holdUsedAfterFull ) );
+
+		// ---- 4. the cargo display that is not in any scene yet shows the hold in cubic meters too (made here from its class)
+		var displayObject = new GameObject( "probe cargo display" );
+		var labelsObject = new GameObject( "labels" );
+		var valuesObject = new GameObject( "values" );
+
+		labelsObject.transform.SetParent( displayObject.transform );
+		valuesObject.transform.SetParent( displayObject.transform );
+
+		var cargoDisplay = displayObject.AddComponent<TerrainVehicleCargoDisplay>();
+
+		cargoDisplay.m_labelsText = labelsObject.AddComponent<TMPro.TextMeshProUGUI>();
+		cargoDisplay.m_valuesText = valuesObject.AddComponent<TMPro.TextMeshProUGUI>();
+
+		Call( cargoDisplay, "UpdateCargoDisplay" );
+
+		var displayValues = cargoDisplay.m_valuesText.text.Replace( "\n", "/" );
+
+		Destroy( displayObject );
+
+		Log( "deposits: the values column of TerrainVehicleCargoDisplay with a full hold: " + displayValues );
+
+		Check( "deposits: the unused cargo display shows cubic meters", displayValues.Contains( Tools.VolumeToText( holdSize ) + "/" + Tools.VolumeToText( holdSize ) + " m" ), displayValues );
+
+		// ---- 5. back into the ship: the ship's hold takes what fits, the rest stays in the terrain vehicle
+		var shipFreeBefore = playerData.m_playerShip.GetRemainingVolume();
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		var shipFreeAfter = playerData.m_playerShip.GetRemainingVolume();
+		var leftInVehicle = holdSize - playerData.m_terrainVehicle.GetRemainingVolume();
+		var expectedMoved = Mathf.Min( shipFreeBefore, holdSize );
+
+		Log( "deposits: back in the ship (" + playerData.m_general.m_location + "): the ship had room for " + Tools.VolumeToText( shipFreeBefore ) + " cubic meters and has room for " + Tools.VolumeToText( shipFreeAfter ) + " now; " + Tools.VolumeToText( leftInVehicle ) + " are still in the terrain vehicle" );
+
+		Check( "deposits: the ship takes what fits and the rest stays in the terrain vehicle (control)", ( shipFreeAfter == shipFreeBefore - expectedMoved ) && ( shipFreeAfter >= 0 ) && ( leftInVehicle == holdSize - expectedMoved ), "moved " + ( shipFreeBefore - shipFreeAfter ) + " tenths (should be " + expectedMoved + "), left in the vehicle " + leftInVehicle );
+
+		Finish( "scenario=deposits count=" + deposits.Length + " sizes=" + smallest + ".." + largest + " total=" + total + " placement=" + placement + " first=" + firstVolume + "/" + cargoAfterFirst + " toFill=" + pickups + " hold=" + holdUsed + "/" + holdSize + " ship=" + shipFreeBefore + "->" + shipFreeAfter + " leftInVehicle=" + leftInVehicle + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

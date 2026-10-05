@@ -59,7 +59,8 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 			{
 				var elementName = gameData.m_elementList[ elementRef.m_elementId ].m_name;
 				labels += elementName + "\n";
-				values += elementRef.m_volume + " m³\n";
+				// (the cargo hold counts in tenths of a cubic meter)
+				values += Tools.VolumeToText( elementRef.m_volume ) + " m³\n";
 			}
 		}
 
@@ -89,7 +90,7 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 		var used = total - remaining;
 
 		labels += "\n<color=#808080>Capacity:</color>";
-		values += "\n<color=#808080>" + used + "/" + total + " m³</color>";
+		values += "\n<color=#808080>" + Tools.VolumeToText( used ) + "/" + Tools.VolumeToText( total ) + " m³</color>";
 
 		m_labelsText.text = labels;
 		m_valuesText.text = values;
