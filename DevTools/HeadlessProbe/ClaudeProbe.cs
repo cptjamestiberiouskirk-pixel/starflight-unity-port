@@ -1917,7 +1917,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
-		// a recognizable amount of armor, shields down so that every hit goes to the hull
+		// a recognizable amount of armor, shields down so that every hit goes to the hull. The ship gets class 1 armor plating, whose 500 points can hold it:
+		// a bare hull has 250, and since PR 66 a save with more armor points than its ship can have is cut back when it is loaded (this scenario reloads its save)
+		dataController.m_playerData.m_playerShip.m_armorClass = 1;
 		dataController.m_playerData.m_playerShip.m_armorPoints = 400;
 		dataController.m_playerData.m_playerShip.m_shieldsAreUp = false;
 
