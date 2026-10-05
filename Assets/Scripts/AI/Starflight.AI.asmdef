@@ -1,0 +1,16 @@
+{
+    "name": "Starflight.AI",
+    "rootNamespace": "Starflight.AI",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "STARFLIGHT_SEMANTIC_KERNEL"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
