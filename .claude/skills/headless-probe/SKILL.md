@@ -41,4 +41,4 @@ One summary block per scenario. The README gives the count and the duration.
 
 ## After a run
 
-Run `git status --porcelain`. The probe deletes its copy in `Assets/`. A run that showed the "Starport clear" message can leave `Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset` modified with no change in content: restore it with `git checkout -- "<path>"` before staging, and stage files by name.
+Run `git status --porcelain`. The probe deletes its copy in `Assets/`. Stage files by name. If `Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset` is listed with an empty diff, the checkout is older than its `.gitattributes` line: restore it with `git checkout -- "<path>"`.

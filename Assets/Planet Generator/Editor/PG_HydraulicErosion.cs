@@ -182,7 +182,10 @@ public class PG_HydraulicErosion
 
 			var offset = step * snapshotInterval;
 
-			Parallel.For( 0, 8, parallelOptions, j =>
+			// rain on the eight parts of the map one after the other, on this thread. They used to be rained on at the same time, on eight threads that all
+			// wrote to the one map without a lock - a drop runs out of its own part of the map, so now and then an update was lost and the same planet came
+			// out a little different every time. This way the drops always fall in the same order and the result is the same every time (it takes about eight times as long)
+			for ( var j = 0; j < 8; j++ )
 			{
 				var dx = randomXYSize * ( j % 4 );
 				var dy = randomXYSize * ( j / 4 );
@@ -197,7 +200,7 @@ public class PG_HydraulicErosion
 					// let the drop run until it ends by itself, but never for more steps than its water can last
 					for ( var dropStep = 0; ( dropStep < maximumDropSteps ) && drop.Update(); dropStep++ ) { }
 				}
-			} );
+			}
 		}
 
 		UnityEngine.Debug.Log( "Erosion Steps - " + stopwatch.ElapsedMilliseconds + " milliseconds" );

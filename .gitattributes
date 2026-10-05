@@ -1,0 +1,4 @@
+# Unity writes this font asset again, with LF line endings, in every play session that shows a character the static font does not have
+# (the arrow in the "Starport clear" message). Checked out with LF, the file Unity writes is the file git has, and the working tree stays clean.
+# Without this line a checkout with core.autocrlf=true gets CRLF, and after such a play session git status lists the file as modified with an empty diff.
+Assets/TextMesh[[:space:]]Pro/Resources/Fonts[[:space:]]&[[:space:]]Materials/LiberationSans[[:space:]]SDF[[:space:]]-[[:space:]]Fallback.asset text eol=lf
