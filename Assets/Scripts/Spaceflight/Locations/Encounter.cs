@@ -6,6 +6,9 @@ using System.Text.RegularExpressions;
 
 public class Encounter : MonoBehaviour
 {
+	// the text of the comm that stands in when the game data has nothing to say for a race, subject and stance
+	const string c_noCommFoundText = "ERROR";
+
 	// the speed the alien ships move at
 	public float m_alienShipSpeed;
 
@@ -1610,7 +1613,7 @@ public class Encounter : MonoBehaviour
 		{
 			Debug.Log( "Whoops - no suitable comm found! (" + race + ", " + subject + ", " + stance + ")" );
 
-			return new GD_Comm( "ERROR" );
+			return new GD_Comm( c_noCommFoundText );
 		}
 
 		// have we shown all possible comms for this subject?
@@ -1667,8 +1670,21 @@ public class Encounter : MonoBehaviour
 		// get to the captains's personnel file
 		var personnelFile = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Captain );
 
+		// remember what the player said last (looking for an outgoing comm changes it)
+		var lastSubjectFromPlayer = m_pdEncounter.m_lastSubjectFromPlayer;
+
 		// find a comm
 		var comm = FindComm( subject, outgoing );
+
+		// the player has no statement to make in a posture the game data has no statements for (it has none for the neutral posture) - transmit nothing then
+		// (this used to transmit the word ERROR)
+		if ( outgoing && ( subject == GD_Comm.Subject.Statement ) && ( comm.m_text == c_noCommFoundText ) )
+		{
+			// nothing was said
+			m_pdEncounter.m_lastSubjectFromPlayer = lastSubjectFromPlayer;
+
+			return;
+		}
 
 		// copy the comm text (because we will replace tokens)
 		var text = comm.m_text;

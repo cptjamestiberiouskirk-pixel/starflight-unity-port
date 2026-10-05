@@ -95,7 +95,6 @@ public class PlanetGenerator
 	public Texture2D m_specularTexture;
 	public Texture2D m_normalTexture;
 	public Texture2D m_waterMaskTexture;
-	public Texture2D m_legendTexture;
 	public Texture2D m_elevationTexture;
 
 	public void Start( GD_Planet planet )

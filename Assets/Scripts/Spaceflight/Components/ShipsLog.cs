@@ -233,15 +233,26 @@ public class ShipsLog : MonoBehaviour
 		// get the height of the entries mask
 		var entriesMaskHeight = m_entriesMask.GetComponent<RectTransform>().rect.height;
 
-		// make sure the selector is visible
-		while ( ( selectorOffset < ( m_currentEntriesOffset + rowHeight ) ) && ( m_currentEntriesOffset > 0.0f ) )
+		// make sure the selector is visible - each pass scrolls the list by one row, so neither loop ever needs more passes than there are entries
+		// (the limit is there for a row height that scrolls nowhere - zero, or the negative height of a text with nothing in it - which would keep a loop going for good)
+		var maximumPasses = m_entryList.Count + 1;
+
+		var passes = 0;
+
+		while ( ( selectorOffset < ( m_currentEntriesOffset + rowHeight ) ) && ( m_currentEntriesOffset > 0.0f ) && ( passes < maximumPasses ) )
 		{
 			m_currentEntriesOffset -= rowHeight;
+
+			passes++;
 		}
 
-		while ( ( selectorOffset > ( entriesMaskHeight + m_currentEntriesOffset - rowHeight ) ) && ( m_currentEntriesOffset < ( ( rowHeight * m_entryList.Count ) - entriesMaskHeight ) ) )
+		passes = 0;
+
+		while ( ( selectorOffset > ( entriesMaskHeight + m_currentEntriesOffset - rowHeight ) ) && ( m_currentEntriesOffset < ( ( rowHeight * m_entryList.Count ) - entriesMaskHeight ) ) && ( passes < maximumPasses ) )
 		{
 			m_currentEntriesOffset += rowHeight;
+
+			passes++;
 		}
 		
 		// scroll the entries
