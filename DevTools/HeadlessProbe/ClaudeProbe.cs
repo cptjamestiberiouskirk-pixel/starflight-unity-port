@@ -507,6 +507,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioUnmapped();
 				break;
 
+			case "orbit":
+				yield return ScenarioOrbit();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -8063,6 +8067,298 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "unmapped: a game loaded in the terrain vehicle on a planet with maps stays in the terrain vehicle (control)", ( goodLocationAfterLoad == PD_General.Location.Disembarked ) && ( goodExceptions == 0 ), "location " + goodLocationAfterLoad + ", exceptions " + goodExceptions );
 
 		Finish( "scenario=unmapped albedo=" + realAlbedoSize + "->" + albedoSize + " oldMapsKept=" + keepsTheOldMaps + " couldNotBeMapped=" + couldNotBeMapped + " rangeMessage=" + rangeMessage.Contains( "could not be mapped" ) + " orbitMessage=" + orbitMessage.Contains( "could not be mapped" ) + " loaded=" + locationAfterLoad + "/exceptions" + exceptionsAfterLoad + "/saved" + savedLocation + " cargo=" + vehicleCargoBefore + "->" + vehicleCargoAfter + " control=" + goodLocationAfterLoad + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- ruling of 2026-10-05: an encounter in orbit begins when the ship goes into orbit around its planet, and ends at the level of the star system
+
+	// fly out of the encounter: the encounter location looks at how far the player is from its middle, so put the player beyond its edge and let it run
+	static IEnumerator FlyOutOfEncounter()
+	{
+		DataController.m_instance.m_playerData.m_general.m_coordinates = new Vector3( 5000.0f, 0.0f, 0.0f );
+
+		yield return Frames( 5 );
+	}
+
+	IEnumerator ScenarioOrbit()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var starSystem = controller.m_starSystem;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// ---- the game data: the encounters in orbit, and whether their star has a planet in the orbit they name
+		var inOrbitEncounters = 0;
+		var withAPlanet = 0;
+		var withoutAPlanet = "";
+
+		for ( var i = 0; i < gameData.m_encounterList.Length; i++ )
+		{
+			var gdEncounter = gameData.m_encounterList[ i ];
+
+			if ( gdEncounter.m_location != 2 )
+			{
+				continue;
+			}
+
+			inOrbitEncounters++;
+
+			var pdEncounter = playerData.FindEncounter( i );
+			var found = false;
+
+			foreach ( var planet in gameData.m_planetList )
+			{
+				if ( ( planet.m_starId == pdEncounter.GetStarId() ) && ( planet.m_orbitPosition == gdEncounter.m_orbitPosition ) )
+				{
+					found = true;
+				}
+			}
+
+			if ( found )
+			{
+				withAPlanet++;
+			}
+			else
+			{
+				withoutAPlanet += i + " (" + gdEncounter.m_race + ", star " + pdEncounter.GetStarId() + ", orbit " + gdEncounter.m_orbitPosition + ") ";
+			}
+		}
+
+		Log( "orbit: the game data has " + inOrbitEncounters + " encounters in orbit; " + withAPlanet + " of them name an orbit that has a planet; the others: " + ( ( withoutAPlanet == "" ) ? "none" : withoutAPlanet.Trim() ) );
+
+		// ---- 0. the way out of the other encounters is unchanged (control): one that began in the star system, and one that began in hyperspace
+		var range = controller.m_encounterRange * 1.25f;
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		var systemBefore = playerData.m_general.m_lastStarSystemCoordinates;
+		var locationBefore = playerData.m_general.m_location;
+
+		EnterEncounter( speminId );
+
+		yield return Frames( 5 );
+		yield return FlyOutOfEncounter();
+
+		var locationAfterSystemEncounter = playerData.m_general.m_location;
+		var systemMove = playerData.m_general.m_lastStarSystemCoordinates - systemBefore;
+
+		// the same encounter again, this time as if the ship had met it in hyperspace
+		EnterEncounter( speminId );
+
+		yield return Frames( 5 );
+
+		playerData.m_general.m_lastLocation = PD_General.Location.Hyperspace;
+
+		var hyperspaceBefore = playerData.m_general.m_lastHyperspaceCoordinates;
+
+		playerData.m_general.m_coordinates = new Vector3( 5000.0f, 0.0f, 0.0f );
+
+		yield return null;
+		yield return null;
+
+		var locationAfterHyperspaceEncounter = playerData.m_general.m_location;
+		var hyperspaceMove = playerData.m_general.m_lastHyperspaceCoordinates - hyperspaceBefore;
+
+		Log( "orbit: out of an encounter that began in the star system (" + locationBefore + "): " + locationAfterSystemEncounter + ", the ship's place in the system moved by " + systemMove + " (encounter range times 1.25 is " + range.ToString( "F1" ) + ") | out of one that began in hyperspace: " + locationAfterHyperspaceEncounter + ", the ship's place in hyperspace moved by " + hyperspaceMove );
+
+		Check( "orbit: the way out of an encounter that began in a star system or in hyperspace is unchanged (control)", ( locationBefore == PD_General.Location.StarSystem ) && ( locationAfterSystemEncounter == PD_General.Location.StarSystem ) && ( Vector3.Distance( systemMove, Vector3.right * range ) < 0.01f ) && ( locationAfterHyperspaceEncounter != PD_General.Location.Encounter ) && ( Vector3.Distance( hyperspaceMove, Vector3.right * range ) < 0.01f ), "star system: " + locationAfterSystemEncounter + " moved " + systemMove + " | hyperspace: " + locationAfterHyperspaceEncounter + " moved " + hyperspaceMove + " | expected (" + range.ToString( "F1" ) + ", 0, 0)" );
+
+		// ---- the star of encounter 316 (a derelict in orbit 3 of star 30, and no other encounter in that star system)
+		const int c_encounterId = 316;
+		const int c_starId = 30;
+
+		var theEncounter = gameData.m_encounterList[ c_encounterId ];
+
+		var guardedPlanetId = -1;
+		var otherPlanetId = -1;
+
+		foreach ( var planet in gameData.m_planetList )
+		{
+			if ( planet.m_starId == c_starId )
+			{
+				if ( planet.m_orbitPosition == theEncounter.m_orbitPosition )
+				{
+					guardedPlanetId = planet.m_id;
+				}
+				else
+				{
+					otherPlanetId = planet.m_id;
+				}
+			}
+		}
+
+		if ( ( theEncounter.m_location != 2 ) || ( guardedPlanetId < 0 ) || ( otherPlanetId < 0 ) )
+		{
+			Finish( "scenario=orbit abort: encounter " + c_encounterId + " is not what this scenario expects (location " + theEncounter.m_location + ", planets " + guardedPlanetId + " and " + otherPlanetId + ")", 2 );
+			yield break;
+		}
+
+		EnterStarSystem( c_starId );
+
+		var start = Time.realtimeSinceStartup;
+
+		while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 40.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		var systemCoordinates = playerData.m_general.m_lastStarSystemCoordinates;
+
+		// ---- 1. into orbit around a planet nobody waits at (control)
+		yield return EnterOrbit( otherPlanetId );
+
+		var locationAtOtherPlanet = playerData.m_general.m_location;
+
+		// ---- 2. into orbit around the planet the derelict is at
+		var exceptionsBefore = s_exceptionCount;
+
+		yield return EnterOrbit( guardedPlanetId );
+
+		var locationAtGuardedPlanet = playerData.m_general.m_location;
+		var encounterBegun = ( locationAtGuardedPlanet == PD_General.Location.Encounter );
+		var currentEncounter = playerData.m_general.m_currentEncounterId;
+		var cameFrom = playerData.m_general.m_lastLocation;
+		var saved = Stored( dataController.m_activeSaveGameSlotNumber );
+		var savedAs = ( saved == null ) ? "nothing saved" : ( saved.m_general.m_location + " from " + saved.m_general.m_lastLocation );
+
+		// where the aliens are: on the side of the planet, seen from where the ship was in the star system
+		var sideOfThePlanet = -2.0f;
+		var shipsInTheEncounter = 0;
+
+		if ( encounterBegun )
+		{
+			var planetPosition = starSystem.GetPlanetController( guardedPlanetId ).transform.localPosition;
+			var towardsThePlanet = Vector3.Normalize( planetPosition - systemCoordinates );
+
+			foreach ( var alienShip in controller.m_encounter.m_pdEncounter.GetAlienShipList() )
+			{
+				if ( alienShip.m_addedToEncounter && !alienShip.m_isDead )
+				{
+					shipsInTheEncounter++;
+
+					sideOfThePlanet = Vector3.Dot( Vector3.Normalize( alienShip.m_coordinates ), towardsThePlanet );
+				}
+			}
+		}
+
+		Log( "orbit: in orbit around planet " + otherPlanetId + " (nobody waits there): " + locationAtOtherPlanet + " | around planet " + guardedPlanetId + " (encounter " + c_encounterId + " is in its orbit): " + locationAtGuardedPlanet + ", current encounter " + currentEncounter + ", came from " + cameFrom + ", saved as " + savedAs + ", ships " + shipsInTheEncounter + ", on the side of the planet " + sideOfThePlanet.ToString( "F3" ) );
+
+		Check( "orbit: nothing begins in orbit around a planet nobody waits at (control)", locationAtOtherPlanet == PD_General.Location.InOrbit, locationAtOtherPlanet.ToString() );
+		Check( "orbit: the encounter begins when the ship goes into orbit around its planet", encounterBegun && ( currentEncounter == c_encounterId ) && ( cameFrom == PD_General.Location.InOrbit ) && ( shipsInTheEncounter > 0 ), locationAtGuardedPlanet + ", encounter " + currentEncounter + ", from " + cameFrom + ", ships " + shipsInTheEncounter );
+		Check( "orbit: its ships come from the side of the planet", sideOfThePlanet > 0.95f, sideOfThePlanet.ToString( "F3" ) );
+
+		// ---- 3. flying out of it: back at the level of the star system, where the ship was, and nothing begins by itself there
+		var locationAfterLeaving = "not left";
+		var movedBy = -1.0f;
+		var locationLater = "";
+
+		if ( encounterBegun )
+		{
+			yield return FlyOutOfEncounter();
+
+			locationAfterLeaving = playerData.m_general.m_location.ToString();
+			movedBy = Vector3.Distance( playerData.m_general.m_lastStarSystemCoordinates, systemCoordinates );
+
+			yield return Frames( 30 );
+
+			locationLater = playerData.m_general.m_location.ToString();
+		}
+
+		Log( "orbit: after flying out of the encounter: " + locationAfterLeaving + ", " + movedBy.ToString( "F1" ) + " from where the ship was in the star system; 30 frames later: " + locationLater );
+
+		Check( "orbit: an encounter from orbit ends at the level of the star system, where the ship was", ( locationAfterLeaving == "StarSystem" ) && ( movedBy == 0.0f ) && ( locationLater == "StarSystem" ), locationAfterLeaving + ", moved " + movedBy.ToString( "F1" ) + ", later " + locationLater );
+
+		// ---- 4. back into orbit: the derelict is still there, so the encounter begins again
+		var locationSecondTime = "not tried";
+
+		if ( encounterBegun )
+		{
+			yield return EnterOrbit( guardedPlanetId );
+
+			locationSecondTime = playerData.m_general.m_location.ToString();
+
+			if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+			{
+				yield return FlyOutOfEncounter();
+			}
+		}
+
+		Check( "orbit: going back into orbit begins it again while it has living ships", locationSecondTime == "Encounter", locationSecondTime );
+
+		// ---- 5. a launch from the surface of that planet: the ship is in orbit 17 seconds into the camera animation, which runs for 30 - the encounter waits for its end
+		playerData.m_general.m_currentPlanetId = guardedPlanetId;
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		var locationOnTheSurface = playerData.m_general.m_location;
+
+		PressButton( ButtonController.ButtonSet.CommandA, 0 );
+
+		yield return Frames( 3 );
+
+		PressButton( ButtonController.ButtonSet.Launch, 0 );
+
+		// wait for the ship to be in orbit (or for the encounter, if it does not wait)
+		yield return WaitForLocation( PD_General.Location.InOrbit, 25.0f );
+
+		var inOrbitAt = Time.realtimeSinceStartup;
+		var launchingWhenInOrbit = controller.m_playerCamera.IsLaunchingOrLanding();
+		var locationWhenInOrbit = playerData.m_general.m_location;
+
+		// two seconds later the animation is still running
+		yield return new WaitForSecondsRealtime( 2.0f );
+
+		var launchingTwoSecondsLater = controller.m_playerCamera.IsLaunchingOrLanding();
+		var locationTwoSecondsLater = playerData.m_general.m_location;
+
+		// now wait for the encounter
+		yield return WaitForLocation( PD_General.Location.Encounter, 20.0f );
+
+		var encounterAfter = Time.realtimeSinceStartup - inOrbitAt;
+		var locationAfterLaunch = playerData.m_general.m_location;
+		var launchingWhenItBegan = controller.m_playerCamera.IsLaunchingOrLanding();
+		var consoleAfterLaunch = Console();
+
+		Log( "orbit: launch from planet " + guardedPlanetId + " (" + locationOnTheSurface + "): in orbit with the launch animation running " + launchingWhenInOrbit + " (" + locationWhenInOrbit + "), two seconds later " + launchingTwoSecondsLater + " (" + locationTwoSecondsLater + "); " + encounterAfter.ToString( "F1" ) + " s after reaching orbit the location is " + locationAfterLaunch + " with the animation running " + launchingWhenItBegan + ", console " + consoleAfterLaunch );
+
+		Check( "orbit: after a launch the encounter waits for the end of the launch animation", ( locationOnTheSurface == PD_General.Location.Planetside ) && launchingWhenInOrbit && launchingTwoSecondsLater && ( locationTwoSecondsLater == PD_General.Location.InOrbit ) && ( locationAfterLaunch == PD_General.Location.Encounter ) && !launchingWhenItBegan, "two seconds into orbit: " + locationTwoSecondsLater + " (animation " + launchingTwoSecondsLater + "), then " + locationAfterLaunch + " after " + encounterAfter.ToString( "F1" ) + " s (animation " + launchingWhenItBegan + ")" );
+
+		// ---- 6. with its ships destroyed the encounter is over for good: the ship stays in orbit
+		var locationWithNoShipsLeft = "not tried";
+
+		if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+		{
+			var alienShipList = controller.m_encounter.m_pdEncounter.GetAlienShipList();
+
+			for ( var i = 0; i < alienShipList.Length; i++ )
+			{
+				Kill( i );
+			}
+
+			yield return Frames( 5 );
+			yield return FlyOutOfEncounter();
+			yield return EnterOrbit( guardedPlanetId );
+			yield return Frames( 20 );
+
+			locationWithNoShipsLeft = playerData.m_general.m_location.ToString();
+		}
+
+		var exceptions = s_exceptionCount - exceptionsBefore;
+
+		Log( "orbit: with every ship of the encounter destroyed, in orbit around planet " + guardedPlanetId + ": " + locationWithNoShipsLeft + " | exceptions since the first orbit: " + exceptions );
+
+		Check( "orbit: an encounter with no living ships does not begin, and nothing threw", ( locationWithNoShipsLeft == "InOrbit" ) && ( exceptions == 0 ), locationWithNoShipsLeft + ", exceptions " + exceptions );
+
+		Finish( "scenario=orbit inOrbitEncounters=" + inOrbitEncounters + " withAPlanet=" + withAPlanet + " control=" + locationAtOtherPlanet + " begun=" + locationAtGuardedPlanet + "/" + currentEncounter + "/from" + cameFrom + " side=" + sideOfThePlanet.ToString( "F2" ) + " left=" + locationAfterLeaving + "/" + movedBy.ToString( "F0" ) + " again=" + locationSecondTime + " launch=" + locationTwoSecondsLater + "->" + locationAfterLaunch + "@" + encounterAfter.ToString( "F0" ) + "s noShips=" + locationWithNoShipsLeft + " exceptions=" + exceptions + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

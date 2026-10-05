@@ -18,6 +18,9 @@ public class InOrbit : MonoBehaviour
 	// current planet spin
 	float m_spin;
 
+	// true from the moment the ship goes into orbit until we have looked for an encounter that waits in orbit around this planet (we look once every time)
+	bool m_lookForEncounter;
+
 	// unity awake
 	void Awake()
 	{
@@ -35,6 +38,20 @@ public class InOrbit : MonoBehaviour
 		if ( SpaceflightController.m_instance.m_gameIsPaused )
 		{
 			return;
+		}
+
+		// has the ship just gone into orbit? then an encounter that waits in orbit around this planet begins now
+		// (not while the launch from the surface is still bringing the ship up - its camera animation and the events of that animation have to finish first)
+		if ( m_lookForEncounter && !SpaceflightController.m_instance.m_playerCamera.IsLaunchingOrLanding() )
+		{
+			// we look only once every time the ship goes into orbit
+			m_lookForEncounter = false;
+
+			if ( SpaceflightController.m_instance.BeginInOrbitEncounter() )
+			{
+				// the encounter location has taken over
+				return;
+			}
 		}
 
 		// slowly spin the planet
@@ -76,6 +93,9 @@ public class InOrbit : MonoBehaviour
 		}
 
 		Debug.Log( "Showing the in orbit location." );
+
+		// the ship has just gone into orbit - look for an encounter that waits here (in the next update, not in the middle of this switch of location)
+		m_lookForEncounter = true;
 
 		// get to the game data
 		var gameData = DataController.m_instance.m_gameData;
