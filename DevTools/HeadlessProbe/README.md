@@ -87,9 +87,10 @@ What the probe does:
 | `commlink` | hostile aliens before, during and after a comm link (Spemin scouts through the real `Connect` and `Disconnect`; the Uhlek with the comm flag set by hand, since they never talk), a player missile and an alien missile that run out of time (an explosion, no damage) next to a missile that arrives, and that `Encounter.LeaveEncounterAfterVictory` is gone (about 65 s) |
 | `deposits` | the size of all 762 deposits of planet 90 (1 to 5 cubic meters) with a checksum of where they are, so that two runs can be compared, a pickup through the real button, how many deposits fill the terrain vehicle's hold, the cargo display that is not in any scene, and what the ship's hold takes on the way back |
 | `unmapped` | a planet whose maps could not be generated (planet 90 with a file that cannot be read): the four maps on its material before and after, whether the maps from before are destroyed, the messages within orbital range and in orbit, and a game that is loaded in the terrain vehicle on that planet (where it ends up, the exceptions of its first second, its cargo, what is saved), with a planet that has its maps as the control |
+| `orbit` | encounters in orbit (encounter 316 at planet 115 of star 30): that it begins when the ship goes into orbit and not at another planet, where its ships come from, where the ship is after flying out of it, that it begins again, a real launch from the planet's surface (the encounter waits for the end of the 30 s animation), and that it is over once its ships are destroyed. Also the way out of a star system and a hyperspace encounter as a control, and how many of the game data's encounters in orbit name an orbit that has a planet (about 50 s) |
 | `starport-savedata` | a save with more armor points than its armor allows is cut back when it is loaded (and one written with a destroyed ship still loads with 1 point), the dates of the bank, of the Operations notices and of their ship's log entries with the computer set to the Thai calendar, a ship's log entry dated by an older build after a load, and the starting balance of a build and of the Editor |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (47 scenarios, about 17 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (48 scenarios, about 18 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
@@ -129,6 +130,7 @@ Pitfalls:
 - Hyperspace encounters show all their ships at once. The 128 star-system encounters have 6 ships, 3 at a time; those are the ones where a ship's index and its model slot drift apart.
 - Only vessels 1 to 4 (Spemin, Mechan) and 20 have a debris model. Encounters 115 and 116 are Spemin, 7 is Elowan.
 - Mechans are hostile to a ship with no human crew.
+- Twelve encounters are in orbit around a planet (location 2). Star 30 has one of them (316, a derelict at planet 115) and no other encounter, which makes it the quiet place to test them. Four of the twelve (139, 165, 302, 305) name an orbit that has no planet, so they can never begin.
 - The Arth system (where a scenario starts) has four planets besides Arth: 90, 91 and 92 are frozen, 94 is a small rock planet. Planet 90 has a mineral density of 43% (762 deposits, 2218 cubic meters in all). Landing and disembarking work headless; the landing animation takes 35 s.
 - A new game has 20.0 cubic meters of Endurium (200 tenths), 250 armor points and, in the Editor, 1,000,000 MU (a build starts with the original 12,000 MU; the probe always runs in the Editor).
 

@@ -456,7 +456,7 @@ public class SpaceflightController : MonoBehaviour
 			// get the encounter location
 			var encounterLocation = encounter.GetLocation();
 
-			// orbit encounters are handled in maneuver
+			// orbit encounters do not move and are not met in flight - they begin when the ship goes into orbit around their planet (see BeginInOrbitEncounter)
 			if ( encounterLocation == PD_General.Location.InOrbit )
 			{
 				continue;
@@ -511,18 +511,91 @@ public class SpaceflightController : MonoBehaviour
 		// did the player run into an encounter?
 		if ( encounterToBegin != null )
 		{
-			// yes - save encounter information in the player data
-			playerData.m_general.m_currentEncounterId = encounterToBegin.m_encounterId;
-
-			// put the player in the middle of the encounter
-			playerData.m_general.m_lastEncounterCoordinates = Vector3.zero;
-
-			// let the encounter system know we are now entering this encounter
-			m_encounter.JustEntered();
-
-			// switch to the encounter location
-			SwitchLocation( PD_General.Location.Encounter );
+			// yes - begin it
+			BeginEncounter( encounterToBegin );
 		}
+	}
+
+	// begins an encounter - the player is put in the middle of it and the encounter location takes over
+	void BeginEncounter( PD_Encounter encounter )
+	{
+		// get to the player data
+		var playerData = DataController.m_instance.m_playerData;
+
+		// save encounter information in the player data
+		playerData.m_general.m_currentEncounterId = encounter.m_encounterId;
+
+		// put the player in the middle of the encounter
+		playerData.m_general.m_lastEncounterCoordinates = Vector3.zero;
+
+		// let the encounter system know we are now entering this encounter
+		m_encounter.JustEntered();
+
+		// switch to the encounter location
+		SwitchLocation( PD_General.Location.Encounter );
+	}
+
+	// begins the encounter that waits in orbit around the planet the ship is orbiting, if there is one with living ships (the in orbit location calls this once every time the ship goes into orbit)
+	// the ship drops out of orbit into the encounter, and when the encounter ends it is back at the level of the star system (see Encounter.LeaveEncounter) - as in the original game
+	// returns true if an encounter has begun
+	public bool BeginInOrbitEncounter()
+	{
+		// get to the game data
+		var gameData = DataController.m_instance.m_gameData;
+
+		// get to the player data
+		var playerData = DataController.m_instance.m_playerData;
+
+		// this is only for a ship that is in orbit
+		if ( playerData.m_general.m_location != PD_General.Location.InOrbit )
+		{
+			return false;
+		}
+
+		// get the planet the ship is orbiting
+		var planetController = m_starSystem.GetPlanetController( playerData.m_general.m_currentPlanetId );
+
+		if ( ( planetController == null ) || ( planetController.m_planet == null ) )
+		{
+			return false;
+		}
+
+		// go through each potential encounter
+		foreach ( var encounter in playerData.m_encounterList )
+		{
+			// only encounters that are in orbit around a planet of this star
+			if ( ( encounter.GetLocation() != PD_General.Location.InOrbit ) || ( encounter.GetStarId() != playerData.m_general.m_currentStarId ) )
+			{
+				continue;
+			}
+
+			// skip an encounter the game data does not have (the orbit position is in the game data)
+			if ( ( encounter.m_encounterId < 0 ) || ( encounter.m_encounterId >= gameData.m_encounterList.Length ) )
+			{
+				continue;
+			}
+
+			// is this encounter in orbit around the planet the ship is orbiting?
+			if ( gameData.m_encounterList[ encounter.m_encounterId ].m_orbitPosition != planetController.m_planet.m_orbitPosition )
+			{
+				// no - skip it
+				continue;
+			}
+
+			// skip encounters that have no living ships left (there is nobody to meet the player)
+			if ( !encounter.HasLivingAlienShips() )
+			{
+				continue;
+			}
+
+			// begin this encounter (there is only ever one in the same orbit)
+			BeginEncounter( encounter );
+
+			return true;
+		}
+
+		// nobody is waiting here
+		return false;
 	}
 
 #if UNITY_EDITOR

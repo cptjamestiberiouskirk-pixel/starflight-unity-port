@@ -176,21 +176,7 @@ public class Encounter : MonoBehaviour
 			// still allow player to leave - check if player has left the encounter area
 			if ( playerData.m_general.m_coordinates.magnitude >= 4096.0f )
 			{
-				// calculate the normalized exit direction vector
-				var exitDirection = Vector3.Normalize( playerData.m_general.m_coordinates );
-
-				// was the last location in hyperspace?
-				if ( playerData.m_general.m_lastLocation == PD_General.Location.Hyperspace )
-				{
-					playerData.m_general.m_lastHyperspaceCoordinates += exitDirection * SpaceflightController.m_instance.m_encounterRange * 1.25f;
-				}
-				else
-				{
-					playerData.m_general.m_lastStarSystemCoordinates += exitDirection * SpaceflightController.m_instance.m_encounterRange * 1.25f;
-				}
-
-				// switch back to the last location
-				SpaceflightController.m_instance.SwitchLocation( playerData.m_general.m_lastLocation );
+				LeaveEncounter();
 			}
 			return;
 		}
@@ -311,24 +297,49 @@ public class Encounter : MonoBehaviour
 			// has the player left the encounter?
 			if ( playerData.m_general.m_coordinates.magnitude >= 4096.0f )
 			{
-				// calculate the normalized exit direction vector
-				var exitDirection = Vector3.Normalize( playerData.m_general.m_coordinates );
-
-				// was the last location in hyperspace?
-				if ( playerData.m_general.m_lastLocation == PD_General.Location.Hyperspace )
-				{
-					// yes - update the last hyperspace coordinates
-					playerData.m_general.m_lastHyperspaceCoordinates += exitDirection * SpaceflightController.m_instance.m_encounterRange * 1.25f;
-				}
-				else
-				{
-					// no - update the last star system coordinates
-					playerData.m_general.m_lastStarSystemCoordinates += exitDirection * SpaceflightController.m_instance.m_encounterRange * 1.25f;
-				}
-
-				// yes - switch back to the last location
-				SpaceflightController.m_instance.SwitchLocation( playerData.m_general.m_lastLocation );
+				// yes - go back to where the encounter began
+				LeaveEncounter();
 			}
+		}
+	}
+
+	// the player has flown out of the encounter - go back to where the ship was when the encounter began
+	void LeaveEncounter()
+	{
+		// get to the player data
+		var playerData = DataController.m_instance.m_playerData;
+
+		// calculate the normalized exit direction vector
+		var exitDirection = Vector3.Normalize( playerData.m_general.m_coordinates );
+
+		// where did the encounter begin?
+		switch ( playerData.m_general.m_lastLocation )
+		{
+			case PD_General.Location.Hyperspace:
+
+				// in hyperspace - come out of it away from the aliens, on the side the player left on
+				playerData.m_general.m_lastHyperspaceCoordinates += exitDirection * SpaceflightController.m_instance.m_encounterRange * 1.25f;
+
+				SpaceflightController.m_instance.SwitchLocation( PD_General.Location.Hyperspace );
+
+				break;
+
+			case PD_General.Location.InOrbit:
+
+				// in orbit around a planet - an encounter from orbit ends at the level of the star system, as in the original game
+				// the ship is where it was when it went into orbit, next to the planet (going back into orbit ourselves would begin the same encounter again at once)
+				SpaceflightController.m_instance.SwitchLocation( PD_General.Location.StarSystem );
+
+				break;
+
+			default:
+
+				// in a star system - come out of it away from the aliens, on the side the player left on
+				playerData.m_general.m_lastStarSystemCoordinates += exitDirection * SpaceflightController.m_instance.m_encounterRange * 1.25f;
+
+				SpaceflightController.m_instance.SwitchLocation( playerData.m_general.m_lastLocation );
+
+				break;
 		}
 	}
 
@@ -530,6 +541,17 @@ public class Encounter : MonoBehaviour
 				alienShip.m_addedToEncounter = false;
 			}
 
+			// an encounter in orbit has no place of its own in the star system - it is at its planet, and that is the side its ships come from
+			if ( m_pdEncounter.GetLocation() == PD_General.Location.InOrbit )
+			{
+				var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( playerData.m_general.m_currentPlanetId );
+
+				if ( planetController != null )
+				{
+					m_pdEncounter.SetCoordinates( planetController.transform.localPosition );
+				}
+			}
+
 			// add the first round of alien ships to the encounter
 			AddAlienShips();
 
@@ -713,8 +735,16 @@ public class Encounter : MonoBehaviour
 					// encounter inside a star system has nothing to do with where the aliens are, so they appeared on any side but the one they came from)
 					var playerCoordinates = ( m_pdEncounter.GetLocation() == PD_General.Location.Hyperspace ) ? playerData.m_general.m_lastHyperspaceCoordinates : playerData.m_general.m_lastStarSystemCoordinates;
 
+					// the direction the aliens come from (if they are exactly where the player is there is no such direction, and they would appear on top of the player - so pick one)
+					var directionOfApproach = Vector3.Normalize( m_pdEncounter.m_currentCoordinates - playerCoordinates );
+
+					if ( directionOfApproach == Vector3.zero )
+					{
+						directionOfApproach = Vector3.forward;
+					}
+
 					// put alien ship in area approximately in the correct direction of approach
-					coordinates = new Vector3( randomPosition.x, 0.0f, randomPosition.y ) * 256.0f + Vector3.Normalize( m_pdEncounter.m_currentCoordinates - playerCoordinates ) * 4096.0f;
+					coordinates = new Vector3( randomPosition.x, 0.0f, randomPosition.y ) * 256.0f + directionOfApproach * 4096.0f;
 				}
 				else
 				{
