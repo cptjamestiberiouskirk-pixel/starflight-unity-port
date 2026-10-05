@@ -12,3 +12,5 @@ paths:
 - `Process()` runs on the main thread and never waits for the task: it looks at `IsCompleted` each frame. Only the main thread changes the step and the abort flag; the task only writes the progress and its own buffers.
 - A planet file that cannot be read (`ReadPlanetData` throws) fails the task, and `Process()` turns that into an abort of that one planet with an error in the log. An aborted planet has no maps and no elevation data: check `Planet.HasMaps()` before using its generator.
 - Never let an exception out of `Process()`: `SpaceflightController.Update` calls it first thing every frame, so the game would stay paused for good.
+- The erosion pass of the tool (`PG_HydraulicErosion`) rains on one thread on purpose. With the drops on several threads, all writing to the one map, the same planet came out different on every run. Do not put the drops back on threads.
+- The 811 planet files were made by the old, racing erosion pass, so generating a planet again gives a file that differs from the one in the project. Never regenerate planet files without the project owner's go-ahead.

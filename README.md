@@ -23,13 +23,14 @@ The project has been refactored to a clean, **root-directory architecture** to e
 
 - **Deterministic Exploration**: Navigate a fixed map of **270 star systems and approximately 800 predetermined planets**, preserving the exact coordinates and data of the 1986 original.
 - **Data-Driven Architecture**: Uses JSON-based definitions for game assets and player progress via the `ISaveSystem`.
-- **Combat System**: Laser cannons, missile launchers, shield absorption, armor damage, and AI combat behaviors with victory/defeat detection. Alien ships have armor and shield points, any race turns hostile when fired on (the Uhlek attack on sight), and every shot uses a little Endurium.
+- **Combat System**: Laser cannons, missile launchers, shield absorption, armor damage, and AI combat behaviors with victory/defeat detection. Alien ships have armor and shield points, any race turns hostile when fired on (the Uhlek attack on sight), aliens hold their fire while a comm link is up, and every shot uses a little Endurium.
 - **Encounters in Orbit**: Home fleets, drones and a derelict wait in orbit around their planets and meet the ship when it goes into orbit there. The ship drops into the encounter and comes back at the level of the star system, as in the original.
 - **Ship Systems Over Time**: Shields keep their charge and recharge slowly, and the engineer's repairs and the doctor's treatment take time, faster with higher skill.
 - **Ship Destruction**: Complete death sequences with explosion effects, debris spawning, and salvage opportunities.
 - **Game Over System**: Player ship destruction triggers the game over screen. Returning to the title screen goes back to the last save.
 - **Terrain Scanning**: Enhanced exploration with 3D world-space labels, mineral detection, and Star Trek-style transporter effects.
-- **Cargo Management**: Real-time volume tracking for minerals and elements with automatic transfer to the ship.
+- **Cargo Management**: Real-time volume tracking for minerals and elements with automatic transfer to the ship. A mineral deposit holds 1 to 5 cubic meters.
+- **Original Economy in Builds**: A new game in a build starts with the original 12,000 MU (the Editor keeps 1,000,000 for testing), and the bank and the notices show stardates as the original did (`26-03-4620`).
 - **Debris Scanning**: Scan destroyed vessel wreckage for salvage analysis.
 
 ---
