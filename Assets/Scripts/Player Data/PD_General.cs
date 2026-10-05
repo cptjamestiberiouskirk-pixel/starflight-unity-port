@@ -190,6 +190,19 @@ public class PD_General
 		}
 	}
 
+	// turns a stardate that is stored as year-month-day (the form that sorts - the bank ledger and the starport notices use it) into the form the game shows, day-month-year
+	// (always with the invariant culture - the date formats of the computer's region would show the year of its calendar)
+	public static string GetDisplayStardate( string stardateYMD )
+	{
+		if ( DateTime.TryParseExact( stardateYMD, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var dateTime ) )
+		{
+			return dateTime.ToString( "dd-MM-yyyy", System.Globalization.CultureInfo.InvariantCulture );
+		}
+
+		// not a stardate we can read - show it as it is
+		return stardateYMD ?? "";
+	}
+
 	// this updates the game time
 	public void UpdateGameTime( float deltaTime )
 	{

@@ -206,6 +206,15 @@ public class DataController : MonoBehaviour
 			playerData.m_playerShip.m_armorPoints = 1;
 		}
 
+		// repair save files that hold more armor points than their ship can have (selling the armor used to leave its points behind) - this only ever takes points away
+		playerData.m_playerShip.ValidateArmorPoints();
+
+		// repair save files whose ships log has starport notices dated with the calendar of the computer they were read on
+		if ( playerData.m_shipsLog != null )
+		{
+			playerData.m_shipsLog.ValidateStarportNoticeDates();
+		}
+
 		return playerData;
 	}
 

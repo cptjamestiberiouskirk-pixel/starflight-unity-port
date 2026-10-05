@@ -39,8 +39,8 @@ public class BankPanel : Panel
 		{
 			PD_Bank.Transaction transaction = bank.m_transactionList[ transactionId ];
 
-			DateTime dateTime = DateTime.ParseExact( transaction.m_stardate, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture );
-			m_dateListText.text += dateTime.ToShortDateString();
+			// the date of a transaction is a stardate, so show it the way the game shows stardates (not in the date format of the computer's region)
+			m_dateListText.text += PD_General.GetDisplayStardate( transaction.m_stardate );
 			m_transactionsListText.text += transaction.m_description;
 			m_amountListText.text += transaction.m_amount;
 

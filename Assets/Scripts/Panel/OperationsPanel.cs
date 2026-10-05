@@ -126,9 +126,8 @@ public class OperationsPanel : Panel
 		// get access to the game data
 		GameData gameData = DataController.m_instance.m_gameData;
 
-		// update the stardate text
-		DateTime dateTime = DateTime.ParseExact( playerData.m_general.m_currentStardateYMD, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture );
-		m_stardateText.text = "Today is " + dateTime.ToLongDateString();
+		// update the stardate text (the way the game shows stardates, not in the date format of the computer's region)
+		m_stardateText.text = "Today is " + PD_General.GetDisplayStardate( playerData.m_general.m_currentStardateYMD );
 
 		// figure out which notice we should be showing (current notice)
 		string earliestNewNoticeStardate = "9999-12-31";
@@ -332,9 +331,8 @@ public class OperationsPanel : Panel
 		// check if we are displaying the first line
 		if ( m_currentLine == 0 )
 		{
-			// clear the text and add the date
-			DateTime messageDate = DateTime.ParseExact( currentNotice.m_stardate, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture );
-			m_messageText.text = messageDate.ToLongDateString();
+			// clear the text and add the date (a stardate too)
+			m_messageText.text = PD_General.GetDisplayStardate( currentNotice.m_stardate );
 
 			// remember the newest notice read
 			if ( string.Compare( currentNotice.m_stardate, DataController.m_instance.m_playerData.m_starport.m_lastReadNoticeStardate ) > 0 )
