@@ -20,11 +20,14 @@ public class TerrainElement : MonoBehaviour
 	// the pickup distance threshold
 	const float c_pickupDistance = 10.0f;
 
-	// minimum volume per deposit
+	// minimum volume per deposit, in cubic meters
 	const int c_minVolume = 1;
 
-	// maximum volume per deposit
+	// maximum volume per deposit, in cubic meters
 	const int c_maxVolume = 5;
+
+	// the cargo holds count in tenths of a cubic meter
+	const int c_tenthsPerCubicMeter = 10;
 
 	// initialize this element
 	public void Initialize( int elementId, TerrainVehicle terrainVehicle )
@@ -32,8 +35,9 @@ public class TerrainElement : MonoBehaviour
 		m_elementId = elementId;
 		m_terrainVehicle = terrainVehicle;
 
-		// random volume for this deposit
-		m_volume = Random.Range( c_minVolume, c_maxVolume + 1 );
+		// random volume for this deposit - 1 to 5 cubic meters, kept in tenths like everything in the cargo holds
+		// (still one random number per deposit - the objects of a planet are placed with random numbers seeded from the planet, and a second number here would move everything placed after it)
+		m_volume = Random.Range( c_minVolume, c_maxVolume + 1 ) * c_tenthsPerCubicMeter;
 	}
 
 	// check if this element is close enough to the terrain vehicle to pick up
