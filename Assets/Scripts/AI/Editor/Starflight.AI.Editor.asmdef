@@ -1,0 +1,20 @@
+{
+    "name": "Starflight.AI.Editor",
+    "rootNamespace": "Starflight.AI.EditorTools",
+    "references": [
+        "Starflight.AI"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "STARFLIGHT_SEMANTIC_KERNEL"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

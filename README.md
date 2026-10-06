@@ -56,6 +56,13 @@ Every pull request and push to `master` runs a headless Unity compile check (`.g
 ### Local Checks
 `DevTools/HeadlessProbe/` holds a headless compile check and a play-mode probe for Windows. The probe runs the real Spaceflight or Starport scene in batch mode with an in-memory save system and checks game behaviour through scenarios, one for every fix made since 2026-10-03. It sits outside `Assets/`, so it is not part of the build. See its [README](DevTools/HeadlessProbe/README.md).
 
+### AI Orchestration (optional)
+`Assets/Scripts/AI/` runs a [Semantic Kernel](https://github.com/microsoft/semantic-kernel) inside the game that talks to Claude through the Claude Code command line (`claude -p`), so it uses the plan you are signed in with in Claude Code instead of an API key. Each request starts a `claude` process and takes a few seconds, so it suits world events and tooling, not anything per frame, and it only works on a machine with Claude Code installed and signed in.
+
+1. Open the project. NuGetForUnity (in `Packages/manifest.json`) restores `Microsoft.SemanticKernel.Core` and its dependencies from `Assets/packages.config` into `Assets/Packages/`, and `SemanticKernelDefineSync` then adds the `STARFLIGHT_SEMANTIC_KERNEL` define, which the `Starflight.AI` assemblies need to compile. Until then the AI code is left out and the rest of the project compiles as before. Commit `Assets/Packages/`, `Assets/packages.config` and `ProjectSettings/ProjectSettings.asset` together: a define without the DLLs fails the CI compile.
+2. **Starflight Remake > AI > Add Semantic Orchestrator To Active Scene** adds a `SemanticOrchestrator` object with a `MainThreadDispatcher` and a `MetagameOrchestrator`. In play mode, **Trigger World Simulation** on the orchestrator's context menu asks Claude to simulate a border dispute (Thrynn and Elowan by default). Claude calls the `WorldState-generate_faction_event` kernel function, which decides the outcome and logs it, then narrates it.
+3. The 3D crate comes from `DevTools/Blender/make_scifi_crate.py` (run it in Blender, from a shell or through the Blender MCP server; it writes `Assets/Models/SciFiCrate.fbx`). **Starflight Remake > AI > Import SciFi Crate Into Active Scene** then makes `Assets/Models/SciFiCrate.prefab` and places it at the origin. `Assets/UI/EventLogBg.svg` is a background for an event log panel.
+
 ---
 
 ## 📂 Project Structure
@@ -76,6 +83,7 @@ Assets/
 │   └── Starflight Game Data.json # Primary project configuration
 ├── Scenes/                # Game scenes (Intro, Spaceflight, Starport, Persistent)
 ├── Scripts/               # Core game logic and system architecture
+│   ├── AI/                # Optional Semantic Kernel orchestration through the claude command line
 │   ├── Game Data/         # C# Data Classes/Models (GD_Planet, GD_Star, GD_Vessel)
 │   ├── Persistent/        # Global managers (DataController, SoundController)
 │   └── Spaceflight/       # Combat, Navigation, and UI interaction logic

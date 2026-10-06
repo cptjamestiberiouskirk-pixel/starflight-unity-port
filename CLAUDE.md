@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Unity 6 (**6000.3.13f1**) port of the 1986 space RPG *Starflight*. All gameplay C# lives in `Assets/Scripts/`. There are **no assembly definitions** (everything compiles into `Assembly-CSharp` / `Assembly-CSharp-Editor`) and **no automated tests**.
+Unity 6 (**6000.3.13f1**) port of the 1986 space RPG *Starflight*. All gameplay C# lives in `Assets/Scripts/`. The game code has **no assembly definitions** (everything compiles into `Assembly-CSharp` / `Assembly-CSharp-Editor`) and there are **no automated tests**. The one exception is the optional AI tooling in `Assets/Scripts/AI/` (`Starflight.AI`, `Starflight.AI.Editor`, see "AI orchestration" below).
 
 The 270 stars / ~811 planets are fixed data from the original game, not random generation: preserve original values when touching game data.
 
@@ -76,6 +76,11 @@ In the Spaceflight scene the Cancel input (the Escape key) opens the save panel,
   - The textures a generator makes are never freed by Unity. `Planet` keeps the generator whose maps are on its material and calls `PlanetGenerator.Release()` once the next planet's maps are on it, when the orbit is empty in the new system, and in `OnDestroy`.
 - **Objects on the surface**: `TerrainGridPopulator` places a planet's rocks, deposits and trees with `Random` seeded from the planet, so that they are in the same places every time, and puts the game's `Random.state` back afterwards. Anything else that needs repeatable random numbers has to do the same. The number of random draws per object is part of every planet: a deposit's size (1 to 5 cubic meters, kept in tenths like everything in the cargo holds) comes from its one draw, and a second draw would move everything placed after it. `PG_Craters.Initialize` reads the crater textures once per session, and with `GetPixel` on purpose: `GetPixels` gives values that differ in the last bit for these 16 bit textures, and every planet is worked out from them.
 - **Experimental path**: `PlanetManager` + Burst `TerrainJob` + `PlanetData` ScriptableObject (`Spaceflight/PlanetGenerator/`), bridged by `ProceduralAdapter` (kill switch `ProceduralAdapter.EnableProceduralGeneration`).
+
+### AI orchestration (optional)
+`Assets/Scripts/AI/` builds a Semantic Kernel (`MetagameOrchestrator`) whose chat service (`ClaudeCliChatService`) runs `claude -p` with the prompt on standard input, never on the command line, and does the function calling itself: the offered kernel functions go into the system prompt, `--json-schema` makes Claude answer with either a final text or tool calls, and the service invokes the calls and loops (bounded by `m_maximumToolRounds`). Kernel functions run on thread pool threads, so they reach Unity only through `MainThreadDispatcher.Enqueue`.
+- The packages come from NuGetForUnity (`Assets/packages.config`, `Assets/NuGet.config` with `slimRestore` off so that dependencies are restored). Both asmdefs require the `STARFLIGHT_SEMANTIC_KERNEL` define, which `SemanticKernelDefineSync` (`Assets/Tools/Editor/`) sets only while the Semantic Kernel DLLs are in `Assets/Packages/`. Never commit the define without those DLLs: CI would fail to compile.
+- Game code must not depend on `Starflight.AI` (it is not auto-referenced, and it does not exist without the define).
 
 ### Coordinates
 `Tools` (`Scripts/Misc/Tools.cs`) converts between original game coordinates (0–255 grid) and world space (`(game - 128) * 256`), plus lat/long and map conversions for planet surfaces. `Notes.txt` documents original-game constants (comm subject IDs, stance values, landing sequence, disembark move scale).
