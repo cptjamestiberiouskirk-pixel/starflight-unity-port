@@ -22,9 +22,12 @@ public class SemanticKernelDefineSync : AssetPostprocessor
 	static readonly string[] c_requiredAssemblies = { "Microsoft.SemanticKernel.Core.dll", "Microsoft.SemanticKernel.Abstractions.dll" };
 
 	// check once the editor has loaded
+	//
+	// the check runs at once, not through EditorApplication.delayCall: a delayed call waits for the editor's next update,
+	// and an editor in the background (driven by the Unity command line, for example) gets none until it has focus again
 	static SemanticKernelDefineSync()
 	{
-		EditorApplication.delayCall += Sync;
+		SyncAndLogErrors();
 	}
 
 	// check again when NuGetForUnity adds or removes packages
@@ -32,8 +35,34 @@ public class SemanticKernelDefineSync : AssetPostprocessor
 	{
 		if ( TouchesSemanticKernel( importedAssets ) || TouchesSemanticKernel( deletedAssets ) || TouchesSemanticKernel( movedAssets ) || TouchesSemanticKernel( movedFromAssetPaths ) )
 		{
-			EditorApplication.delayCall -= Sync;
-			EditorApplication.delayCall += Sync;
+			SyncAndLogErrors();
+		}
+	}
+
+	// runs the check that was skipped in play mode, once the editor is back in edit mode
+	static void OnPlayModeStateChanged( PlayModeStateChange state )
+	{
+		if ( state != PlayModeStateChange.EnteredEditMode )
+		{
+			return;
+		}
+
+		EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+
+		SyncAndLogErrors();
+	}
+
+	// the automatic checks run in the static constructor and during imports, where an exception would break the class
+	// (a TypeInitializationException) or the import, so it is logged instead
+	static void SyncAndLogErrors()
+	{
+		try
+		{
+			Sync();
+		}
+		catch ( Exception exception )
+		{
+			Debug.LogException( exception );
 		}
 	}
 
@@ -81,9 +110,12 @@ public class SemanticKernelDefineSync : AssetPostprocessor
 	[MenuItem( "Starflight Remake/AI/Sync Semantic Kernel Define" )]
 	public static void Sync()
 	{
-		// changing defines recompiles, which must not happen while entering play mode
+		// changing defines recompiles, which must not happen in play mode or while entering it, so check again after it
 		if ( EditorApplication.isPlayingOrWillChangePlaymode )
 		{
+			EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+			EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+
 			return;
 		}
 
