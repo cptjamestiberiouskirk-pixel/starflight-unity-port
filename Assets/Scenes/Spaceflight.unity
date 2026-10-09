@@ -54084,9 +54084,9 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 2800000, guid: 4df34ffeb3721df43989d450f463ebd0, type: 3}
   - {fileID: 0}
-  - {fileID: 2800000, guid: d4b780f448c4e834a8ecb13606919497, type: 3}
-  - {fileID: 2800000, guid: 9a29a3da61be1e64e8ceaa84e2b38436, type: 3}
   - {fileID: 2800000, guid: 6cc35ae36c3b0214fb061d746ef20100, type: 3}
+  - {fileID: 2800000, guid: 9a29a3da61be1e64e8ceaa84e2b38436, type: 3}
+  - {fileID: 0}
   m_maskTextures:
   - {fileID: 0}
   - {fileID: 2800000, guid: 24ed52c0312b1e649af5426b97395b6c, type: 3}
@@ -54112,9 +54112,9 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 2800000, guid: d8870cc568d5f2e49843235c4933342b, type: 3}
   - {fileID: 0}
-  - {fileID: 2800000, guid: 22c3d8bec7ee7fb4b95db2fabd0b887c, type: 3}
-  - {fileID: 2800000, guid: 5e66511911a628b4c883e1b489580123, type: 3}
   - {fileID: 2800000, guid: 56737267aa8f924469d6b1857fdd059e, type: 3}
+  - {fileID: 2800000, guid: 9269177d719951b4bb202201e2a19d9c, type: 3}
+  - {fileID: 0}
   m_colorCycleSpeed: 5
   m_minDuration: 2
   m_maxDuration: 8

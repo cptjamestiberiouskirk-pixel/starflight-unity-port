@@ -535,6 +535,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioShipModels();
 				break;
 
+			case "sensorpictures":
+				yield return ScenarioSensorPictures();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -9647,6 +9651,100 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "no exceptions in the encounters", s_exceptionCount == exceptionsBeforeEncounters, "exceptions=" + ( s_exceptionCount - exceptionsBeforeEncounters ) );
 
 		Finish( "scenario=shipmodels placeholders=" + placeholders + " encounter=" + encounterId + " sizes=" + sizes.Trim() + " playerDestroyed=" + CombatController.m_instance.PlayerIsDestroyed(), 0 );
+	}
+
+	// ---------------------------------------------------------------- sensor pictures: which picture each kind of scan puts in the sensor window
+
+	IEnumerator ScenarioSensorPictures()
+	{
+		var spaceflightController = SpaceflightController.m_instance;
+		var sensors = spaceflightController.m_displayController.m_sensorsDisplay;
+
+		EnsureCrew();
+
+		// a planet scan needs a planet to orbit (94 is the small rock planet of the Arth system)
+		yield return EnterOrbit( 94 );
+
+		var planet = DataController.m_instance.m_gameData.m_planetList[ 94 ];
+
+		spaceflightController.m_displayController.ChangeDisplay( sensors );
+		yield return Frames( 3 );
+
+		sensors.StartScanning( SensorsDisplay.ScanType.Planet, 18, planet.m_mass, planet.m_bioDensity, planet.m_mineralDensity );
+		yield return Frames( 2 );
+
+		Check( "planet scan uses the planet mask", MaskName( sensors ) == "Sensors - Planet Mask", SensorPicture( sensors ) );
+		Check( "planet scan shows the planet background", BackgroundName( sensors ) == "Sensors - Planet", SensorPicture( sensors ) );
+		Check( "planet scan shows a picture", PictureShown( sensors ), SensorPicture( sensors ) );
+
+		// a vessel that has its own picture (control)
+		spaceflightController.m_displayController.ChangeDisplay( sensors );
+		sensors.StartScanning( SensorsDisplay.ScanType.SpeminScout, 1, 400, 100, 100 );
+		yield return Frames( 2 );
+
+		Check( "spemin scout scan shows its own picture", PictureShown( sensors ) && ( MaskName( sensors ) == "Sensors - Spemin Scout Mask" ), SensorPicture( sensors ) );
+
+		// a vessel that has no picture yet, scanned right after one that has (the window must not keep the last picture or show another ship)
+		spaceflightController.m_displayController.ChangeDisplay( sensors );
+		sensors.StartScanning( SensorsDisplay.ScanType.ElowanScout, 1, 50, 100, 100 );
+		yield return Frames( 2 );
+
+		Check( "elowan scout scan (no picture) leaves the window empty", !PictureShown( sensors ), SensorPicture( sensors ) );
+		Check( "elowan scout scan keeps its scan type", sensors.m_scanType == SensorsDisplay.ScanType.ElowanScout, "scanType=" + sensors.m_scanType );
+
+		// the same without going through ChangeDisplay in between (a second scan while the window is already up)
+		sensors.StartScanning( SensorsDisplay.ScanType.SpeminScout, 1, 400, 100, 100 );
+		yield return Frames( 2 );
+		sensors.StartScanning( SensorsDisplay.ScanType.ThrynnWarship, 1, 400, 100, 100 );
+		yield return Frames( 2 );
+
+		Check( "thrynn warship scan right after a spemin scout leaves the window empty", !PictureShown( sensors ), SensorPicture( sensors ) );
+
+		// debris has a picture of its own slot (until wrecks get a picture per vessel)
+		spaceflightController.m_displayController.ChangeDisplay( sensors );
+		sensors.StartScanning( SensorsDisplay.ScanType.Debris, 1, 400, 0, 80 );
+		yield return Frames( 2 );
+
+		Check( "debris scan shows the wreck picture", PictureShown( sensors ) && ( MaskName( sensors ) == "Sensors - Spemin Warship_debris_mask" ), SensorPicture( sensors ) );
+
+		// every slot of the two texture arrays is either empty or a texture that is there (a reference to a missing asset reads as null too, so count the slots that are set)
+		var slotsSet = 0;
+
+		for ( var i = 0; i < sensors.m_maskTextures.Length; i++ )
+		{
+			if ( ( sensors.m_maskTextures[ i ] != null ) && ( i < sensors.m_backgroundTextures.Length ) && ( sensors.m_backgroundTextures[ i ] != null ) )
+			{
+				slotsSet++;
+			}
+		}
+
+		Log( "sensor slots with both textures: " + slotsSet + " of " + sensors.m_maskTextures.Length );
+
+		Finish( "scenario=sensorpictures slotsWithPicture=" + slotsSet + " last=[" + SensorPicture( sensors ) + "]", 0 );
+	}
+
+	static string MaskName( SensorsDisplay sensors )
+	{
+		var texture = sensors.m_maskImage.material.GetTexture( "_MaskTex" );
+
+		return ( texture != null ) ? texture.name : "none";
+	}
+
+	static string BackgroundName( SensorsDisplay sensors )
+	{
+		var texture = sensors.m_backgroundImage.material.GetTexture( "_MainTex" );
+
+		return ( texture != null ) ? texture.name : "none";
+	}
+
+	static bool PictureShown( SensorsDisplay sensors )
+	{
+		return sensors.m_backgroundImage.gameObject.activeInHierarchy && sensors.m_maskImage.gameObject.activeInHierarchy;
+	}
+
+	static string SensorPicture( SensorsDisplay sensors )
+	{
+		return "scanType=" + sensors.m_scanType + " shown=" + PictureShown( sensors ) + " background=" + BackgroundName( sensors ) + " mask=" + MaskName( sensors );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
