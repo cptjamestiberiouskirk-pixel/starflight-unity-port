@@ -1454,12 +1454,28 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "thrynn warship scan right after a spemin scout leaves the window empty", !PictureShown( sensors ), SensorPicture( sensors ) );
 
-		// debris has a picture of its own slot (until wrecks get a picture per vessel)
+		// a debris scan that does not say which vessel left the debris has no picture (debris pictures are per vessel)
 		spaceflightController.m_displayController.ChangeDisplay( sensors );
 		sensors.StartScanning( SensorsDisplay.ScanType.Debris, 1, 400, 0, 80 );
 		yield return Frames( 2 );
 
-		Check( "debris scan shows the wreck picture", PictureShown( sensors ) && ( MaskName( sensors ) == "Sensors - Spemin Warship_debris_mask" ), SensorPicture( sensors ) );
+		Check( "debris scan without a vessel leaves the window empty", !PictureShown( sensors ), SensorPicture( sensors ) );
+
+		// the wreck of a ship destroyed in a real encounter, scanned the way the sensors button does: each vessel shows what is left of itself
+		var wreck = "";
+
+		yield return ScanWreck( 2, result => wreck = result );
+		Check( "spemin scout wreck shows the spemin scout debris", wreck.Contains( "shown=True" ) && wreck.EndsWith( "mask=Sensors - Spemin Scout_debris_mask" ), wreck );
+
+		yield return ScanWreck( 4, result => wreck = result );
+		Check( "mechan scout wreck shows the mechan scout debris", wreck.Contains( "shown=True" ) && wreck.EndsWith( "mask=Sensors - Mechan Scout_debris_mask" ), wreck );
+
+		yield return ScanWreck( 9, result => wreck = result );
+		Check( "thrynn scout wreck (no debris picture) leaves the window empty", wreck.Contains( "scanType=Debris shown=False" ), wreck );
+
+		// control: the spemin warship wreck is the picture every wreck had before
+		yield return ScanWreck( 3, result => wreck = result );
+		Check( "spemin warship wreck shows the spemin warship debris", wreck.Contains( "shown=True" ) && wreck.EndsWith( "mask=Sensors - Spemin Warship_debris_mask" ), wreck );
 
 		// every slot of the two texture arrays is either empty or a texture that is there (a reference to a missing asset reads as null too, so count the slots that are set)
 		var slotsSet = 0;
@@ -1499,6 +1515,66 @@ public class ClaudeProbe : MonoBehaviour
 	static string SensorPicture( SensorsDisplay sensors )
 	{
 		return "scanType=" + sensors.m_scanType + " shown=" + PictureShown( sensors ) + " background=" + BackgroundName( sensors ) + " mask=" + MaskName( sensors );
+	}
+
+	// enter a spemin star system group whose ships are all of this vessel, destroy the first ship, scan its wreck through the encounter, report the sensor picture and leave
+	IEnumerator ScanWreck( int vesselId, Action<string> result )
+	{
+		var spaceflightController = SpaceflightController.m_instance;
+		var sensors = spaceflightController.m_displayController.m_sensorsDisplay;
+
+		var encounterId = FindEncounter( 1, 6, 3, 0 );
+
+		if ( encounterId < 0 )
+		{
+			result( "no spemin star system encounter" );
+			yield break;
+		}
+
+		var pdEncounter = DataController.m_instance.m_playerData.FindEncounter( encounterId );
+
+		pdEncounter.Reset( encounterId );
+
+		foreach ( var alienShip in pdEncounter.GetAlienShipList() )
+		{
+			alienShip.m_vesselId = vesselId;
+		}
+
+		EnterEncounter( encounterId );
+		yield return Frames( 10 );
+
+		var alienIndex = FirstLivingAlien();
+
+		if ( alienIndex < 0 )
+		{
+			result( "no living ship in encounter " + encounterId );
+			LeaveEncounter();
+			yield return Frames( 10 );
+			yield break;
+		}
+
+		Kill( alienIndex );
+		yield return Frames( 5 );
+
+		var text = "vessel=" + vesselId + " dead=" + pdEncounter.GetAlienShipList()[ alienIndex ].m_isDead + " ";
+
+		try
+		{
+			spaceflightController.m_displayController.ChangeDisplay( sensors );
+			spaceflightController.m_encounter.StartScanning( alienIndex + 1 );
+		}
+		catch ( Exception exception )
+		{
+			text += "scan threw " + exception.GetType().Name + " ";
+		}
+
+		yield return Frames( 2 );
+
+		result( text + SensorPicture( sensors ) );
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
 	}
 
 	// ---------------------------------------------------------------- M8: saves survive a damaged file

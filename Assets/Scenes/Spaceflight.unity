@@ -54084,7 +54084,7 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 2800000, guid: 4df34ffeb3721df43989d450f463ebd0, type: 3}
   - {fileID: 0}
-  - {fileID: 2800000, guid: 6cc35ae36c3b0214fb061d746ef20100, type: 3}
+  - {fileID: 0}
   - {fileID: 2800000, guid: 9a29a3da61be1e64e8ceaa84e2b38436, type: 3}
   - {fileID: 0}
   m_maskTextures:
@@ -54112,8 +54112,58 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 2800000, guid: d8870cc568d5f2e49843235c4933342b, type: 3}
   - {fileID: 0}
-  - {fileID: 2800000, guid: 56737267aa8f924469d6b1857fdd059e, type: 3}
+  - {fileID: 0}
   - {fileID: 2800000, guid: 9269177d719951b4bb202201e2a19d9c, type: 3}
+  - {fileID: 0}
+  m_debrisBackgroundTextures:
+  - {fileID: 0}
+  - {fileID: 2800000, guid: 45f6e8bbdba99134a938eea02c4af0fe, type: 3}
+  - {fileID: 2800000, guid: 9162a46f9dddb624d802eb56311c642d, type: 3}
+  - {fileID: 2800000, guid: 6cc35ae36c3b0214fb061d746ef20100, type: 3}
+  - {fileID: 2800000, guid: a049db809a537ed4ba87f3a6dc21c286, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 2800000, guid: 5e74b50754199614cbf73f5c862dea5c, type: 3}
+  - {fileID: 2800000, guid: 337f97fbae43ec2499a23e1411d49dd4, type: 3}
+  - {fileID: 2800000, guid: 7a2b32f8928ab664ba09fcdf90494333, type: 3}
+  - {fileID: 0}
+  - {fileID: 2800000, guid: bbc00474f2e2a344e94a72e4eac11902, type: 3}
+  - {fileID: 0}
+  m_debrisMaskTextures:
+  - {fileID: 0}
+  - {fileID: 2800000, guid: c7239550395d5a043a713b18e412ac0b, type: 3}
+  - {fileID: 2800000, guid: 79fb00156fe4d8a4dbd34a3f53b8b5c4, type: 3}
+  - {fileID: 2800000, guid: 56737267aa8f924469d6b1857fdd059e, type: 3}
+  - {fileID: 2800000, guid: 89c644dd16f4869428bba4aff22534a3, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 2800000, guid: 986294e8ed02400449f30fd2f6554bff, type: 3}
+  - {fileID: 2800000, guid: 55003ea5314d925459eeec919a824387, type: 3}
+  - {fileID: 2800000, guid: de0d213aee753374fa9b9a0feede963d, type: 3}
+  - {fileID: 0}
+  - {fileID: 2800000, guid: 9327eedf17866b744b6b77e5da71a72a, type: 3}
   - {fileID: 0}
   m_colorCycleSpeed: 5
   m_minDuration: 2
