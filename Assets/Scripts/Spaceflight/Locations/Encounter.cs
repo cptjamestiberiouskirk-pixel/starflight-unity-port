@@ -2451,16 +2451,30 @@ public class Encounter : MonoBehaviour
 				// calculate salvage value based on vessel type (mineral density represents salvage potential)
 				var salvageDensity = UnityEngine.Mathf.Clamp( vessel.m_mass / 5, 10, 80 );
 
-				// start the debris scan (with the picture of what is left of this vessel)
-				SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.StartScanning( scanType, 1, vessel.m_mass, 0, salvageDensity, vesselId );
+				// start the debris scan (with the picture of what is left of this vessel, and the mass of the vessel in tons)
+				SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.StartScanning( scanType, 0, vessel.m_mass, 0, salvageDensity, vesselId );
 			}
 			else
 			{
 				// no - get the vessel id
-				var scanType = (SensorsDisplay.ScanType) alienShipList[ currentSelection - 1 ].m_vesselId;
+				var vesselId = alienShipList[ currentSelection - 1 ].m_vesselId;
+				var scanType = (SensorsDisplay.ScanType) vesselId;
 
-				// start the scan
-				SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.StartScanning( scanType, 1, 20, 0, 100 );
+				// get the vessel data (the sensors read its mass in tons, its bio density and its energy, as in the original)
+				var gameData = DataController.m_instance.m_gameData;
+
+				if ( ( vesselId >= 0 ) && ( vesselId < gameData.m_vesselList.Length ) )
+				{
+					var vessel = gameData.m_vesselList[ vesselId ];
+
+					// start the scan
+					SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.StartScanning( scanType, 0, vessel.m_mass, vessel.m_bioDensity, vessel.m_mineralDensity );
+				}
+				else
+				{
+					// a vessel we have no data for (start the scan with nothing to read)
+					SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.StartScanning( scanType, 0, 0, 0, 0 );
+				}
 			}
 		}
 	}
