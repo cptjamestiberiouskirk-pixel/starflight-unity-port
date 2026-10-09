@@ -1,0 +1,129 @@
+{
+	"race": "Elowan",
+	"vessels": [
+		{
+			"id": 5,
+			"name": "Elowan Transport",
+			"strinfoSize": 0.7,
+			"length": 35.742,
+			"model": "Assets/Game Objects/Ships/Elowan/Elowan Transport.fbx",
+			"debris": "Assets/Game Objects/Ships Debris/Elowan/Elowan Transport.fbx",
+			"materials": [
+				"Elowan Hull",
+				"Elowan Trim",
+				"Elowan Light",
+				"Elowan Engine"
+			]
+		},
+		{
+			"id": 6,
+			"name": "Elowan Scout",
+			"strinfoSize": 0.1,
+			"length": 15.318,
+			"model": "Assets/Game Objects/Ships/Elowan/Elowan Scout.fbx",
+			"debris": "Assets/Game Objects/Ships Debris/Elowan/Elowan Scout.fbx",
+			"materials": [
+				"Elowan Hull",
+				"Elowan Light",
+				"Elowan Trim",
+				"Elowan Engine"
+			]
+		},
+		{
+			"id": 7,
+			"name": "Elowan Warship",
+			"strinfoSize": 0.3,
+			"length": 15.318,
+			"model": "Assets/Game Objects/Ships/Elowan/Elowan Warship.fbx",
+			"debris": "Assets/Game Objects/Ships Debris/Elowan/Elowan Warship.fbx",
+			"materials": [
+				"Elowan Hull",
+				"Elowan Trim",
+				"Elowan Light",
+				"Elowan Engine"
+			]
+		}
+	],
+	"materials": [
+		{
+			"name": "Elowan Hull",
+			"albedo": [
+				0.17,
+				0.33,
+				0.14
+			],
+			"specular": [
+				0.25,
+				0.32,
+				0.22
+			],
+			"smoothness": 0.55,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Elowan"
+		},
+		{
+			"name": "Elowan Trim",
+			"albedo": [
+				0.1,
+				0.17,
+				0.08
+			],
+			"specular": [
+				0.18,
+				0.22,
+				0.16
+			],
+			"smoothness": 0.45,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Elowan"
+		},
+		{
+			"name": "Elowan Light",
+			"albedo": [
+				0.1,
+				0.3,
+				0.45
+			],
+			"specular": [
+				0.5,
+				0.5,
+				0.5
+			],
+			"smoothness": 0.8,
+			"emissive": [
+				0.2,
+				0.65,
+				1.0
+			],
+			"folder": "Assets/Game Objects/Ships/Elowan"
+		},
+		{
+			"name": "Elowan Engine",
+			"albedo": [
+				0.35,
+				0.06,
+				0.03
+			],
+			"specular": [
+				0.4,
+				0.2,
+				0.2
+			],
+			"smoothness": 0.6,
+			"emissive": [
+				0.62,
+				0.14,
+				0.06
+			],
+			"folder": "Assets/Game Objects/Ships/Elowan"
+		}
+	]
+}
