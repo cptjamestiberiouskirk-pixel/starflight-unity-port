@@ -384,8 +384,11 @@ public class SensorsDisplay : ShipDisplay
 		m_isDoingCinematics = true;
 		m_soundStopped = false;
 
-		// set the correct background and mask textures for the scan type (if even the unknown ones are missing we keep whatever is there)
-		if ( HasTextures( textureIndex ) )
+		// is there a picture for this scan type? (the unknown slot is empty, so an object we have no picture for leaves the window empty, as the original does for an unidentified object)
+		var hasPicture = HasTextures( textureIndex );
+
+		// set the correct background and mask textures for the scan type
+		if ( hasPicture )
 		{
 			m_backgroundMaterial.SetTexture( "_MainTex", m_backgroundTextures[ textureIndex ] );
 
@@ -417,9 +420,9 @@ public class SensorsDisplay : ShipDisplay
 		m_massText.gameObject.SetActive( true );
 		m_bioMinText.gameObject.SetActive( true );
 
-		// show the background and mask
-		m_backgroundImage.gameObject.SetActive( true );
-		m_maskImage.gameObject.SetActive( true );
+		// show the background and mask (only if we have a picture - otherwise the last scan's picture would still be there)
+		m_backgroundImage.gameObject.SetActive( hasPicture );
+		m_maskImage.gameObject.SetActive( hasPicture );
 
 		// hide the instructions text
 		m_instructionsText.gameObject.SetActive( false );
