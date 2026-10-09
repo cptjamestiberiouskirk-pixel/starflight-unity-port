@@ -117,13 +117,14 @@ From `.github/copilot-instructions.md` (project rules):
 
 - `Max/`, `Illustrator/`, `Photoshop/`, `Research/` (incl. the original manual), `Planets/`, `Spacescape-0.5.1/`, `Music/` at the root are source art and reference material outside `Assets/`: Unity does not import them.
 - Under `.claude/` only `settings.json`, `rules/`, `agents/` and `skills/` are tracked; the rest of `.claude/` and `AGENTS.md` are gitignored.
+- `ROADMAP.md` is the plan of record for parity with the original game: phases, items with their sources, and the owner's decisions. Pick feature work from it.
 - `CODE_REVIEW_2026-10-03.md` is the current review (open findings, fixes and how they were checked); re-verify line numbers there. `PROJECT_CONTEXT.md` and `PROJECT_ANALYSIS_REPORT.md` are historical.
 
 ## Working rules
 
 - Label claims CONFIRMED (seen in code, logs or the console), INFERRED (one link unverified: name it) or HYPOTHESIZED. Say what was not tested. Nothing is fixed until it has compiled; say so when a fix only masks a symptom.
 - No em dashes anywhere: code, comments, docs, commit messages, PR titles and bodies.
-- One small PR per change, on its own branch from the current `origin/master`. Stage files by name, use conventional-commit messages, add a `CHANGELOG.md` bullet under `## [Unreleased]` for every change and update `README.md` for features (`.github/prompts/commitall.prompt.md` has the steps). Do not implement a design-dependent item before the project owner has made the call.
+- One small PR per change, on its own branch from the current `origin/master`. Stage files by name, use conventional-commit messages, add a `CHANGELOG.md` bullet under `## [Unreleased]` for every change and update `README.md` for features (`.github/prompts/commitall.prompt.md` has the steps). Do not implement a design-dependent item before the project owner has made the call. Where the research sources under `Research/` document the original game's behaviour, that behaviour is the call (ruled 2026-10-09, `ROADMAP.md` D1); behaviour found only in the 1984 draft notes is not.
 - Squash-merge (`gh pr merge <n> --squash`, without `--delete-branch`) only once the `compile` check of the PR's head commit is SUCCESS, never on a red or pending check. `master` has no branch protection, so do not use GitHub auto-merge.
 - Before pushing a branch that edits `CHANGELOG.md`, trial-merge it against every open PR branch (`git merge-tree --write-tree --name-only HEAD origin/<branch>`); on a conflict, move the new bullet so an unchanged line separates the two insertions.
 - Unity package updates: one per branch, compile-checked before the commit, never in bulk. The CI report lists `com.unity.sdk.linux-x86_64`, `com.unity.toolchain.linux-x86_64-linux` and `com.unity.sysroot.base` as added: container noise, never commit them.

@@ -1,0 +1,186 @@
+# Roadmap to a complete Starflight
+
+Written 2026-10-05 against `master` at `bf6a2910`, and agreed with the project owner on 2026-10-09. The goal is a port that does everything the 1986 game does, before anything new or different is added.
+
+This is the plan of record. Pick work from it, and when a PR for an item merges, put the PR number into the item's row in the same docs change that updates `CODE_REVIEW_2026-10-03.md` or `CHANGELOG.md`. Change an item's description only when the sources or the owner's rulings change it.
+
+## How to read this
+
+- **Status** of a feature in the port: DONE, PARTIAL (says what is missing), STUB (a button that only prints text or plays a sound), MISSING.
+- **Source** is where the original behaviour is written down:
+  - STRINFO: `Research/Data/STRINFO.DOC`
+  - xls: `Research/Data/Starflight 1 Data.xls`
+  - Survey: `Research/Data/Starflight_1_Survey.xls`
+  - notes: `Research/Notes/`
+  - SS: `Research/Screenshots/`
+  - Files under notes marked DRAFT are 1984 to 1985 design notes. They are not proof of what the game shipped with.
+- Each numbered item is meant to be one PR with its own probe scenario, as `CLAUDE.md` requires.
+- **Ask** marks an item where the sources do not settle what the original did, so the project owner has to decide.
+- **Evidence.** The port's status comes from reading the code on 2026-10-05; nothing was run. Spot-checked by hand: the Starport repair, Distress, the terrain vehicle weapon, the Messages log, crew vitality and the game clock. Re-verify line numbers before working on an item.
+
+## Where the port stands
+
+| Area | Status | Main gaps |
+|---|---|---|
+| Starport: Personnel, Crew Assignment, Bank, Docking Bay | DONE | |
+| Starport: Trade Depot | PARTIAL | no lifeform sales; Endurium price never changes |
+| Starport: Ship Configuration | PARTIAL | Repair is a STUB (`ShipConfigurationPanel.cs:692`) |
+| Starport: Operations | PARTIAL | Evaluation is fixed scene text; no colony recommendations |
+| Flight, hyperspace, fluxes, fuel | DONE | |
+| Nebulae | PARTIAL | drawn, no effect (`PlayerShip.cs:218` TODO) |
+| Stellar flares | PARTIAL | checked once on entering a system; Arth's flare does nothing |
+| Starmap | PARTIAL | no fuel estimate |
+| Game clock | PARTIAL | runs only in the star system and hyperspace (`SpaceflightController.cs:181`) |
+| Ship console: Captain | PARTIAL | Log Planet is stored and never used; Messages log always empty |
+| Ship console: Science | PARTIAL | science skill has no effect; salvage not implemented |
+| Ship console: Engineer, Doctor | PARTIAL | repair needs no minerals; the Doctor never has a patient |
+| Ship console: Communications | PARTIAL | Distress is a STUB |
+| Combat | DONE | alien vessel armor, shields and speed are not taken from the data |
+| Comm system | PARTIAL | posture never changes the aliens' mood; homeworld and surrender lines are never shown |
+| Alien trade, tribute, surrender | MISSING | |
+| Terrain vehicle: drive, map, mine, return | DONE | |
+| Terrain vehicle: Look, Scan | PARTIAL | no lifeforms to report |
+| Ruins, artifacts, planet messages | MISSING | code exists but is not wired into any scene |
+| Weather and terrain hazards | MISSING | dust storm is cosmetic |
+| Lifeforms (stun, capture, sell, attack) | MISSING | |
+| Crew injury and death | MISSING | nothing lowers vitality |
+| Artifact effects (15 special artifacts) | MISSING | effects exist as analysis text only |
+| Main story and endgame | MISSING | no Crystal Planet, no win, no flare deadline |
+
+The README's "Completion: ~95%" is far too high for the game as a whole. It is closer to an accurate figure for the engine and the Starport.
+
+## Decisions
+
+These decide how much of the roadmap can go ahead without asking item by item.
+
+- **D1. Fidelity rule. Ruled 2026-10-09: yes.** Where the sources document the original's behaviour, implement it as documented without asking per item. Ask only where the sources are silent or contradict each other (the items marked Ask). Behaviour found only in the DRAFT notes counts as Ask.
+
+Still open:
+
+- **D2. Where recovered data goes.** The JSON has none of these: the ruin messages and sites, the special artifact sites, the colony evaluation values, the win and flare messages, and the Black Egg messages. Two options:
+  - (a) Add them to `Starflight Game Data.json`. `.claude/settings.json` asks before every edit of that file.
+  - (b) Put them in a second file next to it (for example `Starflight Story Data.json`). The original values stay untouched in one file and the added records live in the other.
+
+  Either way no existing value changes.
+- **D3. Lifeforms.** The original did not store lifeforms as a table. The STARB.COM map in the xls shows overlays that created them per planet: VITA-OV (ecosystem), HP-OV and LP-OV (lifeform classes and species), SEED-OV (minerals, lifeforms and ruins) and BEHAV-OV (behaviour), plus text tables of lifeform descriptions. None of that code or text is in the repository. The sources available are the 1984 notes (`planet.txt`, `lf-behav.txt`, `lf-words.txt`, 874 lines in total). Options:
+  - (a) Rebuild the lifeforms from the notes. This is a reconstruction, not a copy.
+  - (b) Work from a copy of the original game files, if you own one.
+  - (c) Leave lifeforms out.
+- **D4. Interstel Police** (the copy protection arrest). Recommendation: leave it out.
+- **D5. Conflicts in the sources.**
+  - The Rod Device site: STRINFO gives two different coordinates.
+  - The Red Cylinder: planet 3 or 4 of Koann.
+  - The real effects of the Black Box, the Hypercube and the Ellipsoid.
+  - The flare deadline: the Elowan say "final week of your Ten-month", while the manual's timeline says 4623. The data disagrees with itself. Arth's star (star 25 at 125,100) has `m_daysToNextFlare` 300, which is late in the tenth month of 4620 and fits the Elowan. Its year, month and day fields say 4621-01-01 (CONFIRMED in the JSON).
+
+Reading STRINFO: its "PLANET N OF SYSTEM X, Y" is the N-th planet from the sun, not the orbit number. This holds in 15 of the 16 entries that also print an orbit number; the 16th is Koann, see D5. To find the JSON's `m_orbitPosition`, sort the star's planets by orbit.
+
+## Phase 0: Foundations
+
+| # | Item | Original (source) | Port today |
+|---|---|---|---|
+| 0.1 | Correct the orbit positions of encounters 139, 165, 301, 302, 305, and put encounters 144 to 146 back in hyperspace, with a load repair for old saves | xls; STRINFO agrees for 4 of the 5 orbits | PR 80 |
+| 0.2 | Land past an orbit guardian | Homeworlds cannot be landed on at all: "the homeworlds of all races are well guarded and thither thou mayest not descend" (Elowan lore, STRINFO 2.4), so the home fleets keep blocking. Veloxi drones grant orbit if you answer yes to multiples of six; the Mechans help only "Group 9" (STRINFO 2.1 to 2.3) | the encounter begins on every entry into orbit, so the planet cannot be landed on |
+| 0.3 | Game clock runs on the planet surface, and (Ask) in orbit and in encounters | the terrain vehicle panel shows the date (SS Terrain Vehicle) | clock runs only in the star system and hyperspace |
+| 0.4 | Recover the missing data per D2: 36 ruin messages with sites, 15 artifact sites, colony evaluation list with bonuses and fines, the game's messages for the endgame and flares | STRINFO 1.2, 2.12, 2.14, 3.1, 4.1; Survey sheets "Habitable Planets" and "Optimal Planets" | data only, no behaviour change |
+| 0.5 | Flare data: the 36 stars whose day count wrapped below zero are marked as already flared | `m_daysToNextFlare` equals 65536 plus `m_daysSincePreviousFlare` for all 36 | they flare about 179 years from now |
+| 0.6 | Play the visual results of PRs 66 to 72 once in the Editor (owner) | | nothing visual has been seen |
+
+## Phase 1: Close the loops in systems that already exist
+
+Small items, each documented in the sources.
+
+| # | Item | Original (source) | Port today |
+|---|---|---|---|
+| 1.1 | Repair at the Starport, at a cost | Ship Configuration has Repair (SS Ship Configuration); price: Ask | STUB, plays a sound |
+| 1.2 | Engineer's repair uses minerals from the cargo hold | "We need 2 cubic meters of Molybdenum for repairs" (SS Repair) | timed and free |
+| 1.3 | Colony recommendation: Log Planet asks "Recommend this planet for colonization?"; Operations Evaluation lists the results; bonus of 30k to 55k MU, or a fine that grows with each unsuitable recommendation | STRINFO 1.2, Survey; `m_habitable` on five planet tables is unused | Log Planet stores an entry nobody reads |
+| 1.4 | Distress: towed home and fined 15k to 80k MU; "There's no response" once the Starport is gone | STRINFO 1.2, 2.14 | STUB, prints text |
+| 1.5 | Endurium price rises to 1500 and then 2000 MU with the notices of 20-02 and 15-05 | STRINFO 1.1, 1.4 | fixed price |
+| 1.6 | Losing the terrain vehicle costs 10,000 MU and a replacement | STRINFO 1.2 | depends on 5.x hazards |
+| 1.7 | Science skill decides whether an analysis succeeds | starship.txt (DRAFT formula: skill / 2); Ask on the formula | science skill unused |
+| 1.8 | Flares: checked every day while the ship is in a system; a flare with the ship there ends the game ("incinerated"); Analysis shows "UNSTABLE, est. time to flare" under 1000 days | disys.txt `?FLARE`, STRINFO 2.14, notes | checked once on arrival, up to 50 damage |
+| 1.9 | Nebulae act on the shields | priority.txt; how strongly: Ask | TODO, no effect |
+| 1.10 | Starmap shows a fuel estimate | alpha.txt | no estimate |
+| 1.11 | Alien vessels use their own armor, shields and speed from the data | xls Vessels; `GD_Vessel.m_armor`, `m_shields`, `m_moveDelay` unused | 100 points per class, one speed for all |
+| 1.12 | Salvage from debris | wrecks leave debris (communic.txt); what can be taken: Ask | "Salvage collection not yet implemented" |
+
+## Phase 2: Encounters that matter
+
+| # | Item | Original (source) | Port today |
+|---|---|---|---|
+| 2.1 | Posture moves the aliens' mood (0 to 100, with friendly, diplomatic and hostile or obsequious bands; your strength decides between hostile and grovelling) | compart.txt, Notes.txt | posture only picks the lines (`Encounter.cs:1543`) |
+| 2.2 | Homeworld warnings and surrender (22 and 8 lines in the data); the Spemin surrender after losses | STRINFO 2.x | lines skipped (`Encounter.cs:1561`, `1577`) |
+| 2.3 | Trade and tribute: the Thrynn buy artifacts and plutonium for Endurium and sell the Black Box for 30; the Veloxi demand 3 Endurium; the Elowan give 15 if you carry under 20 | STRINFO 2.x; `GD_Artifact.m_thrynnPrice` unused | MISSING |
+| 2.4 | Race rules: a crew member of the race removes the garbling; the Elowan refuse a ship with a Thrynn aboard; the Mechans will not deal without humans; Gazurtoid ships are immune to missiles; a comm link that is ended cannot reopen in the same encounter | compart.txt, alpha.txt, STRINFO 2.x, 7.x | garbling by comm skill only; the rest MISSING |
+| 2.5 | The Noah 9 derelict (SOS) and the other races that now fall to the `default` case | STRINFO 2.x | they only fight back |
+
+## Phase 3: Ruins, artifacts and messages on the ground
+
+This is on the critical path to the endgame.
+
+| # | Item | Original (source) | Port today |
+|---|---|---|---|
+| 3.1 | Ruins at their real sites: ancient ruins with Endurium lumps, Old Empire ruins with artifacts and messages | planet.txt, dir.txt SEED-OV, data from 0.4 | `TerrainRuins` not wired, picks a random artifact (`TerrainRuins.cs:57`) |
+| 3.2 | The 15 special artifacts at their sites, and the terrain vehicle picks up artifacts | STRINFO 4.1 | `PD_TerrainVehicle.AddArtifact` has no caller |
+| 3.3 | The 36 ruin messages go to the ship's log under Messages | STRINFO 3.1 | `m_foundMessages` is never written |
+| 3.4 | Terrain vehicle cargo display | | `TerrainVehicleCargoDisplay` not wired |
+
+## Phase 4: Artifact effects
+
+Only the effects that matter for winning have to come before Phase 5. The others can follow at any time.
+
+| Artifact | Effect (source: Starport analysis, STRINFO) | How it is obtained | Needed to win |
+|---|---|---|---|
+| Crystal Orb | cancels the Crystal Planet's field | Sphexi, 46N 14E | yes |
+| Black Egg | planet bomb, armed by dropping it | three Old Empire sites | yes |
+| Crystal Cone | finds the Crystal Planet's nexus from orbit | Uhlek space | INFERRED yes |
+| Ring Device | shows nearby fluxes (alpha.txt: fluxes are hidden without it and navigation skill) | Mars, 90N 0 | no; Ask whether fluxes should become hidden |
+| Whining Orb | translates Spemin | Starport, 6000 MU | no |
+| Flat Device | shields the terrain vehicle from lifeforms | Starport, 30,000 MU | no, needs Phase 6 |
+| Shimmering Ball | automatic cloak in combat | 68,66 planet 1 | no |
+| Rod Device | stronger laser shield | New Scotland (site: D5) | no |
+| Tesseract | doubles engine efficiency | 18,50 planet 5 | no |
+| Crystal Pearl | warps a badly damaged ship away | City of the Ancients | no |
+| Red Cylinder | finds ancient ruins from orbit | Koann (planet: D5) | no |
+| Dodecahedron | attracts every ship nearby | 118,146 planet 4 | no |
+| Black Box, Hypercube, Ellipsoid | unclear (D5) | Thrynn trade, Earth, 81,98 | Ask |
+
+## Phase 5: Main story and endgame
+
+After this phase the game can be played from start to win.
+
+| # | Item | Original (source) |
+|---|---|---|
+| 5.1 | Arth's sun flares on its date: the Starport is destroyed and the game goes on (distress gets no answer; the win message can still arrive) | STRINFO 2.14, Elowan comm, data (D5) |
+| 5.2 | The Crystal Planet (192,152 planet 1): its field damages a ship without the Orb | STRINFO |
+| 5.3 | Drop the armed Black Egg at 47N 45E to win. Anywhere else on the Crystal Planet: "damaged but not destroyed". On the Uhlek brain world (55,32 planet 2) the Uhlek fall silent. On Elan the Elowan young die. | STRINFO 2.12, SS Story |
+| 5.4 | Win sequence: the message, 500,000 MU, the Interstel medal, a supplemental evaluation; no more flares after the win | STRINFO 1.2, 2.12; disys.txt |
+| 5.5 | Every way to lose (flare, ship destroyed, all crew dead) ends through the same game over | STRINFO, disys.txt |
+
+## Phase 6: Lifeforms and crew injury
+
+Depends on D3. This is the largest piece and is not on the path to winning, which is why it comes after Phase 5.
+
+| # | Item | Original (source) |
+|---|---|---|
+| 6.1 | Lifeforms created per planet from its seed, the same every visit | dir.txt VITA-OV, HP-OV, LP-OV, SEED-OV; planet.txt |
+| 6.2 | Scan reports them (volume, aggression, intelligence, niche); Look describes them | planet.txt, lf-words.txt |
+| 6.3 | Behaviour: approach, attack, flee, predator and prey, flying | lf-behav.txt |
+| 6.4 | Stunner and laser; capture into stasis; sale at the Trade Depot; payment for recorded data | planet.txt (DRAFT values) |
+| 6.5 | Attacks hurt the crew, scaled by durability; the Doctor treats them; death, the chain of command, DEAD on the personnel file | lf-words.txt, starship.txt, disys.txt |
+| 6.6 | Weather and terrain hazards: storms, lava destroys the vehicle, uphill is slow | planet.txt, alpha.txt, dir.txt STORM-OV |
+
+## Phase 7: Fidelity pass
+
+- Compare every screen with `Research/Screenshots/` and every message with STRINFO.
+- Correct the README's completion figure.
+- Draw the planet in encounters that begin in orbit (ruling 5, later step).
+- Alien captain and ship names (`%` and `+` in 15 greetings): Ask, since the data has no names.
+- Crew learn by using their skills: DRAFT only, so Ask.
+
+## Order
+
+The critical path to a game that can be won is 0.1, 0.2 and 0.4, then Phase 3, the winning artifacts of Phase 4, and Phase 5. Phases 1 and 2 are independent small PRs that can run in between. Lifeforms (Phase 6) come last because they are the biggest item, depend on D3, and only the Flat Device needs them.
+
+Rough size, counting one PR per item: Phase 0 about 5, Phase 1 about 12, Phase 2 about 5, Phase 3 about 4, Phase 4 about 12, Phase 5 about 5, Phase 6 about 6 to 10. That is about 50 PRs in all.
