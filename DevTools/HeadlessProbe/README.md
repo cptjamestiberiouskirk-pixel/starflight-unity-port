@@ -48,6 +48,7 @@ What the probe does:
 | `h6`, `m15` | combat target and model slots |
 | `m13`, `m14` | destroyed encounters and destroyed ships |
 | `m7` | sensor scan types |
+| `sensorpictures` | the picture each kind of scan puts in the sensor window: a planet in orbit (its mask), a Spemin scout (control: its own picture), an Elowan scout and a Thrynn warship with no picture (window left empty, also straight after a scan that had one, scan type kept) and debris (the wreck picture) |
 | `m8` | `JsonSaveSystem` in a scratch directory |
 | `m24` | gravity text |
 | `starport-m22` | panel close guard |
@@ -96,7 +97,7 @@ What the probe does:
 | `gameclock` | how many game seconds pass in 1.5 real seconds in the star system (control), in orbit, on a planet's surface, in the terrain vehicle (through the real Disembark button), in an encounter and in the docking bay (control: none), and the fuel raised shields use at the star hour in an encounter (about 40 s) |
 | `shipmodels` | alien ship models: `Encounter.Start` with an empty model slot, which vessels still clone the placeholder ("Not Modeled Yet", a stretched sphere), and every vessel in a real hyperspace encounter: that it gets a model, its size in the ship's own frame, and its debris on the frame it appears (the size and the orientation of the ship). Vessels in `c_shipModelLengths` (the procedural stand-ins of `DevTools/ShipModels`) are also checked against their length (about 30 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (54 scenarios, about 24 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (55 scenarios, about 24 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
