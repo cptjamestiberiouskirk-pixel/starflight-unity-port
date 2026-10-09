@@ -59,13 +59,52 @@ public class PD_Encounter : IComparable
 		// get access to the encounter
 		m_encounter = gameData.m_encounterList[ encounterId ];
 
-		// set the location (translated)
+		// put the encounter where the game data says it is
+		PlaceAtHome();
+
+		// allocate and initialize each of the alien ships in the encounter
+		m_alienShipList = new PD_AlienShip[ m_encounter.m_maxNumShips ];
+
+		for ( var i = 0; i < m_alienShipList.Length; i++ )
+		{
+			var alienShip = new PD_AlienShip();
+
+			alienShip.Initialize( m_encounter );
+
+			m_alienShipList[ i ] = alienShip;
+		}
+
+		// allocate the shown comm list
+		m_shownCommList = new List<int>();
+
+		// initialize the encounter distance
+		m_currentDistance = float.MaxValue;
+	}
+
+	// the location the game data gives this encounter (translated) - an unknown value leaves the location as it is
+	PD_General.Location GetLocationInGameData()
+	{
 		switch ( m_encounter.m_location )
 		{
-			case 0: m_location = PD_General.Location.Hyperspace; break;
-			case 1: m_location = PD_General.Location.StarSystem; break;
-			case 2: m_location = PD_General.Location.InOrbit; break;
+			case 0: return PD_General.Location.Hyperspace;
+			case 1: return PD_General.Location.StarSystem;
+			case 2: return PD_General.Location.InOrbit;
 		}
+
+		return m_location;
+	}
+
+	// sets the location, the star and the home coordinates of this encounter from the game data, and puts it at home
+	void PlaceAtHome()
+	{
+		// get access to the game data
+		var gameData = DataController.m_instance.m_gameData;
+
+		// set the location (translated)
+		m_location = GetLocationInGameData();
+
+		// a hyperspace encounter is at no star
+		m_starId = 0;
 
 		if ( m_location != PD_General.Location.Hyperspace )
 		{
@@ -100,24 +139,33 @@ public class PD_Encounter : IComparable
 
 		// set the current coordinates to be at home
 		m_currentCoordinates = m_homeCoordinates;
+	}
 
-		// allocate and initialize each of the alien ships in the encounter
-		m_alienShipList = new PD_AlienShip[ m_encounter.m_maxNumShips ];
+	// repair save files written before the game data moved this encounter (encounters 144 to 146 were in a star system, the original has them in hyperspace) - its ships and what was said are kept
+	public bool ValidateLocation()
+	{
+		// get access to the game data
+		var gameData = DataController.m_instance.m_gameData;
 
-		for ( var i = 0; i < m_alienShipList.Length; i++ )
+		// an encounter the game data does not have is left alone
+		if ( ( m_encounterId < 0 ) || ( m_encounterId >= gameData.m_encounterList.Length ) )
 		{
-			var alienShip = new PD_AlienShip();
-
-			alienShip.Initialize( m_encounter );
-
-			m_alienShipList[ i ] = alienShip;
+			return false;
 		}
 
-		// allocate the shown comm list
-		m_shownCommList = new List<int>();
+		// get access to the encounter
+		m_encounter = gameData.m_encounterList[ m_encounterId ];
 
-		// initialize the encounter distance
-		m_currentDistance = float.MaxValue;
+		// nothing to do if the save has it where the game data has it
+		if ( GetLocationInGameData() == m_location )
+		{
+			return false;
+		}
+
+		// move it to where the game data has it
+		PlaceAtHome();
+
+		return true;
 	}
 
 	public PD_General.Location GetLocation()

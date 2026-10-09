@@ -215,6 +215,9 @@ public class DataController : MonoBehaviour
 			playerData.m_shipsLog.ValidateStarportNoticeDates();
 		}
 
+		// repair save files written before the game data moved encounters 144 to 146 from a star system to hyperspace
+		playerData.ValidateEncounterLocations();
+
 		return playerData;
 	}
 
