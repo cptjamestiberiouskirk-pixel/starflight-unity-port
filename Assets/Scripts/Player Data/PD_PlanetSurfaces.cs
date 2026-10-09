@@ -22,17 +22,45 @@ public class PD_PlanetSurfaces
 
 	public List<Deposit> m_depositList;
 
+	// the artifact sites (ids into the game data's artifact site list) whose artifact has been taken
+	public List<int> m_takenArtifactSiteList;
+
 	public void Reset()
 	{
 		m_depositList = new List<Deposit>();
+		m_takenArtifactSiteList = new List<int>();
 	}
 
-	// make sure there is a list (save files from before this have none)
+	// make sure there are lists (save files from before them have none)
 	public void Validate()
 	{
 		if ( m_depositList == null )
 		{
 			m_depositList = new List<Deposit>();
+		}
+
+		if ( m_takenArtifactSiteList == null )
+		{
+			m_takenArtifactSiteList = new List<int>();
+		}
+	}
+
+	// true if the artifact of this site has been taken
+	public bool IsArtifactSiteTaken( int artifactSiteId )
+	{
+		Validate();
+
+		return m_takenArtifactSiteList.Contains( artifactSiteId );
+	}
+
+	// call this when the artifact of a site has been taken
+	public void TakeArtifactSite( int artifactSiteId )
+	{
+		Validate();
+
+		if ( !m_takenArtifactSiteList.Contains( artifactSiteId ) )
+		{
+			m_takenArtifactSiteList.Add( artifactSiteId );
 		}
 	}
 
