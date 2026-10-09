@@ -84,6 +84,7 @@ public class ScanButton : ShipButton
 		int rockCount = 0;
 		int vegetationCount = 0;
 		int ruinCount = 0;
+		int artifactCount = 0;
 
 		// scan for mineral deposits (elements)
 		if ( terrainGrid.m_terrainElements != null )
@@ -158,8 +159,25 @@ public class ScanButton : ShipButton
 				{
 					ruinCount++;
 
+					// does it still hold an artifact? (the sensors see what is in a ruin - the label is the artifact's marker for now)
+					var label = "Ruin";
+					var ruin = child.GetComponent<TerrainRuin>();
+					var playerData = DataController.m_instance.m_playerData;
+
+					if ( ( ruin != null ) && ( playerData.m_planetSurfaces != null ) )
+					{
+						foreach ( var artifactSiteId in ruin.m_artifactSiteIds )
+						{
+							if ( !playerData.m_planetSurfaces.IsArtifactSiteTaken( artifactSiteId ) )
+							{
+								label = "Ruin - artifact";
+								artifactCount++;
+							}
+						}
+					}
+
 					// add floating label to this ruin
-					ShowLabelOnObject( child.gameObject, "Ruin", Color.white );
+					ShowLabelOnObject( child.gameObject, label, Color.white );
 				}
 			}
 		}
@@ -171,6 +189,12 @@ public class ScanButton : ShipButton
 		if ( ruinCount > 0 )
 		{
 			report += "<color=white>Ruin" + ( ruinCount > 1 ? "s" : "" ) + ": " + ruinCount + "</color>\n";
+		}
+
+		// list the artifacts the ruins still hold (picked up with the cargo button)
+		if ( artifactCount > 0 )
+		{
+			report += "<color=cyan>Artifact" + ( artifactCount > 1 ? "s" : "" ) + " in the ruins: " + artifactCount + "</color>\n";
 		}
 
 		// list mineral deposits (pickable)

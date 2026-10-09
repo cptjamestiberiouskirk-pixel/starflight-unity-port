@@ -632,11 +632,11 @@
       "m_artifactName": "Red Cylinder",
       "m_starX": 112,
       "m_starY": 200,
-      "m_planetFromSun": 4,
+      "m_planetFromSun": 3,
       "m_latitude": 59,
       "m_longitude": -64,
       "m_text": "Koann 3.",
-      "m_note": "CONFLICT (roadmap D5): STRINFO prints planet 4 here, in 1.2 and in 5.1, but names it Koann 3, its 5.1 entry gives orbit number 5 (the third planet from the sun of 112, 200), and the former Elowan homeworld notes (3.1) say planet 3. Kept as printed until the owner decides.",
+      "m_note": "STRINFO prints planet 4 here, in 1.2 and in 5.1, but names it Koann 3, its 5.1 entry gives orbit number 5 (the third planet from the sun of 112, 200), and the former Elowan homeworld notes (3.1) say planet 3. Ruled 2026-10-09 by the owner: the third planet (roadmap D5).",
       "m_source": "STRINFO 4.1"
     },
     {
@@ -657,10 +657,10 @@
       "m_starX": 180,
       "m_starY": 124,
       "m_planetFromSun": 2,
-      "m_latitude": 59,
-      "m_longitude": 22,
-      "m_text": "Harrison's base 1 on New Scotland.",
-      "m_note": "CONFLICT (roadmap D5): New Scotland's entry in STRINFO 5.1 says Harrison's first base is at 59N x 22E and his second at 54N x 13E, and that the Rod Device is at the latter. Kept as 4.1 prints it until the owner decides.",
+      "m_latitude": 54,
+      "m_longitude": 13,
+      "m_text": "Harrison's base 2 on New Scotland.",
+      "m_note": "STRINFO contradicts itself: 4.1 puts the Rod Device at 59N x 22E, Harrison's base 1; New Scotland's entry in 5.1 says his first base is at 59N x 22E, the second at 54N x 13E, and the Rod Device is at the latter. Ruled 2026-10-09 by the owner: 54N x 13E (roadmap D5).",
       "m_source": "STRINFO 4.1"
     },
     {
@@ -705,10 +705,10 @@
       "m_placeName": "KOANN 3",
       "m_starX": 112,
       "m_starY": 200,
-      "m_planetFromSun": 4,
+      "m_planetFromSun": 3,
       "m_rating": "Suitable",
       "m_bonus": 40000,
-      "m_note": "CONFLICT (roadmap D5): see the Red Cylinder site; Koann 3 may be the planet in orbit 5.",
+      "m_note": "STRINFO prints planet 4 of 112, 200; the third planet (orbit 5) is taken, as for the Red Cylinder site (ruled 2026-10-09 by the owner, roadmap D5).",
       "m_source": "STRINFO 1.2"
     },
     {

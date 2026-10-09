@@ -17,8 +17,12 @@ public class TVCargoButton : ShipButton
 		// get player data
 		var playerData = DataController.m_instance.m_playerData;
 
-		// is the terrain vehicle beside a ruin with messages in it that have not been recorded yet? (the manual, page 21: cargo records the messages found in ruins)
-		if ( RecordMessagesInRuin() )
+		// is the terrain vehicle beside a ruin with messages in it that have not been recorded yet, or artifacts that have not been taken? (the manual, page 21:
+		// cargo records the messages found in ruins, and picks up any item next to the terrain vehicle)
+		var messagesRecorded = RecordMessagesInRuin();
+		var artifactsFound = TakeArtifactsInRuin( !messagesRecorded );
+
+		if ( messagesRecorded || artifactsFound )
 		{
 			return false;
 		}
@@ -119,6 +123,85 @@ public class TVCargoButton : ShipButton
 		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Message recorded in the ruins:</color>\n<color=#0aa>" + text + "</color>" );
 
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+
+		return true;
+	}
+
+	// takes the artifacts of the ruin the terrain vehicle is beside that have not been taken yet, as far as there is room in its hold - returns true if the ruin had any
+	bool TakeArtifactsInRuin( bool clearMessages )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+		var terrainGrid = SpaceflightController.m_instance.m_disembarked.m_terrainGrid;
+		var terrainVehicle = SpaceflightController.m_instance.m_terrainVehicle;
+
+		if ( ( terrainGrid == null ) || ( terrainGrid.m_terrainRuins == null ) || ( terrainVehicle == null ) || ( playerData.m_planetSurfaces == null ) )
+		{
+			return false;
+		}
+
+		var text = "";
+		var anythingTaken = false;
+
+		foreach ( Transform child in terrainGrid.m_terrainRuins.transform )
+		{
+			var ruin = child.GetComponent<TerrainRuin>();
+
+			if ( ( ruin == null ) || !ruin.IsInReach( terrainVehicle.transform.position ) )
+			{
+				continue;
+			}
+
+			foreach ( var artifactSiteId in ruin.m_artifactSiteIds )
+			{
+				if ( ( artifactSiteId < 0 ) || ( artifactSiteId >= gameData.m_artifactSiteList.Length ) || playerData.m_planetSurfaces.IsArtifactSiteTaken( artifactSiteId ) )
+				{
+					continue;
+				}
+
+				var artifactId = gameData.m_artifactSiteList[ artifactSiteId ].m_artifactId;
+
+				if ( ( artifactId < 0 ) || ( artifactId >= gameData.m_artifactList.Length ) )
+				{
+					continue;
+				}
+
+				var artifact = gameData.m_artifactList[ artifactId ];
+
+				// is there room for it in the terrain vehicle? (artifact volumes are in tenths of a cubic meter, as the holds count)
+				if ( artifact.m_volume > playerData.m_terrainVehicle.GetRemainingVolume() )
+				{
+					text += ( ( text == "" ) ? "" : "\n" ) + "<color=yellow>There is a " + artifact.m_name + " here (" + Tools.VolumeToText( artifact.m_volume ) + " cubic meters), but the cargo hold has no room for it.</color>";
+
+					continue;
+				}
+
+				// yes - take it, and remember that it has been taken
+				playerData.m_terrainVehicle.AddArtifact( artifactId );
+				playerData.m_planetSurfaces.TakeArtifactSite( artifactSiteId );
+
+				text += ( ( text == "" ) ? "" : "\n" ) + "<color=green>Picked up the " + artifact.m_name + " (" + Tools.VolumeToText( artifact.m_volume ) + " cubic meters).</color>";
+
+				anythingTaken = true;
+			}
+		}
+
+		if ( text == "" )
+		{
+			return false;
+		}
+
+		if ( clearMessages )
+		{
+			SpaceflightController.m_instance.m_messages.Clear();
+		}
+
+		SpaceflightController.m_instance.m_messages.AddText( text );
+
+		SoundController.m_instance.PlaySound( anythingTaken ? SoundController.Sound.Transporter : SoundController.Sound.Error );
+
+		// update the terrain vehicle display (the cargo it shows has changed)
+		SpaceflightController.m_instance.m_displayController.m_terrainVehicleDisplay.Show();
 
 		return true;
 	}

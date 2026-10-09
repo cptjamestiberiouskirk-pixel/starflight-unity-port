@@ -559,6 +559,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioRuins();
 				break;
 
+			case "artifactsites":
+				yield return ScenarioArtifactSites();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -10797,6 +10801,182 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "ruins: a planet the original has no messages on has no ruins (control)", done[ 0 ] && ( ruinsOn90 == 0 ), ruinsOn90 + " ruins on planet 90" );
 
 		Finish( "scenario=ruins earth=" + ruins.Count + "/" + expectedRuins + " site=" + siteHolds + " found=" + foundAfter + "/" + foundAfterSecondPress + " planet90=" + ruinsOn90, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 3: the special artifacts at their sites, taken with the cargo button and kept as taken
+
+	// how many of this artifact a storage holds
+	static int ArtifactsHeld( PD_ArtifactStorage storage, int artifactId )
+	{
+		var count = 0;
+
+		if ( ( storage != null ) && ( storage.m_artifactList != null ) )
+		{
+			foreach ( var artifactReference in storage.m_artifactList )
+			{
+				if ( artifactReference.m_artifactId == artifactId )
+				{
+					count++;
+				}
+			}
+		}
+
+		return count;
+	}
+
+	IEnumerator ScenarioArtifactSites()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// ---- 1. the owner's rulings of 2026-10-09 on two of STRINFO's conflicts: the Rod Device at 54N x 13E, and Koann 3 the third planet of 112, 200 (orbit 5, planet 58)
+		var rodDevice = "missing";
+		var redCylinderPlanet = -1;
+
+		foreach ( var artifactSite in gameData.m_artifactSiteList )
+		{
+			if ( artifactSite.m_artifactName == "Rod Device" )
+			{
+				rodDevice = artifactSite.m_latitude + "/" + artifactSite.m_longitude;
+			}
+
+			if ( artifactSite.m_artifactName == "Red Cylinder" )
+			{
+				redCylinderPlanet = artifactSite.m_planetId;
+			}
+		}
+
+		var koannPlanet = -1;
+
+		foreach ( var colonyEvaluation in gameData.m_colonyEvaluationList )
+		{
+			if ( ( colonyEvaluation.m_starX == 112 ) && ( colonyEvaluation.m_starY == 200 ) )
+			{
+				koannPlanet = colonyEvaluation.m_planetId;
+			}
+		}
+
+		Log( "artifactsites: the Rod Device at " + rodDevice + ", the Red Cylinder on planet " + redCylinderPlanet + ", Koann 3's evaluation for planet " + koannPlanet + " (planet 58 is in orbit 5 of star 16)" );
+
+		Check( "artifactsites: the Rod Device lies at 54N x 13E, and the Red Cylinder and Koann 3's evaluation are on the third planet of 112, 200", ( rodDevice == "54/13" ) && ( redCylinderPlanet == 58 ) && ( koannPlanet == 58 ), rodDevice + ", " + redCylinderPlanet + ", " + koannPlanet );
+
+		// ---- 2. Earth, at 11N x 104W: the Hypercube lies in the ruin of the invoice
+		const int c_earth = 5;
+		var hypercubeId = gameData.FindArtifactId( "Hypercube" );
+
+		playerData.m_general.m_selectedLatitude = -104.0f;
+		playerData.m_general.m_selectedLongitude = 11.0f;
+
+		yield return GoIntoOrbit( 0, c_earth );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=artifactsites abort: never got into the terrain vehicle on Earth (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var ruins = RuinsOnTheGround();
+		var sitePosition = Tools.LatLongToWorldCoordinates( -104.0f, 11.0f );
+		Component siteRuin = null;
+
+		foreach ( var ruin in ruins )
+		{
+			var delta = ruin.transform.position - sitePosition;
+
+			if ( ( Mathf.Abs( delta.x ) < 0.5f ) && ( Mathf.Abs( delta.z ) < 0.5f ) )
+			{
+				siteRuin = ruin;
+			}
+		}
+
+		var siteArtifacts = ( siteRuin == null ) ? null : FieldOrNull( siteRuin, "m_artifactSiteIds" ) as List<int>;
+		var siteHolds = ( siteArtifacts == null ) ? "nothing" : string.Join( ",", siteArtifacts );
+
+		Log( "artifactsites: Earth has " + ruins.Count + " ruins; the ruin of 11N x 104W holds the artifact sites " + siteHolds + " and the messages " + ( ( siteRuin == null ) ? "-" : string.Join( ",", MessagesInRuin( siteRuin ) ) ) );
+
+		Check( "artifactsites: the Hypercube's site shares the ruin of the invoice, and Earth still has 12 ruins", ( ruins.Count == 12 ) && ( siteArtifacts != null ) && ( siteArtifacts.Count == 1 ) && ( gameData.m_artifactSiteList[ siteArtifacts[ 0 ] ].m_artifactId == hypercubeId ), ruins.Count + " ruins, sites " + siteHolds );
+
+		// ---- 3. the scan sees the artifact in the ruin
+		if ( siteRuin != null )
+		{
+			controller.m_terrainVehicle.transform.position = siteRuin.transform.position + Vector3.forward * 5.0f;
+		}
+
+		yield return Frames( 2 );
+
+		controller.m_messages.Clear();
+
+		new ScanButton().Execute();
+
+		yield return Frames( 3 );
+
+		var scanText = MessageList();
+
+		Check( "artifactsites: the scan reports the artifact in the ruin", scanText.Contains( "Artifact in the ruins: 1" ), scanText.Substring( 0, Mathf.Min( 200, scanText.Length ) ) );
+
+		// ---- 4. the cargo button takes it, once, and the taking is saved
+		new TVCargoButton().Execute();
+
+		yield return Frames( 3 );
+
+		var inVehicle = ArtifactsHeld( playerData.m_terrainVehicle.m_artifactStorage, hypercubeId );
+		var takenText = MessageList();
+
+		new TVCargoButton().Execute();
+
+		yield return Frames( 3 );
+
+		var inVehicleAfterSecondPress = ArtifactsHeld( playerData.m_terrainVehicle.m_artifactStorage, hypercubeId );
+		var takenList = FieldOrNull( FieldOrNull( playerData, "m_planetSurfaces" ), "m_takenArtifactSiteList" ) as List<int>;
+		var takenCount = ( takenList == null ) ? -1 : takenList.Count;
+
+		Log( "artifactsites: Hypercubes in the terrain vehicle " + inVehicle + ", after a second press " + inVehicleAfterSecondPress + ", artifact sites taken " + takenCount + " | " + takenText.Substring( 0, Mathf.Min( 200, takenText.Length ) ) );
+
+		Check( "artifactsites: the cargo button beside the ruin takes the Hypercube into the terrain vehicle, once", ( inVehicle == 1 ) && ( inVehicleAfterSecondPress == 1 ) && takenText.Contains( "Picked up the Hypercube" ), inVehicle + " then " + inVehicleAfterSecondPress );
+		Check( "artifactsites: the taking is in the save", takenCount == 1, takenCount + " sites taken" );
+
+		// ---- 5. back into the ship: the Hypercube goes into the ship's hold; out again: there is nothing more to take
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		var inShip = ArtifactsHeld( playerData.m_playerShip.m_artifactStorage, hypercubeId );
+		var leftInVehicle = ArtifactsHeld( playerData.m_terrainVehicle.m_artifactStorage, hypercubeId );
+
+		yield return DisembarkNow( done );
+
+		controller.m_terrainVehicle.transform.position = sitePosition + Vector3.forward * 5.0f;
+
+		yield return Frames( 2 );
+
+		new TVCargoButton().Execute();
+
+		yield return Frames( 3 );
+
+		var inVehicleLater = ArtifactsHeld( playerData.m_terrainVehicle.m_artifactStorage, hypercubeId );
+
+		Log( "artifactsites: back in the ship: " + inShip + " in the ship's hold, " + leftInVehicle + " left in the terrain vehicle | out again and the cargo button pressed at the ruin: " + inVehicleLater + " in the terrain vehicle" );
+
+		Check( "artifactsites: back in the ship the Hypercube is in the ship's hold", ( inShip == 1 ) && ( leftInVehicle == 0 ), inShip + " in the ship, " + leftInVehicle + " in the vehicle" );
+		Check( "artifactsites: going out again, the ruin has nothing more to take", done[ 0 ] && ( inVehicleLater == 0 ), inVehicleLater + " Hypercubes taken the second time" );
+
+		// ---- 6. the messages of the same ruin were recorded as before (control)
+		var recorded = playerData.m_shipsLog.m_foundMessages.Count;
+
+		Check( "artifactsites: the two messages of the ruin are recorded as before (control)", recorded == 2, recorded + " messages" );
+
+		Finish( "scenario=artifactsites rod=" + rodDevice + " redCylinder=" + redCylinderPlanet + " earthRuins=" + ruins.Count + " site=" + siteHolds + " taken=" + inVehicle + "/" + inVehicleAfterSecondPress + " ship=" + inShip + " later=" + inVehicleLater, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

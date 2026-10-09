@@ -101,8 +101,9 @@ What the probe does:
 | `calendar` | the stardate texts of the clock in the original's calendar of 10 months of 30 days (day 0 as the control, the turn of a month, day 40, day 299, day 300, day 365), the day of Arth's flare against the date fields of its star, and a save made in the real-world calendar (bank, ship's log, current date) next to one made in the original's (the control) after loading (about 30 s) |
 | `pickups` | on planet 90 in the terrain vehicle: a deposit taken whole through the real Cargo button, one taken in part (the hold has room for 1 cubic meter), and one left alone as the control, found again by where they were placed after going back into the ship and out again, and the record of them through a save and a load (about 35 s) |
 | `ruins` | on Earth (planet 5), landed at 11N x 104W: the ruins of the recovered data's messages (one per site, one per message at a random place: 12), the ruin of the site at its latitude and longitude with both of its messages, no rock or tree next to a ruin, the real Cargo button recording the two messages in the ship's log dated that day and only once, the scan naming the ruin, the same places after going out again, and planet 90 with no ruins as the control (about 60 s) |
+| `artifactsites` | the owner's rulings on the Rod Device (54N x 13E) and Koann 3 (planet 58), then on Earth at 11N x 104W: the Hypercube's site in the ruin of the invoice (still 12 ruins), the scan seeing the artifact, the real Cargo button taking it into the terrain vehicle once and the taking in the save, the Hypercube in the ship's hold after going back in, nothing more to take after going out again, and the ruin's two messages recorded as before (the control) (about 35 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (60 scenarios, about 28 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (61 scenarios, about 29 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

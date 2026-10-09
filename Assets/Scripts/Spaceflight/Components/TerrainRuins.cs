@@ -94,6 +94,39 @@ public class TerrainRuins : TerrainGridPopulator
 			}
 		}
 
+		// the special artifacts of this planet (STRINFO 4.1) - after the messages, so that the places of the ruins of the messages do not change, and with no random
+		// numbers: an artifact lies in the ruin of its site, which a message can share (the Hypercube lies at the site of the invoice on Earth)
+		foreach ( var artifactSite in gameData.m_artifactSiteList )
+		{
+			if ( artifactSite.m_planetId != planet.m_id )
+			{
+				continue;
+			}
+
+			var siteKey = (long) artifactSite.m_latitude * 1000 + artifactSite.m_longitude;
+
+			// is there a ruin at this site already?
+			if ( !ruinsAtSites.TryGetValue( siteKey, out var ruin ) )
+			{
+				// no - a ruin of its own, at its latitude and longitude
+				var worldCoordinates = Tools.LatLongToWorldCoordinates( artifactSite.m_longitude, artifactSite.m_latitude );
+
+				Tools.WorldToMapCoordinates( worldCoordinates, out var mapX, out var mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
+
+				var template = m_ruinTemplates[ artifactSite.m_id % m_ruinTemplates.Length ];
+
+				var ruinObject = PlaceObjectAt( template, mapX, mapY, elevationScale, ( artifactSite.m_id * 211 ) % 360 );
+
+				ruinObject.name = "Ruin of artifact site " + artifactSite.m_id;
+
+				ruin = ruinObject.AddComponent<TerrainRuin>();
+
+				ruinsAtSites[ siteKey ] = ruin;
+			}
+
+			ruin.m_artifactSiteIds.Add( artifactSite.m_id );
+		}
+
 		// give the game its random numbers back
 		Random.state = randomState;
 	}

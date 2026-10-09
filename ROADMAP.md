@@ -68,8 +68,8 @@ Still open:
   - (c) Leave lifeforms out.
 - **D4. Interstel Police** (the copy protection arrest). Recommendation: leave it out.
 - **D5. Conflicts in the sources.**
-  - The Rod Device site: STRINFO gives two different coordinates.
-  - The Red Cylinder and Koann 3: STRINFO prints planet 4 of 112,200 three times (1.2, 4.1, 5.1), but the name Koann 3, the orbit number 5 of its 5.1 entry (the third planet from that sun) and the Elowan message (3.1, "planet 3") all point to orbit 5. The recovered data keeps planet 4 as printed until this is decided.
+  - The Rod Device site: STRINFO gives two different coordinates. Ruled 2026-10-09: 54N x 13E, Harrison's base 2, as New Scotland's own entry says.
+  - The Red Cylinder and Koann 3: STRINFO prints planet 4 of 112,200 three times (1.2, 4.1, 5.1), but the name Koann 3, the orbit number 5 of its 5.1 entry (the third planet from that sun) and the Elowan message (3.1, "planet 3") all point to orbit 5. Ruled 2026-10-09: the third planet (orbit 5).
   - The real effects of the Black Box, the Hypercube and the Ellipsoid.
   - The flare deadline: resolved 2026-10-09. The data does not disagree with itself: the year, month and day fields of every star still to flare are its flare day in the original's calendar of 10 months of 30 days (234 of 234), so Arth's day 300 is 01-01-4621. The original looks for a flare as a day ends, so Arth's comes as 30-10-4620, the last day of the year, ends: the Elowan's "final week of your Ten-month". See item 0.7.
 
@@ -126,7 +126,7 @@ Rulings of 2026-10-09: place only what the sources document now (the 14 artifact
 |---|---|---|---|
 | 3.0 | What has been taken from a planet stays taken: deposits now, the artifacts and messages with 3.2 and 3.3 | the manual (page 21) | PR 100: every disembark placed the planet again from its seed, so a deposit that had been picked up was back |
 | 3.1 | Ruins at the sites of the recovered data: a ruin at each artifact site and at each message, the two formations (the Most Magnificent Hexagon of 6 ancient ruins on Sphexi, the City of the Ancients of 15) | planet.txt, dir.txt SEED-OV, data from 0.4 | the messages: PR 102, 12 ruins on Earth; the artifact sites and the two formations follow |
-| 3.2 | The 15 special artifacts at their sites, and the terrain vehicle picks up artifacts | STRINFO 4.1 | `PD_TerrainVehicle.AddArtifact` has no caller |
+| 3.2 | The 12 special artifacts at their 14 sites, taken with the Cargo button | STRINFO 4.1 | PR 108: in the ruins of their sites, taken once and saved, carried to the ship; the Black Box, the Flat Device and the Whining Orb are bought, not found |
 | 3.3 | The 38 messages go to the ship's log under Messages, recorded with the Cargo button beside their ruin, dated the day they were found | STRINFO 3.1; the manual (page 21) | PR 102 |
 | 3.4 | Terrain vehicle cargo display | | `TerrainVehicleCargoDisplay` not wired |
 | 3.5 | Random ruins: ancient crystal ruins with Endurium lumps or 1 to 4 "truly amazing" artifacts, Old Empire ruins with artifacts or writing | planet.txt (DRAFT only) | Ask: deferred by the owner on 2026-10-09 |
