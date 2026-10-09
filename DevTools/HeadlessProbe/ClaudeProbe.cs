@@ -1445,6 +1445,13 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "spemin scout scan shows its own picture", PictureShown( sensors ) && ( MaskName( sensors ) == "Sensors - Spemin Scout Mask" ), SensorPicture( sensors ) );
 
+		// a picture traced from the original by DevTools/SensorPictures
+		spaceflightController.m_displayController.ChangeDisplay( sensors );
+		sensors.StartScanning( SensorsDisplay.ScanType.ElowanTransport, 0, 350, 100, 100 );
+		yield return Frames( 2 );
+
+		Check( "elowan transport scan shows its own picture", PictureShown( sensors ) && ( BackgroundName( sensors ) == "Sensors - Elowan Transport" ) && ( MaskName( sensors ) == "Sensors - Elowan Transport Mask" ), SensorPicture( sensors ) );
+
 		// a vessel that has no picture yet, scanned right after one that has (the window must not keep the last picture or show another ship)
 		spaceflightController.m_displayController.ChangeDisplay( sensors );
 		sensors.StartScanning( SensorsDisplay.ScanType.ElowanScout, 1, 50, 100, 100 );
