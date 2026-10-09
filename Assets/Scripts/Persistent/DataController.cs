@@ -236,6 +236,14 @@ public class DataController : MonoBehaviour
 		// repair save files whose stardates are in the real-world calendar (before the port used the original's calendar of 10 months of 30 days)
 		playerData.ValidateStardateCalendar();
 
+		// save files from before what was taken from the planets was saved have no record of it
+		if ( playerData.m_planetSurfaces == null )
+		{
+			playerData.m_planetSurfaces = new PD_PlanetSurfaces();
+		}
+
+		playerData.m_planetSurfaces.Validate();
+
 		return playerData;
 	}
 

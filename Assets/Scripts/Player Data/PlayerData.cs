@@ -25,6 +25,7 @@ public class PlayerData
 	public PD_Encounter[] m_encounterList;
 	public PD_TerrainVehicle m_terrainVehicle;
 	public PD_ShipsLog m_shipsLog;
+	public PD_PlanetSurfaces m_planetSurfaces;
 
 	// this resets our player progress to the new game state
 	public void Reset()
@@ -44,6 +45,7 @@ public class PlayerData
 		m_encounterList = new PD_Encounter[ gameData.m_encounterList.Length ];
 		m_terrainVehicle = new PD_TerrainVehicle();
 		m_shipsLog = new PD_ShipsLog();
+		m_planetSurfaces = new PD_PlanetSurfaces();
 
 		m_general.Reset();
 		m_starport.Reset();
@@ -54,6 +56,7 @@ public class PlayerData
 		m_knownArtifacts.Reset();
 		m_terrainVehicle.Reset();
 		m_shipsLog.Reset();
+		m_planetSurfaces.Reset();
 
 		for ( var i = 0; i < gameData.m_encounterList.Length; i++ )
 		{

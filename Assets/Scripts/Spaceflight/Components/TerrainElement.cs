@@ -11,6 +11,10 @@ public class TerrainElement : MonoBehaviour
 	// how much this deposit contains, in tenths of a cubic meter (the unit the cargo holds count in)
 	public int m_volume;
 
+	// the planet, and the deposit by the order it was placed in - what has been taken from it is saved under these (PD_PlanetSurfaces)
+	public int m_planetId;
+	public int m_depositIndex;
+
 	// reference to the terrain vehicle for pickup detection
 	TerrainVehicle m_terrainVehicle;
 
@@ -30,14 +34,38 @@ public class TerrainElement : MonoBehaviour
 	const int c_tenthsPerCubicMeter = 10;
 
 	// initialize this element
-	public void Initialize( int elementId, TerrainVehicle terrainVehicle )
+	public void Initialize( int elementId, TerrainVehicle terrainVehicle, int planetId, int depositIndex )
 	{
 		m_elementId = elementId;
 		m_terrainVehicle = terrainVehicle;
+		m_planetId = planetId;
+		m_depositIndex = depositIndex;
 
 		// random volume for this deposit - 1 to 5 cubic meters, kept in tenths like everything in the cargo holds
 		// (still one random number per deposit - the objects of a planet are placed with random numbers seeded from the planet, and a second number here would move everything placed after it)
 		m_volume = Random.Range( c_minVolume, c_maxVolume + 1 ) * c_tenthsPerCubicMeter;
+
+		// has something been taken from this deposit before? (this comes after the random number, so that nothing placed after it moves)
+		var playerData = ( DataController.m_instance != null ) ? DataController.m_instance.m_playerData : null;
+
+		if ( ( playerData != null ) && ( playerData.m_planetSurfaces != null ) )
+		{
+			var volumeLeft = playerData.m_planetSurfaces.GetDepositVolumeLeft( m_planetId, m_depositIndex );
+
+			if ( volumeLeft == 0 )
+			{
+				// yes - all of it: the deposit is gone
+				m_volume = 0;
+				m_pickedUp = true;
+
+				gameObject.SetActive( false );
+			}
+			else if ( volumeLeft > 0 )
+			{
+				// yes - some of it: this is what is left
+				m_volume = Mathf.Min( m_volume, volumeLeft );
+			}
+		}
 	}
 
 	// check if this element is close enough to the terrain vehicle to pick up
