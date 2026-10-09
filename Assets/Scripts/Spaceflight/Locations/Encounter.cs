@@ -67,7 +67,11 @@ public class Encounter : MonoBehaviour
 		// turn off all of the alien ship model templates
 		foreach ( var alienShipModelTemplate in m_alienShipModelTemplate )
 		{
-			alienShipModelTemplate.SetActive( false );
+			// an empty slot has nothing to turn off (ResetAlienShipModels reports it when a ship needs it)
+			if ( alienShipModelTemplate != null )
+			{
+				alienShipModelTemplate.SetActive( false );
+			}
 		}
 
 		// turn off all of the debris model templates
