@@ -48,7 +48,7 @@ What the probe does:
 | `h6`, `m15` | combat target and model slots |
 | `m13`, `m14` | destroyed encounters and destroyed ships |
 | `m7` | sensor scan types |
-| `sensorpictures` | the picture each kind of scan puts in the sensor window: a planet in orbit (its mask), a Spemin scout (control: its own picture), an Elowan scout and a Thrynn warship with no picture (window left empty, also straight after a scan that had one, scan type kept) and debris (the wreck picture) |
+| `sensorpictures` | the picture each kind of scan puts in the sensor window: a planet in orbit (its mask), a Spemin scout (control: its own picture), an Elowan scout and a Thrynn warship with no picture (window left empty, also straight after a scan that had one, scan type kept), debris that names no vessel (window left empty), and the wreck of a ship destroyed in a real encounter for a Spemin scout, a Mechan scout, a Thrynn scout (no debris picture: window left empty) and a Spemin warship (control: the picture every wreck had before) |
 | `m8` | `JsonSaveSystem` in a scratch directory |
 | `m24` | gravity text |
 | `starport-m22` | panel close guard |
