@@ -543,6 +543,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioRecoveredData();
 				break;
 
+			case "flaredata":
+				yield return ScenarioFlareData();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -9932,6 +9936,113 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "recovereddata: the original game data is unchanged (control)", sizes == "811/51/558", sizes );
 
 		Finish( "scenario=recovereddata counts=" + counts + " unresolved=" + ( ( unresolved == "" ) ? "none" : unresolved.Trim().Replace( ' ', ',' ) ) + " planets=" + planets.Replace( ' ', ',' ) + " gameData=" + sizes, 0 );
+	}
+
+	// ---------------------------------------------------------------- roadmap 0.5: the flare days of the stars that flared before the game began
+
+	// the inner size of the shine of the star system's sun (what StarSystem.Show set last)
+	static float ShineInnerSize()
+	{
+		var shine = SpaceflightController.m_instance.m_starSystem.m_shine;
+		var material = FieldOrNull( shine, "m_material" ) as Material;
+
+		return ( material == null ) ? float.NaN : material.GetVector( "_Size" ).x;
+	}
+
+	IEnumerator ScenarioFlareData()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		yield return null;
+
+		// ---- 1. the stars whose flare day the game data holds unsigned: 36, all with a negative m_daysSincePreviousFlare
+		var flaredBefore = 0;
+		var signed = 0;
+		var earthSun = "";
+		var future = 0;
+		var futureRange = "";
+		var futureMin = int.MaxValue;
+		var futureMax = int.MinValue;
+		var calendarMatches = 0;
+
+		foreach ( var star in gameData.m_starList )
+		{
+			if ( star.m_daysSincePreviousFlare < 0 )
+			{
+				flaredBefore++;
+
+				if ( star.m_daysToNextFlare == star.m_daysSincePreviousFlare )
+				{
+					signed++;
+				}
+			}
+			else
+			{
+				future++;
+
+				futureMin = Mathf.Min( futureMin, star.m_daysToNextFlare );
+				futureMax = Mathf.Max( futureMax, star.m_daysToNextFlare );
+
+				// the date fields of the game data, worked out with a calendar of 10 months of 30 days from day 0 = 01-01-4620
+				var day = star.m_daysToNextFlare;
+
+				if ( ( star.m_yearOfNextFlare == 4620 + day / 300 ) && ( star.m_monthOfNextFlare == ( day % 300 ) / 30 + 1 ) && ( star.m_dayOfNextFlare == day % 30 + 1 ) )
+				{
+					calendarMatches++;
+				}
+			}
+
+			if ( star.m_id == 0 )
+			{
+				earthSun = star.m_xCoordinate + "," + star.m_yCoordinate + " day " + star.m_daysToNextFlare;
+			}
+		}
+
+		futureRange = futureMin + " to " + futureMax;
+
+		var arth = gameData.m_starList[ 25 ];
+
+		Log( "flaredata: stars that flared before the game began: " + flaredBefore + ", flare day signed: " + signed + " | Earth's sun: " + earthSun + " | stars still to flare: " + future + " (days " + futureRange + "), Arth (star 25 at " + arth.m_xCoordinate + "," + arth.m_yCoordinate + ") on day " + arth.m_daysToNextFlare + " | their date fields in a calendar of 10 months of 30 days: " + calendarMatches + " of " + future );
+
+		Check( "flaredata: the 36 stars that flared before the game began have a negative flare day", ( flaredBefore == 36 ) && ( signed == 36 ), signed + " of " + flaredBefore + " signed, Earth's sun " + earthSun );
+		Check( "flaredata: the 234 stars still to flare keep their flare day, Arth's on day 300 (control)", ( future == 234 ) && ( futureMin == 4 ) && ( futureMax == 792 ) && ( arth.m_daysToNextFlare == 300 ), future + " stars, days " + futureRange + ", Arth " + arth.m_daysToNextFlare );
+		Check( "flaredata: the date fields of the stars still to flare are their flare day in a calendar of 10 months of 30 days (control: the game data itself)", calendarMatches == 234, calendarMatches + " of " + future );
+
+		// ---- 2. in the game: the sun of a star that flared before the game began shines as a stable sun, and Arth's (300 days away) is larger (control)
+		EnterStarSystem( 0 );
+
+		var start = Time.realtimeSinceStartup;
+
+		while ( controller.m_starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 40.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		var earthShine = ShineInnerSize();
+
+		EnterStarSystem( 25 );
+
+		start = Time.realtimeSinceStartup;
+
+		while ( controller.m_starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 40.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		var arthShine = ShineInnerSize();
+
+		Log( "flaredata: inner size of the sun's shine: Earth's sun " + earthShine.ToString( "F5" ) + ", Arth's sun " + arthShine.ToString( "F5" ) + " (a stable sun is 128)" );
+
+		Check( "flaredata: the sun of a star that flared before the game began shines as a stable sun", earthShine == 128.0f, earthShine.ToString( "F5" ) );
+		Check( "flaredata: Arth's sun, 300 days from its flare, shines larger (control)", arthShine > 128.0f, arthShine.ToString( "F5" ) );
+
+		Finish( "scenario=flaredata flaredBefore=" + flaredBefore + " signed=" + signed + " future=" + future + " calendar=" + calendarMatches + " shine=" + earthShine.ToString( "F5" ) + "/" + arthShine.ToString( "F5" ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

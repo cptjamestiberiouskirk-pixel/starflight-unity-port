@@ -8,6 +8,10 @@ public class GD_Star
 {
 	public const int c_maxNumPlanets = 8;
 
+	// the flare day of the original is a signed 16 bit number
+	const int c_maxSignedDayCount = 32767;
+	const int c_dayCountRange = 65536;
+
 	public int m_id;
 
 	public int m_xCoordinate;
@@ -15,8 +19,11 @@ public class GD_Star
 
 	public string m_class;
 
+	// the day of the game (0 is the first day) the star flares on - negative for a star that flared that many days before the game began (see Initialize)
 	public int m_daysToNextFlare;
 	public int m_daysSincePreviousFlare;
+
+	// the same day as a date of the original's calendar of 10 months of 30 days - not used by the game
 	public int m_yearOfNextFlare;
 	public int m_monthOfNextFlare;
 	public int m_dayOfNextFlare;
@@ -30,6 +37,13 @@ public class GD_Star
 
 	public void Initialize( GameData gameData )
 	{
+		// the original kept the flare day of a star as one signed 16 bit number, negative for a star that had flared before the game began. The game data has it
+		// unsigned for the 36 stars that had (65536 more: Earth's sun at 65476 flared 60 days before the start, and m_daysSincePreviousFlare holds the -60), so put the sign back
+		if ( m_daysToNextFlare > c_maxSignedDayCount )
+		{
+			m_daysToNextFlare -= c_dayCountRange;
+		}
+
 		// allocate planets array
 		m_planetList = new GD_Planet[ 8 ];
 
