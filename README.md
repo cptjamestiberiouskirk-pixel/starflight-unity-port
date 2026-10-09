@@ -109,7 +109,7 @@ The project features a **deterministic visualization system** that renders plane
 ---
 
 ## 👽 Alien Asset Status
-- **Alien ship models**: the Spemin ships, the Mechan Scout and the Mysterion are hand-made models. The Veloxi, Thrynn, Elowan and Uhlek ships are procedural low-poly stand-ins built by the Blender scripts in `DevTools/ShipModels` (see its [README](DevTools/ShipModels/README.md)), shaped after the original's sensor pictures and sized after STRINFO. The other vessels still use a placeholder until their stand-ins are in.
+- **Alien ship models**: the Spemin ships, the Mechan Scout and the Mysterion are hand-made models. The Veloxi, Thrynn, Elowan, Uhlek and Gazurtoid ships are procedural low-poly stand-ins built by the Blender scripts in `DevTools/ShipModels` (see its [README](DevTools/ShipModels/README.md)), shaped after the original's sensor pictures and sized after STRINFO. The other vessels still use a placeholder until their stand-ins are in.
 - **Thrynn.fbx**: Currently ~74MB. Requires manual extraction of materials and potential polygon reduction to optimize performance.
 
 ---
@@ -129,7 +129,7 @@ The project features a **deterministic visualization system** that renders plane
 
 ### 🔧 In Progress
 - Salvage collection from debris fields
-- Alien ship models for the Gazurtoid, Noah 9 and the Enterprise (procedural stand-ins, one race at a time)
+- Alien ship models for the Noah 9 derelict and the Enterprise (procedural stand-ins)
 
 ### 📊 Completion: ~95%
 
