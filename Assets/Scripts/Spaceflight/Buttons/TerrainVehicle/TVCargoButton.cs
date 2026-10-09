@@ -538,6 +538,14 @@ public class TVCargoButton : ShipButton
 
 		SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.TerrainVehicleCargo );
 
+		// the display shows the hold while the list is open
+		var displayController = SpaceflightController.m_instance.m_displayController;
+
+		if ( displayController.m_terrainVehicleCargoDisplay != null )
+		{
+			displayController.ChangeDisplay( displayController.m_terrainVehicleCargoDisplay );
+		}
+
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 	}
 
@@ -637,6 +645,11 @@ public class TVCargoButton : ShipButton
 	public static void BackToTerrainVehicle()
 	{
 		SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.TerrainVehicle );
+
+		// and back to the terrain vehicle's display
+		var displayController = SpaceflightController.m_instance.m_displayController;
+
+		displayController.ChangeDisplay( displayController.m_terrainVehicleDisplay );
 	}
 
 	// picks up again what the terrain vehicle dropped beside it, as far as there is room - returns true if anything dropped was there

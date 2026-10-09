@@ -13,6 +13,7 @@ public class DisplayController : MonoBehaviour
 	public SensorsDisplay m_sensorsDisplay;
 	public TerrainMapDisplay m_terrainMapDisplay;
 	public TerrainVehicleDisplay m_terrainVehicleDisplay;
+	public TerrainVehicleCargoDisplay m_terrainVehicleCargoDisplay;
 
 	// the current display
 	ShipDisplay m_currentDisplay;
@@ -38,6 +39,11 @@ public class DisplayController : MonoBehaviour
 		m_sensorsDisplay.Hide();
 		m_terrainMapDisplay.Hide();
 		m_terrainVehicleDisplay.Hide();
+
+		if ( m_terrainVehicleCargoDisplay != null )
+		{
+			m_terrainVehicleCargoDisplay.Hide();
+		}
 
 		// change the current display
 		m_currentDisplay = newDisplay;

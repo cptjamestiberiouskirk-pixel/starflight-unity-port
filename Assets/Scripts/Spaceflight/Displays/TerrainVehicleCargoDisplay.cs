@@ -11,6 +11,10 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 	// text component for cargo values
 	public TextMeshProUGUI m_valuesText;
 
+	// what the hold held when the text was made last (the text is made again only when it changes)
+	int m_shownVolumeUsed = -1;
+	int m_shownItemCount = -1;
+
 	TerrainVehicleCargoDisplay()
 	{
 	}
@@ -24,6 +28,10 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 	public override void Show()
 	{
 		base.Show();
+
+		// make the text again
+		m_shownVolumeUsed = -1;
+
 		UpdateCargoDisplay();
 	}
 
@@ -38,6 +46,19 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 		{
 			return;
 		}
+
+		// has the hold changed since the text was made? (making it every frame makes garbage every frame)
+		var terrainVehicle = DataController.m_instance.m_playerData.m_terrainVehicle;
+		var volumeUsed = DataController.m_instance.m_gameData.m_misc.m_terrainVehicleVolume - terrainVehicle.GetRemainingVolume();
+		var itemCount = ( ( terrainVehicle.m_elementStorage != null ) && ( terrainVehicle.m_elementStorage.m_elementList != null ) ? terrainVehicle.m_elementStorage.m_elementList.Count : 0 ) + ( ( terrainVehicle.m_artifactStorage != null ) && ( terrainVehicle.m_artifactStorage.m_artifactList != null ) ? terrainVehicle.m_artifactStorage.m_artifactList.Count : 0 );
+
+		if ( ( volumeUsed == m_shownVolumeUsed ) && ( itemCount == m_shownItemCount ) )
+		{
+			return;
+		}
+
+		m_shownVolumeUsed = volumeUsed;
+		m_shownItemCount = itemCount;
 
 		var gameData = DataController.m_instance.m_gameData;
 		var playerData = DataController.m_instance.m_playerData;
