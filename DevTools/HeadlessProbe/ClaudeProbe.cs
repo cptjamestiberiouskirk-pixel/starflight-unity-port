@@ -9619,18 +9619,35 @@ public class ClaudeProbe : MonoBehaviour
 					yield return null;
 				}
 
-				// the debris tumbles, so measure it in its own frame and scale that into the ship's frame (it is a direct child)
+				// the debris tumbles, so measure it in its own frame, scale that into the ship's frame (it is a direct child) and turn it
+				// by the template's rotation, which is how it should start out
 				var tumble = model.GetComponentInChildren<DebrisTumble>( false );
-				var debrisSize = ( tumble != null ) ? Vector3.Scale( SizeInFrameOf( tumble.transform, tumble.gameObject ), tumble.transform.localScale ) : Vector3.zero;
+				var debrisSize = Vector3.zero;
+
+				if ( tumble != null )
+				{
+					var ownSize = Vector3.Scale( SizeInFrameOf( tumble.transform, tumble.gameObject ), tumble.transform.localScale );
+					var turn = Matrix4x4.Rotate( debrisTemplates[ vesselId ].transform.localRotation );
+
+					for ( var axis = 0; axis < 3; axis++ )
+					{
+						debrisSize[ axis ] = Mathf.Abs( turn[ axis, 0 ] ) * ownSize.x + Mathf.Abs( turn[ axis, 1 ] ) * ownSize.y + Mathf.Abs( turn[ axis, 2 ] ) * ownSize.z;
+					}
+				}
+
 				var debrisLongest = Mathf.Max( debrisSize.x, debrisSize.y, debrisSize.z );
 				var ratio = ( longest > 0.0f ) ? ( debrisLongest / longest ) : 0.0f;
+				var sameShape = true;
 
-				sizes += "(debris " + ratio.ToString( "F2" ) + ")";
-
-				if ( c_shipModelLengths.ContainsKey( vesselId ) )
+				for ( var axis = 0; axis < 3; axis++ )
 				{
-					Check( "vessel " + vesselId + " leaves debris of its own size", ( tumble != null ) && ( Mathf.Abs( ratio - 1.0f ) <= 0.1f ), "debris=" + debrisSize.ToString( "F1" ) + " ratio=" + ratio.ToString( "F2" ) );
+					sameShape &= Mathf.Abs( debrisSize[ axis ] - size[ axis ] ) <= longest * 0.1f;
 				}
+
+				sizes += "(debris " + ratio.ToString( "F2" ) + ( sameShape ? "" : " turned" ) + ")";
+
+				Check( "vessel " + vesselId + " leaves debris of its own size", ( tumble != null ) && ( Mathf.Abs( ratio - 1.0f ) <= 0.1f ), "debris=" + debrisSize.ToString( "F1" ) + " ratio=" + ratio.ToString( "F2" ) );
+				Check( "vessel " + vesselId + " leaves debris turned like the ship", ( tumble != null ) && sameShape, "debris=" + debrisSize.ToString( "F1" ) + " ship=" + size.ToString( "F1" ) );
 			}
 
 			ClearMissiles();
