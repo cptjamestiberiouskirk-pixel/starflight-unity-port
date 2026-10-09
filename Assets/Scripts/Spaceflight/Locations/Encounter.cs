@@ -101,6 +101,9 @@ public class Encounter : MonoBehaviour
 			return;
 		}
 
+		// measure the destroyed ship before it is removed, so that its debris can be given the same size
+		var shipSize = GetLongestSide( alienShipModel.transform, alienShipModel );
+
 		// clear any existing children (the destroyed ship model)
 		Tools.DestroyChildrenOf( alienShipModel );
 
@@ -125,10 +128,21 @@ public class Encounter : MonoBehaviour
 		// spawn the debris model as a child
 		var debrisInstance = Instantiate( debrisTemplate, alienShipModel.transform );
 		debrisInstance.transform.localPosition = Vector3.zero;
-		debrisInstance.transform.localRotation = Quaternion.identity;
+
+		// keep the template's own rotation: an imported model's root can carry the turn that puts it the right way up
+		debrisInstance.transform.localRotation = debrisTemplate.transform.localRotation;
 		
-		// use the template's local scale directly - adjust in Unity Inspector if needed
+		// start from the template's local scale
 		debrisInstance.transform.localScale = debrisTemplate.transform.localScale;
+
+		// then fit the debris to the size of the ship it replaces (the debris models are imported at scales of their own)
+		var debrisSize = GetLongestSide( alienShipModel.transform, debrisInstance );
+
+		if ( ( shipSize > 0.0f ) && ( debrisSize > 0.0f ) )
+		{
+			debrisInstance.transform.localScale *= shipSize / debrisSize;
+		}
+
 		debrisInstance.SetActive( true );
 		
 		Debug.Log( $"SpawnDebrisForShip: Spawned debris for vesselId {vesselId} at {position} with scale {debrisInstance.transform.localScale}" );
@@ -140,6 +154,46 @@ public class Encounter : MonoBehaviour
 		// add slow tumbling rotation to the debris
 		var tumble = debrisInstance.AddComponent<DebrisTumble>();
 		tumble.m_rotationSpeed = new Vector3( Random.Range( -10f, 10f ), Random.Range( -10f, 10f ), Random.Range( -10f, 10f ) );
+	}
+
+	/// <summary>
+	/// The longest side of the meshes under model, measured along the axes of container (zero if there are none).
+	/// </summary>
+	static float GetLongestSide( Transform container, GameObject model )
+	{
+		var toContainer = container.worldToLocalMatrix;
+		var bounds = new Bounds();
+		var hasBounds = false;
+
+		foreach ( var meshFilter in model.GetComponentsInChildren<MeshFilter>( true ) )
+		{
+			if ( meshFilter.sharedMesh == null )
+			{
+				continue;
+			}
+
+			// put the eight corners of the mesh's own bounds into the container's frame
+			var matrix = toContainer * meshFilter.transform.localToWorldMatrix;
+			var meshBounds = meshFilter.sharedMesh.bounds;
+
+			for ( var corner = 0; corner < 8; corner++ )
+			{
+				var sign = new Vector3( ( ( corner & 1 ) == 0 ) ? -1.0f : 1.0f, ( ( corner & 2 ) == 0 ) ? -1.0f : 1.0f, ( ( corner & 4 ) == 0 ) ? -1.0f : 1.0f );
+				var point = matrix.MultiplyPoint3x4( meshBounds.center + Vector3.Scale( meshBounds.extents, sign ) );
+
+				if ( hasBounds )
+				{
+					bounds.Encapsulate( point );
+				}
+				else
+				{
+					bounds = new Bounds( point, Vector3.zero );
+					hasBounds = true;
+				}
+			}
+		}
+
+		return hasBounds ? Mathf.Max( bounds.size.x, bounds.size.y, bounds.size.z ) : 0.0f;
 	}
 
 	/// <summary>
