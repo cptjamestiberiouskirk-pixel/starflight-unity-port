@@ -21,7 +21,9 @@ public class GD_Comm
 		Statement = 13,
 		Question = 14,
 		Terminate = 15,
-		Custom = 16
+		Custom = 16,
+		OrbitGranted = 17,
+		OrbitDenied = 18
 	}
 
 	public enum Stance

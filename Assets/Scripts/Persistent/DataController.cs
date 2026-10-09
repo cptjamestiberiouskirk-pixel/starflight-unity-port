@@ -14,7 +14,10 @@ public class DataController : MonoBehaviour
 
 	// the name of the game data file
 	public string m_gameDataFileName;
-	
+
+	// the name of the file with what was recovered from the other sources of the original game (in Resources)
+	const string c_recoveredDataFileName = "Starflight Recovered Data";
+
 	// the name of the save game file
 	public string m_playerDataFileName;
 
@@ -117,6 +120,18 @@ public class DataController : MonoBehaviour
 
 		// convert it from the json string to our game data class
 		m_gameData = JsonUtility.FromJson<GameData>( textAsset.text );
+
+		// add what was recovered from the other sources of the original game (kept in its own file so the game data file stays the original data)
+		var recoveredDataAsset = Resources.Load( c_recoveredDataFileName ) as TextAsset;
+
+		if ( recoveredDataAsset != null )
+		{
+			m_gameData.AddRecoveredData( JsonUtility.FromJson<RecoveredData>( recoveredDataAsset.text ) );
+		}
+		else
+		{
+			UnityEngine.Debug.LogError( "The recovered data file " + c_recoveredDataFileName + " is missing" );
+		}
 
 		// initalize the game data
 		m_gameData.Initialize();

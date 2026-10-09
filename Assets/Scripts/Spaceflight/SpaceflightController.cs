@@ -50,6 +50,9 @@ public class SpaceflightController : MonoBehaviour
 	// remember whether or not we have faded in the scene already
 	bool m_alreadyFadedIn;
 
+	// the encounters in orbit that have let the ship into orbit (a veloxi drone that was answered correctly) - this lasts until the ship leaves the star system, and is not saved
+	readonly System.Collections.Generic.List<int> m_orbitPermissions = new System.Collections.Generic.List<int>();
+
 	// static instance to this spaceflight controller
 	public static SpaceflightController m_instance;
 
@@ -289,6 +292,12 @@ public class SpaceflightController : MonoBehaviour
 
 			// remember that the new location is different
 			locationIsDifferent = true;
+		}
+
+		// leaving the star system ends every permission to orbit that was granted in it
+		if ( newLocation == PD_General.Location.Hyperspace )
+		{
+			m_orbitPermissions.Clear();
 		}
 
 		// make sure the display is updated (in case we are loading from a save game)
@@ -535,8 +544,24 @@ public class SpaceflightController : MonoBehaviour
 		SwitchLocation( PD_General.Location.Encounter );
 	}
 
+	// call this when an encounter in orbit lets the ship into orbit (a veloxi drone that was answered correctly) - it does not begin again until the ship leaves the star system
+	public void GrantOrbitPermission( int encounterId )
+	{
+		if ( !m_orbitPermissions.Contains( encounterId ) )
+		{
+			m_orbitPermissions.Add( encounterId );
+		}
+	}
+
+	// returns true if this encounter in orbit has let the ship into orbit during this visit to the star system
+	public bool HasOrbitPermission( int encounterId )
+	{
+		return m_orbitPermissions.Contains( encounterId );
+	}
+
 	// begins the encounter that waits in orbit around the planet the ship is orbiting, if there is one with living ships (the in orbit location calls this once every time the ship goes into orbit)
-	// the ship drops out of orbit into the encounter, and when the encounter ends it is back at the level of the star system (see Encounter.LeaveEncounter) - as in the original game
+	// the ship drops out of orbit into the encounter, and when the encounter ends it is back at the level of the star system (see Encounter.LeaveEncounter) - as in the original game,
+	// unless the encounter has let the ship into orbit
 	// returns true if an encounter has begun
 	public bool BeginInOrbitEncounter()
 	{
@@ -584,6 +609,12 @@ public class SpaceflightController : MonoBehaviour
 
 			// skip encounters that have no living ships left (there is nobody to meet the player)
 			if ( !encounter.HasLivingAlienShips() )
+			{
+				continue;
+			}
+
+			// skip an encounter that has already let the ship into orbit during this visit to the star system
+			if ( HasOrbitPermission( encounter.m_encounterId ) )
 			{
 				continue;
 			}

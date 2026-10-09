@@ -93,6 +93,41 @@ public class GameData
 		}
 	}
 
+	// this adds what was recovered from the other sources of the original game (STRINFO) to the game data - call it before Initialize
+	public void AddRecoveredData( RecoveredData recoveredData )
+	{
+		// nothing to add if there is no recovered data
+		if ( ( recoveredData == null ) || ( recoveredData.m_commList == null ) )
+		{
+			return;
+		}
+
+		// collect the comm ids the game data already has
+		var commIds = new System.Collections.Generic.HashSet<int>();
+
+		foreach ( var comm in m_commList )
+		{
+			commIds.Add( comm.m_id );
+		}
+
+		// add the recovered comms whose id is not taken
+		var commList = new System.Collections.Generic.List<GD_Comm>( m_commList );
+
+		foreach ( var comm in recoveredData.m_commList )
+		{
+			if ( commIds.Add( comm.m_id ) )
+			{
+				commList.Add( comm );
+			}
+			else
+			{
+				UnityEngine.Debug.LogError( "Recovered comm " + comm.m_id + " has the id of a comm the game data already has - it is left out" );
+			}
+		}
+
+		m_commList = commList.ToArray();
+	}
+
 	// this finds the element in the list by its name
 	public int FindElementId( string name )
 	{

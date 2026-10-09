@@ -9,6 +9,12 @@ public class Encounter : MonoBehaviour
 	// the text of the comm that stands in when the game data has nothing to say for a race, subject and stance
 	const string c_noCommFoundText = "ERROR";
 
+	// how many numbers a veloxi drone asks the player to confirm before it lets the ship into orbit (the original's number is not known - the project owner chose 3)
+	const int c_droneNumberCount = 3;
+
+	// how long the "permission to orbit granted" message stays up before the ship is back in orbit (in seconds)
+	const float c_returnToOrbitDelay = 3.0f;
+
 	// the speed the alien ships move at
 	public float m_alienShipSpeed;
 
@@ -48,6 +54,9 @@ public class Encounter : MonoBehaviour
 
 	// did we just enter this encounter from hyperspace?
 	bool m_justEntered;
+
+	// counts down to the return into orbit after a veloxi drone has let the ship in (negative while it has not)
+	float m_returnToOrbitTimer = -1.0f;
 
 	// current dolly distance
 	float m_currentOffset;
@@ -235,7 +244,12 @@ public class Encounter : MonoBehaviour
 
 			case GameData.Race.VeloxProbe:
 
-				UpdateVeloxProbeEncounter();
+				// a drone that has let the ship into orbit ends the encounter itself
+				if ( UpdateVeloxProbeEncounter() )
+				{
+					return;
+				}
+
 				break;
 
 			case GameData.Race.Minstrel:
@@ -329,9 +343,18 @@ public class Encounter : MonoBehaviour
 
 			case PD_General.Location.InOrbit:
 
-				// in orbit around a planet - an encounter from orbit ends at the level of the star system, as in the original game
-				// the ship is where it was when it went into orbit, next to the planet (going back into orbit ourselves would begin the same encounter again at once)
-				SpaceflightController.m_instance.SwitchLocation( PD_General.Location.StarSystem );
+				// in orbit around a planet - did the aliens let the ship into orbit (a veloxi drone that was answered correctly)?
+				if ( SpaceflightController.m_instance.HasOrbitPermission( m_pdEncounter.m_encounterId ) )
+				{
+					// yes - back into orbit (the encounter does not begin again while the ship stays in this star system)
+					SpaceflightController.m_instance.SwitchLocation( PD_General.Location.InOrbit );
+				}
+				else
+				{
+					// no - an encounter from orbit ends at the level of the star system, as in the original game
+					// the ship is where it was when it went into orbit, next to the planet (going back into orbit ourselves would begin the same encounter again at once)
+					SpaceflightController.m_instance.SwitchLocation( PD_General.Location.StarSystem );
+				}
 
 				break;
 
@@ -957,6 +980,9 @@ public class Encounter : MonoBehaviour
 	void InitializeVeloxProbeEncounter()
 	{
 		DefaultEncounterInitialize();
+
+		// the drone has not let the ship into orbit yet
+		m_returnToOrbitTimer = -1.0f;
 	}
 
 	// initialize encounter with minstrel
@@ -1123,10 +1149,178 @@ public class Encounter : MonoBehaviour
 		DefaultEncounterUpdate();
 	}
 
-	// update encounter with velox probe
-	void UpdateVeloxProbeEncounter()
+	// update encounter with a veloxi drone - before it lets a ship into orbit it asks the player to confirm a series of numbers, and only a yes to the multiples of 6
+	// (and a no to the others) gets "permission to orbit granted" - anything else gets "permission to orbit denied" and an attack (STRINFO 2.3)
+	// returns true if the drone has ended the encounter
+	bool UpdateVeloxProbeEncounter()
 	{
-		DefaultEncounterUpdate();
+		// has the drone let the ship into orbit?
+		if ( m_returnToOrbitTimer >= 0.0f )
+		{
+			// yes - give the player a moment to read it, then back into orbit
+			m_returnToOrbitTimer -= Time.deltaTime;
+
+			if ( m_returnToOrbitTimer < 0.0f )
+			{
+				if ( m_pdEncounter.m_connected )
+				{
+					Disconnect();
+				}
+
+				LeaveEncounter();
+
+				return true;
+			}
+
+			return false;
+		}
+
+		// are we talking to the drone?
+		if ( !m_pdEncounter.m_connected )
+		{
+			// no - did the player end the comm link before answering all of the numbers? that fails the test
+			if ( m_pdEncounter.m_disconnected && ( m_pdEncounter.m_alienStance != GD_Comm.Stance.Hostile ) )
+			{
+				DenyOrbit();
+			}
+
+			// the drone hails like everyone else, and attacks once it is hostile
+			DefaultEncounterUpdate();
+
+			return false;
+		}
+
+		// is a number waiting for an answer?
+		if ( m_pdEncounter.m_lastQuestionFromAliens != 0 )
+		{
+			// did the player answer it?
+			var answer = m_pdEncounter.m_lastSubjectFromPlayer;
+
+			if ( ( answer != GD_Comm.Subject.Yes ) && ( answer != GD_Comm.Subject.No ) )
+			{
+				// no - keep waiting
+				return false;
+			}
+
+			// yes - the right answer is a yes to a multiple of 6 and a no to any other number
+			var number = m_pdEncounter.m_lastQuestionFromAliens;
+			var rightAnswer = ( ( number % 6 ) == 0 ) ? GD_Comm.Subject.Yes : GD_Comm.Subject.No;
+
+			// the number has been answered
+			m_pdEncounter.m_lastQuestionFromAliens = 0;
+
+			// a ship that fired on the drone never gets permission
+			if ( ( answer != rightAnswer ) || m_pdEncounter.m_attackedByPlayer )
+			{
+				DenyOrbit();
+
+				return false;
+			}
+
+			// another right answer - was it the last number?
+			m_pdEncounter.m_numCorrectAnswers++;
+
+			if ( m_pdEncounter.m_numCorrectAnswers >= c_droneNumberCount )
+			{
+				// yes - let the ship into orbit
+				GrantOrbit();
+
+				return false;
+			}
+
+			// no - the next number comes shortly
+			m_pdEncounter.m_conversationTimer = Random.Range( 2.0f, 4.0f );
+
+			return false;
+		}
+
+		// the first number comes shortly after the comm link is up
+		if ( m_pdEncounter.m_conversationTimer > 4.0f )
+		{
+			m_pdEncounter.m_conversationTimer = Random.Range( 2.0f, 4.0f );
+		}
+
+		// is it time for the next number?
+		m_pdEncounter.m_conversationTimer -= Time.deltaTime;
+
+		if ( m_pdEncounter.m_conversationTimer <= 0.0f )
+		{
+			AskDroneNumber();
+		}
+
+		return false;
+	}
+
+	// the drone asks the player to confirm a number from 1 to 99 - about half of them are multiples of 6
+	void AskDroneNumber()
+	{
+		int number;
+
+		if ( Random.Range( 0, 2 ) == 0 )
+		{
+			// a multiple of 6 (6 to 96)
+			number = 6 * Random.Range( 1, 17 );
+		}
+		else
+		{
+			// any other number (a multiple of 6 moves up by one, which is at most 97)
+			number = Random.Range( 1, 100 );
+
+			if ( ( number % 6 ) == 0 )
+			{
+				number++;
+			}
+		}
+
+		// show the number (the drones ask in numbers only, so there is nothing to garble)
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Receiving:</color>\n<color=#0a0>" + number + "?</color>" );
+
+		// play the beep sound
+		SoundController.m_instance.PlaySound( SoundController.Sound.Beep );
+
+		// the player answers with yes or no
+		SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.AnswerQuestion );
+
+		// forget the last subject from the player
+		m_pdEncounter.m_lastSubjectFromPlayer = GD_Comm.Subject.None;
+
+		// remember the number (it is never 0, which means no question)
+		m_pdEncounter.m_lastQuestionFromAliens = number;
+	}
+
+	// the drone lets the ship into orbit
+	void GrantOrbit()
+	{
+		// "permission to orbit granted"
+		AddComm( GD_Comm.Subject.OrbitGranted, false );
+
+		// the drone is friendly now
+		m_pdEncounter.m_alienStance = GD_Comm.Stance.Friendly;
+
+		// it does not stop the ship again while the ship stays in this star system
+		SpaceflightController.m_instance.GrantOrbitPermission( m_pdEncounter.m_encounterId );
+
+		// back into orbit once the player has had a moment to read it
+		m_returnToOrbitTimer = c_returnToOrbitDelay;
+	}
+
+	// the drone refuses the ship and attacks
+	void DenyOrbit()
+	{
+		// "permission to orbit denied"
+		AddComm( GD_Comm.Subject.OrbitDenied, false );
+
+		// followed by a veloxi drone attack
+		m_pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+
+		// no more numbers
+		m_pdEncounter.m_lastQuestionFromAliens = 0;
+
+		// the aliens hold their fire while the comm link is up, so the drone ends it
+		if ( m_pdEncounter.m_connected )
+		{
+			Disconnect();
+		}
 	}
 
 	// update encounter with minstrel
