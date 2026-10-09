@@ -145,6 +145,9 @@ public class TerrainGrid : MonoBehaviour
 		if ( m_terrainRuins != null )
 		{
 			m_terrainRuins.Initialize( m_planetGenerator, m_elevationScale, planet.m_id + 4 );
+
+			// a ruin stands on its own (taking the rocks and trees next to it away moves nothing else)
+			m_terrainRuins.ClearAroundRuins( new TerrainGridPopulator[] { m_terrainRocks, m_terrainTrees } );
 		}
 	}
 

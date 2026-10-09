@@ -41,6 +41,25 @@ public class TerrainGridPopulator : MonoBehaviour
 		m_spawnLists = null;
 	}
 
+	// places one object at a given place on the planet's map, with no random numbers: on the surface, turned by yaw degrees, and in the spawn list,
+	// so that nothing placed after it lands on it
+	protected GameObject PlaceObjectAt( GameObject template, float mapX, float mapY, float elevationScale, float yaw )
+	{
+		var normal = m_planetGenerator.GetBilinearSmoothedNormal( mapX, mapY, elevationScale * 0.125f );
+
+		var position = Tools.MapToWorldCoordinates( mapX, mapY, m_planetGenerator.m_textureMapWidth, m_planetGenerator.m_textureMapHeight );
+
+		position.y = m_planetGenerator.GetBilinearSmoothedElevation( mapX, mapY ) * elevationScale;
+
+		var rotation = Quaternion.FromToRotation( Vector3.up, normal ) * Quaternion.Euler( 0.0f, yaw, 0.0f ) * template.transform.localRotation;
+
+		var clonedObject = Instantiate( template, position, rotation, transform );
+
+		AddToSpawnList( position );
+
+		return clonedObject;
+	}
+
 	// populate the planet
 	protected void Initialize( float elevationScale, GameObject[] templates, int numObjects, int randomSeed, bool favorHigherElevations, float minScale, float maxScale, ObjectSpawnedCallback onObjectSpawned = null )
 	{

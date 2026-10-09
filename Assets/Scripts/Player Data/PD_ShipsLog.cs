@@ -112,6 +112,48 @@ using System.Collections.Generic;
 		return true;
 	}
 
+	// call this when a message has been recorded in a ruin - "any messages you find are identified by the date found" (the manual, page 21)
+	// returns false if this message is in the ships log already
+	public bool AddFoundMessage( int messageId, string stardate, string header, string message )
+	{
+		// save files from before the messages were found have no list
+		if ( m_foundMessages == null )
+		{
+			m_foundMessages = new List<Entry>();
+		}
+
+		foreach ( var entry in m_foundMessages )
+		{
+			if ( entry.m_id == messageId )
+			{
+				return false;
+			}
+		}
+
+		m_foundMessages.Add( new Entry( messageId, stardate, header, message ) );
+
+		return true;
+	}
+
+	// true if this message has been recorded already
+	public bool HasFoundMessage( int messageId )
+	{
+		if ( m_foundMessages == null )
+		{
+			return false;
+		}
+
+		foreach ( var entry in m_foundMessages )
+		{
+			if ( entry.m_id == messageId )
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	public void AddStarportNotice( int noticeId )
 	{
 		// get to the game data

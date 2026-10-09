@@ -1,64 +1,157 @@
-
 using UnityEngine;
 
+// places the ruins of a planet: where the original game has its messages (GameData.m_planetMessageList, recovered from STRINFO 3.1)
+// a message at a site lies in a ruin at its latitude and longitude, and one STRINFO puts at "random locations" or "several locations" lies in one ruin of its own,
+// at a place picked with random numbers seeded from the planet (the same every time) - the random ruins of the 1984 design notes are not placed (roadmap 3.5)
 public class TerrainRuins : TerrainGridPopulator
 {
-	// the ruin templates
+	// the ruin templates (the five ancient ruin models for now)
 	public GameObject[] m_ruinTemplates;
 
-	// the artifact templates
-	public GameObject[] m_artifactTemplates;
-
-	// the maximum number of ruins we can place
-	public int m_maxNumRuins = 5;
-
-	// reference to the terrain vehicle for artifact pickup
+	// reference to the terrain vehicle
 	public TerrainVehicle m_terrainVehicle;
 
-	// populate this planet with ruins and artifacts
+	// rocks and trees closer than this to a ruin are taken away, so that the ruin stands on its own
+	const float c_clearRadius = 16.0f;
+
+	// how many places to try for a ruin at a random place on the planet
+	const int c_maxTries = 50;
+
+	// place the ruins of this planet
 	public void Initialize( PlanetGenerator planetGenerator, float elevationScale, int randomSeed )
 	{
+		// remove the ruins of the last planet
+		Tools.DestroyChildrenOf( gameObject );
+
+		// nothing to place without templates
+		if ( ( m_ruinTemplates == null ) || ( m_ruinTemplates.Length == 0 ) )
+		{
+			return;
+		}
+
 		// get to this planet
 		var planet = planetGenerator.GetPlanet();
 
-		// calculate the number of ruins to place (based on mineral density as a proxy for "interestingness")
-		var numRuins = ( planet.m_mineralDensity * m_maxNumRuins ) / 100;
+		var gameData = DataController.m_instance.m_gameData;
 
-		// always place at least one ruin if mineral density is high enough
-		if ( numRuins == 0 && planet.m_mineralDensity > 50 )
+		// remember where the game's random numbers are, so that they can carry on from there when we are done (as the other populators do)
+		var randomState = Random.state;
+
+		Random.InitState( randomSeed );
+
+		// the ruins placed at a site so far, by latitude and longitude (several messages can lie at the same site - Mardan 2 has three)
+		var ruinsAtSites = new System.Collections.Generic.Dictionary<long, TerrainRuin>();
+
+		// go through the messages of this planet in their order (the order the random places are picked in must be the same every time)
+		foreach ( var planetMessage in gameData.m_planetMessageList )
 		{
-			numRuins = 1;
+			if ( planetMessage.m_planetId != planet.m_id )
+			{
+				continue;
+			}
+
+			float mapX;
+			float mapY;
+
+			var siteKey = (long) planetMessage.m_latitude * 1000 + planetMessage.m_longitude;
+
+			if ( planetMessage.m_placement == "Site" )
+			{
+				// is there a ruin at this site already?
+				if ( ruinsAtSites.TryGetValue( siteKey, out var ruinAtSite ) )
+				{
+					// yes - the message lies in it too
+					ruinAtSite.m_messageIds.Add( planetMessage.m_id );
+
+					continue;
+				}
+
+				// at its latitude and longitude (the port's world x is east-west and z north-south - see Tools.LatLongToWorldCoordinates)
+				var worldCoordinates = Tools.LatLongToWorldCoordinates( planetMessage.m_longitude, planetMessage.m_latitude );
+
+				Tools.WorldToMapCoordinates( worldCoordinates, out mapX, out mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
+			}
+			else
+			{
+				// at a place of its own on the planet
+				FindPlaceForRuin( planetGenerator, elevationScale, out mapX, out mapY );
+			}
+
+			// one of the templates, by the message (no random number, so nothing else moves)
+			var template = m_ruinTemplates[ planetMessage.m_id % m_ruinTemplates.Length ];
+
+			var ruinObject = PlaceObjectAt( template, mapX, mapY, elevationScale, ( planetMessage.m_id * 137 ) % 360 );
+
+			ruinObject.name = "Ruin of message " + planetMessage.m_id;
+
+			var ruin = ruinObject.AddComponent<TerrainRuin>();
+
+			ruin.m_messageIds.Add( planetMessage.m_id );
+
+			if ( planetMessage.m_placement == "Site" )
+			{
+				ruinsAtSites[ siteKey ] = ruin;
+			}
 		}
 
-		if ( numRuins > 0 )
+		// give the game its random numbers back
+		Random.state = randomState;
+	}
+
+	// takes away the rocks and the trees that are too close to a ruin (call this once all the populators have placed their objects - taking them away moves nothing else)
+	public void ClearAroundRuins( TerrainGridPopulator[] populators )
+	{
+		foreach ( Transform ruin in transform )
 		{
-			// place ruins
-			InitializeWithCallback( elevationScale, m_ruinTemplates, numRuins, randomSeed, true, 1.0f, 1.0f, OnRuinSpawned );
+			foreach ( var populator in populators )
+			{
+				if ( populator == null )
+				{
+					continue;
+				}
+
+				foreach ( Transform child in populator.transform )
+				{
+					var delta = child.position - ruin.position;
+
+					delta.y = 0.0f;
+
+					if ( delta.magnitude < c_clearRadius )
+					{
+						// destroyed, not hidden: the cargo and scan buttons go through the children of a populator, hidden ones too
+						Destroy( child.gameObject );
+					}
+				}
+			}
 		}
 	}
 
-	// callback for when a ruin object is spawned
-	void OnRuinSpawned( GameObject spawnedObject, int templateIndex )
+	// picks a place for a ruin with the planet's random numbers: not steep, and above the water - the last place tried if no place is good
+	void FindPlaceForRuin( PlanetGenerator planetGenerator, float elevationScale, out float mapX, out float mapY )
 	{
-		// ruins might have artifacts inside them
-		if ( Random.Range( 0, 100 ) < 50 )
+		var minimumElevation = ( planetGenerator.m_maximumElevation - planetGenerator.m_waterElevation ) * 0.05f + planetGenerator.m_waterElevation;
+
+		mapX = 0.0f;
+		mapY = 0.0f;
+
+		for ( var i = 0; i < c_maxTries; i++ )
 		{
-			// pick a random artifact template
-			int artifactIndex = Random.Range( 0, m_artifactTemplates.Length );
-			GameObject artifactTemplate = m_artifactTemplates[ artifactIndex ];
+			mapX = Random.Range( 0.0f, planetGenerator.m_textureMapWidth );
+			mapY = Random.Range( planetGenerator.m_textureMapHeight * 0.125f, planetGenerator.m_textureMapHeight * 0.875f );
 
-			// spawn the artifact near the ruin
-			Vector3 artifactPosition = spawnedObject.transform.position + spawnedObject.transform.forward * 5.0f;
-			GameObject artifact = Instantiate( artifactTemplate, artifactPosition, spawnedObject.transform.rotation, transform );
+			var normal = planetGenerator.GetBilinearSmoothedNormal( mapX, mapY, elevationScale * 0.125f );
 
-			// add the TerrainArtifact component (assuming it exists or will be created)
-			var terrainArtifact = artifact.AddComponent<TerrainArtifact>();
-			
-			// get a random artifact ID from the game data (this is a bit of a hack, ideally we'd have a list of valid artifacts for this planet)
-			var gameData = DataController.m_instance.m_gameData;
-			int artifactId = Random.Range( 0, gameData.m_artifactList.Length );
-			
-			terrainArtifact.Initialize( artifactId, m_terrainVehicle );
+			if ( normal.y < 0.707f )
+			{
+				continue;
+			}
+
+			if ( planetGenerator.GetBilinearSmoothedElevation( mapX, mapY ) < minimumElevation )
+			{
+				continue;
+			}
+
+			return;
 		}
 	}
 }

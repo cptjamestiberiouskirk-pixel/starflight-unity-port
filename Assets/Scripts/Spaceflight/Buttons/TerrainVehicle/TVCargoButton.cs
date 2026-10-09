@@ -17,6 +17,12 @@ public class TVCargoButton : ShipButton
 		// get player data
 		var playerData = DataController.m_instance.m_playerData;
 
+		// is the terrain vehicle beside a ruin with messages in it that have not been recorded yet? (the manual, page 21: cargo records the messages found in ruins)
+		if ( RecordMessagesInRuin() )
+		{
+			return false;
+		}
+
 		// find all elements in pickup range
 		var elementsInRange = FindElementsInRange();
 
@@ -59,6 +65,62 @@ public class TVCargoButton : ShipButton
 		}
 
 		return false;
+	}
+
+	// records the messages of the ruin the terrain vehicle is beside, if it has any that have not been recorded yet - returns true if it did
+	bool RecordMessagesInRuin()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+		var terrainGrid = SpaceflightController.m_instance.m_disembarked.m_terrainGrid;
+		var terrainVehicle = SpaceflightController.m_instance.m_terrainVehicle;
+
+		if ( ( terrainGrid == null ) || ( terrainGrid.m_terrainRuins == null ) || ( terrainVehicle == null ) )
+		{
+			return false;
+		}
+
+		var text = "";
+
+		foreach ( Transform child in terrainGrid.m_terrainRuins.transform )
+		{
+			var ruin = child.GetComponent<TerrainRuin>();
+
+			if ( ( ruin == null ) || !ruin.IsInReach( terrainVehicle.transform.position ) )
+			{
+				continue;
+			}
+
+			foreach ( var messageId in ruin.m_messageIds )
+			{
+				if ( ( messageId < 0 ) || ( messageId >= gameData.m_planetMessageList.Length ) || playerData.m_shipsLog.HasFoundMessage( messageId ) )
+				{
+					continue;
+				}
+
+				var planetMessage = gameData.m_planetMessageList[ messageId ];
+
+				// the header names where it was found
+				var header = string.IsNullOrEmpty( planetMessage.m_placeName ) ? ( "Planet " + planetMessage.m_planetFromSun + " of " + planetMessage.m_starX + ", " + planetMessage.m_starY ) : planetMessage.m_placeName;
+
+				// dated by the day it was found
+				playerData.m_shipsLog.AddFoundMessage( messageId, playerData.m_general.m_currentStardateDHMY, header, planetMessage.m_text );
+
+				text += ( ( text == "" ) ? "" : "\n\n" ) + planetMessage.m_text;
+			}
+		}
+
+		if ( text == "" )
+		{
+			return false;
+		}
+
+		SpaceflightController.m_instance.m_messages.Clear();
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Message recorded in the ruins:</color>\n<color=#0aa>" + text + "</color>" );
+
+		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+
+		return true;
 	}
 
 	// detection range for non-pickable objects (slightly larger than pickup range)
