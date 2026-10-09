@@ -9612,29 +9612,18 @@ public class ClaudeProbe : MonoBehaviour
 			{
 				Kill( 0 );
 
+				// catch the debris on the frame it appears and measure it in the ship's frame before it has tumbled
 				var until = Time.realtimeSinceStartup + 3.0f;
+				DebrisTumble tumble = null;
 
-				while ( Time.realtimeSinceStartup < until )
+				while ( ( tumble == null ) && ( Time.realtimeSinceStartup < until ) )
 				{
 					yield return null;
+
+					tumble = model.GetComponentInChildren<DebrisTumble>( false );
 				}
 
-				// the debris tumbles, so measure it in its own frame, scale that into the ship's frame (it is a direct child) and turn it
-				// by the template's rotation, which is how it should start out
-				var tumble = model.GetComponentInChildren<DebrisTumble>( false );
-				var debrisSize = Vector3.zero;
-
-				if ( tumble != null )
-				{
-					var ownSize = Vector3.Scale( SizeInFrameOf( tumble.transform, tumble.gameObject ), tumble.transform.localScale );
-					var turn = Matrix4x4.Rotate( debrisTemplates[ vesselId ].transform.localRotation );
-
-					for ( var axis = 0; axis < 3; axis++ )
-					{
-						debrisSize[ axis ] = Mathf.Abs( turn[ axis, 0 ] ) * ownSize.x + Mathf.Abs( turn[ axis, 1 ] ) * ownSize.y + Mathf.Abs( turn[ axis, 2 ] ) * ownSize.z;
-					}
-				}
-
+				var debrisSize = ( tumble != null ) ? SizeInFrameOf( model.transform, tumble.gameObject ) : Vector3.zero;
 				var debrisLongest = Mathf.Max( debrisSize.x, debrisSize.y, debrisSize.z );
 				var ratio = ( longest > 0.0f ) ? ( debrisLongest / longest ) : 0.0f;
 				var sameShape = true;
