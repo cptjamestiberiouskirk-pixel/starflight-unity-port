@@ -9696,6 +9696,8 @@ public class ClaudeProbe : MonoBehaviour
 		{ 8, 61.272f }, { 9, 20.424f }, { 10, 40.848f },
 		// elowan transport, scout and warship (0.7, 0.1 shown at 0.3, and 0.3)
 		{ 5, 35.742f }, { 6, 15.318f }, { 7, 15.318f },
+		// uhlek scout and warship (2 and 10, shown at 5.0)
+		{ 16, 102.12f }, { 17, 256.213f },
 	};
 
 	// the size of the meshes under model, measured along the axes of container (the ship's own frame: +Z is its nose)
