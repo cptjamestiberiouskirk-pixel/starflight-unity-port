@@ -128,7 +128,7 @@ Rulings of 2026-10-09: place only what the sources document now (the 14 artifact
 | 3.1 | Ruins at the sites of the recovered data: a ruin at each artifact site and at each message, the two formations (the Most Magnificent Hexagon of 6 ancient ruins on Sphexi, the City of the Ancients of 15) | planet.txt, dir.txt SEED-OV, data from 0.4 | the messages: PR 102, 12 ruins on Earth; the artifact sites: PR 108; the two formations: PR 109 |
 | 3.2 | The 12 special artifacts at their 14 sites, taken with the Cargo button | STRINFO 4.1 | PR 108: in the ruins of their sites, taken once and saved, carried to the ship; the Black Box, the Flat Device and the Whining Orb are bought, not found |
 | 3.3 | The 38 messages go to the ship's log under Messages, recorded with the Cargo button beside their ruin, dated the day they were found | STRINFO 3.1; the manual (page 21) | PR 102 |
-| 3.4 | Terrain vehicle cargo display | | `TerrainVehicleCargoDisplay` not wired |
+| 3.4 | Dropping cargo, and the terrain vehicle's cargo display (ruled 2026-10-09: both, dropping first) | the manual (page 21): Cargo lists what the vehicle carries "and gives you the option of dropping anything", and a dropped object can be picked up again; the display is not in the sources | dropping: PR 110; the display: `TerrainVehicleCargoDisplay` not wired |
 | 3.5 | Random ruins: ancient crystal ruins with Endurium lumps or 1 to 4 "truly amazing" artifacts, Old Empire ruins with artifacts or writing | planet.txt (DRAFT only) | Ask: deferred by the owner on 2026-10-09 |
 
 ## Phase 4: Artifact effects

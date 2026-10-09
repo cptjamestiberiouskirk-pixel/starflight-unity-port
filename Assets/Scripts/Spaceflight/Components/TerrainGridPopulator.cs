@@ -34,6 +34,12 @@ public class TerrainGridPopulator : MonoBehaviour
 		}
 	}
 
+	// the planet generator of the planet the objects are placed on (null once the planet has been let go of)
+	protected static PlanetGenerator GetPlanetGenerator()
+	{
+		return m_planetGenerator;
+	}
+
 	// let go of the planet generator and the spawn lists (they are statics, so they would stay in memory after the spaceflight scene is gone)
 	public static void ForgetPlanet()
 	{

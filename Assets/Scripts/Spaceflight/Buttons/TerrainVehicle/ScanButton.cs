@@ -85,6 +85,7 @@ public class ScanButton : ShipButton
 		int vegetationCount = 0;
 		int ruinCount = 0;
 		int artifactCount = 0;
+		int droppedCount = 0;
 
 		// scan for mineral deposits (elements)
 		if ( terrainGrid.m_terrainElements != null )
@@ -155,6 +156,16 @@ public class ScanButton : ShipButton
 			{
 				var distance = Vector3.Distance( child.position, vehiclePos );
 
+				// something the terrain vehicle dropped lies with the ruins
+				if ( ( distance <= c_scanRange ) && ( child.GetComponent<TerrainDroppedCargo>() != null ) )
+				{
+					droppedCount++;
+
+					ShowLabelOnObject( child.gameObject, "Dropped cargo", Color.yellow );
+
+					continue;
+				}
+
 				if ( distance <= c_scanRange )
 				{
 					ruinCount++;
@@ -189,6 +200,12 @@ public class ScanButton : ShipButton
 		if ( ruinCount > 0 )
 		{
 			report += "<color=white>Ruin" + ( ruinCount > 1 ? "s" : "" ) + ": " + ruinCount + "</color>\n";
+		}
+
+		// list what the terrain vehicle has dropped (picked up again with the cargo button)
+		if ( droppedCount > 0 )
+		{
+			report += "<color=yellow>Dropped cargo: " + droppedCount + "</color>\n";
 		}
 
 		// list the artifacts the ruins still hold (picked up with the cargo button)

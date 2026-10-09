@@ -567,6 +567,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioFormations();
 				break;
 
+			case "dropcargo":
+				yield return ScenarioDropCargo();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -11133,6 +11137,197 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "formations: Earth keeps its 12 ruins (control)", earthRuins == 12, earthRuins + " ruins" );
 
 		Finish( "scenario=formations sphexi=" + orbRuins + "+" + ringRuins + " city=" + pearlRuins + "+" + blockRuins + " earth=" + earthRuins, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 3: dropping cargo from the terrain vehicle, and picking it up again
+
+	// the things the terrain vehicle has dropped that lie on the ground (found by the component's name, so that this compiles on the code before dropping existed)
+	static List<Component> DroppedOnTheGround()
+	{
+		var list = new List<Component>();
+		var grid = SpaceflightController.m_instance.m_disembarked.m_terrainGrid;
+		var container = ( grid == null ) ? null : FieldOrNull( grid, "m_terrainRuins" ) as Component;
+
+		if ( container != null )
+		{
+			foreach ( Transform child in container.transform )
+			{
+				var dropped = child.GetComponent( "TerrainDroppedCargo" );
+
+				if ( ( dropped != null ) && child.gameObject.activeSelf )
+				{
+					list.Add( dropped );
+				}
+			}
+		}
+
+		return list;
+	}
+
+	// the button set of the cargo list by its name (-1 if this code does not have it)
+	static int CargoListButtonSet()
+	{
+		try
+		{
+			return (int) Enum.Parse( typeof( ButtonController.ButtonSet ), "TerrainVehicleCargo" );
+		}
+		catch ( Exception )
+		{
+			return -1;
+		}
+	}
+
+	IEnumerator ScenarioDropCargo()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// ---- down to planet 90 and out in the terrain vehicle, with 3 cubic meters of an element and a Hypercube in its hold, and nothing within reach
+		yield return EnterOrbit( 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=dropcargo abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var terrainVehicle = controller.m_terrainVehicle;
+		var deposits = controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true );
+		var elementId = gameData.m_planetList[ 90 ].m_elementIdA;
+		var hypercubeId = gameData.FindArtifactId( "Hypercube" );
+
+		foreach ( var deposit in deposits )
+		{
+			if ( Vector3.Distance( deposit.transform.position, terrainVehicle.transform.position ) < 50.0f )
+			{
+				deposit.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		playerData.m_terrainVehicle.AddElement( elementId, 30 );
+		playerData.m_terrainVehicle.AddArtifact( hypercubeId );
+
+		var dropPosition = terrainVehicle.transform.position;
+
+		// ---- 1. the cargo button with nothing within reach: the cargo list, with the buttons for dropping
+		controller.m_messages.Clear();
+
+		new TVCargoButton().Execute();
+
+		yield return Frames( 2 );
+
+		var setAfterCargo = buttonController.GetCurrentButtonSet().ToString();
+		var listText = MessageList();
+		var cargoListSet = CargoListButtonSet();
+
+		Log( "dropcargo: after the cargo button: button set " + setAfterCargo + " | " + listText.Substring( 0, Mathf.Min( 200, listText.Length ) ) );
+
+		Check( "dropcargo: the cargo button lists the cargo with the first item marked, and puts the buttons for dropping on the console", ( setAfterCargo == "TerrainVehicleCargo" ) && listText.Contains( "> " ), setAfterCargo );
+
+		// ---- 2. next, then drop: the Hypercube is dropped; drop again: the element is dropped, and the console goes back to the terrain vehicle's buttons
+		var hypercubeAfterDrop = -1;
+		var droppedAfterFirst = -1;
+		var elementAfterDrops = -1;
+		var setAfterLastDrop = "";
+
+		if ( cargoListSet >= 0 )
+		{
+			PressButton( (ButtonController.ButtonSet) cargoListSet, 0 );
+
+			yield return Frames( 2 );
+
+			PressButton( (ButtonController.ButtonSet) cargoListSet, 1 );
+
+			yield return Frames( 2 );
+
+			hypercubeAfterDrop = ArtifactsHeld( playerData.m_terrainVehicle.m_artifactStorage, hypercubeId );
+			droppedAfterFirst = DroppedOnTheGround().Count;
+
+			PressButton( (ButtonController.ButtonSet) cargoListSet, 1 );
+
+			yield return Frames( 2 );
+
+			elementAfterDrops = TerrainVehicleCargo( elementId );
+			setAfterLastDrop = buttonController.GetCurrentButtonSet().ToString();
+		}
+
+		var droppedSaved = FieldOrNull( FieldOrNull( playerData, "m_planetSurfaces" ), "m_droppedCargoList" ) as System.Collections.IList;
+		var droppedOnGround = DroppedOnTheGround().Count;
+
+		Log( "dropcargo: after next and drop: Hypercubes in the vehicle " + hypercubeAfterDrop + ", dropped on the ground " + droppedAfterFirst + " | after the second drop: the element in the vehicle " + elementAfterDrops + ", button set " + setAfterLastDrop + ", on the ground " + droppedOnGround + ", saved " + ( ( droppedSaved == null ) ? "nothing" : droppedSaved.Count.ToString() ) );
+
+		Check( "dropcargo: next marks the Hypercube and drop puts it on the ground beside the terrain vehicle", ( hypercubeAfterDrop == 0 ) && ( droppedAfterFirst == 1 ), hypercubeAfterDrop + " in the vehicle, " + droppedAfterFirst + " on the ground" );
+		Check( "dropcargo: dropping the last item empties the hold and brings back the terrain vehicle's buttons", ( elementAfterDrops == 0 ) && ( setAfterLastDrop == "TerrainVehicle" ) && ( droppedOnGround == 2 ), elementAfterDrops + ", " + setAfterLastDrop + ", " + droppedOnGround );
+		Check( "dropcargo: what was dropped is in the save", ( droppedSaved != null ) && ( droppedSaved.Count == 2 ), ( droppedSaved == null ) ? "nothing" : droppedSaved.Count.ToString() );
+
+		// ---- 3. the scan sees it
+		foreach ( var dropped in DroppedOnTheGround() )
+		{
+			var delta = dropped.transform.position - terrainVehicle.transform.position;
+
+			Log( "dropcargo: a dropped thing is " + delta.magnitude.ToString( "F1" ) + " from the terrain vehicle (" + new Vector2( delta.x, delta.z ).magnitude.ToString( "F1" ) + " across, " + delta.y.ToString( "F1" ) + " up)" );
+		}
+
+		controller.m_messages.Clear();
+
+		new ScanButton().Execute();
+
+		yield return Frames( 3 );
+
+		var scanText = MessageList();
+
+		Check( "dropcargo: the scan reports the dropped cargo", scanText.Contains( "Dropped cargo: 2" ), scanText.Substring( 0, Mathf.Min( 200, scanText.Length ) ) );
+
+		// ---- 4. back into the ship and out again: it still lies where it was dropped, and the cargo button picks it all up again
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		var droppedAgain = DroppedOnTheGround();
+		var atTheSpot = 0;
+
+		foreach ( var dropped in droppedAgain )
+		{
+			var delta = dropped.transform.position - dropPosition;
+
+			if ( ( Mathf.Abs( delta.x ) < 0.5f ) && ( Mathf.Abs( delta.z ) < 0.5f ) )
+			{
+				atTheSpot++;
+			}
+		}
+
+		terrainVehicle.transform.position = dropPosition;
+
+		yield return Frames( 2 );
+
+		new TVCargoButton().Execute();
+
+		yield return Frames( 3 );
+
+		var elementBack = TerrainVehicleCargo( elementId );
+		var hypercubeBack = ArtifactsHeld( playerData.m_terrainVehicle.m_artifactStorage, hypercubeId );
+		var leftOnGround = DroppedOnTheGround().Count;
+		var leftSaved = ( droppedSaved == null ) ? -1 : ( FieldOrNull( FieldOrNull( playerData, "m_planetSurfaces" ), "m_droppedCargoList" ) as System.Collections.IList ).Count;
+
+		Log( "dropcargo: out again: " + droppedAgain.Count + " dropped things on the ground, " + atTheSpot + " where they were dropped | after the cargo button: the element " + elementBack + ", Hypercubes " + hypercubeBack + ", left on the ground " + leftOnGround + ", left in the save " + leftSaved );
+
+		Check( "dropcargo: going out again, what was dropped lies where it was dropped", ( droppedAgain.Count == 2 ) && ( atTheSpot == 2 ), droppedAgain.Count + " on the ground, " + atTheSpot + " at the spot" );
+		Check( "dropcargo: the cargo button picks it all up again, and nothing is left on the ground or in the save", ( elementBack == 30 ) && ( hypercubeBack == 1 ) && ( leftOnGround == 0 ) && ( leftSaved == 0 ), elementBack + ", " + hypercubeBack + ", " + leftOnGround + ", " + leftSaved );
+
+		Finish( "scenario=dropcargo set=" + setAfterCargo + " dropped=" + droppedOnGround + " saved=" + ( ( droppedSaved == null ) ? -1 : droppedSaved.Count ) + " again=" + droppedAgain.Count + " back=" + elementBack + "/" + hypercubeBack, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
