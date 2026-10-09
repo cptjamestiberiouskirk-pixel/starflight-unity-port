@@ -55176,6 +55176,8 @@ MonoBehaviour:
   m_instructionsText: {fileID: 1497518113}
   m_backgroundImage: {fileID: 516640458}
   m_maskImage: {fileID: 290923541}
+  m_panelImage: {fileID: 12672837}
+  m_emptyBorderWidth: 16
   m_backgroundTextures:
   - {fileID: 0}
   - {fileID: 2800000, guid: 7a706c15a1de4584fb3c6a56ba75197b, type: 3}
