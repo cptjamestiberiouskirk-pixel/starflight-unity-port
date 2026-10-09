@@ -125,9 +125,9 @@ Rulings of 2026-10-09: place only what the sources document now (the 14 artifact
 | # | Item | Original (source) | Port today |
 |---|---|---|---|
 | 3.0 | What has been taken from a planet stays taken: deposits now, the artifacts and messages with 3.2 and 3.3 | the manual (page 21) | PR 100: every disembark placed the planet again from its seed, so a deposit that had been picked up was back |
-| 3.1 | Ruins at the sites of the recovered data: a ruin at each artifact site and at each message, the two formations (the Most Magnificent Hexagon of 6 ancient ruins on Sphexi, the City of the Ancients of 15) | planet.txt, dir.txt SEED-OV, data from 0.4 | the messages: PR (this one), 12 ruins on Earth; the artifact sites and the two formations follow |
+| 3.1 | Ruins at the sites of the recovered data: a ruin at each artifact site and at each message, the two formations (the Most Magnificent Hexagon of 6 ancient ruins on Sphexi, the City of the Ancients of 15) | planet.txt, dir.txt SEED-OV, data from 0.4 | the messages: PR 102, 12 ruins on Earth; the artifact sites and the two formations follow |
 | 3.2 | The 15 special artifacts at their sites, and the terrain vehicle picks up artifacts | STRINFO 4.1 | `PD_TerrainVehicle.AddArtifact` has no caller |
-| 3.3 | The 38 messages go to the ship's log under Messages, recorded with the Cargo button beside their ruin, dated the day they were found | STRINFO 3.1; the manual (page 21) | PR (this one) |
+| 3.3 | The 38 messages go to the ship's log under Messages, recorded with the Cargo button beside their ruin, dated the day they were found | STRINFO 3.1; the manual (page 21) | PR 102 |
 | 3.4 | Terrain vehicle cargo display | | `TerrainVehicleCargoDisplay` not wired |
 | 3.5 | Random ruins: ancient crystal ruins with Endurium lumps or 1 to 4 "truly amazing" artifacts, Old Empire ruins with artifacts or writing | planet.txt (DRAFT only) | Ask: deferred by the owner on 2026-10-09 |
 
