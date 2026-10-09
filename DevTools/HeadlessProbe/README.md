@@ -104,8 +104,9 @@ What the probe does:
 | `artifactsites` | the owner's rulings on the Rod Device (54N x 13E) and Koann 3 (planet 58), then on Earth at 11N x 104W: the Hypercube's site in the ruin of the invoice (still 12 ruins), the scan seeing the artifact, the real Cargo button taking it into the terrain vehicle once and the taking in the save, the Hypercube in the ship's hold after going back in, nothing more to take after going out again, and the ruin's two messages recorded as before (the control) (about 35 s) |
 | `formations` | on Sphexi (the drones' permission granted first), the Crystal Orb's ruin at 46N x 14E in the middle of six ruins at one distance and 60 degrees apart, on the first planet of 56, 144 the Crystal Pearl's ruin at 28N x 13W with fifteen ruins none of which is south or west of it, and Earth's 12 ruins as the control (about 40 s) |
 | `dropcargo` | on planet 90 with 3 cubic meters of an element and a Hypercube in the terrain vehicle: the real Cargo button listing the hold with the drop buttons, Next and Drop through the button controller (the Hypercube, then the element, and the console back to the vehicle's buttons), the drops in the save, the scan reporting them, both lying at the spot after going back in and out again, and the Cargo button taking them all back (about 35 s) |
+| `cargodisplay` | on planet 90 with an element and a Hypercube in the terrain vehicle: the cargo display shown in place of the terrain vehicle's when the real Cargo button opens the list, its labels and values, how much memory an update takes when nothing changed (with the control that shows the measurement works), the display after the Hypercube is dropped, and Back bringing the terrain vehicle's display back (about 25 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (63 scenarios, about 31 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (64 scenarios, about 32 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

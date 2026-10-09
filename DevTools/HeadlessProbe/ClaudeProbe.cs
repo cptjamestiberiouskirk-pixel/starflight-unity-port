@@ -571,6 +571,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioDropCargo();
 				break;
 
+			case "cargodisplay":
+				yield return ScenarioCargoDisplay();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -11330,6 +11334,114 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "dropcargo: the cargo button picks it all up again, and nothing is left on the ground or in the save", ( elementBack == 30 ) && ( hypercubeBack == 1 ) && ( leftOnGround == 0 ) && ( leftSaved == 0 ), elementBack + ", " + hypercubeBack + ", " + leftOnGround + ", " + leftSaved );
 
 		Finish( "scenario=dropcargo set=" + setAfterCargo + " dropped=" + droppedOnGround + " saved=" + ( ( droppedSaved == null ) ? -1 : droppedSaved.Count ) + " again=" + droppedAgain.Count + " back=" + elementBack + "/" + hypercubeBack, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 3: the terrain vehicle's cargo display
+
+	IEnumerator ScenarioCargoDisplay()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var displayController = controller.m_displayController;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// ---- out on planet 90 with 3 cubic meters of an element and a Hypercube, nothing within reach
+		yield return EnterOrbit( 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=cargodisplay abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var terrainVehicle = controller.m_terrainVehicle;
+
+		foreach ( var deposit in controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true ) )
+		{
+			if ( Vector3.Distance( deposit.transform.position, terrainVehicle.transform.position ) < 50.0f )
+			{
+				deposit.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		var elementId = gameData.m_planetList[ 90 ].m_elementIdA;
+		var elementName = gameData.m_elementList[ elementId ].m_name;
+		var hypercubeId = gameData.FindArtifactId( "Hypercube" );
+
+		playerData.m_terrainVehicle.AddElement( elementId, 30 );
+		playerData.m_terrainVehicle.AddArtifact( hypercubeId );
+
+		// the display controller's field is new, the display class is not (it was there, wired into nothing)
+		var cargoDisplay = FieldOrNull( displayController, "m_terrainVehicleCargoDisplay" ) as TerrainVehicleCargoDisplay;
+		var labels = ( cargoDisplay == null ) ? null : cargoDisplay.m_labelsText;
+		var values = ( cargoDisplay == null ) ? null : cargoDisplay.m_valuesText;
+
+		// ---- 1. the cargo button opens the cargo list, and the display shows the hold
+		new TVCargoButton().Execute();
+
+		yield return Frames( 3 );
+
+		var shownOnOpen = ( cargoDisplay != null ) && cargoDisplay.gameObject.activeInHierarchy;
+		var vehicleShownOnOpen = displayController.m_terrainVehicleDisplay.gameObject.activeInHierarchy;
+		var labelsOnOpen = ( labels == null ) ? "" : labels.text;
+		var valuesOnOpen = ( values == null ) ? "" : values.text;
+
+		Log( "cargodisplay: cargo display shown " + shownOnOpen + ", terrain vehicle display shown " + vehicleShownOnOpen + " | labels: " + labelsOnOpen.Replace( '\n', '/' ) + " | values: " + valuesOnOpen.Replace( '\n', '/' ) );
+
+		Check( "cargodisplay: the cargo button shows the cargo display, with the element and the Hypercube in it", shownOnOpen && !vehicleShownOnOpen && labelsOnOpen.Contains( elementName ) && labelsOnOpen.Contains( "Hypercube" ) && valuesOnOpen.Contains( "3.0" ), shownOnOpen + "/" + vehicleShownOnOpen + " " + labelsOnOpen.Replace( '\n', '/' ) );
+
+		// ---- 2. an update with nothing changed takes no memory (the text is made again only when the hold changes), with the control that shows the measurement works
+		var controlBytes = AllocatedByTheControl();
+		var updateBytes = ( cargoDisplay == null ) ? -1 : Allocated( () => cargoDisplay.Update(), c_meterCalls );
+		var updateBytesPerCall = ( updateBytes < 0 ) ? -1 : updateBytes / c_meterCalls;
+
+		Log( "cargodisplay: an update of the cargo display with nothing changed takes " + updateBytesPerCall + " bytes (the control, an array of 256 bytes, measures " + controlBytes + ")" );
+
+		Check( "cargodisplay: the measurement works (control)", controlBytes >= 256, controlBytes + " bytes per call for an array of 256 bytes" );
+		Check( "cargodisplay: an update of the cargo display with nothing changed takes no memory", updateBytesPerCall == 0, updateBytesPerCall + " bytes per call" );
+
+		// ---- 3. a drop: the display follows the hold
+		var cargoListSet = CargoListButtonSet();
+
+		if ( cargoListSet >= 0 )
+		{
+			PressButton( (ButtonController.ButtonSet) cargoListSet, 0 );
+
+			yield return Frames( 2 );
+
+			PressButton( (ButtonController.ButtonSet) cargoListSet, 1 );
+
+			yield return Frames( 3 );
+		}
+
+		var labelsAfterDrop = ( labels == null ) ? "" : labels.text;
+
+		Check( "cargodisplay: after the Hypercube is dropped the display no longer shows it", ( labels != null ) && !labelsAfterDrop.Contains( "Hypercube" ) && labelsAfterDrop.Contains( elementName ), labelsAfterDrop.Replace( '\n', '/' ) );
+
+		// ---- 4. back: the terrain vehicle's display again
+		if ( cargoListSet >= 0 )
+		{
+			PressButton( (ButtonController.ButtonSet) cargoListSet, 2 );
+
+			yield return Frames( 3 );
+		}
+
+		var shownAfterBack = ( cargoDisplay != null ) && cargoDisplay.gameObject.activeInHierarchy;
+		var vehicleShownAfterBack = displayController.m_terrainVehicleDisplay.gameObject.activeInHierarchy;
+
+		Check( "cargodisplay: back brings the terrain vehicle's display back", ( cargoDisplay != null ) && !shownAfterBack && vehicleShownAfterBack, shownAfterBack + "/" + vehicleShownAfterBack );
+
+		Finish( "scenario=cargodisplay open=" + shownOnOpen + " bytes=" + updateBytesPerCall + " back=" + vehicleShownAfterBack, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
