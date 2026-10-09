@@ -1449,28 +1449,38 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "spemin scout scan shows its own picture", PictureShown( sensors ) && ( MaskName( sensors ) == "Sensors - Spemin Scout Mask" ), SensorPicture( sensors ) );
 
-		// a picture traced from the original by DevTools/SensorPictures
+		// the pictures traced from the original by DevTools/SensorPictures: each vessel shows its own
+		var tracedPictures = new[]
+		{
+			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.ElowanTransport, "Sensors - Elowan Transport" ),
+			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.ElowanScout, "Sensors - Elowan Scout" ),
+			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.ElowanWarship, "Sensors - Elowan Warship" ),
+		};
+
+		foreach ( var traced in tracedPictures )
+		{
+			spaceflightController.m_displayController.ChangeDisplay( sensors );
+			sensors.StartScanning( traced.Key, 0, 100, 100, 100 );
+			yield return Frames( 2 );
+
+			Check( traced.Key + " scan shows its own picture", PictureShown( sensors ) && ( BackgroundName( sensors ) == traced.Value ) && ( MaskName( sensors ) == traced.Value + " Mask" ), SensorPicture( sensors ) );
+		}
+
+		// an object that has no picture (an unknown object; every vessel has one), scanned right after one that has (the window must not keep the last picture)
 		spaceflightController.m_displayController.ChangeDisplay( sensors );
-		sensors.StartScanning( SensorsDisplay.ScanType.ElowanTransport, 0, 350, 100, 100 );
+		sensors.StartScanning( SensorsDisplay.ScanType.Unknown, 0, 50, 100, 100 );
 		yield return Frames( 2 );
 
-		Check( "elowan transport scan shows its own picture", PictureShown( sensors ) && ( BackgroundName( sensors ) == "Sensors - Elowan Transport" ) && ( MaskName( sensors ) == "Sensors - Elowan Transport Mask" ), SensorPicture( sensors ) );
-
-		// a vessel that has no picture yet, scanned right after one that has (the window must not keep the last picture or show another ship)
-		spaceflightController.m_displayController.ChangeDisplay( sensors );
-		sensors.StartScanning( SensorsDisplay.ScanType.ElowanScout, 1, 50, 100, 100 );
-		yield return Frames( 2 );
-
-		Check( "elowan scout scan (no picture) leaves the window empty", !PictureShown( sensors ), SensorPicture( sensors ) );
-		Check( "elowan scout scan keeps its scan type", sensors.m_scanType == SensorsDisplay.ScanType.ElowanScout, "scanType=" + sensors.m_scanType );
+		Check( "unknown object scan (no picture) leaves the window empty", !PictureShown( sensors ), SensorPicture( sensors ) );
+		Check( "unknown object scan keeps its scan type", sensors.m_scanType == SensorsDisplay.ScanType.Unknown, "scanType=" + sensors.m_scanType );
 
 		// the same without going through ChangeDisplay in between (a second scan while the window is already up)
 		sensors.StartScanning( SensorsDisplay.ScanType.SpeminScout, 1, 400, 100, 100 );
 		yield return Frames( 2 );
-		sensors.StartScanning( SensorsDisplay.ScanType.ThrynnWarship, 1, 400, 100, 100 );
+		sensors.StartScanning( SensorsDisplay.ScanType.Unknown, 1, 400, 100, 100 );
 		yield return Frames( 2 );
 
-		Check( "thrynn warship scan right after a spemin scout leaves the window empty", !PictureShown( sensors ), SensorPicture( sensors ) );
+		Check( "unknown object scan right after a spemin scout leaves the window empty", !PictureShown( sensors ), SensorPicture( sensors ) );
 
 		// a debris scan that does not say which vessel left the debris has no picture (debris pictures are per vessel)
 		spaceflightController.m_displayController.ChangeDisplay( sensors );
