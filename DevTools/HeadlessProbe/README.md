@@ -96,8 +96,9 @@ What the probe does:
 | `gameclock` | how many game seconds pass in 1.5 real seconds in the star system (control), in orbit, on a planet's surface, in the terrain vehicle (through the real Disembark button), in an encounter and in the docking bay (control: none), and the fuel raised shields use at the star hour in an encounter (about 40 s) |
 | `shipmodels` | alien ship models: `Encounter.Start` with an empty model slot, which vessels still clone the placeholder ("Not Modeled Yet", a stretched sphere), and every vessel in a real hyperspace encounter: that it gets a model, its size in the ship's own frame, and its debris on the frame it appears (the size and the orientation of the ship). Vessels in `c_shipModelLengths` (the procedural stand-ins of `DevTools/ShipModels`) are also checked against their length (about 30 s) |
 | `recovereddata` | the lists of the recovered data file (planet messages, artifact sites, colony evaluations, story texts): their counts, that every record resolves to a planet (and an artifact) of the game data, eight planets worked out by hand, the guards in orbit at the planets STRINFO names, the story texts with their line breaks, and the game data file unchanged as the control. Reads the lists by reflection, so it compiles on the code before them (about 25 s) |
+| `flaredata` | the flare day of the 36 stars that flared before the game began (negative, Earth's sun -60), the 234 still to flare (days 4 to 792, Arth 300) and their date fields in a calendar of 10 months of 30 days as controls, and the shine of Earth's sun (a stable sun) next to Arth's (about 35 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (55 scenarios, about 24 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (56 scenarios, about 25 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
