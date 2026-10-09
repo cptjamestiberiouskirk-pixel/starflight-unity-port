@@ -1,6 +1,6 @@
 # Code review, 2026-10-03
 
-Review of `master` at 4648ce3. Items fixed since then are listed under "Fixed since the review"; everything else in this file is still open as of PR #73 (2026-10-05).
+Review of `master` at 4648ce3. Items fixed since then are listed under "Fixed since the review"; everything else in this file is still open as of PR #80 (2026-10-09).
 
 **Scope:** all of `Assets/Scripts` (225 files, about 32k lines), plus `Assets/Planet Generator/Editor`, `Assets/Tools/Editor` and `Assets/Shaders/Editor`.
 
@@ -28,6 +28,7 @@ Fixed in PR #3 (bf0b1a7) unless noted. None of these changed the save version.
 
 | # | Was |
 |---|---|
+| Low (PR #80) | Game data, the two proposals of 2026-10-05, applied after the owner's rule of 2026-10-09 (implement the original's documented behaviour). Four of the twelve encounters in orbit named an orbit with no planet (139, 165, 302, 305) and drone 301 began at planet 430; their `m_orbitPosition` is now 6, 4, 5, 1 and 1 (301: orbit 1, planet 431), from the original planet records, which point to their orbit encounter. STRINFO agrees for the four it mentions once its "planet N of system X,Y" is read as the N-th planet from the sun (CONFIRMED in 15 of the 16 entries that also print an orbit number). The Thrynn scouts 144 to 146 had location 1 although their coordinates are no star, so they sat at star 0; they are hyperspace encounters (records 68, 69 and 72 of a run of seven scouts among the 176 hyperspace records). A save that has them in a star system is repaired on load (`PlayerData.ValidateEncounterLocations`, ships and comm history kept); the orbit is read from the game data and needs no repair. Probe scenario `encounterdata`: 7 of 10 checks fail on the old code, 10 of 10 pass on the new; `h7`, `h5`, `batch1`, `savedata`, `starport-savedata`, `orbit` and `encounters` pass |
 | H1 | Encounters were picked by array index although `Radar` sorts `m_encounterList` by distance; now `PlayerData.FindEncounter()` (regression from b9727c5) |
 | H2 | `PD_ShipsLog.m_alienComms` (`List<Entry>[]`) was never saved and the AlienComms buttons threw after a load; now `EntryList[]` behind `GetAlienComms()` |
 | H3 | Deleting assigned crew locked Crew Assignment and the Docking Bay; roles are unassigned on delete and repaired on load |
@@ -150,24 +151,7 @@ None open. M1 to M27 are all under "Fixed since the review".
 
 ## Low
 
-What is still open after PR #73 (2026-10-05). Everything else that was on this list is under "Fixed since the review". On 2026-10-05 the project owner ruled on the seventeen design questions this list had; the rulings that changed code are PR #66 to #72, and the rulings that change nothing are recorded here with their date. All entries are CONFIRMED unless marked otherwise.
-
-**Game data: two proposals that wait for the owner's go-ahead**
-
-Neither was applied: original game data is not changed on a finding, and `.claude/settings.json` asks before any edit of `Starflight Game Data.json`. Both were researched on 2026-10-05 against `Research/Data/Starflight 1 Data.xls`, an extract of the original game's STARA.COM and STARB.COM (third-party work, last updated in 2006; that it is a faithful extract is INFERRED, and so is that the port's data was made from it: the values agree, the order of the records does not).
-
-- **Encounters 144 to 146 (Thrynn) are hyperspace encounters, and only their location is wrong.** Ruling 1 asked which star their coordinates were meant for. Finding: none. In the original encounter table they are records 68, 69 and 72 of a run of seven single Thrynn scouts (records 67 to 73). Their bytes are the same as those of the other four, apart from the coordinates and the pointers; they sit inside the first 176 records of the table, which are the hyperspace encounters (every one of the other 173 has `m_location` 0 in the game data and none is on a star, while records 177 to 317 are all on a star); and each is linked to its table neighbours as a sibling, in one unbroken list from record 62 to 95. Their coordinates (144, 49), (149, 37) and (202, 10) are no star in the game data and none in the draft star list of `Research/Notes/starmap.txt`; the first two are 18 and 17 from the middle of the Thrynn territory, like three of the other four scouts. The original record has no location field at all: where a record hangs decides it. **Proposal:** set `m_location` of encounters 144, 145 and 146 from 1 to 0. No original value changes. Today `PD_Encounter.Reset` puts all three into star 0 (the star at 215, 86). A save holds the location and the place of every encounter, so the three would have to be reset when an older save is loaded.
-- **Five of the twelve in-orbit encounters name the wrong orbit.** Found with PR #70. `Notes.txt` already lists the orbit positions of the Veloxi drones under "Questionable Data". In the original, a planet record points to its orbit encounter record; all twelve are found that way, each at the star with its own coordinates, and planet number n of the extract is the n-th planet from the sun (the planet types agree with the game data for all 270 stars). Seven agree with the game data: 33 (orbit 1), 65 (4), 77 (4), 233 (3), 303 (5), 304 (4), 316 (3). Five do not:
-
-  | Encounter | Race | Star | Original | Game data | Effect today |
-  |---|---|---|---|---|---|
-  | 139 | Spemin home fleet | 32 | orbit 6 (planet 120) | orbit 2 | no planet in orbit 2: cannot begin |
-  | 165 | Thrynn home fleet | 13 | orbit 4 (planet 46) | orbit 6 | no planet in orbit 6: cannot begin |
-  | 301 | Veloxi drone | 137 | orbit 1 (planet 431) | orbit 2 | begins at planet 430 |
-  | 302 | Veloxi drone | 29 | orbit 5 (planet 112) | orbit 2 | no planet in orbit 2: cannot begin |
-  | 305 | Veloxi drones | 35 | orbit 1 (planet 130) | orbit 2 | no planet in orbit 2: cannot begin |
-
-  **Proposal:** set `m_orbitPosition` of encounters 139, 165, 301, 302 and 305 to 6, 4, 1, 5 and 1. INFERRED: that the planet's pointer means "its orbit encounter" (it leads to the record with the same star coordinates in 12 of 12 cases).
+What is still open after PR #80 (2026-10-09). Everything else that was on this list is under "Fixed since the review". On 2026-10-05 the project owner ruled on the seventeen design questions this list had; the rulings that changed code are PR #66 to #72, and the rulings that change nothing are recorded here with their date. All entries are CONFIRMED unless marked otherwise.
 
 **Encounters and combat**
 - A planet with a living encounter in its orbit cannot be landed on (new with PR #70, follows from ruling 5): the encounter begins every time the ship goes into orbit, before the player can press Land. The drones and the derelict are single ships; the home fleets have 255 ships, 8 at a time. For the Mechans the encounter begins friendly once Mechan 9 is unlocked, but it still begins. Needs a decision if such planets are meant to be reachable (after a peaceful end, once per visit to the star system, with Mechan 9 unlocked).
