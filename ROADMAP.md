@@ -69,7 +69,7 @@ Still open:
 - **D4. Interstel Police** (the copy protection arrest). Recommendation: leave it out.
 - **D5. Conflicts in the sources.**
   - The Rod Device site: STRINFO gives two different coordinates.
-  - The Red Cylinder: planet 3 or 4 of Koann.
+  - The Red Cylinder and Koann 3: STRINFO prints planet 4 of 112,200 three times (1.2, 4.1, 5.1), but the name Koann 3, the orbit number 5 of its 5.1 entry (the third planet from that sun) and the Elowan message (3.1, "planet 3") all point to orbit 5. The recovered data keeps planet 4 as printed until this is decided.
   - The real effects of the Black Box, the Hypercube and the Ellipsoid.
   - The flare deadline: the Elowan say "final week of your Ten-month", while the manual's timeline says 4623. The data disagrees with itself. Arth's star (star 25 at 125,100) has `m_daysToNextFlare` 300, which is late in the tenth month of 4620 and fits the Elowan. Its year, month and day fields say 4621-01-01 (CONFIRMED in the JSON).
 
@@ -82,7 +82,7 @@ Reading STRINFO: its "PLANET N OF SYSTEM X, Y" is the N-th planet from the sun, 
 | 0.1 | Correct the orbit positions of encounters 139, 165, 301, 302, 305, and put encounters 144 to 146 back in hyperspace, with a load repair for old saves | xls; STRINFO agrees for 4 of the 5 orbits | PR 80 |
 | 0.2 | Land past an orbit guardian | Homeworlds cannot be landed on at all: "the homeworlds of all races are well guarded and thither thou mayest not descend" (Elowan lore, STRINFO 2.4), so the home fleets keep blocking. Veloxi drones grant orbit if you answer yes to multiples of six; the Mechans help only "Group 9" (STRINFO 2.1 to 2.3) | drones: PR 82 (three numbers, permission until the ship leaves the system: the owner's choices of 2026-10-09). Mechans at Heaven (encounter 77): Ask, the sources do not say that Mechan 9 lets a ship land |
 | 0.3 | Game clock runs on the planet surface, and (Ask) in orbit and in encounters | the terrain vehicle panel shows the date (SS Terrain Vehicle) | PR 83: the clock runs in every Spaceflight location except the docking bay (kernel `PARALLEL-TASKS`, manual pages 7 and 24); the Starport is left as it is |
-| 0.4 | Recover the missing data per D2: 36 ruin messages with sites, 15 artifact sites, colony evaluation list with bonuses and fines, the game's messages for the endgame and flares | STRINFO 1.2, 2.12, 2.14, 3.1, 4.1; Survey sheets "Habitable Planets" and "Optimal Planets" | data only, no behaviour change |
+| 0.4 | Recover the missing data per D2: 36 ruin messages with sites, 15 artifact sites, colony evaluation list with bonuses and fines, the game's messages for the endgame and flares | STRINFO 1.2, 2.12, 2.14, 3.1, 4.1; Survey sheets "Habitable Planets" and "Optimal Planets" | PR 85: 38 planet messages, 14 artifact sites, 51 colony evaluations and 10 story texts in the recovered data file, every one resolved to its planet; no behaviour yet |
 | 0.5 | Flare data: the 36 stars whose day count wrapped below zero are marked as already flared | `m_daysToNextFlare` equals 65536 plus `m_daysSincePreviousFlare` for all 36 | they flare about 179 years from now |
 | 0.6 | Play the visual results of PRs 66 to 72 once in the Editor (owner) | | nothing visual has been seen |
 

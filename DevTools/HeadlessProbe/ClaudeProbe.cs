@@ -535,6 +535,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioShipModels();
 				break;
 
+			case "recovereddata":
+				yield return ScenarioRecoveredData();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -9647,6 +9651,186 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "no exceptions in the encounters", s_exceptionCount == exceptionsBeforeEncounters, "exceptions=" + ( s_exceptionCount - exceptionsBeforeEncounters ) );
 
 		Finish( "scenario=shipmodels placeholders=" + placeholders + " encounter=" + encounterId + " sizes=" + sizes.Trim() + " playerDestroyed=" + CombatController.m_instance.PlayerIsDestroyed(), 0 );
+	}
+
+	// ---------------------------------------------------------------- roadmap 0.4: what the original had and the game data file lacks, recovered from STRINFO
+
+	// a field of an object by reflection, or null if the object or the field is not there (the recovered data lists do not exist in the code before them)
+	static object FieldOrNull( object target, string name )
+	{
+		if ( target == null )
+		{
+			return null;
+		}
+
+		var field = target.GetType().GetField( name, c_any );
+
+		return ( field == null ) ? null : field.GetValue( target );
+	}
+
+	static int IntFieldOrMin( object target, string name )
+	{
+		var value = FieldOrNull( target, name );
+
+		return ( value is int ) ? (int) value : int.MinValue;
+	}
+
+	// the records of one of the recovered data lists of the game data (empty if the list is not there)
+	static List<object> RecoveredList( string name )
+	{
+		var list = new List<object>();
+
+		if ( FieldOrNull( DataController.m_instance.m_gameData, name ) is Array array )
+		{
+			foreach ( var item in array )
+			{
+				list.Add( item );
+			}
+		}
+
+		return list;
+	}
+
+	// the planet the first record with this value in this field was found at (int.MinValue if there is no such record)
+	static int PlanetOfRecord( List<object> list, string field, object value, string field2 = null, object value2 = null )
+	{
+		foreach ( var record in list )
+		{
+			if ( !Equals( FieldOrNull( record, field ), value ) )
+			{
+				continue;
+			}
+
+			if ( ( field2 != null ) && !Equals( FieldOrNull( record, field2 ), value2 ) )
+			{
+				continue;
+			}
+
+			return IntFieldOrMin( record, "m_planetId" );
+		}
+
+		return int.MinValue;
+	}
+
+	// the planet an encounter in orbit waits at (from the game data's orbit, not from the recovered data)
+	static int PlanetOfOrbitEncounter( int encounterId )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gdEncounter = DataController.m_instance.m_gameData.m_encounterList[ encounterId ];
+
+		return PlanetInOrbit( playerData.FindEncounter( encounterId ).GetStarId(), gdEncounter.m_orbitPosition );
+	}
+
+	IEnumerator ScenarioRecoveredData()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		yield return null;
+
+		var messages = RecoveredList( "m_planetMessageList" );
+		var sites = RecoveredList( "m_artifactSiteList" );
+		var evaluations = RecoveredList( "m_colonyEvaluationList" );
+		var storyTexts = RecoveredList( "m_storyTextList" );
+
+		var counts = messages.Count + "/" + sites.Count + "/" + evaluations.Count + "/" + storyTexts.Count;
+
+		Log( "recovereddata: planet messages / artifact sites / colony evaluations / story texts: " + counts );
+
+		Check( "recovereddata: the game data has the 38 planet messages, 14 artifact sites, 51 colony evaluations and 10 story texts of STRINFO", counts == "38/14/51/10", counts );
+
+		// ---- every record names a planet (and an artifact) the game data has
+		var unresolved = "";
+
+		foreach ( var record in messages )
+		{
+			if ( IntFieldOrMin( record, "m_planetId" ) < 0 )
+			{
+				unresolved += "message " + IntFieldOrMin( record, "m_id" ) + " ";
+			}
+		}
+
+		foreach ( var record in sites )
+		{
+			if ( ( IntFieldOrMin( record, "m_planetId" ) < 0 ) || ( IntFieldOrMin( record, "m_artifactId" ) < 0 ) )
+			{
+				unresolved += "site " + IntFieldOrMin( record, "m_id" ) + " ";
+			}
+		}
+
+		foreach ( var record in evaluations )
+		{
+			if ( IntFieldOrMin( record, "m_planetId" ) < 0 )
+			{
+				unresolved += "evaluation " + IntFieldOrMin( record, "m_id" ) + " ";
+			}
+		}
+
+		Log( "recovereddata: records that name something the game data does not have: " + ( ( unresolved == "" ) ? "none" : unresolved.Trim() ) );
+
+		Check( "recovereddata: every record names a planet and an artifact the game data has", ( messages.Count > 0 ) && ( sites.Count > 0 ) && ( evaluations.Count > 0 ) && ( unresolved == "" ), ( unresolved == "" ) ? counts : unresolved.Trim() );
+
+		// ---- planets worked out by hand from the game data (the planets of a star by orbit, counted from the sun)
+		var orb = PlanetOfRecord( sites, "m_artifactName", "Crystal Orb" );
+		var eggAt143 = PlanetOfRecord( sites, "m_artifactName", "Black Egg", "m_starX", 143 );
+		var pearl = PlanetOfRecord( sites, "m_artifactName", "Crystal Pearl" );
+		var ring = PlanetOfRecord( sites, "m_artifactName", "Ring Device" );
+		var hypercube = PlanetOfRecord( sites, "m_artifactName", "Hypercube" );
+		var heaven = PlanetOfRecord( evaluations, "m_placeName", "HEAVEN" );
+		var crystalPlanet = PlanetOfRecord( messages, "m_placeName", "THE CRYSTAL PLANET" );
+		var noahWreck = PlanetOfRecord( messages, "m_placeName", "NOAH 9 WRECK SITE" );
+
+		var planets = "orb " + orb + " egg " + eggAt143 + " pearl " + pearl + " ring " + ring + " hypercube " + hypercube + " heaven " + heaven + " crystal " + crystalPlanet + " noah " + noahWreck;
+
+		Log( "recovereddata: planets: " + planets + " (by hand: 130, 112, 123, 4, 5, 107, 33, 115)" );
+
+		Check( "recovereddata: the planets match the ones worked out by hand (Sphexi 130, the Black Egg of 143,115 at 112, the City of the Ancients 123, Mars 4, Earth 5, Heaven 107, the Crystal Planet 33, the Noah 9 wreck 115)", ( orb == 130 ) && ( eggAt143 == 112 ) && ( pearl == 123 ) && ( ring == 4 ) && ( hypercube == 5 ) && ( heaven == 107 ) && ( crystalPlanet == 33 ) && ( noahWreck == 115 ), planets );
+
+		// ---- the two numberings meet: the guards in orbit (game data orbits) wait at the planets STRINFO names (counted from the sun)
+		var guards = "302 at " + PlanetOfOrbitEncounter( 302 ) + " / Black Egg " + eggAt143 + ", 305 at " + PlanetOfOrbitEncounter( 305 ) + " / Crystal Orb " + orb + ", 77 at " + PlanetOfOrbitEncounter( 77 ) + " / Heaven " + heaven + ", 33 at " + PlanetOfOrbitEncounter( 33 ) + " / Shimmering Ball " + PlanetOfRecord( sites, "m_artifactName", "Shimmering Ball" );
+
+		Log( "recovereddata: guards in orbit and the planets STRINFO names: " + guards );
+
+		Check( "recovereddata: the Veloxi drones, the Mechans and the Gazurtoids wait in orbit around the planets STRINFO puts the Black Egg, the Crystal Orb, Heaven and the Shimmering Ball on", ( PlanetOfOrbitEncounter( 302 ) == eggAt143 ) && ( PlanetOfOrbitEncounter( 305 ) == orb ) && ( PlanetOfOrbitEncounter( 77 ) == heaven ) && ( PlanetOfOrbitEncounter( 33 ) == PlanetOfRecord( sites, "m_artifactName", "Shimmering Ball" ) ), guards );
+
+		// ---- the story texts
+		string[] keys = { "EvaluationOptimal", "EvaluationSuitable", "EvaluationUnsuitable", "MissionComplete", "TerrainVehicleLost", "TowingCharges", "CrystalPlanetDestroyed", "CrystalPlanetDamaged", "FlareDeath", "DistressNoResponse" };
+
+		var missingKeys = "";
+		var flareText = "";
+
+		foreach ( var key in keys )
+		{
+			string text = null;
+
+			foreach ( var record in storyTexts )
+			{
+				if ( Equals( FieldOrNull( record, "m_key" ), key ) )
+				{
+					text = FieldOrNull( record, "m_text" ) as string;
+				}
+			}
+
+			if ( string.IsNullOrEmpty( text ) || text.Contains( "EMBED" ) )
+			{
+				missingKeys += key + " ";
+			}
+
+			if ( key == "FlareDeath" )
+			{
+				flareText = text ?? "";
+			}
+		}
+
+		Log( "recovereddata: story texts missing or broken: " + ( ( missingKeys == "" ) ? "none" : missingKeys.Trim() ) + " | the flare text: " + flareText.Replace( '\n', '/' ) );
+
+		Check( "recovereddata: the ten story texts are there, with their line breaks", ( missingKeys == "" ) && flareText.Contains( "INCINERATED" ) && flareText.Contains( "\n" ), ( missingKeys == "" ) ? flareText.Replace( '\n', '/' ) : missingKeys.Trim() );
+
+		// ---- the game data file itself is unchanged (control): 811 planets, 51 artifacts, its 556 comms and the 2 recovered drone lines
+		var sizes = gameData.m_planetList.Length + "/" + gameData.m_artifactList.Length + "/" + gameData.m_commList.Length;
+
+		Check( "recovereddata: the original game data is unchanged (control)", sizes == "811/51/558", sizes );
+
+		Finish( "scenario=recovereddata counts=" + counts + " unresolved=" + ( ( unresolved == "" ) ? "none" : unresolved.Trim().Replace( ' ', ',' ) ) + " planets=" + planets.Replace( ' ', ',' ) + " gameData=" + sizes, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

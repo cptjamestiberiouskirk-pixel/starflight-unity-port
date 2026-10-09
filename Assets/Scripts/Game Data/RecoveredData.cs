@@ -8,4 +8,8 @@ using System;
 public class RecoveredData
 {
 	public GD_Comm[] m_commList;
+	public GD_PlanetMessage[] m_planetMessageList;
+	public GD_ArtifactSite[] m_artifactSiteList;
+	public GD_ColonyEvaluation[] m_colonyEvaluationList;
+	public GD_StoryText[] m_storyTextList;
 }
