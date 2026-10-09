@@ -1455,6 +1455,9 @@ public class ClaudeProbe : MonoBehaviour
 			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.ElowanTransport, "Sensors - Elowan Transport" ),
 			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.ElowanScout, "Sensors - Elowan Scout" ),
 			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.ElowanWarship, "Sensors - Elowan Warship" ),
+			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.ThrynnTransport, "Sensors - Thrynn Transport" ),
+			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.ThrynnScout, "Sensors - Thrynn Scout" ),
+			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.ThrynnWarship, "Sensors - Thrynn Warship" ),
 		};
 
 		foreach ( var traced in tracedPictures )
