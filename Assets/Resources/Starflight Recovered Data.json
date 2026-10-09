@@ -1312,5 +1312,29 @@
       "m_note": "A distress signal after the Starport has been destroyed.",
       "m_source": "STRINFO 2.14"
     }
+  ],
+  "m_ruinFormationList": [
+    {
+      "m_id": 0,
+      "m_name": "THE MOST MAGNIFICENT HEXAGON",
+      "m_artifactName": "Crystal Orb",
+      "m_count": 6,
+      "m_shape": "Ring",
+      "m_spacing": 48.0,
+      "m_text": "THE CRYSTAL ORB IS FOUND WITHIN A RECENT RUIN IN THE CENTER OF A CIRCULAR FORMATION OF 6 ANCIENT RUINS KNOWN AS 'THE MOST MAGNIFICENT HEXAGON'.",
+      "m_note": "STRINFO gives the count and the shape, not the size: the port puts the six ruins 48 units from the Orb's ruin.",
+      "m_source": "STRINFO 4.1"
+    },
+    {
+      "m_id": 1,
+      "m_name": "THE CITY OF THE ANCIENTS",
+      "m_artifactName": "Crystal Pearl",
+      "m_count": 15,
+      "m_shape": "NorthEast",
+      "m_spacing": 40.0,
+      "m_text": "THE CRYSTAL PEARL IS FOUND WITHIN A RECENT RUIN IN THE SOUTHWEST OF A CLUSTER OF 15 ANCIENT RUINS KNOWN AS 'THE CITY OF THE ANCIENTS'.",
+      "m_note": "STRINFO gives the count and that the Pearl's ruin is in the southwest, not the layout: the port puts the 15 ruins in rows of 4, 40 units apart, north and east of the Pearl's ruin, which takes the southwest corner of the block.",
+      "m_source": "STRINFO 4.1"
+    }
   ]
 }

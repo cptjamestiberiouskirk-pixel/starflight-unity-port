@@ -127,6 +127,58 @@ public class TerrainRuins : TerrainGridPopulator
 			ruin.m_artifactSiteIds.Add( artifactSite.m_id );
 		}
 
+		// the formations of ancient ruins around the ruins of two of the artifacts (STRINFO 4.1) - also with no random numbers, and they hold nothing
+		foreach ( var ruinFormation in gameData.m_ruinFormationList )
+		{
+			if ( ( ruinFormation.m_artifactSiteId < 0 ) || ( ruinFormation.m_artifactSiteId >= gameData.m_artifactSiteList.Length ) )
+			{
+				continue;
+			}
+
+			var artifactSite = gameData.m_artifactSiteList[ ruinFormation.m_artifactSiteId ];
+
+			if ( artifactSite.m_planetId != planet.m_id )
+			{
+				continue;
+			}
+
+			// the middle of the formation is the ruin of the artifact
+			var center = Tools.LatLongToWorldCoordinates( artifactSite.m_longitude, artifactSite.m_latitude );
+
+			// the number of columns of a block (a block of 15 has rows of 4, with the artifact's ruin in the first place of the first row)
+			var columns = Mathf.Max( 1, Mathf.CeilToInt( Mathf.Sqrt( ruinFormation.m_count + 1 ) ) );
+
+			for ( var i = 0; i < ruinFormation.m_count; i++ )
+			{
+				Vector3 offset;
+
+				if ( ruinFormation.m_shape == "Ring" )
+				{
+					// in a circle around the artifact's ruin, the first one to the north
+					var angle = i * Mathf.PI * 2.0f / ruinFormation.m_count;
+
+					offset = new Vector3( Mathf.Sin( angle ), 0.0f, Mathf.Cos( angle ) ) * ruinFormation.m_spacing;
+				}
+				else
+				{
+					// in rows to the east and the north of the artifact's ruin, which has the southwest corner (place 0) of the block
+					var place = i + 1;
+
+					offset = new Vector3( ( place % columns ) * ruinFormation.m_spacing, 0.0f, ( place / columns ) * ruinFormation.m_spacing );
+				}
+
+				Tools.WorldToMapCoordinates( center + offset, out var mapX, out var mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
+
+				var template = m_ruinTemplates[ ( ruinFormation.m_id * 7 + i ) % m_ruinTemplates.Length ];
+
+				var ruinObject = PlaceObjectAt( template, mapX, mapY, elevationScale, ( i * 60 + ruinFormation.m_id * 30 ) % 360 );
+
+				ruinObject.name = "Ruin " + ( i + 1 ) + " of " + ruinFormation.m_name;
+
+				ruinObject.AddComponent<TerrainRuin>();
+			}
+		}
+
 		// give the game its random numbers back
 		Random.state = randomState;
 	}
