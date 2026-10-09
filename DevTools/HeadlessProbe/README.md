@@ -101,7 +101,7 @@ What the probe does:
 | `calendar` | the stardate texts of the clock in the original's calendar of 10 months of 30 days (day 0 as the control, the turn of a month, day 40, day 299, day 300, day 365), the day of Arth's flare against the date fields of its star, and a save made in the real-world calendar (bank, ship's log, current date) next to one made in the original's (the control) after loading (about 30 s) |
 | `pickups` | on planet 90 in the terrain vehicle: a deposit taken whole through the real Cargo button, one taken in part (the hold has room for 1 cubic meter), and one left alone as the control, found again by where they were placed after going back into the ship and out again, and the record of them through a save and a load (about 35 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (58 scenarios, about 26 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (59 scenarios, about 27 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
