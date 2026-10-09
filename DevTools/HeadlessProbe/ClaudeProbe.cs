@@ -563,6 +563,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioArtifactSites();
 				break;
 
+			case "formations":
+				yield return ScenarioFormations();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -10977,6 +10981,151 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "artifactsites: the two messages of the ruin are recorded as before (control)", recorded == 2, recorded + " messages" );
 
 		Finish( "scenario=artifactsites rod=" + rodDevice + " redCylinder=" + redCylinderPlanet + " earthRuins=" + ruins.Count + " site=" + siteHolds + " taken=" + inVehicle + "/" + inVehicleAfterSecondPress + " ship=" + inShip + " later=" + inVehicleLater, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 3: the Most Magnificent Hexagon and the City of the Ancients
+
+	// lands on a planet at a latitude and a longitude (north and east positive) and goes out in the terrain vehicle - returns the ruins on the ground, or null if the vehicle did not go out
+	static IEnumerator LandAndGoOut( int starId, int planetId, float northLatitude, float eastLongitude, List<Component>[] ruins )
+	{
+		var controller = SpaceflightController.m_instance;
+		var playerData = DataController.m_instance.m_playerData;
+		var done = new bool[ 1 ];
+
+		ruins[ 0 ] = null;
+
+		// the crosshair's "latitude" is east-west in the port, its "longitude" north-south
+		playerData.m_general.m_selectedLatitude = eastLongitude;
+		playerData.m_general.m_selectedLongitude = northLatitude;
+
+		yield return GoIntoOrbit( starId, planetId );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		if ( done[ 0 ] )
+		{
+			ruins[ 0 ] = RuinsOnTheGround();
+		}
+	}
+
+	IEnumerator ScenarioFormations()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var ruins = new List<Component>[ 1 ];
+
+		EnsureCrew();
+
+		// ---- 1. Sphexi (planet 130, the first of 132, 165): the Crystal Orb at 46N x 14E in the middle of six ruins - the drones in its orbit let the ship in first
+		controller.GrantOrbitPermission( 305 );
+
+		yield return LandAndGoOut( 35, 130, 46.0f, 14.0f, ruins );
+
+		var sphexiRuins = ruins[ 0 ];
+		var orbCenter = Tools.LatLongToWorldCoordinates( 14.0f, 46.0f );
+		var orbRuins = 0;
+		var ringRuins = 0;
+		var ringDistances = "";
+		var ringAngles = new List<float>();
+
+		if ( sphexiRuins != null )
+		{
+			foreach ( var ruin in sphexiRuins )
+			{
+				var delta = ruin.transform.position - orbCenter;
+
+				delta.y = 0.0f;
+
+				if ( delta.magnitude < 0.5f )
+				{
+					orbRuins++;
+				}
+				else
+				{
+					ringRuins++;
+					ringDistances += delta.magnitude.ToString( "F1" ) + " ";
+					ringAngles.Add( Mathf.Atan2( delta.x, delta.z ) * Mathf.Rad2Deg );
+				}
+			}
+		}
+
+		ringAngles.Sort();
+
+		var evenlySpread = ringAngles.Count == 6;
+
+		for ( var i = 1; i < ringAngles.Count; i++ )
+		{
+			evenlySpread = evenlySpread && ( Mathf.Abs( ringAngles[ i ] - ringAngles[ i - 1 ] - 60.0f ) < 0.5f );
+		}
+
+		var allAtOneDistance = ringRuins > 0;
+
+		foreach ( var text in ringDistances.Trim().Split( ' ' ) )
+		{
+			allAtOneDistance = allAtOneDistance && ( text == "48.0" );
+		}
+
+		Log( "formations: Sphexi has " + ( ( sphexiRuins == null ) ? "-" : sphexiRuins.Count.ToString() ) + " ruins: " + orbRuins + " at the Orb's site, " + ringRuins + " around it at " + ringDistances.Trim() + ", at angles " + string.Join( " ", ringAngles.ConvertAll( a => a.ToString( "F0" ) ) ) );
+
+		Check( "formations: the Crystal Orb's ruin on Sphexi stands in the middle of six ruins in a circle (the Most Magnificent Hexagon)", ( sphexiRuins != null ) && ( orbRuins == 1 ) && ( ringRuins == 6 ) && allAtOneDistance && evenlySpread, orbRuins + " + " + ringRuins + ", distances " + ringDistances.Trim() );
+
+		// ---- 2. the City of the Ancients (planet 123, the first of 56, 144): fifteen ruins, the Crystal Pearl's at 28N x 13W in their southwest
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandAndGoOut( 33, 123, 28.0f, -13.0f, ruins );
+
+		var cityRuins = ruins[ 0 ];
+		var pearlCenter = Tools.LatLongToWorldCoordinates( -13.0f, 28.0f );
+		var pearlRuins = 0;
+		var blockRuins = 0;
+		var southOrWest = 0;
+		var farthestEast = 0.0f;
+		var farthestNorth = 0.0f;
+
+		if ( cityRuins != null )
+		{
+			foreach ( var ruin in cityRuins )
+			{
+				var delta = ruin.transform.position - pearlCenter;
+
+				if ( ( Mathf.Abs( delta.x ) < 0.5f ) && ( Mathf.Abs( delta.z ) < 0.5f ) )
+				{
+					pearlRuins++;
+					continue;
+				}
+
+				blockRuins++;
+
+				if ( ( delta.x < -0.5f ) || ( delta.z < -0.5f ) )
+				{
+					southOrWest++;
+				}
+
+				farthestEast = Mathf.Max( farthestEast, delta.x );
+				farthestNorth = Mathf.Max( farthestNorth, delta.z );
+			}
+		}
+
+		Log( "formations: the City of the Ancients has " + ( ( cityRuins == null ) ? "-" : cityRuins.Count.ToString() ) + " ruins: " + pearlRuins + " at the Pearl's site, " + blockRuins + " others, " + southOrWest + " of them south or west of it, reaching " + farthestEast.ToString( "F0" ) + " east and " + farthestNorth.ToString( "F0" ) + " north" );
+
+		Check( "formations: the Crystal Pearl's ruin is in the southwest of a cluster of fifteen ruins (the City of the Ancients)", ( cityRuins != null ) && ( pearlRuins == 1 ) && ( blockRuins == 15 ) && ( southOrWest == 0 ) && ( farthestEast > 0.0f ) && ( farthestNorth > 0.0f ), pearlRuins + " + " + blockRuins + ", " + southOrWest + " south or west" );
+
+		// ---- 3. a planet with no formation keeps its ruins as they were (control): Earth has 12
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandAndGoOut( 0, 5, 11.0f, -104.0f, ruins );
+
+		var earthRuins = ( ruins[ 0 ] == null ) ? -1 : ruins[ 0 ].Count;
+
+		Check( "formations: Earth keeps its 12 ruins (control)", earthRuins == 12, earthRuins + " ruins" );
+
+		Finish( "scenario=formations sphexi=" + orbRuins + "+" + ringRuins + " city=" + pearlRuins + "+" + blockRuins + " earth=" + earthRuins, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

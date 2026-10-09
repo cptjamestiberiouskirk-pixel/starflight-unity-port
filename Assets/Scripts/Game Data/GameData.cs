@@ -60,6 +60,7 @@ public class GameData
 	[NonSerialized] public GD_ArtifactSite[] m_artifactSiteList = new GD_ArtifactSite[ 0 ];
 	[NonSerialized] public GD_ColonyEvaluation[] m_colonyEvaluationList = new GD_ColonyEvaluation[ 0 ];
 	[NonSerialized] public GD_StoryText[] m_storyTextList = new GD_StoryText[ 0 ];
+	[NonSerialized] public GD_RuinFormation[] m_ruinFormationList = new GD_RuinFormation[ 0 ];
 
 	public void Initialize()
 	{
@@ -133,6 +134,31 @@ public class GameData
 			if ( colonyEvaluation.m_planetId < 0 )
 			{
 				UnityEngine.Debug.LogError( "Recovered colony evaluation " + colonyEvaluation.m_id + " names a planet the game data does not have" );
+			}
+		}
+
+		ResolveRuinFormations();
+	}
+
+	// finds the artifact site each ruin formation is around (call this after the artifact sites are resolved)
+	void ResolveRuinFormations()
+	{
+		foreach ( var ruinFormation in m_ruinFormationList )
+		{
+			ruinFormation.m_artifactSiteId = -1;
+
+			foreach ( var artifactSite in m_artifactSiteList )
+			{
+				if ( artifactSite.m_artifactName == ruinFormation.m_artifactName )
+				{
+					ruinFormation.m_artifactSiteId = artifactSite.m_id;
+					break;
+				}
+			}
+
+			if ( ruinFormation.m_artifactSiteId < 0 )
+			{
+				UnityEngine.Debug.LogError( "Recovered ruin formation " + ruinFormation.m_id + " names an artifact that has no site" );
 			}
 		}
 	}
@@ -256,6 +282,11 @@ public class GameData
 		if ( recoveredData.m_storyTextList != null )
 		{
 			m_storyTextList = recoveredData.m_storyTextList;
+		}
+
+		if ( recoveredData.m_ruinFormationList != null )
+		{
+			m_ruinFormationList = recoveredData.m_ruinFormationList;
 		}
 	}
 
