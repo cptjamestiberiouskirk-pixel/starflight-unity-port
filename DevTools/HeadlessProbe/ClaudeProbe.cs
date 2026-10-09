@@ -519,6 +519,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSmallFixes();
 				break;
 
+			case "encounterdata":
+				yield return ScenarioEncounterData();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -8744,6 +8748,270 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "ships log: the scroll loops end with a row height that scrolls nowhere", cameBackAfter < 1000, "came back after " + cameBackAfter + " ms (row height " + rowHeight.ToString( "G4" ) + ")" );
 
 		Finish( "scenario=smallfixes gameTimeBytes=" + gameTimeBytesPerCall + " statement=" + ( neutralStatement.Contains( "ERROR" ) ? "ERROR" : "nothing" ) + " resolver=" + includesKept + "/" + includeAfterIgnore + " systemDisplay=" + changeSystemThrew + " legendTexture=" + ( legendField != null ) + " shipsLog=" + cameBackAfter + "ms checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- roadmap 0.1: the locations and orbits of encounters, corrected to the original game data
+
+	// the planet of a star in the given orbit (-1 if the star has none there)
+	static int PlanetInOrbit( int starId, int orbitPosition )
+	{
+		foreach ( var planet in DataController.m_instance.m_gameData.m_planetList )
+		{
+			if ( ( planet.m_starId == starId ) && ( planet.m_orbitPosition == orbitPosition ) )
+			{
+				return planet.m_id;
+			}
+		}
+
+		return -1;
+	}
+
+	// goes into orbit around a planet of a star: returns through the out parameter the id of the encounter that began there (-1 for none), and flies out of it
+	static IEnumerator OrbitAndSee( int starId, int planetId, int[] encounterBegun )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var starSystem = SpaceflightController.m_instance.m_starSystem;
+
+		encounterBegun[ 0 ] = -1;
+
+		if ( playerData.m_general.m_currentStarId != starId )
+		{
+			// the star system encounters of that star wait on the far side of the system, so that none of them reaches the ship before it is in orbit (star 32 has five Spemin groups)
+			foreach ( var pdEncounter in playerData.m_encounterList )
+			{
+				if ( ( pdEncounter.GetLocation() == PD_General.Location.StarSystem ) && ( pdEncounter.GetStarId() == starId ) )
+				{
+					pdEncounter.SetCoordinates( new Vector3( -7500.0f, 0.0f, 0.0f ) );
+				}
+			}
+
+			EnterStarSystem( starId );
+
+			var start = Time.realtimeSinceStartup;
+
+			while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 40.0f ) )
+			{
+				yield return null;
+			}
+
+			yield return Frames( 5 );
+		}
+		else if ( playerData.m_general.m_location != PD_General.Location.StarSystem )
+		{
+			SpaceflightController.m_instance.SwitchLocation( PD_General.Location.StarSystem );
+
+			yield return Frames( 5 );
+		}
+
+		yield return EnterOrbit( planetId );
+
+		if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+		{
+			encounterBegun[ 0 ] = playerData.m_general.m_currentEncounterId;
+
+			yield return FlyOutOfEncounter();
+		}
+		else if ( playerData.m_general.m_location == PD_General.Location.InOrbit )
+		{
+			// back to the level of the star system without going through an encounter
+			SpaceflightController.m_instance.SwitchLocation( PD_General.Location.StarSystem );
+
+			yield return Frames( 5 );
+		}
+	}
+
+	IEnumerator ScenarioEncounterData()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets (the Spemin home fleet has 255 ships)
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// ---- 1. the game data: the three Thrynn scouts are hyperspace encounters, and the five encounters in orbit name the orbit the original gives them
+		int[] scoutIds = { 144, 145, 146 };
+
+		var scouts = "";
+		var scoutsInHyperspace = true;
+
+		foreach ( var id in scoutIds )
+		{
+			var location = gameData.m_encounterList[ id ].m_location;
+
+			scouts += id + ":" + location + " ";
+
+			scoutsInHyperspace = scoutsInHyperspace && ( location == 0 );
+		}
+
+		int[] orbitIds = { 139, 165, 301, 302, 305 };
+		int[] originalOrbits = { 6, 4, 1, 5, 1 };
+
+		var orbits = "";
+		var orbitsAsInTheOriginal = true;
+
+		for ( var i = 0; i < orbitIds.Length; i++ )
+		{
+			var orbit = gameData.m_encounterList[ orbitIds[ i ] ].m_orbitPosition;
+
+			orbits += orbitIds[ i ] + ":" + orbit + " ";
+
+			orbitsAsInTheOriginal = orbitsAsInTheOriginal && ( orbit == originalOrbits[ i ] );
+		}
+
+		Log( "encounterdata: game data location of the scouts (0 is hyperspace): " + scouts.Trim() + " | orbit of the five: " + orbits.Trim() + " (the original: 139:6 165:4 301:1 302:5 305:1)" );
+
+		Check( "encounterdata: encounters 144 to 146 are hyperspace encounters in the game data", scoutsInHyperspace, scouts.Trim() );
+		Check( "encounterdata: encounters 139, 165, 301, 302 and 305 name the orbit of the original", orbitsAsInTheOriginal, orbits.Trim() );
+
+		// ---- 2. every encounter in orbit names an orbit its star has a planet in
+		var inOrbit = 0;
+		var withAPlanet = 0;
+		var withoutAPlanet = "";
+
+		for ( var i = 0; i < gameData.m_encounterList.Length; i++ )
+		{
+			var gdEncounter = gameData.m_encounterList[ i ];
+
+			if ( gdEncounter.m_location != 2 )
+			{
+				continue;
+			}
+
+			inOrbit++;
+
+			if ( PlanetInOrbit( playerData.FindEncounter( i ).GetStarId(), gdEncounter.m_orbitPosition ) >= 0 )
+			{
+				withAPlanet++;
+			}
+			else
+			{
+				withoutAPlanet += i + " ";
+			}
+		}
+
+		Log( "encounterdata: " + withAPlanet + " of " + inOrbit + " encounters in orbit name an orbit that has a planet; the others: " + ( ( withoutAPlanet == "" ) ? "none" : withoutAPlanet.Trim() ) );
+
+		Check( "encounterdata: every encounter in orbit names an orbit that has a planet", ( inOrbit == 12 ) && ( withAPlanet == 12 ), withAPlanet + " of " + inOrbit + ", without: " + withoutAPlanet.Trim() );
+
+		// ---- 3. a new game: the scouts are in hyperspace, at the place the game data gives them
+		var newGame = new PlayerData();
+
+		newGame.Reset();
+
+		var newGameScouts = "";
+		var newGameScoutsInHyperspace = true;
+
+		foreach ( var id in scoutIds )
+		{
+			var pdEncounter = newGame.FindEncounter( id );
+			var gdEncounter = gameData.m_encounterList[ id ];
+			var expected = Tools.GameToWorldCoordinates( new Vector3( gdEncounter.m_xCoordinate, 0.0f, gdEncounter.m_yCoordinate ) );
+
+			newGameScouts += id + ":" + pdEncounter.GetLocation() + " " + pdEncounter.m_homeCoordinates + " ";
+
+			newGameScoutsInHyperspace = newGameScoutsInHyperspace && ( pdEncounter.GetLocation() == PD_General.Location.Hyperspace ) && ( Vector3.Distance( pdEncounter.m_homeCoordinates, expected ) < 0.01f ) && ( pdEncounter.m_currentCoordinates == pdEncounter.m_homeCoordinates );
+		}
+
+		Log( "encounterdata: the scouts in a new game: " + newGameScouts.Trim() );
+
+		Check( "encounterdata: a new game has the scouts in hyperspace at their coordinates", newGameScoutsInHyperspace, newGameScouts.Trim() );
+
+		// ---- 4. a save written before the correction: scout 144 in star 0, one of its ships destroyed; another encounter of that save as the control
+		var oldSave = new PlayerData();
+
+		oldSave.Reset();
+
+		var oldScout = oldSave.FindEncounter( 144 );
+
+		oldScout.m_location = PD_General.Location.StarSystem;
+		oldScout.m_starId = 0;
+		oldScout.m_homeCoordinates = new Vector3( 1234.0f, 0.0f, -567.0f );
+		oldScout.m_currentCoordinates = new Vector3( 1300.0f, 0.0f, -500.0f );
+		oldScout.m_alienShipList[ 0 ].m_isDead = true;
+		oldScout.m_shownCommList.Add( 42 );
+
+		const int c_controlId = 7;
+
+		var control = oldSave.FindEncounter( c_controlId );
+		var controlLocation = control.GetLocation();
+		var controlStar = control.GetStarId();
+		var controlHome = new Vector3( 2222.0f, 0.0f, 3333.0f );
+
+		control.m_homeCoordinates = controlHome;
+		control.m_currentCoordinates = controlHome;
+
+		MemorySaveSystem.s_slots[ 1 ] = JsonUtility.ToJson( oldSave, true );
+
+		PlayerData loaded = null;
+
+		try
+		{
+			loaded = Call( dataController, "LoadPlayerData", 1 ) as PlayerData;
+		}
+		catch ( Exception exception )
+		{
+			Log( "encounterdata: loading threw " + exception.GetType().Name + ": " + exception.Message );
+		}
+
+		MemorySaveSystem.s_slots.Remove( 1 );
+
+		var repairedText = "nothing loaded";
+		var repaired = false;
+		var kept = false;
+		var controlText = "nothing loaded";
+		var controlUnchanged = false;
+
+		if ( loaded != null )
+		{
+			var scout = loaded.FindEncounter( 144 );
+			var expected = Tools.GameToWorldCoordinates( new Vector3( gameData.m_encounterList[ 144 ].m_xCoordinate, 0.0f, gameData.m_encounterList[ 144 ].m_yCoordinate ) );
+
+			repairedText = scout.GetLocation() + ", star " + scout.GetStarId() + ", home " + scout.m_homeCoordinates + ", now " + scout.m_currentCoordinates + " (expected " + expected + ")";
+			repaired = ( scout.GetLocation() == PD_General.Location.Hyperspace ) && ( Vector3.Distance( scout.m_homeCoordinates, expected ) < 0.01f ) && ( scout.m_currentCoordinates == scout.m_homeCoordinates );
+			kept = scout.m_alienShipList[ 0 ].m_isDead && scout.m_shownCommList.Contains( 42 );
+
+			var loadedControl = loaded.FindEncounter( c_controlId );
+
+			controlText = loadedControl.GetLocation() + ", star " + loadedControl.GetStarId() + ", home " + loadedControl.m_homeCoordinates;
+			controlUnchanged = ( loadedControl.GetLocation() == controlLocation ) && ( loadedControl.GetStarId() == controlStar ) && ( loadedControl.m_homeCoordinates == controlHome ) && ( loadedControl.m_currentCoordinates == controlHome );
+		}
+
+		Log( "encounterdata: scout 144 of a save that has it in star 0, after loading: " + repairedText + " | its destroyed ship and its comm kept: " + kept + " | encounter " + c_controlId + " (control, " + controlLocation + " at star " + controlStar + "): " + controlText );
+
+		Check( "encounterdata: a save that has scout 144 in a star system loads with it in hyperspace at its coordinates", repaired, repairedText );
+		Check( "encounterdata: the repaired scout keeps its destroyed ship and what was said", kept, "kept " + kept );
+		Check( "encounterdata: an encounter that is where the game data has it is left alone (control)", controlUnchanged, controlText );
+
+		// ---- 5. in the game: the drone at the planet in orbit 5 of 143,115 (star 29, the planet with a Black Egg), and the Spemin home fleet at the one planet of 82,148 (star 32)
+		var begun = new int[ 1 ];
+
+		var blackEggPlanet = PlanetInOrbit( 29, 5 );
+		var otherPlanet = PlanetInOrbit( 29, 7 );
+
+		yield return OrbitAndSee( 29, otherPlanet, begun );
+
+		var atOtherPlanet = begun[ 0 ];
+
+		yield return OrbitAndSee( 29, blackEggPlanet, begun );
+
+		var atBlackEggPlanet = begun[ 0 ];
+
+		var speminPlanet = PlanetInOrbit( 32, 6 );
+
+		yield return OrbitAndSee( 32, speminPlanet, begun );
+
+		var atSpeminPlanet = begun[ 0 ];
+
+		Log( "encounterdata: into orbit around planet " + otherPlanet + " of star 29: encounter " + atOtherPlanet + " | around planet " + blackEggPlanet + " of star 29: encounter " + atBlackEggPlanet + " | around planet " + speminPlanet + " of star 32: encounter " + atSpeminPlanet + " (-1 is none)" );
+
+		Check( "encounterdata: nothing begins at the planet of star 29 the drone does not guard (control)", ( otherPlanet >= 0 ) && ( atOtherPlanet == -1 ), "planet " + otherPlanet + ", encounter " + atOtherPlanet );
+		Check( "encounterdata: the Veloxi drone 302 begins at the planet in orbit 5 of star 29", ( blackEggPlanet >= 0 ) && ( atBlackEggPlanet == 302 ), "planet " + blackEggPlanet + ", encounter " + atBlackEggPlanet );
+		Check( "encounterdata: the Spemin home fleet 139 begins at the planet in orbit 6 of star 32", ( speminPlanet >= 0 ) && ( atSpeminPlanet == 139 ), "planet " + speminPlanet + ", encounter " + atSpeminPlanet );
+
+		Finish( "scenario=encounterdata scouts=" + scouts.Trim().Replace( ' ', ',' ) + " orbits=" + orbits.Trim().Replace( ' ', ',' ) + " inOrbitWithAPlanet=" + withAPlanet + "/" + inOrbit + " repaired=" + repaired + " star29=" + atOtherPlanet + "," + atBlackEggPlanet + " star32=" + atSpeminPlanet, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

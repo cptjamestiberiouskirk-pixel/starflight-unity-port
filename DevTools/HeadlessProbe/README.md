@@ -91,8 +91,9 @@ What the probe does:
 | `erosion` | the erosion pass of the planet generator tool (editor assembly, by reflection): six runs on the same 256 by 128 bowl and three on rough ground with the tool's default settings, how many different results they give, and the seconds per run. A bowl sends every drop to the middle of the map, which is where the eight threads of the old code got in each other's way. No planet file is read or written (about 65 s) |
 | `smallfixes` | how much memory an update of the game time takes when the hour does not change (with the control that shows the measurement works) and that the stardate texts still follow the time, the Statement button in a neutral posture, the planet generator tool's contract resolver (two includes for one type, an include for a type with ignores), the system display with a planet in orbit 9, the legend texture field, and last the ship's log scroll loops with rows of no height and a list that is scrolled down. **The code before the fix hangs in that last step**: run it there with `-TimeoutSeconds 100` and read the check lines above it |
 | `starport-savedata` | a save with more armor points than its armor allows is cut back when it is loaded (and one written with a destroyed ship still loads with 1 point), the dates of the bank, of the Operations notices and of their ship's log entries with the computer set to the Thai calendar, a ship's log entry dated by an older build after a load, and the starting balance of a build and of the Editor |
+| `encounterdata` | the encounter data corrected to the original: the Thrynn scouts 144 to 146 in hyperspace (game data, a new game, and a save that has scout 144 in a star system, with another encounter of that save as the control), every encounter in orbit at an orbit that has a planet, and in the game the Veloxi drone 302 at the planet in orbit 5 of star 29 (the other planet as the control) and the Spemin home fleet 139 at the one planet of star 32 (about 40 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (50 scenarios, about 19 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (51 scenarios, about 20 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
@@ -132,7 +133,7 @@ Pitfalls:
 - Hyperspace encounters show all their ships at once. The 128 star-system encounters have 6 ships, 3 at a time; those are the ones where a ship's index and its model slot drift apart.
 - Only vessels 1 to 4 (Spemin, Mechan) and 20 have a debris model. Encounters 115 and 116 are Spemin, 7 is Elowan.
 - Mechans are hostile to a ship with no human crew.
-- Twelve encounters are in orbit around a planet (location 2). Star 30 has one of them (316, a derelict at planet 115) and no other encounter, which makes it the quiet place to test them. Four of the twelve (139, 165, 302, 305) name an orbit that has no planet, so they can never begin.
+- Twelve encounters are in orbit around a planet (location 2). Star 30 has one of them (316, a derelict at planet 115) and no other encounter, which makes it the quiet place to test them. Since the encounter data was corrected to the original (2026-10-09) all twelve name an orbit that has a planet; before that 139, 165, 302 and 305 could never begin. Star 32 (82,148) has the Spemin home fleet and five Spemin star system groups.
 - The Arth system (where a scenario starts) has four planets besides Arth: 90, 91 and 92 are frozen, 94 is a small rock planet. Planet 90 has a mineral density of 43% (762 deposits, 2218 cubic meters in all). Landing and disembarking work headless; the landing animation takes 35 s.
 - A new game has 20.0 cubic meters of Endurium (200 tenths), 250 armor points and, in the Editor, 1,000,000 MU (a build starts with the original 12,000 MU; the probe always runs in the Editor).
 

@@ -63,6 +63,28 @@ public class PlayerData
 		}
 	}
 
+	// repair save files whose encounters are not where the game data has them (the game data was corrected after they were written) - returns how many were moved
+	public int ValidateEncounterLocations()
+	{
+		var numMoved = 0;
+
+		// older save files may not have an encounter list
+		if ( m_encounterList == null )
+		{
+			return numMoved;
+		}
+
+		foreach ( var encounter in m_encounterList )
+		{
+			if ( ( encounter != null ) && encounter.ValidateLocation() )
+			{
+				numMoved++;
+			}
+		}
+
+		return numMoved;
+	}
+
 	// find an encounter by its id (Radar keeps m_encounterList sorted by distance, so the array index is not the encounter id)
 	public PD_Encounter FindEncounter( int encounterId )
 	{
