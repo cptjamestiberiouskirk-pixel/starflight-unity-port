@@ -180,10 +180,13 @@ public class SpaceflightController : MonoBehaviour
 		// get to the player data
 		var playerData = DataController.m_instance.m_playerData;
 
-		// are we in the star system or hyperspace locations?
-		if ( ( playerData.m_general.m_location == PD_General.Location.StarSystem ) || ( playerData.m_general.m_location == PD_General.Location.Hyperspace ) )
+		// the game time passes wherever the ship is out in space: in the star system, in hyperspace, in orbit, on a planet's surface and in an encounter. In the original
+		// the clock, the repairs and the crew's treatment run in one list of tasks behind one switch (disys.txt, PARALLEL-TASKS), and the doctor treats the crew on a
+		// planet's surface too (the manual, page 7). This is also what makes raised shields cost their fuel every star hour during a fight. Not in the docking bay, which
+		// is part of the starport
+		if ( ( playerData.m_general.m_location != PD_General.Location.DockingBay ) && ( playerData.m_general.m_location != PD_General.Location.Starport ) )
 		{
-			// yes - update the game time
+			// update the game time
 			playerData.m_general.UpdateGameTime( Time.deltaTime );
 		}
 
