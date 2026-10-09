@@ -100,8 +100,9 @@ What the probe does:
 | `flaredata` | the flare day of the 36 stars that flared before the game began (negative, Earth's sun -60), the 234 still to flare (days 4 to 792, Arth 300) and their date fields in a calendar of 10 months of 30 days as controls, and the shine of Earth's sun (a stable sun) next to Arth's (about 35 s) |
 | `calendar` | the stardate texts of the clock in the original's calendar of 10 months of 30 days (day 0 as the control, the turn of a month, day 40, day 299, day 300, day 365), the day of Arth's flare against the date fields of its star, and a save made in the real-world calendar (bank, ship's log, current date) next to one made in the original's (the control) after loading (about 30 s) |
 | `pickups` | on planet 90 in the terrain vehicle: a deposit taken whole through the real Cargo button, one taken in part (the hold has room for 1 cubic meter), and one left alone as the control, found again by where they were placed after going back into the ship and out again, and the record of them through a save and a load (about 35 s) |
+| `ruins` | on Earth (planet 5), landed at 11N x 104W: the ruins of the recovered data's messages (one per site, one per message at a random place: 12), the ruin of the site at its latitude and longitude with both of its messages, no rock or tree next to a ruin, the real Cargo button recording the two messages in the ship's log dated that day and only once, the scan naming the ruin, the same places after going out again, and planet 90 with no ruins as the control (about 60 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (59 scenarios, about 27 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (60 scenarios, about 28 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
