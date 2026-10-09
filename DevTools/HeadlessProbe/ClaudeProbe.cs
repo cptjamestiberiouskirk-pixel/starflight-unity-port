@@ -9698,6 +9698,8 @@ public class ClaudeProbe : MonoBehaviour
 		{ 5, 35.742f }, { 6, 15.318f }, { 7, 15.318f },
 		// uhlek scout and warship (2 and 10, shown at 5.0)
 		{ 16, 102.12f }, { 17, 256.213f },
+		// gazurtoid scout and warship (60 and 90, shown at 7.0 and 7.5)
+		{ 14, 357.844f }, { 15, 380.843f },
 	};
 
 	// the size of the meshes under model, measured along the axes of container (the ship's own frame: +Z is its nose)

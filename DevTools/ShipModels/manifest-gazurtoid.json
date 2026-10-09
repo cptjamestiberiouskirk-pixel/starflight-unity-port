@@ -1,0 +1,115 @@
+{
+	"race": "Gazurtoid",
+	"vessels": [
+		{
+			"id": 14,
+			"name": "Gazurtoid Scout",
+			"strinfoSize": 60.0,
+			"length": 357.844,
+			"model": "Assets/Game Objects/Ships/Gazurtoid/Gazurtoid Scout.fbx",
+			"debris": "Assets/Game Objects/Ships Debris/Gazurtoid/Gazurtoid Scout.fbx",
+			"materials": [
+				"Gazurtoid Hull",
+				"Gazurtoid Trim",
+				"Gazurtoid Light",
+				"Gazurtoid Engine"
+			]
+		},
+		{
+			"id": 15,
+			"name": "Gazurtoid Warship",
+			"strinfoSize": 90.0,
+			"length": 380.843,
+			"model": "Assets/Game Objects/Ships/Gazurtoid/Gazurtoid Warship.fbx",
+			"debris": "Assets/Game Objects/Ships Debris/Gazurtoid/Gazurtoid Warship.fbx",
+			"materials": [
+				"Gazurtoid Hull",
+				"Gazurtoid Trim",
+				"Gazurtoid Light",
+				"Gazurtoid Engine"
+			]
+		}
+	],
+	"materials": [
+		{
+			"name": "Gazurtoid Hull",
+			"albedo": [
+				0.2,
+				0.19,
+				0.17
+			],
+			"specular": [
+				0.35,
+				0.35,
+				0.33
+			],
+			"smoothness": 0.65,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Gazurtoid"
+		},
+		{
+			"name": "Gazurtoid Trim",
+			"albedo": [
+				0.11,
+				0.1,
+				0.09
+			],
+			"specular": [
+				0.22,
+				0.22,
+				0.2
+			],
+			"smoothness": 0.5,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Gazurtoid"
+		},
+		{
+			"name": "Gazurtoid Light",
+			"albedo": [
+				0.1,
+				0.3,
+				0.4
+			],
+			"specular": [
+				0.5,
+				0.5,
+				0.5
+			],
+			"smoothness": 0.8,
+			"emissive": [
+				0.2,
+				0.7,
+				0.9
+			],
+			"folder": "Assets/Game Objects/Ships/Gazurtoid"
+		},
+		{
+			"name": "Gazurtoid Engine",
+			"albedo": [
+				0.4,
+				0.05,
+				0.15
+			],
+			"specular": [
+				0.45,
+				0.25,
+				0.3
+			],
+			"smoothness": 0.7,
+			"emissive": [
+				0.9,
+				0.15,
+				0.45
+			],
+			"folder": "Assets/Game Objects/Ships/Gazurtoid"
+		}
+	]
+}
