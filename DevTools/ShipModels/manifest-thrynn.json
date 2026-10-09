@@ -1,0 +1,129 @@
+{
+	"race": "Thrynn",
+	"vessels": [
+		{
+			"id": 8,
+			"name": "Thrynn Transport",
+			"strinfoSize": 1.2,
+			"length": 61.272,
+			"model": "Assets/Game Objects/Ships/Thrynn/Thrynn Transport.fbx",
+			"debris": "Assets/Game Objects/Ships Debris/Thrynn/Thrynn Transport.fbx",
+			"materials": [
+				"Thrynn Hull",
+				"Thrynn Light",
+				"Thrynn Trim",
+				"Thrynn Engine"
+			]
+		},
+		{
+			"id": 9,
+			"name": "Thrynn Scout",
+			"strinfoSize": 0.4,
+			"length": 20.424,
+			"model": "Assets/Game Objects/Ships/Thrynn/Thrynn Scout.fbx",
+			"debris": "Assets/Game Objects/Ships Debris/Thrynn/Thrynn Scout.fbx",
+			"materials": [
+				"Thrynn Hull",
+				"Thrynn Light",
+				"Thrynn Trim",
+				"Thrynn Engine"
+			]
+		},
+		{
+			"id": 10,
+			"name": "Thrynn Warship",
+			"strinfoSize": 0.8,
+			"length": 40.848,
+			"model": "Assets/Game Objects/Ships/Thrynn/Thrynn Warship.fbx",
+			"debris": "Assets/Game Objects/Ships Debris/Thrynn/Thrynn Warship.fbx",
+			"materials": [
+				"Thrynn Hull",
+				"Thrynn Light",
+				"Thrynn Trim",
+				"Thrynn Engine"
+			]
+		}
+	],
+	"materials": [
+		{
+			"name": "Thrynn Hull",
+			"albedo": [
+				0.26,
+				0.31,
+				0.25
+			],
+			"specular": [
+				0.3,
+				0.32,
+				0.3
+			],
+			"smoothness": 0.5,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Thrynn"
+		},
+		{
+			"name": "Thrynn Light",
+			"albedo": [
+				0.1,
+				0.3,
+				0.4
+			],
+			"specular": [
+				0.5,
+				0.5,
+				0.5
+			],
+			"smoothness": 0.8,
+			"emissive": [
+				0.2,
+				0.75,
+				0.9
+			],
+			"folder": "Assets/Game Objects/Ships/Thrynn"
+		},
+		{
+			"name": "Thrynn Trim",
+			"albedo": [
+				0.12,
+				0.13,
+				0.12
+			],
+			"specular": [
+				0.2,
+				0.2,
+				0.2
+			],
+			"smoothness": 0.4,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Thrynn"
+		},
+		{
+			"name": "Thrynn Engine",
+			"albedo": [
+				0.35,
+				0.06,
+				0.03
+			],
+			"specular": [
+				0.4,
+				0.2,
+				0.2
+			],
+			"smoothness": 0.6,
+			"emissive": [
+				0.6,
+				0.14,
+				0.05
+			],
+			"folder": "Assets/Game Objects/Ships/Thrynn"
+		}
+	]
+}
