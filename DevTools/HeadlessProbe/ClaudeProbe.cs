@@ -1477,6 +1477,8 @@ public class ClaudeProbe : MonoBehaviour
 			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.GazurtoidWarship, "Sensors - Gazurtoid Warship" ),
 			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.UhlekScout, "Sensors - Uhlek Scout" ),
 			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.UhlekWarship, "Sensors - Uhlek Warship" ),
+			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.TheEnterprise, "Sensors - Enterprise" ),
+			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.NoahTransport, "Sensors - Noah Derelict" ),
 		};
 
 		foreach ( var traced in tracedPictures )
