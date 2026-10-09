@@ -2451,8 +2451,8 @@ public class Encounter : MonoBehaviour
 				// calculate salvage value based on vessel type (mineral density represents salvage potential)
 				var salvageDensity = UnityEngine.Mathf.Clamp( vessel.m_mass / 5, 10, 80 );
 
-				// start the debris scan
-				SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.StartScanning( scanType, 1, vessel.m_mass, 0, salvageDensity );
+				// start the debris scan (with the picture of what is left of this vessel)
+				SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.StartScanning( scanType, 1, vessel.m_mass, 0, salvageDensity, vesselId );
 			}
 			else
 			{

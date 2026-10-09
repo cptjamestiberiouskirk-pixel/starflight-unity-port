@@ -57,6 +57,12 @@ public class SensorsDisplay : ShipDisplay
 	// the masks for the various scan types
 	public Texture[] m_maskTextures;
 
+	// the background textures for the debris each vessel leaves (indexed by vessel id)
+	public Texture[] m_debrisBackgroundTextures;
+
+	// the masks for the debris each vessel leaves (indexed by vessel id)
+	public Texture[] m_debrisMaskTextures;
+
 	// how fast to cycle the colors
 	public float m_colorCycleSpeed;
 
@@ -352,8 +358,19 @@ public class SensorsDisplay : ShipDisplay
 		return ( m_maskTextures[ scanTypeIndex ] != null ) && ( m_backgroundTextures[ scanTypeIndex ] != null );
 	}
 
-	// call this to start the scanning cinematics
-	public void StartScanning( ScanType scanType, int massPowerBase, int mass, int bioDensity, int mineralDensity )
+	// returns the texture at this index of the list, or null if the list has none there
+	static Texture GetTexture( Texture[] textureList, int index )
+	{
+		if ( ( textureList == null ) || ( index < 0 ) || ( index >= textureList.Length ) )
+		{
+			return null;
+		}
+
+		return textureList[ index ];
+	}
+
+	// call this to start the scanning cinematics (vessel id is the vessel that left the debris, for a debris scan)
+	public void StartScanning( ScanType scanType, int massPowerBase, int mass, int bioDensity, int mineralDensity, int vesselId = -1 )
 	{
 		// get to the game data
 		var gameData = DataController.m_instance.m_gameData;
@@ -361,13 +378,32 @@ public class SensorsDisplay : ShipDisplay
 		// get to the player data
 		var playerData = DataController.m_instance.m_playerData;
 
-		// if we don't have a mask or background for this scan type then show the unknown ones instead
-		// (only the picture changes - the scan type stays what it is, so the readout and the analysis are for the real object)
-		int textureIndex = (int) scanType;
+		// the picture for this scan
+		Texture backgroundTexture = null;
+		Texture maskTexture = null;
 
-		if ( !HasTextures( textureIndex ) )
+		if ( scanType == ScanType.Debris )
 		{
-			textureIndex = (int) ScanType.Unknown;
+			// debris has the picture of what is left of the vessel that was destroyed (a vessel with no such picture leaves the window empty)
+			backgroundTexture = GetTexture( m_debrisBackgroundTextures, vesselId );
+			maskTexture = GetTexture( m_debrisMaskTextures, vesselId );
+		}
+		else
+		{
+			// if we don't have a mask or background for this scan type then show the unknown ones instead
+			// (only the picture changes - the scan type stays what it is, so the readout and the analysis are for the real object)
+			int textureIndex = (int) scanType;
+
+			if ( !HasTextures( textureIndex ) )
+			{
+				textureIndex = (int) ScanType.Unknown;
+			}
+
+			if ( HasTextures( textureIndex ) )
+			{
+				backgroundTexture = m_backgroundTextures[ textureIndex ];
+				maskTexture = m_maskTextures[ textureIndex ];
+			}
 		}
 
 		// remember the scan type, mass, bio density, and mineral density
@@ -384,15 +420,15 @@ public class SensorsDisplay : ShipDisplay
 		m_isDoingCinematics = true;
 		m_soundStopped = false;
 
-		// is there a picture for this scan type? (the unknown slot is empty, so an object we have no picture for leaves the window empty, as the original does for an unidentified object)
-		var hasPicture = HasTextures( textureIndex );
+		// is there a picture for this scan? (the unknown slot is empty, so an object we have no picture for leaves the window empty, as the original does for an unidentified object)
+		var hasPicture = ( backgroundTexture != null ) && ( maskTexture != null );
 
-		// set the correct background and mask textures for the scan type
+		// set the background and mask textures of the picture
 		if ( hasPicture )
 		{
-			m_backgroundMaterial.SetTexture( "_MainTex", m_backgroundTextures[ textureIndex ] );
+			m_backgroundMaterial.SetTexture( "_MainTex", backgroundTexture );
 
-			m_maskMaterial.SetTexture( "_MaskTex", m_maskTextures[ textureIndex ] );
+			m_maskMaterial.SetTexture( "_MaskTex", maskTexture );
 		}
 
 		// reset background and mask image scale
