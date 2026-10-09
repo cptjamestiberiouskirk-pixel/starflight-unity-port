@@ -9456,8 +9456,9 @@ public class ClaudeProbe : MonoBehaviour
 					yield return null;
 				}
 
+				// the debris tumbles, so measure it in its own frame and scale that into the ship's frame (it is a direct child)
 				var tumble = model.GetComponentInChildren<DebrisTumble>( false );
-				var debrisSize = ( tumble != null ) ? SizeInFrameOf( model.transform, tumble.gameObject ) : Vector3.zero;
+				var debrisSize = ( tumble != null ) ? Vector3.Scale( SizeInFrameOf( tumble.transform, tumble.gameObject ), tumble.transform.localScale ) : Vector3.zero;
 				var debrisLongest = Mathf.Max( debrisSize.x, debrisSize.y, debrisSize.z );
 				var ratio = ( longest > 0.0f ) ? ( debrisLongest / longest ) : 0.0f;
 
