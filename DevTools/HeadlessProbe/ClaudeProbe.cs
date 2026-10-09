@@ -527,6 +527,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioDrones();
 				break;
 
+			case "shipmodels":
+				yield return ScenarioShipModels();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -9287,6 +9291,192 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "drones: ending the comm link before answering gets permission denied and an attack", begunThird && ( stanceAfterTerminate == "Hostile" ) && ( deniedAfterTerminate == 1 ), "begun " + begunThird + ", stance " + stanceAfterTerminate + ", denied " + deniedAfterTerminate );
 
 		Finish( "scenario=drones lines=" + ( grantedLine != "missing" ) + "/" + ( deniedLine != "missing" ) + " numbers=" + numbers.Trim().Replace( ' ', ',' ) + " granted=" + grantedShown + " afterGrant=" + locationAfterGrant + "/" + locationLater + " secondOrbit=" + locationSecondOrbit + " wrong=" + wrongNumber + "/" + stanceAfterWrong + " terminated=" + stanceAfterTerminate, 0 );
+	}
+
+	// ---------------------------------------------------------------- alien ship models
+
+	// the lengths the procedural stand-ins are built to (DevTools/ShipModels, rulings of 2026-10-09): vessel id, length in units
+	static readonly Dictionary<int, float> c_shipModelLengths = new Dictionary<int, float>();
+
+	// the size of the meshes under model, measured along the axes of container (the ship's own frame: +Z is its nose)
+	static Vector3 SizeInFrameOf( Transform container, GameObject model )
+	{
+		var toContainer = container.worldToLocalMatrix;
+		var bounds = new Bounds();
+		var first = true;
+
+		var meshes = new List<KeyValuePair<Mesh, Transform>>();
+
+		foreach ( var filter in model.GetComponentsInChildren<MeshFilter>( true ) )
+		{
+			meshes.Add( new KeyValuePair<Mesh, Transform>( filter.sharedMesh, filter.transform ) );
+		}
+
+		foreach ( var skinned in model.GetComponentsInChildren<SkinnedMeshRenderer>( true ) )
+		{
+			meshes.Add( new KeyValuePair<Mesh, Transform>( skinned.sharedMesh, skinned.transform ) );
+		}
+
+		foreach ( var pair in meshes )
+		{
+			if ( pair.Key == null )
+			{
+				continue;
+			}
+
+			var matrix = toContainer * pair.Value.localToWorldMatrix;
+			var meshBounds = pair.Key.bounds;
+
+			for ( var corner = 0; corner < 8; corner++ )
+			{
+				var sign = new Vector3( ( corner & 1 ) == 0 ? -1.0f : 1.0f, ( corner & 2 ) == 0 ? -1.0f : 1.0f, ( corner & 4 ) == 0 ? -1.0f : 1.0f );
+				var point = matrix.MultiplyPoint3x4( meshBounds.center + Vector3.Scale( meshBounds.extents, sign ) );
+
+				if ( first )
+				{
+					bounds = new Bounds( point, Vector3.zero );
+					first = false;
+				}
+				else
+				{
+					bounds.Encapsulate( point );
+				}
+			}
+		}
+
+		return bounds.size;
+	}
+
+	static bool IsPlaceholderModel( GameObject template )
+	{
+		return ( template == null ) || ( template.name == "Not Modeled Yet" );
+	}
+
+	// alien ship models: an empty template slot in Encounter.Start, which vessels still use the placeholder, and for every vessel
+	// in a real hyperspace encounter the model it gets, its size in the ship's frame, and the debris it leaves
+	IEnumerator ScenarioShipModels()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var templates = encounter.m_alienShipModelTemplate;
+		var debrisTemplates = encounter.m_alienShipDebrisTemplate;
+
+		Check( "a model slot for every vessel", templates.Length == gameData.m_vesselList.Length, "slots=" + templates.Length + " vessels=" + gameData.m_vesselList.Length );
+		Check( "a debris slot for every vessel", ( debrisTemplates != null ) && ( debrisTemplates.Length == gameData.m_vesselList.Length ), "slots=" + ( ( debrisTemplates == null ) ? -1 : debrisTemplates.Length ) );
+
+		// 1. Encounter.Start turns every model template off; an empty slot must not stop it
+		var exceptionsBeforeStart = s_exceptionCount;
+		var keptTemplate = templates[ 0 ];
+
+		templates[ 0 ] = null;
+		Call( encounter, "Start" );
+		templates[ 0 ] = keptTemplate;
+
+		Check( "Encounter.Start steps over an empty model slot", s_exceptionCount == exceptionsBeforeStart, "exceptions=" + ( s_exceptionCount - exceptionsBeforeStart ) );
+
+		// 2. which vessels still clone the placeholder (a stretched sphere with the UV grid material)
+		var placeholders = "";
+
+		for ( var vesselId = 1; vesselId < templates.Length; vesselId++ )
+		{
+			if ( IsPlaceholderModel( templates[ vesselId ] ) )
+			{
+				placeholders += ( ( placeholders.Length > 0 ) ? "," : "" ) + vesselId;
+			}
+		}
+
+		Log( "vessels with the placeholder model: " + placeholders );
+
+		foreach ( var pair in c_shipModelLengths )
+		{
+			var template = ( pair.Key < templates.Length ) ? templates[ pair.Key ] : null;
+
+			Check( "vessel " + pair.Key + " has its own model", !IsPlaceholderModel( template ), "template=" + ( ( template == null ) ? "none" : template.name ) );
+		}
+
+		// 3. every vessel in a hyperspace encounter (all its ships are shown at once)
+		var encounterId = -1;
+
+		for ( var i = 0; i < gameData.m_encounterList.Length; i++ )
+		{
+			if ( ( gameData.m_encounterList[ i ].m_location == 0 ) && ( gameData.m_encounterList[ i ].m_maxNumShips >= 1 ) )
+			{
+				encounterId = i;
+				break;
+			}
+		}
+
+		if ( encounterId < 0 )
+		{
+			Finish( "abort: no hyperspace encounter", 2 );
+			yield break;
+		}
+
+		var sizes = "";
+		var exceptionsBeforeEncounters = s_exceptionCount;
+
+		for ( var vesselId = 1; vesselId < templates.Length; vesselId++ )
+		{
+			// a fresh encounter with every ship of this vessel type, and a ship that survives what they fire
+			playerData.FindEncounter( encounterId ).Reset( encounterId );
+			ForceVessel( encounterId, vesselId );
+			playerData.m_playerShip.m_armorPoints = playerData.m_playerShip.GetMaximumArmorPoints();
+
+			EnterEncounter( encounterId );
+			yield return Frames( 10 );
+
+			var vesselName = gameData.m_vesselList[ vesselId ].m_name;
+			var model = encounter.GetAlienShipModel( 0 );
+			var hasModel = ( model != null ) && model.activeSelf && ( model.transform.childCount > 0 );
+			var size = hasModel ? SizeInFrameOf( model.transform, model ) : Vector3.zero;
+			var longest = Mathf.Max( size.x, size.y, size.z );
+
+			sizes += " " + vesselId + ":" + size.x.ToString( "F1" ) + "x" + size.y.ToString( "F1" ) + "x" + size.z.ToString( "F1" );
+
+			Check( "vessel " + vesselId + " (" + vesselName + ") gets a model in an encounter", hasModel, "model=" + ( ( model == null ) ? "none" : model.name ) );
+
+			float expectedLength;
+
+			if ( c_shipModelLengths.TryGetValue( vesselId, out expectedLength ) )
+			{
+				Check( "vessel " + vesselId + " is " + expectedLength.ToString( "F1" ) + " units long", Mathf.Abs( longest - expectedLength ) <= expectedLength * 0.05f, "size=" + size.ToString( "F1" ) );
+				Check( "vessel " + vesselId + " is longest along its nose", size.z >= Mathf.Max( size.x, size.y ) * 0.999f, "size=" + size.ToString( "F1" ) );
+			}
+
+			// the debris: destroy the first ship and wait for its explosion to call back (1.5 s)
+			if ( hasModel && ( debrisTemplates != null ) && ( vesselId < debrisTemplates.Length ) && ( debrisTemplates[ vesselId ] != null ) )
+			{
+				Kill( 0 );
+
+				var until = Time.realtimeSinceStartup + 3.0f;
+
+				while ( Time.realtimeSinceStartup < until )
+				{
+					yield return null;
+				}
+
+				var tumble = model.GetComponentInChildren<DebrisTumble>( false );
+				var debrisSize = ( tumble != null ) ? SizeInFrameOf( model.transform, tumble.gameObject ) : Vector3.zero;
+				var debrisLongest = Mathf.Max( debrisSize.x, debrisSize.y, debrisSize.z );
+				var ratio = ( longest > 0.0f ) ? ( debrisLongest / longest ) : 0.0f;
+
+				sizes += "(debris " + ratio.ToString( "F2" ) + ")";
+
+				if ( c_shipModelLengths.ContainsKey( vesselId ) )
+				{
+					Check( "vessel " + vesselId + " leaves debris of its own size", ( tumble != null ) && ( Mathf.Abs( ratio - 1.0f ) <= 0.1f ), "debris=" + debrisSize.ToString( "F1" ) + " ratio=" + ratio.ToString( "F2" ) );
+				}
+			}
+
+			ClearMissiles();
+			LeaveEncounter();
+			yield return Frames( 5 );
+		}
+
+		Check( "no exceptions in the encounters", s_exceptionCount == exceptionsBeforeEncounters, "exceptions=" + ( s_exceptionCount - exceptionsBeforeEncounters ) );
+
+		Finish( "scenario=shipmodels placeholders=" + placeholders + " encounter=" + encounterId + " sizes=" + sizes.Trim() + " playerDestroyed=" + CombatController.m_instance.PlayerIsDestroyed(), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
