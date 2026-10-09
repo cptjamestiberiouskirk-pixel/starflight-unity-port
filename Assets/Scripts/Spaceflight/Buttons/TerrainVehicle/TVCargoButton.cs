@@ -27,11 +27,25 @@ public class TVCargoButton : ShipButton
 			return false;
 		}
 
+		// is the terrain vehicle beside something it dropped before? (it can be picked up again - the manual, page 21)
+		if ( TakeDroppedCargo() )
+		{
+			return false;
+		}
+
 		// find all elements in pickup range
 		var elementsInRange = FindElementsInRange();
 
 		if ( elementsInRange.Count == 0 )
 		{
+			// does the terrain vehicle carry anything? then list it, with the option of dropping it (the manual, page 21)
+			if ( BuildCargoItems().Count > 0 )
+			{
+				OpenCargoList();
+
+				return false;
+			}
+
 			// check if there's a non-pickable object nearby and provide feedback
 			var nearbyObjectName = FindNearbyNonPickableObject();
 
@@ -449,6 +463,276 @@ public class TVCargoButton : ShipButton
 		}
 
 		// returning true prevents the default spaceflight update from running
+		return true;
+	}
+
+	// ---------------------------------------------------------------- dropping cargo ("the option of dropping anything" - the manual, page 21)
+
+	// one thing in the terrain vehicle's hold: an element with its volume, or an artifact
+	public struct CargoItem
+	{
+		public int m_elementId;
+		public int m_volume;
+		public int m_artifactId;
+	}
+
+	// the item of the cargo list that is marked (the Next and Drop buttons work on it)
+	static int s_markedItem;
+
+	// what the terrain vehicle carries, elements first, then artifacts
+	public static List<CargoItem> BuildCargoItems()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var items = new List<CargoItem>();
+
+		var elementStorage = playerData.m_terrainVehicle.m_elementStorage;
+
+		if ( ( elementStorage != null ) && ( elementStorage.m_elementList != null ) )
+		{
+			foreach ( var elementReference in elementStorage.m_elementList )
+			{
+				if ( elementReference.m_volume > 0 )
+				{
+					items.Add( new CargoItem { m_elementId = elementReference.m_elementId, m_volume = elementReference.m_volume, m_artifactId = -1 } );
+				}
+			}
+		}
+
+		var artifactStorage = playerData.m_terrainVehicle.m_artifactStorage;
+
+		if ( ( artifactStorage != null ) && ( artifactStorage.m_artifactList != null ) )
+		{
+			foreach ( var artifactReference in artifactStorage.m_artifactList )
+			{
+				items.Add( new CargoItem { m_elementId = -1, m_volume = 0, m_artifactId = artifactReference.m_artifactId } );
+			}
+		}
+
+		return items;
+	}
+
+	// the name of a cargo item as the list shows it
+	static string DescribeCargoItem( CargoItem item )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		if ( ( item.m_artifactId >= 0 ) && ( item.m_artifactId < gameData.m_artifactList.Length ) )
+		{
+			return gameData.m_artifactList[ item.m_artifactId ].m_name + " (" + Tools.VolumeToText( gameData.m_artifactList[ item.m_artifactId ].m_volume ) + " m³)";
+		}
+
+		if ( ( item.m_elementId >= 0 ) && ( item.m_elementId < gameData.m_elementList.Length ) )
+		{
+			return gameData.m_elementList[ item.m_elementId ].m_name + " (" + Tools.VolumeToText( item.m_volume ) + " m³)";
+		}
+
+		return "Unknown";
+	}
+
+	// lists the cargo with the first item marked, and puts the buttons for dropping on the console
+	public static void OpenCargoList()
+	{
+		s_markedItem = 0;
+
+		ShowCargoList( "" );
+
+		SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.TerrainVehicleCargo );
+
+		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+	}
+
+	// shows the cargo list with the marked item, after a line saying what has just happened (if any)
+	static void ShowCargoList( string firstLine )
+	{
+		var items = BuildCargoItems();
+
+		s_markedItem = ( items.Count == 0 ) ? 0 : Mathf.Clamp( s_markedItem, 0, items.Count - 1 );
+
+		var text = ( firstLine == "" ) ? "" : ( firstLine + "\n" );
+
+		text += "<color=yellow>Terrain Vehicle Cargo:</color>";
+
+		for ( var i = 0; i < items.Count; i++ )
+		{
+			text += "\n" + ( ( i == s_markedItem ) ? "<color=white>> " : "<color=#808080>  " ) + DescribeCargoItem( items[ i ] ) + "</color>";
+		}
+
+		if ( items.Count == 0 )
+		{
+			text += "\n<color=white>Empty</color>";
+		}
+
+		SpaceflightController.m_instance.m_messages.Clear();
+		SpaceflightController.m_instance.m_messages.AddText( text );
+	}
+
+	// marks the next item of the cargo list
+	public static void MarkNextItem()
+	{
+		var items = BuildCargoItems();
+
+		s_markedItem = ( items.Count == 0 ) ? 0 : ( s_markedItem + 1 ) % items.Count;
+
+		ShowCargoList( "" );
+	}
+
+	// drops the marked item, all of it, on the ground beside the terrain vehicle - where it is saved, and from where it can be picked up again
+	public static void DropMarkedItem()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var items = BuildCargoItems();
+
+		if ( ( items.Count == 0 ) || ( playerData.m_planetSurfaces == null ) )
+		{
+			BackToTerrainVehicle();
+
+			return;
+		}
+
+		var item = items[ Mathf.Clamp( s_markedItem, 0, items.Count - 1 ) ];
+		var description = DescribeCargoItem( item );
+
+		// out of the hold
+		if ( item.m_artifactId >= 0 )
+		{
+			playerData.m_terrainVehicle.RemoveArtifact( item.m_artifactId );
+		}
+		else
+		{
+			playerData.m_terrainVehicle.RemoveElement( item.m_elementId, item.m_volume );
+		}
+
+		// onto the ground where the terrain vehicle is, saved with the planet
+		var position = SpaceflightController.m_instance.m_terrainVehicle.transform.position;
+
+		var droppedCargo = playerData.m_planetSurfaces.AddDroppedCargo( playerData.m_general.m_currentPlanetId, position.x, position.y, position.z, item.m_elementId, item.m_volume, item.m_artifactId );
+
+		var terrainRuins = SpaceflightController.m_instance.m_disembarked.m_terrainGrid.m_terrainRuins;
+
+		if ( terrainRuins != null )
+		{
+			terrainRuins.PlaceDroppedCargo( droppedCargo );
+		}
+
+		SoundController.m_instance.PlaySound( SoundController.Sound.Transporter );
+
+		// the display shows the hold
+		SpaceflightController.m_instance.m_displayController.m_terrainVehicleDisplay.Show();
+
+		// anything left to drop?
+		if ( BuildCargoItems().Count == 0 )
+		{
+			SpaceflightController.m_instance.m_messages.Clear();
+			SpaceflightController.m_instance.m_messages.AddText( "<color=green>Dropped " + description + ".</color>\n<color=yellow>Terrain Vehicle Cargo:</color>\n<color=white>Empty</color>" );
+
+			BackToTerrainVehicle();
+
+			return;
+		}
+
+		ShowCargoList( "<color=green>Dropped " + description + ".</color>" );
+	}
+
+	// back to the terrain vehicle's buttons
+	public static void BackToTerrainVehicle()
+	{
+		SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.TerrainVehicle );
+	}
+
+	// picks up again what the terrain vehicle dropped beside it, as far as there is room - returns true if anything dropped was there
+	bool TakeDroppedCargo()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+		var terrainGrid = SpaceflightController.m_instance.m_disembarked.m_terrainGrid;
+		var terrainVehicle = SpaceflightController.m_instance.m_terrainVehicle;
+
+		if ( ( terrainGrid == null ) || ( terrainGrid.m_terrainRuins == null ) || ( terrainVehicle == null ) || ( playerData.m_planetSurfaces == null ) )
+		{
+			return false;
+		}
+
+		var text = "";
+		var anythingTaken = false;
+
+		foreach ( Transform child in terrainGrid.m_terrainRuins.transform )
+		{
+			var dropped = child.GetComponent<TerrainDroppedCargo>();
+
+			if ( ( dropped == null ) || !dropped.IsInReach( terrainVehicle.transform.position ) )
+			{
+				continue;
+			}
+
+			var droppedCargo = playerData.m_planetSurfaces.FindDroppedCargo( dropped.m_droppedCargoId );
+
+			if ( droppedCargo == null )
+			{
+				continue;
+			}
+
+			var remainingVolume = playerData.m_terrainVehicle.GetRemainingVolume();
+
+			if ( ( droppedCargo.m_artifactId >= 0 ) && ( droppedCargo.m_artifactId < gameData.m_artifactList.Length ) )
+			{
+				var artifact = gameData.m_artifactList[ droppedCargo.m_artifactId ];
+
+				if ( artifact.m_volume > remainingVolume )
+				{
+					text += ( ( text == "" ) ? "" : "\n" ) + "<color=yellow>The " + artifact.m_name + " lies here, but the cargo hold has no room for it.</color>";
+
+					continue;
+				}
+
+				playerData.m_terrainVehicle.AddArtifact( droppedCargo.m_artifactId );
+
+				text += ( ( text == "" ) ? "" : "\n" ) + "<color=green>Picked up the " + artifact.m_name + " again.</color>";
+
+				droppedCargo.m_volume = 0;
+			}
+			else if ( ( droppedCargo.m_elementId >= 0 ) && ( droppedCargo.m_elementId < gameData.m_elementList.Length ) )
+			{
+				var volume = Mathf.Min( droppedCargo.m_volume, remainingVolume );
+
+				if ( volume <= 0 )
+				{
+					text += ( ( text == "" ) ? "" : "\n" ) + "<color=yellow>The " + gameData.m_elementList[ droppedCargo.m_elementId ].m_name + " lies here, but the cargo hold is full.</color>";
+
+					continue;
+				}
+
+				playerData.m_terrainVehicle.AddElement( droppedCargo.m_elementId, volume );
+
+				droppedCargo.m_volume -= volume;
+
+				text += ( ( text == "" ) ? "" : "\n" ) + "<color=green>Picked up " + Tools.VolumeToText( volume ) + " cubic meters of " + gameData.m_elementList[ droppedCargo.m_elementId ].m_name + " again.</color>";
+			}
+
+			anythingTaken = true;
+
+			// all of it picked up? then it is gone from the ground
+			if ( droppedCargo.m_volume <= 0 )
+			{
+				playerData.m_planetSurfaces.RemoveDroppedCargo( droppedCargo.m_id );
+
+				child.gameObject.SetActive( false );
+
+				Object.Destroy( child.gameObject );
+			}
+		}
+
+		if ( text == "" )
+		{
+			return false;
+		}
+
+		SpaceflightController.m_instance.m_messages.Clear();
+		SpaceflightController.m_instance.m_messages.AddText( text );
+
+		SoundController.m_instance.PlaySound( anythingTaken ? SoundController.Sound.Transporter : SoundController.Sound.Error );
+
+		SpaceflightController.m_instance.m_displayController.m_terrainVehicleDisplay.Show();
+
 		return true;
 	}
 }

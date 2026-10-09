@@ -14,12 +14,21 @@ public class TerrainRuins : TerrainGridPopulator
 	// rocks and trees closer than this to a ruin are taken away, so that the ruin stands on its own
 	const float c_clearRadius = 16.0f;
 
+	// the size of something dropped by the terrain vehicle, as a part of a ruin model (a stand-in until there are models)
+	const float c_droppedCargoScale = 0.2f;
+
+	// the elevation scale of the planet the ruins were placed on (to place what the terrain vehicle drops later)
+	float m_elevationScale;
+
 	// how many places to try for a ruin at a random place on the planet
 	const int c_maxTries = 50;
 
 	// place the ruins of this planet
 	public void Initialize( PlanetGenerator planetGenerator, float elevationScale, int randomSeed )
 	{
+		// remember the elevation scale (for what the terrain vehicle drops)
+		m_elevationScale = elevationScale;
+
 		// remove the ruins of the last planet
 		Tools.DestroyChildrenOf( gameObject );
 
@@ -179,8 +188,51 @@ public class TerrainRuins : TerrainGridPopulator
 			}
 		}
 
+		// what the terrain vehicle has dropped on this planet (no random numbers either)
+		var playerData = DataController.m_instance.m_playerData;
+
+		if ( playerData.m_planetSurfaces != null )
+		{
+			playerData.m_planetSurfaces.Validate();
+
+			foreach ( var droppedCargo in playerData.m_planetSurfaces.m_droppedCargoList )
+			{
+				if ( droppedCargo.m_planetId == planet.m_id )
+				{
+					PlaceDroppedCargo( droppedCargo );
+				}
+			}
+		}
+
 		// give the game its random numbers back
 		Random.state = randomState;
+	}
+
+	// places something the terrain vehicle has dropped where it lies (call it when it is dropped, and the ruins place everything dropped on a planet again on every visit)
+	public GameObject PlaceDroppedCargo( PD_PlanetSurfaces.DroppedCargo droppedCargo )
+	{
+		if ( ( m_ruinTemplates == null ) || ( m_ruinTemplates.Length == 0 ) || ( GetPlanetGenerator() == null ) )
+		{
+			return null;
+		}
+
+		Tools.WorldToMapCoordinates( new Vector3( droppedCargo.m_x, 0.0f, droppedCargo.m_z ), out var mapX, out var mapY, GetPlanetGenerator().m_textureMapWidth, GetPlanetGenerator().m_textureMapHeight );
+
+		var droppedObject = PlaceObjectAt( m_ruinTemplates[ 0 ], mapX, mapY, m_elevationScale, ( droppedCargo.m_id * 47 ) % 360 );
+
+		// at the height the terrain vehicle was at when it dropped it (the vehicle floats on water, where the ground is lower)
+		var position = droppedObject.transform.position;
+
+		position.y = droppedCargo.m_y;
+
+		droppedObject.transform.position = position;
+
+		droppedObject.transform.localScale = Vector3.one * c_droppedCargoScale;
+		droppedObject.name = "Dropped cargo " + droppedCargo.m_id;
+
+		droppedObject.AddComponent<TerrainDroppedCargo>().m_droppedCargoId = droppedCargo.m_id;
+
+		return droppedObject;
 	}
 
 	// takes away the rocks and the trees that are too close to a ruin (call this once all the populators have placed their objects - taking them away moves nothing else)

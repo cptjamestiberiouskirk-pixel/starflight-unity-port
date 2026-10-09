@@ -25,10 +25,34 @@ public class PD_PlanetSurfaces
 	// the artifact sites (ids into the game data's artifact site list) whose artifact has been taken
 	public List<int> m_takenArtifactSiteList;
 
+	[Serializable]
+
+	public class DroppedCargo
+	{
+		public int m_id;
+
+		// where it lies (world x, y and z on the planet's surface - y is where the terrain vehicle was, which floats on water)
+		public int m_planetId;
+		public float m_x;
+		public float m_y;
+		public float m_z;
+
+		// what it is: an element and its volume in tenths of a cubic meter, or an artifact (-1 for the one it is not)
+		public int m_elementId = -1;
+		public int m_volume;
+		public int m_artifactId = -1;
+	}
+
+	// what the terrain vehicle has dropped on the planets ("when an object is dropped on a planet's surface it can be picked up again" - the manual, page 21)
+	public List<DroppedCargo> m_droppedCargoList;
+	public int m_nextDroppedCargoId;
+
 	public void Reset()
 	{
 		m_depositList = new List<Deposit>();
 		m_takenArtifactSiteList = new List<int>();
+		m_droppedCargoList = new List<DroppedCargo>();
+		m_nextDroppedCargoId = 0;
 	}
 
 	// make sure there are lists (save files from before them have none)
@@ -42,6 +66,52 @@ public class PD_PlanetSurfaces
 		if ( m_takenArtifactSiteList == null )
 		{
 			m_takenArtifactSiteList = new List<int>();
+		}
+
+		if ( m_droppedCargoList == null )
+		{
+			m_droppedCargoList = new List<DroppedCargo>();
+		}
+	}
+
+	// call this when the terrain vehicle drops something - returns what lies on the ground now
+	public DroppedCargo AddDroppedCargo( int planetId, float x, float y, float z, int elementId, int volume, int artifactId )
+	{
+		Validate();
+
+		var droppedCargo = new DroppedCargo { m_id = m_nextDroppedCargoId, m_planetId = planetId, m_x = x, m_y = y, m_z = z, m_elementId = elementId, m_volume = volume, m_artifactId = artifactId };
+
+		m_nextDroppedCargoId++;
+
+		m_droppedCargoList.Add( droppedCargo );
+
+		return droppedCargo;
+	}
+
+	// what was dropped with this id (null if it has been picked up again)
+	public DroppedCargo FindDroppedCargo( int droppedCargoId )
+	{
+		Validate();
+
+		foreach ( var droppedCargo in m_droppedCargoList )
+		{
+			if ( droppedCargo.m_id == droppedCargoId )
+			{
+				return droppedCargo;
+			}
+		}
+
+		return null;
+	}
+
+	// call this when something that was dropped has been picked up again
+	public void RemoveDroppedCargo( int droppedCargoId )
+	{
+		var droppedCargo = FindDroppedCargo( droppedCargoId );
+
+		if ( droppedCargo != null )
+		{
+			m_droppedCargoList.Remove( droppedCargo );
 		}
 	}
 
