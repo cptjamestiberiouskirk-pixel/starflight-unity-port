@@ -555,6 +555,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioPickups();
 				break;
 
+			case "ruins":
+				yield return ScenarioRuins();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -10561,6 +10565,238 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "pickups: the deposits that were taken from are saved", ( savedDeposits != null ) && ( savedDeposits.Count == 2 ), savedText );
 
 		Finish( "scenario=pickups whole=" + wholeTaken + " partLeft=" + partLeft + " afterReturn=" + afterReturn.Replace( ' ', '_' ) + " saved=" + savedText.Replace( ' ', '_' ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 3: ruins at the places of the original's messages, and the messages recorded with the cargo button
+
+	// the ruins of the terrain vehicle's grid (found by the component's name, so that this compiles on the code before ruins existed)
+	static List<Component> RuinsOnTheGround()
+	{
+		var list = new List<Component>();
+		var grid = SpaceflightController.m_instance.m_disembarked.m_terrainGrid;
+		var container = ( grid == null ) ? null : FieldOrNull( grid, "m_terrainRuins" ) as Component;
+
+		if ( container != null )
+		{
+			foreach ( Transform child in container.transform )
+			{
+				var ruin = child.GetComponent( "TerrainRuin" );
+
+				if ( ruin != null )
+				{
+					list.Add( ruin );
+				}
+			}
+		}
+
+		return list;
+	}
+
+	// the message ids a ruin holds
+	static List<int> MessagesInRuin( Component ruin )
+	{
+		return ( FieldOrNull( ruin, "m_messageIds" ) as List<int> ) ?? new List<int>();
+	}
+
+	IEnumerator ScenarioRuins()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// ---- what the recovered data puts on Earth (planet 5, the third planet of 215, 86): the messages at sites (a site can hold several) and the ones at random places
+		const int c_earth = 5;
+
+		var siteKeys = new HashSet<string>();
+		var randomMessages = 0;
+		var siteMessageIds = new List<int>();
+
+		foreach ( var planetMessage in gameData.m_planetMessageList )
+		{
+			if ( planetMessage.m_planetId != c_earth )
+			{
+				continue;
+			}
+
+			if ( planetMessage.m_placement == "Site" )
+			{
+				siteKeys.Add( planetMessage.m_latitude + "/" + planetMessage.m_longitude );
+
+				if ( ( planetMessage.m_latitude == 11 ) && ( planetMessage.m_longitude == -104 ) )
+				{
+					siteMessageIds.Add( planetMessage.m_id );
+				}
+			}
+			else
+			{
+				randomMessages++;
+			}
+		}
+
+		var expectedRuins = siteKeys.Count + randomMessages;
+
+		// ---- land at 11N x 104W (the crosshair's "latitude" is east-west in the port, its "longitude" north-south) and go out in the terrain vehicle
+		playerData.m_general.m_selectedLatitude = -104.0f;
+		playerData.m_general.m_selectedLongitude = 11.0f;
+
+		yield return GoIntoOrbit( 0, c_earth );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=ruins abort: never got into the terrain vehicle on Earth (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var ruins = RuinsOnTheGround();
+
+		// the ruin of the site, where the latitude and the longitude put it
+		var sitePosition = Tools.LatLongToWorldCoordinates( -104.0f, 11.0f );
+		Component siteRuin = null;
+
+		foreach ( var ruin in ruins )
+		{
+			var delta = ruin.transform.position - sitePosition;
+
+			if ( ( Mathf.Abs( delta.x ) < 0.5f ) && ( Mathf.Abs( delta.z ) < 0.5f ) )
+			{
+				siteRuin = ruin;
+			}
+		}
+
+		var siteHolds = ( siteRuin == null ) ? "no ruin" : string.Join( ",", MessagesInRuin( siteRuin ) );
+
+		Log( "ruins: Earth has " + siteMessageIds.Count + " messages at 11N x 104W (" + string.Join( ",", siteMessageIds ) + "), " + siteKeys.Count + " sites and " + randomMessages + " messages at random places: " + expectedRuins + " ruins expected, " + ruins.Count + " on the ground | the ruin at the site holds " + siteHolds );
+
+		Check( "ruins: Earth has a ruin for each site and for each message at a random place", ( expectedRuins == 12 ) && ( ruins.Count == expectedRuins ), ruins.Count + " of " + expectedRuins );
+		Check( "ruins: the ruin of 11N x 104W is at its latitude and longitude and holds both of its messages", ( siteRuin != null ) && ( siteHolds == string.Join( ",", siteMessageIds ) ) && ( siteMessageIds.Count == 2 ), siteHolds );
+
+		// ---- no rock or tree right next to a ruin
+		var crowded = 0;
+		var grid = controller.m_disembarked.m_terrainGrid;
+
+		foreach ( var ruin in ruins )
+		{
+			foreach ( var container in new Component[] { grid.m_terrainRocks, grid.m_terrainTrees } )
+			{
+				foreach ( Transform child in container.transform )
+				{
+					var delta = child.position - ruin.transform.position;
+
+					delta.y = 0.0f;
+
+					if ( child.gameObject.activeSelf && ( delta.magnitude < 15.0f ) )
+					{
+						crowded++;
+					}
+				}
+			}
+		}
+
+		Check( "ruins: no rock or tree stands right next to a ruin", ( ruins.Count > 0 ) && ( crowded == 0 ), crowded + " rocks or trees within 15 units of a ruin" );
+
+		// ---- the cargo button beside the ruin of the site records its messages in the ship's log, dated today, once
+		if ( siteRuin != null )
+		{
+			controller.m_terrainVehicle.transform.position = siteRuin.transform.position + Vector3.forward * 5.0f;
+		}
+
+		yield return Frames( 2 );
+
+		var foundBefore = playerData.m_shipsLog.m_foundMessages.Count;
+
+		controller.m_messages.Clear();
+
+		new TVCargoButton().Execute();
+
+		yield return Frames( 3 );
+
+		var foundAfter = playerData.m_shipsLog.m_foundMessages.Count;
+		var recordedText = MessageList();
+		var today = playerData.m_general.m_currentStardateDHMY;
+		var datedToday = 0;
+		var recordedIds = "";
+
+		foreach ( var entry in playerData.m_shipsLog.m_foundMessages )
+		{
+			recordedIds += entry.m_id + " ";
+
+			if ( entry.m_stardate == today )
+			{
+				datedToday++;
+			}
+		}
+
+		new TVCargoButton().Execute();
+
+		yield return Frames( 3 );
+
+		var foundAfterSecondPress = playerData.m_shipsLog.m_foundMessages.Count;
+
+		Log( "ruins: found messages " + foundBefore + " -> " + foundAfter + " (" + recordedIds.Trim() + "), " + datedToday + " dated today (" + today + "), after a second press " + foundAfterSecondPress + " | " + recordedText.Substring( 0, Mathf.Min( 160, recordedText.Length ) ) );
+
+		Check( "ruins: the cargo button beside the ruin records its two messages in the ship's log, dated the day they were found", ( foundBefore == 0 ) && ( foundAfter == 2 ) && ( datedToday == 2 ) && recordedText.Contains( "INVOICE" ), foundBefore + " -> " + foundAfter + ", dated today " + datedToday );
+		Check( "ruins: pressing it again records nothing twice", foundAfterSecondPress == foundAfter, foundAfter + " -> " + foundAfterSecondPress );
+
+		// ---- the scan names the ruins
+		controller.m_messages.Clear();
+
+		new ScanButton().Execute();
+
+		yield return Frames( 3 );
+
+		var scanText = MessageList();
+
+		Check( "ruins: the scan reports the ruin", scanText.Contains( "Ruin" ), scanText.Substring( 0, Mathf.Min( 160, scanText.Length ) ) );
+
+		// ---- back into the ship and out again: the same ruins at the same places
+		var placesBefore = "";
+
+		foreach ( var ruin in ruins )
+		{
+			placesBefore += Mathf.RoundToInt( ruin.transform.position.x ) + "/" + Mathf.RoundToInt( ruin.transform.position.z ) + " ";
+		}
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		var placesAfter = "";
+
+		foreach ( var ruin in RuinsOnTheGround() )
+		{
+			placesAfter += Mathf.RoundToInt( ruin.transform.position.x ) + "/" + Mathf.RoundToInt( ruin.transform.position.z ) + " ";
+		}
+
+		Check( "ruins: the ruins are at the same places every time", ( placesBefore != "" ) && ( placesBefore == placesAfter ), placesBefore.Trim() + " | " + placesAfter.Trim() );
+
+		// ---- a planet with no messages has no ruins (control): planet 90 of the Arth system
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return GoIntoOrbit( 25, 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		var ruinsOn90 = RuinsOnTheGround().Count;
+
+		Check( "ruins: a planet the original has no messages on has no ruins (control)", done[ 0 ] && ( ruinsOn90 == 0 ), ruinsOn90 + " ruins on planet 90" );
+
+		Finish( "scenario=ruins earth=" + ruins.Count + "/" + expectedRuins + " site=" + siteHolds + " found=" + foundAfter + "/" + foundAfterSecondPress + " planet90=" + ruinsOn90, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

@@ -121,6 +121,7 @@ The project features a **deterministic visualization system** that renders plane
 - Full starport operations (Personnel, Ship Config, Trading, Banking)
 - Hyperspace navigation and star system exploration
 - Planetary landing and terrain vehicle exploration
+- Ruins on the planets where the original game left its messages; the terrain vehicle records them in the ship's log
 - 10 alien races with unique encounter behaviors
 - Encounters that guard planets from orbit; a Veloxi drone grants permission to orbit to a crew that answers its numbers the Veloxi way
 - Complete combat system with lasers, missiles, shields, armor

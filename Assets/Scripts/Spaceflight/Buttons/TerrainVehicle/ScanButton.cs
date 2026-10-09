@@ -83,6 +83,7 @@ public class ScanButton : ShipButton
 		var mineralDeposits = new Dictionary<string, int>(); // element name -> count
 		int rockCount = 0;
 		int vegetationCount = 0;
+		int ruinCount = 0;
 
 		// scan for mineral deposits (elements)
 		if ( terrainGrid.m_terrainElements != null )
@@ -146,8 +147,31 @@ public class ScanButton : ShipButton
 			}
 		}
 
+		// scan for ruins
+		if ( terrainGrid.m_terrainRuins != null )
+		{
+			foreach ( Transform child in terrainGrid.m_terrainRuins.transform )
+			{
+				var distance = Vector3.Distance( child.position, vehiclePos );
+
+				if ( distance <= c_scanRange )
+				{
+					ruinCount++;
+
+					// add floating label to this ruin
+					ShowLabelOnObject( child.gameObject, "Ruin", Color.white );
+				}
+			}
+		}
+
 		// build the report
 		var report = "";
+
+		// list ruins (the messages in them are recorded with the cargo button)
+		if ( ruinCount > 0 )
+		{
+			report += "<color=white>Ruin" + ( ruinCount > 1 ? "s" : "" ) + ": " + ruinCount + "</color>\n";
+		}
 
 		// list mineral deposits (pickable)
 		foreach ( var deposit in mineralDeposits )
