@@ -9641,7 +9641,11 @@ public class ClaudeProbe : MonoBehaviour
 	// ---------------------------------------------------------------- alien ship models
 
 	// the lengths the procedural stand-ins are built to (DevTools/ShipModels, rulings of 2026-10-09): vessel id, length in units
-	static readonly Dictionary<int, float> c_shipModelLengths = new Dictionary<int, float>();
+	static readonly Dictionary<int, float> c_shipModelLengths = new Dictionary<int, float>()
+	{
+		// veloxi transport, scout, warship and drone (STRINFO 1, 0.6, 1 and 0.3 times the player ship)
+		{ 11, 51.06f }, { 12, 30.636f }, { 13, 51.06f }, { 18, 15.318f },
+	};
 
 	// the size of the meshes under model, measured along the axes of container (the ship's own frame: +Z is its nose)
 	static Vector3 SizeInFrameOf( Transform container, GameObject model )
@@ -9690,6 +9694,66 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		return bounds.size;
+	}
+
+	// the middle of the meshes under model along the nose axis (+Z) of container
+	static float SizeCenterAlongNose( Transform container, GameObject model )
+	{
+		var low = float.MaxValue;
+		var high = float.MinValue;
+
+		foreach ( var filter in model.GetComponentsInChildren<MeshFilter>( true ) )
+		{
+			if ( filter.sharedMesh == null )
+			{
+				continue;
+			}
+
+			var bounds = filter.sharedMesh.bounds;
+
+			for ( var corner = 0; corner < 8; corner++ )
+			{
+				var sign = new Vector3( ( corner & 1 ) == 0 ? -1.0f : 1.0f, ( corner & 2 ) == 0 ? -1.0f : 1.0f, ( corner & 4 ) == 0 ? -1.0f : 1.0f );
+				var z = container.InverseTransformPoint( filter.transform.TransformPoint( bounds.center + Vector3.Scale( bounds.extents, sign ) ) ).z;
+
+				low = Mathf.Min( low, z );
+				high = Mathf.Max( high, z );
+			}
+		}
+
+		return ( low <= high ) ? ( ( low + high ) / 2.0f ) : 0.0f;
+	}
+
+	// where the parts with an engine material are, along the ship's nose axis (+Z), in the frame of container; NaN if there are none
+	static float EngineCenterAlongNose( Transform container, GameObject model )
+	{
+		var total = 0.0f;
+		var count = 0;
+
+		foreach ( var renderer in model.GetComponentsInChildren<MeshRenderer>( true ) )
+		{
+			var filter = renderer.GetComponent<MeshFilter>();
+
+			if ( ( filter == null ) || ( filter.sharedMesh == null ) )
+			{
+				continue;
+			}
+
+			var materials = renderer.sharedMaterials;
+
+			for ( var i = 0; ( i < materials.Length ) && ( i < filter.sharedMesh.subMeshCount ); i++ )
+			{
+				if ( ( materials[ i ] != null ) && materials[ i ].name.Contains( "Engine" ) )
+				{
+					var center = filter.sharedMesh.GetSubMesh( i ).bounds.center;
+
+					total += container.InverseTransformPoint( filter.transform.TransformPoint( center ) ).z;
+					count++;
+				}
+			}
+		}
+
+		return ( count > 0 ) ? ( total / count ) : float.NaN;
 	}
 
 	static bool IsPlaceholderModel( GameObject template )
@@ -9790,6 +9854,16 @@ public class ClaudeProbe : MonoBehaviour
 			{
 				Check( "vessel " + vesselId + " is " + expectedLength.ToString( "F1" ) + " units long", Mathf.Abs( longest - expectedLength ) <= expectedLength * 0.05f, "size=" + size.ToString( "F1" ) );
 				Check( "vessel " + vesselId + " is longest along its nose", size.z >= Mathf.Max( size.x, size.y ) * 0.999f, "size=" + size.ToString( "F1" ) );
+
+				// the ship flies along +Z of its model container, so its engines have to be behind the middle of the bounds
+				var engines = EngineCenterAlongNose( model.transform, model );
+
+				if ( !float.IsNaN( engines ) )
+				{
+					var middle = SizeCenterAlongNose( model.transform, model );
+
+					Check( "vessel " + vesselId + " has its engines at the back", engines < middle, "engines z=" + engines.ToString( "F1" ) + " middle z=" + middle.ToString( "F1" ) );
+				}
 			}
 
 			// the debris: destroy the first ship and wait for its explosion to call back (1.5 s)
