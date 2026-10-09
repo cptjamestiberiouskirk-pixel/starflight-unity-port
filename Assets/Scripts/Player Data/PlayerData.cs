@@ -63,6 +63,40 @@ public class PlayerData
 		}
 	}
 
+	// repair save files made before the stardates were in the original's calendar of 10 months of 30 days: the dates the bank ledger and the ships log keep are moved to it
+	// (the day count of the game is the same in both calendars), and the current stardate is made from the day and the hour of the game - the starport has no clock,
+	// so without this a game loaded there would show the date of the save until the ship launches
+	public void ValidateStardateCalendar()
+	{
+		if ( m_general == null )
+		{
+			return;
+		}
+
+		if ( m_general.m_stardateCalendar != PD_General.c_originalCalendar )
+		{
+			if ( ( m_bank != null ) && ( m_bank.m_transactionList != null ) )
+			{
+				foreach ( var transaction in m_bank.m_transactionList )
+				{
+					if ( transaction != null )
+					{
+						transaction.m_stardate = PD_General.ConvertRealCalendarYMD( transaction.m_stardate );
+					}
+				}
+			}
+
+			if ( m_shipsLog != null )
+			{
+				m_shipsLog.ConvertRealCalendarDates();
+			}
+
+			m_general.m_stardateCalendar = PD_General.c_originalCalendar;
+		}
+
+		m_general.MakeStardateTexts();
+	}
+
 	// repair save files whose encounters are not where the game data has them (the game data was corrected after they were written) - returns how many were moved
 	public int ValidateEncounterLocations()
 	{

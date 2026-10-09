@@ -547,6 +547,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioFlareData();
 				break;
 
+			case "calendar":
+				yield return ScenarioCalendar();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -8810,7 +8814,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "game time: the measurement works (control)", controlBytes >= 256, controlBytes + " bytes per call for an array of 256 bytes" );
 		Check( "game time: an update in which the hour does not change takes no memory", gameTimeBytesPerCall == 0, gameTimeBytesPerCall + " bytes per call" );
-		Check( "game time: the stardate texts follow the hour and the day, also after a load (control)", ( stardateAtFive == "4620-01-11 / 11.05-01-4620" ) && ( stardateAtSix == "4620-01-11 / 11.06-01-4620" ) && ( stardateOnDayForty == "4620-02-10 / 10.06-02-4620" ) && ( stardateAfterLoad == stardateOnDayForty ), stardateAtFive + " | " + stardateAtSix + " | " + stardateOnDayForty + " | loaded " + stardateAfterLoad );
+		Check( "game time: the stardate texts follow the hour and the day, also after a load (control)", ( stardateAtFive == "4620-01-11 / 11.05-01-4620" ) && ( stardateAtSix == "4620-01-11 / 11.06-01-4620" ) && ( stardateOnDayForty == "4620-02-11 / 11.06-02-4620" ) && ( stardateAfterLoad == stardateOnDayForty ), stardateAtFive + " | " + stardateAtSix + " | " + stardateOnDayForty + " | loaded " + stardateAfterLoad );
 
 		// ---- 2. the statement button with a neutral posture (set by hand - the console only gets to the comm buttons after a hail, which sets a posture): the game data has no neutral statement
 		var speminId = FindEncounter( 1, 6, 3, 0 );
@@ -10238,6 +10242,145 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "flaredata: Arth's sun, 300 days from its flare, shines larger (control)", arthShine > 128.0f, arthShine.ToString( "F5" ) );
 
 		Finish( "scenario=flaredata flaredBefore=" + flaredBefore + " signed=" + signed + " future=" + future + " calendar=" + calendarMatches + " shine=" + earthShine.ToString( "F5" ) + "/" + arthShine.ToString( "F5" ), 0 );
+	}
+
+	// ---------------------------------------------------------------- roadmap 0.7: the original's calendar of 10 months of 30 days
+
+	// sets a field by reflection if the object has it (the calendar flag does not exist in the code before it) - returns false if it does not
+	static bool SetFieldIfThere( object target, string name, object value )
+	{
+		var field = target.GetType().GetField( name, c_any );
+
+		if ( field == null )
+		{
+			return false;
+		}
+
+		field.SetValue( target, value );
+
+		return true;
+	}
+
+	// the two stardate texts of a day and an hour, made by the game's own clock
+	static string StardateTexts( int day, int hour )
+	{
+		var general = new PD_General();
+
+		general.Reset();
+
+		general.m_day = day;
+		general.m_hour = hour;
+		general.m_lastHour = hour;
+
+		general.UpdateGameTime( 0.0f );
+
+		return general.m_currentStardateYMD + " / " + general.m_currentStardateDHMY;
+	}
+
+	IEnumerator ScenarioCalendar()
+	{
+		var dataController = DataController.m_instance;
+		var gameData = dataController.m_gameData;
+
+		yield return null;
+
+		// ---- 1. the stardate texts of the clock: the first day (control), the turn of a month, day 40, the last day of the year, day 300 and day 365
+		var day0 = StardateTexts( 0, 6 );
+		var day29 = StardateTexts( 29, 6 );
+		var day30 = StardateTexts( 30, 6 );
+		var day40 = StardateTexts( 40, 6 );
+		var day299 = StardateTexts( 299, 6 );
+		var day300 = StardateTexts( 300, 6 );
+		var day365 = StardateTexts( 365, 6 );
+
+		Log( "calendar: day 0 " + day0 + " | day 29 " + day29 + " | day 30 " + day30 + " | day 40 " + day40 + " | day 299 " + day299 + " | day 300 " + day300 + " | day 365 " + day365 );
+
+		Check( "calendar: the first day of the game is 01-01-4620 (control)", day0 == "4620-01-01 / 01.06-01-4620", day0 );
+		Check( "calendar: a month has 30 days (day 29 is the 30th of month 1, day 30 the 1st of month 2, day 40 the 11th)", ( day29 == "4620-01-30 / 30.06-01-4620" ) && ( day30 == "4620-02-01 / 01.06-02-4620" ) && ( day40 == "4620-02-11 / 11.06-02-4620" ), day29 + " | " + day30 + " | " + day40 );
+		Check( "calendar: a year has 10 months (day 299 is 30-10-4620, day 300 is 01-01-4621, day 365 is 06-03-4621)", ( day299 == "4620-10-30 / 30.06-10-4620" ) && ( day300 == "4621-01-01 / 01.06-01-4621" ) && ( day365 == "4621-03-06 / 06.06-03-4621" ), day299 + " | " + day300 + " | " + day365 );
+
+		// ---- 2. the clock and the star data agree: Arth's sun flares on day 300, and the date fields of its star say the same day
+		var arth = gameData.m_starList[ 25 ];
+		var arthFields = arth.m_yearOfNextFlare.ToString( "D4" ) + "-" + arth.m_monthOfNextFlare.ToString( "D2" ) + "-" + arth.m_dayOfNextFlare.ToString( "D2" );
+		var arthClock = StardateTexts( arth.m_daysToNextFlare, 0 ).Split( ' ' )[ 0 ];
+
+		Log( "calendar: Arth's sun flares on day " + arth.m_daysToNextFlare + ": the clock shows " + arthClock + ", the date fields of the star say " + arthFields );
+
+		Check( "calendar: the clock shows the day of Arth's flare as the date the star data gives it", arthClock == arthFields, arthClock + " / " + arthFields );
+
+		// ---- 3. a save made in the real-world calendar: on day 365, hour 15 (31-12-4620 there, 4620 is a leap year), with a bank entry, a logged planet and something the aliens said
+		var oldSave = new PlayerData();
+
+		oldSave.Reset();
+
+		var hasCalendarFlag = SetFieldIfThere( oldSave.m_general, "m_stardateCalendar", 0 );
+
+		oldSave.m_general.m_day = 365;
+		oldSave.m_general.m_hour = 15;
+		oldSave.m_general.m_currentStardateYMD = "4620-12-31";
+		oldSave.m_general.m_currentStardateDHMY = "31.15-12-4620";
+		oldSave.m_bank.m_transactionList.Add( new PD_Bank.Transaction( "4620-12-31", "Trade depot", "100+" ) );
+		oldSave.m_shipsLog.AddPlanetLog( 90, "10.06-02-4620", "Planet 90", "a logged planet" );
+		oldSave.m_shipsLog.GetAlienComms( PD_ShipsLog.AlienComm.Themselves ).Add( new PD_ShipsLog.Entry( 5, "31.15-12-4620", "Alien Species #6", "something the aliens said" ) );
+
+		// and one made in the original's calendar (control: nothing in it may move)
+		var newSave = new PlayerData();
+
+		newSave.Reset();
+
+		newSave.m_general.m_day = 65;
+		newSave.m_general.m_hour = 0;
+		newSave.m_bank.m_transactionList.Add( new PD_Bank.Transaction( "4620-03-06", "Trade depot", "100+" ) );
+
+		PlayerData loadedOld = null;
+		PlayerData loadedNew = null;
+
+		try
+		{
+			MemorySaveSystem.s_slots[ 1 ] = JsonUtility.ToJson( oldSave, true );
+			loadedOld = Call( dataController, "LoadPlayerData", 1 ) as PlayerData;
+
+			MemorySaveSystem.s_slots[ 1 ] = JsonUtility.ToJson( newSave, true );
+			loadedNew = Call( dataController, "LoadPlayerData", 1 ) as PlayerData;
+		}
+		catch ( Exception exception )
+		{
+			Log( "calendar: loading threw " + exception.GetType().Name + ": " + exception.Message );
+		}
+
+		MemorySaveSystem.s_slots.Remove( 1 );
+
+		var oldDates = "nothing loaded";
+		var oldRepaired = false;
+
+		if ( loadedOld != null )
+		{
+			var bank = loadedOld.m_bank.m_transactionList;
+			var planetLog = loadedOld.m_shipsLog.m_planetLogs[ 0 ].m_stardate;
+			var alienComm = loadedOld.m_shipsLog.GetAlienComms( PD_ShipsLog.AlienComm.Themselves )[ 0 ].m_stardate;
+			var today = loadedOld.m_general.m_currentStardateYMD + " / " + loadedOld.m_general.m_currentStardateDHMY;
+
+			oldDates = "bank " + bank[ 0 ].m_stardate + ", " + bank[ bank.Count - 1 ].m_stardate + " | planet log " + planetLog + " | aliens " + alienComm + " | today " + today + " | calendar flag " + IntFieldOrMin( loadedOld.m_general, "m_stardateCalendar" );
+			oldRepaired = ( bank[ 0 ].m_stardate == "4620-01-01" ) && ( bank[ bank.Count - 1 ].m_stardate == "4621-03-06" ) && ( planetLog == "11.06-02-4620" ) && ( alienComm == "06.15-03-4621" ) && ( today == "4621-03-06 / 06.15-03-4621" );
+		}
+
+		var newDates = "nothing loaded";
+		var newKept = false;
+
+		if ( loadedNew != null )
+		{
+			var bank = loadedNew.m_bank.m_transactionList;
+
+			newDates = "bank " + bank[ bank.Count - 1 ].m_stardate + " | today " + loadedNew.m_general.m_currentStardateYMD;
+			newKept = ( bank[ bank.Count - 1 ].m_stardate == "4620-03-06" );
+		}
+
+		Log( "calendar: a save in the real-world calendar (the save has the calendar flag: " + hasCalendarFlag + "), after loading: " + oldDates + " | a save in the original's calendar: " + newDates );
+
+		Check( "calendar: a save made in the real-world calendar has its bank, ship's log and current dates moved to the original's calendar when it is loaded", oldRepaired, oldDates );
+		Check( "calendar: a save made in the original's calendar keeps its dates (control)", newKept, newDates );
+
+		Finish( "scenario=calendar day40=" + day40.Replace( ' ', '_' ) + " day300=" + day300.Replace( ' ', '_' ) + " arth=" + arthClock + "/" + arthFields + " repaired=" + oldRepaired + " kept=" + newKept, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

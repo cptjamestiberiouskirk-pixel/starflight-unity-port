@@ -233,6 +233,9 @@ public class DataController : MonoBehaviour
 		// repair save files written before the game data moved encounters 144 to 146 from a star system to hyperspace
 		playerData.ValidateEncounterLocations();
 
+		// repair save files whose stardates are in the real-world calendar (before the port used the original's calendar of 10 months of 30 days)
+		playerData.ValidateStardateCalendar();
+
 		return playerData;
 	}
 

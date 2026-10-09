@@ -167,6 +167,35 @@ using System.Collections.Generic;
 		}
 	}
 
+	// call this when a save file made before the stardates were in the original's calendar has been loaded - what the aliens said and the planets that were logged
+	// are dated day.hour-month-year in the real-world calendar there (the starport notices are dated from the game data, see ValidateStarportNoticeDates)
+	public void ConvertRealCalendarDates()
+	{
+		if ( m_planetLogs != null )
+		{
+			foreach ( var entry in m_planetLogs )
+			{
+				if ( entry != null )
+				{
+					entry.m_stardate = PD_General.ConvertRealCalendarDHMY( entry.m_stardate );
+				}
+			}
+		}
+
+		ValidateAlienComms();
+
+		foreach ( var entryList in m_alienComms )
+		{
+			foreach ( var entry in entryList.m_entryList )
+			{
+				if ( entry != null )
+				{
+					entry.m_stardate = PD_General.ConvertRealCalendarDHMY( entry.m_stardate );
+				}
+			}
+		}
+	}
+
 	public void AddAlienComm( GD_Comm comm, string message )
 	{
 		// get to the player data
