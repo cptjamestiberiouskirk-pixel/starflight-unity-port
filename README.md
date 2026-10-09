@@ -111,6 +111,7 @@ The project features a **deterministic visualization system** that renders plane
 ## 👽 Alien Asset Status
 - **Alien ship models**: the Spemin ships, the Mechan Scout and the Mysterion are hand-made models. The Veloxi, Thrynn and Elowan ships are procedural low-poly stand-ins built by the Blender scripts in `DevTools/ShipModels` (see its [README](DevTools/ShipModels/README.md)), shaped after the original's sensor pictures and sized after STRINFO. The other vessels still use a placeholder until their stand-ins are in.
 - **Thrynn.fbx**: Currently ~74MB. Requires manual extraction of materials and potential polygon reduction to optimize performance.
+- **Sensor pictures**: the sensor window shows a picture for the Spemin ships, the Mechan Scout, the Velox drone, the Nomad probe, the Mysterion and the Minstrel (drawn by hand) and for the Elowan transport (traced from the original's screenshot by `DevTools/SensorPictures`, see its [README](DevTools/SensorPictures/README.md)). A vessel without a picture leaves the window empty; each wreck shows the debris of its own vessel where one is drawn.
 
 ---
 
