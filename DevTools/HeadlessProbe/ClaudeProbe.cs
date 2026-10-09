@@ -1506,6 +1506,36 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "unknown object scan (no picture) leaves the window empty", !PictureShown( sensors ), SensorPicture( sensors ) );
 		Check( "unknown object scan keeps its scan type", sensors.m_scanType == SensorsDisplay.ScanType.Unknown, "scanType=" + sensors.m_scanType );
 
+		// an empty window is black inside a magenta border, as the original shows an unidentified object
+		var window = sensors.m_backgroundImage.transform.parent;
+		var emptyTransform = window.Find( "Empty" );
+		var panelTransform = window.Find( "Panel" );
+		var emptyImage = ( emptyTransform != null ) ? emptyTransform.GetComponent<UnityEngine.UI.Image>() : null;
+		var panelImage = ( panelTransform != null ) ? panelTransform.GetComponent<UnityEngine.UI.Image>() : null;
+		var emptyText = "empty=" + ( emptyImage != null );
+
+		if ( ( emptyImage != null ) && ( panelImage != null ) )
+		{
+			var emptySize = emptyImage.rectTransform.rect.size;
+			var panelSize = panelImage.rectTransform.rect.size;
+
+			emptyText += " active=" + emptyImage.gameObject.activeInHierarchy + " colour=" + emptyImage.color + " size=" + emptySize + " panel=" + panelSize + " order=" + panelTransform.GetSiblingIndex() + "<" + emptyTransform.GetSiblingIndex() + "<" + sensors.m_backgroundImage.transform.GetSiblingIndex();
+		}
+
+		Check( "unknown object scan shows a black window inside a magenta border", ( emptyImage != null ) && ( panelImage != null ) && emptyImage.gameObject.activeInHierarchy && ( emptyImage.color == Color.black ) && ( Mathf.Abs( panelImage.rectTransform.rect.width - emptyImage.rectTransform.rect.width - 32.0f ) < 0.5f ) && ( Mathf.Abs( panelImage.rectTransform.rect.height - emptyImage.rectTransform.rect.height - 32.0f ) < 0.5f ), emptyText );
+		Check( "the black inside is drawn over the panel and under the pictures", ( emptyTransform != null ) && ( panelTransform != null ) && ( panelTransform.GetSiblingIndex() < emptyTransform.GetSiblingIndex() ) && ( emptyTransform.GetSiblingIndex() < sensors.m_backgroundImage.transform.GetSiblingIndex() ), emptyText );
+
+		// a scan with a picture, and a display that has just been shown, keep the magenta window
+		sensors.StartScanning( SensorsDisplay.ScanType.SpeminScout, 1, 400, 100, 100 );
+		yield return Frames( 2 );
+
+		Check( "a scan with a picture hides the black inside", ( emptyImage != null ) && !emptyImage.gameObject.activeInHierarchy, "empty=" + ( emptyImage != null ) );
+
+		spaceflightController.m_displayController.ChangeDisplay( sensors );
+		yield return Frames( 2 );
+
+		Check( "a display that has just been shown hides the black inside", ( emptyImage != null ) && !emptyImage.gameObject.activeInHierarchy, "empty=" + ( emptyImage != null ) );
+
 		// the same without going through ChangeDisplay in between (a second scan while the window is already up)
 		sensors.StartScanning( SensorsDisplay.ScanType.SpeminScout, 1, 400, 100, 100 );
 		yield return Frames( 2 );

@@ -51,6 +51,12 @@ public class SensorsDisplay : ShipDisplay
 	// the scan image (this should be using custom mask image shader)
 	public Image m_maskImage;
 
+	// the magenta panel of the sensor window
+	public Image m_panelImage;
+
+	// how wide the magenta border around an empty window is (the original's is 3 of the window's 90 pixels)
+	public float m_emptyBorderWidth = 16.0f;
+
 	// the background textures for the various scan types
 	public Texture[] m_backgroundTextures;
 
@@ -83,6 +89,10 @@ public class SensorsDisplay : ShipDisplay
 
 	// the mask material
 	Material m_maskMaterial;
+
+	// the inside of the window when a scan has no picture: black inside a magenta border, as the original shows an unidentified object
+	// (a copy of the panel, made the first time the display is shown)
+	Image m_emptyImage;
 
 	// are we running the cinematics?
 	bool m_isDoingCinematics;
@@ -342,6 +352,28 @@ public class SensorsDisplay : ShipDisplay
 			m_maskImage.material = m_maskMaterial;
 		}
 
+		// make the black inside of an empty window (once)
+		if ( ( m_emptyImage == null ) && ( m_panelImage != null ) )
+		{
+			// a copy of the panel, drawn right above it (and under the pictures)
+			var emptyObject = Instantiate( m_panelImage.gameObject, m_panelImage.transform.parent );
+
+			emptyObject.name = "Empty";
+			emptyObject.transform.SetSiblingIndex( m_panelImage.transform.GetSiblingIndex() + 1 );
+
+			m_emptyImage = emptyObject.GetComponent<Image>();
+			m_emptyImage.color = Color.black;
+			m_emptyImage.raycastTarget = false;
+
+			// smaller than the panel by the width of the border on every side
+			var panelRect = m_panelImage.rectTransform;
+			var emptyRect = m_emptyImage.rectTransform;
+			var border = new Vector2( m_emptyBorderWidth, m_emptyBorderWidth );
+
+			emptyRect.offsetMin = panelRect.offsetMin + border;
+			emptyRect.offsetMax = panelRect.offsetMax - border;
+		}
+
 		// hide the top and bottom text
 		m_massText.gameObject.SetActive( false );
 		m_bioMinText.gameObject.SetActive( false );
@@ -349,6 +381,12 @@ public class SensorsDisplay : ShipDisplay
 		// hide the background and mask
 		m_backgroundImage.gameObject.SetActive( false );
 		m_maskImage.gameObject.SetActive( false );
+
+		// the window is magenta until something is scanned
+		if ( m_emptyImage != null )
+		{
+			m_emptyImage.gameObject.SetActive( false );
+		}
 
 		// show the instructions text
 		m_instructionsText.gameObject.SetActive( true );
@@ -476,6 +514,12 @@ public class SensorsDisplay : ShipDisplay
 		// show the background and mask (only if we have a picture - otherwise the last scan's picture would still be there)
 		m_backgroundImage.gameObject.SetActive( hasPicture );
 		m_maskImage.gameObject.SetActive( hasPicture );
+
+		// with no picture the window is black inside its magenta border
+		if ( m_emptyImage != null )
+		{
+			m_emptyImage.gameObject.SetActive( !hasPicture );
+		}
 
 		// hide the instructions text
 		m_instructionsText.gameObject.SetActive( false );
