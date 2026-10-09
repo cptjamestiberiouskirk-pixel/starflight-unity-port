@@ -551,6 +551,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCalendar();
 				break;
 
+			case "pickups":
+				yield return ScenarioPickups();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -10398,6 +10402,152 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "calendar: a save made in the original's calendar keeps its dates (control)", newKept, newDates );
 
 		Finish( "scenario=calendar day40=" + day40.Replace( ' ', '_' ) + " day300=" + day300.Replace( ' ', '_' ) + " arth=" + arthClock + "/" + arthFields + " repaired=" + oldRepaired + " kept=" + newKept, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 3: what has been taken from a planet stays taken
+
+	// into the terrain vehicle through the real Disembark button, from the planet's surface (returns false if the vehicle did not go out)
+	static IEnumerator DisembarkNow( bool[] done )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		done[ 0 ] = false;
+
+		PressButton( ButtonController.ButtonSet.CommandA, 1 );
+
+		yield return WaitForLocation( PD_General.Location.Disembarked, 15.0f );
+		yield return Frames( 10 );
+
+		done[ 0 ] = ( playerData.m_general.m_location == PD_General.Location.Disembarked );
+	}
+
+	// the deposit of the terrain vehicle's grid that was placed at this spot (x and z), or null - deposits that are gone (inactive) are not counted
+	static TerrainElement DepositAt( Vector3 position )
+	{
+		var container = SpaceflightController.m_instance.m_disembarked.m_terrainGrid.m_terrainElements.transform;
+
+		foreach ( var deposit in container.GetComponentsInChildren<TerrainElement>( false ) )
+		{
+			var delta = deposit.transform.position - position;
+
+			if ( ( Mathf.Abs( delta.x ) < 0.01f ) && ( Mathf.Abs( delta.z ) < 0.01f ) )
+			{
+				return deposit;
+			}
+		}
+
+		return null;
+	}
+
+	IEnumerator ScenarioPickups()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// down to planet 90 (43% mineral density) and into the terrain vehicle
+		yield return EnterOrbit( 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=pickups abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var terrainVehicle = controller.m_terrainVehicle;
+		var container = controller.m_disembarked.m_terrainGrid.m_terrainElements.transform;
+		var deposits = container.GetComponentsInChildren<TerrainElement>( true );
+
+		if ( deposits.Length < 10 )
+		{
+			Finish( "scenario=pickups abort: the planet has only " + deposits.Length + " deposits", 2 );
+			yield break;
+		}
+
+		// three deposits, known by where they were placed: one to take all of, one to take part of, and one to leave alone (the control)
+		var whole = deposits[ 0 ];
+		var part = deposits[ 1 ];
+		var untouched = deposits[ 2 ];
+
+		var wholePosition = whole.transform.position;
+		var partPosition = part.transform.position;
+		var untouchedPosition = untouched.transform.position;
+		var partVolumeBefore = part.m_volume;
+		var untouchedVolumeBefore = untouched.m_volume;
+
+		// nothing else within reach of the terrain vehicle
+		foreach ( var other in deposits )
+		{
+			if ( Vector3.Distance( other.transform.position, terrainVehicle.transform.position ) < 50.0f )
+			{
+				other.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		// ---- 1. all of the first deposit, through the real Cargo button
+		whole.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+
+		new TVCargoButton().Execute();
+
+		yield return Frames( 5 );
+
+		var wholeTaken = whole.HasBeenPickedUp();
+
+		// ---- 2. part of the second: the hold has room for 1 cubic meter only
+		var room = playerData.m_terrainVehicle.GetRemainingVolume();
+
+		playerData.m_terrainVehicle.AddElement( part.m_elementId, room - 10 );
+
+		part.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+
+		new TVCargoButton().Execute();
+
+		yield return Frames( 5 );
+
+		var partLeft = part.m_volume;
+
+		part.transform.position = partPosition;
+
+		Log( "pickups: on planet 90, deposit 0 taken whole: " + wholeTaken + " | deposit 1 had " + partVolumeBefore + " tenths, " + partLeft + " left after 10 fitted | deposit 2 (control) has " + untouchedVolumeBefore );
+
+		// ---- 3. back into the ship, and out again: the planet is placed again from its seed
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		var wholeAgain = DepositAt( wholePosition );
+		var partAgain = DepositAt( partPosition );
+		var untouchedAgain = DepositAt( untouchedPosition );
+
+		var afterReturn = "whole " + ( ( wholeAgain == null ) ? "gone" : ( wholeAgain.m_volume + " tenths" ) ) + ", part " + ( ( partAgain == null ) ? "gone" : ( partAgain.m_volume + " tenths" ) ) + ", control " + ( ( untouchedAgain == null ) ? "gone" : ( untouchedAgain.m_volume + " tenths" ) );
+
+		Log( "pickups: out again: " + afterReturn );
+
+		Check( "pickups: a deposit that was taken whole is gone the next time the terrain vehicle goes out", wholeTaken && done[ 0 ] && ( wholeAgain == null ), afterReturn );
+		Check( "pickups: a deposit that was taken in part has only what was left", done[ 0 ] && ( partLeft == partVolumeBefore - 10 ) && ( partAgain != null ) && ( partAgain.m_volume == partLeft ), afterReturn + " (left " + partLeft + ")" );
+		Check( "pickups: a deposit nothing was taken from is as it was (control)", done[ 0 ] && ( untouchedAgain != null ) && ( untouchedAgain.m_volume == untouchedVolumeBefore ), afterReturn );
+
+		// ---- 4. through a save and a load: what was taken is in the save
+		var loaded = JsonUtility.FromJson<PlayerData>( JsonUtility.ToJson( playerData ) );
+		var surfaces = FieldOrNull( loaded, "m_planetSurfaces" );
+		var savedDeposits = FieldOrNull( surfaces, "m_depositList" ) as System.Collections.IList;
+		var savedText = ( savedDeposits == null ) ? "nothing saved" : savedDeposits.Count + " deposits saved";
+
+		Log( "pickups: after a save and a load: " + savedText );
+
+		Check( "pickups: the deposits that were taken from are saved", ( savedDeposits != null ) && ( savedDeposits.Count == 2 ), savedText );
+
+		Finish( "scenario=pickups whole=" + wholeTaken + " partLeft=" + partLeft + " afterReturn=" + afterReturn.Replace( ' ', '_' ) + " saved=" + savedText.Replace( ' ', '_' ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

@@ -206,6 +206,14 @@ public class TVCargoButton : ShipButton
 		{
 			// yes - remove the element from the planet
 			element.Pickup();
+
+			element.m_volume = 0;
+		}
+
+		// remember what is left of the deposit, so that it is not back the next time the terrain vehicle goes out on this planet
+		if ( playerData.m_planetSurfaces != null )
+		{
+			playerData.m_planetSurfaces.SetDepositVolumeLeft( element.m_planetId, element.m_depositIndex, element.m_volume );
 		}
 
 		// show pickup message

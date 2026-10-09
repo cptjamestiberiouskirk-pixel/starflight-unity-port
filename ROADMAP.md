@@ -120,12 +120,16 @@ Small items, each documented in the sources.
 
 This is on the critical path to the endgame.
 
+Rulings of 2026-10-09: place only what the sources document now (the 14 artifact sites and the 38 messages of the recovered data); random ruins come later (item 3.5); a message STRINFO puts at "random locations" lies in one ruin, at a place picked from the planet's seed; every ruin uses the five Ancient Ruins models for now, and an artifact a small marker; what has been taken from a planet is saved, deposits too. The manual (page 21): the terrain vehicle's Cargo picks up any item beside it and records the messages found in ruins, and "any messages you find are identified by the date found".
+
 | # | Item | Original (source) | Port today |
 |---|---|---|---|
-| 3.1 | Ruins at their real sites: ancient ruins with Endurium lumps, Old Empire ruins with artifacts and messages | planet.txt, dir.txt SEED-OV, data from 0.4 | `TerrainRuins` not wired, picks a random artifact (`TerrainRuins.cs:57`) |
+| 3.0 | What has been taken from a planet stays taken: deposits now, the artifacts and messages with 3.2 and 3.3 | the manual (page 21) | PR 100: every disembark placed the planet again from its seed, so a deposit that had been picked up was back |
+| 3.1 | Ruins at the sites of the recovered data: a ruin at each artifact site and at each message, the two formations (the Most Magnificent Hexagon of 6 ancient ruins on Sphexi, the City of the Ancients of 15) | planet.txt, dir.txt SEED-OV, data from 0.4 | `TerrainRuins` not wired, picks a random artifact (`TerrainRuins.cs:57`) |
 | 3.2 | The 15 special artifacts at their sites, and the terrain vehicle picks up artifacts | STRINFO 4.1 | `PD_TerrainVehicle.AddArtifact` has no caller |
 | 3.3 | The 36 ruin messages go to the ship's log under Messages | STRINFO 3.1 | `m_foundMessages` is never written |
 | 3.4 | Terrain vehicle cargo display | | `TerrainVehicleCargoDisplay` not wired |
+| 3.5 | Random ruins: ancient crystal ruins with Endurium lumps or 1 to 4 "truly amazing" artifacts, Old Empire ruins with artifacts or writing | planet.txt (DRAFT only) | Ask: deferred by the owner on 2026-10-09 |
 
 ## Phase 4: Artifact effects
 
