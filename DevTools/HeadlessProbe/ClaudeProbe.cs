@@ -9688,6 +9688,8 @@ public class ClaudeProbe : MonoBehaviour
 	{
 		// veloxi transport, scout, warship and drone (STRINFO 1, 0.6, 1 and 0.3 times the player ship)
 		{ 11, 51.06f }, { 12, 30.636f }, { 13, 51.06f }, { 18, 15.318f },
+		// thrynn transport, scout and warship (1.2, 0.4 and 0.8)
+		{ 8, 61.272f }, { 9, 20.424f }, { 10, 40.848f },
 	};
 
 	// the size of the meshes under model, measured along the axes of container (the ship's own frame: +Z is its nose)
