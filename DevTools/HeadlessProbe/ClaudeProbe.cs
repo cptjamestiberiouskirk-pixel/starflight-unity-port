@@ -9700,6 +9700,8 @@ public class ClaudeProbe : MonoBehaviour
 		{ 16, 102.12f }, { 17, 256.213f },
 		// gazurtoid scout and warship (60 and 90, shown at 7.0 and 7.5)
 		{ 14, 357.844f }, { 15, 380.843f },
+		// the noah 9 derelict (4) and the enterprise (38, shown at 6.5)
+		{ 23, 204.24f }, { 21, 331.936f },
 	};
 
 	// the size of the meshes under model, measured along the axes of container (the ship's own frame: +Z is its nose)
@@ -9851,6 +9853,8 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		Log( "vessels with the placeholder model: " + placeholders );
+
+		Check( "no vessel clones the placeholder model", placeholders.Length == 0, "vessels=" + placeholders );
 
 		foreach ( var pair in c_shipModelLengths )
 		{

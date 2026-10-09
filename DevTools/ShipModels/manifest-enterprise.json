@@ -1,0 +1,122 @@
+{
+	"race": "Enterprise",
+	"vessels": [
+		{
+			"id": 21,
+			"name": "The Enterprise",
+			"strinfoSize": 38.0,
+			"length": 331.936,
+			"model": "Assets/Game Objects/Ships/Enterprise/The Enterprise.fbx",
+			"debris": "Assets/Game Objects/Ships Debris/Enterprise/The Enterprise.fbx",
+			"materials": [
+				"Enterprise Hull",
+				"Enterprise Trim",
+				"Enterprise Light",
+				"Enterprise Deflector",
+				"Enterprise Bussard"
+			]
+		}
+	],
+	"materials": [
+		{
+			"name": "Enterprise Hull",
+			"albedo": [
+				0.72,
+				0.73,
+				0.75
+			],
+			"specular": [
+				0.4,
+				0.4,
+				0.42
+			],
+			"smoothness": 0.55,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Enterprise"
+		},
+		{
+			"name": "Enterprise Trim",
+			"albedo": [
+				0.45,
+				0.46,
+				0.48
+			],
+			"specular": [
+				0.3,
+				0.3,
+				0.32
+			],
+			"smoothness": 0.45,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Enterprise"
+		},
+		{
+			"name": "Enterprise Light",
+			"albedo": [
+				0.12,
+				0.25,
+				0.45
+			],
+			"specular": [
+				0.5,
+				0.5,
+				0.5
+			],
+			"smoothness": 0.8,
+			"emissive": [
+				0.3,
+				0.6,
+				1.0
+			],
+			"folder": "Assets/Game Objects/Ships/Enterprise"
+		},
+		{
+			"name": "Enterprise Deflector",
+			"albedo": [
+				0.45,
+				0.3,
+				0.1
+			],
+			"specular": [
+				0.5,
+				0.4,
+				0.3
+			],
+			"smoothness": 0.8,
+			"emissive": [
+				1.0,
+				0.6,
+				0.2
+			],
+			"folder": "Assets/Game Objects/Ships/Enterprise"
+		},
+		{
+			"name": "Enterprise Bussard",
+			"albedo": [
+				0.4,
+				0.05,
+				0.04
+			],
+			"specular": [
+				0.45,
+				0.25,
+				0.25
+			],
+			"smoothness": 0.7,
+			"emissive": [
+				0.95,
+				0.15,
+				0.08
+			],
+			"folder": "Assets/Game Objects/Ships/Enterprise"
+		}
+	]
+}

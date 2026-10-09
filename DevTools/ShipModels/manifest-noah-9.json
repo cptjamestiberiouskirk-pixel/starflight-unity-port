@@ -1,0 +1,80 @@
+{
+	"race": "Noah 9",
+	"vessels": [
+		{
+			"id": 23,
+			"name": "Noah 9 Derelict Transport",
+			"strinfoSize": 4.0,
+			"length": 204.24,
+			"model": "Assets/Game Objects/Ships/Noah 9/Noah 9 Derelict Transport.fbx",
+			"debris": "Assets/Game Objects/Ships Debris/Noah 9/Noah 9 Derelict Transport.fbx",
+			"materials": [
+				"Noah 9 Trim",
+				"Noah 9 Hull",
+				"Noah 9 Scorch"
+			]
+		}
+	],
+	"materials": [
+		{
+			"name": "Noah 9 Trim",
+			"albedo": [
+				0.12,
+				0.1,
+				0.09
+			],
+			"specular": [
+				0.12,
+				0.12,
+				0.12
+			],
+			"smoothness": 0.25,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Noah 9"
+		},
+		{
+			"name": "Noah 9 Hull",
+			"albedo": [
+				0.27,
+				0.23,
+				0.19
+			],
+			"specular": [
+				0.18,
+				0.17,
+				0.15
+			],
+			"smoothness": 0.3,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Noah 9"
+		},
+		{
+			"name": "Noah 9 Scorch",
+			"albedo": [
+				0.05,
+				0.05,
+				0.05
+			],
+			"specular": [
+				0.05,
+				0.05,
+				0.05
+			],
+			"smoothness": 0.1,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Noah 9"
+		}
+	]
+}
