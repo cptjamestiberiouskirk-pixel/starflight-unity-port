@@ -223,7 +223,8 @@ public class PD_General
 	}
 
 	// the stardate of a day of the game (0 is the first day) as year-month-day, in the original's calendar of 10 months of 30 days that begins on 01-01-4620
-	// (the flare dates of the original's star data are in this calendar - Arth's sun flares on day 300, which is 30-10-4620, "the final week of your Ten-month")
+	// (the flare dates of the original's star data are in this calendar - Arth's sun flares on day 300, 01-01-4621: the original looks for a flare as a day ends, so it comes
+	// as 30-10-4620, the last day of the year, ends, which the Elowan call "the final week of your Ten-month")
 	public static string GetStardateYMD( int day )
 	{
 		day = Math.Max( 0, day );
