@@ -87,7 +87,7 @@ public class SensorsDisplay : ShipDisplay
 	// are we running the cinematics?
 	bool m_isDoingCinematics;
 
-	// mass power base (18 for planets, 1 for ships)
+	// mass power base (18 for planets, 0 for ships and debris, whose mass in the game data is in tons)
 	int m_massPowerBase;
 
 	// mass of object we are scanning
@@ -293,10 +293,27 @@ public class SensorsDisplay : ShipDisplay
 		var massLength = Mathf.RoundToInt( scannedMass ).ToString().Length;
 		var massPower = m_massPowerBase + massLength - 1;
 		var massBase = Mathf.FloorToInt( scannedMass / Mathf.Pow( 10.0f, massLength - 1 ) );
-		m_massText.text = "Mass: <color=\"white\">" + massBase + "x10<sup>" + massPower + "</sup></color> Tons";
 
-		// update the bio text
-		m_bioMinText.text = "Bio: <color=\"white\">" + Mathf.RoundToInt( scannedBio ) + "%</color>   Min: <color=\"white\">" + Mathf.RoundToInt( scannedMinerals ) + "%</color>";
+		// a mass under ten tons is shown as it is, with no power of ten (the original shows the minstrel as "2")
+		if ( massPower <= 0 )
+		{
+			m_massText.text = "Mass: <color=\"white\">" + Mathf.RoundToInt( scannedMass ) + "</color> Tons";
+		}
+		else
+		{
+			m_massText.text = "Mass: <color=\"white\">" + massBase + "x10<sup>" + massPower + "</sup></color> Tons";
+		}
+
+		// update the bio text (the sensors read the minerals of a planet or of debris, and the energy of a vessel, as in the original)
+		var secondLabel = IsVessel( m_scanType ) ? "Energy" : "Min";
+
+		m_bioMinText.text = "Bio: <color=\"white\">" + Mathf.RoundToInt( scannedBio ) + "%</color>   " + secondLabel + ": <color=\"white\">" + Mathf.RoundToInt( scannedMinerals ) + "%</color>";
+	}
+
+	// returns true if this scan type is a vessel (and not a planet, debris or an unknown object)
+	static bool IsVessel( ScanType scanType )
+	{
+		return ( scanType != ScanType.Planet ) && ( scanType != ScanType.Debris ) && ( scanType != ScanType.Unknown );
 	}
 
 	// the display label
