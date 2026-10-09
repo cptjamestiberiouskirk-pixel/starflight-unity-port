@@ -527,6 +527,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioDrones();
 				break;
 
+			case "gameclock":
+				yield return ScenarioGameClock();
+				break;
+
 			case "shipmodels":
 				yield return ScenarioShipModels();
 				break;
@@ -9291,6 +9295,165 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "drones: ending the comm link before answering gets permission denied and an attack", begunThird && ( stanceAfterTerminate == "Hostile" ) && ( deniedAfterTerminate == 1 ), "begun " + begunThird + ", stance " + stanceAfterTerminate + ", denied " + deniedAfterTerminate );
 
 		Finish( "scenario=drones lines=" + ( grantedLine != "missing" ) + "/" + ( deniedLine != "missing" ) + " numbers=" + numbers.Trim().Replace( ' ', ',' ) + " granted=" + grantedShown + " afterGrant=" + locationAfterGrant + "/" + locationLater + " secondOrbit=" + locationSecondOrbit + " wrong=" + wrongNumber + "/" + stanceAfterWrong + " terminated=" + stanceAfterTerminate, 0 );
+	}
+
+	// ---------------------------------------------------------------- roadmap 0.3: the game clock runs wherever the ship is out in space
+
+	// the game time in whole game seconds
+	static long GameSeconds()
+	{
+		var general = DataController.m_instance.m_playerData.m_general;
+
+		return ( ( (long) general.m_day * 24 + general.m_hour ) * 60 + general.m_minute ) * 60 + general.m_second;
+	}
+
+	// how many game seconds pass in the current location in the given real seconds (the location is read again at the end, so a location that the game leaves by itself shows up)
+	static IEnumerator ClockIn( float realSeconds, long[] passed, string[] where )
+	{
+		var start = GameSeconds();
+		var end = Time.realtimeSinceStartup + realSeconds;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			yield return null;
+		}
+
+		passed[ 0 ] = GameSeconds() - start;
+		where[ 0 ] = DataController.m_instance.m_playerData.m_general.m_location.ToString();
+	}
+
+	IEnumerator ScenarioGameClock()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		var passed = new long[ 1 ];
+		var where = new string[ 1 ];
+		var results = "";
+
+		// ---- 1. the star system (the clock ran here before - control)
+		yield return ClockIn( 1.5f, passed, where );
+
+		var inStarSystem = passed[ 0 ];
+		var starSystemWhere = where[ 0 ];
+
+		results += where[ 0 ] + "=" + passed[ 0 ] + " ";
+
+		// ---- 2. in orbit around planet 90 (in the Arth system, which the scenario starts in; nobody waits in its orbit; the m10 scenario lands on it too)
+		yield return EnterOrbit( 90 );
+		yield return ClockIn( 1.5f, passed, where );
+
+		var inOrbit = passed[ 0 ];
+		var orbitWhere = where[ 0 ];
+
+		results += where[ 0 ] + "=" + passed[ 0 ] + " ";
+
+		// ---- 3. on its surface (the way the orbit scenario puts the ship down, without the 35 s landing)
+		var planetsideWhere = "not reached";
+		long onSurface = -1;
+
+		try
+		{
+			controller.m_planetside.UpdateTerrainGridNow();
+			controller.SwitchLocation( PD_General.Location.Planetside );
+		}
+		catch ( Exception exception )
+		{
+			Log( "gameclock: putting the ship down threw " + exception.GetType().Name + ": " + exception.Message );
+		}
+
+		yield return Frames( 10 );
+		yield return ClockIn( 1.5f, passed, where );
+
+		onSurface = passed[ 0 ];
+		planetsideWhere = where[ 0 ];
+
+		results += where[ 0 ] + "=" + passed[ 0 ] + " ";
+
+		// ---- 4. in the terrain vehicle, through the real Disembark button
+		PressButton( ButtonController.ButtonSet.CommandA, 1 );
+
+		yield return WaitForLocation( PD_General.Location.Disembarked, 15.0f );
+		yield return Frames( 10 );
+		yield return ClockIn( 1.5f, passed, where );
+
+		var inVehicle = passed[ 0 ];
+		var vehicleWhere = where[ 0 ];
+
+		results += where[ 0 ] + "=" + passed[ 0 ] + " ";
+
+		// ---- 5. in an encounter, with the shields up across a star hour: the hour's fuel for the shields
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		EnterEncounter( speminId );
+
+		yield return Frames( 5 );
+		yield return ClockIn( 1.5f, passed, where );
+
+		var inEncounter = passed[ 0 ];
+		var encounterWhere = where[ 0 ];
+
+		results += where[ 0 ] + "=" + passed[ 0 ] + " ";
+
+		// the shields up and the clock just before the next hour (a star hour is about 20 real seconds)
+		playerData.m_playerShip.RaiseShields();
+
+		yield return Frames( 2 );
+
+		var general = playerData.m_general;
+
+		general.m_minute = 59;
+		general.m_second = 0;
+
+		var hourBefore = general.m_hour;
+		var fuelBefore = Endurium();
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var hourAfter = general.m_hour;
+		var fuelAfter = Endurium();
+		var stillInEncounter = playerData.m_general.m_location == PD_General.Location.Encounter;
+
+		playerData.m_playerShip.DropShields();
+
+		Log( "gameclock: in the encounter with the shields up from minute 59: hour " + hourBefore + " -> " + hourAfter + ", Endurium " + fuelBefore + " -> " + fuelAfter + " tenths, still in the encounter " + stillInEncounter );
+
+		yield return FlyOutOfEncounter();
+
+		// ---- 6. the docking bay is part of the starport: no clock there (control)
+		controller.SwitchLocation( PD_General.Location.DockingBay );
+
+		yield return Frames( 10 );
+		yield return ClockIn( 1.5f, passed, where );
+
+		var inDockingBay = passed[ 0 ];
+		var dockingBayWhere = where[ 0 ];
+
+		results += where[ 0 ] + "=" + passed[ 0 ] + " ";
+
+		Log( "gameclock: game seconds passed in 1.5 real seconds: " + results.Trim() + " (at one game year for 50 hours of play, 1.5 real seconds are about 263 game seconds)" );
+
+		// about 175 game seconds pass in a real second; allow for the frame time cap of slow frames
+		Check( "gameclock: the clock runs in the star system (control)", ( starSystemWhere == "StarSystem" ) && ( inStarSystem > 100 ), starSystemWhere + " " + inStarSystem );
+		Check( "gameclock: the clock runs in orbit", ( orbitWhere == "InOrbit" ) && ( inOrbit > 100 ), orbitWhere + " " + inOrbit );
+		Check( "gameclock: the clock runs on a planet's surface", ( planetsideWhere == "Planetside" ) && ( onSurface > 100 ), planetsideWhere + " " + onSurface );
+		Check( "gameclock: the clock runs in the terrain vehicle", ( vehicleWhere == "Disembarked" ) && ( inVehicle > 100 ), vehicleWhere + " " + inVehicle );
+		Check( "gameclock: the clock runs in an encounter", ( encounterWhere == "Encounter" ) && ( inEncounter > 100 ), encounterWhere + " " + inEncounter );
+		Check( "gameclock: raised shields use their fuel at the star hour in an encounter", stillInEncounter && ( hourAfter != hourBefore ) && ( fuelAfter < fuelBefore ), "hour " + hourBefore + " -> " + hourAfter + ", Endurium " + fuelBefore + " -> " + fuelAfter );
+		Check( "gameclock: the clock stands still in the docking bay (control)", ( dockingBayWhere == "DockingBay" ) && ( inDockingBay == 0 ), dockingBayWhere + " " + inDockingBay );
+
+		Finish( "scenario=gameclock " + results.Trim().Replace( ' ', ',' ) + " shieldHour=" + hourBefore + "->" + hourAfter + " fuel=" + fuelBefore + "->" + fuelAfter, 0 );
 	}
 
 	// ---------------------------------------------------------------- alien ship models
