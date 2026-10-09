@@ -523,6 +523,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioEncounterData();
 				break;
 
+			case "drones":
+				yield return ScenarioDrones();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -9012,6 +9016,277 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "encounterdata: the Spemin home fleet 139 begins at the planet in orbit 6 of star 32", ( speminPlanet >= 0 ) && ( atSpeminPlanet == 139 ), "planet " + speminPlanet + ", encounter " + atSpeminPlanet );
 
 		Finish( "scenario=encounterdata scouts=" + scouts.Trim().Replace( ' ', ',' ) + " orbits=" + orbits.Trim().Replace( ' ', ',' ) + " inOrbitWithAPlanet=" + withAPlanet + "/" + inOrbit + " repaired=" + repaired + " star29=" + atOtherPlanet + "," + atBlackEggPlanet + " star32=" + atSpeminPlanet, 0 );
+	}
+
+	// ---------------------------------------------------------------- roadmap 0.2: a Veloxi drone lets the ship into orbit after the right answers to its numbers (STRINFO 2.3)
+
+	// goes into orbit around a planet of a star (into the star system first if the ship is elsewhere) and stays there, or in whatever encounter begins
+	static IEnumerator GoIntoOrbit( int starId, int planetId )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var starSystem = SpaceflightController.m_instance.m_starSystem;
+
+		if ( ( playerData.m_general.m_currentStarId != starId ) || ( playerData.m_general.m_location == PD_General.Location.Hyperspace ) )
+		{
+			EnterStarSystem( starId );
+
+			var start = Time.realtimeSinceStartup;
+
+			while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 40.0f ) )
+			{
+				yield return null;
+			}
+
+			yield return Frames( 5 );
+		}
+		else if ( playerData.m_general.m_location != PD_General.Location.StarSystem )
+		{
+			SpaceflightController.m_instance.SwitchLocation( PD_General.Location.StarSystem );
+
+			yield return Frames( 5 );
+		}
+
+		yield return EnterOrbit( planetId );
+	}
+
+	// waits until the aliens of the encounter ask a question (a drone: a number), or the time is up - returns it through the array (0 for none)
+	static IEnumerator WaitForAlienQuestion( float seconds, int[] question )
+	{
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var end = Time.realtimeSinceStartup + seconds;
+
+		question[ 0 ] = 0;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			if ( ( encounter.m_pdEncounter != null ) && ( encounter.m_pdEncounter.m_lastQuestionFromAliens != 0 ) )
+			{
+				question[ 0 ] = encounter.m_pdEncounter.m_lastQuestionFromAliens;
+
+				yield break;
+			}
+
+			yield return null;
+		}
+	}
+
+	// how many times the message list has this text in it
+	static int CountMessages( string text )
+	{
+		var count = 0;
+
+		foreach ( var message in DataController.m_instance.m_playerData.m_general.m_messageList )
+		{
+			if ( message.Contains( text ) )
+			{
+				count++;
+			}
+		}
+
+		return count;
+	}
+
+	IEnumerator ScenarioDrones()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var encounter = controller.m_encounter;
+
+		EnsureCrew();
+
+		// a ship that survives a drone attack
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		const string c_grantedText = "Permission to orbit granted.";
+		const string c_deniedText = "Permission to orbit denied.";
+
+		// ---- 1. the game data: the two lines of STRINFO 2.3, from the file of recovered data (subjects 17 and 18 are new, so they are cast from numbers here)
+		var grantedLine = "missing";
+		var deniedLine = "missing";
+
+		foreach ( var comm in gameData.m_commList )
+		{
+			if ( comm.m_race != GameData.Race.VeloxProbe )
+			{
+				continue;
+			}
+
+			if ( (int) comm.m_subject == 17 )
+			{
+				grantedLine = comm.m_id + ":" + comm.m_text;
+			}
+			else if ( (int) comm.m_subject == 18 )
+			{
+				deniedLine = comm.m_id + ":" + comm.m_text;
+			}
+		}
+
+		Log( "drones: game data comms " + gameData.m_commList.Length + " | the drone's lines: granted " + grantedLine + " | denied " + deniedLine );
+
+		Check( "drones: the game data has the drone's two lines from STRINFO, after the 556 of the original data", ( grantedLine == "1000:" + c_grantedText ) && ( deniedLine == "1001:" + c_deniedText ) && ( gameData.m_commList.Length == 558 ), "granted " + grantedLine + " | denied " + deniedLine + " | " + gameData.m_commList.Length + " comms" );
+
+		// ---- 2. the drone at the planet in orbit 5 of star 29 (the planet with a Black Egg): three numbers, each answered right
+		const int c_droneId = 302;
+		const int c_starId = 29;
+
+		var planetId = PlanetInOrbit( c_starId, 5 );
+		var question = new int[ 1 ];
+
+		yield return GoIntoOrbit( c_starId, planetId );
+
+		var begun = ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == c_droneId );
+		var numbers = "";
+		var numbersAsked = 0;
+		var numbersInRange = true;
+
+		if ( begun )
+		{
+			encounter.Connect();
+
+			yield return Frames( 2 );
+
+			for ( var i = 0; i < 3; i++ )
+			{
+				yield return WaitForAlienQuestion( 8.0f, question );
+
+				numbers += question[ 0 ] + " ";
+
+				if ( question[ 0 ] == 0 )
+				{
+					break;
+				}
+
+				numbersAsked++;
+				numbersInRange = numbersInRange && ( question[ 0 ] >= 1 ) && ( question[ 0 ] <= 99 );
+
+				// the right answer: yes to a multiple of 6, no to any other number
+				if ( ( question[ 0 ] % 6 ) == 0 )
+				{
+					new AnswerYesButton().Execute();
+				}
+				else
+				{
+					new AnswerNoButton().Execute();
+				}
+
+				yield return Frames( 3 );
+			}
+		}
+
+		var grantedShown = CountMessages( c_grantedText );
+
+		// the ship goes back into orbit by itself a few seconds later
+		yield return WaitForLocation( PD_General.Location.InOrbit, 8.0f );
+
+		var locationAfterGrant = playerData.m_general.m_location;
+		var planetAfterGrant = playerData.m_general.m_currentPlanetId;
+
+		yield return Frames( 30 );
+
+		var locationLater = playerData.m_general.m_location;
+
+		Log( "drones: into orbit around planet " + planetId + ": encounter begun " + begun + " | numbers asked: " + numbers.Trim() + " | granted shown " + grantedShown + " | then " + locationAfterGrant + " at planet " + planetAfterGrant + ", 30 frames later " + locationLater );
+
+		Check( "drones: the drone asks three numbers from 1 to 99", begun && ( numbersAsked == 3 ) && numbersInRange, "begun " + begun + ", numbers " + numbers.Trim() );
+		Check( "drones: three right answers get permission to orbit", grantedShown == 1, "granted shown " + grantedShown );
+		Check( "drones: after permission the ship is back in orbit around the planet, and the drone does not begin again", ( locationAfterGrant == PD_General.Location.InOrbit ) && ( planetAfterGrant == planetId ) && ( locationLater == PD_General.Location.InOrbit ), locationAfterGrant + " at " + planetAfterGrant + ", later " + locationLater );
+
+		// ---- 3. out to the level of the star system and into orbit again: the permission holds while the ship stays in the star system
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+		yield return EnterOrbit( planetId );
+
+		var locationSecondOrbit = playerData.m_general.m_location;
+
+		Check( "drones: going into orbit again in the same visit to the star system begins nothing", locationSecondOrbit == PD_General.Location.InOrbit, locationSecondOrbit.ToString() );
+
+		// ---- 4. a new visit (through hyperspace): the drone asks again, and a wrong answer gets permission denied and an attack
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 5 );
+		yield return GoIntoOrbit( c_starId, planetId );
+
+		var begunAgain = ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == c_droneId );
+		var wrongNumber = 0;
+
+		if ( begunAgain )
+		{
+			encounter.Connect();
+
+			yield return Frames( 2 );
+			yield return WaitForAlienQuestion( 8.0f, question );
+
+			wrongNumber = question[ 0 ];
+
+			// the message list keeps the last ten messages only - start counting from here
+			controller.m_messages.Clear();
+
+			// the wrong answer
+			if ( ( wrongNumber % 6 ) == 0 )
+			{
+				new AnswerNoButton().Execute();
+			}
+			else
+			{
+				new AnswerYesButton().Execute();
+			}
+
+			yield return Frames( 3 );
+		}
+
+		var deniedShown = CountMessages( c_deniedText );
+		var stanceAfterWrong = ( encounter.m_pdEncounter == null ) ? "none" : encounter.m_pdEncounter.m_alienStance.ToString();
+		var connectedAfterWrong = ( encounter.m_pdEncounter != null ) && encounter.m_pdEncounter.m_connected;
+
+		yield return FlyOutOfEncounter();
+
+		var locationAfterDenial = playerData.m_general.m_location;
+
+		Log( "drones: a new visit: encounter begun " + begunAgain + " | number " + wrongNumber + " answered wrong | denied shown " + deniedShown + ", stance " + stanceAfterWrong + ", comm link up " + connectedAfterWrong + " | after flying out: " + locationAfterDenial );
+
+		Check( "drones: on a new visit to the star system the drone asks again", begunAgain && ( wrongNumber != 0 ), "begun " + begunAgain + ", number " + wrongNumber );
+		Check( "drones: a wrong answer gets permission denied, and the drone ends the comm link and attacks", ( deniedShown == 1 ) && ( stanceAfterWrong == "Hostile" ) && !connectedAfterWrong, "denied shown " + deniedShown + ", stance " + stanceAfterWrong + ", link up " + connectedAfterWrong );
+		Check( "drones: flying out after a refusal ends at the level of the star system", locationAfterDenial == PD_General.Location.StarSystem, locationAfterDenial.ToString() );
+
+		// ---- 5. ending the comm link before the numbers are answered fails the test as well
+		yield return EnterOrbit( planetId );
+
+		var begunThird = ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == c_droneId );
+		var stanceAfterTerminate = "not begun";
+
+		if ( begunThird )
+		{
+			encounter.Connect();
+
+			yield return Frames( 2 );
+			yield return WaitForAlienQuestion( 8.0f, question );
+
+			// the message list keeps the last ten messages only - start counting from here
+			controller.m_messages.Clear();
+
+			encounter.AddComm( GD_Comm.Subject.Terminate, true );
+
+			yield return Frames( 3 );
+
+			stanceAfterTerminate = encounter.m_pdEncounter.m_alienStance.ToString();
+
+			yield return FlyOutOfEncounter();
+		}
+
+		var deniedAfterTerminate = CountMessages( c_deniedText );
+
+		Log( "drones: comm link ended before answering: begun " + begunThird + ", stance " + stanceAfterTerminate + ", denied shown " + deniedAfterTerminate );
+
+		Check( "drones: ending the comm link before answering gets permission denied and an attack", begunThird && ( stanceAfterTerminate == "Hostile" ) && ( deniedAfterTerminate == 1 ), "begun " + begunThird + ", stance " + stanceAfterTerminate + ", denied " + deniedAfterTerminate );
+
+		Finish( "scenario=drones lines=" + ( grantedLine != "missing" ) + "/" + ( deniedLine != "missing" ) + " numbers=" + numbers.Trim().Replace( ' ', ',' ) + " granted=" + grantedShown + " afterGrant=" + locationAfterGrant + "/" + locationLater + " secondOrbit=" + locationSecondOrbit + " wrong=" + wrongNumber + "/" + stanceAfterWrong + " terminated=" + stanceAfterTerminate, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

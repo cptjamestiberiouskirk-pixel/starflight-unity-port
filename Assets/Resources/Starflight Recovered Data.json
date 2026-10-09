@@ -1,0 +1,25 @@
+{
+  "m_about": "What the original game had and Starflight Game Data.json does not, recovered from Research/Data/STRINFO.DOC. Ids start at 1000 so that they never meet the ids of the game data. m_source names the section of STRINFO each record comes from.",
+  "m_commList": [
+    {
+      "m_id": 1000,
+      "m_race": 10,
+      "m_subject": 17,
+      "m_stance": 1,
+      "m_homeworld": false,
+      "m_surrender": false,
+      "m_text": "Permission to orbit granted.",
+      "m_source": "STRINFO 2.3 Veloxi drones: answering yes only to multiples of 6"
+    },
+    {
+      "m_id": 1001,
+      "m_race": 10,
+      "m_subject": 18,
+      "m_stance": 1,
+      "m_homeworld": false,
+      "m_surrender": false,
+      "m_text": "Permission to orbit denied.",
+      "m_source": "STRINFO 2.3 Veloxi drones: failing this, followed by a Veloxi drone attack"
+    }
+  ]
+}

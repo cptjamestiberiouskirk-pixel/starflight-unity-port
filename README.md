@@ -120,6 +120,7 @@ The project features a **deterministic visualization system** that renders plane
 - Hyperspace navigation and star system exploration
 - Planetary landing and terrain vehicle exploration
 - 10 alien races with unique encounter behaviors
+- Encounters that guard planets from orbit; a Veloxi drone grants permission to orbit to a crew that answers its numbers the Veloxi way
 - Complete combat system with lasers, missiles, shields, armor
 - Ship destruction with debris spawning
 - Game over and restart functionality
