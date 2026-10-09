@@ -54,14 +54,14 @@ The README's "Completion: ~95%" is far too high for the game as a whole. It is c
 These decide how much of the roadmap can go ahead without asking item by item.
 
 - **D1. Fidelity rule. Ruled 2026-10-09: yes.** Where the sources document the original's behaviour, implement it as documented without asking per item. Ask only where the sources are silent or contradict each other (the items marked Ask). Behaviour found only in the DRAFT notes counts as Ask.
-
-Still open:
-
-- **D2. Where recovered data goes.** The JSON has none of these: the ruin messages and sites, the special artifact sites, the colony evaluation values, the win and flare messages, and the Black Egg messages. Two options:
+- **D2. Where recovered data goes. Ruled 2026-10-09: a second data file**, `Assets/Resources/Starflight Recovered Data.json`, merged into the game data at load (first used by item 0.2). The options were:
   - (a) Add them to `Starflight Game Data.json`. `.claude/settings.json` asks before every edit of that file.
   - (b) Put them in a second file next to it (for example `Starflight Story Data.json`). The original values stay untouched in one file and the added records live in the other.
 
   Either way no existing value changes.
+
+Still open:
+
 - **D3. Lifeforms.** The original did not store lifeforms as a table. The STARB.COM map in the xls shows overlays that created them per planet: VITA-OV (ecosystem), HP-OV and LP-OV (lifeform classes and species), SEED-OV (minerals, lifeforms and ruins) and BEHAV-OV (behaviour), plus text tables of lifeform descriptions. None of that code or text is in the repository. The sources available are the 1984 notes (`planet.txt`, `lf-behav.txt`, `lf-words.txt`, 874 lines in total). Options:
   - (a) Rebuild the lifeforms from the notes. This is a reconstruction, not a copy.
   - (b) Work from a copy of the original game files, if you own one.
@@ -80,7 +80,7 @@ Reading STRINFO: its "PLANET N OF SYSTEM X, Y" is the N-th planet from the sun, 
 | # | Item | Original (source) | Port today |
 |---|---|---|---|
 | 0.1 | Correct the orbit positions of encounters 139, 165, 301, 302, 305, and put encounters 144 to 146 back in hyperspace, with a load repair for old saves | xls; STRINFO agrees for 4 of the 5 orbits | PR 80 |
-| 0.2 | Land past an orbit guardian | Homeworlds cannot be landed on at all: "the homeworlds of all races are well guarded and thither thou mayest not descend" (Elowan lore, STRINFO 2.4), so the home fleets keep blocking. Veloxi drones grant orbit if you answer yes to multiples of six; the Mechans help only "Group 9" (STRINFO 2.1 to 2.3) | the encounter begins on every entry into orbit, so the planet cannot be landed on |
+| 0.2 | Land past an orbit guardian | Homeworlds cannot be landed on at all: "the homeworlds of all races are well guarded and thither thou mayest not descend" (Elowan lore, STRINFO 2.4), so the home fleets keep blocking. Veloxi drones grant orbit if you answer yes to multiples of six; the Mechans help only "Group 9" (STRINFO 2.1 to 2.3) | drones: PR 82 (three numbers, permission until the ship leaves the system: the owner's choices of 2026-10-09). Mechans at Heaven (encounter 77): Ask, the sources do not say that Mechan 9 lets a ship land |
 | 0.3 | Game clock runs on the planet surface, and (Ask) in orbit and in encounters | the terrain vehicle panel shows the date (SS Terrain Vehicle) | clock runs only in the star system and hyperspace |
 | 0.4 | Recover the missing data per D2: 36 ruin messages with sites, 15 artifact sites, colony evaluation list with bonuses and fines, the game's messages for the endgame and flares | STRINFO 1.2, 2.12, 2.14, 3.1, 4.1; Survey sheets "Habitable Planets" and "Optimal Planets" | data only, no behaviour change |
 | 0.5 | Flare data: the 36 stars whose day count wrapped below zero are marked as already flared | `m_daysToNextFlare` equals 65536 plus `m_daysSincePreviousFlare` for all 36 | they flare about 179 years from now |
