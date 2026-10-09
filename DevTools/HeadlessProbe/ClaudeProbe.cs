@@ -9599,6 +9599,9 @@ public class ClaudeProbe : MonoBehaviour
 
 			Check( "vessel " + vesselId + " (" + vesselName + ") gets a model in an encounter", hasModel, "model=" + ( ( model == null ) ? "none" : model.name ) );
 
+			// the smallest vessels are shown at 0.3 times the player ship (3.404 units long in its FBX, scale 15)
+			Check( "vessel " + vesselId + " is big enough to be seen (a quarter of the player ship or more)", longest >= 3.404f * 15.0f * 0.25f, "longest side=" + longest.ToString( "F1" ) );
+
 			float expectedLength;
 
 			if ( c_shipModelLengths.TryGetValue( vesselId, out expectedLength ) )
