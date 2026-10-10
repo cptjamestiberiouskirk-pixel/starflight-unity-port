@@ -59,10 +59,8 @@ Shader "Custom/UI/Masked Image"
 				#include "UnityCG.cginc"
 				#include "UnityUI.cginc"
 
-				// local keywords, as in the built-in UI shaders: the canvas switches UNITY_UI_CLIP_RECT on for a clipped graphic (RectMask2D) only
-				// when the shader declares it local, so as a global keyword the clip rectangle was never applied
-				#pragma multi_compile_local _ UNITY_UI_CLIP_RECT
-				#pragma multi_compile_local _ UNITY_UI_ALPHACLIP
+				#pragma multi_compile __ UNITY_UI_CLIP_RECT
+				#pragma multi_compile __ UNITY_UI_ALPHACLIP
 
 				struct appdata_t
 				{
