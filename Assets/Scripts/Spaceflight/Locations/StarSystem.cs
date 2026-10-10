@@ -21,6 +21,9 @@ public class StarSystem : MonoBehaviour
 	// true if we are generating planets
 	bool m_generatingPlanets;
 
+	// true once the ship has been told in orbital range of Arth that the Starport does not answer (after the flare of Arth's sun)
+	bool m_reportedNoStarport;
+
 	// unity awake
 	void Awake()
 	{
@@ -82,8 +85,19 @@ public class StarSystem : MonoBehaviour
 			// are we close enough to orbit the planet?
 			if ( distanceToPlanet <= orbitPlanetController.m_planetModel.transform.localScale.y )
 			{
+				// after Arth's sun has flared there is no Starport to dock at any more (and the ship cannot go into orbit around Arth then)
+				if ( IsDestroyedStarport( orbitPlanetController.m_planet.m_id ) )
+				{
+					if ( !m_reportedNoStarport )
+					{
+						m_reportedNoStarport = true;
+
+						SpaceflightController.m_instance.m_messages.Clear();
+						SpaceflightController.m_instance.m_messages.AddText( "<color=white>There's no response from Starport.</color>" );
+					}
+				}
 				// is this a different planet?
-				if ( m_planetToOrbitId != orbitPlanetController.m_planet.m_id )
+				else if ( m_planetToOrbitId != orbitPlanetController.m_planet.m_id )
 				{
 					// yes - remember this planet
 					m_planetToOrbitId = orbitPlanetController.m_planet.m_id;
@@ -99,16 +113,22 @@ public class StarSystem : MonoBehaviour
 					}
 				}
 			}
-			else if ( m_planetToOrbitId != -1 )
+			else
 			{
-				// forget this planet
-				m_planetToOrbitId = -1;
+				// out of orbital range: the Starport's silence is reported again next time
+				m_reportedNoStarport = false;
 
-				var spectralClass = m_currentStar.GetSpectralClass();
+				if ( m_planetToOrbitId != -1 )
+				{
+					// forget this planet
+					m_planetToOrbitId = -1;
 
-				// display the spectral class and ecosphere
-				SpaceflightController.m_instance.m_messages.Clear();
-				SpaceflightController.m_instance.m_messages.AddText( "<color=white>Stellar Parameters</color>\nSpectral Class: <color=white>" + m_currentStar.m_class + "</color>\nEcosphere: <color=white>" + spectralClass.m_ecosphereMin + " - " + spectralClass.m_ecosphereMax + "</color>" );
+					var spectralClass = m_currentStar.GetSpectralClass();
+
+					// display the spectral class and ecosphere
+					SpaceflightController.m_instance.m_messages.Clear();
+					SpaceflightController.m_instance.m_messages.AddText( "<color=white>Stellar Parameters</color>\nSpectral Class: <color=white>" + m_currentStar.m_class + "</color>\nEcosphere: <color=white>" + spectralClass.m_ecosphereMin + " - " + spectralClass.m_ecosphereMax + "</color>" );
+				}
 			}
 		}
 
@@ -298,6 +318,14 @@ public class StarSystem : MonoBehaviour
 
 			Debug.Log( "The star will flare in " + timeToFlare + " days - minSize = " + minSize + ", maxSize = " + maxSize );
 		}
+	}
+
+	// true if this is Arth and its Starport has been destroyed by the flare of Arth's sun
+	public static bool IsDestroyedStarport( int planetId )
+	{
+		var dataController = DataController.m_instance;
+
+		return ( planetId == dataController.m_gameData.m_misc.m_arthPlanetId ) && dataController.m_playerData.m_general.m_starportDestroyed;
 	}
 
 	// true if a Black Egg has destroyed this planet

@@ -595,6 +595,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportWin();
 				break;
 
+			case "arthflare":
+				yield return ScenarioArthFlare();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -12134,6 +12138,145 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-win: after the win the evaluation is Interstel's supplemental evaluation on the completion of the mission", texts[ 1 ].Contains( "COMPLETION OF MISSION" ) && texts[ 1 ].Contains( "500,000 MU" ), texts[ 1 ] );
 
 		Finish( "scenario=starport-win before=" + texts[ 0 ].Contains( "colony" ) + " after=" + texts[ 1 ].Contains( "COMPLETION OF MISSION" ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 5: Arth's sun flares
+
+	// true if the save says the Starport has been destroyed (false on the code before it has the flag)
+	static bool StarportDestroyed()
+	{
+		return Equals( FieldOrNull( DataController.m_instance.m_playerData.m_general, "m_starportDestroyed" ), true );
+	}
+
+	// puts the game on a day (the clock works the game time out from it in the next update)
+	static void SetGameDay( int day )
+	{
+		var general = DataController.m_instance.m_playerData.m_general;
+
+		general.m_day = day;
+		general.m_hour = 0;
+		general.m_minute = 0;
+		general.m_second = 0;
+	}
+
+	IEnumerator ScenarioArthFlare()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var arthStarId = gameData.m_misc.m_arthStarId;
+		var arthPlanetId = gameData.m_misc.m_arthPlanetId;
+		var flareDay = gameData.m_starList[ arthStarId ].m_daysToNextFlare;
+
+		EnsureCrew();
+
+		// ---- 1. away from Arth, in the star system of the Crystal Planet (planet 90 is in Arth's): the day before the flare nothing happens (control), on the day the Starport is gone and the ship is fine
+		var awayStarId = gameData.m_planetList[ 33 ].m_starId;
+
+		EnterStarSystem( awayStarId );
+
+		var end = Time.realtimeSinceStartup + 40.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && controller.m_starSystem.GeneratingPlanets() )
+		{
+			yield return null;
+		}
+
+		SetGameDay( flareDay - 1 );
+
+		yield return Frames( 10 );
+
+		var destroyedTheDayBefore = StarportDestroyed();
+
+		SetGameDay( flareDay );
+
+		yield return Frames( 10 );
+
+		var destroyedOnTheDay = StarportDestroyed();
+		var shipFineAway = !controller.m_combatController.PlayerIsDestroyed() && ( playerData.m_playerShip.m_armorPoints > 0 );
+
+		Log( "arthflare: away from Arth (star " + awayStarId + "): the Starport destroyed the day before the flare (day " + ( flareDay - 1 ) + ") " + destroyedTheDayBefore + ", on the day " + destroyedOnTheDay + ", the ship fine " + shipFineAway );
+
+		Check( "arthflare: the day before Arth's flare the Starport is there (control)", !destroyedTheDayBefore, destroyedTheDayBefore.ToString() );
+		Check( "arthflare: on the day of Arth's flare the Starport is destroyed, and a ship in another star system is fine", destroyedOnTheDay && shipFineAway, destroyedOnTheDay + ", " + shipFineAway );
+
+		// ---- 2. a distress signal gets no response
+		controller.m_messages.Clear();
+
+		new DistressButton().Execute();
+
+		var distressText = MessageList();
+
+		Check( "arthflare: after the flare a distress signal gets no response", distressText.Contains( "NO RESPONSE" ), distressText );
+
+		// ---- 3. in Arth's star system: no Starport model, and in orbital range of Arth no docking
+		EnterStarSystem( arthStarId );
+
+		end = Time.realtimeSinceStartup + 40.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && controller.m_starSystem.GeneratingPlanets() )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		var arthController = controller.m_starSystem.GetPlanetController( arthPlanetId );
+		var starportShown = ( arthController != null ) && ( arthController.m_starportModel != null ) && arthController.m_starportModel.activeInHierarchy;
+
+		controller.m_messages.Clear();
+
+		for ( var frame = 0; ( frame < 20 ) && ( arthController != null ); frame++ )
+		{
+			playerData.m_general.m_coordinates = arthController.transform.localPosition;
+			controller.m_playerShip.transform.position = arthController.transform.localPosition;
+
+			yield return null;
+		}
+
+		var rangeText = MessageList();
+		var planetToOrbit = controller.m_starSystem.m_planetToOrbitId;
+
+		Log( "arthflare: in Arth's system after the flare: the Starport model shown " + starportShown + ", at Arth the planet to orbit " + planetToOrbit + " | " + rangeText );
+
+		Check( "arthflare: after the flare Arth has no Starport, does not answer, and cannot be docked at", !starportShown && ( planetToOrbit != arthPlanetId ) && rangeText.Contains( "no response from Starport" ), starportShown + ", " + planetToOrbit + ", " + rangeText );
+
+		// ---- 4. once the game has been won Arth's sun does not flare (the control for 5)
+		SetFieldIfPresent( playerData.m_general, "m_starportDestroyed", false );
+		SetFieldIfPresent( playerData.m_general, "m_gameWon", true );
+
+		playerData.m_general.m_coordinates = new Vector3( 7900.0f, 0.0f, 0.0f );
+		controller.m_playerShip.transform.position = playerData.m_general.m_coordinates;
+
+		yield return Frames( 10 );
+
+		var destroyedAfterTheWin = StarportDestroyed();
+
+		Check( "arthflare: after the win Arth's sun does not flare (control)", !destroyedAfterTheWin, destroyedAfterTheWin.ToString() );
+
+		// ---- 5. not won, in Arth's star system on the day: the ship and its crew are incinerated, and the game is over
+		SetFieldIfPresent( playerData.m_general, "m_gameWon", false );
+
+		controller.m_messages.Clear();
+
+		end = Time.realtimeSinceStartup + 4.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !controller.m_combatController.PlayerIsDestroyed() )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 3 );
+
+		var incinerated = controller.m_combatController.PlayerIsDestroyed();
+		var deathText = MessageList();
+
+		Log( "arthflare: in Arth's system on the day: the ship destroyed " + incinerated + " | " + deathText );
+
+		Check( "arthflare: a ship in Arth's star system when its sun flares is incinerated, and the game is over", incinerated && deathText.Contains( "INCINERATED" ) && deathText.Contains( "125, 100" ) && deathText.Contains( "01-01-4621" ), incinerated + " | " + deathText );
+
+		Finish( "scenario=arthflare dayBefore=" + destroyedTheDayBefore + " onTheDay=" + destroyedOnTheDay + " starportShown=" + starportShown + " afterWin=" + destroyedAfterTheWin + " incinerated=" + incinerated, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

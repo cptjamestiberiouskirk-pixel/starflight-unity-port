@@ -161,10 +161,10 @@ public class Planet : MonoBehaviour
 		// show this orbit
 		gameObject.SetActive( true );
 
-		// show or hide the starport model depending on whether or not this planet is Arth
+		// show or hide the starport model depending on whether or not this planet is Arth (and not after the flare of Arth's sun has destroyed it)
 		if ( m_starportModel != null )
 		{
-			m_starportModel.SetActive( m_planet.m_id == gameData.m_misc.m_arthPlanetId );
+			m_starportModel.SetActive( ( m_planet.m_id == gameData.m_misc.m_arthPlanetId ) && !StarSystem.IsDestroyedStarport( m_planet.m_id ) );
 		}
 
 		// scale the planet based on its mass
