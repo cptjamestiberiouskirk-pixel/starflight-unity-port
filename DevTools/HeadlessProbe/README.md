@@ -115,8 +115,9 @@ What the probe does:
 | `racelosses` | what a Black Egg on Elan or on the Uhlek mind-ganglion does: damage from an Uhlek encounter in 10 s before the ganglion's planet is destroyed (the control) and after (none); an Elowan warship encounter before Elan is destroyed (the control, not hostile, nothing of Elan) and after (hostile, the comm of the game data about the deed most unthinkably foul, no answer to a hail, and they attack) (about 80 s) |
 | `tesseract` | the Tesseract: the fuel the engines use in 3 s of hyperspace from a standstill, in a corner of it with no encounter able to begin, without the Tesseract (the control) and with it in the hold (about half, 0.4 to 0.6 for the frame timing) (about 20 s) |
 | `whiningorb` | the Whining Orb, with a communications officer of no skill: a Spemin statement from the game data without the Orb (the control, garbled), with the Orb in the hold (every word), and an Elowan statement with the Orb (the control, still garbled) (about 30 s) |
+| `roddevice` | the Rod Device: the armor one alien laser shot and one plasma bolt take off, without the Rod Device (the control) and with it in the hold (half the laser, the plasma bolt unchanged as the control) (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (74 scenarios, about 42 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (75 scenarios, about 43 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
