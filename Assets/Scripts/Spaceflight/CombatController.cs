@@ -54,6 +54,11 @@ public class CombatController : MonoBehaviour
 	// what destroyed the player ship, when it was not the damage it took (null for that) - the game over screen says it
 	string m_gameOverCause;
 
+	// the Shimmering Ball cloaks the ship in combat, and a shot of the player drops the cloak for a while (the owner's ruling of 2026-10-10; how long is the port's
+	// choice) - the time until it cloaks the ship again
+	const float c_uncloakedTime = 3.0f;
+	float m_uncloakedTimer;
+
 	// player debris template (assign in inspector)
 	public GameObject m_playerDebrisTemplate;
 
@@ -144,6 +149,18 @@ public class CombatController : MonoBehaviour
 		{
 			m_playerMissileCooldown -= Time.deltaTime;
 		}
+
+		if ( m_uncloakedTimer > 0.0f )
+		{
+			m_uncloakedTimer -= Time.deltaTime;
+		}
+	}
+
+	// true while the Shimmering Ball cloaks the ship: "this artifact seems to be a cloaking device. As far as we can tell it should operate automatically during
+	// combat" (the Starport's analysis) - the aliens cannot fire at a ship they cannot see
+	public bool PlayerIsCloaked()
+	{
+		return ( m_uncloakedTimer <= 0.0f ) && DataController.m_instance.m_playerData.m_playerShip.HasArtifact( "Shimmering Ball" );
 	}
 
 	/// <summary>
@@ -336,6 +353,9 @@ public class CombatController : MonoBehaviour
 		// firing on the aliens makes them hostile for the rest of the encounter (whether or not the shot does any damage)
 		SpaceflightController.m_instance.m_encounter.PlayerAttacked();
 
+		// and it shows them where the ship is, cloaked or not
+		m_uncloakedTimer = c_uncloakedTime;
+
 		// check if target is immune
 		if ( targetVessel.m_immuneToLasers )
 		{
@@ -418,6 +438,9 @@ public class CombatController : MonoBehaviour
 
 		// firing on the aliens makes them hostile for the rest of the encounter (whether or not the missile hits)
 		encounter.PlayerAttacked();
+
+		// and it shows them where the ship is, cloaked or not
+		m_uncloakedTimer = c_uncloakedTime;
 
 		// the launch uses up a little endurium
 		playerData.m_playerShip.UseUpFuel( c_missileFuelPerShot );
@@ -784,6 +807,12 @@ public class CombatController : MonoBehaviour
 	{
 		// there is nothing left to fire at once the player ship has been destroyed (a missile launched now would still be in the air when the game over screen pauses the game)
 		if ( m_playerIsDestroyed )
+		{
+			return;
+		}
+
+		// nor at a ship the Shimmering Ball cloaks
+		if ( PlayerIsCloaked() )
 		{
 			return;
 		}

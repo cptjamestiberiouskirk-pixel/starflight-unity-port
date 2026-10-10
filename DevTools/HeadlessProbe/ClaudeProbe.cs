@@ -631,6 +631,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioDodecahedron();
 				break;
 
+			case "shimmeringball":
+				yield return ScenarioShimmeringBall();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -13001,6 +13005,80 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "dodecahedron: with the Dodecahedron in the hold aliens from twice as far come at the ship", closerWith > 1.0f, closerWith.ToString() );
 
 		Finish( "scenario=dodecahedron without=" + closerWithout + " with=" + closerWith, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 4: the Shimmering Ball
+
+	IEnumerator ScenarioShimmeringBall()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var ship = playerData.m_playerShip;
+		var combat = CombatController.m_instance;
+		var ballId = gameData.FindArtifactId( "Shimmering Ball" );
+
+		EnsureCrew();
+
+		// a ship that can fire its laser, and no Shimmering Ball to begin with
+		ship.m_laserCannonClass = 1;
+		ship.AddElement( 5, 50 );
+
+		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( ballId ) != null ); guard++ )
+		{
+			ship.RemoveArtifact( ballId );
+		}
+
+		GD_Vessel laserVessel = null;
+
+		foreach ( var vessel in gameData.m_vesselList )
+		{
+			if ( ( laserVessel == null ) && !vessel.m_hasPlasmaBolts && ( vessel.m_laserClass > 0 ) )
+			{
+				laserVessel = vessel;
+			}
+		}
+
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		EnterEncounter( speminId );
+		yield return Frames( 10 );
+
+		var alienShip = playerData.FindEncounter( speminId ).GetAlienShipList()[ 0 ];
+
+		// ---- 1. the control: without the Shimmering Ball an alien laser hits
+		var hitWithout = ArmorLostToOneShot( alienShip, laserVessel );
+
+		// ---- 2. with the Shimmering Ball in the hold the aliens cannot fire at the cloaked ship
+		ship.AddArtifact( ballId );
+
+		var hitCloaked = ArmorLostToOneShot( alienShip, laserVessel );
+
+		// ---- 3. a shot of the player drops the cloak: the aliens can fire back
+		combat.SetTarget( FirstLivingAlien() );
+
+		BringAliensClose();
+
+		var laserFired = combat.FirePlayerLaser();
+		var hitAfterFiring = ArmorLostToOneShot( alienShip, laserVessel );
+
+		// ---- 4. and a few seconds later the ship is cloaked again
+		yield return new WaitForSecondsRealtime( 4.0f );
+
+		var hitLater = ArmorLostToOneShot( alienShip, laserVessel );
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		Log( "shimmeringball: one laser shot of a " + laserVessel.m_name + ": without the Shimmering Ball " + hitWithout + ", cloaked " + hitCloaked + ", right after the player fired (fired " + laserFired + ") " + hitAfterFiring + ", 4 s later " + hitLater );
+
+		Check( "shimmeringball: without the Shimmering Ball an alien laser hits (control)", hitWithout > 0, hitWithout.ToString() );
+		Check( "shimmeringball: with the Shimmering Ball the aliens cannot fire at the cloaked ship", hitCloaked == 0, hitCloaked.ToString() );
+		Check( "shimmeringball: a shot of the player drops the cloak, and the aliens can fire back", laserFired && ( hitAfterFiring > 0 ), laserFired + ", " + hitAfterFiring );
+		Check( "shimmeringball: a few seconds after the player's shot the ship is cloaked again", hitLater == 0, hitLater.ToString() );
+
+		Finish( "scenario=shimmeringball without=" + hitWithout + " cloaked=" + hitCloaked + " afterFiring=" + hitAfterFiring + " later=" + hitLater, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
