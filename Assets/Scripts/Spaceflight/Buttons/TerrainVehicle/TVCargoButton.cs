@@ -624,6 +624,14 @@ public class TVCargoButton : ShipButton
 
 		SoundController.m_instance.PlaySound( SoundController.Sound.Transporter );
 
+		// what the messages say about it - a Black Egg is armed by dropping it ("to activate it, you must drop it" - the Starport's analysis)
+		var droppedText = "<color=green>Dropped " + description + ".</color>";
+
+		if ( ( item.m_artifactId >= 0 ) && ( item.m_artifactId == DataController.m_instance.m_gameData.FindArtifactId( "Black Egg" ) ) )
+		{
+			droppedText += "\n<color=red>The Black Egg is armed.</color>";
+		}
+
 		// the display shows the hold
 		SpaceflightController.m_instance.m_displayController.m_terrainVehicleDisplay.Show();
 
@@ -631,14 +639,14 @@ public class TVCargoButton : ShipButton
 		if ( BuildCargoItems().Count == 0 )
 		{
 			SpaceflightController.m_instance.m_messages.Clear();
-			SpaceflightController.m_instance.m_messages.AddText( "<color=green>Dropped " + description + ".</color>\n<color=yellow>Terrain Vehicle Cargo:</color>\n<color=white>Empty</color>" );
+			SpaceflightController.m_instance.m_messages.AddText( droppedText + "\n<color=yellow>Terrain Vehicle Cargo:</color>\n<color=white>Empty</color>" );
 
 			BackToTerrainVehicle();
 
 			return;
 		}
 
-		ShowCargoList( "<color=green>Dropped " + description + ".</color>" );
+		ShowCargoList( droppedText );
 	}
 
 	// back to the terrain vehicle's buttons

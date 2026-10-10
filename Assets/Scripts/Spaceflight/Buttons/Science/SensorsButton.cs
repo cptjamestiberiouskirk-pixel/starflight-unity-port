@@ -98,7 +98,8 @@ public class SensorsButton : ShipButton
 				var planetList = star.GetPlanetList();
 				foreach ( var p in planetList )
 				{
-					if ( p != null && p.m_id != -1 )
+					// (not a planet a Black Egg has destroyed)
+					if ( p != null && p.m_id != -1 && !StarSystem.IsPlanetDestroyed( p.m_id ) )
 						numPlanets++;
 				}
 

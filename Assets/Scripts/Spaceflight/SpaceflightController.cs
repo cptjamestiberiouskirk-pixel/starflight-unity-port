@@ -31,6 +31,9 @@ public class SpaceflightController : MonoBehaviour
 	public ShipsLog m_shipsLog;
 	public CombatController m_combatController;
 
+	// the Black Egg that has been dropped on a planet of this star system, if any
+	readonly BlackEgg m_blackEgg = new BlackEgg();
+
 	// some settings
 	public float m_alienHyperspaceRadarDistance;
 	public float m_alienStarSystemRadarDistance;
@@ -196,6 +199,9 @@ public class SpaceflightController : MonoBehaviour
 		// the engineer and the doctor carry on with the repairs and the treatment they were told to do
 		playerData.m_playerShip.UpdateRepairs( Time.deltaTime );
 		playerData.m_crewAssignment.UpdateTreatment( Time.deltaTime );
+
+		// a Black Egg that has been dropped on a planet counts down once the ship is back up above it
+		m_blackEgg.Update();
 
 		// save the game once in a while
 		m_timer += Time.deltaTime;

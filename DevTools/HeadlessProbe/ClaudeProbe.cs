@@ -579,6 +579,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCrystalField();
 				break;
 
+			case "blackegg":
+				yield return ScenarioBlackEgg();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -10182,7 +10186,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "recovereddata: planet messages / artifact sites / colony evaluations / story texts: " + counts );
 
-		Check( "recovereddata: the game data has the 38 planet messages, 14 artifact sites, 51 colony evaluations and 10 story texts of STRINFO", counts == "38/14/51/10", counts );
+		Check( "recovereddata: the game data has the 38 planet messages, 14 artifact sites, 51 colony evaluations and 13 story texts of STRINFO and the original's screens", counts == "38/14/51/13", counts );
 
 		// ---- every record names a planet (and an artifact) the game data has
 		var unresolved = "";
@@ -11590,6 +11594,203 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "crystalfield: with the Crystal Orb in the hold the field does no damage", lostWithTheOrb == 0, lostWithTheOrb.ToString() );
 
 		Finish( "scenario=crystalfield control=" + lostAroundPlanet90 + " withoutOrb=" + lostWithoutTheOrb + " withOrb=" + lostWithTheOrb, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 4: the Black Egg
+
+	// the planets the save says a Black Egg has destroyed (found by the field's name, so that this compiles on the code before the Black Egg; null if the code has no such list)
+	static System.Collections.IList DestroyedPlanets()
+	{
+		return FieldOrNull( DataController.m_instance.m_playerData.m_planetSurfaces, "m_destroyedPlanetList" ) as System.Collections.IList;
+	}
+
+	// waits in orbit until the ship is no longer in orbit or the time is up
+	static IEnumerator WaitWhileInOrbit( float seconds )
+	{
+		var end = Time.realtimeSinceStartup + seconds;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( DataController.m_instance.m_playerData.m_general.m_location == PD_General.Location.InOrbit ) )
+		{
+			yield return null;
+		}
+	}
+
+	IEnumerator ScenarioBlackEgg()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var blackEggId = gameData.FindArtifactId( "Black Egg" );
+		var planet90StarId = gameData.m_planetList[ 90 ].m_starId;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// ---- 1. out on planet 90 with a Black Egg in the terrain vehicle, nothing within reach: the cargo list drops it, and it is armed
+		yield return GoIntoOrbit( planet90StarId, 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=blackegg abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var terrainVehicle = controller.m_terrainVehicle;
+
+		foreach ( var deposit in controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true ) )
+		{
+			if ( Vector3.Distance( deposit.transform.position, terrainVehicle.transform.position ) < 50.0f )
+			{
+				deposit.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		playerData.m_terrainVehicle.AddArtifact( blackEggId );
+
+		controller.m_messages.Clear();
+
+		new TVCargoButton().Execute();
+
+		yield return Frames( 2 );
+
+		var cargoListSet = CargoListButtonSet();
+
+		if ( cargoListSet >= 0 )
+		{
+			PressButton( (ButtonController.ButtonSet) cargoListSet, 1 );
+
+			yield return Frames( 2 );
+		}
+
+		var dropText = MessageList();
+		var eggsOnPlanet90 = 0;
+
+		foreach ( var droppedCargo in playerData.m_planetSurfaces.m_droppedCargoList )
+		{
+			if ( ( droppedCargo.m_planetId == 90 ) && ( droppedCargo.m_artifactId == blackEggId ) )
+			{
+				eggsOnPlanet90++;
+			}
+		}
+
+		Log( "blackegg: after the drop: " + eggsOnPlanet90 + " Black Egg on planet 90 | " + dropText.Substring( 0, Mathf.Min( 200, dropText.Length ) ) );
+
+		Check( "blackegg: the terrain vehicle drops the Black Egg, and the messages say it is armed", ( eggsOnPlanet90 == 1 ) && dropText.Contains( "armed" ), eggsOnPlanet90 + " | " + dropText );
+
+		// ---- 2. back up in orbit: the countdown, BOOM, and planet 90 is gone, with the ship in the star system
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+
+		controller.m_messages.Clear();
+		ship.m_armorPoints = ship.GetMaximumArmorPoints();
+
+		controller.SwitchLocation( PD_General.Location.InOrbit );
+
+		yield return WaitWhileInOrbit( 12.0f );
+		yield return Frames( 3 );
+
+		var countdownText = MessageList();
+		var destroyed = DestroyedPlanets();
+		var planet90Destroyed = ( destroyed != null ) && destroyed.Contains( 90 );
+		var locationAfter = playerData.m_general.m_location;
+		var controllerOf90 = controller.m_starSystem.GetPlanetController( 90 );
+
+		Log( "blackegg: back in orbit above planet 90: location " + locationAfter + ", destroyed in the save " + planet90Destroyed + ", its planet controller " + ( ( controllerOf90 == null ) ? "gone" : "still there" ) + " | " + countdownText.Substring( 0, Mathf.Min( 300, countdownText.Length ) ) );
+
+		Check( "blackegg: back in orbit the egg counts down from 5 and goes BOOM", countdownText.Contains( "COUNTDOWN TRANSMISSION FROM THE BLACK EGG" ) && countdownText.Contains( "5" ) && countdownText.Contains( "1" ) && countdownText.Contains( "BOOM!" ), countdownText );
+		Check( "blackegg: planet 90 is destroyed, saved, gone from its star system, and the ship is in the star system", planet90Destroyed && ( controllerOf90 == null ) && ( locationAfter == PD_General.Location.StarSystem ), planet90Destroyed + ", " + ( controllerOf90 == null ) + ", " + locationAfter );
+
+		// ---- 3. an egg on the Crystal Planet away from its control nexus: damaged but not destroyed
+		var crystalStarId = gameData.m_planetList[ 33 ].m_starId;
+		var awayFromTheNexus = Tools.LatLongToWorldCoordinates( 0.0f, 0.0f );
+
+		playerData.m_planetSurfaces.AddDroppedCargo( 33, awayFromTheNexus.x, 0.0f, awayFromTheNexus.z, -1, 0, blackEggId );
+
+		ship.AddArtifact( gameData.FindArtifactId( "Crystal Orb" ) );
+
+		yield return GoIntoOrbit( crystalStarId, 33 );
+
+		controller.m_messages.Clear();
+
+		var end = Time.realtimeSinceStartup + 10.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !MessageList().Contains( "BOOM!" ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 3 );
+
+		var damagedText = MessageList();
+		var crystalAfterAway = ( destroyed != null ) && destroyed.Contains( 33 );
+		var eggsLeftOn33 = 0;
+
+		foreach ( var droppedCargo in playerData.m_planetSurfaces.m_droppedCargoList )
+		{
+			if ( droppedCargo.m_planetId == 33 )
+			{
+				eggsLeftOn33++;
+			}
+		}
+
+		Log( "blackegg: an egg on the Crystal Planet at 0 x 0: destroyed " + crystalAfterAway + ", location " + playerData.m_general.m_location + ", eggs left " + eggsLeftOn33 + " | " + damagedText );
+
+		Check( "blackegg: away from the control nexus the Crystal Planet is damaged but not destroyed", damagedText.Contains( "CRYSTAL PLANET DAMAGED BUT NOT DESTROYED" ) && !crystalAfterAway && ( eggsLeftOn33 == 0 ) && ( playerData.m_general.m_location == PD_General.Location.InOrbit ), crystalAfterAway + ", " + eggsLeftOn33 + ", " + playerData.m_general.m_location );
+
+		// ---- 4. an egg at the control nexus (47N x 45E): the Crystal Planet is destroyed
+		var atTheNexus = Tools.LatLongToWorldCoordinates( 45.0f, 47.0f );
+
+		playerData.m_planetSurfaces.AddDroppedCargo( 33, atTheNexus.x, 0.0f, atTheNexus.z, -1, 0, blackEggId );
+
+		controller.m_messages.Clear();
+
+		yield return WaitWhileInOrbit( 12.0f );
+		yield return Frames( 3 );
+
+		var nexusText = MessageList();
+		var crystalDestroyed = ( destroyed != null ) && destroyed.Contains( 33 );
+
+		Log( "blackegg: an egg at the nexus: destroyed " + crystalDestroyed + ", location " + playerData.m_general.m_location + " | " + nexusText.Substring( 0, Mathf.Min( 300, nexusText.Length ) ) );
+
+		Check( "blackegg: at the control nexus the Crystal Planet is destroyed, with the message from Interstel", crystalDestroyed && nexusText.Contains( "INTERSTEL MEDAL OF SUBLIME ACHIEVEMENT" ) && ( playerData.m_general.m_location == PD_General.Location.StarSystem ), crystalDestroyed + ", " + playerData.m_general.m_location );
+
+		// ---- 5. back in planet 90's star system: the planet is still gone
+		EnterStarSystem( planet90StarId );
+
+		end = Time.realtimeSinceStartup + 40.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && controller.m_starSystem.GeneratingPlanets() )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		var stillGone = controller.m_starSystem.GetPlanetController( 90 ) == null;
+		var otherPlanets = 0;
+
+		foreach ( var planet in gameData.m_starList[ planet90StarId ].GetPlanetList() )
+		{
+			if ( ( planet != null ) && ( planet.m_id != -1 ) && ( planet.m_id != 90 ) && ( controller.m_starSystem.GetPlanetController( planet.m_id ) != null ) )
+			{
+				otherPlanets++;
+			}
+		}
+
+		Log( "blackegg: back in the star system of planet 90: planet 90 " + ( stillGone ? "gone" : "back" ) + ", the other planets there " + otherPlanets );
+
+		Check( "blackegg: coming back to its star system, the destroyed planet is still gone and the others are there", stillGone && ( otherPlanets > 0 ), stillGone + ", " + otherPlanets );
+
+		Finish( "scenario=blackegg dropped=" + eggsOnPlanet90 + " planet90=" + planet90Destroyed + " crystalAway=" + crystalAfterAway + " crystalNexus=" + crystalDestroyed + " stillGone=" + stillGone, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

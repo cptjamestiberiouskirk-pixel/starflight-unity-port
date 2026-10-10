@@ -142,6 +142,12 @@ public class StarSystem : MonoBehaviour
 		{
 			var planet = m_currentStar.GetPlanet( i );
 
+			// a planet a Black Egg has destroyed is gone
+			if ( ( planet != null ) && IsPlanetDestroyed( planet.m_id ) )
+			{
+				planet = null;
+			}
+
 			m_planetController[ i ].InitializePlanet( planet );
 		}
 
@@ -247,7 +253,7 @@ public class StarSystem : MonoBehaviour
 
 		foreach ( var planet in planetList )
 		{
-			if ( ( planet != null ) && ( planet.m_id != -1 ) )
+			if ( ( planet != null ) && ( planet.m_id != -1 ) && !IsPlanetDestroyed( planet.m_id ) )
 			{
 				// validate orbit position is within bounds
 				int orbitIndex = planet.m_orbitPosition - 1;
@@ -292,6 +298,30 @@ public class StarSystem : MonoBehaviour
 
 			Debug.Log( "The star will flare in " + timeToFlare + " days - minSize = " + minSize + ", maxSize = " + maxSize );
 		}
+	}
+
+	// true if a Black Egg has destroyed this planet
+	public static bool IsPlanetDestroyed( int planetId )
+	{
+		var planetSurfaces = DataController.m_instance.m_playerData.m_planetSurfaces;
+
+		return ( planetSurfaces != null ) && planetSurfaces.IsPlanetDestroyed( planetId );
+	}
+
+	// call this when a Black Egg has destroyed a planet of this star system: it is gone from the system and from the system display
+	public void RemoveDestroyedPlanet( int planetId )
+	{
+		var planetController = GetPlanetController( planetId );
+
+		if ( planetController == null )
+		{
+			return;
+		}
+
+		planetController.InitializePlanet( null );
+		planetController.DisablePlanet();
+
+		SpaceflightController.m_instance.m_displayController.m_systemDisplay.ChangeSystem();
 	}
 
 	// find and return the planet controller that has the planet we are looking for
