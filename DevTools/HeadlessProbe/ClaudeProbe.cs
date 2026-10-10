@@ -583,6 +583,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioBlackEgg();
 				break;
 
+			case "crystalcone":
+				yield return ScenarioCrystalCone();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -11791,6 +11795,94 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "blackegg: coming back to its star system, the destroyed planet is still gone and the others are there", stillGone && ( otherPlanets > 0 ), stillGone + ", " + otherPlanets );
 
 		Finish( "scenario=blackegg dropped=" + eggsOnPlanet90 + " planet90=" + planet90Destroyed + " crystalAway=" + crystalAfterAway + " crystalNexus=" + crystalDestroyed + " stillGone=" + stillGone, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 4: the Crystal Cone
+
+	// goes into orbit around a planet from its star system, clears the messages and waits a while in orbit - returns the messages
+	static IEnumerator OrbitAndListen( int starId, int planetId, string[] messages )
+	{
+		var controller = SpaceflightController.m_instance;
+
+		yield return GoIntoOrbit( starId, planetId );
+
+		// once more from the star system, so that the messages are those of this orbit only
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+
+		controller.m_messages.Clear();
+
+		yield return EnterOrbit( planetId );
+
+		var end = Time.realtimeSinceStartup + 2.0f;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			yield return null;
+		}
+
+		messages[ 0 ] = MessageList();
+	}
+
+	IEnumerator ScenarioCrystalCone()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var coneId = gameData.FindArtifactId( "Crystal Cone" );
+		var crystalStarId = gameData.m_planetList[ 33 ].m_starId;
+		var messages = new string[ 1 ];
+
+		EnsureCrew();
+
+		// the Crystal Orb keeps the field of the Crystal Planet away, and no Crystal Cone to begin with
+		ship.AddArtifact( gameData.FindArtifactId( "Crystal Orb" ) );
+
+		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( coneId ) != null ); guard++ )
+		{
+			ship.RemoveArtifact( coneId );
+		}
+
+		// ---- 1. the control: in orbit around the Crystal Planet without the Cone, nothing about the nexus
+		yield return OrbitAndListen( crystalStarId, 33, messages );
+
+		var withoutTheCone = messages[ 0 ];
+
+		// ---- 2. with the Cone in the hold, going into orbit reports the nexus
+		ship.AddArtifact( coneId );
+
+		yield return OrbitAndListen( crystalStarId, 33, messages );
+
+		var withTheCone = messages[ 0 ];
+
+		// ---- 3. and Land, which opens the map to pick the landing site, reports it again
+		controller.m_messages.Clear();
+
+		new LandButton().Execute();
+
+		yield return Frames( 3 );
+
+		var onLand = MessageList();
+
+		// back to the bridge buttons for what follows
+		controller.m_buttonController.SetBridgeButtons();
+
+		// ---- 4. the control: with the Cone, in orbit around an ordinary planet, nothing about a nexus
+		yield return OrbitAndListen( gameData.m_planetList[ 90 ].m_starId, 90, messages );
+
+		var aroundPlanet90 = messages[ 0 ];
+
+		Log( "crystalcone: without the Cone: " + withoutTheCone + " | with the Cone: " + withTheCone + " | on Land: " + onLand + " | around planet 90: " + aroundPlanet90 );
+
+		Check( "crystalcone: in orbit around the Crystal Planet without the Crystal Cone nothing is said about the nexus (control)", !withoutTheCone.Contains( "nexus" ) && ( withoutTheCone.Length > 0 ), withoutTheCone );
+		Check( "crystalcone: with the Crystal Cone, going into orbit around the Crystal Planet reports the control nexus at 47N x 45E", withTheCone.Contains( "control nexus" ) && withTheCone.Contains( "47N x 45E" ), withTheCone );
+		Check( "crystalcone: with the Crystal Cone, Land over the Crystal Planet reports the nexus again", onLand.Contains( "47N x 45E" ), onLand );
+		Check( "crystalcone: with the Crystal Cone, in orbit around an ordinary planet nothing is said about a nexus (control)", !aroundPlanet90.Contains( "nexus" ), aroundPlanet90 );
+
+		Finish( "scenario=crystalcone without=" + withoutTheCone.Contains( "nexus" ) + " with=" + withTheCone.Contains( "47N x 45E" ) + " land=" + onLand.Contains( "47N x 45E" ) + " planet90=" + aroundPlanet90.Contains( "nexus" ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

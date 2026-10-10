@@ -107,8 +107,9 @@ What the probe does:
 | `cargodisplay` | on planet 90 with an element and a Hypercube in the terrain vehicle: the cargo display shown in place of the terrain vehicle's when the real Cargo button opens the list, its labels and values, how much memory an update takes when nothing changed (with the control that shows the measurement works), the display after the Hypercube is dropped, and Back bringing the terrain vehicle's display back (about 25 s) |
 | `crystalfield` | the field of the Crystal Planet: armor lost in 3 s with the shields down, in orbit around planet 90 (the control, none), around the Crystal Planet without the Crystal Orb in the ship's hold (at least 10) and with it (none) (about 40 s) |
 | `blackegg` | the Black Egg: dropped from the terrain vehicle on planet 90 with the real Cargo list (the messages say it is armed); back in orbit the countdown, BOOM, planet 90 destroyed in the save and gone from its star system with the ship in the star system; an egg on the Crystal Planet at 0 x 0 (damaged but not destroyed, the egg used up) and at the control nexus 47N x 45E (destroyed, with Interstel's message); back in planet 90's star system after another, planet 90 still gone and the others there (about 70 s) |
+| `crystalcone` | the Crystal Cone: the messages of an orbit around the Crystal Planet without the Cone (the control, nothing about the nexus) and with it (the control nexus at 47N x 45E), Land there with the Cone (reported again), and an orbit around planet 90 with the Cone (the control, nothing) (about 50 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (66 scenarios, about 34 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (67 scenarios, about 35 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
