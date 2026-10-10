@@ -619,6 +619,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioRodDevice();
 				break;
 
+			case "crystalpearl":
+				yield return ScenarioCrystalPearl();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -12757,6 +12761,85 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "roddevice: the Rod Device is a laser shield - a plasma bolt does the same damage (control)", plasmaWith == plasmaWithout, plasmaWithout + " -> " + plasmaWith );
 
 		Finish( "scenario=roddevice laser=" + laserWithout + "/" + laserWith + " plasma=" + plasmaWithout + "/" + plasmaWith, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 4: the Crystal Pearl
+
+	IEnumerator ScenarioCrystalPearl()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var ship = playerData.m_playerShip;
+		var combat = CombatController.m_instance;
+		var pearlId = gameData.FindArtifactId( "Crystal Pearl" );
+		var maximum = ship.GetMaximumArmorPoints();
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		EnsureCrew();
+
+		ship.m_shieldsAreUp = false;
+
+		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( pearlId ) != null ); guard++ )
+		{
+			ship.RemoveArtifact( pearlId );
+		}
+
+		// ---- 1. the control: without the Crystal Pearl a ship hit down to a twentieth of its armor stays in the encounter
+		ship.m_armorPoints = maximum;
+
+		EnterEncounter( speminId );
+		yield return Frames( 10 );
+
+		combat.ApplyDamageToPlayer( maximum - maximum / 20, Vector3.forward );
+
+		yield return Frames( 10 );
+
+		var locationWithout = playerData.m_general.m_location;
+		var armorWithout = ship.m_armorPoints;
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 2. with the Crystal Pearl the same hit warps the ship out of the encounter, with the armor it has left
+		ship.AddArtifact( pearlId );
+		ship.m_armorPoints = maximum;
+
+		EnterEncounter( speminId );
+		yield return Frames( 10 );
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		combat.ApplyDamageToPlayer( maximum - maximum / 20, Vector3.forward );
+
+		yield return Frames( 10 );
+
+		var locationWith = playerData.m_general.m_location;
+		var armorWith = ship.m_armorPoints;
+		var warpText = MessageList();
+
+		// ---- 3. and a hit that would destroy the ship warps it out with 1 armor point
+		ship.m_armorPoints = maximum;
+
+		EnterEncounter( speminId );
+		yield return Frames( 10 );
+
+		combat.ApplyDamageToPlayer( maximum * 2, Vector3.forward );
+
+		yield return Frames( 10 );
+
+		var locationAfterLethal = playerData.m_general.m_location;
+		var armorAfterLethal = ship.m_armorPoints;
+		var destroyed = combat.PlayerIsDestroyed();
+
+		Log( "crystalpearl: a hit down to " + ( maximum / 20 ) + " of " + maximum + " armor points without the Pearl: " + locationWithout + " with " + armorWithout + " | with the Pearl: " + locationWith + " with " + armorWith + " (" + warpText + ") | a hit of " + ( maximum * 2 ) + " with the Pearl: " + locationAfterLethal + " with " + armorAfterLethal + ", destroyed " + destroyed );
+
+		Check( "crystalpearl: without the Crystal Pearl a critically wounded ship stays in the encounter (control)", ( locationWithout == PD_General.Location.Encounter ) && ( armorWithout == maximum / 20 ), locationWithout + ", " + armorWithout );
+		Check( "crystalpearl: with the Crystal Pearl a critically wounded ship is warped out of the encounter", ( locationWith != PD_General.Location.Encounter ) && ( armorWith == maximum / 20 ) && warpText.Contains( "Crystal Pearl" ), locationWith + ", " + armorWith + " | " + warpText );
+		Check( "crystalpearl: with the Crystal Pearl a hit that would destroy the ship warps it out with 1 armor point", ( locationAfterLethal != PD_General.Location.Encounter ) && ( armorAfterLethal == 1 ) && !destroyed, locationAfterLethal + ", " + armorAfterLethal + ", " + destroyed );
+
+		Finish( "scenario=crystalpearl without=" + locationWithout + "/" + armorWithout + " with=" + locationWith + "/" + armorWith + " lethal=" + locationAfterLethal + "/" + armorAfterLethal + "/" + destroyed, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

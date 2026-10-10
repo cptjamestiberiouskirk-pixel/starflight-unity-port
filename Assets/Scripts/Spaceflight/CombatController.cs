@@ -615,12 +615,50 @@ public class CombatController : MonoBehaviour
 				SpaceflightController.m_instance.m_messages.AddText( "<color=#FFA500>WARNING: Hull breach imminent!</color>" );
 			}
 
+			// a critically wounded ship is warped out of danger by the Crystal Pearl
+			if ( WarpOutWithTheCrystalPearl() )
+			{
+				return;
+			}
+
 			// check for destruction
 			if ( playerData.m_playerShip.m_armorPoints <= 0 )
 			{
 				DestroyPlayer( playerPosition );
 			}
 		}
+	}
+
+	// the Crystal Pearl is "an automatic warp-out device for when a ship is heavily damaged" (the Thrynn; the Spemin: it "automatically warps a critically wounded
+	// ship out of danger") - with it in the hold a ship in an encounter that has less than a tenth of its armor left, or would be destroyed, is warped out of the
+	// encounter with what armor it has (at least 1 point). The tenth is the port's choice - returns true if the ship was warped out
+	bool WarpOutWithTheCrystalPearl()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+
+		if ( ( playerData.m_general.m_location != PD_General.Location.Encounter ) || !ship.HasArtifact( "Crystal Pearl" ) )
+		{
+			return false;
+		}
+
+		// critically wounded?
+		if ( ship.m_armorPoints * 10 >= ship.GetMaximumArmorPoints() )
+		{
+			return false;
+		}
+
+		// the hit that wounded it did not destroy it
+		ship.m_armorPoints = Mathf.Max( ship.m_armorPoints, 1 );
+
+		// nothing that is still in the air follows the ship out
+		ClearMissiles();
+
+		SpaceflightController.m_instance.m_messages.AddText( "<color=yellow>The Crystal Pearl has warped the ship out of danger!</color>" );
+
+		SpaceflightController.m_instance.m_encounter.WarpOut();
+
+		return true;
 	}
 
 	// call this when something other than damage destroys the player ship (a star that flares with the ship in its system) - the cause is what the game over
