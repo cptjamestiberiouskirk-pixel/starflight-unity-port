@@ -639,6 +639,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioRingDevice();
 				break;
 
+			case "starport-endurium":
+				yield return ScenarioStarportEndurium();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -13178,6 +13182,98 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=ringdevice without=" + shownWithout + " with=" + shownWith + " of=" + fluxCount + " through=" + throughHiddenFlux, 0 );
 	}
 
+	// ---------------------------------------------------------------- phase 1: the price of Endurium
+
+	// what the Starport pays for a cubic meter of an element (through the code's own method where it has one, so that this compiles on the code before it)
+	static int ElementSaleValue( int elementId )
+	{
+		var element = DataController.m_instance.m_gameData.m_elementList[ elementId ];
+		var method = element.GetType().GetMethod( "GetActualValue" );
+
+		return ( method != null ) ? (int) method.Invoke( element, null ) : element.m_actualValue;
+	}
+
+	// buys or sells one cubic meter of Endurium at the trade depot, the way the player would - returns the change of the bank balance
+	static int TradeOneCubicMeterOfEndurium( TradeDepotPanel depot, bool buy )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var balanceBefore = playerData.m_bank.m_currentBalance;
+
+		Call( depot, buy ? "SwitchToBuyItemState" : "SwitchToSellItemState", true );
+
+		var items = GetField( depot, "m_itemList" ) as IList;
+		var index = -1;
+
+		for ( var i = 0; i < items.Count; i++ )
+		{
+			if ( ( (int) GetField( items[ i ], "m_type" ) == 0 ) && ( (int) GetField( items[ i ], "m_id" ) == 5 ) )
+			{
+				index = i;
+			}
+		}
+
+		if ( index < 0 )
+		{
+			return 0;
+		}
+
+		SetField( depot, "m_currentItemIndex", index );
+
+		Call( depot, buy ? "SwitchToBuyAmountState" : "SwitchToSellAmountState" );
+
+		depot.m_amountInputField.text = "1";
+		depot.OnEndEdit();
+
+		return playerData.m_bank.m_currentBalance - balanceBefore;
+	}
+
+	IEnumerator ScenarioStarportEndurium()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var depot = FindPanel<TradeDepotPanel>();
+		var dates = new[] { "4620-02-19", "4620-02-20", "4620-05-15" };
+		var bought = new int[ dates.Length ];
+		var sold = new int[ dates.Length ];
+		var molybdenumBefore = 0;
+		var molybdenumAfter = 0;
+
+		playerData.m_bank.m_currentBalance = 1000000;
+		playerData.m_playerShip.AddElement( 5, 100 );
+
+		yield return OpenPanel( depot, "trade depot" );
+
+		for ( var dateIndex = 0; dateIndex < dates.Length; dateIndex++ )
+		{
+			playerData.m_general.m_currentStardateYMD = dates[ dateIndex ];
+
+			if ( dateIndex == 0 )
+			{
+				molybdenumBefore = ElementSaleValue( 11 );
+			}
+
+			bought[ dateIndex ] = -TradeOneCubicMeterOfEndurium( depot, true );
+			sold[ dateIndex ] = TradeOneCubicMeterOfEndurium( depot, false );
+
+			yield return Frames( 2 );
+		}
+
+		molybdenumAfter = ElementSaleValue( 11 );
+
+		Call( depot, "SwitchToMenuBarState" );
+
+		yield return ClosePanel( depot, "trade depot" );
+
+		Log( "starport-endurium: a cubic meter of Endurium bought / sold on " + dates[ 0 ] + ": " + bought[ 0 ] + " / " + sold[ 0 ] + ", on " + dates[ 1 ] + ": " + bought[ 1 ] + " / " + sold[ 1 ] + ", on " + dates[ 2 ] + ": " + bought[ 2 ] + " / " + sold[ 2 ] + " | what the Starport pays for molybdenum " + molybdenumBefore + " -> " + molybdenumAfter );
+
+		Check( "starport-endurium: before 20-02-4620 Endurium costs 1000 MU, and the Starport buys it back for the same", ( bought[ 0 ] == 1000 ) && ( sold[ 0 ] == 1000 ), bought[ 0 ] + " / " + sold[ 0 ] );
+		Check( "starport-endurium: from 20-02-4620 Endurium is bought and sold for 1500 MU", ( bought[ 1 ] == 1500 ) && ( sold[ 1 ] == 1500 ), bought[ 1 ] + " / " + sold[ 1 ] );
+		Check( "starport-endurium: from 15-05-4620 Endurium is bought and sold for 2000 MU", ( bought[ 2 ] == 2000 ) && ( sold[ 2 ] == 2000 ), bought[ 2 ] + " / " + sold[ 2 ] );
+		Check( "starport-endurium: the other minerals keep their prices (control)", molybdenumBefore == molybdenumAfter, molybdenumBefore + " -> " + molybdenumAfter );
+
+		Finish( "scenario=starport-endurium " + dates[ 0 ] + "=" + bought[ 0 ] + "/" + sold[ 0 ] + " " + dates[ 1 ] + "=" + bought[ 1 ] + "/" + sold[ 1 ] + " " + dates[ 2 ] + "=" + bought[ 2 ] + "/" + sold[ 2 ], 0 );
+	}
+
 	// ---------------------------------------------------------------- batch 1 (starport side)
 
 	struct SellResult
@@ -13315,7 +13411,8 @@ public class ClaudeProbe : MonoBehaviour
 		tradeDepotPanel.SellClicked();
 		yield return Frames( 3 );
 
-		var value = gameData.m_elementList[ 5 ].m_actualValue;
+		// what the Starport pays for Endurium (the same as it sells it for, and rising over time, since roadmap 1.5)
+		var value = ElementSaleValue( 5 );
 
 		var baseline = TrySell( tradeDepotPanel, "abc" );
 		var tooMuch = TrySell( tradeDepotPanel, "25" );

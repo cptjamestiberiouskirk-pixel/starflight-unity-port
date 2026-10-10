@@ -121,8 +121,9 @@ What the probe does:
 | `dodecahedron` | the Dodecahedron: a Spemin encounter at its home in hyperspace with the ship stopped one and a half alien radar distances away (no encounter able to begin): how much closer it comes in 2 s without the Dodecahedron (the control, not at all) and with it in the hold (it comes) (about 20 s) |
 | `shimmeringball` | the Shimmering Ball, one alien laser shot at a time: without it (the control, a hit), with it (no shot at the cloaked ship), right after the player fires the laser (a hit) and 4 s later (cloaked again) (about 25 s) |
 | `ringdevice` | the Ring Device, in hyperspace with no encounter able to begin: the fluxes shown without it (none), the ship put at a hidden flux (the control, it goes through) and the fluxes shown with it in the hold (all) (about 30 s) |
+| `starport-endurium` | the price of Endurium: one cubic meter bought and sold at the real trade depot on 19-02-4620 (1000 both ways), 20-02-4620 (1500) and 15-05-4620 (2000), and what the Starport pays for molybdenum on the first and last date (the control, unchanged) (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (80 scenarios, about 47 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (81 scenarios, about 48 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

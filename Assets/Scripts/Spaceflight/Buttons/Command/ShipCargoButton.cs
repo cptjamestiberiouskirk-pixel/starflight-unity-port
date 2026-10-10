@@ -32,7 +32,7 @@ public class ShipCargoButton : ShipButton
 			{
 				itemColumn += "   " + elementRef.GetElementGameData().m_name + "\n";
 				volumeColumn += Tools.VolumeToText( elementRef.GetVolume() ) + "\n";
-				valueColumn += elementRef.GetElementGameData().m_actualValue + "\n";
+				valueColumn += elementRef.GetElementGameData().GetActualValue() + "\n";
 			}
 		}
 		return new string[] { itemColumn, volumeColumn, valueColumn };

@@ -659,7 +659,7 @@ public class TradeDepotPanel : Panel
 									m_volumeListText.text += ( elementReference.m_volume / 10 ) + "." + ( elementReference.m_volume % 10 ) + Environment.NewLine;
 								}
 
-								m_unitValueListText.text += elementGameData.m_starportPrice + Environment.NewLine;
+								m_unitValueListText.text += elementGameData.GetStarportPrice() + Environment.NewLine;
 
 								m_itemList.Add( new Item( m_rowCount++, 0, elementId, 0 ) );
 							}
@@ -674,7 +674,8 @@ public class TradeDepotPanel : Panel
 
 							m_itemListText.text += elementGameData.m_name + Environment.NewLine;
 							m_volumeListText.text += ( elementReference.m_volume / 10 ) + "." + ( elementReference.m_volume % 10 ) + Environment.NewLine;
-							m_unitValueListText.text += elementGameData.m_starportPrice + Environment.NewLine;
+							// what the Starport pays for it (this showed the price it sells for, twice what a sale brings)
+							m_unitValueListText.text += elementGameData.GetActualValue() + Environment.NewLine;
 
 							m_itemList.Add( new Item( m_rowCount++, 0, elementReference.m_elementId, 0 ) );
 						}
@@ -1009,7 +1010,7 @@ public class TradeDepotPanel : Panel
 						GameData gameData = DataController.m_instance.m_gameData;
 
 						// get the starport price of this element
-						int starportPrice = gameData.m_elementList[ elementId ].m_starportPrice;
+						int starportPrice = gameData.m_elementList[ elementId ].GetStarportPrice();
 
 						// deduct the price of the artifact from the player's bank balance
 						playerData.m_bank.m_currentBalance -= starportPrice * desiredAmount / 10;
@@ -1043,7 +1044,7 @@ public class TradeDepotPanel : Panel
 					GameData gameData = DataController.m_instance.m_gameData;
 
 					// get the sell price of this element
-					int sellPrice = gameData.m_elementList[ elementId ].m_actualValue;
+					int sellPrice = gameData.m_elementList[ elementId ].GetActualValue();
 
 					// add the sell price of the artifact to the player's bank balance
 					playerData.m_bank.m_currentBalance += sellPrice * desiredAmount / 10;
@@ -1196,7 +1197,7 @@ public class TradeDepotPanel : Panel
 		PlayerData playerData = DataController.m_instance.m_playerData;
 
 		// get the starport price of this element
-		int starportPrice = gameData.m_elementList[ elementId ].m_starportPrice;
+		int starportPrice = gameData.m_elementList[ elementId ].GetStarportPrice();
 
 		// get the player's current bank balance
 		int currentBalance = playerData.m_bank.m_currentBalance;
