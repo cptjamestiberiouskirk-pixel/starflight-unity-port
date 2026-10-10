@@ -1524,7 +1524,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "planet scan shows a picture", PictureShown( sensors ), SensorPicture( sensors ) );
 
 		// control: a planet reads bio and minerals (the readout is written every frame while the scan runs)
-		Check( "planet readout reads minerals", sensors.m_bioMinText.text.Contains( "Min: " ) && !sensors.m_bioMinText.text.Contains( "Energy" ), "readout=[" + sensors.m_bioMinText.text + "]" );
+		Check( "planet readout reads minerals, with no percent sign", sensors.m_bioMinText.text.Contains( "Min: " ) && !sensors.m_bioMinText.text.Contains( "Energy" ) && !sensors.m_bioMinText.text.Contains( "%" ), "readout=[" + sensors.m_bioMinText.text + "]" );
 
 		// a vessel that has its own picture (control)
 		spaceflightController.m_displayController.ChangeDisplay( sensors );
@@ -1714,22 +1714,22 @@ public class ClaudeProbe : MonoBehaviour
 		yield return ScanWreck( 3, result => wreck = result );
 		Check( "spemin warship wreck shows the spemin warship debris", wreck.Contains( "shown=True" ) && wreck.EndsWith( "mask=Sensors - Spemin Warship_debris_mask" ), wreck );
 
-		// the readout of a finished scan: a vessel's mass in tons, its bio density and its energy, as the original shows them
+		// the readout of a finished scan: a vessel's mass in tons, its bio density and its energy, as the original shows them (plain numbers, no percent sign)
 		// (spemin scout 4x10^2 bio 100 energy 100, mechan scout 2x10^2 bio 0 energy 100, minstrel "2" with no power of ten, bio 100 energy 0)
 		var scan = "";
 
 		yield return ScanShip( 2, false, true, result => scan = result );
-		Check( "spemin scout readout: 4x10^2 tons, bio 100, energy 100", scan.Contains( "finished=True" ) && scan.Contains( "4x10<sup>2</sup>" ) && scan.Contains( "Bio: <color=\"white\">100%</color>" ) && scan.Contains( "Energy: <color=\"white\">100%</color>" ), scan );
+		Check( "spemin scout readout: 4x10^2 tons, bio 100, energy 100", scan.Contains( "finished=True" ) && scan.Contains( "4x10<sup>2</sup>" ) && scan.Contains( "Bio: <color=\"white\">100</color>" ) && scan.Contains( "Energy: <color=\"white\">100</color>" ), scan );
 
 		yield return ScanShip( 4, false, true, result => scan = result );
-		Check( "mechan scout readout: 2x10^2 tons, bio 0, energy 100", scan.Contains( "finished=True" ) && scan.Contains( "2x10<sup>2</sup>" ) && scan.Contains( "Bio: <color=\"white\">0%</color>" ) && scan.Contains( "Energy: <color=\"white\">100%</color>" ), scan );
+		Check( "mechan scout readout: 2x10^2 tons, bio 0, energy 100", scan.Contains( "finished=True" ) && scan.Contains( "2x10<sup>2</sup>" ) && scan.Contains( "Bio: <color=\"white\">0</color>" ) && scan.Contains( "Energy: <color=\"white\">100</color>" ), scan );
 
 		yield return ScanShip( 22, false, true, result => scan = result );
-		Check( "minstrel readout: 2 tons with no power of ten, bio 100, energy 0", scan.Contains( "finished=True" ) && scan.Contains( "<color=\"white\">2</color> Tons" ) && !scan.Contains( "<sup>" ) && scan.Contains( "Bio: <color=\"white\">100%</color>" ) && scan.Contains( "Energy: <color=\"white\">0%</color>" ), scan );
+		Check( "minstrel readout: 2 tons with no power of ten, bio 100, energy 0", scan.Contains( "finished=True" ) && scan.Contains( "<color=\"white\">2</color> Tons" ) && !scan.Contains( "<sup>" ) && scan.Contains( "Bio: <color=\"white\">100</color>" ) && scan.Contains( "Energy: <color=\"white\">0</color>" ), scan );
 
 		// a wreck has the mass of its vessel in tons (it was one power of ten too high) and its salvage potential as minerals
 		yield return ScanShip( 2, true, true, result => scan = result );
-		Check( "spemin scout wreck readout: 4x10^2 tons, min", scan.Contains( "finished=True" ) && scan.Contains( "4x10<sup>2</sup>" ) && scan.Contains( "Min: " ) && !scan.Contains( "Energy" ), scan );
+		Check( "spemin scout wreck readout: 4x10^2 tons, min, with no percent sign", scan.Contains( "finished=True" ) && scan.Contains( "4x10<sup>2</sup>" ) && scan.Contains( "Min: " ) && !scan.Contains( "Energy" ) && !scan.Contains( "%" ), scan );
 
 		// every slot of the two texture arrays is either empty or a texture that is there (a reference to a missing asset reads as null too, so count the slots that are set)
 		var slotsSet = 0;

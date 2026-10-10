@@ -324,7 +324,8 @@ public class SensorsDisplay : ShipDisplay
 		// update the bio text (the sensors read the minerals of a planet or of debris, and the energy of a vessel, as in the original)
 		var secondLabel = IsVessel( m_scanType ) ? "Energy" : "Min";
 
-		m_bioMinText.text = "Bio: <color=\"white\">" + Mathf.RoundToInt( scannedBio ) + "%</color>   " + secondLabel + ": <color=\"white\">" + Mathf.RoundToInt( scannedMinerals ) + "%</color>";
+		// the original shows plain numbers here, with no percent sign
+		m_bioMinText.text = "Bio: <color=\"white\">" + Mathf.RoundToInt( scannedBio ) + "</color>   " + secondLabel + ": <color=\"white\">" + Mathf.RoundToInt( scannedMinerals ) + "</color>";
 	}
 
 	// returns true if this scan type is a vessel (and not a planet, debris or an unknown object)
