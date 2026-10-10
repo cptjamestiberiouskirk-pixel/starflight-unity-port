@@ -2075,8 +2075,12 @@ public class Encounter : MonoBehaviour
 				}
 			}
 
+			// the Whining Orb translates the language of the Spemin (the Thrynn: "There is an orb device which makes a queer whining sound. This translates the
+			// Spemin language.") - nothing they say is garbled with it aboard
+			var translated = ( m_gdEncounter.m_race == GameData.Race.Spemin ) && playerData.m_playerShip.HasArtifact( "Whining Orb" );
+
 			// did we find any?
-			if ( possibleGarbles.Count > 0 )
+			if ( ( possibleGarbles.Count > 0 ) && !translated )
 			{
 				// yes - get the personnel file of the comm officer
 				personnelFile = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer );

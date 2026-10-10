@@ -611,6 +611,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioTesseract();
 				break;
 
+			case "whiningorb":
+				yield return ScenarioWhiningOrb();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -12582,6 +12586,95 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "tesseract: with the Tesseract in the hold the engines use half the fuel", ( ratio >= 0.4f ) && ( ratio <= 0.6f ) && stayedWith, ratio + ", " + stayedWith );
 
 		Finish( "scenario=tesseract without=" + withoutTheTesseract.ToString( "0.0000" ) + " with=" + withTheTesseract.ToString( "0.0000" ) + " ratio=" + ratio.ToString( "0.00" ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 4: the Whining Orb
+
+	// what the messages show of this comm, said by the aliens of the current encounter
+	static string AlienCommShown( GD_Comm comm )
+	{
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		SpaceflightController.m_instance.m_encounter.AddComm( GD_Comm.Subject.Statement, false, comm );
+
+		return MessageList();
+	}
+
+	IEnumerator ScenarioWhiningOrb()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var ship = playerData.m_playerShip;
+		var orbId = gameData.FindArtifactId( "Whining Orb" );
+
+		EnsureCrew();
+
+		// a communications officer who understands almost nothing, and no Whining Orb to begin with
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 0;
+
+		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( orbId ) != null ); guard++ )
+		{
+			ship.RemoveArtifact( orbId );
+		}
+
+		// a statement of the Spemin from the game data with nothing in it that is filled in
+		GD_Comm speminComm = null;
+
+		foreach ( var comm in gameData.m_commList )
+		{
+			if ( ( comm.m_race == GameData.Race.Spemin ) && ( comm.m_subject == GD_Comm.Subject.Statement ) && ( comm.m_text.IndexOfAny( new[] { '&', '*', '/', '(', ')' } ) < 0 ) )
+			{
+				speminComm = comm;
+
+				break;
+			}
+		}
+
+		// ---- 1. the control: the Spemin, without the Orb, are garbled
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		EnterEncounter( speminId );
+		yield return Frames( 10 );
+
+		var withoutTheOrb = AlienCommShown( speminComm );
+
+		// ---- 2. with the Whining Orb in the hold every word comes through
+		ship.AddArtifact( orbId );
+
+		var withTheOrb = AlienCommShown( speminComm );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 3. the control: the Orb translates only the Spemin - an Elowan statement is still garbled
+		GD_Comm elowanComm = null;
+
+		foreach ( var comm in gameData.m_commList )
+		{
+			if ( ( comm.m_race == GameData.Race.Elowan ) && ( comm.m_subject == GD_Comm.Subject.Statement ) && ( comm.m_text.IndexOfAny( new[] { '&', '*', '/', '(', ')' } ) < 0 ) )
+			{
+				elowanComm = comm;
+
+				break;
+			}
+		}
+
+		EnterEncounter( FindEncounter( 0, 1, 1, 0, GameData.Race.Elowan ) );
+		yield return Frames( 10 );
+
+		var elowanWithTheOrb = AlienCommShown( elowanComm );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		Log( "whiningorb: spemin comm " + speminComm.m_id + " without the Orb: " + withoutTheOrb + " | with it: " + withTheOrb + " | elowan comm " + elowanComm.m_id + " with the Orb: " + elowanWithTheOrb );
+
+		Check( "whiningorb: without the Whining Orb a crew with no skill in communications gets the Spemin garbled (control)", !withoutTheOrb.Contains( speminComm.m_text ), withoutTheOrb );
+		Check( "whiningorb: with the Whining Orb in the hold every word of the Spemin comes through", withTheOrb.Contains( speminComm.m_text ), withTheOrb );
+		Check( "whiningorb: the Whining Orb translates only the Spemin (an Elowan statement is still garbled)", !elowanWithTheOrb.Contains( elowanComm.m_text ), elowanWithTheOrb );
+
+		Finish( "scenario=whiningorb without=" + withoutTheOrb.Contains( speminComm.m_text ) + " with=" + withTheOrb.Contains( speminComm.m_text ) + " elowan=" + elowanWithTheOrb.Contains( elowanComm.m_text ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
