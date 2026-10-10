@@ -21,6 +21,14 @@ public class InOrbit : MonoBehaviour
 	// true from the moment the ship goes into orbit until we have looked for an encounter that waits in orbit around this planet (we look once every time)
 	bool m_lookForEncounter;
 
+	// how many points of damage the field of the Crystal Planet does to a ship that orbits it without the Crystal Orb, and how often (in seconds)
+	// (the sources say only that the ship "will take on damage rapidly" - these are the port's values)
+	const int c_crystalFieldDamage = 5;
+	const float c_crystalFieldInterval = 1.0f;
+
+	// the time until the field of the Crystal Planet does damage again
+	float m_crystalFieldTimer;
+
 	// unity awake
 	void Awake()
 	{
@@ -54,6 +62,9 @@ public class InOrbit : MonoBehaviour
 			}
 		}
 
+		// the field of the Crystal Planet damages a ship that orbits it without the Crystal Orb
+		UpdateCrystalPlanetField();
+
 		// slowly spin the planet
 		m_spin += Time.deltaTime * SpaceflightController.m_instance.m_planetRotationSpeed;
 
@@ -68,6 +79,58 @@ public class InOrbit : MonoBehaviour
 
 		// apply it to the planet
 		m_planetModel.transform.localRotation = newRotation;
+	}
+
+	// the Crystal Planet generates a powerful magnetic force that only the Crystal Orb negates: a ship that orbits it without the orb takes on damage rapidly (STRINFO 5.1, the kernel's crystal planet heating routine)
+	void UpdateCrystalPlanetField()
+	{
+		// no damage while the ship comes up from the surface or goes down to it
+		if ( SpaceflightController.m_instance.m_playerCamera.IsLaunchingOrLanding() )
+		{
+			return;
+		}
+
+		// get to the game data
+		var gameData = DataController.m_instance.m_gameData;
+
+		// get to the player data
+		var playerData = DataController.m_instance.m_playerData;
+
+		// get the planet we are orbiting (guard against an id that is not in the list)
+		var planetId = playerData.m_general.m_currentPlanetId;
+
+		if ( ( planetId < 0 ) || ( planetId >= gameData.m_planetList.Length ) )
+		{
+			return;
+		}
+
+		var planet = gameData.m_planetList[ planetId ];
+
+		// is this the Crystal Planet, and is the Crystal Orb not in the ship's hold?
+		var orbId = gameData.FindArtifactId( "Crystal Orb" );
+		var artifactStorage = playerData.m_playerShip.m_artifactStorage;
+		var shipHasTheOrb = ( artifactStorage != null ) && ( artifactStorage.Find( orbId ) != null );
+
+		if ( !planet.IsCrystalPlanet() || shipHasTheOrb )
+		{
+			// no - the field does nothing, and it begins again with a full interval
+			m_crystalFieldTimer = c_crystalFieldInterval;
+
+			return;
+		}
+
+		// count down to the next damage
+		m_crystalFieldTimer -= Time.deltaTime;
+
+		if ( m_crystalFieldTimer > 0.0f )
+		{
+			return;
+		}
+
+		m_crystalFieldTimer += c_crystalFieldInterval;
+
+		// the field damages the ship (shields first, then armor, as every damage does)
+		SpaceflightController.m_instance.m_combatController.ApplyDamageToPlayer( c_crystalFieldDamage, Vector3.down );
 	}
 
 	// call this to hide the in orbit objects
@@ -96,6 +159,9 @@ public class InOrbit : MonoBehaviour
 
 		// the ship has just gone into orbit - look for an encounter that waits here (in the next update, not in the middle of this switch of location)
 		m_lookForEncounter = true;
+
+		// the field of the Crystal Planet does its first damage a full interval after the ship goes into orbit
+		m_crystalFieldTimer = c_crystalFieldInterval;
 
 		// get to the game data
 		var gameData = DataController.m_instance.m_gameData;

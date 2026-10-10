@@ -9,6 +9,9 @@ public class GD_Planet
 	public const int c_mapWidth = 48;
 	public const int c_mapHeight = 24;
 
+	// the name of the planet type of the Crystal Planet in the game data
+	public const string c_crystalPlanetTypeName = "The Crystal Planet";
+
 	public int m_id;
 	public int m_starId;
 	public int m_planetTypeId;
@@ -62,6 +65,20 @@ public class GD_Planet
 		var gameData = DataController.m_instance.m_gameData;
 
 		return gameData.m_surfaceList[ m_surfaceId ];
+	}
+
+	// call this to find out if this is the Crystal Planet (planet 1 of 192,152 - the one planet of its own type)
+	public bool IsCrystalPlanet()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		// guard against a planet type that is not in the list
+		if ( ( m_planetTypeId < 0 ) || ( m_planetTypeId >= gameData.m_planetTypeList.Length ) )
+		{
+			return false;
+		}
+
+		return gameData.m_planetTypeList[ m_planetTypeId ].m_name == c_crystalPlanetTypeName;
 	}
 
 	// call this to get the orbit angle (in degrees) of the planet
