@@ -1530,6 +1530,32 @@ public class ClaudeProbe : MonoBehaviour
 		// control: a planet reads bio and minerals (the readout is written every frame while the scan runs)
 		Check( "planet readout reads minerals, with no percent sign", sensors.m_bioMinText.text.Contains( "Min: " ) && !sensors.m_bioMinText.text.Contains( "Energy" ) && !sensors.m_bioMinText.text.Contains( "%" ), "readout=[" + sensors.m_bioMinText.text + "]" );
 
+		// the planet's disc is as high in the window as the original draws it (measured in the original on 2026-10-10, in a window 57 pixels high
+		// whose pixels are 1.2 times as high as wide: 2x10^20 tons 10 pixels across, 3x10^21 14, 6x10^21 26, 10^22 tons and up 62)
+		var discMasses = new int[] { 200, 3000, 6000, 10000, 400000 };
+		var discPixels = new float[] { 10.0f, 14.0f, 26.0f, 62.0f, 62.0f };
+		var discText = "";
+		var discsRight = 0;
+
+		for ( var i = 0; i < discMasses.Length; i++ )
+		{
+			spaceflightController.m_displayController.ChangeDisplay( sensors );
+			sensors.StartScanning( SensorsDisplay.ScanType.Planet, 18, discMasses[ i ], planet.m_bioDensity, planet.m_mineralDensity );
+			yield return Frames( 2 );
+
+			var expected = discPixels[ i ] / ( 57.0f * 1.2f );
+			var measured = PlanetDiscFraction( sensors );
+
+			discText += discMasses[ i ] + ": " + measured.ToString( "F3" ) + " (original " + expected.ToString( "F3" ) + ")  ";
+
+			if ( Mathf.Abs( measured - expected ) < 0.01f )
+			{
+				discsRight++;
+			}
+		}
+
+		Check( "a planet's disc is as high in the window as in the original", discsRight == discMasses.Length, discText );
+
 		// a vessel that has its own picture (control)
 		spaceflightController.m_displayController.ChangeDisplay( sensors );
 		sensors.StartScanning( SensorsDisplay.ScanType.SpeminScout, 1, 400, 100, 100 );
@@ -1749,6 +1775,50 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "sensor slots with both textures: " + slotsSet + " of " + sensors.m_maskTextures.Length );
 
 		Finish( "scenario=sensorpictures slotsWithPicture=" + slotsSet + " last=[" + SensorPicture( sensors ) + "]", 0 );
+	}
+
+	// how high the planet's disc is on the screen, as a part of the window's height (the window is the clip, the magenta inside the panel)
+	// (the disc is measured in the mask's file, not taken from the code: the imported texture is not readable)
+	static float PlanetDiscFraction( SensorsDisplay sensors )
+	{
+		var bytes = System.IO.File.ReadAllBytes( "Assets/Game Objects/UI/Sensors/Sensors - Planet Mask.png" );
+		var mask = new Texture2D( 2, 2 );
+
+		mask.LoadImage( bytes );
+
+		// the rows of the middle column that are opaque
+		var top = -1;
+		var bottom = -1;
+
+		for ( var y = 0; y < mask.height; y++ )
+		{
+			if ( mask.GetPixel( mask.width / 2, y ).a > 0.5f )
+			{
+				if ( bottom < 0 )
+				{
+					bottom = y;
+				}
+
+				top = y;
+			}
+		}
+
+		var discRows = top - bottom + 1;
+		var textureHeight = mask.height;
+
+		UnityEngine.Object.DestroyImmediate( mask );
+
+		var clip = sensors.m_maskImage.transform.parent.GetComponent<UnityEngine.UI.RectMask2D>();
+
+		if ( ( clip == null ) || ( bottom < 0 ) )
+		{
+			return -1.0f;
+		}
+
+		var windowHeight = ( (RectTransform) clip.transform ).rect.height - clip.padding.y - clip.padding.w;
+		var discHeight = sensors.m_maskImage.rectTransform.rect.height * sensors.m_maskImage.transform.localScale.y * discRows / textureHeight;
+
+		return discHeight / windowHeight;
 	}
 
 	static string MaskName( SensorsDisplay sensors )
