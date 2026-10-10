@@ -948,6 +948,12 @@ public class Encounter : MonoBehaviour
 	void InitializeElowanEncounter()
 	{
 		DefaultEncounterInitialize();
+
+		// after Elan has been destroyed the Elowan are "now and forever mortal enemies" (their comm in the game data, STRINFO 2.4)
+		if ( BlackEgg.IsElanDestroyed() )
+		{
+			m_pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+		}
 	}
 
 	// initialize encounter with gazurtoid
@@ -1072,7 +1078,54 @@ public class Encounter : MonoBehaviour
 	// update encounter with elowan
 	void UpdateElowanEncounter()
 	{
+		// after Elan has been destroyed the Elowan say only what they think of the player, and then they attack
+		if ( BlackEgg.IsElanDestroyed() )
+		{
+			UpdateElowanAfterElan();
+
+			return;
+		}
+
 		DefaultEncounterUpdate();
+	}
+
+	// the comm of the Elowan for a ship that has destroyed Elan ("Thou hast done a deed most unthinkably foul... We are now and forever mortal enemies.")
+	const int c_elanDestroyedCommId = 3;
+
+	// the Elowan after Elan has been destroyed: hostile, they say their one comm in place of a hail, and the comm link is never open to the player again
+	void UpdateElowanAfterElan()
+	{
+		m_pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+
+		// have they said it yet? (the comm link counts as ended once they have)
+		if ( !m_pdEncounter.m_disconnected )
+		{
+			m_pdEncounter.m_conversationTimer -= Time.deltaTime;
+
+			if ( m_pdEncounter.m_conversationTimer <= 0.0f )
+			{
+				GD_Comm elanComm = null;
+
+				foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
+				{
+					if ( ( comm.m_id == c_elanDestroyedCommId ) && ( comm.m_race == GameData.Race.Elowan ) )
+					{
+						elanComm = comm;
+					}
+				}
+
+				if ( elanComm != null )
+				{
+					AddComm( GD_Comm.Subject.Custom, false, elanComm );
+				}
+
+				m_pdEncounter.m_disconnected = true;
+				m_pdEncounter.m_playerWantsToConnect = false;
+				m_pdEncounter.m_aliensWantToConnect = false;
+			}
+		}
+
+		UpdateAlienCombat();
 	}
 
 	// update encounter with gazurtoid
@@ -1392,6 +1445,13 @@ public class Encounter : MonoBehaviour
 	{
 		// the uhlek are always hostile (this also covers a game that was saved in the middle of an uhlek encounter before they attacked on sight)
 		m_pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+
+		// but once their mind-ganglion has been destroyed they are harmless (STRINFO 5.1: "the Uhlek will be rendered harmless"; the Spemin: "helpless until another one
+		// developed")
+		if ( BlackEgg.IsUhlekMindGanglionDestroyed() )
+		{
+			return;
+		}
 
 		// they never talk (there is nothing for them to say in the game data) - they just attack
 		UpdateAlienCombat();
@@ -1911,7 +1971,7 @@ public class Encounter : MonoBehaviour
 	}
 
 	// adds some text to the conversation
-	public void AddComm( GD_Comm.Subject subject, bool outgoing )
+	public void AddComm( GD_Comm.Subject subject, bool outgoing, GD_Comm forcedComm = null )
 	{
 		// get to the game data
 		var gameData = DataController.m_instance.m_gameData;
@@ -1925,8 +1985,8 @@ public class Encounter : MonoBehaviour
 		// remember what the player said last (looking for an outgoing comm changes it)
 		var lastSubjectFromPlayer = m_pdEncounter.m_lastSubjectFromPlayer;
 
-		// find a comm
-		var comm = FindComm( subject, outgoing );
+		// find a comm (or say the one the caller wants said)
+		var comm = ( forcedComm != null ) ? forcedComm : FindComm( subject, outgoing );
 
 		// the player has no statement to make in a posture the game data has no statements for (it has none for the neutral posture) - transmit nothing then
 		// (this used to transmit the word ERROR)

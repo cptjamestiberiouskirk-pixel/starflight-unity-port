@@ -191,6 +191,27 @@ public class BlackEgg
 		}
 	}
 
+	// true if a Black Egg has destroyed Elan, the homeworld of the Elowan
+	public static bool IsElanDestroyed()
+	{
+		return IsDestroyed( c_elanStarX, c_elanStarY, c_elanPlanetFromSun );
+	}
+
+	// true if a Black Egg has destroyed the planet of the Uhlek mind-ganglion
+	public static bool IsUhlekMindGanglionDestroyed()
+	{
+		return IsDestroyed( c_uhlekStarX, c_uhlekStarY, c_uhlekPlanetFromSun );
+	}
+
+	// true if a Black Egg has destroyed this planet (named as STRINFO names it)
+	static bool IsDestroyed( int starX, int starY, int planetFromSun )
+	{
+		var planetSurfaces = DataController.m_instance.m_playerData.m_planetSurfaces;
+		var planetId = DataController.m_instance.m_gameData.FindPlanetFromSun( starX, starY, planetFromSun );
+
+		return ( planetSurfaces != null ) && ( planetId >= 0 ) && planetSurfaces.IsPlanetDestroyed( planetId );
+	}
+
 	// true if the egg lies at the control nexus of the Crystal Planet
 	public static bool IsAtTheNexus( PD_PlanetSurfaces.DroppedCargo droppedCargo )
 	{

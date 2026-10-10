@@ -603,6 +603,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioGameOver();
 				break;
 
+			case "racelosses":
+				yield return ScenarioRaceLosses();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -12370,6 +12374,119 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "gameover: the game over screen says the ship was incinerated by that star's flare, not that it was destroyed", gameOverText.Contains( "INCINERATED" ) && gameOverText.Contains( coordinates ) && !gameOverText.Contains( "Ship destroyed!" ) && gameOverText.Contains( "ESC" ), gameOverText );
 
 		Finish( "scenario=gameover onArrival=" + fineOnArrival + " dayBefore=" + fineTheDayBefore + " incinerated=" + destroyed + " gameOver=" + controller.m_gameOver, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 5: what a Black Egg on Elan or on the Uhlek mind-ganglion does to those races
+
+	IEnumerator ScenarioRaceLosses()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var ship = playerData.m_playerShip;
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var damage = 0;
+
+		EnsureCrew();
+
+		// a ship that survives being shot at for the whole scenario, with a communications officer who understands every word
+		ship.m_armorPoints = 100000;
+		ship.m_shieldsAreUp = false;
+
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+
+		var uhlekPlanetId = gameData.FindPlanetFromSun( 55, 32, 2 );
+		var elanPlanetId = gameData.FindPlanetFromSun( 148, 63, 2 );
+
+		// ---- 1. the control: the Uhlek attack
+		var uhlekId = FindEncounter( 0, 1, 1, 0, GameData.Race.Uhlek );
+
+		EnterEncounter( uhlekId );
+		yield return Frames( 10 );
+
+		yield return DamageTaken( 10.0f, value => damage = value );
+
+		var uhlekDamageBefore = damage;
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 2. once their mind-ganglion's planet has been destroyed they are harmless
+		playerData.m_planetSurfaces.DestroyPlanet( uhlekPlanetId );
+
+		EnterEncounter( uhlekId );
+		yield return Frames( 10 );
+
+		yield return DamageTaken( 10.0f, value => damage = value );
+
+		var uhlekDamageAfter = damage;
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		Log( "racelosses: uhlek encounter " + uhlekId + ": damage taken in 10 s before their mind-ganglion's planet " + uhlekPlanetId + " was destroyed " + uhlekDamageBefore + ", after " + uhlekDamageAfter );
+
+		Check( "racelosses: the Uhlek attack (control)", uhlekDamageBefore > 0, uhlekDamageBefore.ToString() );
+		Check( "racelosses: once the planet of their mind-ganglion has been destroyed the Uhlek are harmless", uhlekDamageAfter == 0, uhlekDamageAfter.ToString() );
+
+		// ---- 3. the control: the Elowan meet a ship without hostility, and hail it
+		var elowanId = FindEncounter( 0, 1, 1, 0, GameData.Race.Elowan );
+
+		ForceVessel( elowanId, 7 );
+
+		EnterEncounter( elowanId );
+		yield return Frames( 10 );
+
+		var elowanStanceBefore = Stance();
+
+		encounter.m_pdEncounter.m_conversationTimer = 0.1f;
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		var elowanWordsBefore = MessageList();
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 4. after Elan: hostile, their one comm, no comm link for a hail, and they attack
+		playerData.m_planetSurfaces.DestroyPlanet( elanPlanetId );
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		EnterEncounter( elowanId );
+		yield return Frames( 10 );
+
+		var elowanStanceAfter = Stance();
+
+		encounter.m_pdEncounter.m_conversationTimer = 0.1f;
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		var elowanWordsAfter = MessageList();
+
+		// the player hails: no answer
+		encounter.m_pdEncounter.m_playerWantsToConnect = true;
+		encounter.m_pdEncounter.m_conversationTimer = 0.1f;
+
+		yield return DamageTaken( 10.0f, value => damage = value );
+
+		var elowanConnected = encounter.m_pdEncounter.m_connected;
+		var elowanDamageAfter = damage;
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		Log( "racelosses: elowan encounter " + elowanId + ": before Elan (planet " + elanPlanetId + ") was destroyed: stance " + elowanStanceBefore + " | " + elowanWordsBefore + " || after: stance " + elowanStanceAfter + ", connected after a hail " + elowanConnected + ", damage in 10 s " + elowanDamageAfter + " | " + elowanWordsAfter );
+
+		Check( "racelosses: the Elowan meet the ship without hostility and say nothing of Elan (control)", ( elowanStanceBefore != "Hostile" ) && !elowanWordsBefore.Contains( "unthinkably foul" ), elowanStanceBefore + " | " + elowanWordsBefore );
+		Check( "racelosses: after Elan has been destroyed the Elowan are hostile and say it was a deed most unthinkably foul", ( elowanStanceAfter == "Hostile" ) && elowanWordsAfter.Contains( "unthinkably foul" ), elowanStanceAfter + " | " + elowanWordsAfter );
+		Check( "racelosses: after Elan the Elowan do not answer a hail, and they attack", !elowanConnected && ( elowanDamageAfter > 0 ), elowanConnected + ", " + elowanDamageAfter );
+
+		Finish( "scenario=racelosses uhlekBefore=" + uhlekDamageBefore + " uhlekAfter=" + uhlekDamageAfter + " elowanBefore=" + elowanStanceBefore + " elowanAfter=" + elowanStanceAfter + " connected=" + elowanConnected + " elowanDamage=" + elowanDamageAfter, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
