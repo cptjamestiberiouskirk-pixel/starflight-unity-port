@@ -199,6 +199,15 @@ public class SpaceflightController : MonoBehaviour
 		// the shields slowly regain their charge
 		playerData.m_playerShip.UpdateShields( Time.deltaTime );
 
+		// a nebula keeps the shields down: shields that are up when the ship is in one collapse (the design notes have nebulae act on the shields, priority.txt;
+		// what they do is the owner's ruling of 2026-10-10 for roadmap 1.9)
+		if ( playerData.m_playerShip.m_shieldsAreUp && ShipIsInsideANebula() )
+		{
+			playerData.m_playerShip.DropShields();
+
+			m_messages.AddText( "<color=white>The nebula has collapsed the shields.</color>" );
+		}
+
 		// the engineer and the doctor carry on with the repairs and the treatment they were told to do
 		playerData.m_playerShip.UpdateRepairs( Time.deltaTime );
 		playerData.m_crewAssignment.UpdateTreatment( Time.deltaTime );
@@ -544,6 +553,50 @@ public class SpaceflightController : MonoBehaviour
 		{
 			// yes - begin it
 			BeginEncounter( encounterToBegin );
+		}
+	}
+
+	// true if the ship is inside a nebula: in hyperspace, by the nebulae of the game data; anywhere in a star system, if that star is inside one; in an encounter, where
+	// the encounter began
+	public bool ShipIsInsideANebula()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+		var location = playerData.m_general.m_location;
+
+		// an encounter is where it began
+		if ( location == PD_General.Location.Encounter )
+		{
+			location = playerData.m_general.m_lastLocation;
+		}
+
+		switch ( location )
+		{
+			case PD_General.Location.Hyperspace:
+
+				// (in hyperspace the ship's own position, which flux travel moves without updating the saved coordinates)
+				var hyperspaceCoordinates = ( ( playerData.m_general.m_location == PD_General.Location.Hyperspace ) && ( m_playerShip != null ) ) ? m_playerShip.transform.position : playerData.m_general.m_lastHyperspaceCoordinates;
+
+				foreach ( var nebula in gameData.m_nebulaList )
+				{
+					if ( nebula.Contains( hyperspaceCoordinates ) )
+					{
+						return true;
+					}
+				}
+
+				return false;
+
+			case PD_General.Location.DockingBay:
+			case PD_General.Location.Starport:
+
+				return false;
+
+			default:
+
+				var starId = playerData.m_general.m_currentStarId;
+
+				return ( starId >= 0 ) && ( starId < gameData.m_starList.Length ) && gameData.m_starList[ starId ].m_insideNebula;
 		}
 	}
 

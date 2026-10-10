@@ -20,6 +20,17 @@ public class RaiseShieldsButton : ShipButton
 
 			SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
 		}
+		else if ( SpaceflightController.m_instance.ShipIsInsideANebula() )
+		{
+			// a nebula keeps the shields down
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+			SpaceflightController.m_instance.m_messages.Clear();
+
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>The shields cannot be raised inside a nebula.</color>" );
+
+			SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+		}
 		else if ( playerData.m_playerShip.m_elementStorage.Find( 5 ) == null )
 		{
 			// shields burn endurium, so they can't be raised without any
