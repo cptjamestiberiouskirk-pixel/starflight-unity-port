@@ -169,6 +169,10 @@ public class BlackEgg
 		// what comes of it
 		if ( planet.IsCrystalPlanet() )
 		{
+			// the game is won: no star flares any more, and Interstel pays its bonus when the ship is back at the Starport
+			playerData.m_general.m_gameWon = true;
+			playerData.m_general.m_winBonusPending = true;
+
 			AddStoryText( "CrystalPlanetDestroyed" );
 		}
 		else if ( planetId == gameData.FindPlanetFromSun( c_elanStarX, c_elanStarY, c_elanPlanetFromSun ) )

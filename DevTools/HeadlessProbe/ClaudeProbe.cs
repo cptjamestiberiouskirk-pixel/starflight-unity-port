@@ -587,6 +587,14 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCrystalCone();
 				break;
 
+			case "win":
+				yield return ScenarioWin();
+				break;
+
+			case "starport-win":
+				yield return ScenarioStarportWin();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -11883,6 +11891,211 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "crystalcone: with the Crystal Cone, in orbit around an ordinary planet nothing is said about a nexus (control)", !aroundPlanet90.Contains( "nexus" ), aroundPlanet90 );
 
 		Finish( "scenario=crystalcone without=" + withoutTheCone.Contains( "nexus" ) + " with=" + withTheCone.Contains( "47N x 45E" ) + " land=" + onLand.Contains( "47N x 45E" ) + " planet90=" + aroundPlanet90.Contains( "nexus" ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 5: the win
+
+	// sets a field if the code has it (so that this compiles on the code before it) - returns true if it did
+	static bool SetFieldIfPresent( object target, string fieldName, object value )
+	{
+		var field = ( target == null ) ? null : target.GetType().GetField( fieldName );
+
+		if ( field == null )
+		{
+			return false;
+		}
+
+		field.SetValue( target, value );
+
+		return true;
+	}
+
+	// the star that flares soonest after the start, other than Arth's
+	static int StarThatFlaresSoonest()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var starId = -1;
+
+		for ( var id = 0; id < gameData.m_starList.Length; id++ )
+		{
+			var star = gameData.m_starList[ id ];
+
+			if ( ( id == gameData.m_misc.m_arthStarId ) || ( star.m_daysToNextFlare <= 1 ) )
+			{
+				continue;
+			}
+
+			if ( ( starId < 0 ) || ( star.m_daysToNextFlare < gameData.m_starList[ starId ].m_daysToNextFlare ) )
+			{
+				starId = id;
+			}
+		}
+
+		return starId;
+	}
+
+	// enters the star system of a star half a day before it flares, with the shields down and the armor full - returns the armor points lost
+	static IEnumerator ArmorLostToFlare( int starId, int[] lost )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var star = DataController.m_instance.m_gameData.m_starList[ starId ];
+
+		// half a day before the flare
+		playerData.m_general.m_day = star.m_daysToNextFlare - 1;
+		playerData.m_general.m_hour = 12;
+		playerData.m_general.m_minute = 0;
+		playerData.m_general.m_second = 0;
+		playerData.m_general.m_gameTime = star.m_daysToNextFlare - 0.5f;
+
+		ship.m_shieldsAreUp = false;
+		ship.m_armorPoints = ship.GetMaximumArmorPoints();
+
+		var before = ship.m_armorPoints;
+
+		EnterStarSystem( starId );
+
+		yield return Frames( 3 );
+
+		lost[ 0 ] = before - ship.m_armorPoints;
+
+		// wait for the planets, so that what comes next finds a star system that is ready
+		var end = Time.realtimeSinceStartup + 40.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && SpaceflightController.m_instance.m_starSystem.GeneratingPlanets() )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+	}
+
+	IEnumerator ScenarioWin()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var lost = new int[ 1 ];
+
+		EnsureCrew();
+
+		var flareStarId = StarThatFlaresSoonest();
+
+		// ---- 1. the control: before the win a star that is flaring damages the ship
+		yield return ArmorLostToFlare( flareStarId, lost );
+
+		var lostBeforeTheWin = lost[ 0 ];
+
+		// ---- 2. the win: a Black Egg at the control nexus of the Crystal Planet
+		var atTheNexus = Tools.LatLongToWorldCoordinates( 45.0f, 47.0f );
+
+		playerData.m_planetSurfaces.AddDroppedCargo( 33, atTheNexus.x, 0.0f, atTheNexus.z, -1, 0, gameData.FindArtifactId( "Black Egg" ) );
+
+		ship.AddArtifact( gameData.FindArtifactId( "Crystal Orb" ) );
+
+		yield return GoIntoOrbit( gameData.m_planetList[ 33 ].m_starId, 33 );
+
+		var end = Time.realtimeSinceStartup + 12.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( playerData.m_general.m_location == PD_General.Location.InOrbit ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 3 );
+
+		var won = Equals( FieldOrNull( playerData.m_general, "m_gameWon" ), true );
+		var bonusPending = Equals( FieldOrNull( playerData.m_general, "m_winBonusPending" ), true );
+
+		Log( "win: after the egg at the nexus: won " + won + ", bonus pending " + bonusPending + ", location " + playerData.m_general.m_location );
+
+		Check( "win: destroying the Crystal Planet at its control nexus wins the game, with Interstel's bonus to be paid", won && bonusPending, won + "/" + bonusPending );
+
+		// ---- 3. after the win the same star flares no more
+		yield return ArmorLostToFlare( flareStarId, lost );
+
+		var lostAfterTheWin = lost[ 0 ];
+
+		Log( "win: armor lost entering star " + flareStarId + " half a day before its flare (day " + gameData.m_starList[ flareStarId ].m_daysToNextFlare + "): before the win " + lostBeforeTheWin + ", after it " + lostAfterTheWin );
+
+		Check( "win: before the win a star that is flaring damages the ship (control)", lostBeforeTheWin > 0, lostBeforeTheWin.ToString() );
+		Check( "win: after the win no star flares", lostAfterTheWin == 0, lostAfterTheWin.ToString() );
+
+		// ---- 4. back at the Starport: the bonus, once
+		playerData.m_general.m_currentStarId = gameData.m_misc.m_arthStarId;
+		playerData.m_general.m_currentPlanetId = gameData.m_misc.m_arthPlanetId;
+
+		var balanceBefore = playerData.m_bank.m_currentBalance;
+		var ledgerBefore = playerData.m_bank.m_transactionList.Count;
+
+		controller.m_messages.Clear();
+		controller.SwitchLocation( PD_General.Location.DockingBay );
+
+		yield return Frames( 10 );
+
+		var paid = playerData.m_bank.m_currentBalance - balanceBefore;
+		var ledgerEntry = ( playerData.m_bank.m_transactionList.Count > ledgerBefore ) ? playerData.m_bank.m_transactionList[ playerData.m_bank.m_transactionList.Count - 1 ] : null;
+		var dockText = MessageList();
+
+		// out and back in again
+		controller.SwitchLocation( PD_General.Location.JustLaunched );
+
+		yield return Frames( 10 );
+
+		controller.SwitchLocation( PD_General.Location.DockingBay );
+
+		yield return Frames( 10 );
+
+		var paidAgain = playerData.m_bank.m_currentBalance - balanceBefore - paid;
+
+		Log( "win: docking at the Starport paid " + paid + " MU (ledger: " + ( ( ledgerEntry == null ) ? "nothing" : ledgerEntry.m_description + " " + ledgerEntry.m_amount ) + "), docking again paid " + paidAgain + " | " + dockText );
+
+		Check( "win: back at the Starport Interstel pays the bonus of 500,000 MU, in the ledger and the messages", ( paid == 500000 ) && ( ledgerEntry != null ) && ( ledgerEntry.m_amount == "500000+" ) && dockText.Contains( "500,000" ), paid + ", " + ( ( ledgerEntry == null ) ? "no entry" : ledgerEntry.m_amount ) + ", " + dockText );
+		Check( "win: the bonus is paid once", paidAgain == 0, paidAgain.ToString() );
+
+		// a later scenario must not start from a won game
+		SetFieldIfPresent( playerData.m_general, "m_gameWon", false );
+
+		Finish( "scenario=win flareBefore=" + lostBeforeTheWin + " won=" + won + " flareAfter=" + lostAfterTheWin + " paid=" + paid + " paidAgain=" + paidAgain, 0 );
+	}
+
+	IEnumerator ScenarioStarportWin()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var operationsPanel = FindPanel<OperationsPanel>();
+		var texts = new string[ 2 ];
+
+		for ( var pass = 0; pass < 2; pass++ )
+		{
+			// first the control (not won), then won
+			SetFieldIfPresent( playerData.m_general, "m_gameWon", pass == 1 );
+
+			PanelController.m_instance.Open( operationsPanel );
+
+			yield return new WaitForSecondsRealtime( 1.0f );
+
+			operationsPanel.ShowEvaluations();
+
+			yield return Frames( 2 );
+
+			var textTransform = operationsPanel.m_evaluationGameObject.transform.Find( "Display/Error Text Mask/Error Text" );
+			var text = ( textTransform == null ) ? null : textTransform.GetComponent<TMPro.TextMeshProUGUI>();
+
+			texts[ pass ] = ( text == null ) ? "no text" : text.text.Replace( "\r", "" ).Replace( '\n', '/' );
+
+			yield return ClosePanel( operationsPanel, "operations" );
+		}
+
+		SetFieldIfPresent( playerData.m_general, "m_gameWon", false );
+
+		Log( "starport-win: the evaluation before the win: " + texts[ 0 ] + " | after it: " + texts[ 1 ] );
+
+		Check( "starport-win: before the win the evaluation is the scene's (control)", texts[ 0 ].Contains( "colony world recommendations" ), texts[ 0 ] );
+		Check( "starport-win: after the win the evaluation is Interstel's supplemental evaluation on the completion of the mission", texts[ 1 ].Contains( "COMPLETION OF MISSION" ) && texts[ 1 ].Contains( "500,000 MU" ), texts[ 1 ] );
+
+		Finish( "scenario=starport-win before=" + texts[ 0 ].Contains( "colony" ) + " after=" + texts[ 1 ].Contains( "COMPLETION OF MISSION" ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

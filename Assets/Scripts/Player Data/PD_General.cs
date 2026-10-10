@@ -74,6 +74,15 @@ public class PD_General
 	// various game play variables
 	public bool m_mechan9Unlocked;
 
+	// true once a Black Egg has destroyed the Crystal Planet at its control nexus: the game is won, and no star flares any more (the original's ?WIN, disys.txt ?FLARE)
+	public bool m_gameWon;
+
+	// true from the win until the ship is back at the Starport, where Interstel pays the bonus (the original's WMSG, "play the win evaluation message")
+	public bool m_winBonusPending;
+
+	// the bonus that comes with the Interstel Medal of Sublime Achievement (STRINFO 1.2 and 2.12)
+	public const int c_winBonus = 500000;
+
 	// dimensions of the last comm ids table (race x subject)
 	public const int c_numLastCommRaces = 20;
 	public const int c_numLastCommSubjects = 16;
@@ -135,6 +144,10 @@ public class PD_General
 		// reset current ids
 		m_currentStarId = gameData.m_misc.m_arthStarId;
 		m_currentPlanetId = 0;
+
+		// the game has not been won yet
+		m_gameWon = false;
+		m_winBonusPending = false;
 		m_currentEncounterId = 0;
 
 		// facing north

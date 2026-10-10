@@ -66,6 +66,12 @@ public class DockingBay : MonoBehaviour
 
 		// play the docking bay music track
 		MusicController.m_instance.ChangeToTrack( MusicController.Track.DockingBay );
+
+		// back at the Starport after the win: Interstel pays the bonus that comes with its medal
+		if ( playerData.PayWinBonus() )
+		{
+			SpaceflightController.m_instance.m_messages.AddText( "<color=green>Interstel has paid the bonus of " + PD_General.c_winBonus.ToString( "N0", System.Globalization.CultureInfo.InvariantCulture ) + " MU into your account.</color>" );
+		}
 	}
 
 	// call this to start the launch animation

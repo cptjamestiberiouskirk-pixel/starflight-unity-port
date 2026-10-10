@@ -267,8 +267,8 @@ public class StarSystem : MonoBehaviour
 		// calculate the time to next flare (in FP days)
 		var timeToFlare = m_currentStar.m_daysToNextFlare - playerData.m_general.m_gameTime;
 
-		// did we flare already?
-		if ( timeToFlare <= 0.0f )
+		// did we flare already? (or has the game been won? then no star flares any more - the original looks for a flare only while ?WIN is off, disys.txt ?FLARE)
+		if ( ( timeToFlare <= 0.0f ) || playerData.m_general.m_gameWon )
 		{
 			// yes - the sun is stable again
 			m_shine.SetSize( 128.0f, 129.0f );
