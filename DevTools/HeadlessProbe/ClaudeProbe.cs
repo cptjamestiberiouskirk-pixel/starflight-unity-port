@@ -623,6 +623,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCrystalPearl();
 				break;
 
+			case "dodecahedron":
+				yield return ScenarioDodecahedron();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -12840,6 +12844,88 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "crystalpearl: with the Crystal Pearl a hit that would destroy the ship warps it out with 1 armor point", ( locationAfterLethal != PD_General.Location.Encounter ) && ( armorAfterLethal == 1 ) && !destroyed, locationAfterLethal + ", " + armorAfterLethal + ", " + destroyed );
 
 		Finish( "scenario=crystalpearl without=" + locationWithout + "/" + armorWithout + " with=" + locationWith + "/" + armorWith + " lethal=" + locationAfterLethal + "/" + armorAfterLethal + "/" + destroyed, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 4: the Dodecahedron
+
+	// puts an encounter at its home, the ship (stopped) one and a half alien radar distances from it in hyperspace, and returns how much closer the encounter came in some real seconds
+	static IEnumerator EncounterCameCloser( PD_Encounter pdEncounter, float seconds, float[] cameCloser )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		pdEncounter.m_currentCoordinates = pdEncounter.m_homeCoordinates;
+
+		var shipCoordinates = pdEncounter.m_homeCoordinates + Vector3.right * ( controller.m_alienHyperspaceRadarDistance * 1.5f );
+
+		controller.m_playerShip.TurnOffEngines();
+		playerData.m_general.m_currentSpeed = 0.0f;
+		playerData.m_general.m_coordinates = shipCoordinates;
+		playerData.m_general.m_lastHyperspaceCoordinates = shipCoordinates;
+		controller.m_playerShip.transform.position = shipCoordinates;
+
+		yield return Frames( 2 );
+
+		var before = Vector3.Distance( pdEncounter.m_currentCoordinates, playerData.m_general.m_coordinates );
+		var end = Time.realtimeSinceStartup + seconds;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			yield return null;
+		}
+
+		cameCloser[ 0 ] = before - Vector3.Distance( pdEncounter.m_currentCoordinates, playerData.m_general.m_coordinates );
+	}
+
+	IEnumerator ScenarioDodecahedron()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var dodecahedronId = gameData.FindArtifactId( "Dodecahedron" );
+		var cameCloser = new float[ 1 ];
+
+		EnsureCrew();
+
+		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( dodecahedronId ) != null ); guard++ )
+		{
+			ship.RemoveArtifact( dodecahedronId );
+		}
+
+		// in hyperspace, with no encounter able to begin while the aliens are watched
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		var encounterId = FindEncounter( 0, 1, 1, 0 );
+		var pdEncounter = playerData.FindEncounter( encounterId );
+
+		// ---- 1. the control: without the Dodecahedron aliens one and a half radar distances away do not come
+		yield return EncounterCameCloser( pdEncounter, 2.0f, cameCloser );
+
+		var closerWithout = cameCloser[ 0 ];
+
+		// ---- 2. with the Dodecahedron in the hold they do
+		ship.AddArtifact( dodecahedronId );
+
+		yield return EncounterCameCloser( pdEncounter, 2.0f, cameCloser );
+
+		var closerWith = cameCloser[ 0 ];
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "dodecahedron: encounter " + encounterId + " at its home, the ship " + ( controller.m_alienHyperspaceRadarDistance * 1.5f ) + " away (alien radar distance " + controller.m_alienHyperspaceRadarDistance + "): came closer in 2 s by " + closerWithout + " without the Dodecahedron, " + closerWith + " with it" );
+
+		Check( "dodecahedron: without the Dodecahedron aliens beyond their radar distance do not come at the ship (control)", Mathf.Abs( closerWithout ) < 1.0f, closerWithout.ToString() );
+		Check( "dodecahedron: with the Dodecahedron in the hold aliens from twice as far come at the ship", closerWith > 1.0f, closerWith.ToString() );
+
+		Finish( "scenario=dodecahedron without=" + closerWithout + " with=" + closerWith, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
