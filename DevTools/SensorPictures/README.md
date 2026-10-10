@@ -32,4 +32,15 @@ It writes a review sheet to `previews/<vessel>.png`: the original's window as it
 | `make.ps1` | The command above |
 | `SensorPicture.cs` | Finding the window, the scale and the place, writing the textures, the review sheet |
 | `Vectorize.cs` | Tracing, simplifying and filling the outlines |
+| `make-debris.ps1` | A vessel's debris picture, below |
 | `previews/` | The review sheets |
+
+## Debris
+
+A destroyed ship leaves debris, whose sensor picture is made from the ship's sensor picture by the repo's `process_texture_debris.py` (it needs Pillow): its "Light Battle Damage" preset (seed 12345, 25% damage, scatter 2, pieces of at least 150 pixels) reproduces every debris picture made before this tool, and its mask, pixel for pixel.
+
+```powershell
+& "DevTools\SensorPictures\make-debris.ps1" -Vessel "Elowan Transport" -Slot 5 -Python "C:\path\to\python.exe"
+```
+
+It writes `Assets/Game Objects/UI/Sensors Debris/Sensors - <Vessel>_debris.png` and `..._debris_mask.png`, gives new files the import settings of the Spemin Scout debris, and with `-Slot` wires the vessel's entries in `SensorsDisplay.m_debrisBackgroundTextures` and `m_debrisMaskTextures`. Make the debris again whenever a vessel's sensor picture changes.
