@@ -123,8 +123,9 @@ What the probe does:
 | `ringdevice` | the Ring Device, in hyperspace with no encounter able to begin: the fluxes shown without it (none), the ship put at a hidden flux (the control, it goes through) and the fluxes shown with it in the hold (all) (about 30 s) |
 | `starport-endurium` | the price of Endurium: one cubic meter bought and sold at the real trade depot on 19-02-4620 (1000 both ways), 20-02-4620 (1500) and 15-05-4620 (2000), and what the Starport pays for molybdenum on the first and last date (the control, unchanged) (about 20 s) |
 | `nebula` | nebulae keep the shields down: Raise Shields in a star system outside the nebulae (the control, up and staying up), coming into a star system inside a nebula with them up (they collapse, with a message) and pressing it there (refused), and in hyperspace inside a nebula clear of the stars (refused) and outside the nebulae (the control, up) (about 40 s) |
+| `starport-repair` | Repair in ship configuration: a whole ship (no repairs, nothing paid), class 1 armor at 200 of 500 with the shields empty (900 M.U., whole again with full shields), a bare hull at 100 of 250 (450 M.U. at the class 1 price) and with 10 M.U. in the bank (refused, nothing changes) (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (82 scenarios, about 49 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (83 scenarios, about 50 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

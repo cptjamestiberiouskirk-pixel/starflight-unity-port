@@ -151,6 +151,31 @@ public class PD_PlayerShip
 	}
 
 	// the most armor points this ship can have - those of the armor plating that is installed, or those of the bare hull if there is none (so this is never zero)
+	// what the Starport charges to repair the ship: the missing armor points at the price of the ship's armor class (a bare hull at the price of class 1), the
+	// shields for nothing (the owner's ruling of 2026-10-10 for roadmap 1.1 - no source gives the price)
+	public int GetStarportRepairCost()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var missingPoints = GetMaximumArmorPoints() - m_armorPoints;
+
+		if ( missingPoints <= 0 )
+		{
+			return 0;
+		}
+
+		var armorClass = HasArmorPlating() ? m_armorClass : 1;
+
+		if ( ( armorClass < 1 ) || ( armorClass >= gameData.m_armorList.Length ) || ( gameData.m_armorList[ armorClass ].m_points <= 0 ) )
+		{
+			return 0;
+		}
+
+		var armor = gameData.m_armorList[ armorClass ];
+
+		// rounded up, so that a repair is never free
+		return (int) ( ( (long) missingPoints * armor.m_buyPrice + armor.m_points - 1 ) / armor.m_points );
+	}
+
 	public int GetMaximumArmorPoints()
 	{
 		return HasArmorPlating() ? GetArmor().m_points : c_bareHullArmorPoints;

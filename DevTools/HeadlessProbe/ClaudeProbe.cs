@@ -647,6 +647,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioNebula();
 				break;
 
+			case "starport-repair":
+				yield return ScenarioStarportRepair();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -13410,6 +13414,90 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "nebula: inside a nebula the shields cannot be raised, in a star system or in hyperspace", !upInNebulaSystem && inHyperspaceNebula && !upInHyperspaceNebula, upInNebulaSystem + ", " + inHyperspaceNebula + ", " + upInHyperspaceNebula );
 
 		Finish( "scenario=nebula clear=" + upInClearSystem + " afterComingIn=" + upAfterComingIn + " nebulaSystem=" + upInNebulaSystem + " nebulaHyperspace=" + upInHyperspaceNebula + " clearHyperspace=" + upInClearHyperspace, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 1: repair at the Starport
+
+	// presses Repair in ship configuration - returns the balance it took and the message it shows
+	static int PressRepair( ShipConfigurationPanel panel, string[] message )
+	{
+		var bank = DataController.m_instance.m_playerData.m_bank;
+		var balanceBefore = bank.m_currentBalance;
+
+		panel.RepairClicked();
+
+		message[ 0 ] = panel.m_errorMessageText.text;
+
+		// back to the menu, as the player's next key would
+		if ( Equals( GetField( panel, "m_currentState" ).ToString(), "ErrorMessage" ) )
+		{
+			Call( panel, "SwitchToMenuBarState" );
+		}
+
+		return balanceBefore - bank.m_currentBalance;
+	}
+
+	IEnumerator ScenarioStarportRepair()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var bank = playerData.m_bank;
+		var panel = FindPanel<ShipConfigurationPanel>();
+		var message = new string[ 1 ];
+
+		bank.m_currentBalance = 100000;
+		ship.m_shieldingClass = 1;
+
+		yield return OpenPanel( panel, "ship configuration" );
+
+		// ---- 1. the control: a whole ship needs no repairs and costs nothing
+		ship.m_armorClass = 1;
+		ship.m_armorPoints = ship.GetMaximumArmorPoints();
+		ship.m_shieldPoints = ship.GetMaximumShieldPoints();
+
+		var costWhole = PressRepair( panel, message );
+		var messageWhole = message[ 0 ];
+
+		// ---- 2. class 1 armor (500 points for 1500 M.U.) with 200 points left and the shields empty: 300 points at 3 M.U., the shields for nothing
+		ship.m_armorPoints = 200;
+		ship.m_shieldPoints = 0;
+
+		var costClass1 = PressRepair( panel, message );
+		var messageClass1 = message[ 0 ];
+		var armorAfterClass1 = ship.m_armorPoints;
+		var shieldsAfterClass1 = ship.m_shieldPoints;
+
+		// ---- 3. a bare hull (250 points) with 100 left: 150 points at the price of class 1
+		ship.m_armorClass = 0;
+		ship.m_armorPoints = 100;
+
+		var costBareHull = PressRepair( panel, message );
+		var armorAfterBareHull = ship.m_armorPoints;
+
+		// ---- 4. not enough money: refused, nothing changes
+		ship.m_armorPoints = 100;
+		bank.m_currentBalance = 10;
+
+		var costTooPoor = PressRepair( panel, message );
+		var messageTooPoor = message[ 0 ];
+		var armorTooPoor = ship.m_armorPoints;
+
+		bank.m_currentBalance = 100000;
+
+		var ledgerBefore = bank.m_transactionList.Count;
+
+		yield return ClosePanel( panel, "ship configuration" );
+
+		var ledgerEntry = ( bank.m_transactionList.Count > ledgerBefore ) ? bank.m_transactionList[ bank.m_transactionList.Count - 1 ].m_amount : "nothing";
+
+		Log( "starport-repair: a whole ship: " + costWhole + " (" + messageWhole + ") | class 1 armor at 200 of 500, shields empty: " + costClass1 + " M.U. (" + messageClass1 + "), armor " + armorAfterClass1 + ", shields " + shieldsAfterClass1 + " of " + ship.GetMaximumShieldPoints() + " | a bare hull at 100 of 250: " + costBareHull + " M.U., armor " + armorAfterBareHull + " | with 10 M.U.: " + costTooPoor + " (" + messageTooPoor + "), armor " + armorTooPoor + " | the ledger on closing: " + ledgerEntry );
+
+		Check( "starport-repair: a whole ship needs no repairs and pays nothing", ( costWhole == 0 ) && messageWhole.Contains( "no repairs" ), costWhole + " | " + messageWhole );
+		Check( "starport-repair: the missing armor is paid at the price of the ship's armor class, and the ship is whole again with full shields", ( costClass1 == 900 ) && ( armorAfterClass1 == 500 ) && ( shieldsAfterClass1 == ship.GetMaximumShieldPoints() ), costClass1 + ", " + armorAfterClass1 + ", " + shieldsAfterClass1 );
+		Check( "starport-repair: a bare hull is repaired at the price of class 1 armor", ( costBareHull == 450 ) && ( armorAfterBareHull == 250 ), costBareHull + ", " + armorAfterBareHull );
+		Check( "starport-repair: without the money the repair is refused and nothing changes", ( costTooPoor == 0 ) && ( armorTooPoor == 100 ) && messageTooPoor.Contains( "insufficient funds" ), costTooPoor + ", " + armorTooPoor + " | " + messageTooPoor );
+
+		Finish( "scenario=starport-repair whole=" + costWhole + " class1=" + costClass1 + " bareHull=" + costBareHull + " tooPoor=" + costTooPoor, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
