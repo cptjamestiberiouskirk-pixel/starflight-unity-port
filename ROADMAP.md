@@ -145,7 +145,7 @@ Only the effects that matter for winning have to come before Phase 5. The others
 | Flat Device | shields the terrain vehicle from lifeforms | Starport, 30,000 MU | no, needs Phase 6 |
 | Shimmering Ball | automatic cloak in combat | 68,66 planet 1 | no |
 | Rod Device | stronger laser shield | New Scotland (site: D5) | no |
-| Tesseract | doubles engine efficiency | 18,50 planet 5 | no |
+| Tesseract | doubles engine efficiency: PR 124 (half the engines' fuel in hyperspace) | 18,50 planet 5 | no |
 | Crystal Pearl | warps a badly damaged ship away | City of the Ancients | no |
 | Red Cylinder | finds ancient ruins from orbit | Koann (planet: D5) | no |
 | Dodecahedron | attracts every ship nearby | 118,146 planet 4 | no |
