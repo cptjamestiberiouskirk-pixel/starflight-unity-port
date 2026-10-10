@@ -130,6 +130,7 @@ The project features a **deterministic visualization system** that renders plane
 - The Tesseract halves the fuel the engines use in hyperspace
 - The Whining Orb translates the Spemin
 - The Rod Device halves the damage of alien lasers
+- The Crystal Pearl warps a critically wounded ship out of an encounter
 - The game can be won: destroying the Crystal Planet ends the flares, and Interstel pays its 500,000 MU bonus and its supplemental evaluation at the Starport
 - Arth's sun flares on 01-01-4621 unless the game has been won: the Starport is destroyed, and a ship in Arth's system is incinerated
 - 10 alien races with unique encounter behaviors

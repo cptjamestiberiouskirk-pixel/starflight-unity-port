@@ -379,6 +379,12 @@ public class Encounter : MonoBehaviour
 	}
 
 	// the player has flown out of the encounter - go back to where the ship was when the encounter began
+	// the Crystal Pearl has warped the ship out of the encounter - it leaves the encounter the way it would by flying out of it
+	public void WarpOut()
+	{
+		LeaveEncounter();
+	}
+
 	void LeaveEncounter()
 	{
 		// get to the player data

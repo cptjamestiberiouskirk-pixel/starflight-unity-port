@@ -116,8 +116,9 @@ What the probe does:
 | `tesseract` | the Tesseract: the fuel the engines use in 3 s of hyperspace from a standstill, in a corner of it with no encounter able to begin, without the Tesseract (the control) and with it in the hold (about half, 0.4 to 0.6 for the frame timing) (about 20 s) |
 | `whiningorb` | the Whining Orb, with a communications officer of no skill: a Spemin statement from the game data without the Orb (the control, garbled), with the Orb in the hold (every word), and an Elowan statement with the Orb (the control, still garbled) (about 30 s) |
 | `roddevice` | the Rod Device: the armor one alien laser shot and one plasma bolt take off, without the Rod Device (the control) and with it in the hold (half the laser, the plasma bolt unchanged as the control) (about 20 s) |
+| `crystalpearl` | the Crystal Pearl, in a Spemin encounter with the shields down: a hit down to a twentieth of the armor without the Pearl (the control, the ship stays) and with it (warped out of the encounter with that armor and a message), and a hit of twice the armor with the Pearl (warped out with 1 point, not destroyed) (about 25 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (75 scenarios, about 43 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (76 scenarios, about 44 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
