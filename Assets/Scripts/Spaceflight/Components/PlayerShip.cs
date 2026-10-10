@@ -114,8 +114,8 @@ public class PlayerShip : MonoBehaviour
 					// get the engines
 					var engines = playerData.m_playerShip.GetEngines();
 
-					// calculate the amount of fuel used up
-					var fuelAmount = ( playerData.m_general.m_currentSpeed * engines.m_fuelUsedPerCoordinate / 256.0f ) * Time.deltaTime;
+					// calculate the amount of fuel used up (half of it with the Tesseract aboard)
+					var fuelAmount = ( playerData.m_general.m_currentSpeed * engines.m_fuelUsedPerCoordinate / 256.0f ) * Time.deltaTime * playerData.m_playerShip.GetEngineFuelFactor();
 
 					// use it up
 					playerData.m_playerShip.UseUpFuel( fuelAmount );

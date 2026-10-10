@@ -607,6 +607,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioRaceLosses();
 				break;
 
+			case "tesseract":
+				yield return ScenarioTesseract();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -12487,6 +12491,97 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "racelosses: after Elan the Elowan do not answer a hail, and they attack", !elowanConnected && ( elowanDamageAfter > 0 ), elowanConnected + ", " + elowanDamageAfter );
 
 		Finish( "scenario=racelosses uhlekBefore=" + uhlekDamageBefore + " uhlekAfter=" + uhlekDamageAfter + " elowanBefore=" + elowanStanceBefore + " elowanAfter=" + elowanStanceAfter + " connected=" + elowanConnected + " elowanDamage=" + elowanDamageAfter, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 4: the Tesseract
+
+	// flies in hyperspace with the engines on for some real seconds from a standstill - returns the fuel used (in cubic meters) and whether the ship stayed in hyperspace
+	static IEnumerator HyperspaceFuelUsed( float seconds, float[] fuelUsed, bool[] stayed )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		controller.m_playerShip.TurnOffEngines();
+		playerData.m_general.m_currentSpeed = 0.0f;
+
+		var enduriumBefore = Endurium();
+		var fuelUsedBefore = playerData.m_playerShip.m_fuelUsed;
+
+		controller.m_playerShip.TurnOnEngines();
+
+		var end = Time.realtimeSinceStartup + seconds;
+
+		stayed[ 0 ] = true;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			stayed[ 0 ] = stayed[ 0 ] && ( playerData.m_general.m_location == PD_General.Location.Hyperspace );
+
+			yield return null;
+		}
+
+		controller.m_playerShip.TurnOffEngines();
+
+		// what went from the hold (in tenths) and what is still counted towards the next tenth
+		fuelUsed[ 0 ] = ( enduriumBefore - Endurium() ) * 0.1f + ( playerData.m_playerShip.m_fuelUsed - fuelUsedBefore );
+	}
+
+	IEnumerator ScenarioTesseract()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var tesseractId = gameData.FindArtifactId( "Tesseract" );
+		var fuelUsed = new float[ 1 ];
+		var stayed = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// plenty of Endurium, no Tesseract to begin with
+		ship.AddElement( 5, 500 );
+
+		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( tesseractId ) != null ); guard++ )
+		{
+			ship.RemoveArtifact( tesseractId );
+		}
+
+		// out in hyperspace, in a corner of it, with no encounter able to begin while the fuel is measured
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 4.0f, 0.0f, 4.0f ) );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		// ---- 1. the control: the fuel the engines use in 3 s without the Tesseract
+		yield return HyperspaceFuelUsed( 3.0f, fuelUsed, stayed );
+
+		var withoutTheTesseract = fuelUsed[ 0 ];
+		var stayedWithout = stayed[ 0 ];
+
+		// ---- 2. the same with the Tesseract in the hold
+		ship.AddArtifact( tesseractId );
+
+		yield return HyperspaceFuelUsed( 3.0f, fuelUsed, stayed );
+
+		var withTheTesseract = fuelUsed[ 0 ];
+		var stayedWith = stayed[ 0 ];
+
+		controller.m_encounterRange = encounterRange;
+
+		var ratio = ( withoutTheTesseract > 0.0f ) ? ( withTheTesseract / withoutTheTesseract ) : -1.0f;
+
+		Log( "tesseract: fuel the engines used in 3 s of hyperspace from a standstill: without the Tesseract " + withoutTheTesseract.ToString( "0.0000" ) + " m3, with it " + withTheTesseract.ToString( "0.0000" ) + " m3, ratio " + ratio.ToString( "0.00" ) + " (stayed in hyperspace " + stayedWithout + "/" + stayedWith + ")" );
+
+		Check( "tesseract: the engines use fuel in hyperspace (control)", ( withoutTheTesseract > 0.0f ) && stayedWithout, withoutTheTesseract + ", " + stayedWithout );
+		Check( "tesseract: with the Tesseract in the hold the engines use half the fuel", ( ratio >= 0.4f ) && ( ratio <= 0.6f ) && stayedWith, ratio + ", " + stayedWith );
+
+		Finish( "scenario=tesseract without=" + withoutTheTesseract.ToString( "0.0000" ) + " with=" + withTheTesseract.ToString( "0.0000" ) + " ratio=" + ratio.ToString( "0.00" ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
