@@ -589,7 +589,7 @@ public class CombatController : MonoBehaviour
 
 			if ( shieldAbsorb > 0 )
 			{
-				SpaceflightController.m_instance.m_messages.AddText( $"<color=cyan>Shields absorb {shieldAbsorb} damage!</color>" );
+				SpaceflightController.m_instance.m_messages.AddText( $"<color=#00FFFF>Shields absorb {shieldAbsorb} damage!</color>" );
 			}
 		}
 
