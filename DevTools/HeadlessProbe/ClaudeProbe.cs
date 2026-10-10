@@ -615,6 +615,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioWhiningOrb();
 				break;
 
+			case "roddevice":
+				yield return ScenarioRodDevice();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -12675,6 +12679,84 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "whiningorb: the Whining Orb translates only the Spemin (an Elowan statement is still garbled)", !elowanWithTheOrb.Contains( elowanComm.m_text ), elowanWithTheOrb );
 
 		Finish( "scenario=whiningorb without=" + withoutTheOrb.Contains( speminComm.m_text ) + " with=" + withTheOrb.Contains( speminComm.m_text ) + " elowan=" + elowanWithTheOrb.Contains( elowanComm.m_text ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 4: the Rod Device
+
+	// the armor points one shot of this alien vessel takes off the player ship, with its shields down and armor to spare
+	static int ArmorLostToOneShot( PD_AlienShip alienShip, GD_Vessel vessel )
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+
+		ship.m_shieldsAreUp = false;
+		ship.m_armorPoints = 100000;
+
+		CombatController.m_instance.AlienFiresAtPlayer( alienShip, vessel );
+
+		return 100000 - ship.m_armorPoints;
+	}
+
+	IEnumerator ScenarioRodDevice()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var ship = playerData.m_playerShip;
+		var rodId = gameData.FindArtifactId( "Rod Device" );
+
+		EnsureCrew();
+
+		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( rodId ) != null ); guard++ )
+		{
+			ship.RemoveArtifact( rodId );
+		}
+
+		// a vessel with a laser and no plasma bolts, and one with plasma bolts
+		GD_Vessel laserVessel = null;
+		GD_Vessel plasmaVessel = null;
+
+		foreach ( var vessel in gameData.m_vesselList )
+		{
+			if ( ( laserVessel == null ) && !vessel.m_hasPlasmaBolts && ( vessel.m_laserClass > 0 ) )
+			{
+				laserVessel = vessel;
+			}
+
+			if ( ( plasmaVessel == null ) && vessel.m_hasPlasmaBolts )
+			{
+				plasmaVessel = vessel;
+			}
+		}
+
+		// in an encounter, for an alien ship to fire from
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		EnterEncounter( speminId );
+		yield return Frames( 10 );
+
+		var alienShip = dataController.m_playerData.FindEncounter( speminId ).GetAlienShipList()[ 0 ];
+
+		// ---- 1. the control: what a laser and a plasma bolt take off without the Rod Device
+		var laserWithout = ArmorLostToOneShot( alienShip, laserVessel );
+		var plasmaWithout = ( plasmaVessel == null ) ? -1 : ArmorLostToOneShot( alienShip, plasmaVessel );
+
+		// ---- 2. with the Rod Device in the hold: half of the laser, the plasma bolt as before
+		ship.AddArtifact( rodId );
+
+		var laserWith = ArmorLostToOneShot( alienShip, laserVessel );
+		var plasmaWith = ( plasmaVessel == null ) ? -1 : ArmorLostToOneShot( alienShip, plasmaVessel );
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		Log( "roddevice: one laser shot of " + laserVessel.m_name + " (laser class " + laserVessel.m_laserClass + ") takes " + laserWithout + " armor points without the Rod Device, " + laserWith + " with it | a plasma bolt of " + ( ( plasmaVessel == null ) ? "none" : plasmaVessel.m_name ) + " " + plasmaWithout + " without, " + plasmaWith + " with" );
+
+		Check( "roddevice: an alien laser hits the ship (control)", laserWithout > 0, laserWithout.ToString() );
+		Check( "roddevice: with the Rod Device in the hold an alien laser does half the damage", ( laserWithout > 0 ) && ( laserWith == laserWithout / 2 ), laserWithout + " -> " + laserWith );
+		Check( "roddevice: the Rod Device is a laser shield - a plasma bolt does the same damage (control)", plasmaWith == plasmaWithout, plasmaWithout + " -> " + plasmaWith );
+
+		Finish( "scenario=roddevice laser=" + laserWithout + "/" + laserWith + " plasma=" + plasmaWithout + "/" + plasmaWith, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

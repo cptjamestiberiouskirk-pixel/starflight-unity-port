@@ -786,6 +786,14 @@ public class CombatController : MonoBehaviour
 
 			// apply damage
 			int damage = c_laserDamage[ Mathf.Clamp( vessel.m_laserClass, 0, c_laserDamage.Length - 1 ) ];
+
+			// the Rod Device "projects an enhanced laser shield around a spaceship" (the Starport's analysis; the original's combat code keeps whether the ship has it,
+			// disys.txt ?ROD) - how much it takes off is the port's choice: half of every laser hit
+			if ( playerData.m_playerShip.HasArtifact( "Rod Device" ) )
+			{
+				damage /= 2;
+			}
+
 			ApplyDamageToPlayer( damage, direction );
 
 			SpaceflightController.m_instance.m_messages.AddText( $"<color=red>Enemy laser fire!</color>" );
