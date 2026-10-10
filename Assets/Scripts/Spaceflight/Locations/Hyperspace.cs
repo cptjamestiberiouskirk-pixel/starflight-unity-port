@@ -1,5 +1,6 @@
 ﻿
 using UnityEngine;
+using System.Collections.Generic;
 
 public class Hyperspace : MonoBehaviour
 {
@@ -11,6 +12,12 @@ public class Hyperspace : MonoBehaviour
 
 	// true if we are currently traveling through a flux
 	bool m_travelingThroughFlux;
+
+	// the copies of the flux template, one for each flux, and whether they are shown - they are only with the Ring Device aboard: it "will identify any nearby
+	// continuum flux" (the Starport's analysis) and "causes continuum fluxes to appear on ones ships screens" (the Thrynn, STRINFO 2.5), and Noah 1 failed for want
+	// of one (the owner's ruling of 2026-10-10). A flux that is not shown is still there: a ship that flies into it goes through
+	readonly List<GameObject> m_fluxObjectList = new List<GameObject>();
+	bool m_fluxesShown;
 
 	// flux travel timer
 	float m_timer;
@@ -67,9 +74,13 @@ public class Hyperspace : MonoBehaviour
 			// clone the flux
 			var clonedFlux = Instantiate( m_fluxTemplate, flux.GetFrom(), Quaternion.identity, transform );
 
-			// activate the flux
-			clonedFlux.SetActive( true );
+			// remember it (it is shown or hidden in the update, with the Ring Device)
+			m_fluxObjectList.Add( clonedFlux );
+
+			clonedFlux.SetActive( false );
 		}
+
+		m_fluxesShown = false;
 
 		// hide the flux template
 		m_fluxTemplate.SetActive( false );
@@ -92,6 +103,19 @@ public class Hyperspace : MonoBehaviour
 
 		// get to the game data
 		var gameData = DataController.m_instance.m_gameData;
+
+		// the fluxes can be seen only with the Ring Device aboard
+		var showFluxes = playerData.m_playerShip.HasArtifact( "Ring Device" );
+
+		if ( showFluxes != m_fluxesShown )
+		{
+			m_fluxesShown = showFluxes;
+
+			foreach ( var fluxObject in m_fluxObjectList )
+			{
+				fluxObject.SetActive( showFluxes );
+			}
+		}
 
 		// are we travelling through a flux right now?
 		if ( m_travelingThroughFlux )

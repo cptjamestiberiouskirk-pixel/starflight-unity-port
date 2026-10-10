@@ -120,8 +120,9 @@ What the probe does:
 | `crystalpearl` | the Crystal Pearl, in a Spemin encounter with the shields down: a hit down to a twentieth of the armor without the Pearl (the control, the ship stays) and with it (warped out of the encounter with that armor and a message), and a hit of twice the armor with the Pearl (warped out with 1 point, not destroyed) (about 25 s) |
 | `dodecahedron` | the Dodecahedron: a Spemin encounter at its home in hyperspace with the ship stopped one and a half alien radar distances away (no encounter able to begin): how much closer it comes in 2 s without the Dodecahedron (the control, not at all) and with it in the hold (it comes) (about 20 s) |
 | `shimmeringball` | the Shimmering Ball, one alien laser shot at a time: without it (the control, a hit), with it (no shot at the cloaked ship), right after the player fires the laser (a hit) and 4 s later (cloaked again) (about 25 s) |
+| `ringdevice` | the Ring Device, in hyperspace with no encounter able to begin: the fluxes shown without it (none), the ship put at a hidden flux (the control, it goes through) and the fluxes shown with it in the hold (all) (about 30 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (79 scenarios, about 46 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (80 scenarios, about 47 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
