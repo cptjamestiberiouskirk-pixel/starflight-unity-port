@@ -1518,6 +1518,44 @@ public class ClaudeProbe : MonoBehaviour
 			Check( traced.Key + " scan shows its own picture", PictureShown( sensors ) && ( BackgroundName( sensors ) == traced.Value ) && ( MaskName( sensors ) == traced.Value + " Mask" ), SensorPicture( sensors ) );
 		}
 
+		// a picture is wider than the magenta panel (640 against 480 units): the window clips it to the panel, so the noise of a wide ship
+		// (the enterprise reaches past both sides) does not show beside the window
+		spaceflightController.m_displayController.ChangeDisplay( sensors );
+		sensors.StartScanning( SensorsDisplay.ScanType.TheEnterprise, 0, 19000, 100, 100 );
+		yield return Frames( 3 );
+
+		var clipWindow = sensors.m_maskImage.transform.parent;
+		var clip = clipWindow.GetComponent<UnityEngine.UI.RectMask2D>();
+		var clipPanel = clipWindow.Find( "Panel" );
+		var clipText = "clip=" + ( clip != null );
+
+		if ( clip != null )
+		{
+			clipText += " padding=" + clip.padding + " noiseClipped=" + sensors.m_maskImage.canvasRenderer.hasRectClipping;
+		}
+
+		if ( clipPanel != null )
+		{
+			var panelRect = (RectTransform) clipPanel;
+
+			clipText += " panelOffsets=" + panelRect.offsetMin + "/" + panelRect.offsetMax;
+		}
+
+		// the clip is the panel's rectangle less the transparent edge of its sprite (the magenta starts 6 sprite pixels in)
+		var marginField = typeof( SensorsDisplay ).GetField( "m_panelSpriteMargin" );
+		var clipPanelImage = ( clipPanel != null ) ? clipPanel.GetComponent<UnityEngine.UI.Image>() : null;
+		var expectedMargin = -1.0f;
+
+		if ( ( marginField != null ) && ( clipPanelImage != null ) && ( clipPanelImage.sprite != null ) )
+		{
+			expectedMargin = (float) marginField.GetValue( sensors ) * clipPanelImage.canvas.referencePixelsPerUnit / ( clipPanelImage.sprite.pixelsPerUnit * clipPanelImage.pixelsPerUnitMultiplier );
+		}
+
+		clipText += " expectedMargin=" + expectedMargin;
+
+		Check( "the window clips its pictures to the magenta inside the panel", ( clip != null ) && ( clipPanel != null ) && ( expectedMargin > 0.0f ) && ( ( clip.padding - new Vector4( ( (RectTransform) clipPanel ).offsetMin.x + expectedMargin, ( (RectTransform) clipPanel ).offsetMin.y + expectedMargin, -( (RectTransform) clipPanel ).offsetMax.x + expectedMargin, -( (RectTransform) clipPanel ).offsetMax.y + expectedMargin ) ).magnitude < 0.01f ), clipText );
+		Check( "the noise of a wide picture is clipped", ( clip != null ) && sensors.m_maskImage.canvasRenderer.hasRectClipping, clipText );
+
 		// an object that has no picture (an unknown object; every vessel has one), scanned right after one that has (the window must not keep the last picture)
 		spaceflightController.m_displayController.ChangeDisplay( sensors );
 		sensors.StartScanning( SensorsDisplay.ScanType.Unknown, 0, 50, 100, 100 );

@@ -57,6 +57,9 @@ public class SensorsDisplay : ShipDisplay
 	// how wide the magenta border around an empty window is (the original's is 3 of the window's 90 pixels)
 	public float m_emptyBorderWidth = 16.0f;
 
+	// the transparent edge of the panel's sprite, in the sprite's pixels ("Panel - Background" is 128 x 128 and opaque from its 7th pixel in)
+	public float m_panelSpriteMargin = 6.0f;
+
 	// the background textures for the various scan types
 	public Texture[] m_backgroundTextures;
 
@@ -93,6 +96,10 @@ public class SensorsDisplay : ShipDisplay
 	// the inside of the window when a scan has no picture: black inside a magenta border, as the original shows an unidentified object
 	// (a copy of the panel, made the first time the display is shown)
 	Image m_emptyImage;
+
+	// clips the pictures to the magenta panel (a picture is 640 units wide, the panel 480, so the noise of a wide picture would show beside the window)
+	// (added the first time the display is shown; the backgrounds multiply what is under them, so only the noise needs it)
+	RectMask2D m_windowClip;
 
 	// are we running the cinematics?
 	bool m_isDoingCinematics;
@@ -350,6 +357,29 @@ public class SensorsDisplay : ShipDisplay
 		{
 			m_maskMaterial = new Material( m_maskImage.material );
 			m_maskImage.material = m_maskMaterial;
+		}
+
+		// clip everything in the window to the panel (once)
+		if ( ( m_windowClip == null ) && ( m_panelImage != null ) )
+		{
+			var window = m_panelImage.transform.parent.gameObject;
+
+			if ( !window.TryGetComponent( out m_windowClip ) )
+			{
+				m_windowClip = window.AddComponent<RectMask2D>();
+			}
+
+			// the panel is inset in the window by its offsets (left, bottom, right, top), and its magenta starts inside the sprite's transparent edge
+			// (a sliced sprite's edge is drawn at the canvas's reference pixels per unit over the sprite's pixels per unit)
+			var panelRect = m_panelImage.rectTransform;
+			var margin = 0.0f;
+
+			if ( ( m_panelImage.sprite != null ) && ( m_panelImage.canvas != null ) && ( m_panelImage.sprite.pixelsPerUnit > 0.0f ) && ( m_panelImage.pixelsPerUnitMultiplier > 0.0f ) )
+			{
+				margin = m_panelSpriteMargin * m_panelImage.canvas.referencePixelsPerUnit / ( m_panelImage.sprite.pixelsPerUnit * m_panelImage.pixelsPerUnitMultiplier );
+			}
+
+			m_windowClip.padding = new Vector4( panelRect.offsetMin.x + margin, panelRect.offsetMin.y + margin, -panelRect.offsetMax.x + margin, -panelRect.offsetMax.y + margin );
 		}
 
 		// make the black inside of an empty window (once)
