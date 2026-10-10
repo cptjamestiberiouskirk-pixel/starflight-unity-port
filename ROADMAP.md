@@ -138,7 +138,7 @@ Only the effects that matter for winning have to come before Phase 5. The others
 | Artifact | Effect (source: Starport analysis, STRINFO) | How it is obtained | Needed to win |
 |---|---|---|---|
 | Crystal Orb | cancels the Crystal Planet's field: PR 115, with item 5.2 | Sphexi, 46N 14E | yes |
-| Black Egg | planet bomb, armed by dropping it | three Old Empire sites | yes |
+| Black Egg | planet bomb, armed by dropping it: PR 117 (countdown in orbit, the planet destroyed and saved) | three Old Empire sites | yes |
 | Crystal Cone | finds the Crystal Planet's nexus from orbit | Uhlek space | INFERRED yes |
 | Ring Device | shows nearby fluxes (alpha.txt: fluxes are hidden without it and navigation skill) | Mars, 90N 0 | no; Ask whether fluxes should become hidden |
 | Whining Orb | translates Spemin | Starport, 6000 MU | no |
@@ -159,7 +159,7 @@ After this phase the game can be played from start to win.
 |---|---|---|
 | 5.1 | Arth's sun flares on its date: the Starport is destroyed and the game goes on (distress gets no answer; the win message can still arrive) | STRINFO 2.14, Elowan comm, data (D5) |
 | 5.2 | The Crystal Planet (192,152 planet 1): its field damages a ship without the Orb. PR 115: 5 points a second in orbit without the Orb (the rate is the port's choice) | STRINFO 5.1; disys.txt `'HEAT` (crystal planet heating routine) |
-| 5.3 | Drop the armed Black Egg at 47N 45E to win. Anywhere else on the Crystal Planet: "damaged but not destroyed". On the Uhlek brain world (55,32 planet 2) the Uhlek fall silent. On Elan the Elowan young die. | STRINFO 2.12, SS Story |
+| 5.3 | Drop the armed Black Egg at 47N 45E to win. Anywhere else on the Crystal Planet: "damaged but not destroyed". On the Uhlek brain world (55,32 planet 2) the Uhlek fall silent. On Elan the Elowan young die. PR 117: the egg, the nexus, the damaged planet and the crew's two reports; still to do: what the loss does to the Uhlek and the Elowan | STRINFO 2.12, 5.1, SS Story; disys.txt `?BOMB` |
 | 5.4 | Win sequence: the message, 500,000 MU, the Interstel medal, a supplemental evaluation; no more flares after the win | STRINFO 1.2, 2.12; disys.txt |
 | 5.5 | Every way to lose (flare, ship destroyed, all crew dead) ends through the same game over | STRINFO, disys.txt |
 
