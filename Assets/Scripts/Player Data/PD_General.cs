@@ -83,6 +83,9 @@ public class PD_General
 	// the bonus that comes with the Interstel Medal of Sublime Achievement (STRINFO 1.2 and 2.12)
 	public const int c_winBonus = 500000;
 
+	// true once Arth's sun has flared before the game was won: the Starport has been destroyed (STRINFO 2.12 and 2.14) and the game goes on without it
+	public bool m_starportDestroyed;
+
 	// dimensions of the last comm ids table (race x subject)
 	public const int c_numLastCommRaces = 20;
 	public const int c_numLastCommSubjects = 16;
@@ -145,9 +148,10 @@ public class PD_General
 		m_currentStarId = gameData.m_misc.m_arthStarId;
 		m_currentPlanetId = 0;
 
-		// the game has not been won yet
+		// the game has not been won yet, and the Starport is still there
 		m_gameWon = false;
 		m_winBonusPending = false;
+		m_starportDestroyed = false;
 		m_currentEncounterId = 0;
 
 		// facing north

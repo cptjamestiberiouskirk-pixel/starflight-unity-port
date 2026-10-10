@@ -31,6 +31,17 @@ public class DistressButton : ShipButton
 			return false;
 		}
 
+		// after the flare of Arth's sun there is no Starport to answer (STRINFO 2.14)
+		if ( playerData.m_general.m_starportDestroyed )
+		{
+			var storyText = DataController.m_instance.m_gameData.FindStoryText( "DistressNoResponse" );
+
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>" + ( ( storyText != null ) ? storyText.m_text : "THERE'S NO RESPONSE!" ) + "</color>" );
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+			SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+			return false;
+		}
+
 		// send distress signal
 		SpaceflightController.m_instance.m_messages.AddText(
 			"<color=yellow>DISTRESS SIGNAL SENT</color>\n" +

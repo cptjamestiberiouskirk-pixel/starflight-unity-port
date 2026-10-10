@@ -203,6 +203,9 @@ public class SpaceflightController : MonoBehaviour
 		// a Black Egg that has been dropped on a planet counts down once the ship is back up above it
 		m_blackEgg.Update();
 
+		// Arth's sun flares on its day, unless the game has been won by then
+		ArthFlare.Update();
+
 		// save the game once in a while
 		m_timer += Time.deltaTime;
 

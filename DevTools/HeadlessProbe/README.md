@@ -110,8 +110,9 @@ What the probe does:
 | `crystalcone` | the Crystal Cone: the messages of an orbit around the Crystal Planet without the Cone (the control, nothing about the nexus) and with it (the control nexus at 47N x 45E), Land there with the Cone (reported again), and an orbit around planet 90 with the Cone (the control, nothing) (about 50 s) |
 | `win` | the win: the armor lost entering the star that flares soonest half a day before its flare, before the win (the control, 25) and after it (none); a Black Egg at the Crystal Planet's control nexus setting the win and the pending bonus; docking at the Starport paying 500,000 MU with a ledger entry and a message, and docking again paying nothing (about 70 s) |
 | `starport-win` | the Starport's Evaluation screen before the win (the control, the scene's text about colony recommendations) and after it (Interstel's supplemental evaluation on the completion of the mission) (about 20 s) |
+| `arthflare` | Arth's sun flares: in the Crystal Planet's star system the day before the flare (the control, the Starport there) and on the day (the Starport destroyed, the ship fine); Distress then (no response); in Arth's system after it (no Starport model, no docking in orbital range, the Starport does not answer); after the win (the control, no flare); in Arth's system on the day without the win (the ship incinerated with STRINFO's text, the game over) (about 60 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (69 scenarios, about 37 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (70 scenarios, about 38 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
