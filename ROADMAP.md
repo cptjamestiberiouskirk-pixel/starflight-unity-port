@@ -140,15 +140,15 @@ Only the effects that matter for winning have to come before Phase 5. The others
 | Crystal Orb | cancels the Crystal Planet's field: PR 115, with item 5.2 | Sphexi, 46N 14E | yes |
 | Black Egg | planet bomb, armed by dropping it: PR 117 (countdown in orbit, the planet destroyed and saved) | three Old Empire sites | yes |
 | Crystal Cone | finds the Crystal Planet's nexus from orbit: PR 118 (the messages report it on entering orbit and on Land; how it is shown is the port's choice) | Uhlek space | INFERRED yes |
-| Ring Device | shows nearby fluxes (alpha.txt: fluxes are hidden without it and navigation skill) | Mars, 90N 0 | no; Ask whether fluxes should become hidden |
+| Ring Device | shows nearby fluxes (alpha.txt: fluxes are hidden without it and navigation skill) | Mars, 90N 0 | no; ruled 2026-10-10: fluxes are hidden without it |
 | Whining Orb | translates Spemin: PR 126 | Starport, 6000 MU | no |
 | Flat Device | shields the terrain vehicle from lifeforms | Starport, 30,000 MU | no, needs Phase 6 |
-| Shimmering Ball | automatic cloak in combat | 68,66 planet 1 | no |
+| Shimmering Ball | automatic cloak in combat; ruled 2026-10-10: the aliens cannot fire at the ship until it fires | 68,66 planet 1 | no |
 | Rod Device | stronger laser shield: PR 127 (half of every alien laser hit; the amount is the port's choice) | New Scotland (site: D5) | no |
 | Tesseract | doubles engine efficiency: PR 124 (half the engines' fuel in hyperspace) | 18,50 planet 5 | no |
 | Crystal Pearl | warps a badly damaged ship away: PR 128 (out of an encounter below a tenth of the armor; the tenth is the port's choice) | City of the Ancients | no |
 | Red Cylinder | finds ancient ruins from orbit | Koann (planet: D5) | no |
-| Dodecahedron | attracts every ship nearby | 118,146 planet 4 | no |
+| Dodecahedron | attracts every ship nearby: PR 129 (twice the alien radar distance; the factor is the port's choice) | 118,146 planet 4 | no |
 | Black Box, Hypercube, Ellipsoid | unclear (D5) | Thrynn trade, Earth, 81,98 | Ask |
 
 ## Phase 5: Main story and endgame

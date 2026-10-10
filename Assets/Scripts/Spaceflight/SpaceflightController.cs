@@ -460,6 +460,13 @@ public class SpaceflightController : MonoBehaviour
 		// get the correct alien radar distance
 		var alienRadarDistance = ( location == PD_General.Location.Hyperspace ) ? m_alienHyperspaceRadarDistance : m_alienStarSystemRadarDistance;
 
+		// the Dodecahedron is "an ancient distress beacon which attracts any ships in the area" (the Thrynn, STRINFO 2.5; the Starport's analysis: "it will attract the attention
+		// of anyone in the area") - with it in the hold the aliens notice the ship from twice as far (how far is the port's choice)
+		if ( playerData.m_playerShip.HasArtifact( "Dodecahedron" ) )
+		{
+			alienRadarDistance *= 2.0f;
+		}
+
 		// the encounter the player has run into in this frame (the nearest one, if more than one is within range)
 		PD_Encounter encounterToBegin = null;
 
