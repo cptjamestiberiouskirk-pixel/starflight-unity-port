@@ -317,6 +317,21 @@ public class PD_PlayerShip
 		RecalculateVolumeUsed();
 	}
 
+	// true if this artifact (by its name in the game data) is in the cargo hold
+	public bool HasArtifact( string artifactName )
+	{
+		var artifactId = DataController.m_instance.m_gameData.FindArtifactId( artifactName );
+
+		return ( artifactId >= 0 ) && ( m_artifactStorage != null ) && ( m_artifactStorage.Find( artifactId ) != null );
+	}
+
+	// how much of the fuel the engines would use they do use: the Tesseract "projects a field which doubles the energy efficiency of a ship's engines" (the Starport's
+	// analysis)
+	public float GetEngineFuelFactor()
+	{
+		return HasArtifact( "Tesseract" ) ? 0.5f : 1.0f;
+	}
+
 	public void RemoveArtifact( int artifactId )
 	{
 		// ensure storage exists
