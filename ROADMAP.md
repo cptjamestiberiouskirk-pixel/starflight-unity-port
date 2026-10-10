@@ -100,7 +100,7 @@ Small items, each documented in the sources.
 | 1.5 | Endurium price rises to 1500 and then 2000 MU with the notices of 20-02 and 15-05 | STRINFO 1.1, 1.4 | fixed price |
 | 1.6 | Losing the terrain vehicle costs 10,000 MU and a replacement | STRINFO 1.2 | depends on 5.x hazards |
 | 1.7 | Science skill decides whether an analysis succeeds | starship.txt (DRAFT formula: skill / 2); Ask on the formula | science skill unused |
-| 1.8 | Flares: checked every day while the ship is in a system; a flare with the ship there ends the game ("incinerated"); Analysis shows "UNSTABLE, est. time to flare" under 1000 days | disys.txt `?FLARE`, STRINFO 2.14, notes | checked once on arrival, up to 50 damage |
+| 1.8 | Flares: checked every day while the ship is in a system; a flare with the ship there ends the game ("incinerated"); Analysis shows "UNSTABLE, est. time to flare" under 1000 days | disys.txt `?FLARE`, STRINFO 2.14, notes | PR 122: every star flares at a ship in its system on its day; the Analysis text still to do |
 | 1.9 | Nebulae act on the shields | priority.txt; how strongly: Ask | TODO, no effect |
 | 1.10 | Starmap shows a fuel estimate | alpha.txt | no estimate |
 | 1.11 | Alien vessels use their own armor, shields and speed from the data | xls Vessels; `GD_Vessel.m_armor`, `m_shields`, `m_moveDelay` unused | 100 points per class, one speed for all |
@@ -161,7 +161,7 @@ After this phase the game can be played from start to win.
 | 5.2 | The Crystal Planet (192,152 planet 1): its field damages a ship without the Orb. PR 115: 5 points a second in orbit without the Orb (the rate is the port's choice) | STRINFO 5.1; disys.txt `'HEAT` (crystal planet heating routine) |
 | 5.3 | Drop the armed Black Egg at 47N 45E to win. Anywhere else on the Crystal Planet: "damaged but not destroyed". On the Uhlek brain world (55,32 planet 2) the Uhlek fall silent. On Elan the Elowan young die. PR 117: the egg, the nexus, the damaged planet and the crew's two reports; still to do: what the loss does to the Uhlek and the Elowan | STRINFO 2.12, 5.1, SS Story; disys.txt `?BOMB` |
 | 5.4 | Win sequence: the message, 500,000 MU, the Interstel medal, a supplemental evaluation; no more flares after the win. PR 120: the win saved, no flares, the bonus paid on docking, the evaluation in Operations | STRINFO 1.2, 2.12; disys.txt `?WIN`, `?FLARE`, `WMSG` |
-| 5.5 | Every way to lose (flare, ship destroyed, all crew dead) ends through the same game over | STRINFO, disys.txt |
+| 5.5 | Every way to lose (flare, ship destroyed, all crew dead) ends through the same game over. PR 122: one destruction path, the game over says the cause; all crew dead waits for Phase 6 (crew death is only in the 1984 drafts) | STRINFO, disys.txt |
 
 ## Phase 6: Lifeforms and crew injury
 

@@ -599,6 +599,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioArthFlare();
 				break;
 
+			case "gameover":
+				yield return ScenarioGameOver();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -11976,32 +11980,44 @@ public class ClaudeProbe : MonoBehaviour
 		return starId;
 	}
 
-	// enters the star system of a star half a day before it flares, with the shields down and the armor full - returns the armor points lost
-	static IEnumerator ArmorLostToFlare( int starId, int[] lost )
+	// puts the game on a day (the clock works the game time out from it in the next update)
+	static void SetGameDay( int day )
 	{
-		var playerData = DataController.m_instance.m_playerData;
-		var ship = playerData.m_playerShip;
+		var general = DataController.m_instance.m_playerData.m_general;
+
+		general.m_day = day;
+		general.m_hour = 0;
+		general.m_minute = 0;
+		general.m_second = 0;
+		general.m_gameTime = day;
+	}
+
+	// a star that flared before the game began, other than Arth's (its star system is safe whatever day it is)
+	static int StarThatNeverFlares()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		for ( var id = 0; id < gameData.m_starList.Length; id++ )
+		{
+			if ( ( id != gameData.m_misc.m_arthStarId ) && ( gameData.m_starList[ id ].m_daysToNextFlare <= 0 ) )
+			{
+				return id;
+			}
+		}
+
+		return 0;
+	}
+
+	// enters the star system of a star the day before it flares and stays there into the day of its flare - returns whether the ship was destroyed
+	static IEnumerator ThroughTheFlareDay( int starId, bool[] destroyed )
+	{
 		var star = DataController.m_instance.m_gameData.m_starList[ starId ];
 
-		// half a day before the flare
-		playerData.m_general.m_day = star.m_daysToNextFlare - 1;
-		playerData.m_general.m_hour = 12;
-		playerData.m_general.m_minute = 0;
-		playerData.m_general.m_second = 0;
-		playerData.m_general.m_gameTime = star.m_daysToNextFlare - 0.5f;
-
-		ship.m_shieldsAreUp = false;
-		ship.m_armorPoints = ship.GetMaximumArmorPoints();
-
-		var before = ship.m_armorPoints;
+		SetGameDay( star.m_daysToNextFlare - 1 );
 
 		EnterStarSystem( starId );
 
-		yield return Frames( 3 );
-
-		lost[ 0 ] = before - ship.m_armorPoints;
-
-		// wait for the planets, so that what comes next finds a star system that is ready
+		// wait for the planets, so that the star system is ready
 		var end = Time.realtimeSinceStartup + 40.0f;
 
 		while ( ( Time.realtimeSinceStartup < end ) && SpaceflightController.m_instance.m_starSystem.GeneratingPlanets() )
@@ -12009,7 +12025,14 @@ public class ClaudeProbe : MonoBehaviour
 			yield return null;
 		}
 
-		yield return Frames( 5 );
+		yield return Frames( 10 );
+
+		// the day of the flare comes
+		SetGameDay( star.m_daysToNextFlare );
+
+		yield return Frames( 15 );
+
+		destroyed[ 0 ] = SpaceflightController.m_instance.m_combatController.PlayerIsDestroyed();
 	}
 
 	IEnumerator ScenarioWin()
@@ -12019,18 +12042,13 @@ public class ClaudeProbe : MonoBehaviour
 		var gameData = dataController.m_gameData;
 		var controller = SpaceflightController.m_instance;
 		var ship = playerData.m_playerShip;
-		var lost = new int[ 1 ];
+		var destroyed = new bool[ 1 ];
 
 		EnsureCrew();
 
 		var flareStarId = StarThatFlaresSoonest();
 
-		// ---- 1. the control: before the win a star that is flaring damages the ship
-		yield return ArmorLostToFlare( flareStarId, lost );
-
-		var lostBeforeTheWin = lost[ 0 ];
-
-		// ---- 2. the win: a Black Egg at the control nexus of the Crystal Planet
+		// ---- 1. the win: a Black Egg at the control nexus of the Crystal Planet
 		var atTheNexus = Tools.LatLongToWorldCoordinates( 45.0f, 47.0f );
 
 		playerData.m_planetSurfaces.AddDroppedCargo( 33, atTheNexus.x, 0.0f, atTheNexus.z, -1, 0, gameData.FindArtifactId( "Black Egg" ) );
@@ -12055,17 +12073,16 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "win: destroying the Crystal Planet at its control nexus wins the game, with Interstel's bonus to be paid", won && bonusPending, won + "/" + bonusPending );
 
-		// ---- 3. after the win the same star flares no more
-		yield return ArmorLostToFlare( flareStarId, lost );
+		// ---- 2. after the win no star flares: in the star system of the star that flares soonest through the day of its flare (the gameover scenario has the control)
+		yield return ThroughTheFlareDay( flareStarId, destroyed );
 
-		var lostAfterTheWin = lost[ 0 ];
+		var destroyedAfterTheWin = destroyed[ 0 ];
 
-		Log( "win: armor lost entering star " + flareStarId + " half a day before its flare (day " + gameData.m_starList[ flareStarId ].m_daysToNextFlare + "): before the win " + lostBeforeTheWin + ", after it " + lostAfterTheWin );
+		Log( "win: in the system of star " + flareStarId + " through the day of its flare (day " + gameData.m_starList[ flareStarId ].m_daysToNextFlare + ") after the win: the ship destroyed " + destroyedAfterTheWin );
 
-		Check( "win: before the win a star that is flaring damages the ship (control)", lostBeforeTheWin > 0, lostBeforeTheWin.ToString() );
-		Check( "win: after the win no star flares", lostAfterTheWin == 0, lostAfterTheWin.ToString() );
+		Check( "win: after the win no star flares", !destroyedAfterTheWin, destroyedAfterTheWin.ToString() );
 
-		// ---- 4. back at the Starport: the bonus, once
+		// ---- 3. back at the Starport: the bonus, once
 		playerData.m_general.m_currentStarId = gameData.m_misc.m_arthStarId;
 		playerData.m_general.m_currentPlanetId = gameData.m_misc.m_arthPlanetId;
 
@@ -12100,7 +12117,7 @@ public class ClaudeProbe : MonoBehaviour
 		// a later scenario must not start from a won game
 		SetFieldIfPresent( playerData.m_general, "m_gameWon", false );
 
-		Finish( "scenario=win flareBefore=" + lostBeforeTheWin + " won=" + won + " flareAfter=" + lostAfterTheWin + " paid=" + paid + " paidAgain=" + paidAgain, 0 );
+		Finish( "scenario=win won=" + won + " flaredAfter=" + destroyedAfterTheWin + " paid=" + paid + " paidAgain=" + paidAgain, 0 );
 	}
 
 	IEnumerator ScenarioStarportWin()
@@ -12148,17 +12165,6 @@ public class ClaudeProbe : MonoBehaviour
 		return Equals( FieldOrNull( DataController.m_instance.m_playerData.m_general, "m_starportDestroyed" ), true );
 	}
 
-	// puts the game on a day (the clock works the game time out from it in the next update)
-	static void SetGameDay( int day )
-	{
-		var general = DataController.m_instance.m_playerData.m_general;
-
-		general.m_day = day;
-		general.m_hour = 0;
-		general.m_minute = 0;
-		general.m_second = 0;
-	}
-
 	IEnumerator ScenarioArthFlare()
 	{
 		var dataController = DataController.m_instance;
@@ -12171,8 +12177,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
-		// ---- 1. away from Arth, in the star system of the Crystal Planet (planet 90 is in Arth's): the day before the flare nothing happens (control), on the day the Starport is gone and the ship is fine
-		var awayStarId = gameData.m_planetList[ 33 ].m_starId;
+		// ---- 1. away from Arth, in the system of a star that flared before the game began (planet 90 is in Arth's, and a star that flares in the first 300 days would
+		// flare at the ship as the days go by): the day before the flare nothing happens (control), on the day the Starport is gone and the ship is fine
+		var awayStarId = StarThatNeverFlares();
 
 		EnterStarSystem( awayStarId );
 
@@ -12277,6 +12284,92 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "arthflare: a ship in Arth's star system when its sun flares is incinerated, and the game is over", incinerated && deathText.Contains( "INCINERATED" ) && deathText.Contains( "125, 100" ) && deathText.Contains( "01-01-4621" ), incinerated + " | " + deathText );
 
 		Finish( "scenario=arthflare dayBefore=" + destroyedTheDayBefore + " onTheDay=" + destroyedOnTheDay + " starportShown=" + starportShown + " afterWin=" + destroyedAfterTheWin + " incinerated=" + incinerated, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 5: every way to lose ends in the same game over
+
+	IEnumerator ScenarioGameOver()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var flareStarId = StarThatFlaresSoonest();
+		var flareStar = gameData.m_starList[ flareStarId ];
+		var otherStarId = StarThatNeverFlares();
+
+		EnsureCrew();
+
+		ship.m_shieldsAreUp = false;
+		ship.m_armorPoints = ship.GetMaximumArmorPoints();
+
+		var armorBefore = ship.m_armorPoints;
+
+		// ---- 1. the control: coming into a star system on the day of its star's flare, the ship is fine (the star flares as the day before ends)
+		SetGameDay( flareStar.m_daysToNextFlare );
+
+		EnterStarSystem( flareStarId );
+
+		var end = Time.realtimeSinceStartup + 40.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && controller.m_starSystem.GeneratingPlanets() )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 15 );
+
+		var fineOnArrival = !controller.m_combatController.PlayerIsDestroyed() && ( ship.m_armorPoints == armorBefore );
+
+		// ---- 2. the control: the day before the flare, in its star system, the ship is fine (the port damaged a ship then)
+		EnterStarSystem( otherStarId );
+
+		yield return Frames( 5 );
+
+		SetGameDay( flareStar.m_daysToNextFlare - 1 );
+
+		EnterStarSystem( flareStarId );
+
+		end = Time.realtimeSinceStartup + 40.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && controller.m_starSystem.GeneratingPlanets() )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 15 );
+
+		var fineTheDayBefore = !controller.m_combatController.PlayerIsDestroyed() && ( ship.m_armorPoints == armorBefore );
+
+		Log( "gameover: star " + flareStarId + " (" + flareStar.m_xCoordinate + ", " + flareStar.m_yCoordinate + ") flares on day " + flareStar.m_daysToNextFlare + ": coming in on that day the ship is fine " + fineOnArrival + ", in its system the day before fine " + fineTheDayBefore + " (armor " + ship.m_armorPoints + " of " + armorBefore + ")" );
+
+		Check( "gameover: a ship that comes into a star system on its star's flare day is not caught in the flare (control)", fineOnArrival, fineOnArrival.ToString() );
+		Check( "gameover: in a star system the day before its star flares the ship is fine", fineTheDayBefore, ship.m_armorPoints + " of " + armorBefore );
+
+		// ---- 3. the day of the flare comes with the ship there: incinerated, and the game over screen says so (once the explosion is over, 1.5 s)
+		SetGameDay( flareStar.m_daysToNextFlare );
+
+		end = Time.realtimeSinceStartup + 6.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !controller.m_gameOver )
+		{
+			yield return null;
+		}
+
+		// the message box is redrawn in its late update
+		yield return Frames( 3 );
+
+		var destroyed = controller.m_combatController.PlayerIsDestroyed();
+		var gameOverText = MessageList();
+		var coordinates = flareStar.m_xCoordinate + ", " + flareStar.m_yCoordinate;
+
+		Log( "gameover: on the flare day in its system: destroyed " + destroyed + ", game over " + controller.m_gameOver + ", paused " + controller.m_gameIsPaused + " | " + gameOverText );
+
+		Check( "gameover: a ship in a star system when its star flares is incinerated, and the game is over", destroyed && controller.m_gameOver && controller.m_gameIsPaused, destroyed + ", " + controller.m_gameOver + ", " + controller.m_gameIsPaused );
+		Check( "gameover: the game over screen says the ship was incinerated by that star's flare, not that it was destroyed", gameOverText.Contains( "INCINERATED" ) && gameOverText.Contains( coordinates ) && !gameOverText.Contains( "Ship destroyed!" ) && gameOverText.Contains( "ESC" ), gameOverText );
+
+		Finish( "scenario=gameover onArrival=" + fineOnArrival + " dayBefore=" + fineTheDayBefore + " incinerated=" + destroyed + " gameOver=" + controller.m_gameOver, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
