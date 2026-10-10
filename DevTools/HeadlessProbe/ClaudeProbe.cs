@@ -643,6 +643,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportEndurium();
 				break;
 
+			case "nebula":
+				yield return ScenarioNebula();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -13272,6 +13276,140 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-endurium: the other minerals keep their prices (control)", molybdenumBefore == molybdenumAfter, molybdenumBefore + " -> " + molybdenumAfter );
 
 		Finish( "scenario=starport-endurium " + dates[ 0 ] + "=" + bought[ 0 ] + "/" + sold[ 0 ] + " " + dates[ 1 ] + "=" + bought[ 1 ] + "/" + sold[ 1 ] + " " + dates[ 2 ] + "=" + bought[ 2 ] + "/" + sold[ 2 ], 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 1: nebulae keep the shields down
+
+	// presses Raise Shields - returns whether the shields are up afterwards
+	static bool PressRaiseShields()
+	{
+		new RaiseShieldsButton().Execute();
+
+		return DataController.m_instance.m_playerData.m_playerShip.m_shieldsAreUp;
+	}
+
+	IEnumerator ScenarioNebula()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+
+		// shields to raise, and the Endurium they burn
+		ship.m_shieldingClass = 1;
+		ship.AddElement( 5, 100 );
+
+		// a star inside a nebula, and one that is not (that flared before the game began, so its system is safe whatever the day)
+		var nebulaStarId = -1;
+
+		for ( var starId = 0; ( starId < gameData.m_starList.Length ) && ( nebulaStarId < 0 ); starId++ )
+		{
+			if ( gameData.m_starList[ starId ].m_insideNebula && ( starId != gameData.m_misc.m_arthStarId ) )
+			{
+				nebulaStarId = starId;
+			}
+		}
+
+		var clearStarId = StarThatNeverFlares();
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		// ---- 1. the control: in a star system outside the nebulae the shields come up
+		EnterStarSystem( clearStarId );
+
+		var generating = Time.realtimeSinceStartup + 40.0f;
+
+		while ( ( Time.realtimeSinceStartup < generating ) && controller.m_starSystem.GeneratingPlanets() )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 10 );
+
+		ship.DropShields();
+
+		var upInClearSystem = PressRaiseShields();
+
+		yield return Frames( 5 );
+
+		var stillUpInClearSystem = ship.m_shieldsAreUp;
+
+		// ---- 2. coming into a star system inside a nebula with the shields up, they collapse, and they cannot be raised there
+		EnterStarSystem( nebulaStarId );
+
+		var end = Time.realtimeSinceStartup + 40.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && controller.m_starSystem.GeneratingPlanets() )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 10 );
+
+		var upAfterComingIn = ship.m_shieldsAreUp;
+		var collapseText = MessageList();
+		var upInNebulaSystem = PressRaiseShields();
+
+		// ---- 3. in hyperspace inside a nebula the shields cannot be raised; outside them they can (the control)
+		// (a nebula whose center is clear of every star, or the ship would come out of hyperspace into that star's system at once)
+		GD_Nebula nebula = null;
+
+		foreach ( var candidate in gameData.m_nebulaList )
+		{
+			var center = Tools.GameToWorldCoordinates( new Vector3( candidate.m_xCoordinate, 0.0f, candidate.m_yCoordinate ) );
+			var clear = true;
+
+			foreach ( var star in gameData.m_starList )
+			{
+				if ( Vector3.Distance( center, star.GetWorldCoordinates() ) < star.GetBreachDistance() * 4.0f )
+				{
+					clear = false;
+				}
+			}
+
+			if ( clear && ( nebula == null ) )
+			{
+				nebula = candidate;
+			}
+		}
+
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( nebula.m_xCoordinate, 0.0f, nebula.m_yCoordinate ) );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		var inHyperspaceNebula = playerData.m_general.m_location == PD_General.Location.Hyperspace;
+		var upInHyperspaceNebula = PressRaiseShields();
+
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 4.0f, 0.0f, 4.0f ) );
+
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		var upInClearHyperspace = PressRaiseShields();
+
+		ship.DropShields();
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "nebula: star " + clearStarId + " (no nebula): shields up " + upInClearSystem + ", still up " + stillUpInClearSystem + " | star " + nebulaStarId + " (inside a nebula): up after coming in " + upAfterComingIn + ", raised there " + upInNebulaSystem + " (" + collapseText + ") | hyperspace inside nebula " + nebula.m_id + " (in hyperspace " + inHyperspaceNebula + "): raised " + upInHyperspaceNebula + " | hyperspace outside: raised " + upInClearHyperspace );
+
+		Check( "nebula: outside the nebulae the shields come up and stay up (control)", upInClearSystem && stillUpInClearSystem && upInClearHyperspace, upInClearSystem + ", " + stillUpInClearSystem + ", " + upInClearHyperspace );
+		Check( "nebula: shields that are up collapse when the ship comes into a star system inside a nebula", !upAfterComingIn && collapseText.Contains( "nebula" ), upAfterComingIn + " | " + collapseText );
+		Check( "nebula: inside a nebula the shields cannot be raised, in a star system or in hyperspace", !upInNebulaSystem && inHyperspaceNebula && !upInHyperspaceNebula, upInNebulaSystem + ", " + inHyperspaceNebula + ", " + upInHyperspaceNebula );
+
+		Finish( "scenario=nebula clear=" + upInClearSystem + " afterComingIn=" + upAfterComingIn + " nebulaSystem=" + upInNebulaSystem + " nebulaHyperspace=" + upInHyperspaceNebula + " clearHyperspace=" + upInClearHyperspace, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

@@ -215,7 +215,7 @@ public class PlayerShip : MonoBehaviour
 		// sort the results
 		Array.Sort( gameData.m_nebulaList );
 
-		// TODO: affect shields
+		// (a nebula keeps the shields down - see SpaceflightController.Update)
 	}
 
 	// call this to show the player ship

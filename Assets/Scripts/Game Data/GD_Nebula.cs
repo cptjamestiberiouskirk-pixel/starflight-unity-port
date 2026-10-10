@@ -35,6 +35,12 @@ public class GD_Nebula : IComparable
 		throw new ArgumentException( "Object is not a Nebula" );
 	}
 
+	// true if these hyperspace coordinates are inside this nebula
+	public bool Contains( Vector3 hyperspaceCoordinates )
+	{
+		return Vector3.Distance( hyperspaceCoordinates, m_center ) <= m_size;
+	}
+
 	public void Update( Vector3 hyperspaceCoordinates )
 	{
 		m_currentDistance = Vector3.Distance( hyperspaceCoordinates, m_center );
