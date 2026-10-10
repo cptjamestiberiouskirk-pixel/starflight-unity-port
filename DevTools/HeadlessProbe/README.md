@@ -112,8 +112,9 @@ What the probe does:
 | `starport-win` | the Starport's Evaluation screen before the win (the control, the scene's text about colony recommendations) and after it (Interstel's supplemental evaluation on the completion of the mission) (about 20 s) |
 | `arthflare` | Arth's sun flares: in the system of a star that flared before the game began, the day before the flare (the control, the Starport there) and on the day (the Starport destroyed, the ship fine); Distress then (no response); in Arth's system after it (no Starport model, no docking in orbital range, the Starport does not answer); after the win (the control, no flare); in Arth's system on the day without the win (the ship incinerated with STRINFO's text, the game over) (about 60 s) |
 | `gameover` | every way to lose ends in the same game over: coming into the system of the star that flares soonest on its flare day (the control, fine), in its system the day before (fine, the old code's arrival damage gone), then its flare day coming with the ship there (incinerated, the game over screen with STRINFO's text and the star's coordinates instead of "Ship destroyed!") (about 50 s) |
+| `racelosses` | what a Black Egg on Elan or on the Uhlek mind-ganglion does: damage from an Uhlek encounter in 10 s before the ganglion's planet is destroyed (the control) and after (none); an Elowan warship encounter before Elan is destroyed (the control, not hostile, nothing of Elan) and after (hostile, the comm of the game data about the deed most unthinkably foul, no answer to a hail, and they attack) (about 80 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (71 scenarios, about 39 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (72 scenarios, about 40 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
