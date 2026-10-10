@@ -211,7 +211,7 @@ public class ScanButton : ShipButton
 		// list the artifacts the ruins still hold (picked up with the cargo button)
 		if ( artifactCount > 0 )
 		{
-			report += "<color=cyan>Artifact" + ( artifactCount > 1 ? "s" : "" ) + " in the ruins: " + artifactCount + "</color>\n";
+			report += "<color=#00FFFF>Artifact" + ( artifactCount > 1 ? "s" : "" ) + " in the ruins: " + artifactCount + "</color>\n";
 		}
 
 		// list mineral deposits (pickable)

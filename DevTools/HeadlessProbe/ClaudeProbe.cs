@@ -347,6 +347,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSensorPictures();
 				break;
 
+			case "colournames":
+				yield return ScenarioColourNames();
+				break;
+
 			case "m8":
 				yield return ScenarioM8();
 				break;
@@ -1840,6 +1844,77 @@ public class ClaudeProbe : MonoBehaviour
 		ClearMissiles();
 		LeaveEncounter();
 		yield return Frames( 10 );
+	}
+
+	// ---------------------------------------------------------------- colour names: every named colour in rich text is one that TextMesh Pro knows
+
+	IEnumerator ScenarioColourNames()
+	{
+		// the names TextMesh Pro reads in <color=name> (TMP_Text, "<color=name>"); any other name makes it print the tag as text
+		var known = new HashSet<string> { "red", "lightblue", "blue", "grey", "black", "green", "white", "orange", "purple", "yellow" };
+
+		// every <color=name> in the game's scripts
+		var unknown = new List<string>();
+		var named = 0;
+		var pattern = new System.Text.RegularExpressions.Regex( "<color=([A-Za-z]+)>" );
+
+		foreach ( var path in System.IO.Directory.GetFiles( System.IO.Path.Combine( Application.dataPath, "Scripts" ), "*.cs", System.IO.SearchOption.AllDirectories ) )
+		{
+			var lines = System.IO.File.ReadAllLines( path );
+
+			for ( var i = 0; i < lines.Length; i++ )
+			{
+				foreach ( System.Text.RegularExpressions.Match match in pattern.Matches( lines[ i ] ) )
+				{
+					named++;
+
+					if ( !known.Contains( match.Groups[ 1 ].Value.ToLowerInvariant() ) )
+					{
+						unknown.Add( System.IO.Path.GetFileName( path ) + ":" + ( i + 1 ) + " " + match.Value );
+					}
+				}
+			}
+		}
+
+		Check( "every named colour in the scripts is one TextMesh Pro knows", ( named > 0 ) && ( unknown.Count == 0 ), "named=" + named + " unknown=[" + string.Join( ", ", unknown ) + "]" );
+
+		// the shield message as the player sees it: shields up, a hit they absorb, then the text TextMesh Pro shows in the message box
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+
+		// a new game has no shields: fit class 1 (500 points)
+		if ( ship.m_shieldingClass < 1 )
+		{
+			ship.m_shieldingClass = 1;
+		}
+
+		ship.m_shieldsAreUp = true;
+		ship.m_shieldPoints = ship.GetMaximumShieldPoints();
+
+		var armorBefore = ship.m_armorPoints;
+		var shown = "";
+
+		try
+		{
+			CombatController.m_instance.ApplyDamageToPlayer( 10, Vector3.forward );
+		}
+		catch ( Exception exception )
+		{
+			shown = "hit threw " + exception.GetType().Name + " ";
+		}
+
+		yield return Frames( 3 );
+
+		var messagesText = GetField( SpaceflightController.m_instance.m_messages, "m_messagesUI" ) as TMPro.TMP_Text;
+
+		if ( messagesText != null )
+		{
+			messagesText.ForceMeshUpdate();
+			shown += messagesText.GetParsedText().Replace( '\n', '/' );
+		}
+
+		Check( "the shield message shows its words and no tag", shown.Contains( "Shields absorb 10 damage!" ) && !shown.Contains( "<color" ), "shown=[" + shown + "] armor " + armorBefore + "->" + ship.m_armorPoints );
+
+		Finish( "scenario=colournames named=" + named + " unknown=" + unknown.Count, 0 );
 	}
 
 	// ---------------------------------------------------------------- M8: saves survive a damaged file

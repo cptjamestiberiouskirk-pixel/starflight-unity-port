@@ -428,7 +428,7 @@ public class TVCargoButton : ShipButton
 				foreach ( var artifactRef in artifactStorage.m_artifactList )
 				{
 					var artifactName = gameData.m_artifactList[ artifactRef.m_artifactId ].m_name;
-					text += "<color=cyan>" + artifactName + "</color>\n";
+					text += "<color=#00FFFF>" + artifactName + "</color>\n";
 				}
 			}
 

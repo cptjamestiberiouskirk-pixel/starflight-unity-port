@@ -243,7 +243,7 @@ public class Hyperspace : MonoBehaviour
 						m_flashingScreen = true;
 						m_flashTimer = 0.0f;
 
-						SpaceflightController.m_instance.m_messages.AddText( "<color=cyan>Continuum flux detected! Navigational sensors offline!</color>" );
+						SpaceflightController.m_instance.m_messages.AddText( "<color=#00FFFF>Continuum flux detected! Navigational sensors offline!</color>" );
 					}
 				}
 			}
