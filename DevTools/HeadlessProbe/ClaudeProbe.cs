@@ -1525,11 +1525,32 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "unknown object scan shows a black window inside a magenta border", ( emptyImage != null ) && ( panelImage != null ) && emptyImage.gameObject.activeInHierarchy && ( emptyImage.color == Color.black ) && ( Mathf.Abs( panelImage.rectTransform.rect.width - emptyImage.rectTransform.rect.width - 32.0f ) < 0.5f ) && ( Mathf.Abs( panelImage.rectTransform.rect.height - emptyImage.rectTransform.rect.height - 32.0f ) < 0.5f ), emptyText );
 		Check( "the black inside is drawn over the panel and under the pictures", ( emptyTransform != null ) && ( panelTransform != null ) && ( panelTransform.GetSiblingIndex() < emptyTransform.GetSiblingIndex() ) && ( emptyTransform.GetSiblingIndex() < sensors.m_backgroundImage.transform.GetSiblingIndex() ), emptyText );
 
+		// the original shows no readout for an unidentified object
+		Check( "unknown object scan shows no readout", !sensors.m_massText.gameObject.activeInHierarchy && !sensors.m_bioMinText.gameObject.activeInHierarchy, "mass=" + sensors.m_massText.gameObject.activeInHierarchy + " bio=" + sensors.m_bioMinText.gameObject.activeInHierarchy );
+
 		// a scan with a picture, and a display that has just been shown, keep the magenta window
 		sensors.StartScanning( SensorsDisplay.ScanType.SpeminScout, 1, 400, 100, 100 );
 		yield return Frames( 2 );
 
 		Check( "a scan with a picture hides the black inside", ( emptyImage != null ) && !emptyImage.gameObject.activeInHierarchy, "empty=" + ( emptyImage != null ) );
+		Check( "a scan with a picture shows its readout", sensors.m_massText.gameObject.activeInHierarchy && sensors.m_bioMinText.gameObject.activeInHierarchy, "mass=" + sensors.m_massText.gameObject.activeInHierarchy + " bio=" + sensors.m_bioMinText.gameObject.activeInHierarchy );
+
+		// at the end of the scan of an unknown object the science officer says what the original's says (no bio or minerals, so the scan takes the shortest time)
+		spaceflightController.m_displayController.ChangeDisplay( sensors );
+		sensors.StartScanning( SensorsDisplay.ScanType.Unknown, 0, 50, 0, 0 );
+
+		var unknownScanEnds = Time.realtimeSinceStartup + sensors.m_maxDuration + 5.0f;
+
+		while ( !sensors.m_hasSensorData && ( Time.realtimeSinceStartup < unknownScanEnds ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 3 );
+
+		var unknownMessage = MessagesText();
+
+		Check( "unknown object scan ends with the original's message", sensors.m_hasSensorData && unknownMessage.Contains( "Scanners indicate unidentified object!" ), "finished=" + sensors.m_hasSensorData + " messages=[" + unknownMessage + "]" );
 
 		spaceflightController.m_displayController.ChangeDisplay( sensors );
 		yield return Frames( 2 );

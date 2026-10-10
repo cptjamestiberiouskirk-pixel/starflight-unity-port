@@ -234,7 +234,7 @@ public class SensorsDisplay : ShipDisplay
 				case ScanType.Unknown:
 				{
 					SpaceflightController.m_instance.m_messages.Clear();
-					SpaceflightController.m_instance.m_messages.AddText( "<color=#FFFF00>Unknown object detected.</color>" );
+					SpaceflightController.m_instance.m_messages.AddText( "<color=#FFFF00>Scanners indicate unidentified object!</color>" );
 
 					break;
 				}
@@ -247,7 +247,7 @@ public class SensorsDisplay : ShipDisplay
 					if ( ( vesselId < 0 ) || ( vesselId >= gameData.m_vesselList.Length ) )
 					{
 						SpaceflightController.m_instance.m_messages.Clear();
-						SpaceflightController.m_instance.m_messages.AddText( "<color=#FFFF00>Unknown object detected.</color>" );
+						SpaceflightController.m_instance.m_messages.AddText( "<color=#FFFF00>Scanners indicate unidentified object!</color>" );
 
 						break;
 					}
@@ -507,9 +507,9 @@ public class SensorsDisplay : ShipDisplay
 		// play the scanning sound
 		SoundController.m_instance.PlaySound( SoundController.Sound.Scanning );
 
-		// show the top and bottom text
-		m_massText.gameObject.SetActive( true );
-		m_bioMinText.gameObject.SetActive( true );
+		// show the top and bottom text (an object with no picture shows no readout, as the original shows an unidentified object)
+		m_massText.gameObject.SetActive( hasPicture );
+		m_bioMinText.gameObject.SetActive( hasPicture );
 
 		// show the background and mask (only if we have a picture - otherwise the last scan's picture would still be there)
 		m_backgroundImage.gameObject.SetActive( hasPicture );
