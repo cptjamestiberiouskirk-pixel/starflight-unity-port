@@ -1311,6 +1311,24 @@
       "m_text": "THERE'S NO RESPONSE!\nCANCELLED",
       "m_note": "A distress signal after the Starport has been destroyed.",
       "m_source": "STRINFO 2.14"
+    },
+    {
+      "m_key": "BlackEggCountdown",
+      "m_text": "CAPTAIN, WE ARE RECEIVING A COUNTDOWN TRANSMISSION FROM THE BLACK EGG...",
+      "m_note": "Then 5 to 1, one number to a line, and BOOM!, and the planet is gone from the view. Seen in orbit above the Uhlek mind-ganglion's planet.",
+      "m_source": "SS Story (starflt_072 to starflt_074)"
+    },
+    {
+      "m_key": "ElanDestroyed",
+      "m_text": "CAPTAIN, I FELT A TREMOR AS IF MILLIONS OF VOICES CRIED OUT AND WERE SUDDENLY SILENCED.",
+      "m_note": "A crew member, when a Black Egg destroys Elan, the homeworld of the Elowan (planet 2 of 148, 63).",
+      "m_source": "STRINFO 5.1"
+    },
+    {
+      "m_key": "UhlekMindGanglionDestroyed",
+      "m_text": "CAPTAIN, ALL ALIEN COMMUNICATIONS IN THE LOCAL VICINITY HAVE CEASED!",
+      "m_note": "A crew member, when a Black Egg destroys the planet of the Uhlek mind-ganglion (planet 2 of 55, 32). STRINFO: the Uhlek are rendered harmless.",
+      "m_source": "STRINFO 5.1; SS Story (starflt_074)"
     }
   ],
   "m_ruinFormationList": [

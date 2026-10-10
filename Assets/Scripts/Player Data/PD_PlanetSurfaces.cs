@@ -47,12 +47,16 @@ public class PD_PlanetSurfaces
 	public List<DroppedCargo> m_droppedCargoList;
 	public int m_nextDroppedCargoId;
 
+	// the planets a Black Egg has destroyed (ids into the game data's planet list)
+	public List<int> m_destroyedPlanetList;
+
 	public void Reset()
 	{
 		m_depositList = new List<Deposit>();
 		m_takenArtifactSiteList = new List<int>();
 		m_droppedCargoList = new List<DroppedCargo>();
 		m_nextDroppedCargoId = 0;
+		m_destroyedPlanetList = new List<int>();
 	}
 
 	// make sure there are lists (save files from before them have none)
@@ -72,6 +76,32 @@ public class PD_PlanetSurfaces
 		{
 			m_droppedCargoList = new List<DroppedCargo>();
 		}
+
+		if ( m_destroyedPlanetList == null )
+		{
+			m_destroyedPlanetList = new List<int>();
+		}
+	}
+
+	// true if a Black Egg has destroyed this planet
+	public bool IsPlanetDestroyed( int planetId )
+	{
+		Validate();
+
+		return m_destroyedPlanetList.Contains( planetId );
+	}
+
+	// call this when a Black Egg destroys a planet - what was dropped on it goes with it
+	public void DestroyPlanet( int planetId )
+	{
+		Validate();
+
+		if ( !m_destroyedPlanetList.Contains( planetId ) )
+		{
+			m_destroyedPlanetList.Add( planetId );
+		}
+
+		m_droppedCargoList.RemoveAll( droppedCargo => droppedCargo.m_planetId == planetId );
 	}
 
 	// call this when the terrain vehicle drops something - returns what lies on the ground now
