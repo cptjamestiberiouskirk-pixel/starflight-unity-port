@@ -127,6 +127,7 @@ The project features a **deterministic visualization system** that renders plane
 - The Crystal Planet's field damages a ship in orbit that does not carry the Crystal Orb
 - The Black Egg: dropped by the terrain vehicle it is armed, and back in orbit it counts down and destroys the planet (the Crystal Planet only at its control nexus)
 - The Crystal Cone locates the Crystal Planet's control nexus from orbit
+- The game can be won: destroying the Crystal Planet ends the flares, and Interstel pays its 500,000 MU bonus and its supplemental evaluation at the Starport
 - 10 alien races with unique encounter behaviors
 - Encounters that guard planets from orbit; a Veloxi drone grants permission to orbit to a crew that answers its numbers the Veloxi way
 - Complete combat system with lasers, missiles, shields, armor

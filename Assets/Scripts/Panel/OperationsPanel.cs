@@ -35,6 +35,10 @@ public class OperationsPanel : Panel
 	float m_currentOffset;
 	bool m_endOfMessageReached;
 
+	// the text of the evaluation screen, and what it said in the scene (the colony recommendations are not in the port yet)
+	TextMeshProUGUI m_evaluationText;
+	string m_evaluationSceneText;
+
 	// the starport controller
 	public AstronautController m_astronautController;
 
@@ -177,6 +181,36 @@ public class OperationsPanel : Panel
 		m_previousButton.gameObject.SetActive( false );
 		m_nextButton.gameObject.SetActive( false );
 		m_quitButton.gameObject.SetActive( false );
+
+		// after the win the evaluation is Interstel's supplemental evaluation on the completion of the mission (STRINFO 1.2)
+		ShowWinEvaluation();
+	}
+
+	// shows the supplemental evaluation on the completion of the mission once the game has been won
+	void ShowWinEvaluation()
+	{
+		if ( m_evaluationText == null )
+		{
+			var evaluationTransform = m_evaluationGameObject.transform.Find( "Display/Error Text Mask/Error Text" );
+
+			if ( evaluationTransform == null )
+			{
+				return;
+			}
+
+			m_evaluationText = evaluationTransform.GetComponent<TextMeshProUGUI>();
+
+			if ( m_evaluationText == null )
+			{
+				return;
+			}
+
+			m_evaluationSceneText = m_evaluationText.text;
+		}
+
+		var storyText = DataController.m_instance.m_playerData.m_general.m_gameWon ? DataController.m_instance.m_gameData.FindStoryText( "MissionComplete" ) : null;
+
+		m_evaluationText.text = ( storyText != null ) ? storyText.m_text : m_evaluationSceneText;
 	}
 
 	// this is called if we clicked on the notices button

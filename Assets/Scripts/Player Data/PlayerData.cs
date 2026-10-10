@@ -136,6 +136,24 @@ public class PlayerData
 		return null;
 	}
 
+	// call this when the ship is back at the Starport: after the win Interstel pays the bonus that comes with its medal, once ("this award includes a special bonus of
+	// 500,000 MU when you return to Starport" - STRINFO 2.12) - returns true if it was paid now
+	public bool PayWinBonus()
+	{
+		if ( !m_general.m_gameWon || !m_general.m_winBonusPending )
+		{
+			return false;
+		}
+
+		m_general.m_winBonusPending = false;
+
+		m_bank.m_currentBalance += PD_General.c_winBonus;
+
+		m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Mission completed", PD_General.c_winBonus.ToString() + "+" ) );
+
+		return true;
+	}
+
 	// returns true if the player data version is current
 	public bool IsCurrentVersion()
 	{

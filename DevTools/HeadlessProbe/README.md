@@ -108,8 +108,10 @@ What the probe does:
 | `crystalfield` | the field of the Crystal Planet: armor lost in 3 s with the shields down, in orbit around planet 90 (the control, none), around the Crystal Planet without the Crystal Orb in the ship's hold (at least 10) and with it (none) (about 40 s) |
 | `blackegg` | the Black Egg: dropped from the terrain vehicle on planet 90 with the real Cargo list (the messages say it is armed); back in orbit the countdown, BOOM, planet 90 destroyed in the save and gone from its star system with the ship in the star system; an egg on the Crystal Planet at 0 x 0 (damaged but not destroyed, the egg used up) and at the control nexus 47N x 45E (destroyed, with Interstel's message); back in planet 90's star system after another, planet 90 still gone and the others there (about 70 s) |
 | `crystalcone` | the Crystal Cone: the messages of an orbit around the Crystal Planet without the Cone (the control, nothing about the nexus) and with it (the control nexus at 47N x 45E), Land there with the Cone (reported again), and an orbit around planet 90 with the Cone (the control, nothing) (about 50 s) |
+| `win` | the win: the armor lost entering the star that flares soonest half a day before its flare, before the win (the control, 25) and after it (none); a Black Egg at the Crystal Planet's control nexus setting the win and the pending bonus; docking at the Starport paying 500,000 MU with a ledger entry and a message, and docking again paying nothing (about 70 s) |
+| `starport-win` | the Starport's Evaluation screen before the win (the control, the scene's text about colony recommendations) and after it (Interstel's supplemental evaluation on the completion of the mission) (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (67 scenarios, about 35 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (69 scenarios, about 37 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
