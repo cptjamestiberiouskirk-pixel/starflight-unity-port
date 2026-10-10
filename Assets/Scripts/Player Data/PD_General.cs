@@ -98,6 +98,9 @@ public class PD_General
 	// lines of messages
 	public List<string> m_messageList;
 
+	// Interstel's supplemental evaluations (towing charges and the like - STRINFO 1.2), as the Operations evaluation screen shows them, oldest first
+	public List<string> m_supplementalEvaluationList;
+
 	// the day and the hour the two stardate texts were last made for (not saved - they are made again in the first update after a load)
 	[NonSerialized] int m_stardateDay = -1;
 	[NonSerialized] int m_stardateHour = -1;
@@ -166,6 +169,8 @@ public class PD_General
 
 		// message list
 		m_messageList = new List<string>();
+
+		m_supplementalEvaluationList = new List<string>();
 	}
 
 	// get the id of the last comm used to answer a question about this subject for this race
@@ -291,6 +296,18 @@ public class PD_General
 	}
 
 	// this updates the game time
+	// call this to add a supplemental evaluation from Interstel (the Operations evaluation screen shows them)
+	public void AddSupplementalEvaluation( string evaluation )
+	{
+		// save files from before the list have none
+		if ( m_supplementalEvaluationList == null )
+		{
+			m_supplementalEvaluationList = new List<string>();
+		}
+
+		m_supplementalEvaluationList.Add( evaluation );
+	}
+
 	public void UpdateGameTime( float deltaTime )
 	{
 		// 175.2 game hours pass in an hour of play (365 days in 50 hours - the sources do not give the original's rate, so the rate stays as it was when the calendar became the original's)

@@ -651,6 +651,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportRepair();
 				break;
 
+			case "distress":
+				yield return ScenarioDistress();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -13498,6 +13502,113 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-repair: without the money the repair is refused and nothing changes", ( costTooPoor == 0 ) && ( armorTooPoor == 100 ) && messageTooPoor.Contains( "insufficient funds" ), costTooPoor + ", " + armorTooPoor + " | " + messageTooPoor );
 
 		Finish( "scenario=starport-repair whole=" + costWhole + " class1=" + costClass1 + " bareHull=" + costBareHull + " tooPoor=" + costTooPoor, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 1: distress
+
+	// enters a star system, sends a distress call - returns what it cost, where the ship is then, and the last supplemental evaluation (or "")
+	static IEnumerator DistressFrom( int starId, int[] fine, string[] where, string[] evaluation )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		EnterStarSystem( starId );
+
+		var end = Time.realtimeSinceStartup + 40.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && controller.m_starSystem.GeneratingPlanets() )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		var balanceBefore = playerData.m_bank.m_currentBalance;
+
+		controller.m_messages.Clear();
+
+		new DistressButton().Execute();
+
+		yield return Frames( 5 );
+
+		fine[ 0 ] = balanceBefore - playerData.m_bank.m_currentBalance;
+		where[ 0 ] = playerData.m_general.m_location + " at star " + playerData.m_general.m_currentStarId;
+
+		var evaluations = FieldOrNull( playerData.m_general, "m_supplementalEvaluationList" ) as IList;
+
+		evaluation[ 0 ] = ( ( evaluations == null ) || ( evaluations.Count == 0 ) ) ? "" : ( evaluations[ evaluations.Count - 1 ] as string );
+	}
+
+	IEnumerator ScenarioDistress()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var arthStarId = gameData.m_misc.m_arthStarId;
+		var arthStar = gameData.m_starList[ arthStarId ];
+		var fine = new int[ 1 ];
+		var where = new string[ 1 ];
+		var evaluation = new string[ 1 ];
+
+		EnsureCrew();
+
+		playerData.m_bank.m_currentBalance = 1000000;
+
+		var encounterRange = SpaceflightController.m_instance.m_encounterRange;
+
+		SpaceflightController.m_instance.m_encounterRange = 0.0f;
+
+		// the star farthest from Arth (one that flared before the game began would be safer, but the farthest is what sets the largest fine)
+		var farthestStarId = arthStarId;
+		var farthest = 0.0f;
+
+		for ( var starId = 0; starId < gameData.m_starList.Length; starId++ )
+		{
+			var star = gameData.m_starList[ starId ];
+			var distance = Vector2.Distance( new Vector2( star.m_xCoordinate, star.m_yCoordinate ), new Vector2( arthStar.m_xCoordinate, arthStar.m_yCoordinate ) );
+
+			if ( distance > farthest )
+			{
+				farthest = distance;
+				farthestStarId = starId;
+			}
+		}
+
+		// ---- 1. a distress call from the star farthest from Arth: towed home, fined the most, with Interstel's evaluation
+		var ledgerBefore = playerData.m_bank.m_transactionList.Count;
+
+		yield return DistressFrom( farthestStarId, fine, where, evaluation );
+
+		var fineFar = fine[ 0 ];
+		var whereFar = where[ 0 ];
+		var evaluationFar = evaluation[ 0 ];
+		var ledgerFar = ( playerData.m_bank.m_transactionList.Count > ledgerBefore ) ? playerData.m_bank.m_transactionList[ playerData.m_bank.m_transactionList.Count - 1 ].m_description + " " + playerData.m_bank.m_transactionList[ playerData.m_bank.m_transactionList.Count - 1 ].m_amount : "nothing";
+
+		// ---- 2. one from Arth's own star system: the smallest fine
+		yield return DistressFrom( arthStarId, fine, where, evaluation );
+
+		var fineNear = fine[ 0 ];
+
+		// ---- 3. the control: after the Starport has been destroyed there is no response, and no tow
+		SetFieldIfPresent( playerData.m_general, "m_starportDestroyed", true );
+
+		yield return DistressFrom( StarThatNeverFlares(), fine, where, evaluation );
+
+		var fineAfterStarport = fine[ 0 ];
+		var whereAfterStarport = where[ 0 ];
+		var textAfterStarport = MessageList();
+
+		SetFieldIfPresent( playerData.m_general, "m_starportDestroyed", false );
+
+		SpaceflightController.m_instance.m_encounterRange = encounterRange;
+
+		Log( "distress: from star " + farthestStarId + " (" + farthest.ToString( "0" ) + " from Arth): fined " + fineFar + ", now " + whereFar + ", ledger '" + ledgerFar + "' | from Arth's system: fined " + fineNear + " | after the Starport: fined " + fineAfterStarport + ", now " + whereAfterStarport + " (" + textAfterStarport + ") | the evaluation: " + evaluationFar.Replace( '\n', '/' ) );
+
+		Check( "distress: a distress call gets the ship towed back to the Starport's docking bay", whereFar.StartsWith( "DockingBay" ) && whereFar.EndsWith( "star " + arthStarId ), whereFar );
+		Check( "distress: the fine runs from 15000 MU in Arth's system to 80000 MU from the farthest star, in the ledger and in Interstel's evaluation", ( fineNear == 15000 ) && ( fineFar == 80000 ) && ledgerFar.StartsWith( "Towing charges" ) && evaluationFar.Contains( "TOWING CHARGES" ) && evaluationFar.Contains( fineFar.ToString() ), fineNear + ", " + fineFar + ", '" + ledgerFar + "'" );
+		Check( "distress: after the Starport has been destroyed there is no response, no fine and no tow (control)", ( fineAfterStarport == 0 ) && !whereAfterStarport.StartsWith( "DockingBay" ) && textAfterStarport.Contains( "NO RESPONSE" ), fineAfterStarport + ", " + whereAfterStarport );
+
+		Finish( "scenario=distress far=" + fineFar + " near=" + fineNear + " afterStarport=" + fineAfterStarport, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

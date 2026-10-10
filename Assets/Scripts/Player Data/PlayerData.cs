@@ -1,5 +1,6 @@
 ﻿
 using System;
+using UnityEngine;
 
 [Serializable]
 
@@ -152,6 +153,48 @@ public class PlayerData
 		m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Mission completed", PD_General.c_winBonus.ToString() + "+" ) );
 
 		return true;
+	}
+
+	// the fine for being towed back to the Starport after a distress call: "fines vary directly with the distance from Arth and range from 15000 to 80000 MU"
+	// (STRINFO 1.2) - in proportion to the distance from Arth against the farthest star from it (that scale is the port's choice)
+	public const int c_smallestTowingFine = 15000;
+	public const int c_largestTowingFine = 80000;
+
+	public int GetTowingFine()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var arthStar = gameData.m_starList[ gameData.m_misc.m_arthStarId ];
+		var arth = new Vector2( arthStar.m_xCoordinate, arthStar.m_yCoordinate );
+
+		// where the ship is, in the coordinates of the starmap: in hyperspace its own, anywhere else its star's
+		Vector2 here;
+
+		var location = ( m_general.m_location == PD_General.Location.Encounter ) ? m_general.m_lastLocation : m_general.m_location;
+
+		if ( location == PD_General.Location.Hyperspace )
+		{
+			var game = Tools.WorldToGameCoordinates( m_general.m_lastHyperspaceCoordinates );
+
+			here = new Vector2( game.x, game.z );
+		}
+		else
+		{
+			var star = gameData.m_starList[ m_general.m_currentStarId ];
+
+			here = new Vector2( star.m_xCoordinate, star.m_yCoordinate );
+		}
+
+		// the farthest star from Arth
+		var farthest = 1.0f;
+
+		foreach ( var star in gameData.m_starList )
+		{
+			farthest = Mathf.Max( farthest, Vector2.Distance( arth, new Vector2( star.m_xCoordinate, star.m_yCoordinate ) ) );
+		}
+
+		var share = Mathf.Clamp01( Vector2.Distance( arth, here ) / farthest );
+
+		return c_smallestTowingFine + Mathf.RoundToInt( share * ( c_largestTowingFine - c_smallestTowingFine ) );
 	}
 
 	// returns true if the player data version is current

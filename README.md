@@ -137,6 +137,7 @@ The project features a **deterministic visualization system** that renders plane
 - The price of Endurium rises with the notices of 20-02 and 15-05, and the Starport buys it back for what it sells it for
 - Nebulae keep the shields down
 - The Starport repairs the ship at the price of its armor
+- A distress call gets the ship towed home, for a fine that grows with the distance from Arth
 - The game can be won: destroying the Crystal Planet ends the flares, and Interstel pays its 500,000 MU bonus and its supplemental evaluation at the Starport
 - Arth's sun flares on 01-01-4621 unless the game has been won: the Starport is destroyed, and a ship in Arth's system is incinerated
 - 10 alien races with unique encounter behaviors
