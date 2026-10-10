@@ -1551,6 +1551,30 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "debris scan without a vessel leaves the window empty", !PictureShown( sensors ), SensorPicture( sensors ) );
 
+		// every vessel's wreck shows the debris of its own picture ("<picture>_debris", made by DevTools/SensorPictures/make-debris.ps1 or before it)
+		var everyPicture = new List<KeyValuePair<SensorsDisplay.ScanType, string>>( tracedPictures )
+		{
+			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.SpeminTransport, "Sensors - Spemin Transport" ),
+			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.SpeminScout, "Sensors - Spemin Scout" ),
+			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.SpeminWarship, "Sensors - Spemin Warship" ),
+			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.MechanScout, "Sensors - Mechan Scout" ),
+			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.VeloxDrone, "Sensors - Velox Drone" ),
+			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.NomadProbe, "Sensors - Nomad Probe" ),
+			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.Mysterion, "Sensors - Mysterion" ),
+			new KeyValuePair<SensorsDisplay.ScanType, string>( SensorsDisplay.ScanType.Minstrel, "Sensors - Minstrel" ),
+		};
+
+		foreach ( var vessel in everyPicture )
+		{
+			spaceflightController.m_displayController.ChangeDisplay( sensors );
+			sensors.StartScanning( SensorsDisplay.ScanType.Debris, 0, 100, 0, 50, (int) vessel.Key );
+			yield return Frames( 2 );
+
+			Check( vessel.Key + " wreck shows its own debris", PictureShown( sensors ) && ( BackgroundName( sensors ) == vessel.Value + "_debris" ) && ( MaskName( sensors ) == vessel.Value + "_debris_mask" ), SensorPicture( sensors ) );
+		}
+
+		Log( "vessels checked for their debris: " + everyPicture.Count );
+
 		// the wreck of a ship destroyed in a real encounter, scanned the way the sensors button does: each vessel shows what is left of itself
 		var wreck = "";
 
@@ -1561,7 +1585,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "mechan scout wreck shows the mechan scout debris", wreck.Contains( "shown=True" ) && wreck.EndsWith( "mask=Sensors - Mechan Scout_debris_mask" ), wreck );
 
 		yield return ScanWreck( 9, result => wreck = result );
-		Check( "thrynn scout wreck (no debris picture) leaves the window empty", wreck.Contains( "scanType=Debris shown=False" ), wreck );
+		Check( "thrynn scout wreck shows the thrynn scout debris", wreck.Contains( "shown=True" ) && wreck.EndsWith( "mask=Sensors - Thrynn Scout_debris_mask" ), wreck );
 
 		// control: the spemin warship wreck is the picture every wreck had before
 		yield return ScanWreck( 3, result => wreck = result );
