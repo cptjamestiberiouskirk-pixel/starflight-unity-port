@@ -93,15 +93,15 @@ Small items, each documented in the sources.
 
 | # | Item | Original (source) | Port today |
 |---|---|---|---|
-| 1.1 | Repair at the Starport, at a cost | Ship Configuration has Repair (SS Ship Configuration); price: Ask | STUB, plays a sound |
-| 1.2 | Engineer's repair uses minerals from the cargo hold | "We need 2 cubic meters of Molybdenum for repairs" (SS Repair) | timed and free |
+| 1.1 | Repair at the Starport, at a cost | Ship Configuration has Repair (SS Ship Configuration); price ruled 2026-10-10: what the missing armor points are worth at the price of the ship's armor class, shields free | STUB, plays a sound |
+| 1.2 | Engineer's repair uses minerals from the cargo hold | "We need 2 cubic meters of Molybdenum for repairs" (SS Repair); ruled 2026-10-10: the original's damage per system (hull, engines, sensors, comm, shields, missiles, lasers, SS Damage) with its repair minerals - a larger item of several PRs | timed and free |
 | 1.3 | Colony recommendation: Log Planet asks "Recommend this planet for colonization?"; Operations Evaluation lists the results; bonus of 30k to 55k MU, or a fine that grows with each unsuitable recommendation | STRINFO 1.2, Survey; `m_habitable` on five planet tables is unused | Log Planet stores an entry nobody reads |
 | 1.4 | Distress: towed home and fined 15k to 80k MU; "There's no response" once the Starport is gone | STRINFO 1.2, 2.14 | STUB, prints text |
-| 1.5 | Endurium price rises to 1500 and then 2000 MU with the notices of 20-02 and 15-05 | STRINFO 1.1, 1.4 | fixed price |
+| 1.5 | Endurium price rises to 1500 and then 2000 MU with the notices of 20-02 and 15-05 | STRINFO 1.1, 1.4 (bought back at the same price: ruled 2026-10-10 over the game data's 500) | PR 134 |
 | 1.6 | Losing the terrain vehicle costs 10,000 MU and a replacement | STRINFO 1.2 | depends on 5.x hazards |
 | 1.7 | Science skill decides whether an analysis succeeds | starship.txt (DRAFT formula: skill / 2); Ask on the formula | science skill unused |
 | 1.8 | Flares: checked every day while the ship is in a system; a flare with the ship there ends the game ("incinerated"); Analysis shows "UNSTABLE, est. time to flare" under 1000 days | disys.txt `?FLARE`, STRINFO 2.14, notes | PR 122: every star flares at a ship in its system on its day; the Analysis text still to do |
-| 1.9 | Nebulae act on the shields | priority.txt; how strongly: Ask | TODO, no effect |
+| 1.9 | Nebulae act on the shields | priority.txt; ruled 2026-10-10: the shields cannot be up inside a nebula, no damage | TODO, no effect |
 | 1.10 | Starmap shows a fuel estimate | alpha.txt | no estimate |
 | 1.11 | Alien vessels use their own armor, shields and speed from the data | xls Vessels; `GD_Vessel.m_armor`, `m_shields`, `m_moveDelay` unused | 100 points per class, one speed for all |
 | 1.12 | Salvage from debris | wrecks leave debris (communic.txt); what can be taken: Ask | "Salvage collection not yet implemented" |
