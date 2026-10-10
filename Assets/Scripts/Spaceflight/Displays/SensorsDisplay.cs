@@ -94,6 +94,10 @@ public class SensorsDisplay : ShipDisplay
 	// (a copy of the panel, made the first time the display is shown)
 	Image m_emptyImage;
 
+	// clips the pictures to the magenta panel (a picture is 640 units wide, the panel 480, so the noise of a wide picture would show beside the window)
+	// (added the first time the display is shown; the backgrounds multiply what is under them, so only the noise needs it)
+	RectMask2D m_windowClip;
+
 	// are we running the cinematics?
 	bool m_isDoingCinematics;
 
@@ -350,6 +354,22 @@ public class SensorsDisplay : ShipDisplay
 		{
 			m_maskMaterial = new Material( m_maskImage.material );
 			m_maskImage.material = m_maskMaterial;
+		}
+
+		// clip everything in the window to the panel (once)
+		if ( ( m_windowClip == null ) && ( m_panelImage != null ) )
+		{
+			var window = m_panelImage.transform.parent.gameObject;
+
+			if ( !window.TryGetComponent( out m_windowClip ) )
+			{
+				m_windowClip = window.AddComponent<RectMask2D>();
+			}
+
+			// the panel is inset in the window by its offsets (left, bottom, right, top)
+			var panelRect = m_panelImage.rectTransform;
+
+			m_windowClip.padding = new Vector4( panelRect.offsetMin.x, panelRect.offsetMin.y, -panelRect.offsetMax.x, -panelRect.offsetMax.y );
 		}
 
 		// make the black inside of an empty window (once)
