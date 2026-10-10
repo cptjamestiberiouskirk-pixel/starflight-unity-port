@@ -29,6 +29,9 @@ public class InOrbit : MonoBehaviour
 	// the time until the field of the Crystal Planet does damage again
 	float m_crystalFieldTimer;
 
+	// true from the moment the ship goes into orbit until the Crystal Cone has had its chance to report the control nexus of the Crystal Planet (once every time)
+	bool m_reportNexus;
+
 	// unity awake
 	void Awake()
 	{
@@ -60,6 +63,14 @@ public class InOrbit : MonoBehaviour
 				// the encounter location has taken over
 				return;
 			}
+		}
+
+		// the Crystal Cone reports the control nexus of the Crystal Planet once the ship is in orbit around it (not while the launch from the surface is still bringing it up)
+		if ( m_reportNexus && !SpaceflightController.m_instance.m_playerCamera.IsLaunchingOrLanding() )
+		{
+			m_reportNexus = false;
+
+			CrystalCone.ReportNexus();
 		}
 
 		// the field of the Crystal Planet damages a ship that orbits it without the Crystal Orb
@@ -162,6 +173,9 @@ public class InOrbit : MonoBehaviour
 
 		// the field of the Crystal Planet does its first damage a full interval after the ship goes into orbit
 		m_crystalFieldTimer = c_crystalFieldInterval;
+
+		// and the Crystal Cone reports the nexus
+		m_reportNexus = true;
 
 		// get to the game data
 		var gameData = DataController.m_instance.m_gameData;

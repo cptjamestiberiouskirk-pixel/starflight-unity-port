@@ -49,6 +49,9 @@ public class LandButton : ShipButton
 				// change the buttons
 				SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Land );
 
+				// over the Crystal Planet the Crystal Cone reports where its control nexus is, for picking the landing site
+				CrystalCone.ReportNexus();
+
 				return true;
 
 			default:

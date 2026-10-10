@@ -126,6 +126,7 @@ The project features a **deterministic visualization system** that renders plane
 - The terrain vehicle drops cargo from its hold and picks it up again, with a cargo display while the cargo list is open
 - The Crystal Planet's field damages a ship in orbit that does not carry the Crystal Orb
 - The Black Egg: dropped by the terrain vehicle it is armed, and back in orbit it counts down and destroys the planet (the Crystal Planet only at its control nexus)
+- The Crystal Cone locates the Crystal Planet's control nexus from orbit
 - 10 alien races with unique encounter behaviors
 - Encounters that guard planets from orbit; a Veloxi drone grants permission to orbit to a crew that answers its numbers the Veloxi way
 - Complete combat system with lasers, missiles, shields, armor
