@@ -34,6 +34,9 @@ public class SpaceflightController : MonoBehaviour
 	// the Black Egg that has been dropped on a planet of this star system, if any
 	readonly BlackEgg m_blackEgg = new BlackEgg();
 
+	// the flares of the stars
+	readonly StellarFlares m_stellarFlares = new StellarFlares();
+
 	// some settings
 	public float m_alienHyperspaceRadarDistance;
 	public float m_alienStarSystemRadarDistance;
@@ -203,8 +206,8 @@ public class SpaceflightController : MonoBehaviour
 		// a Black Egg that has been dropped on a planet counts down once the ship is back up above it
 		m_blackEgg.Update();
 
-		// Arth's sun flares on its day, unless the game has been won by then
-		ArthFlare.Update();
+		// the stars flare on their days (Arth's destroys the Starport), unless the game has been won by then
+		m_stellarFlares.Update();
 
 		// save the game once in a while
 		m_timer += Time.deltaTime;

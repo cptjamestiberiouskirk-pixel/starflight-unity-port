@@ -293,23 +293,11 @@ public class StarSystem : MonoBehaviour
 			// yes - the sun is stable again
 			m_shine.SetSize( 128.0f, 129.0f );
 		}
-		else if ( timeToFlare <= 1.0f ) // are we flaring NOW?
-		{
-			// calculate damage based on how close we are to the flare peak
-			int damage = Mathf.RoundToInt( ( 1.0f - timeToFlare ) * 50.0f );
-
-			if ( damage > 0 )
-			{
-				// apply damage to the player
-				SpaceflightController.m_instance.m_combatController.ApplyDamageToPlayer( damage, Vector3.zero );
-
-				// let the player know
-				SpaceflightController.m_instance.m_messages.AddText( "<color=red>Radiation levels critical! Star is flaring!</color>" );
-			}
-		}
 		else
 		{
-			var size = 1.0f / timeToFlare;
+			// the closer the flare, the bigger the shine (as big as it gets in the last day - a star that flares with the ship here incinerates it, see StellarFlares;
+			// the damage it did on arrival in the last day before its flare is not in the original)
+			var size = 1.0f / Mathf.Max( timeToFlare, 1.0f );
 
 			var minSize = 128.0f + size * 64.0f;
 			var maxSize = 129.0f + size * 128.0f;

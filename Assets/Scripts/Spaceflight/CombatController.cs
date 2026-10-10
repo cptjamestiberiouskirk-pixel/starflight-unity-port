@@ -51,6 +51,9 @@ public class CombatController : MonoBehaviour
 	// true once the player ship has been destroyed (it can only be destroyed once)
 	bool m_playerIsDestroyed;
 
+	// what destroyed the player ship, when it was not the damage it took (null for that) - the game over screen says it
+	string m_gameOverCause;
+
 	// player debris template (assign in inspector)
 	public GameObject m_playerDebrisTemplate;
 
@@ -615,35 +618,60 @@ public class CombatController : MonoBehaviour
 			// check for destruction
 			if ( playerData.m_playerShip.m_armorPoints <= 0 )
 			{
-				playerData.m_playerShip.m_armorPoints = 0;
-
-				// this only happens once
-				m_playerIsDestroyed = true;
-
-				// nothing that is still in the air has a ship left to hit
-				ClearMissiles();
-
-				// play ship explosion sound
-				SoundController.m_instance.PlaySound( SoundController.Sound.ShipExplosion );
-
-				// spawn player debris
-				SpawnPlayerDebris( playerPosition );
-
-				// show explosion
-				var explosion = GetAvailableExplosion();
-				if ( explosion != null )
-				{
-					explosion.Play( playerPosition, () =>
-					{
-						ShowGameOver();
-					} );
-				}
-				else
-				{
-					// no explosion available, show game over immediately
-					ShowGameOver();
-				}
+				DestroyPlayer( playerPosition );
 			}
+		}
+	}
+
+	// call this when something other than damage destroys the player ship (a star that flares with the ship in its system) - the cause is what the game over
+	// screen says (every way to lose the game ends in the same game over)
+	public void DestroyPlayerShip( string cause )
+	{
+		// a ship that has been destroyed cannot be destroyed again
+		if ( m_playerIsDestroyed )
+		{
+			return;
+		}
+
+		var playerData = DataController.m_instance.m_playerData;
+
+		playerData.m_playerShip.m_shieldPoints = 0;
+
+		m_gameOverCause = cause;
+
+		DestroyPlayer( playerData.m_general.m_coordinates );
+	}
+
+	// the player ship is destroyed: it explodes, and then the game is over
+	void DestroyPlayer( Vector3 playerPosition )
+	{
+		DataController.m_instance.m_playerData.m_playerShip.m_armorPoints = 0;
+
+		// this only happens once
+		m_playerIsDestroyed = true;
+
+		// nothing that is still in the air has a ship left to hit
+		ClearMissiles();
+
+		// play ship explosion sound
+		SoundController.m_instance.PlaySound( SoundController.Sound.ShipExplosion );
+
+		// spawn player debris
+		SpawnPlayerDebris( playerPosition );
+
+		// show explosion
+		var explosion = GetAvailableExplosion();
+		if ( explosion != null )
+		{
+			explosion.Play( playerPosition, () =>
+			{
+				ShowGameOver();
+			} );
+		}
+		else
+		{
+			// no explosion available, show game over immediately
+			ShowGameOver();
 		}
 	}
 
@@ -691,9 +719,17 @@ public class CombatController : MonoBehaviour
 		// clear messages so game over text is visible
 		SpaceflightController.m_instance.m_messages.Clear();
 
-		// game over!
-		SpaceflightController.m_instance.m_messages.AddText( "<color=#FF0000>Ship destroyed!</color>" );
-		SpaceflightController.m_instance.m_messages.AddText( "<color=#FFFF00>GAME OVER</color>" );
+		// game over! (with what caused it, if it was not the damage the ship took - such a cause says game over itself, as STRINFO's flare text does)
+		if ( string.IsNullOrEmpty( m_gameOverCause ) )
+		{
+			SpaceflightController.m_instance.m_messages.AddText( "<color=#FF0000>Ship destroyed!</color>" );
+			SpaceflightController.m_instance.m_messages.AddText( "<color=#FFFF00>GAME OVER</color>" );
+		}
+		else
+		{
+			SpaceflightController.m_instance.m_messages.AddText( "<color=#FF0000>" + m_gameOverCause + "</color>" );
+		}
+
 		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Press ESC to return to title screen.</color>" );
 
 		// pause the game
