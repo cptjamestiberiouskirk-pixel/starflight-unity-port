@@ -1529,7 +1529,19 @@ public class ClaudeProbe : MonoBehaviour
 			clipText += " panelOffsets=" + panelRect.offsetMin + "/" + panelRect.offsetMax;
 		}
 
-		Check( "the window clips its pictures to the magenta panel", ( clip != null ) && ( clipPanel != null ) && ( clip.padding == new Vector4( ( (RectTransform) clipPanel ).offsetMin.x, ( (RectTransform) clipPanel ).offsetMin.y, -( (RectTransform) clipPanel ).offsetMax.x, -( (RectTransform) clipPanel ).offsetMax.y ) ), clipText );
+		// the clip is the panel's rectangle less the transparent edge of its sprite (the magenta starts 6 sprite pixels in)
+		var marginField = typeof( SensorsDisplay ).GetField( "m_panelSpriteMargin" );
+		var clipPanelImage = ( clipPanel != null ) ? clipPanel.GetComponent<UnityEngine.UI.Image>() : null;
+		var expectedMargin = -1.0f;
+
+		if ( ( marginField != null ) && ( clipPanelImage != null ) && ( clipPanelImage.sprite != null ) )
+		{
+			expectedMargin = (float) marginField.GetValue( sensors ) * clipPanelImage.canvas.referencePixelsPerUnit / ( clipPanelImage.sprite.pixelsPerUnit * clipPanelImage.pixelsPerUnitMultiplier );
+		}
+
+		clipText += " expectedMargin=" + expectedMargin;
+
+		Check( "the window clips its pictures to the magenta inside the panel", ( clip != null ) && ( clipPanel != null ) && ( expectedMargin > 0.0f ) && ( ( clip.padding - new Vector4( ( (RectTransform) clipPanel ).offsetMin.x + expectedMargin, ( (RectTransform) clipPanel ).offsetMin.y + expectedMargin, -( (RectTransform) clipPanel ).offsetMax.x + expectedMargin, -( (RectTransform) clipPanel ).offsetMax.y + expectedMargin ) ).magnitude < 0.01f ), clipText );
 		Check( "the noise of a wide picture is clipped", ( clip != null ) && sensors.m_maskImage.canvasRenderer.hasRectClipping, clipText );
 
 		// an object that has no picture (an unknown object; every vessel has one), scanned right after one that has (the window must not keep the last picture)

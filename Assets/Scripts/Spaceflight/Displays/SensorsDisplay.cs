@@ -57,6 +57,9 @@ public class SensorsDisplay : ShipDisplay
 	// how wide the magenta border around an empty window is (the original's is 3 of the window's 90 pixels)
 	public float m_emptyBorderWidth = 16.0f;
 
+	// the transparent edge of the panel's sprite, in the sprite's pixels ("Panel - Background" is 128 x 128 and opaque from its 7th pixel in)
+	public float m_panelSpriteMargin = 6.0f;
+
 	// the background textures for the various scan types
 	public Texture[] m_backgroundTextures;
 
@@ -366,10 +369,17 @@ public class SensorsDisplay : ShipDisplay
 				m_windowClip = window.AddComponent<RectMask2D>();
 			}
 
-			// the panel is inset in the window by its offsets (left, bottom, right, top)
+			// the panel is inset in the window by its offsets (left, bottom, right, top), and its magenta starts inside the sprite's transparent edge
+			// (a sliced sprite's edge is drawn at the canvas's reference pixels per unit over the sprite's pixels per unit)
 			var panelRect = m_panelImage.rectTransform;
+			var margin = 0.0f;
 
-			m_windowClip.padding = new Vector4( panelRect.offsetMin.x, panelRect.offsetMin.y, -panelRect.offsetMax.x, -panelRect.offsetMax.y );
+			if ( ( m_panelImage.sprite != null ) && ( m_panelImage.canvas != null ) && ( m_panelImage.sprite.pixelsPerUnit > 0.0f ) && ( m_panelImage.pixelsPerUnitMultiplier > 0.0f ) )
+			{
+				margin = m_panelSpriteMargin * m_panelImage.canvas.referencePixelsPerUnit / ( m_panelImage.sprite.pixelsPerUnit * m_panelImage.pixelsPerUnitMultiplier );
+			}
+
+			m_windowClip.padding = new Vector4( panelRect.offsetMin.x + margin, panelRect.offsetMin.y + margin, -panelRect.offsetMax.x + margin, -panelRect.offsetMax.y + margin );
 		}
 
 		// make the black inside of an empty window (once)
