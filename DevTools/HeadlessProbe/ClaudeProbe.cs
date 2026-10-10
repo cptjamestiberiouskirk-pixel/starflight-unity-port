@@ -575,6 +575,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCargoDisplay();
 				break;
 
+			case "crystalfield":
+				yield return ScenarioCrystalField();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -11517,6 +11521,75 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "cargodisplay: back brings the terrain vehicle's display back", ( cargoDisplay != null ) && !shownAfterBack && vehicleShownAfterBack, shownAfterBack + "/" + vehicleShownAfterBack );
 
 		Finish( "scenario=cargodisplay open=" + shownOnOpen + " bytes=" + updateBytesPerCall + " back=" + vehicleShownAfterBack, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 4: the field of the Crystal Planet, and the Crystal Orb
+
+	// the armor points the player ship loses in orbit in the given number of real seconds, with its shields down and its armor full
+	static IEnumerator ArmorLostInOrbit( float seconds, int[] lost )
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+
+		ship.m_shieldsAreUp = false;
+		ship.m_armorPoints = ship.GetMaximumArmorPoints();
+
+		var before = ship.m_armorPoints;
+		var end = Time.realtimeSinceStartup + seconds;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			yield return null;
+		}
+
+		lost[ 0 ] = before - ship.m_armorPoints;
+	}
+
+	IEnumerator ScenarioCrystalField()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var ship = playerData.m_playerShip;
+		var orbId = gameData.FindArtifactId( "Crystal Orb" );
+		var lost = new int[ 1 ];
+
+		EnsureCrew();
+
+		// no Crystal Orb aboard to begin with
+		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( orbId ) != null ); guard++ )
+		{
+			ship.RemoveArtifact( orbId );
+		}
+
+		// ---- 1. the control: in orbit around an ordinary planet nothing damages the ship
+		yield return GoIntoOrbit( gameData.m_planetList[ 90 ].m_starId, 90 );
+		yield return ArmorLostInOrbit( 3.0f, lost );
+
+		var lostAroundPlanet90 = lost[ 0 ];
+
+		// ---- 2. in orbit around the Crystal Planet (planet 1 of 192,152) without the Crystal Orb the ship takes damage
+		yield return GoIntoOrbit( gameData.m_planetList[ 33 ].m_starId, 33 );
+
+		var location = playerData.m_general.m_location;
+
+		yield return ArmorLostInOrbit( 3.0f, lost );
+
+		var lostWithoutTheOrb = lost[ 0 ];
+
+		// ---- 3. with the Crystal Orb in the hold the field does nothing
+		ship.AddArtifact( orbId );
+
+		yield return ArmorLostInOrbit( 3.0f, lost );
+
+		var lostWithTheOrb = lost[ 0 ];
+
+		Log( "crystalfield: armor lost in 3 s around planet 90 " + lostAroundPlanet90 + ", around the Crystal Planet without the orb " + lostWithoutTheOrb + " (" + location + "), with the orb " + lostWithTheOrb );
+
+		Check( "crystalfield: in orbit around an ordinary planet the ship takes no damage (control)", lostAroundPlanet90 == 0, lostAroundPlanet90.ToString() );
+		Check( "crystalfield: in orbit around the Crystal Planet without the Crystal Orb the ship takes damage rapidly", ( location == PD_General.Location.InOrbit ) && ( lostWithoutTheOrb >= 10 ), lostWithoutTheOrb + " in " + location );
+		Check( "crystalfield: with the Crystal Orb in the hold the field does no damage", lostWithTheOrb == 0, lostWithTheOrb.ToString() );
+
+		Finish( "scenario=crystalfield control=" + lostAroundPlanet90 + " withoutOrb=" + lostWithoutTheOrb + " withOrb=" + lostWithTheOrb, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
