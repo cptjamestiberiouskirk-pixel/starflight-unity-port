@@ -133,6 +133,7 @@ The project features a **deterministic visualization system** that renders plane
 - The Crystal Pearl warps a critically wounded ship out of an encounter
 - The Dodecahedron draws alien ships from twice as far
 - The Shimmering Ball cloaks the ship in combat until it fires
+- Continuum fluxes can be seen only with the Ring Device aboard
 - The game can be won: destroying the Crystal Planet ends the flares, and Interstel pays its 500,000 MU bonus and its supplemental evaluation at the Starport
 - Arth's sun flares on 01-01-4621 unless the game has been won: the Starport is destroyed, and a ship in Arth's system is incinerated
 - 10 alien races with unique encounter behaviors

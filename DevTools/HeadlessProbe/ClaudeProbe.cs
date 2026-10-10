@@ -635,6 +635,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioShimmeringBall();
 				break;
 
+			case "ringdevice":
+				yield return ScenarioRingDevice();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -13079,6 +13083,99 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "shimmeringball: a few seconds after the player's shot the ship is cloaked again", hitLater == 0, hitLater.ToString() );
 
 		Finish( "scenario=shimmeringball without=" + hitWithout + " cloaked=" + hitCloaked + " afterFiring=" + hitAfterFiring + " later=" + hitLater, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 4: the Ring Device
+
+	// how many of the fluxes the hyperspace location shows (its copies of the flux template that are active)
+	static int FluxesShown()
+	{
+		var hyperspace = SpaceflightController.m_instance.m_hyperspace;
+		var template = GetField( hyperspace, "m_fluxTemplate" ) as GameObject;
+		var cloneName = template.name + "(Clone)";
+		var shown = 0;
+
+		foreach ( Transform child in hyperspace.transform )
+		{
+			if ( ( child.name == cloneName ) && child.gameObject.activeSelf )
+			{
+				shown++;
+			}
+		}
+
+		return shown;
+	}
+
+	IEnumerator ScenarioRingDevice()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var ringId = gameData.FindArtifactId( "Ring Device" );
+		var fluxCount = gameData.m_fluxList.Length;
+
+		EnsureCrew();
+
+		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( ringId ) != null ); guard++ )
+		{
+			ship.RemoveArtifact( ringId );
+		}
+
+		// in hyperspace, with no encounter able to begin
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		// out in a corner of hyperspace (the game starts at Arth, and coming out there would put the ship back into Arth's star system at once)
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 4.0f, 0.0f, 4.0f ) );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		// ---- 1. without the Ring Device no flux is shown
+		var shownWithout = FluxesShown();
+
+		// ---- 2. a flux that is not shown is still there: the ship that flies into it goes through
+		var flux = gameData.m_fluxList[ 0 ];
+
+		controller.m_playerShip.TurnOffEngines();
+		playerData.m_general.m_currentSpeed = 0.0f;
+		playerData.m_general.m_coordinates = flux.GetFrom();
+		controller.m_playerShip.transform.position = flux.GetFrom();
+
+		yield return Frames( 5 );
+
+		var throughHiddenFlux = Equals( GetField( controller.m_hyperspace, "m_travelingThroughFlux" ), true ) && ( playerData.m_general.m_location == PD_General.Location.Hyperspace );
+
+		// wait until the ship is out of the flux again
+		var end = Time.realtimeSinceStartup + 20.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && Equals( GetField( controller.m_hyperspace, "m_travelingThroughFlux" ), true ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		// ---- 3. with the Ring Device in the hold every flux is shown
+		ship.AddArtifact( ringId );
+
+		yield return Frames( 5 );
+
+		var shownWith = FluxesShown();
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "ringdevice: fluxes shown in hyperspace without the Ring Device " + shownWithout + ", with it " + shownWith + " of " + fluxCount + " | without it the ship flew into the flux at " + flux.m_x1 + ", " + flux.m_y1 + ": going through " + throughHiddenFlux );
+
+		Check( "ringdevice: without the Ring Device no continuum flux is shown", shownWithout == 0, shownWithout + " of " + fluxCount );
+		Check( "ringdevice: a flux that is not shown is still there, and a ship that flies into it goes through (control)", throughHiddenFlux, throughHiddenFlux.ToString() );
+		Check( "ringdevice: with the Ring Device in the hold every continuum flux is shown", shownWith == fluxCount, shownWith + " of " + fluxCount );
+
+		Finish( "scenario=ringdevice without=" + shownWithout + " with=" + shownWith + " of=" + fluxCount + " through=" + throughHiddenFlux, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
