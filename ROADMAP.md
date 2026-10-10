@@ -139,7 +139,7 @@ Only the effects that matter for winning have to come before Phase 5. The others
 |---|---|---|---|
 | Crystal Orb | cancels the Crystal Planet's field: PR 115, with item 5.2 | Sphexi, 46N 14E | yes |
 | Black Egg | planet bomb, armed by dropping it: PR 117 (countdown in orbit, the planet destroyed and saved) | three Old Empire sites | yes |
-| Crystal Cone | finds the Crystal Planet's nexus from orbit | Uhlek space | INFERRED yes |
+| Crystal Cone | finds the Crystal Planet's nexus from orbit: PR 118 (the messages report it on entering orbit and on Land; how it is shown is the port's choice) | Uhlek space | INFERRED yes |
 | Ring Device | shows nearby fluxes (alpha.txt: fluxes are hidden without it and navigation skill) | Mars, 90N 0 | no; Ask whether fluxes should become hidden |
 | Whining Orb | translates Spemin | Starport, 6000 MU | no |
 | Flat Device | shields the terrain vehicle from lifeforms | Starport, 30,000 MU | no, needs Phase 6 |
