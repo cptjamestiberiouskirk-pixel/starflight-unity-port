@@ -130,8 +130,9 @@ What the probe does:
 | `colonies` | colony recommendations through the real Log Planet button: the question after logging, Yes for Mardan 4 (optimal, on Interstel's list) and two planets of the Uhlek system that are not on it, No for a third (the control); docking at the Starport (the 50000 MU bonus, the first unsuitable planet's 100 MU warning with its reasons, the second fined 5000 MU a reason without the warning, the ledger and the evaluations, nothing left pending) (about 60 s) |
 | `systemdamage` | damage to the ship's systems, on a bare hull with shields and lasers and no missile launcher: a new ship's systems whole, one hit of 50 (one system loses 20, the hull's share), 40 hits of 5 (only installed systems damaged, the missiles whole), the Damage report listing the systems, and their health through a save and load (about 15 s) |
 | `systemeffects` | what a damaged system does: the shield generator's maximum charge at half its health (half), the top speed in hyperspace with the engines at half (half), a laser shot at half (half the damage) and with the cannon destroyed (no firing), a Spemin statement to an officer of full skill with the comm whole and destroyed (garbled), and Sensors in a star system with the sensors at 20 (no readings) (about 50 s) |
+| `systemrepairs` | the engineer's repairs with minerals, class 2 armor at half with the engines at 30 and the lasers at 70: Repair without molybdenum (asks for 7 cubic meters, ceasing repair), with it and No (left in the hold), with Yes (7 taken, the engines' repair begins), the engines finished (on to the hull, asking for 5 of aluminum) and a whole ship (the control, no repairs required) (about 15 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (89 scenarios, about 56 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (90 scenarios, about 57 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

@@ -68,6 +68,18 @@ public class PD_PlayerShip
 	// how whole each system is, from 0 (destroyed) to 100 (undamaged), by ShipSystem (null in save files from before the systems could be damaged)
 	public int[] m_systemHealth;
 
+	// what the engineer is repairing: the hull (the armor points), or a system by its ShipSystem plus 1 (0, the hull, in save files from before the systems could
+	// be damaged, when the hull was all the engineer repaired)
+	public int m_repairItem;
+	public const int c_hullRepairItem = 0;
+	public const int c_repairItemCount = (int) ShipSystem.Count + 1;
+
+	// the repair mineral of the hull and of each system, by its name in the game data, and how much of it the engineer needs: a cubic meter for every tenth
+	// repaired (the owner's ruling of 2026-10-11 for roadmap 1.2 - the original's engineer asks for "2 cubic meters of Molybdenum", "5 cubic meters of Aluminum",
+	// SS Repair; which mineral goes with which system is the port's choice)
+	static readonly string[] c_repairMinerals = { "Aluminum", "Molybdenum", "Copper", "Silver", "Titanium", "Iron", "Platinum" };
+	public const int c_repairMineralPerTenth = 10;
+
 	public void Reset()
 	{
 		// reset the ship name
@@ -674,6 +686,93 @@ public class PD_PlayerShip
 	}
 
 	// call this to have the engineer start repairing the armor
+	// how whole a repair item is, from 0 to 100 (the hull by its armor points)
+	public int GetRepairItemHealth( int item )
+	{
+		if ( item == c_hullRepairItem )
+		{
+			var maximum = GetMaximumArmorPoints();
+
+			return ( maximum > 0 ) ? Mathf.Clamp( Mathf.FloorToInt( m_armorPoints * 100.0f / maximum ), 0, 100 ) : 100;
+		}
+
+		return GetSystemHealth( (ShipSystem) ( item - 1 ) );
+	}
+
+	// true if the ship has this repair item (the hull always)
+	public bool HasRepairItem( int item )
+	{
+		return ( item == c_hullRepairItem ) || ( ( item > 0 ) && ( item < c_repairItemCount ) && HasSystem( (ShipSystem) ( item - 1 ) ) );
+	}
+
+	// the name of a repair item, as the engineer says it
+	public string GetRepairItemName( int item )
+	{
+		return ( item == c_hullRepairItem ) ? GetArmorName() : GetSystemName( (ShipSystem) ( item - 1 ) ).ToLower();
+	}
+
+	// the most damaged item the ship has (the engineer repairs the worst first) - -1 if everything is whole
+	public int FindWorstRepairItem()
+	{
+		var worst = -1;
+		var worstHealth = 100;
+
+		for ( var item = 0; item < c_repairItemCount; item++ )
+		{
+			if ( !HasRepairItem( item ) )
+			{
+				continue;
+			}
+
+			var health = GetRepairItemHealth( item );
+
+			if ( health < worstHealth )
+			{
+				worst = item;
+				worstHealth = health;
+			}
+		}
+
+		return worst;
+	}
+
+	// the element id of a repair item's mineral (-1 if the game data has no such element)
+	public int GetRepairMineralId( int item )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		if ( ( item < 0 ) || ( item >= c_repairMinerals.Length ) )
+		{
+			return -1;
+		}
+
+		for ( var elementId = 0; elementId < gameData.m_elementList.Length; elementId++ )
+		{
+			if ( gameData.m_elementList[ elementId ].m_name == c_repairMinerals[ item ] )
+			{
+				return elementId;
+			}
+		}
+
+		return -1;
+	}
+
+	// how much of its mineral a repair item needs to be whole again, in tenths of a cubic meter (a cubic meter for every tenth missing, rounded up)
+	public int GetRepairMineralNeeded( int item )
+	{
+		var missing = 100 - GetRepairItemHealth( item );
+
+		return ( missing <= 0 ) ? 0 : ( ( missing + 9 ) / 10 ) * c_repairMineralPerTenth;
+	}
+
+	// call this when the engineer starts on a repair item
+	public void StartRepairs( int item )
+	{
+		m_repairItem = item;
+
+		StartRepairs();
+	}
+
 	public void StartRepairs()
 	{
 		m_repairsAreUnderWay = true;
@@ -686,6 +785,14 @@ public class PD_PlayerShip
 		// nothing to do unless the engineer has been told to repair the armor
 		if ( !m_repairsAreUnderWay )
 		{
+			return;
+		}
+
+		// a system rather than the hull?
+		if ( ( m_repairItem > c_hullRepairItem ) && ( m_repairItem < c_repairItemCount ) )
+		{
+			UpdateSystemRepairs( deltaTime );
+
 			return;
 		}
 
@@ -739,6 +846,64 @@ public class PD_PlayerShip
 			m_repairProgress = 0.0f;
 
 			SpaceflightController.m_instance.m_messages.AddText( "<color=green>Repairs on the " + GetArmorName() + " all completed, sir.</color>" );
+
+			// and on to the next
+			RepairNext();
+		}
+	}
+
+	// the engineer repairs a system a little at a time, at the pace the hull is repaired at (the same share of the whole in the same time)
+	void UpdateSystemRepairs( float deltaTime )
+	{
+		var system = (ShipSystem) ( m_repairItem - 1 );
+
+		// is there anything left to repair?
+		if ( GetSystemHealth( system ) >= 100 )
+		{
+			m_repairsAreUnderWay = false;
+			m_repairProgress = 0.0f;
+
+			return;
+		}
+
+		var repairRate = GetRepairRate();
+		var maximumArmor = GetMaximumArmorPoints();
+
+		if ( ( repairRate <= 0.0f ) || ( maximumArmor <= 0 ) )
+		{
+			m_repairsAreUnderWay = false;
+
+			SpaceflightController.m_instance.m_messages.AddText( "<color=red>Repairs have stopped. No engineer is available!</color>" );
+
+			return;
+		}
+
+		// repair a little more (in whole points of health)
+		m_repairProgress += repairRate * 100.0f / maximumArmor * deltaTime;
+
+		var pointsRepaired = Mathf.FloorToInt( m_repairProgress );
+
+		m_repairProgress -= pointsRepaired;
+
+		SetSystemHealth( system, GetSystemHealth( system ) + pointsRepaired );
+
+		if ( GetSystemHealth( system ) >= 100 )
+		{
+			m_repairsAreUnderWay = false;
+			m_repairProgress = 0.0f;
+
+			SpaceflightController.m_instance.m_messages.AddText( "<color=green>Repairs on the " + GetRepairItemName( m_repairItem ) + " all completed, sir.</color>" );
+
+			RepairNext();
+		}
+	}
+
+	// once a repair is done the engineer moves on to the most damaged item left (and asks for its mineral)
+	void RepairNext()
+	{
+		if ( ( SpaceflightController.m_instance != null ) && ( FindWorstRepairItem() >= 0 ) )
+		{
+			RepairButton.AskForRepair( FindWorstRepairItem() );
 		}
 	}
 
