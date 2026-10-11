@@ -51,6 +51,38 @@ public class TerrainLifeform : MonoBehaviour
 	const float c_speedPerMovementRate = 4.0f;
 	const float c_flyingHeight = 8.0f;
 
+	// "BEHAVIOR : Has 5 states - Fleeing Mate, Approaching Mate, Attacking Mate, Wandering, and Other" (lf-words.txt)
+	public enum Behaviour
+	{
+		Other,
+		Wandering,
+		ApproachingMate,
+		FleeingMate,
+		AttackingMate
+	}
+
+	// its mate (lf-behav.txt: "Pair all un-paired lifeforms in the encounter area"): another lifeform of any species that it may hunt, flee, attack or eat by the
+	// notes' rules - the pairs are made again on every visit, as the lifeforms are
+	TerrainLifeform m_mate;
+
+	public Behaviour m_behaviour = Behaviour.Other;
+
+	// "?ATTACKED : Set to true once an alien has attacked its mate. Set to false if an alien is not next to its mate."
+	bool m_attackedMate;
+
+	// "?RANDOMLY-UNPAIRED : A random determination such that this will happen every now and then" - the chance at each step is the port's
+	const float c_unpairChance = 0.02f;
+
+	// "EAT-ITS-MATE : Roll a RND no. from 1 - 100. If it is < 10 then the mate is eaten and it dissappears."
+	const int c_eatChance = 10;
+
+	// "?BIG-ENOUGH : Is the alien's size (1-9) >= its mate's size - 2 ?", "?ULTRA-AGGR : True if alien's aggression is >= 80", "?AGGR-ENOUGH : Is its
+	// aggression level >= 40 ?", "?CAN-BREAK-AWAY? : There is a 10% chance this is true"
+	const int c_sizeAdvantage = 2;
+	const int c_ultraAggressive = 80;
+	const int c_aggressiveEnough = 40;
+	const float c_breakAwayChance = 0.1f;
+
 	// when the player last fired the laser (for "?PLAYER-FIRING-LASER : Set to True when player fires. Set back to false shortly after")
 	public static float s_laserFiredTime = -100.0f;
 
@@ -222,6 +254,7 @@ public class TerrainLifeform : MonoBehaviour
 		var distance = toVehicle.magnitude;
 
 		m_moving = false;
+		m_behaviour = Behaviour.Other;
 
 		// outside the encounter area it does nothing
 		if ( distance > c_encounterArea )
@@ -281,11 +314,212 @@ public class TerrainLifeform : MonoBehaviour
 			return;
 		}
 
+		// the response to another lifeform: its mate
+		if ( RespondToMate( vehicle.transform.position, mobile ) )
+		{
+			return;
+		}
+
 		// "WANDER <-- ?ALIVE TRUE ?STUNNED FALSE ?MOBILE TRUE": in its species' direction, with "some random variation"
 		if ( mobile )
 		{
 			m_moveDirection = Quaternion.Euler( 0.0f, Random.Range( -20.0f, 20.0f ), 0.0f ) * m_moveDirection;
 			m_moving = true;
+			m_behaviour = Behaviour.Wandering;
+		}
+	}
+
+	// true if this lifeform is in the encounter area around the terrain vehicle
+	static bool IsInEncounterArea( TerrainLifeform lifeform, Vector3 vehiclePosition )
+	{
+		var delta = lifeform.transform.position - vehiclePosition;
+
+		delta.y = 0.0f;
+
+		return delta.magnitude <= c_encounterArea;
+	}
+
+	// pairs it with the nearest unpaired lifeform in the encounter area, if there is one (the notes do not say which: the nearest is the port's)
+	void FindMate( Vector3 vehiclePosition )
+	{
+		if ( m_populator == null )
+		{
+			return;
+		}
+
+		TerrainLifeform nearest = null;
+		var nearestDistance = float.MaxValue;
+
+		foreach ( var other in m_populator.m_lifeformList )
+		{
+			if ( ( other == null ) || ( other == this ) || ( other.m_mate != null ) || !IsInEncounterArea( other, vehiclePosition ) )
+			{
+				continue;
+			}
+
+			var distance = Vector3.Distance( other.transform.position, transform.position );
+
+			if ( distance < nearestDistance )
+			{
+				nearest = other;
+				nearestDistance = distance;
+			}
+		}
+
+		if ( nearest != null )
+		{
+			m_mate = nearest;
+			nearest.m_mate = this;
+		}
+	}
+
+	// "BECOME-UNPAIRED : Un-link lifeform from it's mate." (both ways)
+	void BecomeUnpaired()
+	{
+		if ( ( m_mate != null ) && ( m_mate.m_mate == this ) )
+		{
+			m_mate.m_mate = null;
+			m_mate.m_attackedMate = false;
+		}
+
+		m_mate = null;
+		m_attackedMate = false;
+	}
+
+	// the notes' response to another lifeform (lf-behav.txt): a lifeform approaches the mate it can eat, attacks it when it is next to it, and eats it, and one
+	// whose mate comes at it flees - returns true if it did something - the notes list the rules without saying which comes first where two could apply: the port
+	// tries eating before attacking, so that a grazer that has bitten a plant may eat it ("?ATTACKED"), and the rules to become unpaired first, since the others
+	// need a mate
+	bool RespondToMate( Vector3 vehiclePosition, bool mobile )
+	{
+		if ( m_mate == null )
+		{
+			FindMate( vehiclePosition );
+		}
+
+		if ( m_mate == null )
+		{
+			return false;
+		}
+
+		// "BECOME-UNPAIRED <-- ?HAS-MATE TRUE ?MATE-OUT-OF-BOUNDS TRUE", "... ?RANDOMLY-UNPAIRED TRUE", "... ?MATE-JUST-EATEN TRUE" (an eaten mate is gone)
+		if ( !IsInEncounterArea( m_mate, vehiclePosition ) || ( Random.value < c_unpairChance ) )
+		{
+			BecomeUnpaired();
+
+			return true;
+		}
+
+		var toMate = m_mate.transform.position - transform.position;
+
+		toMate.y = 0.0f;
+
+		var mateDistance = toMate.magnitude;
+		var nextToMate = mateDistance <= c_nextToPlayer;
+
+		if ( !nextToMate )
+		{
+			m_attackedMate = false;
+		}
+
+		var niche = m_species.m_niche;
+		var mateNiche = m_mate.m_species.m_niche;
+
+		var producer = niche == GD_Species.Niche.Producer;
+		var herbivore = niche == GD_Species.Niche.Herbivore;
+		var carnivore = niche == GD_Species.Niche.Carnivore;
+		var omnivore = niche == GD_Species.Niche.Omnivore;
+		var mateProducer = mateNiche == GD_Species.Niche.Producer;
+		var mateHerbivore = mateNiche == GD_Species.Niche.Herbivore;
+
+		var mateAlive = m_mate.m_status != Status.Dead;
+		var mateOnGround = !m_mate.m_flying;
+		var mateApproaching = m_mate.m_behaviour == Behaviour.ApproachingMate;
+		var mateAttacking = m_mate.m_behaviour == Behaviour.AttackingMate;
+		var bigEnough = m_species.m_size >= m_mate.m_species.m_size - c_sizeAdvantage;
+		var ultraAggressive = m_aggression >= c_ultraAggressive;
+		var aggressiveEnough = m_aggression >= c_aggressiveEnough;
+
+		// the mates it hunts: "?HERBIVORE TRUE ?MATE-PRODUCER TRUE", "?CARNIVORE TRUE ?MATE-HERBIVORE TRUE ?BIG-ENOUGH TRUE", "?OMNIVORE TRUE ?MATE-PRODUCER TRUE",
+		// "?OMNIVORE TRUE ?MATE-HERBIVORE TRUE ?BIG-ENOUGH TRUE", "?HERBIVORE FALSE ?PRODUCER FALSE ?MATE-HERBIVORE FALSE ?MATE-PRODUCER FALSE ?BIG-ENOUGH TRUE
+		// ?ULTRA-AGGR TRUE"
+		var hunts = ( herbivore && mateProducer ) || ( carnivore && mateHerbivore && bigEnough ) || ( omnivore && mateProducer ) || ( omnivore && mateHerbivore && bigEnough ) || ( !herbivore && !producer && !mateHerbivore && !mateProducer && bigEnough && ultraAggressive );
+
+		// "EAT-ITS-MATE <-- ?CARNIVORE FALSE ?PRODUCER FALSE ?MATE-PRODUCER TRUE ?ATTACKED TRUE ?MATE-IS-ATTACKING FALSE ?NEXT-TO-MATE TRUE", "... ?CARNIVORE FALSE
+		// ?PRODUCER FALSE ?MATE-PRODUCER TRUE ?MATE-ALIVE FALSE ?NEXT-TO-MATE TRUE", "... ?PRODUCER FALSE ?HERBIVORE FALSE ?MATE-PRODUCER FALSE ?MATE-ALIVE FALSE
+		// ?NEXT-TO-MATE TRUE"
+		var eatsPlant = !carnivore && !producer && mateProducer && ( ( m_attackedMate && !mateAttacking ) || !mateAlive );
+		var eatsCarcass = !producer && !herbivore && !mateProducer && !mateAlive;
+
+		if ( nextToMate && ( eatsPlant || eatsCarcass ) )
+		{
+			m_behaviour = Behaviour.Other;
+
+			if ( Random.Range( 1, 101 ) < c_eatChance )
+			{
+				EatMate();
+			}
+
+			return true;
+		}
+
+		// "APPROACH-ITS-MATE <-- ?MOBILE TRUE ?ALIVE TRUE ?STUNNED FALSE (the mate it hunts) ?NEXT-TO-MATE FALSE ?MATE-ON-GROUND TRUE ?HAS-MATE TRUE"
+		if ( mobile && hunts && !nextToMate && mateOnGround && ( mateDistance > 0.01f ) )
+		{
+			m_moveDirection = toMate / mateDistance;
+			m_moving = true;
+			m_behaviour = Behaviour.ApproachingMate;
+
+			return true;
+		}
+
+		// "FLEE-ITS-MATE <-- ?MOBILE TRUE ?ALIVE TRUE ?STUNNED FALSE ?MATE-APPROACHING TRUE", "... ?MATE-ATTACKING TRUE ?AGGR-ENOUGH FALSE ?CAN-BREAK-AWAY TRUE"
+		if ( mobile && ( mateApproaching || ( mateAttacking && !aggressiveEnough && ( Random.value < c_breakAwayChance ) ) ) && ( mateDistance > 0.01f ) )
+		{
+			m_moveDirection = -toMate / mateDistance;
+			m_moving = true;
+			m_behaviour = Behaviour.FleeingMate;
+
+			return true;
+		}
+
+		// "ATTACK-ITS-MATE <-- (the mate it hunts) ?NEXT-TO-MATE TRUE ?MATE-ALIVE TRUE", "... ?MATE-ATTACKING TRUE ?AGGR-ENOUGH TRUE"
+		if ( ( hunts && nextToMate && mateAlive ) || ( mateAttacking && aggressiveEnough ) )
+		{
+			AttackMate();
+
+			return true;
+		}
+
+		return false;
+	}
+
+	// "ATTACK-ITS-MATE : Sets moving flag to No, and Attacking flag to Yes." - and its mate's status check, "REDUCE-HITS-BY-1-TO-40 <-- ?MATE-IS-ATTACKING
+	// ?HITS>0 TRUE", is done here, since a stunned mate has no behaviour step of its own
+	void AttackMate()
+	{
+		m_moving = false;
+		m_behaviour = Behaviour.AttackingMate;
+		m_attackedMate = true;
+
+		if ( ( m_mate.m_status != Status.Dead ) && ( m_mate.m_hits > 0 ) )
+		{
+			m_mate.m_hits -= Random.Range( 1, 41 );
+
+			m_mate.UpdateStatus();
+		}
+	}
+
+	// "the mate is eaten and it dissappears", and "BECOME-UNPAIRED <-- ?HAS-MATE TRUE ?MATE-JUST-EATEN TRUE"
+	void EatMate()
+	{
+		var mate = m_mate;
+
+		BecomeUnpaired();
+
+		if ( m_populator != null )
+		{
+			m_populator.RemoveEaten( mate );
 		}
 	}
 

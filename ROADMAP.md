@@ -171,7 +171,7 @@ Depends on D3. This is the largest piece and is not on the path to winning, whic
 |---|---|---|
 | 6.1 | Lifeforms created per planet from its seed, the same every visit | dir.txt VITA-OV, HP-OV, LP-OV, SEED-OV; planet.txt |
 | 6.2 | Scan reports them (volume, aggression, intelligence, niche); Look describes them | planet.txt, lf-words.txt |
-| 6.3 | Behaviour: approach, attack, flee, predator and prey, flying | lf-behav.txt |
+| 6.3 | Behaviour: approach, attack, flee, predator and prey, flying. Done: the response to the player (approach, attack, flee, wander), the laser's effect on aggression, the mates (hunt, flee, bite, eat), flyers over water | lf-behav.txt |
 | 6.4 | Stunner and laser; capture into stasis; sale at the Trade Depot; payment for recorded data | planet.txt (DRAFT values) |
 | 6.5 | Attacks hurt the crew, scaled by durability; the Doctor treats them; death, the chain of command, DEAD on the personnel file. Done: the lifeforms' attacks by the notes' formula, death at 0 vitality, the chain of command, DEAD on the file, the game lost with the whole crew | lf-words.txt, starship.txt, disys.txt |
 | 6.6 | Weather and terrain hazards: storms, lava destroys the vehicle, uphill is slow | planet.txt, alpha.txt, dir.txt STORM-OV |
