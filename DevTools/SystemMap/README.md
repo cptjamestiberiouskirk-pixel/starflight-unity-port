@@ -4,7 +4,7 @@ The System Map display of the ship console (`SystemDisplay`) shows the current s
 
 What the map draws now:
 - **Planets**: each planet's own albedo map (the one the planet generator makes when the ship enters the system) on a sphere lit from the star, with a day side and a night side, a darker limb and the planet's atmosphere on the lit rim (its colour from `GD_Planet.GetAtmosphereColor`, as the star system shows it). The images stay upright as the orbits turn, and the planets turn slowly. Until the maps are made a planet is a lit ball in the colour of its surface. The size follows the mass, 18 to 34 map units, on the curve of `GD_Planet.GetScale`.
-- **Star**: a white-hot core, a corona and four short rays in the colour of real stars of its class (`SystemDisplay.GetStarColor`), with a slow shimmer. The planets take a little of that colour in their light.
+- **Star**: a white-hot core, a corona and four short rays in the colour of real stars of its class (`SystemDisplay.GetStarColor`), with a slow shimmer. The planets take a little of that colour in their light. The sun of the 3D star system view takes the same colour (`StarSystem.Show`): its shine is nearly white in the middle and a deeper shade of that colour at the rim (`Assets/Shaders/MaybeConvert/Shine.shader`).
 - **Orbits**: a thin ring on each orbit that has a planet, brighter in a trail behind its planet, so that the way the planets go round shows.
 - **Ecosphere**: a faint band from half way inside the first orbit of the spectral class's ecosphere to half way outside its last.
 - **Background**: a star field with a faint nebula, a different part of it for each star.
@@ -23,6 +23,7 @@ The display is 512 x 512 map units (1 unit is 1 pixel at 1920 x 1080).
 | `build_system_map_art.py` | Blender 5.2 script that makes `System Map Star Field.png` (1024 x 1024, tiles seamlessly) and `System Map Ship.png` in `Assets/Game Objects/Display/System Map` |
 | `SystemMapWiring.cs`, `wire.ps1` | The Unity side, run headless: the import of the two textures, the four materials, and the map's objects in `Spaceflight.unity` |
 | `previews/system-map.png` | The map in the game before and after, rendered by the engine: Arth's system (class G) old and new, then star 156 (class A) old and new |
+| `previews/sun.png` | The sun of the star system view before and after, rendered by the engine, in the same order |
 
 ## Building
 
