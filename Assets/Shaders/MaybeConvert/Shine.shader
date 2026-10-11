@@ -71,7 +71,16 @@
 
 					fixed4 frag( vs_out v ) : SV_Target
 					{
-						return tex2D( _MainTex, v.texcoord ) * _Color;
+						// the gradient gives the shape of the shine (its alpha) and how far out this pixel is: it goes from white in the
+						// middle to orange at the rim, so the loss of blue is the distance to the rim
+						float4 gradient = tex2D( _MainTex, v.texcoord );
+						float rim = saturate( 1.0 - gradient.b );
+
+						// the colour of the star, nearly white in the middle and deeper toward the rim (for a G star the rim is the orange
+						// of the gradient, for a blue star a deep blue)
+						float3 color = pow( max( _Color.rgb, 0.0001 ), lerp( 0.35, 3.0, rim ) );
+
+						return float4( color, gradient.a * _Color.a );
 					}
 
 				ENDCG
