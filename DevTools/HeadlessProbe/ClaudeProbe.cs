@@ -683,6 +683,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioHomeworlds();
 				break;
 
+			case "cowardice":
+				yield return ScenarioCowardice();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -14660,6 +14664,153 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "homeworlds: a Thrynn patrol met in flight speaks no homeworld line and does not attack (control)", ( patrolLine.Contains( "Receiving" ) ) && !patrolWarned && !patrolHostile, patrolLine );
 
 		Finish( "scenario=homeworlds thrynn=" + thrynnSaid.Count + " velox=" + veloxSaid.Count, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 2: the Spemin, the Thrynn and the Veloxi after their losses
+
+	// true if the text holds one of these comms of the game data
+	static bool SaysOneOf( string text, params int[] commIds )
+	{
+		foreach ( var commId in commIds )
+		{
+			if ( text.Contains( CommText( commId ) ) )
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	// meets three ships of a race in a star system, fires on them, destroys two and hails - adds the encounter, the aliens' stance and what they answer
+	static IEnumerator BeatAndHail( GameData.Race race, List<string> results )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var encounterId = FindEncounter( 1, 6, 3, 0, race );
+
+		EnterEncounter( encounterId );
+		yield return Frames( 10 );
+
+		encounter.PlayerAttacked();
+
+		Kill( FirstLivingAlien() );
+		Kill( FirstLivingAlien() );
+
+		yield return Frames( 3 );
+
+		// (a hit in the fight may have damaged the comm, which garbles what they say)
+		playerData.m_playerShip.RestoreSystems();
+
+		encounter.Hail( GD_Comm.Stance.Friendly, false );
+
+		var said = new List<string>();
+
+		yield return LetAliensSpeak( 1, said );
+
+		results.Add( encounterId + " " + encounter.m_pdEncounter.m_alienStance + " " + ( ( said.Count > 0 ) ? said[ 0 ] : "nothing said" ) );
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+	}
+
+	IEnumerator ScenarioCowardice()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		EnsureCrew();
+
+		// an officer who understands every word, and a ship that survives the fight
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// three Spemin ships at once, in a star system
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		EnterEncounter( speminId );
+		yield return Frames( 10 );
+
+		var pdEncounter = encounter.m_pdEncounter;
+		var joined = 0;
+
+		foreach ( var alienShip in pdEncounter.GetAlienShipList() )
+		{
+			joined += alienShip.m_addedToEncounter ? 1 : 0;
+		}
+
+		// the player opens fire
+		encounter.PlayerAttacked();
+
+		// ---- 1. one ship of three lost: they fight on
+		Kill( FirstLivingAlien() );
+		yield return Frames( 3 );
+
+		var stanceAfterOne = pdEncounter.m_alienStance;
+
+		// ---- 2. a second: they act cowardly and stop fighting
+		Kill( FirstLivingAlien() );
+		yield return Frames( 3 );
+
+		var stanceAfterTwo = pdEncounter.m_alienStance;
+		var survivorLives = FirstLivingAlien() >= 0;
+
+		// ---- 3. their hail is one of the cowardly ones (294, 295, and the surrender 296)
+		pdEncounter.m_questionLikelihood = 0;
+
+		var said = new List<string>();
+
+		// (a hit in the fight may have damaged the comm, which garbles what they say)
+		playerData.m_playerShip.RestoreSystems();
+
+		yield return LetAliensSpeak( 1, said );
+
+		var hailCowardly = ( said.Count > 0 ) && SaysOneOf( said[ 0 ], 294, 295, 296 );
+
+		// ---- 4. the player answers, and their statement is one of the obsequious ones (218 to 220)
+		encounter.Hail( GD_Comm.Stance.Friendly, true );
+		yield return Frames( 3 );
+
+		var connected = pdEncounter.m_connected;
+
+		playerData.m_playerShip.RestoreSystems();
+
+		yield return LetAliensSpeak( 1, said );
+
+		var statementCowardly = ( said.Count > 1 ) && SaysOneOf( said[ 1 ], 218, 219, 220 );
+
+		// ---- 5. the player fires again: they still do not fight
+		encounter.PlayerAttacked();
+		yield return Frames( 3 );
+
+		var stanceAfterFiring = pdEncounter.m_alienStance;
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 6. the Thrynn and the Veloxi the same way: two of three lost, and the player's hail is answered with their surrender
+		var thrynn = new List<string>();
+		var velox = new List<string>();
+
+		yield return BeatAndHail( GameData.Race.Thrynn, thrynn );
+		yield return BeatAndHail( GameData.Race.Velox, velox );
+
+		var thrynnSurrender = ( thrynn.Count > 0 ) && thrynn[ 0 ].Contains( " Obsequious " ) && SaysOneOf( thrynn[ 0 ], 385 );
+		var veloxSurrender = ( velox.Count > 0 ) && velox[ 0 ].Contains( " Obsequious " ) && SaysOneOf( velox[ 0 ], 485, 486 );
+
+		Log( "cowardice: encounter " + speminId + " with " + joined + " ships | after one loss " + stanceAfterOne + ", after two " + stanceAfterTwo + " (a survivor " + survivorLives + ") | said " + string.Join( " | ", said ) + " | connected " + connected + " | after firing again " + stanceAfterFiring + " || thrynn: " + string.Join( " | ", thrynn ) + " || veloxi: " + string.Join( " | ", velox ) );
+
+		Check( "cowardice: with one ship of three lost the Spemin fight on (control)", ( joined == 3 ) && ( stanceAfterOne == GD_Comm.Stance.Hostile ), joined + " ships, " + stanceAfterOne );
+		Check( "cowardice: with two lost the survivor acts cowardly and stops fighting", survivorLives && ( stanceAfterTwo == GD_Comm.Stance.Obsequious ), stanceAfterTwo.ToString() );
+		Check( "cowardice: the cowardly Spemin hail with their cowardly lines, the surrender among them", hailCowardly, ( said.Count > 0 ) ? said[ 0 ] : "nothing said" );
+		Check( "cowardice: their statements are the obsequious ones", connected && statementCowardly, connected + " | " + ( ( said.Count > 1 ) ? said[ 1 ] : "nothing said" ) );
+		Check( "cowardice: fired on again, they still do not fight", stanceAfterFiring == GD_Comm.Stance.Obsequious, stanceAfterFiring.ToString() );
+		Check( "cowardice: the Thrynn, two of three lost, stop fighting and answer a hail with their surrender", thrynnSurrender, string.Join( " | ", thrynn ) );
+		Check( "cowardice: the Veloxi, two of three lost, stop fighting and answer a hail with their surrender", veloxSurrender, string.Join( " | ", velox ) );
+
+		Finish( "scenario=cowardice after1=" + stanceAfterOne + " after2=" + stanceAfterTwo + " firing=" + stanceAfterFiring, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

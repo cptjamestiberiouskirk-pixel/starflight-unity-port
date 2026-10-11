@@ -132,8 +132,9 @@ What the probe does:
 | `systemeffects` | what a damaged system does: the shield generator's maximum charge at half its health (half), the top speed in hyperspace with the engines at half (half), a laser shot at half (half the damage) and with the cannon destroyed (no firing), a Spemin statement to an officer of full skill with the comm whole and destroyed (garbled), and Sensors in a star system with the sensors at 20 (no readings) (about 50 s) |
 | `systemrepairs` | the engineer's repairs with minerals, class 2 armor at half with the engines at 30 and the lasers at 70: Repair without molybdenum (asks for 7 cubic meters, ceasing repair), with it and No (left in the hold), with Yes (7 taken, the engines' repair begins), the engines finished (on to the hull, asking for 5 of aluminum) and a whole ship (the control, no repairs required) (about 15 s) |
 | `homeworlds` | the home fleets' warnings: the Thrynn fleet in orbit 4 of 129,33 with the ship silent (its four homeworld hails in order, holding fire until the last, then the comm link ends and they attack), the Veloxi fleet in orbit 3 of 150,148 hailed first (its homeworld response, then the attack) and a Thrynn patrol met in flight (the control: no homeworld line, no attack) (about 25 s) |
+| `cowardice` | the Spemin, Thrynn and Veloxi after their losses: three Spemin ships in a star system fired on: one lost (the control, they fight on), two lost (the survivor turns obsequious), its hail (one of the cowardly lines, the surrender among them), its statement once the player answers (one of the obsequious ones) and the player firing again (they still do not fight), then three Thrynn and three Veloxi ships, two of each destroyed and hailed (each answers with its surrender line) (about 30 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (91 scenarios, about 58 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (92 scenarios, about 59 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
