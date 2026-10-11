@@ -155,6 +155,104 @@ public class PlayerData
 		return true;
 	}
 
+	// what an unsuitable recommendation costs: the first is a warning of 100 MU ("this is only a warning, your next fine will be heavy"), and later fines "vary with
+	// how unsuitable the planet is" (STRINFO 1.2) - 5000 MU for each reason is the port's choice
+	public const int c_firstUnsuitableFine = 100;
+	public const int c_unsuitableFinePerReason = 5000;
+
+	// call this when the ship is back at the Starport: Interstel evaluates the planets recommended for colonization since the last visit - a planet of its list
+	// earns its bonus, any other is unsuitable and fined (STRINFO 1.2) - returns how many it evaluated
+	public int EvaluateColonyRecommendations()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		if ( ( m_general.m_colonyRecommendationList == null ) || ( m_general.m_colonyRecommendationList.Count == 0 ) )
+		{
+			return 0;
+		}
+
+		var evaluated = 0;
+
+		foreach ( var planetId in m_general.m_colonyRecommendationList )
+		{
+			if ( ( planetId < 0 ) || ( planetId >= gameData.m_planetList.Length ) )
+			{
+				continue;
+			}
+
+			evaluated++;
+
+			// is it a planet of Interstel's list?
+			GD_ColonyEvaluation colonyEvaluation = null;
+
+			foreach ( var candidate in gameData.m_colonyEvaluationList )
+			{
+				if ( candidate.m_planetId == planetId )
+				{
+					colonyEvaluation = candidate;
+				}
+			}
+
+			if ( colonyEvaluation != null )
+			{
+				// yes - the bonus
+				m_bank.m_currentBalance += colonyEvaluation.m_bonus;
+				m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Colony bonus", colonyEvaluation.m_bonus + "+" ) );
+
+				var text = gameData.FindStoryText( ( colonyEvaluation.m_rating == "Optimal" ) ? "EvaluationOptimal" : "EvaluationSuitable" );
+
+				if ( text != null )
+				{
+					m_general.AddSupplementalEvaluation( text.m_text.Replace( "[REWARD]", colonyEvaluation.m_bonus.ToString() ) );
+				}
+
+				continue;
+			}
+
+			// no - unsuitable, and fined
+			var reasons = gameData.m_planetList[ planetId ].GetUnsuitableReasons();
+			var firstTime = ( m_general.m_unsuitableRecommendationCount == 0 );
+			var fine = firstTime ? c_firstUnsuitableFine : ( c_unsuitableFinePerReason * System.Math.Max( 1, reasons.Count ) );
+
+			m_general.m_unsuitableRecommendationCount++;
+
+			m_bank.m_currentBalance -= fine;
+			m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Colony fine", fine + "-" ) );
+
+			var unsuitable = gameData.FindStoryText( "EvaluationUnsuitable" );
+
+			if ( unsuitable != null )
+			{
+				var evaluation = unsuitable.m_text;
+
+				// the reasons in place of STRINFO's bracket (which lists them all)
+				var bracketStart = evaluation.IndexOf( '[' );
+				var bracketEnd = evaluation.IndexOf( ']' );
+
+				if ( ( bracketStart >= 0 ) && ( bracketEnd > bracketStart ) )
+				{
+					var reasonText = ( reasons.Count == 0 ) ? "ITS CONDITIONS" : string.Join( ", ", reasons.GetRange( 0, reasons.Count - 1 ) ) + ( ( reasons.Count > 1 ) ? " AND " : "" ) + reasons[ reasons.Count - 1 ];
+
+					evaluation = evaluation.Substring( 0, bracketStart ) + reasonText + evaluation.Substring( bracketEnd + 1 );
+				}
+
+				// the fine, and the warning only the first time
+				evaluation = evaluation.Replace( "FINED 100 MU'S", "FINED " + fine + " MU'S" );
+
+				if ( !firstTime )
+				{
+					evaluation = evaluation.Replace( "  THIS IS ONLY A WARNING, YOUR NEXT FINE WILL BE HEAVY.", "" );
+				}
+
+				m_general.AddSupplementalEvaluation( evaluation );
+			}
+		}
+
+		m_general.m_colonyRecommendationList.Clear();
+
+		return evaluated;
+	}
+
 	// the fine for being towed back to the Starport after a distress call: "fines vary directly with the distance from Arth and range from 15000 to 80000 MU"
 	// (STRINFO 1.2) - in proportion to the distance from Arth against the farthest star from it (that scale is the port's choice)
 	public const int c_smallestTowingFine = 15000;

@@ -140,6 +140,7 @@ The project features a **deterministic visualization system** that renders plane
 - A distress call gets the ship towed home, for a fine that grows with the distance from Arth
 - Alien ships have the armor, shields and speed of their vessels in the game data
 - The starmap shows the fuel needed to fly to the cursor
+- Planets can be recommended for colonization, and Interstel pays a bonus or fines the crew at the Starport
 - The game can be won: destroying the Crystal Planet ends the flares, and Interstel pays its 500,000 MU bonus and its supplemental evaluation at the Starport
 - Arth's sun flares on 01-01-4621 unless the game has been won: the Starport is destroyed, and a ship in Arth's system is incinerated
 - 10 alien races with unique encounter behaviors

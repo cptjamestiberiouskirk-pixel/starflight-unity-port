@@ -663,6 +663,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarmapFuel();
 				break;
 
+			case "colonies":
+				yield return ScenarioColonies();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -13872,6 +13876,137 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starmapfuel: with the Tesseract the estimate is half (4.8)", labelWithTesseract.Contains( "Fuel 4.8" ), labelWithTesseract );
 
 		Finish( "scenario=starmapfuel onShip='" + labelOnShip + "' at20='" + labelAt20 + "' tesseract='" + labelWithTesseract + "'", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 1: colony recommendations
+
+	// goes into orbit around a planet, logs it with the real Log Planet button and answers the question - returns whether the question was asked
+	static IEnumerator LogAndRecommend( int planetId, bool recommend, bool[] asked )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+
+		yield return GoIntoOrbit( gameData.m_planetList[ planetId ].m_starId, planetId );
+
+		new LogPlanetButton().Execute();
+
+		yield return Frames( 2 );
+
+		var recommendSet = -1;
+
+		try
+		{
+			recommendSet = (int) Enum.Parse( typeof( ButtonController.ButtonSet ), "RecommendPlanet" );
+		}
+		catch ( Exception )
+		{
+		}
+
+		asked[ 0 ] = ( recommendSet >= 0 ) && ( (int) controller.m_buttonController.GetCurrentButtonSet() == recommendSet ) && MessageList().Contains( "Recommend this planet" );
+
+		if ( asked[ 0 ] )
+		{
+			// No is the first button, Yes the second (as the original's "<- N  Y ->")
+			PressButton( (ButtonController.ButtonSet) recommendSet, recommend ? 1 : 0 );
+
+			yield return Frames( 2 );
+		}
+	}
+
+	IEnumerator ScenarioColonies()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var bank = playerData.m_bank;
+		var asked = new bool[ 1 ];
+
+		EnsureCrew();
+
+		bank.m_currentBalance = 100000;
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		// Mardan 4, an optimal planet of Interstel's list (50000 MU, and no encounter waits in orbit there - Heaven's Mechans would begin theirs), and two planets of
+		// the Uhlek system that are not on it
+		var heaven = gameData.FindPlanetFromSun( 217, 88, 4 );
+		var unsuitableA = gameData.FindPlanetFromSun( 55, 32, 2 );
+		var unsuitableB = gameData.FindPlanetFromSun( 55, 32, 1 );
+		var notRecommended = gameData.FindPlanetFromSun( 55, 32, 3 );
+		var onTheList = "";
+
+		foreach ( var colonyEvaluation in RecoveredList( "m_colonyEvaluationList" ) )
+		{
+			var planetId = IntFieldOrMin( colonyEvaluation, "m_planetId" );
+
+			if ( ( planetId == unsuitableA ) || ( planetId == unsuitableB ) || ( planetId == notRecommended ) )
+			{
+				onTheList += planetId + " ";
+			}
+		}
+
+		// ---- 1. Log Planet asks whether to recommend the planet, and Yes recommends it
+		yield return LogAndRecommend( heaven, true, asked );
+
+		var askedForHeaven = asked[ 0 ];
+
+		yield return LogAndRecommend( unsuitableA, true, asked );
+		yield return LogAndRecommend( unsuitableB, true, asked );
+
+		// ---- 2. the control: No does not recommend it
+		yield return LogAndRecommend( notRecommended, false, asked );
+
+		var pending = FieldOrNull( playerData.m_general, "m_colonyRecommendationList" ) as IList;
+		var pendingCount = ( pending == null ) ? -1 : pending.Count;
+
+		// ---- 3. back at the Starport, Interstel evaluates them
+		var balanceBefore = bank.m_currentBalance;
+		var ledgerBefore = bank.m_transactionList.Count;
+
+		playerData.m_general.m_currentStarId = gameData.m_misc.m_arthStarId;
+		playerData.m_general.m_currentPlanetId = gameData.m_misc.m_arthPlanetId;
+
+		controller.SwitchLocation( PD_General.Location.DockingBay );
+
+		yield return Frames( 10 );
+
+		controller.m_encounterRange = encounterRange;
+
+		var change = bank.m_currentBalance - balanceBefore;
+		var ledger = "";
+
+		for ( var index = ledgerBefore; index < bank.m_transactionList.Count; index++ )
+		{
+			ledger += bank.m_transactionList[ index ].m_description + " " + bank.m_transactionList[ index ].m_amount + "; ";
+		}
+
+		var evaluations = FieldOrNull( playerData.m_general, "m_supplementalEvaluationList" ) as IList;
+		var evaluationText = "";
+
+		if ( evaluations != null )
+		{
+			foreach ( var evaluation in evaluations )
+			{
+				evaluationText += evaluation + " || ";
+			}
+		}
+
+		var pendingAfter = ( pending == null ) ? -1 : pending.Count;
+		var reasonsA = string.Join( ", ", gameData.m_planetList[ unsuitableA ].GetType().GetMethod( "GetUnsuitableReasons" ) == null ? new List<string>() : (List<string>) gameData.m_planetList[ unsuitableA ].GetType().GetMethod( "GetUnsuitableReasons" ).Invoke( gameData.m_planetList[ unsuitableA ], null ) );
+		var reasonsB = string.Join( ", ", gameData.m_planetList[ unsuitableB ].GetType().GetMethod( "GetUnsuitableReasons" ) == null ? new List<string>() : (List<string>) gameData.m_planetList[ unsuitableB ].GetType().GetMethod( "GetUnsuitableReasons" ).Invoke( gameData.m_planetList[ unsuitableB ], null ) );
+		var reasonCountB = ( reasonsB.Length == 0 ) ? 1 : reasonsB.Split( ',' ).Length;
+
+		Log( "colonies: planets " + heaven + " (Mardan 4), " + unsuitableA + " and " + unsuitableB + " recommended, " + notRecommended + " not (on the list among them: '" + onTheList + "') | asked for Mardan 4 " + askedForHeaven + ", pending before docking " + pendingCount + ", after " + pendingAfter + " | the bank " + change + ", ledger: " + ledger + " | reasons " + unsuitableA + ": " + reasonsA + "; " + unsuitableB + ": " + reasonsB + " | evaluations: " + evaluationText.Replace( '\n', '/' ) );
+
+		Check( "colonies: Log Planet asks whether to recommend the planet for colonization, and Yes recommends it while No does not", askedForHeaven && ( pendingCount == 3 ), askedForHeaven + ", " + pendingCount );
+		Check( "colonies: back at the Starport an optimal planet of Interstel's list earns its bonus", ledger.Contains( "Colony bonus 50000+" ) && evaluationText.Contains( "OPTIMAL PLANET" ) && evaluationText.Contains( "BONUS OF 50000" ), ledger );
+		Check( "colonies: the first unsuitable planet is a warning of 100 MU, with its reasons", ledger.Contains( "Colony fine 100-" ) && evaluationText.Contains( "FINED 100 MU'S.  THIS IS ONLY A WARNING" ) && ( reasonsA.Length > 0 ) && evaluationText.Contains( reasonsA.Split( ',' )[ 0 ].Trim() ), ledger + " | " + reasonsA );
+		Check( "colonies: a later unsuitable planet is fined heavily, 5000 MU for each reason, with no warning", ledger.Contains( "Colony fine " + ( 5000 * reasonCountB ) + "-" ) && ( change == 50000 - 100 - 5000 * reasonCountB ) && ( pendingAfter == 0 ), ledger + " | " + change + " | pending " + pendingAfter );
+
+		Finish( "scenario=colonies asked=" + askedForHeaven + " pending=" + pendingCount + " change=" + change + " pendingAfter=" + pendingAfter, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

@@ -67,6 +67,12 @@ public class DockingBay : MonoBehaviour
 		// play the docking bay music track
 		MusicController.m_instance.ChangeToTrack( MusicController.Track.DockingBay );
 
+		// back at the Starport: Interstel evaluates the planets recommended for colonization
+		if ( playerData.EvaluateColonyRecommendations() > 0 )
+		{
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Interstel has evaluated your colony recommendations - see Operations.</color>" );
+		}
+
 		// back at the Starport after the win: Interstel pays the bonus that comes with its medal
 		if ( playerData.PayWinBonus() )
 		{

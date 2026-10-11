@@ -81,6 +81,92 @@ public class GD_Planet
 		return gameData.m_planetTypeList[ m_planetTypeId ].m_name == c_crystalPlanetTypeName;
 	}
 
+	// the gravity above which a planet's gravity is crushing (in hundredths of a G - the port's choice: STRINFO names crushing gravity as a reason, not where it
+	// begins)
+	public const int c_crushingGravity = 200;
+
+	// why this planet is unsuitable for colonization, in the words of Interstel's evaluation (STRINFO 1.2: extreme heat, extreme cold, crushing gravity, violent
+	// storms, lack of water, lack of oxygen), from what the planet tables of the game data mark habitable - an empty list if none of them applies
+	public System.Collections.Generic.List<string> GetUnsuitableReasons()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var reasons = new System.Collections.Generic.List<string>();
+
+		// the temperature range: below the habitable ones is cold, above them hot (the list goes from sub-arctic to inferno)
+		var heat = false;
+		var cold = false;
+
+		foreach ( var temperatureId in new[] { m_temperatureIdA, m_temperatureIdB } )
+		{
+			if ( ( temperatureId >= 0 ) && ( temperatureId < gameData.m_temperatureList.Length ) && !gameData.m_temperatureList[ temperatureId ].m_habitable )
+			{
+				var firstHabitable = 0;
+
+				while ( ( firstHabitable < gameData.m_temperatureList.Length ) && !gameData.m_temperatureList[ firstHabitable ].m_habitable )
+				{
+					firstHabitable++;
+				}
+
+				if ( temperatureId < firstHabitable )
+				{
+					cold = true;
+				}
+				else
+				{
+					heat = true;
+				}
+			}
+		}
+
+		if ( heat )
+		{
+			reasons.Add( "EXTREME HEAT" );
+		}
+
+		if ( cold )
+		{
+			reasons.Add( "EXTREME COLD" );
+		}
+
+		if ( m_gravity > c_crushingGravity )
+		{
+			reasons.Add( "CRUSHING GRAVITY" );
+		}
+
+		if ( ( m_weatherId >= 0 ) && ( m_weatherId < gameData.m_weatherList.Length ) && !gameData.m_weatherList[ m_weatherId ].m_habitable )
+		{
+			reasons.Add( "VIOLENT STORMS" );
+		}
+
+		if ( ( m_hydrosphereId < 0 ) || ( m_hydrosphereId >= gameData.m_hydrosphereList.Length ) || !gameData.m_hydrosphereList[ m_hydrosphereId ].m_habitable )
+		{
+			reasons.Add( "LACK OF WATER" );
+		}
+
+		// oxygen in the atmosphere, and an atmosphere at all
+		var oxygen = false;
+
+		foreach ( var atmosphereId in new[] { m_atmosphereIdA, m_atmosphereIdB, m_atmosphereIdC } )
+		{
+			if ( ( atmosphereId >= 0 ) && ( atmosphereId < gameData.m_atmosphereList.Length ) && gameData.m_atmosphereList[ atmosphereId ].m_habitable )
+			{
+				oxygen = true;
+			}
+		}
+
+		if ( ( m_atmosphereDensityId < 0 ) || ( m_atmosphereDensityId >= gameData.m_atmosphereDensityList.Length ) || !gameData.m_atmosphereDensityList[ m_atmosphereDensityId ].m_habitable )
+		{
+			oxygen = false;
+		}
+
+		if ( !oxygen )
+		{
+			reasons.Add( "LACK OF OXYGEN" );
+		}
+
+		return reasons;
+	}
+
 	// call this to get the orbit angle (in degrees) of the planet
 	public float GetOrbitAngle()
 	{

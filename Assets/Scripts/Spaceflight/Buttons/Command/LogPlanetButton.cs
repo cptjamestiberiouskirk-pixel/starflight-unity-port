@@ -1,6 +1,15 @@
 
 public class LogPlanetButton : ShipButton
 {
+	// the command buttons that were on the console when the question was asked (Yes and No go back to them)
+	static ButtonController.ButtonSet s_commandButtonSet = ButtonController.ButtonSet.CommandA;
+
+	// back to the command buttons after the question
+	public static void BackToCommandButtons()
+	{
+		SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( s_commandButtonSet );
+	}
+
 	public override string GetLabel()
 	{
 		return "Log Planet";
@@ -82,8 +91,17 @@ public class LogPlanetButton : ShipButton
 
 				if ( wasAdded )
 				{
+					// the original asks whether to recommend the planet that has just been logged (SS Log Planet: "Recommend this planet for colonization? <- N Y ->")
+					s_commandButtonSet = SpaceflightController.m_instance.m_buttonController.GetCurrentButtonSet();
+
 					SpaceflightController.m_instance.m_messages.AddText( "<color=green>Planet logged:</color>\n<color=white>" + planetName + "</color>" );
 					SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+
+					SpaceflightController.m_instance.m_messages.AddText( "<color=white>Recommend this planet for colonization?</color>" );
+
+					SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.RecommendPlanet );
+
+					return false;
 				}
 				else
 				{
