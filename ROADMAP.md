@@ -181,8 +181,8 @@ Depends on D3. This is the largest piece and is not on the path to winning, whic
 - Compare every screen with `Research/Screenshots/` and every message with STRINFO.
 - Correct the README's completion figure.
 - Draw the planet in encounters that begin in orbit (ruling 5, later step).
-- Alien captain and ship names (`%` and `+` in 15 greetings): Ask, since the data has no names.
-- Crew learn by using their skills: DRAFT only, so Ask.
+- Alien captain and ship names (`%` and `+` in 15 greetings): made of the race's syllables (the garble words), as STRINFO's own names are (Fi-noc-tzi, To-chu-pu, Yrh-ey); done 2026-10-11 on Claude's recommendation.
+- Crew learn by using their skills: DRAFT only. Left out on Claude's recommendation (2026-10-11): the shipped game trains crew at the Starport (the Personnel office, which uses the race's learning rate).
 
 ## Order
 

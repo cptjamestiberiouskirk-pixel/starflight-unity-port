@@ -2677,6 +2677,40 @@ public class Encounter : MonoBehaviour
 		return null;
 	}
 
+	// a name in the aliens' own language, made of its syllables (the game data's garble words, which STRINFO's names are made of: the Veloxi's captain Finoctzi of
+	// the ship Tochupu, Fi-noc-tzi and To-chu-pu, the Thrynn's captain Yrhey of the ship Iart'l, Yrh-ey and I-ar-t'l) - two or three syllables, for the captain (0)
+	// or the ship (1) of an encounter, the same at every meeting (STRINFO gives other names for the same lines in brackets, so the original made them up too;
+	// the number of syllables is the port's)
+	string GetAlienName( int which )
+	{
+		var syllables = new List<string>();
+
+		foreach ( var garble in DataController.m_instance.m_gameData.m_garbleList )
+		{
+			if ( ( garble.m_race == m_gdEncounter.m_race ) && !string.IsNullOrEmpty( garble.m_text ) )
+			{
+				syllables.Add( garble.m_text );
+			}
+		}
+
+		if ( syllables.Count == 0 )
+		{
+			return "";
+		}
+
+		// (its own random numbers, so the game's do not move)
+		var random = new System.Random( m_gdEncounter.m_id * 7 + which * 104729 + 1 );
+		var count = random.Next( 2, 4 );
+		var name = "";
+
+		for ( var i = 0; i < count; i++ )
+		{
+			name += syllables[ random.Next( syllables.Count ) ];
+		}
+
+		return char.ToUpper( name[ 0 ] ) + name.Substring( 1 ).ToLower();
+	}
+
 	// a comm of the game data by its id, if it is one of the race of this encounter (null if it is not)
 	GD_Comm FindRaceComm( int commId )
 	{
@@ -3061,6 +3095,12 @@ public class Encounter : MonoBehaviour
 		// replace tokens with values
 		text = text.Replace( "&", "ISS " + playerData.m_playerShip.m_name );
 		text = text.Replace( "*", personnelFile.m_name );
+
+		// and the names of the aliens' captain (%) and ship (+)
+		if ( !outgoing && ( text.Contains( "%" ) || text.Contains( "+" ) ) )
+		{
+			text = text.Replace( "%", GetAlienName( 0 ) ).Replace( "+", GetAlienName( 1 ) );
+		}
 
 		// check for the slash token (replace with subject)
 		if ( text.Contains( "/" ) )

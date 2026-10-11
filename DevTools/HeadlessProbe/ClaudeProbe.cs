@@ -731,6 +731,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLava();
 				break;
 
+			case "aliennames":
+				yield return ScenarioAlienNames();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -16271,6 +16275,93 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lava: at the Starport a new terrain vehicle is installed for a fine of 10,000 MU, with Interstel's evaluation", !lostAfterDocking && ( balanceBefore - balanceAfter == 10000 ) && evaluated, ( balanceBefore - balanceAfter ) + " " + lostAfterDocking + " " + evaluated );
 
 		Finish( "scenario=lava lost=" + lostInLava + " fine=" + ( balanceBefore - balanceAfter ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the names of the aliens' captains and ships
+
+	// meets the aliens of an encounter and has them say a line of the game data - returns what the messages show
+	static IEnumerator SayLine( int encounterId, int commId, List<string> said )
+	{
+		var controller = SpaceflightController.m_instance;
+		GD_Comm line = null;
+
+		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
+		{
+			if ( comm.m_id == commId )
+			{
+				line = comm;
+			}
+		}
+
+		EnterEncounter( encounterId );
+		yield return Frames( 10 );
+
+		for ( var i = 0; i < 2; i++ )
+		{
+			controller.m_messages.Clear();
+
+			controller.m_encounter.AddComm( GD_Comm.Subject.Custom, false, line );
+
+			said.Add( MessageList() );
+		}
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+	}
+
+	// the word after this one in a text ("" if there is none)
+	static string WordAfter( string text, string word )
+	{
+		var index = text.IndexOf( word );
+
+		if ( index < 0 )
+		{
+			return "";
+		}
+
+		var rest = text.Substring( index + word.Length );
+		var end = rest.IndexOfAny( new[] { ' ', '.', ',', '<' } );
+
+		return ( end < 0 ) ? rest : rest.Substring( 0, end );
+	}
+
+	IEnumerator ScenarioAlienNames()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// an officer who understands every word
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		// ---- 1. the Veloxi's "Me is naming captain % of most elegant and dangerous Veloxi ship naming +", twice
+		var velox = new List<string>();
+
+		yield return SayLine( FindEncounter( 1, 6, 3, 0, GameData.Race.Velox ), 496, velox );
+
+		// ---- 2. the Thrynn's "This is captain % of the Thrynn ship +"
+		var thrynn = new List<string>();
+
+		yield return SayLine( FindEncounter( 1, 6, 3, 0, GameData.Race.Thrynn ), 391, thrynn );
+
+		controller.m_encounterRange = encounterRange;
+
+		var veloxCaptain = WordAfter( velox[ 0 ], "captain " );
+		var veloxShip = WordAfter( velox[ 0 ], "ship naming " );
+		var thrynnCaptain = WordAfter( thrynn[ 0 ], "captain " );
+
+		Log( "aliennames: veloxi " + string.Join( " | ", velox ) + " (captain " + veloxCaptain + ", ship " + veloxShip + ") || thrynn " + thrynn[ 0 ] + " (captain " + thrynnCaptain + ")" );
+
+		Check( "aliennames: the Veloxi name their captain and ship instead of % and +", !velox[ 0 ].Contains( "%" ) && !velox[ 0 ].Contains( "+" ) && ( veloxCaptain.Length >= 2 ) && char.IsUpper( veloxCaptain[ 0 ] ) && ( veloxShip.Length >= 2 ), velox[ 0 ] );
+		Check( "aliennames: the names are the same every time", velox[ 0 ] == velox[ 1 ], velox[ 0 ] + " | " + velox[ 1 ] );
+		Check( "aliennames: the Thrynn name theirs too", !thrynn[ 0 ].Contains( "%" ) && !thrynn[ 0 ].Contains( "+" ) && ( thrynnCaptain.Length >= 2 ), thrynn[ 0 ] );
+
+		Finish( "scenario=aliennames veloxi=" + veloxCaptain + "/" + veloxShip + " thrynn=" + thrynnCaptain, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
