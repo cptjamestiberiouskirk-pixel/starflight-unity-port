@@ -1602,6 +1602,22 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "the gas giant in orbit 3 of 123,101 reads 5x10^23 tons, as in the original", sensors.m_hasSensorData && sensors.m_massText.text.Contains( "5x10<sup>23</sup>" ), "finished=" + sensors.m_hasSensorData + " mass=[" + sensors.m_massText.text + "] gameData=" + gasGiant.m_mass );
 
+		// the frozen planet in orbit 7 of Arth's system (planet 90) reads 6x10^21 tons in the original (seen 2026-10-11; the game data had 4x10^22, the survey 3.6x10^22)
+		var arthSeven = DataController.m_instance.m_gameData.m_planetList[ 90 ];
+
+		spaceflightController.m_displayController.ChangeDisplay( sensors );
+		sensors.m_hasSensorData = false;
+		sensors.StartScanning( SensorsDisplay.ScanType.Planet, 18, arthSeven.m_mass, arthSeven.m_bioDensity, arthSeven.m_mineralDensity );
+
+		readoutUntil = Time.realtimeSinceStartup + sensors.m_maxDuration + 5.0f;
+
+		while ( !sensors.m_hasSensorData && ( Time.realtimeSinceStartup < readoutUntil ) )
+		{
+			yield return null;
+		}
+
+		Check( "the frozen planet in orbit 7 of Arth's system reads 6x10^21 tons, as in the original", sensors.m_hasSensorData && sensors.m_massText.text.Contains( "6x10<sup>21</sup>" ), "finished=" + sensors.m_hasSensorData + " mass=[" + sensors.m_massText.text + "] gameData=" + arthSeven.m_mass );
+
 		// a vessel that has its own picture (control)
 		spaceflightController.m_displayController.ChangeDisplay( sensors );
 		sensors.StartScanning( SensorsDisplay.ScanType.SpeminScout, 1, 400, 100, 100 );
