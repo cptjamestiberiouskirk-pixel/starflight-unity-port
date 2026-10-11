@@ -185,6 +185,25 @@ public class ScanButton : ShipButton
 								artifactCount++;
 							}
 						}
+
+						// and what a random ruin still holds
+						foreach ( var item in ruin.m_randomItems )
+						{
+							if ( playerData.m_planetSurfaces.IsRandomRuinItemTaken( item.m_key ) )
+							{
+								continue;
+							}
+
+							if ( item.m_artifactId >= 0 )
+							{
+								label = "Ruin - artifact";
+								artifactCount++;
+							}
+							else if ( label == "Ruin" )
+							{
+								label = "Ruin - Endurium";
+							}
+						}
 					}
 
 					// add floating label to this ruin

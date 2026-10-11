@@ -129,7 +129,7 @@ Rulings of 2026-10-09: place only what the sources document now (the 14 artifact
 | 3.2 | The 12 special artifacts at their 14 sites, taken with the Cargo button | STRINFO 4.1 | PR 108: in the ruins of their sites, taken once and saved, carried to the ship; the Black Box, the Flat Device and the Whining Orb are bought, not found |
 | 3.3 | The 38 messages go to the ship's log under Messages, recorded with the Cargo button beside their ruin, dated the day they were found | STRINFO 3.1; the manual (page 21) | PR 102 |
 | 3.4 | Dropping cargo, and the terrain vehicle's cargo display (ruled 2026-10-09: both, dropping first) | the manual (page 21): Cargo lists what the vehicle carries "and gives you the option of dropping anything", and a dropped object can be picked up again; the display is not in the sources | dropping: PR 110; the display: PR 112, shown while the cargo list is open |
-| 3.5 | Random ruins: ancient crystal ruins with Endurium lumps or 1 to 4 "truly amazing" artifacts, Old Empire ruins with artifacts or writing | planet.txt (DRAFT only) | Ask: deferred by the owner on 2026-10-09 |
+| 3.5 | Random ruins: ancient crystal ruins with Endurium lumps or 1 to 4 "truly amazing" artifacts, Old Empire ruins with artifacts or writing | planet.txt (DRAFT only); the kernel has a class of ruins and dir.txt's SEED-OV seeds them | the notes' ruins, with the port's counts (a quarter of the planets; Claude's recommendation by the owner's leave of 2026-10-11, after the owner's deferral of 2026-10-09); the writing in Old Empire ruins not placed (no texts) |
 
 ## Phase 4: Artifact effects
 

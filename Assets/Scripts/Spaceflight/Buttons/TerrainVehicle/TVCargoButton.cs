@@ -198,6 +198,58 @@ public class TVCargoButton : ShipButton
 
 				anythingTaken = true;
 			}
+
+			// what a random ruin holds (the crew's words are the 1984 notes': "Captain, we have discovered a truly amazing artifact. We estimate its value at ...")
+			foreach ( var item in ruin.m_randomItems )
+			{
+				if ( playerData.m_planetSurfaces.IsRandomRuinItemTaken( item.m_key ) )
+				{
+					continue;
+				}
+
+				if ( item.m_artifactId >= 0 )
+				{
+					if ( item.m_artifactId >= gameData.m_artifactList.Length )
+					{
+						continue;
+					}
+
+					var artifact = gameData.m_artifactList[ item.m_artifactId ];
+					var discovery = "Captain, we have discovered " + ( ruin.m_isAncient ? "a truly amazing artifact" : "an amazing artifact" ) + ". We estimate its value at " + item.m_estimatedValue + " MU.";
+
+					if ( artifact.m_volume > playerData.m_terrainVehicle.GetRemainingVolume() )
+					{
+						text += ( ( text == "" ) ? "" : "\n" ) + "<color=yellow>" + discovery + " The cargo hold has no room for it (" + Tools.VolumeToText( artifact.m_volume ) + " cubic meters).</color>";
+
+						continue;
+					}
+
+					playerData.m_terrainVehicle.AddArtifact( item.m_artifactId );
+					playerData.m_planetSurfaces.TakeRandomRuinItem( item.m_key );
+
+					text += ( ( text == "" ) ? "" : "\n" ) + "<color=green>" + discovery + " Picked up the " + artifact.m_name + " (" + Tools.VolumeToText( artifact.m_volume ) + " cubic meters).</color>";
+
+					anythingTaken = true;
+				}
+				else if ( item.m_enduriumVolume > 0 )
+				{
+					var discovery = "Captain, we have discovered " + item.m_enduriumVolume + " lumps of Endurium (" + Tools.VolumeToText( item.m_enduriumVolume ) + " cubic meters).";
+
+					if ( item.m_enduriumVolume > playerData.m_terrainVehicle.GetRemainingVolume() )
+					{
+						text += ( ( text == "" ) ? "" : "\n" ) + "<color=yellow>" + discovery + " The cargo hold has no room for it.</color>";
+
+						continue;
+					}
+
+					playerData.m_terrainVehicle.AddElement( gameData.m_misc.m_enduriumElementId, item.m_enduriumVolume );
+					playerData.m_planetSurfaces.TakeRandomRuinItem( item.m_key );
+
+					text += ( ( text == "" ) ? "" : "\n" ) + "<color=green>" + discovery + " Picked it up.</color>";
+
+					anythingTaken = true;
+				}
+			}
 		}
 
 		if ( text == "" )

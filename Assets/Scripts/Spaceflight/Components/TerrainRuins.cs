@@ -2,7 +2,7 @@ using UnityEngine;
 
 // places the ruins of a planet: where the original game has its messages (GameData.m_planetMessageList, recovered from STRINFO 3.1)
 // a message at a site lies in a ruin at its latitude and longitude, and one STRINFO puts at "random locations" or "several locations" lies in one ruin of its own,
-// at a place picked with random numbers seeded from the planet (the same every time) - the random ruins of the 1984 design notes are not placed (roadmap 3.5)
+// at a place picked with random numbers seeded from the planet (the same every time) - and the random ruins of the 1984 design notes (see PlaceRandomRuins)
 public class TerrainRuins : TerrainGridPopulator
 {
 	// the ruin templates (the five ancient ruin models for now)
@@ -188,6 +188,9 @@ public class TerrainRuins : TerrainGridPopulator
 			}
 		}
 
+		// the random ruins (their random numbers come after everything else, so nothing above moves)
+		PlaceRandomRuins( planetGenerator, elevationScale, planet );
+
 		// what the terrain vehicle has dropped on this planet (no random numbers either)
 		var playerData = DataController.m_instance.m_playerData;
 
@@ -259,6 +262,127 @@ public class TerrainRuins : TerrainGridPopulator
 						Destroy( child.gameObject );
 					}
 				}
+			}
+		}
+	}
+
+	// the random ruins of the 1984 design notes (planet.txt; the original's kernel has a class of ruins, and its SEED-OV overlay seeds a planet's "mineral, lifeform
+	// & ruin" objects, but its code is not in the sources): ancient crystal ruins with lumps of Endurium or "truly amazing" artifacts worth 500 to 5000 MU, and
+	// Old Empire ruins with "amazing" artifacts worth 50 to 1000 MU, one to four of them (60%, 25%, 10% and 5%), whose value the crew estimates to within half of
+	// it - the notes do not say how many ruins a planet has, how much Endurium a ruin holds or which artifacts, so those are the port's: a quarter of the planets
+	// has one or two, half of them ancient, half of the ancient ones hold 1 to 5 cubic meters of Endurium, and the artifacts are the game data's that are found
+	// nowhere else, in the range of value of the ruin - the planets the original's messages and artifacts lie on have none, as STRINFO describes them
+	public static int GetRandomRuinCount( GD_Planet planet )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		foreach ( var planetMessage in gameData.m_planetMessageList )
+		{
+			if ( planetMessage.m_planetId == planet.m_id )
+			{
+				return 0;
+			}
+		}
+
+		foreach ( var artifactSite in gameData.m_artifactSiteList )
+		{
+			if ( artifactSite.m_planetId == planet.m_id )
+			{
+				return 0;
+			}
+		}
+
+		// from the planet's id (so that a planet's ruins can be known without placing them), 18 in 100 with one and 7 with two
+		var hash = ( planet.m_id * 7919 + 104729 ) % 100;
+
+		return ( hash < 18 ) ? 1 : ( ( hash < 25 ) ? 2 : 0 );
+	}
+
+	// the artifacts of the game data that random ruins hold: found nowhere else (no site, not sold) and in this range of value
+	static System.Collections.Generic.List<int> FindRandomRuinArtifacts( int lowestValue, int highestValue )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var artifactIds = new System.Collections.Generic.List<int>();
+
+		for ( var artifactId = 0; artifactId < gameData.m_artifactList.Length; artifactId++ )
+		{
+			var artifact = gameData.m_artifactList[ artifactId ];
+
+			if ( artifact.m_availableInStarport || ( artifact.m_name == "Black Box" ) || ( artifact.m_actualValue < lowestValue ) || ( artifact.m_actualValue > highestValue ) )
+			{
+				continue;
+			}
+
+			var hasSite = false;
+
+			foreach ( var artifactSite in gameData.m_artifactSiteList )
+			{
+				hasSite = hasSite || ( artifactSite.m_artifactId == artifactId );
+			}
+
+			if ( !hasSite )
+			{
+				artifactIds.Add( artifactId );
+			}
+		}
+
+		return artifactIds;
+	}
+
+	// how many artifacts a random ruin holds: "60% theres 1, 25% theres 2, 10% theres 3, 5% theres 4"
+	static int GetRandomArtifactCount()
+	{
+		var chance = Random.value;
+
+		return ( chance < 0.6f ) ? 1 : ( ( chance < 0.85f ) ? 2 : ( ( chance < 0.95f ) ? 3 : 4 ) );
+	}
+
+	void PlaceRandomRuins( PlanetGenerator planetGenerator, float elevationScale, GD_Planet planet )
+	{
+		var count = GetRandomRuinCount( planet );
+		var gameData = DataController.m_instance.m_gameData;
+
+		for ( var ruinIndex = 0; ruinIndex < count; ruinIndex++ )
+		{
+			FindPlaceForRuin( planetGenerator, elevationScale, out var mapX, out var mapY );
+
+			var isAncient = Random.value < 0.5f;
+			var template = m_ruinTemplates[ Random.Range( 0, m_ruinTemplates.Length ) ];
+			var ruinObject = PlaceObjectAt( template, mapX, mapY, elevationScale, Random.Range( 0, 360 ) );
+
+			ruinObject.name = ( isAncient ? "Ancient ruin " : "Old Empire ruin " ) + ( ruinIndex + 1 );
+
+			var ruin = ruinObject.AddComponent<TerrainRuin>();
+
+			ruin.m_isAncient = isAncient;
+
+			// an ancient ruin: lumps of Endurium, or truly amazing artifacts
+			if ( isAncient && ( Random.value < 0.5f ) )
+			{
+				ruin.m_randomItems.Add( new TerrainRuin.RandomItem { m_key = TerrainRuin.GetRandomItemKey( planet.m_id, ruinIndex, 0 ), m_enduriumVolume = Random.Range( 1, 6 ) * 10 } );
+
+				continue;
+			}
+
+			var artifactIds = isAncient ? FindRandomRuinArtifacts( 500, 5000 ) : FindRandomRuinArtifacts( 50, 1000 );
+
+			if ( artifactIds.Count == 0 )
+			{
+				continue;
+			}
+
+			var artifactCount = GetRandomArtifactCount();
+
+			for ( var itemIndex = 0; itemIndex < artifactCount; itemIndex++ )
+			{
+				var artifactId = artifactIds[ Random.Range( 0, artifactIds.Count ) ];
+				var value = gameData.m_artifactList[ artifactId ].m_actualValue;
+
+				// the estimate is off by up to half of the value, most often by little ("a normal distribution with the peak at 0"), rounded to the nearest 100
+				var error = ( Random.value + Random.value - 1.0f ) * 0.5f;
+				var estimate = Mathf.Max( 100, Mathf.RoundToInt( value * ( 1.0f + error ) / 100.0f ) * 100 );
+
+				ruin.m_randomItems.Add( new TerrainRuin.RandomItem { m_key = TerrainRuin.GetRandomItemKey( planet.m_id, ruinIndex, itemIndex ), m_artifactId = artifactId, m_estimatedValue = estimate } );
 			}
 		}
 	}
