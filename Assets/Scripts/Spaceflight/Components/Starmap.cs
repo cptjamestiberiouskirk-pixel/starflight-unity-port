@@ -12,6 +12,9 @@ public class Starmap : MonoBehaviour
 
 	Vector3 m_positionOffset;
 
+	// what the viewport label shows while the starmap is open
+	string m_label;
+
 	// unity start
 	void Start()
 	{
@@ -76,14 +79,32 @@ public class Starmap : MonoBehaviour
 				m_starmap.transform.localPosition = m_originalPosition - m_positionOffset;
 
 				// update the viewport label
-				var x = Mathf.RoundToInt( m_positionOffset.x / m_starmap.transform.localScale.x );
-				var y = Mathf.RoundToInt( m_positionOffset.y / m_starmap.transform.localScale.y );
-
-				var text = x.ToString() + "   " + y.ToString();
-
-				SpaceflightController.m_instance.m_viewport.UpdateLabel( text );
+				UpdateLabel();
 			}
 		}
+	}
+
+	// shows the coordinates of the cursor and the fuel estimate: the Endurium the engines would use to fly there from where the ship is in hyperspace ("STARMAP -
+	// The fuel estimate will be working", alpha.txt - how it is shown is the port's choice)
+	void UpdateLabel()
+	{
+		var x = Mathf.RoundToInt( m_positionOffset.x / m_starmap.transform.localScale.x );
+		var y = Mathf.RoundToInt( m_positionOffset.y / m_starmap.transform.localScale.y );
+
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = Tools.WorldToGameCoordinates( playerData.m_general.m_lastHyperspaceCoordinates );
+		var distance = Vector2.Distance( new Vector2( x, y ), new Vector2( ship.x, ship.z ) );
+		var fuel = playerData.m_playerShip.GetFuelForDistance( distance );
+
+		m_label = x + "   " + y + "   Fuel " + fuel.ToString( "0.0", System.Globalization.CultureInfo.InvariantCulture );
+
+		SpaceflightController.m_instance.m_viewport.UpdateLabel( m_label );
+	}
+
+	// the label shown while the starmap is open (for the probe and anything else that wants it)
+	public string GetLabel()
+	{
+		return m_label;
 	}
 
 	// hide the starmap
@@ -128,6 +149,9 @@ public class Starmap : MonoBehaviour
 
 		// update the player ship position
 		m_playerShip.transform.localPosition = new Vector3( -gameHyperspaceCoordinates.x, gameHyperspaceCoordinates.z, 15.0f );
+
+		// the cursor is on the ship to begin with
+		UpdateLabel();
 	}
 
 	// returns true if the starmap is open

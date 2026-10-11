@@ -659,6 +659,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioVesselStats();
 				break;
 
+			case "starmapfuel":
+				yield return ScenarioStarmapFuel();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -13789,6 +13793,85 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "vesselstats: an alien ship moves at the speed of its vessel's move delay (a Spemin ship 2200 / 1500 times as fast as an Elowan one)", ( ratio > 1.3f ) && ( ratio < 1.65f ), ratio.ToString( "0.00" ) );
 
 		Finish( "scenario=vesselstats ratio=" + ratio.ToString( "0.00" ) + " points=" + allMatch, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 1: the starmap's fuel estimate
+
+	// moves the starmap's cursor to these starmap coordinates, as scrolling does, and returns the viewport label
+	static string StarmapLabelAt( float x, float y )
+	{
+		var starmap = SpaceflightController.m_instance.m_starmap;
+		var scale = starmap.m_starmap.transform.localScale;
+
+		SetField( starmap, "m_positionOffset", new Vector3( x * scale.x, y * scale.y, 0.0f ) );
+
+		// the label is made again as the cursor moves (the code before the estimate has no such method: then the label is what it was)
+		var method = typeof( Starmap ).GetMethod( "UpdateLabel", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public );
+
+		if ( method != null )
+		{
+			method.Invoke( starmap, null );
+		}
+
+		return SpaceflightController.m_instance.m_viewport.m_label.text;
+	}
+
+	IEnumerator ScenarioStarmapFuel()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var tesseractId = gameData.FindArtifactId( "Tesseract" );
+
+		EnsureCrew();
+
+		// class 1 engines (0.48 cubic meters of Endurium for every coordinate), no Tesseract
+		ship.m_enginesClass = 1;
+
+		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( tesseractId ) != null ); guard++ )
+		{
+			ship.RemoveArtifact( tesseractId );
+		}
+
+		// in hyperspace at 40, 40 (a corner with no star), with no encounter able to begin
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 40.0f, 0.0f, 40.0f ) );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		// ---- 1. the starmap opens with the cursor on the ship: no fuel to get there
+		controller.m_starmap.Show();
+
+		yield return Frames( 2 );
+
+		var labelOnShip = controller.m_viewport.m_label.text;
+
+		// ---- 2. the cursor 20 coordinates away: 20 x 0.48 = 9.6 cubic meters
+		var labelAt20 = StarmapLabelAt( 60.0f, 40.0f );
+
+		// ---- 3. with the Tesseract, half: 4.8
+		ship.AddArtifact( tesseractId );
+
+		var labelWithTesseract = StarmapLabelAt( 60.0f, 40.0f );
+
+		controller.m_starmap.Hide();
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "starmapfuel: the label on opening '" + labelOnShip + "', at 60, 40 (20 from the ship) '" + labelAt20 + "', with the Tesseract '" + labelWithTesseract + "'" );
+
+		Check( "starmapfuel: the starmap opens with the cursor on the ship and no fuel needed to get there", labelOnShip.Contains( "40   40" ) && labelOnShip.Contains( "Fuel 0.0" ), labelOnShip );
+		Check( "starmapfuel: the starmap shows the Endurium the engines need to fly to the cursor (20 coordinates at 0.48 = 9.6)", labelAt20.Contains( "60   40" ) && labelAt20.Contains( "Fuel 9.6" ), labelAt20 );
+		Check( "starmapfuel: with the Tesseract the estimate is half (4.8)", labelWithTesseract.Contains( "Fuel 4.8" ), labelWithTesseract );
+
+		Finish( "scenario=starmapfuel onShip='" + labelOnShip + "' at20='" + labelAt20 + "' tesseract='" + labelWithTesseract + "'", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

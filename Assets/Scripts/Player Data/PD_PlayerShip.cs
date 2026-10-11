@@ -350,6 +350,13 @@ public class PD_PlayerShip
 		return ( artifactId >= 0 ) && ( m_artifactStorage != null ) && ( m_artifactStorage.Find( artifactId ) != null );
 	}
 
+	// the Endurium (in cubic meters) the engines use to fly this many starmap coordinates in hyperspace (the engines use their class's fuel for every coordinate,
+	// as the ship's update takes it, and half of it with the Tesseract)
+	public float GetFuelForDistance( float coordinates )
+	{
+		return Mathf.Max( 0.0f, coordinates ) * GetEngines().m_fuelUsedPerCoordinate * GetEngineFuelFactor();
+	}
+
 	// how much of the fuel the engines would use they do use: the Tesseract "projects a field which doubles the energy efficiency of a ship's engines" (the Starport's
 	// analysis)
 	public float GetEngineFuelFactor()
