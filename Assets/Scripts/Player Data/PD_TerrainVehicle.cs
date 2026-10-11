@@ -13,6 +13,9 @@ public class PD_TerrainVehicle
 	public PD_ArtifactStorage m_artifactStorage;
 	public PD_ElementStorage m_elementStorage;
 
+	// the lifeforms captured and put in stasis (planet.txt) - null in older save files
+	public PD_SpecimenStorage m_specimenStorage;
+
 	// set when the terrain vehicle has been destroyed, until the Starport installs a new one (the original's kernel: "?TV is TVEHICLE available from ship?" -
 	// false in older save files)
 	public bool m_isLost;
@@ -35,6 +38,8 @@ public class PD_TerrainVehicle
 
 		m_artifactStorage.Reset();
 		m_elementStorage.Reset();
+
+		m_specimenStorage = new PD_SpecimenStorage();
 
 		// recalculate the used up space in the cargo hold
 		RecalculateVolumeUsed();
@@ -134,7 +139,34 @@ public class PD_TerrainVehicle
 		// get total volume used up for artifacts and elements (with null checks)
 		int artifactVolume = ( m_artifactStorage != null ) ? m_artifactStorage.m_volumeUsed : 0;
 		int elementVolume = ( m_elementStorage != null ) ? m_elementStorage.m_volumeUsed : 0;
-		m_volumeUsed = artifactVolume + elementVolume;
+		m_volumeUsed = artifactVolume + elementVolume + ( ( m_specimenStorage != null ) ? m_specimenStorage.GetVolumeUsed() : 0 );
+	}
+
+	// the specimens in the hold (made in an older save file that has none)
+	public PD_SpecimenStorage GetSpecimenStorage()
+	{
+		if ( m_specimenStorage == null )
+		{
+			m_specimenStorage = new PD_SpecimenStorage();
+		}
+
+		return m_specimenStorage;
+	}
+
+	public void AddSpecimen( PD_Specimen specimen )
+	{
+		GetSpecimenStorage().Add( specimen );
+
+		// recalculate the used up space in the cargo hold
+		RecalculateVolumeUsed();
+	}
+
+	public void RemoveSpecimen( PD_Specimen specimen )
+	{
+		GetSpecimenStorage().Remove( specimen );
+
+		// recalculate the used up space in the cargo hold
+		RecalculateVolumeUsed();
 	}
 
 	public void UseUpFuel( float amount )

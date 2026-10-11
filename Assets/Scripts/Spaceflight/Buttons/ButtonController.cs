@@ -36,6 +36,7 @@ public class ButtonController : MonoBehaviour
 		RepairMineral,
 		TerrainVehicleWeapon,
 		TerrainVehicleLifeform,
+		TerrainVehicleDeadLifeform,
 		Count
 	};
 
@@ -107,7 +108,8 @@ public class ButtonController : MonoBehaviour
 		m_buttonSets[ (int) ButtonSet.TerrainVehicle ] = new ShipButton[] { new MapButton(), new MoveButton(), new TVCargoButton(), new LookButton(), new ScanButton(), new WeaponButton() };
 		m_buttonSets[ (int) ButtonSet.TerrainVehicleCargo ] = new ShipButton[] { new CargoNextButton(), new CargoDropButton(), new CargoBackButton() };
 		m_buttonSets[ (int) ButtonSet.TerrainVehicleWeapon ] = new ShipButton[] { new TVFireButton(), new TVSwitchWeaponButton(), new TVWeaponBackButton() };
-		m_buttonSets[ (int) ButtonSet.TerrainVehicleLifeform ] = new ShipButton[] { new TVRecordButton(), new TVIgnoreButton() };
+		m_buttonSets[ (int) ButtonSet.TerrainVehicleLifeform ] = new ShipButton[] { new TVCaptureButton(), new TVRecordButton(), new TVIgnoreButton() };
+		m_buttonSets[ (int) ButtonSet.TerrainVehicleDeadLifeform ] = new ShipButton[] { new TVRecordButton(), new TVIgnoreButton() };
 		m_buttonSets[ (int) ButtonSet.RecommendPlanet ] = new ShipButton[] { new RecommendNoButton(), new RecommendYesButton() };
 		m_buttonSets[ (int) ButtonSet.RepairMineral ] = new ShipButton[] { new RepairNoButton(), new RepairYesButton() };
 		m_buttonSets[ (int) ButtonSet.ShipsLog ] = new ShipButton[] { new StarportNoticesButton(), new AlienCommsButton(), new MessagesButton(), bridgeButton };

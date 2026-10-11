@@ -110,7 +110,7 @@ public class TVCargoButton : ShipButton
 		if ( lifeforms.IsRecording() )
 		{
 			messages.Clear();
-			messages.AddText( "<color=white>Recording...</color>" );
+			messages.AddText( lifeforms.IsCapturing() ? "<color=white>Capturing...</color>" : "<color=white>Recording...</color>" );
 
 			return true;
 		}
@@ -129,7 +129,8 @@ public class TVCargoButton : ShipButton
 
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 
-		SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.TerrainVehicleLifeform );
+		// a living one can be captured as well as recorded ("<-- IGNORE CAPTURE RECORD -->"), a dead one only recorded
+		SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ( lifeform.m_status == TerrainLifeform.Status.Dead ) ? ButtonController.ButtonSet.TerrainVehicleDeadLifeform : ButtonController.ButtonSet.TerrainVehicleLifeform );
 
 		return true;
 	}

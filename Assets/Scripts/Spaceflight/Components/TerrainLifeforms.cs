@@ -32,11 +32,17 @@ public class TerrainLifeforms : TerrainGridPopulator
 	const float c_getAwayRange = c_besideRange * 1.5f;
 	const float c_attackDelay = 1.0f;
 
+	// a capture (planet.txt): "Capturing takes about 6 seconds", "Capturing does not require energy" and "Capturing raises the aliens EDL" - by 1 to 20, as the
+	// laser angers a lifeform (the port's) - and "If the lifeform was captured multiply its value by 5"
+	const float c_captureTime = 6.0f;
+	const int c_captureValueFactor = 5;
+
 	// the lifeform Cargo offered (the console shows Record and Ignore for it)
 	public TerrainLifeform m_offeredLifeform;
 
 	// the recording under way
 	bool m_recording;
+	bool m_capturing;
 	TerrainLifeform m_recordingTarget;
 	float m_recordingTimeLeft;
 
@@ -219,6 +225,32 @@ public class TerrainLifeforms : TerrainGridPopulator
 		return m_recording;
 	}
 
+	// true while the process under way is a capture
+	public bool IsCapturing()
+	{
+		return m_recording && m_capturing;
+	}
+
+	// starts capturing this lifeform (no energy is needed) - it is angered
+	public void StartCapture( TerrainLifeform lifeform )
+	{
+		var messages = SpaceflightController.m_instance.m_messages;
+
+		messages.Clear();
+
+		m_recording = true;
+		m_capturing = true;
+		m_recordingTarget = lifeform;
+		m_recordingTimeLeft = c_captureTime;
+
+		lifeform.m_aggression = Mathf.Clamp( lifeform.m_aggression + Random.Range( 1, 21 ), 1, 100 );
+
+		// "If the response is capture then there is a suspenseful noise"
+		messages.AddText( "<color=white>Capturing...</color>" );
+
+		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+	}
+
 	// starts recording this lifeform's data, if the terrain vehicle has the energy for it - returns true if it started
 	public bool StartRecording( TerrainLifeform lifeform )
 	{
@@ -239,6 +271,7 @@ public class TerrainLifeforms : TerrainGridPopulator
 		terrainVehicle.UseUpFuel( c_recordingEnergy );
 
 		m_recording = true;
+		m_capturing = false;
 		m_recordingTarget = lifeform;
 		m_recordingTimeLeft = c_recordingTime;
 
@@ -308,10 +341,59 @@ public class TerrainLifeforms : TerrainGridPopulator
 
 		m_recording = false;
 
+		// a capture: the lifeform goes into the terrain vehicle's hold, if there is room for it
+		if ( m_capturing )
+		{
+			FinishCapture( playerData, messages );
+
+			return;
+		}
+
 		// the data is worth what is new in it, paid at the Starport
 		playerData.m_general.m_unpaidLifeformDataValue += playerData.m_general.LearnLifeform( m_recordingTarget.m_species, playerData.m_general.m_currentPlanetId, m_recordingTarget.m_status == TerrainLifeform.Status.Dead );
 
 		messages.AddText( "<color=white>Data collection completed, sir.</color>" );
+
+		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+	}
+
+	// a capture is done: "The alien lifeform has been captured and put in stasis. Now loading into T.V." and, "If there is enough room in cargo", "The lifeform is
+	// stored as item # XX" - with no room it stays where it is (the notes do not say)
+	void FinishCapture( PlayerData playerData, Messages messages )
+	{
+		var lifeform = m_recordingTarget;
+		var species = lifeform.m_species;
+		var volume = Mathf.Max( 1, species.m_volume );
+
+		messages.AddText( "<color=white>The alien lifeform has been captured and put in stasis. Now loading into T.V.</color>" );
+
+		if ( playerData.m_terrainVehicle.GetRemainingVolume() < volume )
+		{
+			messages.AddText( "<color=red>There is not enough room for it in the terrain vehicle.</color>" );
+
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+			return;
+		}
+
+		var specimen = new PD_Specimen
+		{
+			m_planetId = playerData.m_general.m_currentPlanetId,
+			m_speciesIndex = species.m_index,
+			m_name = species.GetBodyPlanText(),
+			m_volume = volume,
+			m_value = playerData.m_general.LearnLifeform( species, playerData.m_general.m_currentPlanetId, false ) * c_captureValueFactor
+		};
+
+		playerData.m_terrainVehicle.AddSpecimen( specimen );
+
+		var terrainVehicle = playerData.m_terrainVehicle;
+		var itemNumber = ( ( terrainVehicle.m_elementStorage != null ) && ( terrainVehicle.m_elementStorage.m_elementList != null ) ? terrainVehicle.m_elementStorage.m_elementList.Count : 0 ) + ( ( terrainVehicle.m_artifactStorage != null ) && ( terrainVehicle.m_artifactStorage.m_artifactList != null ) ? terrainVehicle.m_artifactStorage.m_artifactList.Count : 0 ) + terrainVehicle.GetSpecimenStorage().GetCount();
+
+		messages.AddText( "<color=white>The lifeform is stored as item # " + itemNumber + ".</color>" );
+
+		// it is off the surface
+		RemoveEaten( lifeform );
 
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 	}

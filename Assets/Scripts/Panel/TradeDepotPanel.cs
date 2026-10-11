@@ -735,6 +735,30 @@ public class TradeDepotPanel : Panel
 					}
 				}
 
+				// the specimens in the ship's hold can be sold (planet.txt: "Captured specimens may be sold in the trade depot along with minerals")
+				var specimenStorage = playerData.m_playerShip.GetSpecimenStorage();
+
+				if ( ( ( m_currentState == State.SellItem ) || ( m_currentState == State.SellAmount ) ) && ( specimenStorage.GetCount() > 0 ) )
+				{
+					// add specimens heading
+					m_itemListText.text += "<color=#A35514>Specimens</color>" + Environment.NewLine;
+					m_volumeListText.text += Environment.NewLine;
+					m_unitValueListText.text += Environment.NewLine;
+
+					m_rowCount++;
+
+					for ( var specimenIndex = 0; specimenIndex < specimenStorage.m_specimenList.Count; specimenIndex++ )
+					{
+						var specimen = specimenStorage.m_specimenList[ specimenIndex ];
+
+						m_itemListText.text += specimen.m_name + Environment.NewLine;
+						m_volumeListText.text += ( specimen.m_volume / 10 ) + "." + ( specimen.m_volume % 10 ) + Environment.NewLine;
+						m_unitValueListText.text += specimen.m_value + Environment.NewLine;
+
+						m_itemList.Add( new Item( m_rowCount++, 2, specimenIndex, 0 ) );
+					}
+				}
+
 				// add end of list heading
 				m_itemListText.text += "<color=#A35514>End of List</color>" + Environment.NewLine;
 				m_volumeListText.text += Environment.NewLine;
@@ -853,8 +877,9 @@ public class TradeDepotPanel : Panel
 		// check if the player has something to sell (with null-safe checks)
 		int artifactCount = ( playerData.m_playerShip.m_artifactStorage?.m_artifactList?.Count ) ?? 0;
 		int elementCount = ( playerData.m_playerShip.m_elementStorage?.m_elementList?.Count ) ?? 0;
+		int specimenCount = playerData.m_playerShip.GetSpecimenStorage().GetCount();
 
-		if ( artifactCount == 0 && elementCount == 0 )
+		if ( artifactCount == 0 && elementCount == 0 && specimenCount == 0 )
 		{
 			// the player has nothing to sell - block the action
 			SwitchToErrorMessageState( "Starship hold is empty" );
@@ -1130,6 +1155,27 @@ public class TradeDepotPanel : Panel
 		{
 			// it's an element - we need to know how much
 			SwitchToSellAmountState();
+		}
+		else if ( item.m_type == 2 )
+		{
+			// it's a specimen - the Trade Depot pays the value saved with it
+			PlayerData playerData = DataController.m_instance.m_playerData;
+			PD_SpecimenStorage specimenStorage = playerData.m_playerShip.GetSpecimenStorage();
+
+			if ( ( item.m_id >= 0 ) && ( item.m_id < specimenStorage.GetCount() ) )
+			{
+				PD_Specimen specimen = specimenStorage.m_specimenList[ item.m_id ];
+
+				playerData.m_bank.m_currentBalance += specimen.m_value;
+
+				playerData.m_playerShip.RemoveSpecimen( specimen );
+			}
+
+			// update the screen
+			UpdateScreen();
+
+			// play a ui sound
+			SoundController.m_instance.PlaySound( SoundController.Sound.Update );
 		}
 		else
 		{

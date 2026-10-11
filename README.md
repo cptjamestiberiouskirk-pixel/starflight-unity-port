@@ -141,7 +141,7 @@ The project features a **deterministic visualization system** that renders plane
 - Alien ships have the armor, shields and speed of their vessels in the game data
 - The starmap shows the fuel needed to fly to the cursor
 - Planets can be recommended for colonization, and Interstel pays a bonus or fines the crew at the Starport
-- The 35 planets with life have lifeforms of their own species, which Scan reads the terrain vehicle's laser and stunner act on; dangerous ones come at the vehicle and attack the crew, and wimpy ones flee; a crew member whose vitality reaches 0 is dead, a dead captain's command passes down the chain of command, and the game is lost when the whole crew has died; lifeforms hunt, flee and eat one another; the terrain vehicle's Cargo records a lifeform's data, which Interstel pays for at the Starport (capture to come)
+- The 35 planets with life have lifeforms of their own species, which Scan reads the terrain vehicle's laser and stunner act on; dangerous ones come at the vehicle and attack the crew, and wimpy ones flee; a crew member whose vitality reaches 0 is dead, a dead captain's command passes down the chain of command, and the game is lost when the whole crew has died; lifeforms hunt, flee and eat one another; the terrain vehicle's Cargo records a lifeform's data, which Interstel pays for at the Starport, or captures it into stasis as a specimen the Trade Depot buys
 - Lava destroys a terrain vehicle that drives into it; the Starport installs a new one for a fine
 - A quarter of the planets hold random ruins: ancient crystal ruins with Endurium or truly amazing artifacts, and Old Empire ruins with artifacts
 - Destroyed ships leave debris the ship can salvage by flying over it
