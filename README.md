@@ -145,6 +145,7 @@ The project features a **deterministic visualization system** that renders plane
 - Planets can be recommended for colonization, and Interstel pays a bonus or fines the crew at the Starport
 - The 35 planets with life have lifeforms of their own species, which Scan reads the terrain vehicle's laser and stunner act on; dangerous ones come at the vehicle and attack the crew, and wimpy ones flee; a crew member whose vitality reaches 0 is dead, a dead captain's command passes down the chain of command, and the game is lost when the whole crew has died; lifeforms hunt, flee and eat one another; the terrain vehicle's Cargo records a lifeform's data, which Interstel pays for at the Starport, or captures it into stasis as a specimen the Trade Depot buys; Look describes the nearest lifeform and what it is doing, and the minerals, ruins and dropped cargo next to the vehicle
 - Lava destroys a terrain vehicle that drives into it; the Starport installs a new one for a fine
+- Going uphill is slow: the terrain vehicle slows on a rising slope, and a slow climb takes more fuel for the distance
 - A quarter of the planets hold random ruins: ancient crystal ruins with Endurium or truly amazing artifacts, and Old Empire ruins with artifacts
 - Destroyed ships leave debris the ship can salvage by flying over it
 - The science officer's skill decides how much of an analysis is known, and a planet's reading is analyzed once

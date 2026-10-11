@@ -51,6 +51,17 @@ public class TerrainVehicle : MonoBehaviour
 	// the planet generator
 	PlanetGenerator m_planetGenerator;
 
+	// going uphill is slow (the 1984 notes, planet.txt: "going uphill is very slow and inefficient"; the designers' list of 1985, alpha.txt: "The slope of the
+	// contour map will effect the speed of the Terrain Vehicle"; the 1986 kernel keeps an efficiency "for %eff in move") - the speed falls with the rise ahead of
+	// the vehicle, down to a part of it on the steepest slopes, and downhill is no faster; since the engines burn fuel by the time they run, a slow climb also
+	// takes more fuel for the distance - how far ahead the slope is measured, how much it slows and the slowest are the port's
+	const float c_slopeProbeDistance = 8.0f;
+	const float c_uphillSlowdown = 1.5f;
+	const float c_slowestUphill = 0.25f;
+
+	// the efficiency of the slope at the last move (1 on level ground and downhill)
+	float m_slopeEfficiency = 1.0f;
+
 	// whether or not the engine is on or off
 	bool m_enginesAreOn;
 
@@ -121,8 +132,11 @@ public class TerrainVehicle : MonoBehaviour
 		// check if the ship is moving
 		if ( playerData.m_general.m_currentSpeed >= 0.1f )
 		{
+			// uphill is slow
+			m_slopeEfficiency = GetSlopeEfficiency( playerData.m_general.m_coordinates, playerData.m_general.m_currentDirection );
+
 			// calculate the new position of the player
-			var newPosition = transform.localPosition + (Vector3) playerData.m_general.m_currentDirection * m_wheelEfficiency * playerData.m_general.m_currentSpeed * Time.deltaTime;
+			var newPosition = transform.localPosition + (Vector3) playerData.m_general.m_currentDirection * m_wheelEfficiency * m_slopeEfficiency * playerData.m_general.m_currentSpeed * Time.deltaTime;
 
 			// wrap player around the planet
 			var planetWidth = 2048.0f * 4.0f;
@@ -321,6 +335,27 @@ public class TerrainVehicle : MonoBehaviour
 
 		// reduce the current speed of the terrain vehicle
 		playerData.m_general.m_currentSpeed = Mathf.Max( 0.0f, playerData.m_general.m_currentSpeed + pushBackAmount * 10.0f );
+	}
+
+	// the efficiency of moving in this direction from this place: 1 on level ground and downhill, less the steeper the way rises
+	float GetSlopeEfficiency( Vector3 worldCoordinates, Vector3 direction )
+	{
+		if ( ( m_planetGenerator == null ) || ( direction.sqrMagnitude < 0.0001f ) )
+		{
+			return 1.0f;
+		}
+
+		var here = ApplyElevation( worldCoordinates, false ).y;
+		var ahead = ApplyElevation( worldCoordinates + direction.normalized * c_slopeProbeDistance, false ).y;
+		var rise = ( ahead - here ) / c_slopeProbeDistance;
+
+		return Mathf.Clamp( 1.0f - Mathf.Max( 0.0f, rise ) * c_uphillSlowdown, c_slowestUphill, 1.0f );
+	}
+
+	// the efficiency of the slope at the last move (for the probe and the displays)
+	public float GetSlopeEfficiency()
+	{
+		return m_slopeEfficiency;
 	}
 
 	Vector3 ApplyElevation( Vector3 worldCoordinates, bool updateWheelEfficiency )

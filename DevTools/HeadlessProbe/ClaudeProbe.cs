@@ -805,6 +805,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLifeformPictures();
 				break;
 
+			case "uphill":
+				yield return ScenarioUphill();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -18890,6 +18894,108 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lifeformpictures: a picture of the game view and a close-up of every model", pictures == 2 + names.Length, pictures.ToString() );
 
 		Finish( "scenario=lifeformpictures pictures=" + pictures, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 6: going uphill is slow
+
+	// drives the terrain vehicle from this place in this direction at this speed for a second - returns how far it went
+	static IEnumerator DriveForASecond( Vector3 start, Vector3 direction, float speed, float[] distance )
+	{
+		var general = DataController.m_instance.m_playerData.m_general;
+
+		general.m_coordinates = start;
+		general.m_currentDirection = direction;
+
+		yield return Frames( 2 );
+
+		var from = general.m_coordinates;
+		var end = Time.realtimeSinceStartup + 1.0f;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			general.m_currentDirection = direction;
+			general.m_currentSpeed = speed;
+
+			yield return null;
+		}
+
+		general.m_currentSpeed = 0.0f;
+
+		var delta = general.m_coordinates - from;
+
+		delta.y = 0.0f;
+
+		distance[ 0 ] = delta.magnitude;
+	}
+
+	IEnumerator ScenarioUphill()
+	{
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// planet 92 of the Arth system
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var populator = FieldOrNull( controller.m_disembarked.m_terrainGrid, "m_terrainLifeforms" ) as TerrainLifeforms;
+		var general = DataController.m_instance.m_playerData.m_general;
+		var start = general.m_coordinates;
+
+		if ( populator == null )
+		{
+			Finish( "scenario=uphill abort: no populator", 2 );
+			yield break;
+		}
+
+		// the steepest rise around the vehicle, over 8 units, in 16 directions, from up to 20 places nearby
+		var bestRise = 0.0f;
+		var bestPlace = start;
+		var bestDirection = Vector3.forward;
+
+		for ( var place = 0; place < 20; place++ )
+		{
+			var from = start + new Vector3( ( place % 5 ) * 40.0f - 80.0f, 0.0f, ( place / 5 ) * 40.0f - 60.0f );
+
+			if ( !populator.GetGround( from, out var here ) )
+			{
+				continue;
+			}
+
+			for ( var i = 0; i < 16; i++ )
+			{
+				var angle = i * 22.5f * Mathf.Deg2Rad;
+				var direction = new Vector3( Mathf.Sin( angle ), 0.0f, Mathf.Cos( angle ) );
+
+				if ( populator.GetGround( from + direction * 8.0f, out var ahead ) && ( populator.GetGround( from + direction * 30.0f, out var farther ) ) )
+				{
+					var rise = ( ahead - here ) / 8.0f;
+
+					if ( ( rise > bestRise ) && ( farther > ahead ) )
+					{
+						bestRise = rise;
+						bestPlace = from;
+						bestDirection = direction;
+					}
+				}
+			}
+		}
+
+		// a second uphill, and a second downhill from the same place, at the same speed
+		var uphill = new float[ 1 ];
+		var downhill = new float[ 1 ];
+
+		yield return DriveForASecond( bestPlace, bestDirection, 10.0f, uphill );
+		yield return DriveForASecond( bestPlace, -bestDirection, 10.0f, downhill );
+
+		general.m_coordinates = start;
+
+		Log( "uphill: steepest rise " + bestRise + " at " + bestPlace + " towards " + bestDirection + " | a second uphill " + uphill[ 0 ] + ", downhill " + downhill[ 0 ] );
+
+		Check( "uphill: there is a slope to climb near the landing place (control)", bestRise > 0.1f, bestRise.ToString() );
+		Check( "uphill: the terrain vehicle goes less far up a slope than down it", ( downhill[ 0 ] > 1.0f ) && ( uphill[ 0 ] < downhill[ 0 ] * 0.85f ), uphill[ 0 ] + " / " + downhill[ 0 ] );
+
+		Finish( "scenario=uphill rise=" + bestRise + " up=" + uphill[ 0 ] + " down=" + downhill[ 0 ], 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
