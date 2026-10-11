@@ -141,6 +141,7 @@ The project features a **deterministic visualization system** that renders plane
 - Alien ships have the armor, shields and speed of their vessels in the game data
 - The starmap shows the fuel needed to fly to the cursor
 - Planets can be recommended for colonization, and Interstel pays a bonus or fines the crew at the Starport
+- Lava destroys a terrain vehicle that drives into it; the Starport installs a new one for a fine
 - A quarter of the planets hold random ruins: ancient crystal ruins with Endurium or truly amazing artifacts, and Old Empire ruins with artifacts
 - Destroyed ships leave debris the ship can salvage by flying over it
 - The science officer's skill decides how much of an analysis is known, and a planet's reading is analyzed once

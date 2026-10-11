@@ -196,6 +196,20 @@ public class TerrainVehicle : MonoBehaviour
 			steeringJoint.transform.localPosition = Vector3.zero;
 		}
 
+		// lava destroys the terrain vehicle that enters it: the liquid of a molten planet (the 1984 notes, planet.txt: a surface with a movement factor of 0 "indicated
+		// that the vehicle is destroyed if it enters that surface", lava among them) - one that comes out of the ship into it can still drive out
+		var inLava = IsInLava( playerData.m_general.m_coordinates );
+
+		if ( inLava && m_lavaChecked && !m_wasInLava )
+		{
+			LoseToLava();
+
+			return;
+		}
+
+		m_wasInLava = inLava;
+		m_lavaChecked = true;
+
 		// update the fuel efficiency
 		var maximumElevation = 1.25f * m_elevationScale;
 		var waterElevation = m_planetGenerator.m_waterElevation * m_elevationScale;
@@ -315,6 +329,52 @@ public class TerrainVehicle : MonoBehaviour
 		}
 
 		return worldCoordinates;
+	}
+
+	// whether the terrain vehicle was in lava in the last frame, and whether that has been found out since it came out of the ship
+	bool m_wasInLava;
+	bool m_lavaChecked;
+
+	// a terrain vehicle that comes out of the ship starts the check of the lava again
+	void OnEnable()
+	{
+		m_lavaChecked = false;
+	}
+
+	// true if this place of a molten planet is under its liquid, which is lava
+	bool IsInLava( Vector3 worldCoordinates )
+	{
+		if ( ( m_planetGenerator == null ) || ( m_planetGenerator.GetPlanet() == null ) || !m_planetGenerator.GetPlanet().IsMolten() )
+		{
+			return false;
+		}
+
+		var x = worldCoordinates.x * 0.25f + m_planetGenerator.m_textureMapWidth * 0.5f - 0.5f;
+		var y = worldCoordinates.z * 0.25f + m_planetGenerator.m_textureMapHeight * 0.5f - 0.5f;
+
+		return m_planetGenerator.GetBicubicSmoothedElevation( x, y ) < m_planetGenerator.m_waterElevation;
+	}
+
+	// the terrain vehicle is lost in the lava with everything in its hold, and the crew gets back to the ship, which has no terrain vehicle until the Starport
+	// installs a new one and fines the crew (STRINFO 1.2) - how the crew gets back is the port's choice
+	void LoseToLava()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		TurnOffEngines();
+
+		SoundController.m_instance.StopSound( SoundController.Sound.DieselEngine );
+		SoundController.m_instance.PlaySound( SoundController.Sound.Explosion );
+
+		playerData.m_terrainVehicle.Reset();
+		playerData.m_terrainVehicle.m_isLost = true;
+		playerData.m_general.m_currentSpeed = 0.0f;
+
+		SpaceflightController.m_instance.m_buttonController.ClearCurrentButton();
+		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.Planetside );
+
+		SpaceflightController.m_instance.m_messages.Clear();
+		SpaceflightController.m_instance.m_messages.AddText( "<color=red>The terrain vehicle has been destroyed by lava, with everything it carried!</color>\n<color=white>The crew made it back to the ship.</color>" );
 	}
 
 	// call this to turn on the engines (accelerate)

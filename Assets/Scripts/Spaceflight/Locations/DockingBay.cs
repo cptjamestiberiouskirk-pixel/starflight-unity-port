@@ -73,6 +73,24 @@ public class DockingBay : MonoBehaviour
 			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Interstel has evaluated your colony recommendations - see Operations.</color>" );
 		}
 
+		// back at the Starport after the terrain vehicle was lost: a new one is installed, and the crew is fined (STRINFO 1.2)
+		if ( playerData.m_terrainVehicle.m_isLost )
+		{
+			playerData.m_terrainVehicle.m_isLost = false;
+
+			playerData.m_bank.m_currentBalance -= PD_TerrainVehicle.c_lossFine;
+			playerData.m_bank.m_transactionList.Add( new PD_Bank.Transaction( playerData.m_general.m_currentStardateYMD, "Terrain vehicle replaced", PD_TerrainVehicle.c_lossFine + "-" ) );
+
+			var lossText = DataController.m_instance.m_gameData.FindStoryText( "TerrainVehicleLost" );
+
+			if ( lossText != null )
+			{
+				playerData.m_general.AddSupplementalEvaluation( lossText.m_text );
+			}
+
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>A new terrain vehicle has been installed. Interstel has fined you " + PD_TerrainVehicle.c_lossFine.ToString( "N0", System.Globalization.CultureInfo.InvariantCulture ) + " MU - see Operations.</color>" );
+		}
+
 		// back at the Starport after the win: Interstel pays the bonus that comes with its medal
 		if ( playerData.PayWinBonus() )
 		{

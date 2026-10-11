@@ -727,6 +727,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioRandomRuins();
 				break;
 
+			case "lava":
+				yield return ScenarioLava();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -16097,6 +16101,159 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "randomruins: the ruin is at the same place on every visit", ( placeBefore != "none" ) && ( placeBefore == placeAfter ), placeBefore + " | " + placeAfter );
 
 		Finish( "scenario=randomruins ruin=" + name + " at=" + placeBefore, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 6: lava, and the loss of the terrain vehicle
+
+	// a place of the terrain vehicle's planet whose ground lies under the liquid (world x and z) - Vector3.zero if there is none
+	static Vector3 FindPlaceUnderTheLiquid()
+	{
+		return FindPlaceByTheLiquid( true );
+	}
+
+	// a place whose ground lies under the liquid, or well above it
+	static Vector3 FindPlaceByTheLiquid( bool under )
+	{
+		var terrainVehicle = SpaceflightController.m_instance.m_terrainVehicle;
+		var planetGenerator = FieldOrNull( terrainVehicle, "m_planetGenerator" ) as PlanetGenerator;
+
+		if ( planetGenerator == null )
+		{
+			return Vector3.zero;
+		}
+
+		var width = planetGenerator.m_textureMapWidth;
+		var height = planetGenerator.m_textureMapHeight;
+
+		for ( var y = height / 4; y < height * 3 / 4; y += 4 )
+		{
+			for ( var x = 0; x < width; x += 4 )
+			{
+				// well under it, so that the vehicle is in it and not at its edge (or well above it)
+				var elevation = planetGenerator.GetBicubicSmoothedElevation( x, y );
+
+				if ( under ? ( elevation < planetGenerator.m_waterElevation * 0.9f ) : ( elevation > planetGenerator.m_waterElevation * 1.1f + 0.01f ) )
+				{
+					return new Vector3( ( x + 0.5f - width * 0.5f ) * 4.0f, 0.0f, ( y + 0.5f - height * 0.5f ) * 4.0f );
+				}
+			}
+		}
+
+		return Vector3.zero;
+	}
+
+	// whether the ship has lost its terrain vehicle (false on the code before it could)
+	static bool TerrainVehicleIsLost()
+	{
+		var value = FieldOrNull( DataController.m_instance.m_playerData.m_terrainVehicle, "m_isLost" );
+
+		return ( value is bool ) && (bool) value;
+	}
+
+	IEnumerator ScenarioLava()
+	{
+		var dataController = DataController.m_instance;
+		var gameData = dataController.m_gameData;
+		var playerData = dataController.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		// ---- 1. the control: on Arth's world of water, the terrain vehicle driven into the sea floats
+		yield return GoIntoOrbit( 25, 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		var water = FindPlaceUnderTheLiquid();
+
+		playerData.m_general.m_coordinates = water;
+
+		yield return Frames( 5 );
+
+		var afterWater = playerData.m_general.m_location;
+		var lostInWater = TerrainVehicleIsLost();
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+
+		// ---- 2. planet 29, molten (around star 7, which flared before the game began): the terrain vehicle carrying iron, driven into the lava
+		var molten = gameData.m_planetList[ 29 ].IsMolten();
+
+		yield return GoIntoOrbit( 7, 29 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		var landed = done[ 0 ];
+
+		playerData.m_terrainVehicle.AddElement( gameData.FindElementId( "Iron" ), 50 );
+
+		var carriedBefore = playerData.m_terrainVehicle.m_volumeUsed;
+		var lava = FindPlaceUnderTheLiquid();
+
+		// from solid ground (the ship may have landed by the lava, and only entering it destroys the vehicle)
+		playerData.m_general.m_coordinates = FindPlaceByTheLiquid( false );
+
+		yield return Frames( 5 );
+
+		var onSolidGround = playerData.m_general.m_location == PD_General.Location.Disembarked;
+
+		controller.m_messages.Clear();
+
+		playerData.m_general.m_coordinates = lava;
+
+		yield return Frames( 5 );
+
+		var afterLava = playerData.m_general.m_location;
+		var lostInLava = TerrainVehicleIsLost();
+		var carriedAfter = playerData.m_terrainVehicle.m_volumeUsed;
+		var lavaMessage = MessageList();
+
+		// ---- 3. Disembark finds no terrain vehicle
+		controller.m_messages.Clear();
+
+		new DisembarkButton().Execute();
+
+		yield return Frames( 3 );
+
+		var disembarkMessage = MessageList();
+		var afterDisembark = playerData.m_general.m_location;
+
+		// ---- 4. at the Starport: a new terrain vehicle, the fine and Interstel's evaluation
+		var balanceBefore = playerData.m_bank.m_currentBalance;
+
+		controller.SwitchLocation( PD_General.Location.DockingBay );
+
+		yield return Frames( 10 );
+
+		var balanceAfter = playerData.m_bank.m_currentBalance;
+		var lostAfterDocking = TerrainVehicleIsLost();
+		var evaluations = FieldOrNull( playerData.m_general, "m_supplementalEvaluationList" ) as List<string>;
+		var evaluated = ( evaluations != null ) && evaluations.Exists( evaluation => evaluation.Contains( "LOSS OF TERRAIN VEHICLE" ) );
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "lava: water at " + water + " -> " + afterWater + ", lost " + lostInWater + " || planet 29 molten " + molten + ", landed " + landed + ", on solid ground " + onSolidGround + ", lava at " + lava + " -> " + afterLava + ", lost " + lostInLava + ", carried " + carriedBefore + " -> " + carriedAfter + " | " + lavaMessage + " || disembark: " + disembarkMessage + " (" + afterDisembark + ") || balance " + balanceBefore + " -> " + balanceAfter + ", lost after docking " + lostAfterDocking + ", evaluated " + evaluated );
+
+		Check( "lava: the terrain vehicle driven into water floats (control)", ( water != Vector3.zero ) && ( afterWater == PD_General.Location.Disembarked ) && !lostInWater, water + " " + afterWater + " " + lostInWater );
+		Check( "lava: driven into the lava of a molten planet it is destroyed with its cargo, and the crew is back in the ship", landed && onSolidGround && ( lava != Vector3.zero ) && lostInLava && ( carriedAfter == 0 ) && ( afterLava == PD_General.Location.Planetside ) && lavaMessage.Contains( "destroyed by lava" ), lava + " " + afterLava + " " + lostInLava + " " + carriedAfter + " | " + lavaMessage );
+		Check( "lava: with the terrain vehicle lost there is no disembarking", disembarkMessage.Contains( "no terrain vehicle" ) && ( afterDisembark == PD_General.Location.Planetside ), afterDisembark + " | " + disembarkMessage );
+		Check( "lava: at the Starport a new terrain vehicle is installed for a fine of 10,000 MU, with Interstel's evaluation", !lostAfterDocking && ( balanceBefore - balanceAfter == 10000 ) && evaluated, ( balanceBefore - balanceAfter ) + " " + lostAfterDocking + " " + evaluated );
+
+		Finish( "scenario=lava lost=" + lostInLava + " fine=" + ( balanceBefore - balanceAfter ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

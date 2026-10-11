@@ -13,6 +13,13 @@ public class PD_TerrainVehicle
 	public PD_ArtifactStorage m_artifactStorage;
 	public PD_ElementStorage m_elementStorage;
 
+	// set when the terrain vehicle has been destroyed, until the Starport installs a new one (the original's kernel: "?TV is TVEHICLE available from ship?" -
+	// false in older save files)
+	public bool m_isLost;
+
+	// the fine for a lost terrain vehicle (STRINFO 1.2: "you have been fined 10,000 MU")
+	public const int c_lossFine = 10000;
+
 	public void Reset()
 	{
 		// refuel the terrain vehicle
