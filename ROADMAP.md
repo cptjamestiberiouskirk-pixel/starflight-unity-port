@@ -93,7 +93,7 @@ Small items, each documented in the sources.
 
 | # | Item | Original (source) | Port today |
 |---|---|---|---|
-| 1.1 | Repair at the Starport, at a cost | Ship Configuration has Repair (SS Ship Configuration); price ruled 2026-10-10: what the missing armor points are worth at the price of the ship's armor class, shields free | STUB, plays a sound |
+| 1.1 | Repair at the Starport, at a cost | Ship Configuration has Repair (SS Ship Configuration); price ruled 2026-10-10: what the missing armor points are worth at the price of the ship's armor class, shields free | PR 137 |
 | 1.2 | Engineer's repair uses minerals from the cargo hold | "We need 2 cubic meters of Molybdenum for repairs" (SS Repair); ruled 2026-10-10: the original's damage per system (hull, engines, sensors, comm, shields, missiles, lasers, SS Damage) with its repair minerals - a larger item of several PRs | timed and free |
 | 1.3 | Colony recommendation: Log Planet asks "Recommend this planet for colonization?"; Operations Evaluation lists the results; bonus of 30k to 55k MU, or a fine that grows with each unsuitable recommendation | STRINFO 1.2, Survey; `m_habitable` on five planet tables is unused | Log Planet stores an entry nobody reads |
 | 1.4 | Distress: towed home and fined 15k to 80k MU; "There's no response" once the Starport is gone | STRINFO 1.2, 2.14 | STUB, prints text |

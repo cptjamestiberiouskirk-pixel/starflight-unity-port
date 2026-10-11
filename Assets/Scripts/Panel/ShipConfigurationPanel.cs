@@ -408,7 +408,7 @@ public class ShipConfigurationPanel : Panel
 	}
 
 	// call this to switch to the error message state
-	void SwitchToErrorMessageState( string errorMessage )
+	void SwitchToErrorMessageState( string errorMessage, bool isError = true )
 	{
 		// deselect all the buttons
 		EventSystem.current.SetSelectedGameObject( null );
@@ -425,8 +425,11 @@ public class ShipConfigurationPanel : Panel
 		// set the error message
 		m_errorMessageText.text = errorMessage;
 
-		// play a ui sound
-		SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+		// play a ui sound (a message that is not an error, such as a finished repair, plays its own)
+		if ( isError )
+		{
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+		}
 	}
 
 	// call this whenever we change state or do something that would result in something changing on the screen
@@ -688,13 +691,49 @@ public class ShipConfigurationPanel : Panel
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 	}
 
-	// this is called if we clicked on the repair button
+	// this is called if we clicked on the repair button - the Starport restores the armor at a price and the shields for nothing
 	public void RepairClicked()
 	{
 		InputController.m_instance.Debounce();
 
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+		var bank = DataController.m_instance.m_playerData.m_bank;
+
+		var armorIsWhole = ship.m_armorPoints >= ship.GetMaximumArmorPoints();
+		var shieldsAreWhole = ship.m_shieldPoints >= ship.GetMaximumShieldPoints();
+
+		// nothing to repair?
+		if ( armorIsWhole && shieldsAreWhole )
+		{
+			SwitchToErrorMessageState( "The ship needs no repairs" );
+
+			return;
+		}
+
+		var cost = ship.GetStarportRepairCost();
+
+		if ( cost > bank.m_currentBalance )
+		{
+			SwitchToErrorMessageState( "Repairs cost " + cost + " M.U. - insufficient funds" );
+
+			return;
+		}
+
+		// pay, and the ship is whole again (the engineer has nothing left to do)
+		bank.m_currentBalance -= cost;
+
+		if ( !armorIsWhole )
+		{
+			ship.m_armorPoints = ship.GetMaximumArmorPoints();
+		}
+
+		ship.m_shieldPoints = ship.GetMaximumShieldPoints();
+		ship.m_repairsAreUnderWay = false;
+
+		SwitchToErrorMessageState( "Repairs complete" + ( ( cost > 0 ) ? ( " - " + cost + " M.U." ) : "" ), false );
+
 		// play a ui sound
-		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+		SoundController.m_instance.PlaySound( SoundController.Sound.Update );
 	}
 
 	// this is called if we clicked on the name button

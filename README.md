@@ -136,6 +136,7 @@ The project features a **deterministic visualization system** that renders plane
 - Continuum fluxes can be seen only with the Ring Device aboard
 - The price of Endurium rises with the notices of 20-02 and 15-05, and the Starport buys it back for what it sells it for
 - Nebulae keep the shields down
+- The Starport repairs the ship at the price of its armor
 - The game can be won: destroying the Crystal Planet ends the flares, and Interstel pays its 500,000 MU bonus and its supplemental evaluation at the Starport
 - Arth's sun flares on 01-01-4621 unless the game has been won: the Starport is destroyed, and a ship in Arth's system is incinerated
 - 10 alien races with unique encounter behaviors
