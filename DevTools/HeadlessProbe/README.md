@@ -149,8 +149,9 @@ What the probe does:
 | `aliennames` | the names of the aliens' captains and ships: the Veloxi's "Me is naming captain % of ... ship naming +" said twice (names made of their syllables in place of % and +, the same both times) and the Thrynn's "This is captain % of the Thrynn ship +" (about 20 s) |
 | `lifeforms` | the lifeforms of a planet, in the Arth system: planet 90 (no life, the control: none), planet 92 (bio density 7: its lifeforms, 3 to 8 of each species, on dry ground near the equator, at the same places on a second visit) and Scan landed beside one (the notes' reading: aggression and intelligence analogs, niche, composition) (about 45 s) |
 | `tvweapons` | the terrain vehicle's laser and stunner, landed beside a plant of planet 92: Weapon (its buttons), Switch (the stunner mounted), the stunner (what the species record says), the laser (8 units of energy, 20 to 100 hit points a shot, until the plant is dead) and the laser with nothing in range ("hits nothing") (about 40 s) |
+| `lifebehaviour` | how a lifeform responds to the terrain vehicle, a plant of planet 92 set up through its fields: middling aggression next to the vehicle (the control: it neither moves nor attacks), dangerous (it attacks the crew), made mobile 40 units away (it comes at the vehicle) and made wimpy 30 away (it flees) (about 45 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (106 scenarios, about 73 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (107 scenarios, about 74 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
