@@ -5292,12 +5292,18 @@ public class ClaudeProbe : MonoBehaviour
 		// ---- 5. the ship marker points where the ship is heading
 		Check( "systemmap: the ship marker turns to the ship's heading (east 270 degrees, south 180)", ( Mathf.Abs( Mathf.DeltaAngle( eastAngle, 270.0f ) ) < 0.5f ) && ( Mathf.Abs( Mathf.DeltaAngle( southAngle, 180.0f ) ) < 0.5f ), "east " + eastAngle.ToString( "F1" ) + ", south " + southAngle.ToString( "F1" ) );
 
-		// ---- 6. the star field
+		// ---- 6. a frame of the map takes no memory from the heap (it sets the light and the spin of eight materials every frame)
+		var controlBytes = AllocatedByTheControl();
+		var mapBytes = Allocated( systemDisplay.Update, c_meterCalls ) / c_meterCalls;
+
+		Check( "systemmap: a frame of the system map takes no memory (control: the old map took none either)", ( controlBytes >= 256 ) && ( mapBytes == 0 ), mapBytes + " bytes per frame, the control measures " + controlBytes + " bytes per call" );
+
+		// ---- 7. the star field
 		var starFieldTransform = systemDisplay.transform.Find( "Star Field" );
 		var starField = ( starFieldTransform != null ) ? starFieldTransform.GetComponent<UnityEngine.UI.RawImage>() : null;
 		var starFieldRect156 = ( starField != null ) ? starField.uvRect : Rect.zero;
 
-		// ---- 7. star 25 (class G, Arth's sun): orbits 2, 4 and 8 are empty, and the map takes the maps of the new planets
+		// ---- 8. star 25 (class G, Arth's sun): orbits 2, 4 and 8 are empty, and the map takes the maps of the new planets
 		var texturesOf156 = new System.Collections.Generic.List<Texture>();
 
 		foreach ( var image in systemDisplay.m_planetList )

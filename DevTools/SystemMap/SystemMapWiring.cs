@@ -37,6 +37,9 @@ public static class SystemMapWiring
 
 	const int c_uiLayer = 5;
 
+	// the star field stops this many map units inside the display, so that the rounded corners and the soft edge of the console's screen stay
+	const float c_starFieldInset = 2.0f;
+
 	static void Log( string text )
 	{
 		Debug.Log( "[SystemMapWiring] " + text );
@@ -171,7 +174,7 @@ public static class SystemMapWiring
 
 		var root = systemDisplay.transform;
 
-		// the star field covers the whole display, behind everything
+		// the star field covers the display (inside the edge of the console's screen), behind everything
 		var background = FindOrMake( root, "Star Field" ).GetComponent<RawImage>();
 
 		if ( background == null )
@@ -182,7 +185,7 @@ public static class SystemMapWiring
 		background.texture = AssetDatabase.LoadAssetAtPath<Texture2D>( c_starFieldPath );
 		background.raycastTarget = false;
 		background.color = Color.white;
-		Stretch( background.rectTransform );
+		Stretch( background.rectTransform, c_starFieldInset );
 		background.transform.SetSiblingIndex( 0 );
 
 		// the ecosphere band, behind the star and the orbits
@@ -302,14 +305,15 @@ public static class SystemMapWiring
 		return gameObject;
 	}
 
-	// fill the parent
-	static void Stretch( RectTransform rectTransform )
+	// fill the parent, the given number of units inside its edges
+	static void Stretch( RectTransform rectTransform, float inset )
 	{
 		rectTransform.anchorMin = Vector2.zero;
 		rectTransform.anchorMax = Vector2.one;
 		rectTransform.pivot = new Vector2( 0.5f, 0.5f );
 		rectTransform.anchoredPosition3D = Vector3.zero;
-		rectTransform.sizeDelta = Vector2.zero;
+		rectTransform.offsetMin = new Vector2( inset, inset );
+		rectTransform.offsetMax = new Vector2( -inset, -inset );
 		rectTransform.localRotation = Quaternion.identity;
 		rectTransform.localScale = Vector3.one;
 	}
