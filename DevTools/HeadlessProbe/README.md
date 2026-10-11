@@ -135,8 +135,9 @@ What the probe does:
 | `cowardice` | the Spemin, Thrynn and Veloxi after their losses: three Spemin ships in a star system fired on: one lost (the control, they fight on), two lost (the survivor turns obsequious), its hail (one of the cowardly lines, the surrender among them), its statement once the player answers (one of the obsequious ones) and the player firing again (they still do not fight), then three Thrynn and three Veloxi ships, two of each destroyed and hailed (each answers with its surrender line) (about 30 s) |
 | `elowangift` | the Elowan's question of energy, asked as their first question once the comm link is up: a yes with 5 cubic meters of Endurium in the hold (15 given), a yes with 30 (their reproach, nothing given) and a no with 5 (the control, nothing given) (about 25 s) |
 | `veloxdemands` | the Veloxi's demands, each in a new meeting with the comm link up: the tribute of 3 paid from 5 cubic meters (their thanks, no attack), refused (an attack), answered yes with 1 (an attack), the Crystal Orb aboard and handed over (no attack), and the Ellipsoid aboard with the comm link ended unanswered (an attack, the Ellipsoid kept) (about 40 s) |
+| `thrynntrades` | the Thrynn's offers, each in a new meeting with the comm link up and a hold of 16 cargo pods: the Tesseract and the Whining Orb aboard (their offer for the Tesseract, 29 cubic meters, sold), the same answered no (the control: "very well", nothing changes hands), 12 cubic meters of plutonium (12 of Endurium), nothing they want and 40 of Endurium (the Black Box bought for 30) and nothing they want and 10 ("you do not have enough") (about 40 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (94 scenarios, about 61 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (95 scenarios, about 62 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
