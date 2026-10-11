@@ -681,6 +681,7 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_attackedByPlayer = false;
 			m_pdEncounter.m_homeworldWarningCount = 0;
 			m_pdEncounter.m_homeworldWarningsGiven = false;
+			m_pdEncounter.m_aliensAreCowardly = false;
 
 			// initialize race encounter
 			switch ( m_gdEncounter.m_race )
@@ -1259,18 +1260,66 @@ public class Encounter : MonoBehaviour
 	// update encounter with spemin
 	void UpdateSpeminEncounter()
 	{
+		UpdateCowardice();
+
 		DefaultEncounterUpdate();
+	}
+
+	// "after some of their ships are destroyed, the Spemin will act cowardly" (STRINFO 2.7), and so do the Thrynn and the Veloxi, the other races the game data
+	// has surrender lines for (the owner's ruling of 2026-10-11): they stop fighting, even if the player goes on firing, they surrender (each surrender line
+	// first, see FindComm), and they say their obsequious lines (the Spemin's "we lay down our powerful defensive screens" is bluster: their ships have no shields
+	// in the game data) - a home fleet does not, it only warns
+	void UpdateCowardice()
+	{
+		if ( !m_pdEncounter.m_aliensAreCowardly && !IsHomeFleet() && HaveLostSomeShips() )
+		{
+			m_pdEncounter.m_aliensAreCowardly = true;
+		}
+
+		if ( m_pdEncounter.m_aliensAreCowardly )
+		{
+			m_pdEncounter.m_alienStance = GD_Comm.Stance.Obsequious;
+		}
+	}
+
+	// true once the aliens have lost at least half of the ships that have come into the encounter, and still have one - STRINFO's "some of their ships" as the port
+	// reads it (two of three, one of two)
+	bool HaveLostSomeShips()
+	{
+		var joined = 0;
+		var lost = 0;
+
+		foreach ( var alienShip in m_pdEncounter.GetAlienShipList() )
+		{
+			if ( !alienShip.m_addedToEncounter )
+			{
+				continue;
+			}
+
+			joined++;
+
+			if ( alienShip.m_isDead )
+			{
+				lost++;
+			}
+		}
+
+		return ( lost > 0 ) && ( lost < joined ) && ( lost * 2 >= joined );
 	}
 
 	// update encounter with thrynn
 	void UpdateThrynnEncounter()
 	{
+		UpdateCowardice();
+
 		DefaultEncounterUpdate();
 	}
 
 	// update encounter with velox
 	void UpdateVeloxEncounter()
 	{
+		UpdateCowardice();
+
 		DefaultEncounterUpdate();
 	}
 
@@ -1982,6 +2031,20 @@ public class Encounter : MonoBehaviour
 					return warning;
 				}
 			}
+
+			// cowardly aliens say each of their surrender lines for the subject first, in whichever stance the game data has it (the Thrynn's is neutral)
+			if ( m_pdEncounter.m_aliensAreCowardly )
+			{
+				foreach ( var comm in gameData.m_commList )
+				{
+					if ( comm.m_surrender && ( comm.m_race == race ) && ( comm.m_subject == subject ) && !m_pdEncounter.m_shownCommList.Contains( comm.m_id ) )
+					{
+						m_pdEncounter.m_shownCommList.Add( comm.m_id );
+
+						return comm;
+					}
+				}
+			}
 		}
 
 		// go through each comm in the comm list and build a list of possible comms to choose from
@@ -1989,7 +2052,7 @@ public class Encounter : MonoBehaviour
 
 		foreach ( var comm in gameData.m_commList )
 		{
-			if ( comm.m_homeworld || comm.m_surrender )
+			if ( comm.m_homeworld || ( comm.m_surrender && !m_pdEncounter.m_aliensAreCowardly ) )
 			{
 				continue;
 			}
@@ -2005,7 +2068,7 @@ public class Encounter : MonoBehaviour
 		{
 			foreach ( var comm in gameData.m_commList )
 			{
-				if ( comm.m_homeworld || comm.m_surrender )
+				if ( comm.m_homeworld || ( comm.m_surrender && !m_pdEncounter.m_aliensAreCowardly ) )
 				{
 					continue;
 				}

@@ -52,6 +52,9 @@ public class PD_Encounter : IComparable
 	public int m_homeworldWarningCount;
 	public bool m_homeworldWarningsGiven;
 
+	// set once the aliens have lost some of their ships and act cowardly (the Spemin, the Thrynn and the Veloxi) - false in older save files
+	public bool m_aliensAreCowardly;
+
 	public void Reset( int encounterId )
 	{
 		// get access to the game data

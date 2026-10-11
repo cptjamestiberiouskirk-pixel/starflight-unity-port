@@ -147,6 +147,7 @@ The project features a **deterministic visualization system** that renders plane
 - 10 alien races with unique encounter behaviors
 - Encounters that guard planets from orbit; a Veloxi drone grants permission to orbit to a crew that answers its numbers the Veloxi way
 - The Spemin, Thrynn and Veloxi home fleets warn a ship off their homeworlds, more sternly each time, and attack after the last warning
+- The Spemin, Thrynn and Veloxi give up after losing half of their ships: they stop fighting and surrender
 - Complete combat system with lasers, missiles, shields, armor
 - Ship destruction with debris spawning
 - A model with debris for every alien vessel of the game data (hand-made or procedural stand-ins)
