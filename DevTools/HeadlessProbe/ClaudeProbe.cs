@@ -695,6 +695,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioVeloxDemands();
 				break;
 
+			case "thrynntrades":
+				yield return ScenarioThrynnTrades();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -15060,6 +15064,125 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "veloxdemands: with the Ellipsoid aboard they demand it, and ending the comm link with no answer brings an attack", ellipsoid[ 0 ].Contains( CommText( 397 ) ) && ( ellipsoid[ 3 ] == "kept" ) && ( ellipsoid[ 4 ] == "Hostile" ), string.Join( " | ", ellipsoid ) );
 
 		Finish( "scenario=veloxdemands paid=" + paid[ 2 ] + "/" + paid[ 4 ] + " refused=" + refused[ 4 ] + " orb=" + orb[ 3 ] + " ellipsoid=" + ellipsoid[ 4 ], 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 2: the Thrynn's trades
+
+	// meets the Thrynn with this much Endurium and plutonium (in tenths) and these artifacts in the hold, lets them make their offer and answers it with this
+	// button - adds the offer, the reply, the Endurium and plutonium afterwards, whether the first artifact is still aboard, whether a Black Box is, and the stance
+	static IEnumerator TradeWithTheThrynn( int encounterId, int endurium, int plutonium, string[] artifacts, ShipButton answer, List<string> results )
+	{
+		var dataController = DataController.m_instance;
+		var gameData = dataController.m_gameData;
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var ship = dataController.m_playerData.m_playerShip;
+		var plutoniumId = gameData.FindElementId( "Plutonium" );
+
+		SetEndurium( endurium );
+
+		ship.RemoveElement( plutoniumId, HeldElement( plutoniumId ) );
+
+		if ( plutonium > 0 )
+		{
+			ship.AddElement( plutoniumId, plutonium );
+		}
+
+		foreach ( var artifact in gameData.m_artifactList )
+		{
+			for ( var i = 0; ( i < 10 ) && ( ship.m_artifactStorage != null ) && ( ship.m_artifactStorage.Find( artifact.m_id ) != null ); i++ )
+			{
+				ship.m_artifactStorage.Remove( artifact.m_id );
+			}
+		}
+
+		foreach ( var name in artifacts )
+		{
+			ship.AddArtifact( gameData.FindArtifactId( name ) );
+		}
+
+		ship.RecalculateVolumeUsed();
+		ship.RestoreSystems();
+
+		var said = new List<string>();
+
+		yield return MeetAndLetThemAsk( encounterId, said );
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		answer.Execute();
+		yield return Frames( 3 );
+
+		results.Add( ( said.Count > 1 ) ? said[ 1 ] : "nothing said" );
+		results.Add( MessageList() );
+		results.Add( HeldElement( gameData.m_misc.m_enduriumElementId ).ToString() );
+		results.Add( HeldElement( plutoniumId ).ToString() );
+		results.Add( ( artifacts.Length > 0 ) && ship.HasArtifact( artifacts[ 0 ] ) ? "kept" : "gone" );
+		results.Add( ship.HasArtifact( "Black Box" ) ? "black box" : "no black box" );
+		results.Add( encounter.m_pdEncounter.m_alienStance.ToString() );
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+	}
+
+	IEnumerator ScenarioThrynnTrades()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+
+		// an officer who understands every word, and a hold with room for every payment
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+
+		ship.m_numCargoPods = 16;
+		ship.RecalculateVolume();
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		var thrynnId = FindEncounter( 1, 6, 3, 0, GameData.Race.Thrynn );
+
+		// ---- 1. the Tesseract (29 at their prices) and the Whining Orb (18) aboard: they offer for the Tesseract, and a yes sells it for 29 cubic meters
+		var sold = new List<string>();
+
+		yield return TradeWithTheThrynn( thrynnId, 50, 0, new[] { "Tesseract", "Whining Orb" }, new AnswerYesButton(), sold );
+
+		// ---- 2. the same, and a no (the control: "very well", nothing changes hands, no attack)
+		var kept = new List<string>();
+
+		yield return TradeWithTheThrynn( thrynnId, 50, 0, new[] { "Tesseract", "Whining Orb" }, new AnswerNoButton(), kept );
+
+		// ---- 3. 12 cubic meters of plutonium and nothing they want else: 12 of Endurium for it
+		var plutonium = new List<string>();
+
+		yield return TradeWithTheThrynn( thrynnId, 50, 120, new string[ 0 ], new AnswerYesButton(), plutonium );
+
+		// ---- 4. nothing to sell and 40 cubic meters of Endurium: they sell the Black Box for 30
+		var bought = new List<string>();
+
+		yield return TradeWithTheThrynn( thrynnId, 400, 0, new string[ 0 ], new AnswerYesButton(), bought );
+
+		// ---- 5. nothing to sell and 10: "you do not have enough"
+		var tooLittle = new List<string>();
+
+		yield return TradeWithTheThrynn( thrynnId, 100, 0, new string[ 0 ], new AnswerYesButton(), tooLittle );
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "thrynntrades: encounter " + thrynnId + " || sold: " + string.Join( " | ", sold ) + " || kept: " + string.Join( " | ", kept ) + " || plutonium: " + string.Join( " | ", plutonium ) + " || black box: " + string.Join( " | ", bought ) + " || too little: " + string.Join( " | ", tooLittle ) );
+
+		var veryWell = CommText( 303 );
+
+		Check( "thrynntrades: they offer their price for the artifact aboard they pay the most for, and a yes sells it", sold[ 0 ].Contains( "a Tesseract" ) && sold[ 0 ].Contains( " 29 " ) && sold[ 1 ].Contains( veryWell ) && ( sold[ 2 ] == "340" ) && ( sold[ 4 ] == "gone" ), string.Join( " | ", sold ) );
+		Check( "thrynntrades: a no gets \"very well\", and nothing changes hands (control)", kept[ 0 ].Contains( "a Tesseract" ) && kept[ 1 ].Contains( veryWell ) && ( kept[ 2 ] == "50" ) && ( kept[ 4 ] == "kept" ) && ( kept[ 6 ] != "Hostile" ), string.Join( " | ", kept ) );
+		Check( "thrynntrades: they offer a cubic meter of Endurium for each of plutonium", plutonium[ 0 ].Contains( " 12 " ) && ( plutonium[ 2 ] == "170" ) && ( plutonium[ 3 ] == "0" ), string.Join( " | ", plutonium ) );
+		Check( "thrynntrades: with nothing they want aboard they sell the Black Box for 30", bought[ 0 ].Contains( CommText( 301 ) ) && ( bought[ 2 ] == "100" ) && ( bought[ 5 ] == "black box" ), string.Join( " | ", bought ) );
+		Check( "thrynntrades: a yes without 30 cubic meters gets \"you do not have enough\"", tooLittle[ 1 ].Contains( CommText( 302 ) ) && ( tooLittle[ 2 ] == "100" ) && ( tooLittle[ 5 ] == "no black box" ), string.Join( " | ", tooLittle ) );
+
+		Finish( "scenario=thrynntrades sold=" + sold[ 2 ] + " plutonium=" + plutonium[ 2 ] + " blackbox=" + bought[ 5 ], 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

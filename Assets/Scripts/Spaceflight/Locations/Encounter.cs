@@ -1357,7 +1357,180 @@ public class Encounter : MonoBehaviour
 	{
 		UpdateCowardice();
 
+		UpdateThrynnTrade();
+
 		DefaultEncounterUpdate();
+	}
+
+	// the Thrynn's offers (STRINFO 2.5), their question of their own: to buy the artifact in the hold they pay the most for, at their prices (STRINFO 1.3.1,
+	// GD_Artifact.m_thrynnPrice), or else the plutonium in the hold, or else to sell "a device that will make your ship invulnerable" - the Black Box - for 30
+	// of the player's energy crystals - and their two answers, "You do not have enough. Do not try to deceive us." and "Very well."
+	const int c_thrynnPlutoniumOfferCommId = 299;
+	const int c_thrynnArtifactOfferCommId = 300;
+	const int c_thrynnBlackBoxOfferCommId = 301;
+	const int c_thrynnNotEnoughCommId = 302;
+	const int c_thrynnVeryWellCommId = 303;
+
+	// the Black Box's price, in tenths of a cubic meter of Endurium
+	const int c_thrynnBlackBoxPrice = 300;
+
+	// the artifact in the hold the Thrynn pay the most for - null if there is none they want
+	GD_Artifact FindThrynnArtifact()
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+
+		if ( ship.m_artifactStorage == null )
+		{
+			return null;
+		}
+
+		GD_Artifact best = null;
+
+		foreach ( var artifact in DataController.m_instance.m_gameData.m_artifactList )
+		{
+			if ( ( artifact.m_thrynnPrice > 0 ) && ( ( best == null ) || ( artifact.m_thrynnPrice > best.m_thrynnPrice ) ) && ( ship.m_artifactStorage.Find( artifact.m_id ) != null ) )
+			{
+				best = artifact;
+			}
+		}
+
+		return best;
+	}
+
+	// the plutonium in the hold the Thrynn offer to buy, in whole cubic meters (they pay one cubic meter of Endurium for each: the owner's ruling of 2026-10-11 on
+	// "the amount of Endurium offered varies directly with the amount of plutonium available")
+	int FindThrynnPlutonium()
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+		var plutoniumId = DataController.m_instance.m_gameData.FindElementId( "Plutonium" );
+		var plutonium = ( ( plutoniumId < 0 ) || ( ship.m_elementStorage == null ) ) ? null : ship.m_elementStorage.Find( plutoniumId );
+
+		return ( plutonium == null ) ? 0 : plutonium.m_volume / 10;
+	}
+
+	// the Thrynn's next offer (null if they have nothing to offer)
+	GD_Comm FindThrynnOffer()
+	{
+		var artifact = FindThrynnArtifact();
+
+		if ( artifact != null )
+		{
+			// the game data writes the artifact as X and the price as Y ("you have aboard your ship a(n) [ARTIFACT]. This artifact is of interest to us", STRINFO)
+			var offer = FindRaceComm( c_thrynnArtifactOfferCommId );
+
+			if ( offer != null )
+			{
+				var article = ( "AEIOU".IndexOf( char.ToUpper( artifact.m_name[ 0 ] ) ) >= 0 ) ? "an " : "a ";
+
+				offer = WithAmount( offer, "X", article + artifact.m_name );
+				offer = WithAmount( offer, "Y", artifact.m_thrynnPrice.ToString() );
+			}
+
+			return offer;
+		}
+
+		var plutonium = FindThrynnPlutonium();
+
+		if ( plutonium > 0 )
+		{
+			return WithAmount( FindRaceComm( c_thrynnPlutoniumOfferCommId ), "X", plutonium.ToString() );
+		}
+
+		if ( !DataController.m_instance.m_playerData.m_playerShip.HasArtifact( "Black Box" ) )
+		{
+			return FindRaceComm( c_thrynnBlackBoxOfferCommId );
+		}
+
+		return null;
+	}
+
+	// the answer to a Thrynn offer: a yes makes the trade, a yes to the Black Box without 30 cubic meters of Endurium gets "you do not have enough", and a no gets
+	// "very well" (the sources give no other answer, and no attack)
+	void UpdateThrynnTrade()
+	{
+		var offer = m_pdEncounter.m_lastQuestionFromAliens;
+
+		if ( ( offer != c_thrynnPlutoniumOfferCommId ) && ( offer != c_thrynnArtifactOfferCommId ) && ( offer != c_thrynnBlackBoxOfferCommId ) )
+		{
+			return;
+		}
+
+		// not answered yet?
+		var answer = m_pdEncounter.m_lastSubjectFromPlayer;
+
+		if ( answer == GD_Comm.Subject.None )
+		{
+			return;
+		}
+
+		// the question has been answered
+		m_pdEncounter.m_lastQuestionFromAliens = 0;
+
+		if ( answer != GD_Comm.Subject.Yes )
+		{
+			if ( answer == GD_Comm.Subject.No )
+			{
+				SayRaceComm( c_thrynnVeryWellCommId );
+			}
+
+			return;
+		}
+
+		var gameData = DataController.m_instance.m_gameData;
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+		var enduriumId = gameData.m_misc.m_enduriumElementId;
+
+		if ( offer == c_thrynnArtifactOfferCommId )
+		{
+			var artifact = FindThrynnArtifact();
+
+			if ( ( artifact != null ) && ship.RemoveArtifact( artifact.m_name ) )
+			{
+				// their Endurium, as much of it as the hold has room for
+				var payment = Mathf.Min( artifact.m_thrynnPrice * 10, Mathf.Max( 0, ship.GetRemainingVolume() ) );
+
+				if ( payment > 0 )
+				{
+					ship.AddElement( enduriumId, payment );
+				}
+
+				SayRaceComm( c_thrynnVeryWellCommId );
+			}
+		}
+		else if ( offer == c_thrynnPlutoniumOfferCommId )
+		{
+			var plutonium = FindThrynnPlutonium();
+
+			if ( plutonium > 0 )
+			{
+				ship.RemoveElement( gameData.FindElementId( "Plutonium" ), plutonium * 10 );
+
+				var payment = Mathf.Min( plutonium * 10, Mathf.Max( 0, ship.GetRemainingVolume() ) );
+
+				if ( payment > 0 )
+				{
+					ship.AddElement( enduriumId, payment );
+				}
+
+				SayRaceComm( c_thrynnVeryWellCommId );
+			}
+		}
+		else
+		{
+			var endurium = ( ship.m_elementStorage == null ) ? null : ship.m_elementStorage.Find( enduriumId );
+
+			if ( ( endurium == null ) || ( endurium.m_volume < c_thrynnBlackBoxPrice ) )
+			{
+				SayRaceComm( c_thrynnNotEnoughCommId );
+
+				return;
+			}
+
+			ship.RemoveElement( enduriumId, c_thrynnBlackBoxPrice );
+			ship.AddArtifact( gameData.FindArtifactId( "Black Box" ) );
+
+			SayRaceComm( c_thrynnVeryWellCommId );
+		}
 	}
 
 	// update encounter with velox
@@ -2104,6 +2277,10 @@ public class Encounter : MonoBehaviour
 			case GameData.Race.Elowan:
 
 				return FindRaceComm( c_elowanEnergyQuestionCommId );
+
+			case GameData.Race.Thrynn:
+
+				return FindThrynnOffer();
 
 			case GameData.Race.Velox:
 			{
