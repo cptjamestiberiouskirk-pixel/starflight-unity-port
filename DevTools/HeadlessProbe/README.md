@@ -154,7 +154,7 @@ What the probe does:
 | `crewdeath` | the crew's deaths: Ada the captain killed by an injury (dead, and Ben, next in the chain of command, takes command), then Ben, the last of the crew, at 1 vitality beside a dangerous plant of planet 92 (its attacks kill him, the game over says the entire crew has died, and the ship's armor is 0 so the game is not saved) (about 45 s) |
 | `mates` | the lifeforms' mates on planet 92, everything else moved out of the encounter area: a grazer placed where its own wandering would take it away from a plant (it comes at the plant, bites it and in time eats it, which leaves the plant gone), then made a large carnivore beside a small herbivore placed where its wandering would take it towards the hunter (it flees) (about 60 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (109 scenarios, about 76 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (110 scenarios, about 77 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
