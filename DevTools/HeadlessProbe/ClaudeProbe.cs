@@ -715,6 +715,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarStability();
 				break;
 
+			case "analysisskill":
+				yield return ScenarioAnalysisSkill();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -1545,7 +1549,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "vessel scan types that turned into something else: [" + changed.Trim() + "], debris stays debris=" + debrisKept );
 
-		// a complete scan of an elowan scout, then the science officer's analysis
+		// a complete scan of an elowan scout, then the science officer's analysis (a science officer of full skill, who gives every line: roadmap 1.7)
+		DataController.m_instance.m_playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer ).m_science = 250;
+
 		var scanType = SensorsDisplay.ScanType.ElowanScout;
 		var vessel = gameData.m_vesselList[ (int) scanType ];
 
@@ -5756,6 +5762,9 @@ public class ClaudeProbe : MonoBehaviour
 		var scanType = sensors.m_scanType;
 
 		sensors.m_hasSensorData = true;
+
+		// (a science officer of full skill, who gives every line of the analysis: roadmap 1.7)
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer ).m_science = 250;
 
 		sensors.m_scanType = (SensorsDisplay.ScanType) 6;
 
@@ -15739,6 +15748,105 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starstability: a star with less gives the days to its flare", ( near >= 0 ) && scans[ 1 ].Contains( "Unstable - estimated time to flare " + nearDay + " days" ) && scans[ 2 ].Contains( "Unstable - estimated time to flare 100 days" ), scans[ 1 ] + " || " + scans[ 2 ] );
 
 		Finish( "scenario=starstability near=" + near + "/" + nearDay, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 1: the science officer's skill and the analysis
+
+	// takes a new sensor reading of the planet the ship orbits (finished at once) and has the science officer analyze it - returns what the messages show
+	static string AnalyzeNewReading( bool newReading )
+	{
+		var sensors = SpaceflightController.m_instance.m_displayController.m_sensorsDisplay;
+		var planet = DataController.m_instance.m_gameData.m_planetList[ DataController.m_instance.m_playerData.m_general.m_currentPlanetId ];
+
+		if ( newReading )
+		{
+			sensors.StartScanning( SensorsDisplay.ScanType.Planet, 18, planet.m_mass, planet.m_bioDensity, planet.m_mineralDensity );
+		}
+
+		sensors.m_hasSensorData = true;
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		new AnalysisButton().Execute();
+
+		return MessageList();
+	}
+
+	// how many lines of an analysis read "Unknown"
+	static int UnknownLines( string analysis )
+	{
+		var count = 0;
+
+		for ( var index = analysis.IndexOf( ">Unknown<" ); index >= 0; index = analysis.IndexOf( ">Unknown<", index + 1 ) )
+		{
+			count++;
+		}
+
+		return count;
+	}
+
+	IEnumerator ScenarioAnalysisSkill()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var sensors = SpaceflightController.m_instance.m_displayController.m_sensorsDisplay;
+
+		EnsureCrew();
+
+		var scienceOfficer = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer );
+
+		yield return EnterOrbit( 90 );
+
+		// the sensor window has to be up for a reading
+		SpaceflightController.m_instance.m_displayController.ChangeDisplay( sensors );
+		yield return Frames( 3 );
+
+		// ---- 1. a science officer of full skill gives every line (the control)
+		scienceOfficer.m_science = 250;
+
+		var full = AnalyzeNewReading( true );
+
+		// ---- 2. the same reading again: already attempted
+		var again = AnalyzeNewReading( false );
+
+		// ---- 3. no skill: the object's class, and every other line unknown
+		scienceOfficer.m_science = 0;
+
+		var none = AnalyzeNewReading( true );
+
+		// ---- 4. a skill of 100: about half of 120 lines in 20 readings
+		scienceOfficer.m_science = 100;
+
+		var unknownOfHalf = 0;
+
+		for ( var i = 0; i < 20; i++ )
+		{
+			unknownOfHalf += UnknownLines( AnalyzeNewReading( true ) );
+		}
+
+		// ---- 5. an alien ship's reading may be analyzed as often as wanted
+		scienceOfficer.m_science = 250;
+
+		sensors.StartScanning( SensorsDisplay.ScanType.ElowanScout, 1, 50, 0, 0 );
+		sensors.m_hasSensorData = true;
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		new AnalysisButton().Execute();
+		new AnalysisButton().Execute();
+
+		var shipTwice = MessageList();
+
+		yield return Frames( 3 );
+
+		Log( "analysisskill: skill 250: " + full + " || again: " + again + " || skill 0: " + none + " || skill 100: " + unknownOfHalf + " of 120 lines unknown || a ship twice: " + shipTwice );
+
+		Check( "analysisskill: a science officer of full skill gives every line (control)", full.Contains( "Object: <color=white>Planet" ) && ( UnknownLines( full ) == 0 ), full );
+		Check( "analysisskill: the same reading of a planet is not analyzed twice", again.Contains( "I have already attempted analysis of this data, Captain." ), again );
+		Check( "analysisskill: with no skill only the object's class is given", none.Contains( "Object: <color=white>Planet" ) && ( UnknownLines( none ) == 6 ), none );
+		Check( "analysisskill: with a skill of 100 about half the lines are given (skill / 2 percent each)", ( unknownOfHalf >= 36 ) && ( unknownOfHalf <= 84 ), unknownOfHalf + " of 120" );
+		Check( "analysisskill: an alien ship's reading may be analyzed again", !shipTwice.Contains( "already attempted" ) && shipTwice.Contains( "Analysis of Last Sensor Reading" ), shipTwice );
+
+		Finish( "scenario=analysisskill unknown100=" + unknownOfHalf, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
