@@ -1,6 +1,7 @@
 ﻿
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
 public class SpaceflightController : MonoBehaviour
@@ -171,7 +172,7 @@ public class SpaceflightController : MonoBehaviour
 		}
 
 		// handle ESC key for game over (must check BEFORE the pause return!)
-		if ( Input.GetKeyDown( KeyCode.Escape ) && m_gameOver )
+		if ( KeyWentDown( Key.Escape ) && m_gameOver )
 		{
 			RestartGame();
 			return;
@@ -250,13 +251,13 @@ public class SpaceflightController : MonoBehaviour
 
 #if UNITY_EDITOR
 		// DEBUG: Press F9 to spawn a test encounter (Spemin - weak enemy)
-		if ( Input.GetKeyDown( KeyCode.F9 ) )
+		if ( KeyWentDown( Key.F9 ) )
 		{
 			SpawnTestEncounter();
 		}
 
 		// DEBUG: Press F10 to instantly destroy player ship (test game over)
-		if ( Input.GetKeyDown( KeyCode.F10 ) )
+		if ( KeyWentDown( Key.F10 ) )
 		{
 			playerData.m_playerShip.m_shieldPoints = 0;
 			playerData.m_playerShip.m_armorPoints = 0;
@@ -271,6 +272,15 @@ public class SpaceflightController : MonoBehaviour
 			}
 		}
 #endif
+	}
+
+	// true in the frame a key of the keyboard goes down, like Input.GetKeyDown was (a computer can have no keyboard, and a headless run has none)
+	static bool KeyWentDown( Key key )
+	{
+		// get to the keyboard that was used last
+		var keyboard = Keyboard.current;
+
+		return ( keyboard != null ) && keyboard[ key ].wasPressedThisFrame;
 	}
 
 	// call this to hide everything

@@ -79,6 +79,8 @@ What the probe does:
 | `comms` | the captain's name in what the aliens say, Mechan 9 after five right answers with and without having fired on the Mechans, and a press of the fire button when the aliens ask a question before the press is carried out |
 | `terrain` | the crater maps (read once, the same values as the textures), the game's random numbers after rocks are placed, an object on the right edge of the map, a scan while a deposit is being picked up, and scan labels after going back into the ship |
 | `savepanel` | the Escape key in space, two seconds into a landing, after the landing and while the ship explodes, and whether a game that is over stays paused |
+| `input` | real key presses on a virtual Input System keyboard: each of the 19 keys of the old Input Manager axes gives its input and the stick position (8 other keys give none), two keys of one input, the debounce, the save panel opened with Escape and its selection moved with the arrows and the numpad (not A or D), Return and the numpad Enter on Resume, F9, F10 and Escape at game over (about 35 s) |
+| `starport-input` | the Starport event system's input module, and the arrows and the numpad (not S) moving the selection in the Operations panel, and the crew name field taking the focus without an exception (a legacy `InputField` reads `Input.compositionString`) |
 | `visual` | a floating object when its timer starts again, when an explosion is switched off, and how far the landing site crosshair moves in a second |
 | `perframe` | how much memory a frame of the status display and of the terrain vehicle display takes when nothing changes, with a control that shows the measurement works, and that both still follow what changes |
 | `starport-transport` | the docking bay transporter: how much memory an update of the astronaut's opacity takes, that the fade reaches the astronaut, and that the material assets are left alone |
@@ -174,6 +176,7 @@ Pitfalls:
 - **A failed check is not always the change under test.** Missiles in flight survive the end of an encounter, so one fired in the last encounter can hit the player in the next. The `m12` scenario calls `ClearMissiles()` before it leaves an encounter for that reason. Read the log around a failure before blaming the change.
 - **A run writes one font asset again.** A run that shows the "Starport clear" message makes Unity write `Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset` again (the message has an arrow that only the dynamic fallback font can draw). The file is committed in the format Unity writes, and `.gitattributes` checks it out with LF line endings, so the run leaves the working tree clean. In a checkout made before that (CRLF in the working copy), `git status` lists the file as modified with an empty diff after such a run: `git checkout -- "<path>"` clears it. Stage files by name after a run in any case.
 - **Console input without real input:** `SetInput( "m_south", true )` sets an `InputController` property by reflection, and `ConsoleFrameWith( "m_submit" )` runs one `ButtonController.Update` with it held. `InputController.Update` overwrites the property on the next frame, so set it and call the update in the same step.
+- **Real key presses:** `HoldKeys( Key.Numpad8 )` holds keys of a virtual keyboard down (`HoldKeys()` lets them all go) from the next input update on, and `Tap( keys )` presses them for three frames. They go through the Input System to `InputController`, the UI input module and `Keyboard.current`, like a player's keys. `ProbeKeyboard()` adds the keyboard and sets the Input System's in-memory settings so that keys reach play mode without a focused game view. Anything that reacts to a key (the spaceflight controller opens the save panel on Escape, the console debounces) also does so here: switch it off for a check of `InputController` alone.
 
 `changelog_add.py "<title of an existing bullet>" <file with the new bullet>` inserts a CHANGELOG bullet after an existing one (run it from the project root).
 
@@ -189,4 +192,4 @@ Pitfalls:
 ## Limits
 
 - No graphics. Anything visual has to be checked in the GUI Editor.
-- It reports what the code does, not what a player sees, and it drives the game through its own methods, not through real input.
+- It reports what the code does, not what a player sees, and it drives the game through its own methods. The `input` scenarios press keys of a virtual keyboard, which goes through the same Input System path as a real one but says nothing about how the controls feel.
