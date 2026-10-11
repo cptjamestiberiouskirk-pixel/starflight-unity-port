@@ -36,9 +36,13 @@ public class SensorsDisplay : ShipDisplay
 		Unknown
 	};
 
-	// below 10^22 tons the original draws a planet's disc this many pixels across, plus this many for each unit of the leading digit of its mass
+	// from 10^21 to 10^22 tons the original draws a planet's disc this many pixels across, plus this many for each unit of the leading digit of its mass
+	const int c_planetDiscDigitMassPower = 21;
 	const float c_planetDiscBasePixels = 2.0f;
 	const float c_planetDiscPixelsPerDigit = 4.0f;
+
+	// and never smaller than this many pixels across, which is also the size of every planet under 10^21 tons
+	const float c_smallestPlanetDiscPixels = 10.0f;
 
 	// from 10^22 tons up the original draws the disc this many pixels across
 	const int c_fullPlanetDiscMassPower = 22;
@@ -476,8 +480,9 @@ public class SensorsDisplay : ShipDisplay
 	}
 
 	// the scale of a planet's picture that makes its disc as large in the window as the original draws it
-	// (measured in the original on nine planets on 2026-10-10: below 10^22 tons the disc is 2 + 4 x the leading digit of the mass pixels across,
-	// from 2x10^20 to 6x10^21 tons, and from 10^22 tons up it is 62 pixels across, up to 5x10^23 tons; masses under 10^20 tons were not seen)
+	// (measured in the original on fifteen planets on 2026-10-10 and 2026-10-11: under 10^21 tons the disc is 10 pixels across (6x10^19, 2x10^20, 6x10^20),
+	// from 10^21 to 10^22 tons it is 2 + 4 x the leading digit of the mass pixels across but at least 10 (1x10^21 10 pixels, 3, 4, 5, 6, 7 and 9x10^21
+	// 14 to 38), and from 10^22 tons up it is 62 pixels across, up to 5x10^23 tons; 2 and 8x10^21 were not seen)
 	public float GetPlanetPictureScale( int massPowerBase, int mass )
 	{
 		// the leading digit and the power of ten of the mass, as the readout shows them
@@ -491,7 +496,16 @@ public class SensorsDisplay : ShipDisplay
 		}
 
 		// how many of the original's pixels the disc is across
-		var discPixels = ( massPower >= c_fullPlanetDiscMassPower ) ? c_fullPlanetDiscPixels : Mathf.Min( c_fullPlanetDiscPixels, c_planetDiscBasePixels + c_planetDiscPixelsPerDigit * massDigit );
+		var discPixels = c_smallestPlanetDiscPixels;
+
+		if ( massPower >= c_fullPlanetDiscMassPower )
+		{
+			discPixels = c_fullPlanetDiscPixels;
+		}
+		else if ( massPower >= c_planetDiscDigitMassPower )
+		{
+			discPixels = Mathf.Clamp( c_planetDiscBasePixels + c_planetDiscPixelsPerDigit * massDigit, c_smallestPlanetDiscPixels, c_fullPlanetDiscPixels );
+		}
 
 		// the magenta inside the panel is the original's window, and the planet's disc is most of the picture's height at scale 1
 		var windowHeight = ( m_panelImage != null ) ? m_panelImage.rectTransform.rect.height - 2.0f * GetPanelMargin() : 0.0f;
