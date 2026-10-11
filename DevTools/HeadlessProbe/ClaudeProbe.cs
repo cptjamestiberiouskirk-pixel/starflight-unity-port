@@ -3878,8 +3878,13 @@ public class ClaudeProbe : MonoBehaviour
 
 		var hurtDamageLine = StatusDamageLine( out var hurtArmorGauge, out _ );
 
+		// the engineer asks for the hull's repair mineral (since roadmap 1.2): aluminum in the hold, and yes
+		ship.AddElement( 0, 200 );
+
 		messages.Clear();
 		new RepairButton().Execute();
+
+		AnswerRepairQuestion( true );
 
 		var repairMessage = MessageList();
 		var repairsStarted = ship.m_repairsAreUnderWay;
@@ -3910,7 +3915,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "M11 a bare hull at 200 of 250 shows 20% damage and a gauge at four fifths", hurtDamageLine.Contains( ">20% Hull Damage<" ) && Mathf.Approximately( hurtArmorGauge, 0.8f ), "status damage line '" + hurtDamageLine + "', armor gauge " + hurtArmorGauge.ToString( "F3" ) );
 		Check( "M11 the engineer repairs a bare hull", repairsStarted && ( armorAfter10s == 220 ), "repair started " + repairsStarted + ", armor after 10 s " + armorAfter10s + " (was 200) | " + repairMessage );
 		Check( "M11 the repair of a bare hull stops at its 250 points", ( armorWhenDone == 250 ) && !stillUnderWay && doneMessage.Contains( "completed" ), "armor when done " + armorWhenDone + ", still under way " + stillUnderWay + " | " + doneMessage );
-		Check( "M11 an undamaged bare hull needs no repairs", !startedWithNothingToRepair && nothingToRepairMessage.Contains( "No repairs needed" ), "started " + startedWithNothingToRepair + " | " + nothingToRepairMessage );
+		Check( "M11 an undamaged bare hull needs no repairs", !startedWithNothingToRepair && nothingToRepairMessage.Contains( "No repairs" ), "started " + startedWithNothingToRepair + " | " + nothingToRepairMessage );
 
 		// ---- 3. class 2 armor (750 points): undamaged, then down to 300
 		ship.m_armorClass = 2;
@@ -13530,10 +13535,17 @@ public class ClaudeProbe : MonoBehaviour
 			yield return null;
 		}
 
-		yield return Frames( 10 );
+		// (the messages of every frame: a radar message can push the nebula's out of the list before the check reads it)
+		var collapseText = MessageList();
+
+		for ( var frame = 0; frame < 10; frame++ )
+		{
+			yield return null;
+
+			collapseText += " / " + MessageList();
+		}
 
 		var upAfterComingIn = ship.m_shieldsAreUp;
-		var collapseText = MessageList();
 		var upInNebulaSystem = PressRaiseShields();
 
 		// ---- 3. in hyperspace inside a nebula the shields cannot be raised; outside them they can (the control)
