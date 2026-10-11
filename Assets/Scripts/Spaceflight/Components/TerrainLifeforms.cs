@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 // places the lifeforms of a planet: some of each of its species (GD_Species.ForPlanet), where the manual (page 21) says they live - "lifeforms are not distributed
@@ -19,6 +20,9 @@ public class TerrainLifeforms : TerrainGridPopulator
 	// the elevation scale of the planet (for the lifeforms that move)
 	float m_elevationScale;
 
+	// the lifeforms placed (for the pairing of mates: lf-behav.txt, "Pair all un-paired lifeforms in the encounter area")
+	public readonly List<TerrainLifeform> m_lifeformList = new List<TerrainLifeform>();
+
 	// place the lifeforms of this planet
 	public void Initialize( PlanetGenerator planetGenerator, float elevationScale, int randomSeed )
 	{
@@ -26,6 +30,8 @@ public class TerrainLifeforms : TerrainGridPopulator
 
 		// remove the lifeforms of the last planet
 		Tools.DestroyChildrenOf( gameObject );
+
+		m_lifeformList.Clear();
 
 		var speciesList = GD_Species.ForPlanet( planetGenerator.GetPlanet() );
 
@@ -153,6 +159,21 @@ public class TerrainLifeforms : TerrainGridPopulator
 			renderer.material.color = new Color( species.m_red, species.m_green, species.m_blue );
 		}
 
-		lifeformObject.AddComponent<TerrainLifeform>().Initialize( species, this );
+		var lifeform = lifeformObject.AddComponent<TerrainLifeform>();
+
+		lifeform.Initialize( species, this );
+
+		m_lifeformList.Add( lifeform );
+	}
+
+	// a lifeform has been eaten: it is gone at once (taken out of the list and off the surface, so that neither Scan nor Fire finds it before it is destroyed)
+	public void RemoveEaten( TerrainLifeform lifeform )
+	{
+		m_lifeformList.Remove( lifeform );
+
+		lifeform.gameObject.SetActive( false );
+		lifeform.transform.SetParent( null, false );
+
+		Destroy( lifeform.gameObject );
 	}
 }

@@ -765,6 +765,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCrewDeath();
 				break;
 
+			case "mates":
+				yield return ScenarioMates();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -17394,6 +17398,178 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "crewdeath: when the last of the crew dies the game is lost, and it cannot be saved", ( IsDead( ben ) == "True" ) && controller.m_gameOver && gameOverText.Contains( "The entire crew has died" ) && ( playerData.m_playerShip.m_armorPoints <= 0 ), IsDead( ben ) + ", " + controller.m_gameOver + ", " + playerData.m_playerShip.m_armorPoints + " | " + gameOverText );
 
 		Finish( "scenario=crewdeath captain=" + captainAfter + " gameover=" + controller.m_gameOver, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 6: the lifeforms' mates
+
+	// an animal species for a test lifeform (a flyer, so that the ground does not turn it)
+	static GD_Species MakeTestAnimal( GD_Species.Niche niche, int size )
+	{
+		return new GD_Species { m_index = 7, m_bodyPlan = GD_Species.BodyPlan.BilateralFourLegs, m_niche = niche, m_size = size, m_volume = size * size, m_hitPoints = 100, m_aggression = 50, m_intelligence = 50, m_stunPoints = 50, m_movementRate = 3, m_canFly = true, m_red = 1.0f, m_green = 0.5f, m_blue = 0.2f };
+	}
+
+	// a lifeform's behaviour towards its mate ("missing" on the code before mates)
+	static string MateBehaviour( TerrainLifeform lifeform )
+	{
+		var value = ( lifeform == null ) ? null : FieldOrNull( lifeform, "m_behaviour" );
+
+		return ( value == null ) ? "missing" : value.ToString();
+	}
+
+	// the horizontal distance between two places
+	static float Flat( Vector3 a, Vector3 b )
+	{
+		a.y = 0.0f;
+		b.y = 0.0f;
+
+		return Vector3.Distance( a, b );
+	}
+
+	IEnumerator ScenarioMates()
+	{
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// planet 92 of the Arth system, landed beside its first lifeform
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var firstPlace = ( LifeformsOnTheGround().Count > 0 ) ? LifeformsOnTheGround()[ 0 ].position : Vector3.zero;
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
+
+		var all = LifeformsOnTheGround();
+
+		if ( all.Count < 3 )
+		{
+			Finish( "scenario=mates abort: " + all.Count + " lifeforms", 2 );
+			yield break;
+		}
+
+		var vehicle = controller.m_terrainVehicle.transform.position;
+		var plant = all[ 0 ].GetComponent<TerrainLifeform>();
+		var grazer = all[ 1 ].GetComponent<TerrainLifeform>();
+		var prey = all[ 2 ].GetComponent<TerrainLifeform>();
+
+		// everything but the plant and the grazer far outside the encounter area
+		for ( var i = 2; i < all.Count; i++ )
+		{
+			all[ i ].position = vehicle + Vector3.right * 600.0f + Vector3.forward * ( i * 10.0f );
+		}
+
+		// the plant, 30 units from the vehicle, quick to kill
+		plant.transform.position = new Vector3( vehicle.x + 30.0f, plant.transform.position.y, vehicle.z );
+		plant.m_hits = 40;
+
+		// ---- 1. a grazer 30 units from the plant, on the side its own wandering would take it away from: it comes at the plant
+		grazer.m_species = MakeTestAnimal( GD_Species.Niche.Herbivore, 4 );
+		grazer.m_aggression = 50;
+		grazer.m_hits = 100;
+
+		var wander = FieldOrNull( grazer, "m_moveDirection" );
+		var away = ( wander is Vector3 ) ? (Vector3) wander : Vector3.forward;
+
+		grazer.transform.position = plant.transform.position + away * 30.0f;
+
+		var startDistance = Flat( grazer.transform.position, plant.transform.position );
+		var closest = startDistance;
+		var behaviours = "";
+		var end = Time.realtimeSinceStartup + 8.0f;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			closest = Mathf.Min( closest, Flat( grazer.transform.position, plant.transform.position ) );
+
+			var behaviour = MateBehaviour( grazer );
+
+			if ( !behaviours.Contains( behaviour ) )
+			{
+				behaviours += behaviour + " ";
+			}
+
+			if ( closest <= 12.0f )
+			{
+				break;
+			}
+
+			yield return null;
+		}
+
+		// ---- 2. next to it, the grazer bites the plant and in time eats it (the plant is gone)
+		var plantHitsLowest = plant.m_hits;
+		var plantDied = false;
+
+		end = Time.realtimeSinceStartup + 45.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( plant != null ) )
+		{
+			plantHitsLowest = Mathf.Min( plantHitsLowest, plant.m_hits );
+			plantDied |= plant.m_status == TerrainLifeform.Status.Dead;
+
+			var behaviour = MateBehaviour( grazer );
+
+			if ( !behaviours.Contains( behaviour ) )
+			{
+				behaviours += behaviour + " ";
+			}
+
+			yield return null;
+		}
+
+		var plantEaten = plant == null;
+
+		// ---- 3. the grazer made a large carnivore, and a small herbivore 25 units away, on the side its own wandering would take it towards the hunter: it flees
+		grazer.m_species = MakeTestAnimal( GD_Species.Niche.Carnivore, 6 );
+		prey.m_species = MakeTestAnimal( GD_Species.Niche.Herbivore, 2 );
+		prey.m_aggression = 50;
+		prey.m_hits = 100;
+
+		var preyWander = FieldOrNull( prey, "m_moveDirection" );
+		var towards = ( preyWander is Vector3 ) ? (Vector3) preyWander : Vector3.forward;
+		var hunterStart = grazer.transform.position;
+
+		prey.transform.position = hunterStart - towards * 25.0f;
+
+		var preyStart = prey.transform.position;
+		var preyBehaviours = "";
+		var hunterBehaviours = "";
+
+		end = Time.realtimeSinceStartup + 3.0f;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			var behaviour = MateBehaviour( prey );
+
+			if ( !preyBehaviours.Contains( behaviour ) )
+			{
+				preyBehaviours += behaviour + " ";
+			}
+
+			behaviour = MateBehaviour( grazer );
+
+			if ( !hunterBehaviours.Contains( behaviour ) )
+			{
+				hunterBehaviours += behaviour + " ";
+			}
+
+			yield return null;
+		}
+
+		// how far the prey went away from where the hunter was
+		var awayFromHunter = Vector3.Dot( prey.transform.position - preyStart, ( preyStart - hunterStart ).normalized );
+
+		Log( "mates: grazer " + startDistance + " -> closest " + closest + ", behaviours [" + behaviours + "], plant hits lowest " + plantHitsLowest + ", died " + plantDied + ", eaten " + plantEaten + " || prey [" + preyBehaviours + "] hunter [" + hunterBehaviours + "], prey went " + awayFromHunter + " away from the hunter" );
+
+		Check( "mates: a grazer comes at the plant it is paired with", ( closest <= 12.0f ) && behaviours.Contains( "ApproachingMate" ), startDistance + " -> " + closest + " | " + behaviours );
+		Check( "mates: next to it, the grazer bites the plant", ( plantHitsLowest < 40 ) && behaviours.Contains( "AttackingMate" ), plantHitsLowest + " | " + behaviours );
+		Check( "mates: in time the grazer eats the plant, which is gone", plantEaten, plantEaten + ", died " + plantDied );
+		Check( "mates: a small herbivore flees the carnivore that comes at it", preyBehaviours.Contains( "FleeingMate" ) && hunterBehaviours.Contains( "ApproachingMate" ) && ( awayFromHunter > 5.0f ), preyBehaviours + " | " + hunterBehaviours + " | " + awayFromHunter );
+
+		Finish( "scenario=mates closest=" + closest + " eaten=" + plantEaten + " fled=" + awayFromHunter, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

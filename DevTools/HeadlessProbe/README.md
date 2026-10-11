@@ -152,8 +152,9 @@ What the probe does:
 | `tvweapons` | the terrain vehicle's laser and stunner, landed beside a plant of planet 92: Weapon (its buttons), Switch (the stunner mounted), the stunner (what the species record says), the laser (8 units of energy, 20 to 100 hit points a shot, until the plant is dead) and the laser with nothing in range ("hits nothing") (about 40 s) |
 | `lifebehaviour` | how a lifeform responds to the terrain vehicle, a plant of planet 92 set up through its fields: middling aggression next to the vehicle (the control: it neither moves nor attacks), dangerous (it attacks the crew), made mobile 40 units away (it comes at the vehicle) and made wimpy 30 away (it flees) (about 45 s) |
 | `crewdeath` | the crew's deaths: Ada the captain killed by an injury (dead, and Ben, next in the chain of command, takes command), then Ben, the last of the crew, at 1 vitality beside a dangerous plant of planet 92 (its attacks kill him, the game over says the entire crew has died, and the ship's armor is 0 so the game is not saved) (about 45 s) |
+| `mates` | the lifeforms' mates on planet 92, everything else moved out of the encounter area: a grazer placed where its own wandering would take it away from a plant (it comes at the plant, bites it and in time eats it, which leaves the plant gone), then made a large carnivore beside a small herbivore placed where its wandering would take it towards the hunter (it flees) (about 60 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (108 scenarios, about 75 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (109 scenarios, about 76 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
