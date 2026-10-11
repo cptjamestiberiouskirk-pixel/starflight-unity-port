@@ -1554,10 +1554,11 @@ public class ClaudeProbe : MonoBehaviour
 		// control: a planet reads bio and minerals (the readout is written every frame while the scan runs)
 		Check( "planet readout reads minerals, with no percent sign", sensors.m_bioMinText.text.Contains( "Min: " ) && !sensors.m_bioMinText.text.Contains( "Energy" ) && !sensors.m_bioMinText.text.Contains( "%" ), "readout=[" + sensors.m_bioMinText.text + "]" );
 
-		// the planet's disc is as high in the window as the original draws it (measured in the original on 2026-10-10, in a window 57 pixels high
-		// whose pixels are 1.2 times as high as wide: 2x10^20 tons 10 pixels across, 3x10^21 14, 6x10^21 26, 10^22 tons and up 62)
-		var discMasses = new int[] { 200, 3000, 6000, 10000, 400000 };
-		var discPixels = new float[] { 10.0f, 14.0f, 26.0f, 62.0f, 62.0f };
+		// the planet's disc is as high in the window as the original draws it (measured in the original on 2026-10-10 and 2026-10-11, in a window 57 pixels high
+		// whose pixels are 1.2 times as high as wide: 6x10^19, 2x10^20, 6x10^20 and 1x10^21 tons 10 pixels across, 3x10^21 14, 6x10^21 26, 7x10^21 30,
+		// 9x10^21 38, 10^22 tons and up 62)
+		var discMasses = new int[] { 60, 200, 600, 1000, 3000, 6000, 7000, 9000, 10000, 400000 };
+		var discPixels = new float[] { 10.0f, 10.0f, 10.0f, 10.0f, 14.0f, 26.0f, 30.0f, 38.0f, 62.0f, 62.0f };
 		var discText = "";
 		var discsRight = 0;
 
