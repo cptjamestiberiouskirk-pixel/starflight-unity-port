@@ -9,7 +9,9 @@ param(
 	[string]$Scenario = 'h6',
 	[string]$Name = '',
 	# how long to wait for Unity before stopping it. A scenario that shows a hang on the old code never comes back, so give it a short limit.
-	[int]$TimeoutSeconds = 420
+	[int]$TimeoutSeconds = 420,
+	# run with a graphics device (without -nographics), for a scenario that draws pictures (explosionpictures). Slower to start, and it still opens no window.
+	[switch]$Graphics
 )
 
 $proj = (Get-Location).Path
@@ -41,7 +43,10 @@ Copy-Item -LiteralPath $probeSource -Destination $probeTarget -Force
 
 try {
 	$sw = [Diagnostics.Stopwatch]::StartNew()
-	$p = Start-Process -FilePath $unity -ArgumentList '-batchmode', '-nographics', '-projectPath', "`"$proj`"", '-logFile', "`"$log`"", '-executeMethod', 'ClaudeProbe.Run', '-probeScenario', $Scenario -PassThru
+	$unityArgs = @('-batchmode')
+	if (-not $Graphics) { $unityArgs += '-nographics' }
+	$unityArgs += '-projectPath', "`"$proj`"", '-logFile', "`"$log`"", '-executeMethod', 'ClaudeProbe.Run', '-probeScenario', $Scenario
+	$p = Start-Process -FilePath $unity -ArgumentList $unityArgs -PassThru
 
 	# the probe has its own 120 s watchdog; this is the outer limit
 	if (-not $p.WaitForExit($TimeoutSeconds * 1000)) {

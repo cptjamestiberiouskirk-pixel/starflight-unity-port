@@ -489,6 +489,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioVisual();
 				break;
 
+			case "explosionpictures":
+				yield return ScenarioExplosionPictures();
+				break;
+
 			case "perframe":
 				yield return ScenarioPerFrame();
 				break;
@@ -7897,6 +7901,194 @@ public class ClaudeProbe : MonoBehaviour
 		playerData.m_general.m_selectedLatitude = 0.0f;
 
 		Finish( "scenario=visual floatStep=" + largestStep.ToString( "F2" ) + " explosion=" + toldAfter.ToString( "F2" ) + "/" + onAt18 + "/" + onAt26 + " crosshair=" + movedInOneSecond.ToString( "F1" ) + "/" + speedAtTheEnd.ToString( "F1" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: explosion pictures (what the explosion is drawn with, and pictures of it when the run has a graphics device: probe.ps1 -Graphics)
+
+	// render the main camera into a PNG file (the space view only: the console is drawn by other cameras and the canvas)
+	static void RenderCameraPicture( Camera camera, string path )
+	{
+		var renderTexture = new RenderTexture( 1920, 1080, 24, RenderTextureFormat.ARGB32 );
+		var picture = new Texture2D( 1920, 1080, TextureFormat.RGB24, false );
+
+		camera.targetTexture = renderTexture;
+		camera.Render();
+		camera.targetTexture = null;
+
+		var active = RenderTexture.active;
+
+		RenderTexture.active = renderTexture;
+		picture.ReadPixels( new Rect( 0, 0, 1920, 1080 ), 0, 0 );
+		picture.Apply();
+		RenderTexture.active = active;
+
+		System.IO.File.WriteAllBytes( path, picture.EncodeToPNG() );
+
+		UnityEngine.Object.Destroy( picture );
+		renderTexture.Release();
+		UnityEngine.Object.Destroy( renderTexture );
+	}
+
+	// how many explosion pictures were drawn
+	static int s_explosionPictures;
+
+	// draw a picture at each of the given frames after this one (game time is a thirtieth of a second a frame), then wait for the explosion, if one is given, to end
+	static IEnumerator ExplosionPictureSeries( Camera camera, string folder, string prefix, int[] frameTimes, ExplosionEffect explosion )
+	{
+		var start = Time.frameCount;
+
+		foreach ( var frameTime in frameTimes )
+		{
+			while ( Time.frameCount - start < frameTime )
+			{
+				yield return null;
+			}
+
+			RenderCameraPicture( camera, System.IO.Path.Combine( folder, prefix + "t" + ( frameTime * 1000 / 30 ).ToString( "D4" ) + "ms.png" ) );
+			s_explosionPictures++;
+		}
+
+		while ( ( explosion != null ) && explosion.IsPlaying() && ( Time.frameCount - start < 200 ) )
+		{
+			yield return null;
+		}
+	}
+
+	IEnumerator ScenarioExplosionPictures()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var combat = CombatController.m_instance;
+
+		// ---- 1. what an explosion is drawn with: every part textured and transparent, no cubes, and it follows the scale the combat controller gives it
+		var explosion = Call( combat, "GetAvailableExplosion" ) as ExplosionEffect;
+		var renderers = explosion.GetComponentsInChildren<ParticleSystemRenderer>( true );
+		var opaqueOrUntextured = new List<string>();
+		var cubes = 0;
+
+		foreach ( var particleRenderer in renderers )
+		{
+			var material = particleRenderer.sharedMaterial;
+
+			if ( ( material == null ) || ( material.mainTexture == null ) || ( material.renderQueue < 3000 ) )
+			{
+				opaqueOrUntextured.Add( particleRenderer.name + " (" + ( ( material == null ) ? "no material" : material.shader.name + ", queue " + material.renderQueue + ", texture " + ( material.mainTexture != null ) ) + ")" );
+			}
+
+			if ( ( particleRenderer.renderMode == ParticleSystemRenderMode.Mesh ) && ( particleRenderer.mesh != null ) && particleRenderer.mesh.name.StartsWith( "Cube" ) )
+			{
+				cubes++;
+			}
+		}
+
+		var scaledSystems = 0;
+		var particleSystems = explosion.GetComponentsInChildren<ParticleSystem>( true );
+
+		foreach ( var particleSystem in particleSystems )
+		{
+			if ( particleSystem.main.scalingMode == ParticleSystemScalingMode.Hierarchy )
+			{
+				scaledSystems++;
+			}
+		}
+
+		Log( "explosionpictures: " + renderers.Length + " parts, opaque or untextured: " + ( ( opaqueOrUntextured.Count == 0 ) ? "none" : string.Join( ", ", opaqueOrUntextured ) ) + "; cube debris parts " + cubes + "; parts that follow the explosion's scale " + scaledSystems + " of " + particleSystems.Length );
+
+		Check( "explosionpictures: every part of an explosion is textured and transparent", ( renderers.Length > 0 ) && ( opaqueOrUntextured.Count == 0 ), ( opaqueOrUntextured.Count == 0 ) ? "all " + renderers.Length + " parts" : string.Join( ", ", opaqueOrUntextured ) );
+		Check( "explosionpictures: the debris is not grey cubes", cubes == 0, cubes + " parts draw the cube mesh" );
+		Check( "explosionpictures: a half size explosion (a missile hit) is drawn at half size", ( particleSystems.Length > 0 ) && ( scaledSystems == particleSystems.Length ), scaledSystems + " of " + particleSystems.Length + " parts follow the scale" );
+
+		// ---- 2. control: making the explosion's textures does not draw from the game's random numbers (the planets depend on them)
+		foreach ( var name in new string[] { "m_glowMaterial", "m_fireMaterial", "m_smokeMaterial", "m_ringMaterial", "m_debrisMaterial", "m_debrisMeshes" } )
+		{
+			var field = typeof( ExplosionEffect ).GetField( name, c_any );
+
+			if ( field != null )
+			{
+				field.SetValue( null, null );
+			}
+		}
+
+		var stateBefore = JsonUtility.ToJson( UnityEngine.Random.state );
+		var madeObject = new GameObject( "Probe Explosion" );
+
+		madeObject.AddComponent<ExplosionEffect>();
+
+		var stateAfter = JsonUtility.ToJson( UnityEngine.Random.state );
+
+		Destroy( madeObject );
+
+		Check( "explosionpictures: making an explosion leaves the game's random numbers alone", stateBefore == stateAfter, ( stateBefore == stateAfter ) ? "Random.state unchanged" : "Random.state changed" );
+
+		// ---- 3. pictures, when there is a graphics device to draw them with
+		if ( SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null )
+		{
+			Log( "explosionpictures: no graphics device (-nographics), so no pictures; run probe.ps1 with -Graphics for them" );
+
+			Finish( "scenario=explosionpictures parts=" + renderers.Length + " opaqueOrUntextured=" + opaqueOrUntextured.Count + " cubes=" + cubes + " scaled=" + scaledSystems + "/" + particleSystems.Length + " pictures=0 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+			yield break;
+		}
+
+		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "explosion-pictures" ) );
+
+		System.IO.Directory.CreateDirectory( folder );
+
+		var camera = Camera.main;
+		var controller = SpaceflightController.m_instance;
+		var frameTimes = new int[] { 2, 5, 9, 15, 24, 33, 45, 60 };
+
+		s_explosionPictures = 0;
+
+		// ---- 3a. out in dark hyperspace (a new game starts next to the sun, whose glare hides everything), with no encounter able to begin
+		controller.m_encounterRange = 0.0f;
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 4.0f, 0.0f, 4.0f ) );
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 30 );
+
+		// game time goes up by a thirtieth of a second a frame, however long a frame takes, so the pictures are at the same moments in every run
+		Time.captureDeltaTime = 1.0f / 30.0f;
+
+		// a missile hit, at half size, beside the ship
+		var hit = Call( combat, "GetAvailableExplosion" ) as ExplosionEffect;
+
+		hit.SetScale( 0.5f );
+		hit.Play( playerData.m_general.m_coordinates + new Vector3( 120.0f, 0.0f, 0.0f ) );
+
+		yield return ExplosionPictureSeries( camera, folder, "space_hit_", new int[] { 9 }, hit );
+
+		// an explosion the size of the ship blowing up, on the ship
+		var full = Call( combat, "GetAvailableExplosion" ) as ExplosionEffect;
+
+		full.Play( playerData.m_general.m_coordinates );
+
+		yield return ExplosionPictureSeries( camera, folder, "space_", frameTimes, full );
+
+		Time.captureDeltaTime = 0.0f;
+
+		// ---- 3b. in orbit around a planet, the ship destroyed the way F10 destroys it (its wreck is left where it was)
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+
+		yield return EnterOrbit( 90 );
+
+		yield return Frames( 30 );
+
+		Time.captureDeltaTime = 1.0f / 30.0f;
+
+		playerData.m_playerShip.m_shieldPoints = 0;
+		playerData.m_playerShip.m_armorPoints = 0;
+		combat.ApplyDamageToPlayer( 1, Vector3.forward );
+
+		yield return ExplosionPictureSeries( camera, folder, "orbit_", frameTimes, null );
+
+		Time.captureDeltaTime = 0.0f;
+
+		var pictures = s_explosionPictures;
+
+		Log( "explosionpictures: " + pictures + " pictures in " + folder );
+
+		Finish( "scenario=explosionpictures parts=" + renderers.Length + " opaqueOrUntextured=" + opaqueOrUntextured.Count + " cubes=" + cubes + " scaled=" + scaledSystems + "/" + particleSystems.Length + " pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- Low: what the displays cost every frame (the status display, the terrain vehicle display)
