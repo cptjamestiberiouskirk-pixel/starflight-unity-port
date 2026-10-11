@@ -497,6 +497,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioHitPictures();
 				break;
 
+			case "weaponpictures":
+				yield return ScenarioWeaponPictures();
+				break;
+
 			case "perframe":
 				yield return ScenarioPerFrame();
 				break;
@@ -8327,6 +8331,202 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "hitpictures: " + s_explosionPictures + " pictures in " + folder );
 
 		Finish( "scenario=hitpictures parts=" + parts + " drawnWrong=" + drawnWrong.Count + " longestLife=" + longestLife.ToString( "F2" ) + "/" + hullDuration.ToString( "F2" ) + " side=" + hullSide.ToString( "F1" ) + "/" + shieldSide.ToString( "F1" ) + " pictures=" + s_explosionPictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: weapon pictures (what the laser and the missile are drawn with, a paused missile's exhaust, and pictures of them with -Graphics)
+
+	// how many particles a missile's exhaust and smoke have
+	static int ExhaustParticles( MissileProjectile missile )
+	{
+		var count = 0;
+
+		foreach ( var particleSystem in missile.GetComponentsInChildren<ParticleSystem>( true ) )
+		{
+			count += particleSystem.particleCount;
+		}
+
+		return count;
+	}
+
+	// draw a picture, zoomed in by the given field of view, at each of the given frames after this one
+	static IEnumerator WeaponPictureSeries( Camera camera, string folder, string prefix, int[] frameTimes, float fieldOfView )
+	{
+		var start = Time.frameCount;
+
+		foreach ( var frameTime in frameTimes )
+		{
+			while ( Time.frameCount - start < frameTime )
+			{
+				yield return null;
+			}
+
+			RenderZoomedPicture( camera, System.IO.Path.Combine( folder, prefix + "t" + ( frameTime * 1000 / 30 ).ToString( "D4" ) + "ms.png" ), fieldOfView );
+			s_explosionPictures++;
+		}
+	}
+
+	IEnumerator ScenarioWeaponPictures()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var combat = CombatController.m_instance;
+		var controller = SpaceflightController.m_instance;
+
+		var laser = Call( combat, "GetAvailableLaser" ) as LaserBeam;
+		var missile = Call( combat, "GetAvailableMissile" ) as MissileProjectile;
+
+		// ---- 1. what the laser and the missile are drawn with: nothing with the lit Standard shader or the untextured opaque particle shader, everything transparent
+		var drawnWrong = new List<string>();
+		var parts = 0;
+
+		foreach ( var effect in new Component[] { laser, missile } )
+		{
+			foreach ( var renderer in effect.GetComponentsInChildren<Renderer>( true ) )
+			{
+				var material = renderer.sharedMaterial;
+
+				parts++;
+
+				if ( ( material == null ) || ( material.shader.name == "Standard" ) || ( material.shader.name == "Particles/Standard Unlit" ) || ( material.renderQueue < 3000 ) )
+				{
+					drawnWrong.Add( effect.GetType().Name + "/" + renderer.name + " (" + ( ( material == null ) ? "no material" : material.shader.name + ", queue " + material.renderQueue ) + ")" );
+				}
+			}
+		}
+
+		Log( "weaponpictures: " + parts + " parts, drawn with the lit or opaque shaders: " + ( ( drawnWrong.Count == 0 ) ? "none" : string.Join( ", ", drawnWrong ) ) );
+
+		Check( "weaponpictures: the laser and the missile are drawn transparent, not with the Standard or untextured particle shaders", ( parts > 0 ) && ( drawnWrong.Count == 0 ), ( drawnWrong.Count == 0 ) ? "all " + parts + " parts" : string.Join( ", ", drawnWrong ) );
+
+		// ---- 2. a missile stands still while the game is paused, and so does its exhaust (it would pile up where the missile stands)
+		var shipTransform = controller.m_playerShip.transform;
+
+		missile.Fire( shipTransform.position + new Vector3( -2000.0f, 0.0f, 2000.0f ), shipTransform, ( position, hit ) => { } );
+
+		yield return Frames( 6 );
+
+		controller.m_gameIsPaused = true;
+
+		yield return Frames( 2 );
+
+		var exhaustAtPause = ExhaustParticles( missile );
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		var exhaustAfterASecond = ExhaustParticles( missile );
+
+		controller.m_gameIsPaused = false;
+
+		yield return Frames( 2 );
+
+		missile.Cancel();
+
+		Log( "weaponpictures: a missile's exhaust had " + exhaustAtPause + " particles when the game was paused and " + exhaustAfterASecond + " a second later" );
+
+		Check( "weaponpictures: a paused missile's exhaust stands still", ( exhaustAtPause > 0 ) && ( exhaustAfterASecond == exhaustAtPause ), exhaustAtPause + " particles at the pause, " + exhaustAfterASecond + " a second later" );
+
+		// ---- 3. control: making the laser and the missile does not draw from the game's random numbers
+		ForgetEffectMaterials();
+
+		var stateBefore = JsonUtility.ToJson( UnityEngine.Random.state );
+		var madeObject = new GameObject( "Probe Weapons" );
+
+		madeObject.AddComponent<LaserBeam>();
+		madeObject.AddComponent<MissileProjectile>();
+
+		var stateAfter = JsonUtility.ToJson( UnityEngine.Random.state );
+
+		Destroy( madeObject );
+
+		Check( "weaponpictures: making the laser and the missile leaves the game's random numbers alone", stateBefore == stateAfter, ( stateBefore == stateAfter ) ? "Random.state unchanged" : "Random.state changed" );
+
+		// ---- 4. pictures, when there is a graphics device to draw them with
+		if ( SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null )
+		{
+			Log( "weaponpictures: no graphics device (-nographics), so no pictures; run probe.ps1 with -Graphics for them" );
+
+			Finish( "scenario=weaponpictures parts=" + parts + " drawnWrong=" + drawnWrong.Count + " exhaust=" + exhaustAtPause + "/" + exhaustAfterASecond + " pictures=0 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+			yield break;
+		}
+
+		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "weapon-pictures" ) );
+
+		System.IO.Directory.CreateDirectory( folder );
+
+		var camera = Camera.main;
+
+		s_explosionPictures = 0;
+
+		// out in dark hyperspace, with no encounter able to begin
+		controller.m_encounterRange = 0.0f;
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 4.0f, 0.0f, 4.0f ) );
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 30 );
+
+		// game time goes up by a thirtieth of a second a frame, so the pictures are at the same moments in every run
+		Time.captureDeltaTime = 1.0f / 30.0f;
+
+		// an alien laser from the upper left, the colour AlienFiresAtPlayer gives it
+		var shooter = shipTransform.position + new Vector3( -150.0f, 0.0f, 110.0f );
+		var redLaser = Call( combat, "GetAvailableLaser" ) as LaserBeam;
+
+		redLaser.SetColor( new Color( 1.0f, 0.5f, 0.5f ) );
+		redLaser.Fire( shooter, shipTransform.position );
+
+		yield return WeaponPictureSeries( camera, folder, "laser_", new int[] { 1, 3, 6, 9 }, 14.0f );
+
+		yield return Frames( 15 );
+
+		// a plasma bolt, the same way in green
+		var plasma = Call( combat, "GetAvailableLaser" ) as LaserBeam;
+
+		plasma.SetColor( new Color( 0.5f, 1.0f, 0.5f ) );
+		plasma.Fire( shooter, shipTransform.position );
+
+		yield return WeaponPictureSeries( camera, folder, "plasma_", new int[] { 2 }, 14.0f );
+
+		yield return Frames( 15 );
+
+		// a missile crossing the view from left to right, just above the ship (it flies 500 a second, so it is across in a little over a second)
+		var crossing = Call( combat, "GetAvailableMissile" ) as MissileProjectile;
+
+		crossing.Fire( shipTransform.position + new Vector3( -320.0f, 0.0f, 60.0f ), shipTransform.position + new Vector3( 400.0f, 0.0f, 60.0f ), ( position, hit ) => { } );
+
+		yield return WeaponPictureSeries( camera, folder, "missile_", new int[] { 6, 12, 18, 24 }, 22.0f );
+
+		crossing.Cancel();
+
+		yield return Frames( 5 );
+
+		// one at the size the game shows it
+		var unzoomed = Call( combat, "GetAvailableMissile" ) as MissileProjectile;
+
+		unzoomed.Fire( shipTransform.position + new Vector3( -320.0f, 0.0f, 60.0f ), shipTransform.position + new Vector3( 400.0f, 0.0f, 60.0f ), ( position, hit ) => { } );
+
+		var start = Time.frameCount;
+
+		while ( Time.frameCount - start < 15 )
+		{
+			yield return null;
+		}
+
+		var laserBeside = Call( combat, "GetAvailableLaser" ) as LaserBeam;
+
+		laserBeside.SetColor( new Color( 1.0f, 0.5f, 0.5f ) );
+		laserBeside.Fire( shooter, shipTransform.position );
+
+		yield return null;
+
+		RenderCameraPicture( camera, System.IO.Path.Combine( folder, "unzoomed_t0500ms.png" ) );
+		s_explosionPictures++;
+
+		unzoomed.Cancel();
+
+		Time.captureDeltaTime = 0.0f;
+
+		Log( "weaponpictures: " + s_explosionPictures + " pictures in " + folder );
+
+		Finish( "scenario=weaponpictures parts=" + parts + " drawnWrong=" + drawnWrong.Count + " exhaust=" + exhaustAtPause + "/" + exhaustAfterASecond + " pictures=" + s_explosionPictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- Low: what the displays cost every frame (the status display, the terrain vehicle display)

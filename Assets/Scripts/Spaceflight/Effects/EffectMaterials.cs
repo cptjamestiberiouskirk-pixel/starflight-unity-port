@@ -2,7 +2,7 @@
 using UnityEngine;
 
 /// <summary>
-/// The materials, textures and meshes the combat effects (explosions, hull hits, shield hits) share, made once in code,
+/// The materials, textures and meshes the combat effects (explosions, hull and shield hits, lasers, missiles) share, made once in code,
 /// and the particle system setup they have in common.
 /// </summary>
 public static class EffectMaterials
@@ -16,6 +16,7 @@ public static class EffectMaterials
 	public static Material m_smokeMaterial;
 	public static Material m_ringMaterial;
 	public static Material m_debrisMaterial;
+	public static Material m_beamMaterial;
 	public static Mesh[] m_debrisMeshes;
 
 	/// <summary>
@@ -24,7 +25,7 @@ public static class EffectMaterials
 	public static void Initialize()
 	{
 		// already made (a destroyed material compares equal to null, so they are made again if anything destroyed them)
-		if ( ( m_glowMaterial != null ) && ( m_fireMaterial != null ) && ( m_smokeMaterial != null ) && ( m_ringMaterial != null ) && ( m_debrisMaterial != null ) && ( m_debrisMeshes != null ) )
+		if ( ( m_glowMaterial != null ) && ( m_fireMaterial != null ) && ( m_smokeMaterial != null ) && ( m_ringMaterial != null ) && ( m_debrisMaterial != null ) && ( m_beamMaterial != null ) && ( m_debrisMeshes != null ) )
 		{
 			return;
 		}
@@ -45,6 +46,9 @@ public static class EffectMaterials
 		m_ringMaterial = CreateMaterial( "Explosion Shockwave", shader, MakeTexture( "Explosion Shockwave", c_textureSize, RingAlpha ), 0.0f );
 		m_smokeMaterial = CreateMaterial( "Explosion Smoke", shader, MakeTexture( "Explosion Smoke", c_textureSize, SmokeAlpha ), 1.0f );
 		m_debrisMaterial = CreateMaterial( "Explosion Debris", shader, MakeShadeTexture(), 1.0f );
+
+		// a laser beam only adds light
+		m_beamMaterial = CreateMaterial( "Laser Beam", shader, MakeBeamTexture(), 0.0f );
 
 		m_debrisMeshes = new Mesh[] { MakeShardMesh(), MakeSliverMesh() };
 	}
@@ -160,6 +164,38 @@ public static class EffectMaterials
 
 		texture.SetPixels32( pixels );
 		texture.Apply( false, true );
+
+		return texture;
+	}
+
+	// the laser beam texture: across the beam (v), a bright narrow core inside a soft glow; along it (u), the same everywhere
+	static Texture2D MakeBeamTexture()
+	{
+		var texture = new Texture2D( 4, 64, TextureFormat.RGBA32, true );
+		texture.name = "Laser Beam";
+		texture.wrapMode = TextureWrapMode.Clamp;
+		texture.filterMode = FilterMode.Bilinear;
+		texture.hideFlags = HideFlags.DontUnloadUnusedAsset;
+
+		var pixels = new Color32[ 4 * 64 ];
+
+		for ( int y = 0; y < 64; y++ )
+		{
+			// how far from the middle of the beam, 0 to 1 at its edge
+			var distance = Mathf.Abs( ( ( y + 0.5f ) / 64.0f ) * 2.0f - 1.0f );
+
+			var core = Mathf.Exp( -( distance / 0.12f ) * ( distance / 0.12f ) );
+			var glow = Mathf.Exp( -( distance / 0.45f ) * ( distance / 0.45f ) );
+			var alpha = Mathf.Clamp01( core * 0.85f + glow * 0.4f ) * Mathf.Clamp01( ( 1.0f - distance ) * 6.0f );
+
+			for ( int x = 0; x < 4; x++ )
+			{
+				pixels[ y * 4 + x ] = new Color32( 255, 255, 255, (byte) Mathf.RoundToInt( alpha * 255.0f ) );
+			}
+		}
+
+		texture.SetPixels32( pixels );
+		texture.Apply( true, true );
 
 		return texture;
 	}

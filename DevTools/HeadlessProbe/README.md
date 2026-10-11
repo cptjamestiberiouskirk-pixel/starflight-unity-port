@@ -31,7 +31,7 @@ Copies `ClaudeProbe.cs` into `Assets/`, launches Unity with `-executeMethod Clau
 
 Unity is stopped if it has not come back after 420 seconds. `-TimeoutSeconds 100` shortens that, for a scenario that is expected to hang on the old code: a hang on the main thread also stops the probe's own 120 second watchdog.
 
-`-Graphics` runs Unity without `-nographics`, so it has a graphics device (it still opens no window). A scenario can then render the game's camera into PNG files: `explosionpictures` writes its pictures to `Logs/explosion-pictures/` and `hitpictures` to `Logs/hit-pictures/` (or the folder given with `-probePictures`). The probe cannot judge how a picture looks; a person has to.
+`-Graphics` runs Unity without `-nographics`, so it has a graphics device (it still opens no window). A scenario can then render the game's camera into PNG files: `explosionpictures` writes its pictures to `Logs/explosion-pictures/`, `hitpictures` to `Logs/hit-pictures/` and `weaponpictures` to `Logs/weapon-pictures/` (or the folder given with `-probePictures`). The probe cannot judge how a picture looks; a person has to.
 
 What the probe does:
 
@@ -87,6 +87,7 @@ What the probe does:
 | `visual` | a floating object when its timer starts again, when an explosion is switched off, and how far the landing site crosshair moves in a second |
 | `explosionpictures` | every part of an explosion is textured and transparent, no part draws cubes, every part follows the explosion's scale, and making an explosion leaves `Random.state` alone (a control); with `-Graphics` it also renders a half size explosion and the F10 destruction of the ship at fixed game times |
 | `hitpictures` | the hull and shield hits are drawn transparent and not with the `Standard` or untextured particle shaders, a hull hit's particles are gone before it is switched off, both hits land on the side the shot came from, and making them leaves `Random.state` alone (a control); with `-Graphics` it also renders them zoomed in, alone and through `ApplyDamageToPlayer` |
+| `weaponpictures` | the laser and the missile are drawn transparent and not with the `Standard` or untextured particle shaders, a paused missile's exhaust stands still, and making them leaves `Random.state` alone (a control); with `-Graphics` it also renders a laser, a plasma bolt and a missile crossing the view |
 | `perframe` | how much memory a frame of the status display and of the terrain vehicle display takes when nothing changes, with a control that shows the measurement works, and that both still follow what changes |
 | `starport-transport` | the docking bay transporter: how much memory an update of the astronaut's opacity takes, that the fade reaches the astronaut, and that the material assets are left alone |
 | `shipslog` | a ship's log of forty entries scrolled to its end, then an empty log, then the first one again: that it opens (the review thought it could hang) and where it is scrolled to |
