@@ -739,6 +739,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLifeforms();
 				break;
 
+			case "tvweapons":
+				yield return ScenarioTVWeapons();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -16482,6 +16486,121 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lifeforms: Scan beside one reads it as the notes' scan has it", scan.Contains( "Lifeform" ) && scan.Contains( "Aggression analog" ) && scan.Contains( "Intelligence analog" ) && scan.Contains( "Niche" ) && scan.Contains( "Composition" ), scan );
 
 		Finish( "scenario=lifeforms on92=" + lifeforms.Count, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 6: the terrain vehicle's laser and stunner
+
+	// a ship button by its class name, or null on the code before it (so the scenario compiles there)
+	static ShipButton MakeButton( string className )
+	{
+		var type = typeof( ShipButton ).Assembly.GetType( className );
+
+		return ( type == null ) ? null : Activator.CreateInstance( type ) as ShipButton;
+	}
+
+	// presses a button made by its class name - returns what the messages show ("missing" if there is no such button)
+	static string Press( string className )
+	{
+		var button = MakeButton( className );
+
+		if ( button == null )
+		{
+			return "missing";
+		}
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		button.Execute();
+
+		return MessageList();
+	}
+
+	// a field of a lifeform's component as text ("" if there is none)
+	static string LifeformField( Transform lifeform, string name )
+	{
+		var value = FieldOrNull( lifeform.GetComponent( "TerrainLifeform" ), name );
+
+		return ( value == null ) ? "" : value.ToString();
+	}
+
+	IEnumerator ScenarioTVWeapons()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// planet 92 of the Arth system: landed beside its first lifeform
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var lifeforms = LifeformsOnTheGround();
+		var firstPlace = ( lifeforms.Count > 0 ) ? lifeforms[ 0 ].position : Vector3.zero;
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
+
+		lifeforms = LifeformsOnTheGround();
+
+		Transform target = null;
+
+		foreach ( var lifeform in lifeforms )
+		{
+			if ( ( target == null ) || ( Vector3.Distance( lifeform.position, controller.m_terrainVehicle.transform.position ) < Vector3.Distance( target.position, controller.m_terrainVehicle.transform.position ) ) )
+			{
+				target = lifeform;
+			}
+		}
+
+		// ---- 1. Weapon: the weapon buttons
+		new WeaponButton().Execute();
+
+		yield return Frames( 2 );
+
+		var weaponSet = controller.m_buttonController.GetCurrentButtonSet().ToString();
+
+		// ---- 2. the stunner: what the species record says it does
+		var switchText = Press( "TVSwitchWeaponButton" );
+		var stunsBefore = ( target == null ) ? "" : LifeformField( target, "m_stuns" );
+		var stunText = Press( "TVFireButton" );
+		var stunsAfter = ( target == null ) ? "" : LifeformField( target, "m_stuns" );
+		var statusAfterStun = ( target == null ) ? "" : LifeformField( target, "m_status" );
+		var species = ( target == null ) ? null : FieldOrNull( target.GetComponent( "TerrainLifeform" ), "m_species" );
+		var stunEffect = ( species == null ) ? "" : FieldOrNull( species, "m_stunEffect" ).ToString();
+
+		// ---- 3. the laser: 8 units of energy a shot, 20 to 100 hit points, until it is dead
+		Press( "TVSwitchWeaponButton" );
+
+		var hitsBefore = ( target == null ) ? 0 : int.Parse( "0" + LifeformField( target, "m_hits" ) );
+		var fuelBefore = playerData.m_terrainVehicle.m_fuelRemaining;
+		var laserText = Press( "TVFireButton" );
+		var fuelAfter = playerData.m_terrainVehicle.m_fuelRemaining;
+		var hitsAfter = ( target == null ) ? 0 : int.Parse( "0" + LifeformField( target, "m_hits" ) );
+		var lastText = laserText;
+
+		for ( var shot = 0; ( shot < 20 ) && ( target != null ) && ( LifeformField( target, "m_status" ) != "Dead" ); shot++ )
+		{
+			lastText = Press( "TVFireButton" );
+		}
+
+		var statusAtTheEnd = ( target == null ) ? "" : LifeformField( target, "m_status" );
+
+		// ---- 4. nothing left within range: the laser hits nothing
+		var nothingText = Press( "TVFireButton" );
+
+		Log( "tvweapons: weapon set " + weaponSet + " | switch: " + switchText + " | stunner (effect " + stunEffect + "): " + stunText + " (stuns " + stunsBefore + " -> " + stunsAfter + ", " + statusAfterStun + ") | laser: " + laserText + " (hits " + hitsBefore + " -> " + hitsAfter + ", energy " + fuelBefore + " -> " + fuelAfter + ") | last: " + lastText + " (" + statusAtTheEnd + ") | then: " + nothingText );
+
+		var stunAsRecorded = ( stunEffect == "Unaffected" ) ? stunText.Contains( "no effect" ) : ( ( stunEffect == "Killed" ) ? stunText.Contains( "kills" ) : ( stunText.Contains( "stunned" ) || ( stunsAfter != stunsBefore ) || ( statusAfterStun == "Dead" ) ) );
+
+		Check( "tvweapons: Weapon shows the weapon buttons, with the laser mounted", ( weaponSet == "TerrainVehicleWeapon" ) && switchText.Contains( "stunner is mounted" ), weaponSet + " | " + switchText );
+		Check( "tvweapons: the stunner does what the species record says", ( target != null ) && ( stunEffect != "" ) && stunAsRecorded, stunEffect + " | " + stunText );
+		Check( "tvweapons: a laser shot costs 8 units of energy and does 20 to 100 points of damage", ( Mathf.Abs( fuelBefore - fuelAfter - 8.0f / 999.0f ) < 0.0001f ) && ( ( statusAfterStun == "Dead" ) || ( ( hitsBefore - hitsAfter >= 20 ) && ( hitsBefore - hitsAfter <= 100 ) ) || ( hitsAfter == 0 ) ), ( fuelBefore - fuelAfter ) + ", " + hitsBefore + " -> " + hitsAfter );
+		Check( "tvweapons: the laser kills it", statusAtTheEnd == "Dead", statusAtTheEnd + " | " + lastText );
+		Check( "tvweapons: with no living lifeform within range the laser hits nothing (control)", nothingText.Contains( "hits nothing" ), nothingText );
+
+		Finish( "scenario=tvweapons stun=" + stunEffect + " end=" + statusAtTheEnd, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
