@@ -1,5 +1,6 @@
 // an orbit on the system map: a thin anti-aliased ring that is brighter in a trail behind its planet
-// (the image turns with its orbit and the planet is at the top of it, so the trail is fixed in the image: it runs clockwise from the top)
+// (the image turns with its orbit and the planet is at the top of it, so the trail is fixed in the image: it runs clockwise from the top;
+// the ring is worked out in gamma space, as it looks on the screen, and drawn premultiplied in the colour space of the project)
 Shader "Custom/UI/System Map Orbit"
 {
 	Properties
@@ -11,7 +12,7 @@ Shader "Custom/UI/System Map Orbit"
 		_RingColor( "Ring Color", Color ) = ( 0.62, 0.74, 0.95, 0.22 )
 		_TrailColor( "Trail Color", Color ) = ( 0.75, 0.85, 1, 0.55 )
 		_Radius( "Radius (fraction of the half size)", Range( 0, 1 ) ) = 0.9
-		_LineWidth( "Line Width (pixels)", Float ) = 1.4
+		_LineWidth( "Line Width (pixels)", Float ) = 1
 		_TrailLength( "Trail Length (radians)", Float ) = 0.66
 
 		_StencilComp( "Stencil Comparison", Float ) = 8
@@ -49,7 +50,7 @@ Shader "Custom/UI/System Map Orbit"
 		Lighting Off
 		ZWrite Off
 		ZTest [unity_GUIZTestMode]
-		Blend SrcAlpha OneMinusSrcAlpha
+		Blend One OneMinusSrcAlpha
 		ColorMask [_ColorMask]
 
 		Pass
@@ -110,6 +111,26 @@ Shader "Custom/UI/System Map Orbit"
 					return OUT;
 				}
 
+				// the shapes of this shader are designed as light added on the screen (in gamma space): its colours are taken
+				// back to gamma space, and the result goes out in the colour space of the project
+				float3 ToGamma( float3 color )
+				{
+					#ifdef UNITY_COLORSPACE_GAMMA
+					return color;
+					#else
+					return LinearToGammaSpace( max( color, 0.0 ) );
+					#endif
+				}
+
+				float3 FromGamma( float3 color )
+				{
+					#ifdef UNITY_COLORSPACE_GAMMA
+					return color;
+					#else
+					return GammaToLinearSpace( max( color, 0.0 ) );
+					#endif
+				}
+
 				fixed4 frag( v2f IN ) : SV_Target
 				{
 					// this pixel from the middle of the image (-1 to 1 across, y up)
@@ -127,12 +148,13 @@ Shader "Custom/UI/System Map Orbit"
 
 					half4 color;
 
-					color.rgb = lerp( _RingColor.rgb, _TrailColor.rgb, trail ) * IN.color.rgb;
 					color.a = ring * saturate( _RingColor.a + _TrailColor.a * trail ) * IN.color.a;
 
 					#ifdef UNITY_UI_CLIP_RECT
 					color.a *= UnityGet2DClipping( IN.worldPosition.xy, _ClipRect );
 					#endif
+
+					color.rgb = FromGamma( lerp( ToGamma( _RingColor.rgb ), ToGamma( _TrailColor.rgb ), trail ) * color.a ) * IN.color.rgb;
 
 					#ifdef UNITY_UI_ALPHACLIP
 					clip( color.a - 0.001 );

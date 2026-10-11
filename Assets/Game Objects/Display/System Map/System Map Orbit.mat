@@ -30,7 +30,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _ColorMask: 15
-    - _LineWidth: 1.4
+    - _LineWidth: 1
     - _Radius: 0.9
     - _Stencil: 0
     - _StencilComp: 8

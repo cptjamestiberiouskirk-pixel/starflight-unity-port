@@ -1,5 +1,6 @@
 // the star on the system map: a white-hot core, a corona in the colour of the star and short rays, drawn additively
-// (_Size is the size of the image in map units, so that the shapes keep their size in map units whatever the image is)
+// (_Size is the size of the image in map units, so that the shapes keep their size in map units whatever the image is; the light is
+// worked out in gamma space, as it looks on the screen, and goes out in the colour space of the project)
 Shader "Custom/UI/System Map Star"
 {
 	Properties
@@ -104,6 +105,26 @@ Shader "Custom/UI/System Map Star"
 					return OUT;
 				}
 
+				// the shapes of this shader are designed as light added on the screen (in gamma space): its colours are taken
+				// back to gamma space, and the result goes out in the colour space of the project
+				float3 ToGamma( float3 color )
+				{
+					#ifdef UNITY_COLORSPACE_GAMMA
+					return color;
+					#else
+					return LinearToGammaSpace( max( color, 0.0 ) );
+					#endif
+				}
+
+				float3 FromGamma( float3 color )
+				{
+					#ifdef UNITY_COLORSPACE_GAMMA
+					return color;
+					#else
+					return GammaToLinearSpace( max( color, 0.0 ) );
+					#endif
+				}
+
 				// the brightness of a ray along the line through the middle at the given angle
 				float Ray( float2 position, float distance, float angle, float length )
 				{
@@ -133,20 +154,22 @@ Shader "Custom/UI/System Map Star"
 						rays += Ray( position, distance, radians( 45.0 * i + 22.0 ) + turn, ( i % 2 == 0 ) ? 16.0 : 9.0 ) * 0.5;
 					}
 
-					float3 light = _StarColor.rgb * ( corona + rays ) * shimmer;
+					float3 starColor = ToGamma( _StarColor.rgb );
+
+					float3 light = starColor * ( corona + rays ) * shimmer;
 
 					// the white-hot core, anti-aliased over one pixel, that turns to the colour of the star at its edge
 					float core = saturate( ( 6.5 - distance ) / max( fwidth( distance ), 0.0001 ) + 0.5 );
 					float edgeOfCore = saturate( distance / 7.0 );
 
-					light += lerp( float3( 1.0, 1.0, 1.0 ), 0.5 + 0.5 * _StarColor.rgb, edgeOfCore * edgeOfCore ) * 1.4 * core;
+					light += lerp( float3( 1.0, 1.0, 1.0 ), 0.5 + 0.5 * starColor, edgeOfCore * edgeOfCore ) * 1.4 * core;
 
 					// everything fades out before the edge of the image
 					float fade = saturate( 1.0 - distance / ( _Size * 0.5 ) );
 
 					half4 color;
 
-					color.rgb = light * fade * fade * IN.color.rgb * IN.color.a;
+					color.rgb = FromGamma( light * fade * fade ) * IN.color.rgb * IN.color.a;
 					color.a = 1.0;
 
 					#ifdef UNITY_UI_CLIP_RECT

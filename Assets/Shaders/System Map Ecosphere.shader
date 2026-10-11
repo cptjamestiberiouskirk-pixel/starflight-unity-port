@@ -1,5 +1,6 @@
 // the ecosphere on the system map: a faint band between two radii with soft edge lines, drawn additively
-// (the radii and the softness are fractions of the half size of the image; SystemDisplay sets them from the star's spectral class)
+// (the radii and the softness are fractions of the half size of the image; SystemDisplay sets them from the star's spectral class;
+// the light is worked out in gamma space, as it looks on the screen, and goes out in the colour space of the project)
 Shader "Custom/UI/System Map Ecosphere"
 {
 	Properties
@@ -112,6 +113,26 @@ Shader "Custom/UI/System Map Ecosphere"
 					return OUT;
 				}
 
+				// the shapes of this shader are designed as light added on the screen (in gamma space): its colours are taken
+				// back to gamma space, and the result goes out in the colour space of the project
+				float3 ToGamma( float3 color )
+				{
+					#ifdef UNITY_COLORSPACE_GAMMA
+					return color;
+					#else
+					return LinearToGammaSpace( max( color, 0.0 ) );
+					#endif
+				}
+
+				float3 FromGamma( float3 color )
+				{
+					#ifdef UNITY_COLORSPACE_GAMMA
+					return color;
+					#else
+					return GammaToLinearSpace( max( color, 0.0 ) );
+					#endif
+				}
+
 				fixed4 frag( v2f IN ) : SV_Target
 				{
 					// this pixel from the middle of the image (-1 to 1 across, y up)
@@ -127,7 +148,7 @@ Shader "Custom/UI/System Map Ecosphere"
 
 					half4 color;
 
-					color.rgb = ( _FillColor.rgb * fill * _FillColor.a + _EdgeColor.rgb * edges * _EdgeColor.a ) * IN.color.rgb * IN.color.a;
+					color.rgb = FromGamma( ToGamma( _FillColor.rgb ) * fill * _FillColor.a + ToGamma( _EdgeColor.rgb ) * edges * _EdgeColor.a ) * IN.color.rgb * IN.color.a;
 					color.a = 1.0;
 
 					#ifdef UNITY_UI_CLIP_RECT
