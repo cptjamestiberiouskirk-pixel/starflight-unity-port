@@ -133,11 +133,66 @@ public class TerrainLifeforms : TerrainGridPopulator
 		return elevation >= planetGenerator.m_waterElevation;
 	}
 
-	// a lifeform at this place: a plain shape in its species' colour stands in for it until there are models (a pillar for a plant, a ball for a radial animal,
-	// a box for an amorphous one, and a capsule for a bilateral one), as large as its size
+	// the models of the body plans (Resources/Lifeforms, made with Blender by DevTools/LifeformModels), loaded once
+	static readonly Dictionary<string, GameObject> s_models = new Dictionary<string, GameObject>();
+
+	// the model of a body plan, or null if there is none
+	static GameObject LoadModel( string name )
+	{
+		if ( !s_models.TryGetValue( name, out var model ) )
+		{
+			model = Resources.Load<GameObject>( "Lifeforms/" + name );
+
+			s_models[ name ] = model;
+		}
+
+		return model;
+	}
+
+	// the name of a species' model: its body plan, and for a plant one of the two models of its size (by its planet and its place among the planet's species,
+	// so that no random number is drawn for it)
+	public static string GetModelName( GD_Species species, int planetId )
+	{
+		var name = species.m_bodyPlan.ToString();
+
+		if ( species.IsPlant() )
+		{
+			name += ( ( ( planetId + species.m_index ) % 2 ) == 0 ) ? "A" : "B";
+		}
+
+		return name;
+	}
+
+	// a lifeform at this place: the model of its body plan, tinted with its species' colour (TerrainLifeform), as large as its size - the models stand on their
+	// base and face along +Z, and each one is turned by its place on the map (no random number is drawn for it); without a model a plain shape stands in for
+	// it (a pillar for a plant, a ball for a radial animal, a box for an amorphous one, and a capsule for a bilateral one)
 	void PlaceLifeform( GD_Species species, float mapX, float mapY, float elevationScale )
 	{
 		var planetGenerator = GetPlanetGenerator();
+		var size = c_markerScale * ( 1.0f + species.m_size * 0.5f );
+		var position = Tools.MapToWorldCoordinates( mapX, mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
+		var ground = planetGenerator.GetBilinearSmoothedElevation( mapX, mapY ) * elevationScale;
+		var model = LoadModel( GetModelName( species, planetGenerator.GetPlanet().m_id ) );
+
+		if ( model != null )
+		{
+			var modelObject = Instantiate( model );
+
+			modelObject.transform.SetParent( transform, false );
+			modelObject.transform.position = new Vector3( position.x, ground, position.z );
+			modelObject.transform.rotation = Quaternion.Euler( 0.0f, Mathf.Repeat( mapX * 37.0f + mapY * 91.0f, 360.0f ), 0.0f );
+			modelObject.transform.localScale = Vector3.one * size;
+			modelObject.name = "Lifeform " + species.m_index + " (" + species.GetBodyPlanText() + ")";
+
+			var modelLifeform = modelObject.AddComponent<TerrainLifeform>();
+
+			modelLifeform.m_groundOffset = 0.0f;
+			modelLifeform.Initialize( species, this );
+
+			m_lifeformList.Add( modelLifeform );
+
+			return;
+		}
 
 		PrimitiveType shape;
 
@@ -168,24 +223,20 @@ public class TerrainLifeforms : TerrainGridPopulator
 			Destroy( collider );
 		}
 
-		var position = Tools.MapToWorldCoordinates( mapX, mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
-		var size = c_markerScale * ( 1.0f + species.m_size * 0.5f );
+		// the pillar and the capsule are two units tall and the ball and the box one, so their middle is that far above the ground (it was half as far, which
+		// sank the pillars and the capsules halfway into it)
+		var groundOffset = ( ( shape == PrimitiveType.Cylinder ) || ( shape == PrimitiveType.Capsule ) ) ? size : size * 0.5f;
 
-		position.y = planetGenerator.GetBilinearSmoothedElevation( mapX, mapY ) * elevationScale + size * 0.5f;
+		position.y = ground + groundOffset;
 
 		lifeformObject.transform.SetParent( transform, false );
 		lifeformObject.transform.position = position;
 		lifeformObject.transform.localScale = Vector3.one * size;
 		lifeformObject.name = "Lifeform " + species.m_index + " (" + species.GetBodyPlanText() + ")";
 
-		var renderer = lifeformObject.GetComponent<Renderer>();
-
-		if ( renderer != null )
-		{
-			renderer.material.color = new Color( species.m_red, species.m_green, species.m_blue );
-		}
-
 		var lifeform = lifeformObject.AddComponent<TerrainLifeform>();
+
+		lifeform.m_groundOffset = groundOffset;
 
 		lifeform.Initialize( species, this );
 

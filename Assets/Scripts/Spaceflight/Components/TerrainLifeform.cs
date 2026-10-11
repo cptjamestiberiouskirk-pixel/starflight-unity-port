@@ -30,8 +30,16 @@ public class TerrainLifeform : MonoBehaviour
 
 	float m_stunRecovery;
 
-	// its renderer (for its colour)
-	Renderer m_renderer;
+	// its renderers (for its colour): a model's skin takes the species colour and its details (eyes, claws, wood) keep theirs, and a plain shape is all
+	// species colour
+	Renderer[] m_renderers;
+	MaterialPropertyBlock m_propertyBlock;
+
+	// how far its pivot is above the ground (0 for a model, which stands on its base; half the height of a plain shape)
+	public float m_groundOffset;
+
+	// how fast it turns to face the way it goes, in turns a second (the port's)
+	const float c_turnRate = 4.0f;
 
 	// the behaviour of the 1984 notes (lf-behav.txt), its response to the player: the laser makes the smart scared and the dumb angry, the dangerous that have
 	// noticed the terrain vehicle approach it and attack it, the wimpy flee it, and the rest wander - the distances, speeds and chances not in the notes are the
@@ -112,7 +120,8 @@ public class TerrainLifeform : MonoBehaviour
 	// does not find an inactive one)
 	public void Initialize( GD_Species species, TerrainLifeforms populator )
 	{
-		m_renderer = GetComponent<Renderer>();
+		m_renderers = GetComponentsInChildren<Renderer>();
+		m_propertyBlock = new MaterialPropertyBlock();
 		m_species = species;
 		m_hits = species.m_hitPoints;
 		m_stuns = species.m_stunPoints;
@@ -124,6 +133,8 @@ public class TerrainLifeform : MonoBehaviour
 		var angle = species.m_index * 137.0f * Mathf.Deg2Rad;
 
 		m_moveDirection = new Vector3( Mathf.Sin( angle ), 0.0f, Mathf.Cos( angle ) );
+
+		Tint( 1.0f );
 	}
 
 	// "any current Movement behavior" in words, for Look (planet.txt)
@@ -224,8 +235,10 @@ public class TerrainLifeform : MonoBehaviour
 			m_hits = 0;
 			m_status = Status.Dead;
 
-			// a dead lifeform lies on its side, darkened
+			// a dead lifeform lies on its side on the ground, darkened
 			transform.rotation = Quaternion.Euler( 0.0f, transform.eulerAngles.y, 90.0f );
+
+			Settle();
 
 			Tint( 0.35f );
 
@@ -586,9 +599,15 @@ public class TerrainLifeform : MonoBehaviour
 
 		m_flying = m_species.m_canFly;
 
-		next.y = height + transform.localScale.y * 0.5f + ( m_flying ? c_flyingHeight : 0.0f );
+		next.y = height + m_groundOffset + ( m_flying ? c_flyingHeight : 0.0f );
 
 		transform.position = next;
+
+		// it faces the way it goes
+		if ( m_moveDirection.sqrMagnitude > 0.0001f )
+		{
+			transform.rotation = Quaternion.Slerp( transform.rotation, Quaternion.LookRotation( m_moveDirection, Vector3.up ), Mathf.Clamp01( deltaTime * c_turnRate ) );
+		}
 	}
 
 	// "ATTACK-PLAYER : Determine whether or not alien hits or misses. Distribute any damage, and print out result-phrase." - one to three attacks (70%, 25%,
@@ -690,9 +709,87 @@ public class TerrainLifeform : MonoBehaviour
 	// shows its species' colour, at this brightness
 	void Tint( float brightness )
 	{
-		if ( m_renderer != null )
+		if ( ( m_renderers == null ) || ( m_species == null ) )
 		{
-			m_renderer.material.color = new Color( m_species.m_red * brightness, m_species.m_green * brightness, m_species.m_blue * brightness );
+			return;
+		}
+
+		var speciesColour = new Color( m_species.m_red * brightness, m_species.m_green * brightness, m_species.m_blue * brightness );
+		var detailColour = new Color( brightness, brightness, brightness );
+
+		foreach ( var renderer in m_renderers )
+		{
+			if ( renderer == null )
+			{
+				continue;
+			}
+
+			var materials = renderer.sharedMaterials;
+
+			for ( var index = 0; index < materials.Length; index++ )
+			{
+				var material = materials[ index ];
+
+				if ( material == null )
+				{
+					continue;
+				}
+
+				// a model's materials (SF - Standard): the skin takes the species colour, the details only the brightness
+				if ( material.HasProperty( "SF_AlbedoColor" ) )
+				{
+					renderer.GetPropertyBlock( m_propertyBlock, index );
+
+					m_propertyBlock.SetColor( "SF_AlbedoColor", material.name.EndsWith( " Skin" ) ? speciesColour : detailColour );
+
+					renderer.SetPropertyBlock( m_propertyBlock, index );
+				}
+				else
+				{
+					// a plain shape
+					renderer.material.color = speciesColour;
+				}
+			}
+		}
+	}
+
+	// puts it back on the ground after it has turned over: the bottom of what is drawn of it on the ground under it
+	void Settle()
+	{
+		if ( ( m_populator == null ) || ( m_renderers == null ) || ( m_renderers.Length == 0 ) )
+		{
+			return;
+		}
+
+		if ( !m_populator.GetGround( transform.position, out var height ) )
+		{
+			return;
+		}
+
+		var bounds = new Bounds( transform.position, Vector3.zero );
+		var any = false;
+
+		foreach ( var renderer in m_renderers )
+		{
+			if ( renderer == null )
+			{
+				continue;
+			}
+
+			if ( any )
+			{
+				bounds.Encapsulate( renderer.bounds );
+			}
+			else
+			{
+				bounds = renderer.bounds;
+				any = true;
+			}
+		}
+
+		if ( any )
+		{
+			transform.position += Vector3.up * ( height - bounds.min.y );
 		}
 	}
 }

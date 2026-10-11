@@ -797,6 +797,14 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLook();
 				break;
 
+			case "lifeformmodels":
+				yield return ScenarioLifeformModels();
+				break;
+
+			case "lifeformpictures":
+				yield return ScenarioLifeformPictures();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -18584,6 +18592,304 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "look: Look says when a lifeform is dead", deadLook.Contains( "It does not move" ) && deadLook.Contains( "Status: Dead" ), deadLook );
 
 		Finish( "scenario=look", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 6: the lifeform models
+
+	// the bounds of everything drawn of an object (a zero box at its place if nothing is)
+	static Bounds DrawnBounds( GameObject gameObject )
+	{
+		var bounds = new Bounds( gameObject.transform.position, Vector3.zero );
+		var any = false;
+
+		foreach ( var renderer in gameObject.GetComponentsInChildren<Renderer>() )
+		{
+			if ( any )
+			{
+				bounds.Encapsulate( renderer.bounds );
+			}
+			else
+			{
+				bounds = renderer.bounds;
+				any = true;
+			}
+		}
+
+		return bounds;
+	}
+
+	IEnumerator ScenarioLifeformModels()
+	{
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		// ---- 1. every body plan has its model (two for each plant size): it fits a cube of one unit, and the snake lies along +Z
+		var names = new[] { "Snakelike", "BilateralNoLegs", "BilateralOneLeg", "BilateralTwoLegs", "BilateralFourLegs", "BilateralManyLegs", "RadialNoLegs", "RadialFewLegs", "RadialManyLegs", "AmorphousNoLegs", "AmorphousLegs", "LeavedSmallA", "LeavedSmallB", "LeavedMediumA", "LeavedMediumB", "LeavedLargeA", "LeavedLargeB" };
+		var found = 0;
+		var fits = 0;
+		var report = "";
+		var snakeAlongZ = false;
+
+		foreach ( var name in names )
+		{
+			var prefab = Resources.Load<GameObject>( "Lifeforms/" + name );
+
+			if ( prefab == null )
+			{
+				report += name + " missing, ";
+				continue;
+			}
+
+			found++;
+
+			var instance = Instantiate( prefab, new Vector3( 0.0f, -5000.0f, 0.0f ), Quaternion.identity );
+			var size = DrawnBounds( instance ).size;
+			var largest = Mathf.Max( size.x, Mathf.Max( size.y, size.z ) );
+
+			if ( ( largest > 0.9f ) && ( largest < 1.1f ) )
+			{
+				fits++;
+			}
+			else
+			{
+				report += name + " " + size + ", ";
+			}
+
+			if ( name == "Snakelike" )
+			{
+				snakeAlongZ = size.z > size.x * 1.5f;
+			}
+
+			Destroy( instance );
+		}
+
+		EnsureCrew();
+
+		// ---- 2. on planet 92 the lifeforms are their models, their skin in the species colour, standing on the ground
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var firstPlace = ( LifeformsOnTheGround().Count > 0 ) ? LifeformsOnTheGround()[ 0 ].position : Vector3.zero;
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
+
+		yield return Frames( 2 );
+
+		var all = LifeformsOnTheGround();
+		var populator = FieldOrNull( controller.m_disembarked.m_terrainGrid, "m_terrainLifeforms" ) as TerrainLifeforms;
+		var modelled = 0;
+		var tinted = 0;
+		var grounded = 0;
+		var detail = "";
+
+		foreach ( var lifeformTransform in all )
+		{
+			var lifeform = lifeformTransform.GetComponent<TerrainLifeform>();
+			var renderers = lifeformTransform.GetComponentsInChildren<Renderer>();
+			var skin = false;
+
+			foreach ( var renderer in renderers )
+			{
+				var materials = renderer.sharedMaterials;
+
+				for ( var index = 0; index < materials.Length; index++ )
+				{
+					if ( ( materials[ index ] == null ) || !materials[ index ].name.EndsWith( " Skin" ) )
+					{
+						continue;
+					}
+
+					skin = true;
+
+					var block = new MaterialPropertyBlock();
+
+					renderer.GetPropertyBlock( block, index );
+
+					var colour = block.GetColor( "SF_AlbedoColor" );
+					var species = lifeform.m_species;
+
+					if ( ( Mathf.Abs( colour.r - species.m_red ) < 0.01f ) && ( Mathf.Abs( colour.g - species.m_green ) < 0.01f ) && ( Mathf.Abs( colour.b - species.m_blue ) < 0.01f ) )
+					{
+						tinted++;
+					}
+					else if ( detail.Length < 200 )
+					{
+						detail += "tint " + colour + " vs " + species.m_red + "/" + species.m_green + "/" + species.m_blue + ", ";
+					}
+				}
+			}
+
+			if ( skin )
+			{
+				modelled++;
+			}
+
+			if ( ( populator != null ) && populator.GetGround( lifeformTransform.position, out var ground ) )
+			{
+				var bottom = DrawnBounds( lifeformTransform.gameObject ).min.y;
+
+				if ( Mathf.Abs( bottom - ground ) < 1.0f )
+				{
+					grounded++;
+				}
+				else if ( detail.Length < 400 )
+				{
+					detail += lifeformTransform.name + " bottom " + bottom + " ground " + ground + ", ";
+				}
+			}
+		}
+
+		Log( "lifeformmodels: models " + found + "/" + names.Length + ", fit a unit cube " + fits + ", snake along +Z " + snakeAlongZ + " | " + report + " || planet 92: " + all.Count + " lifeforms, modelled " + modelled + ", tinted " + tinted + ", on the ground " + grounded + " | " + detail );
+
+		Check( "lifeformmodels: every body plan has its model, each fitting a cube of one unit", ( found == names.Length ) && ( fits == names.Length ), found + "/" + fits + " | " + report );
+		Check( "lifeformmodels: the models face along +Z (the snake lies along it)", snakeAlongZ, snakeAlongZ.ToString() );
+		Check( "lifeformmodels: the lifeforms of planet 92 are their models, the skin in the species colour", ( all.Count > 0 ) && ( modelled == all.Count ) && ( tinted == all.Count ), all.Count + " lifeforms, " + modelled + " modelled, " + tinted + " tinted | " + detail );
+		Check( "lifeformmodels: they stand on the ground", ( all.Count > 0 ) && ( grounded == all.Count ), grounded + " of " + all.Count + " | " + detail );
+
+		Finish( "scenario=lifeformmodels models=" + found + " modelled=" + modelled, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 6: pictures of the lifeform models on a planet (probe.ps1 -Graphics)
+
+	IEnumerator ScenarioLifeformPictures()
+	{
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// planet 92 of the Arth system, landed beside its first lifeform
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var firstPlace = ( LifeformsOnTheGround().Count > 0 ) ? LifeformsOnTheGround()[ 0 ].position : Vector3.zero;
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
+
+		yield return Frames( 10 );
+
+		if ( SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null )
+		{
+			Log( "lifeformpictures: no graphics device (-nographics), so no pictures; run probe.ps1 with -Graphics for them" );
+
+			Finish( "scenario=lifeformpictures pictures=0", 0 );
+			yield break;
+		}
+
+		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "lifeform-pictures" ) );
+
+		System.IO.Directory.CreateDirectory( folder );
+
+		var populator = FieldOrNull( controller.m_disembarked.m_terrainGrid, "m_terrainLifeforms" ) as TerrainLifeforms;
+		var vehicle = controller.m_terrainVehicle.transform.position;
+		var pictures = 0;
+
+		// the game draws its view in a part of the screen beside the console: the pictures are taken by a camera like the game's that takes the whole frame
+		var pictureCameraObject = new GameObject( "Lifeform Picture Camera" );
+		var pictureCamera = pictureCameraObject.AddComponent<Camera>();
+
+		pictureCamera.CopyFrom( Camera.main );
+		pictureCamera.rect = new Rect( 0.0f, 0.0f, 1.0f, 1.0f );
+
+		// ---- 1. the game's own view, with the planet's lifeforms as they are placed
+		RenderCameraPicture( pictureCamera, System.IO.Path.Combine( folder, "01_game_view.png" ) );
+		pictures++;
+
+		// ---- 2. every model in a ring around the vehicle, each in a colour of its own, as large as a middling species
+		var names = new[] { "Snakelike", "BilateralNoLegs", "BilateralOneLeg", "BilateralTwoLegs", "BilateralFourLegs", "BilateralManyLegs", "RadialNoLegs", "RadialFewLegs", "RadialManyLegs", "AmorphousNoLegs", "AmorphousLegs", "LeavedSmallA", "LeavedSmallB", "LeavedMediumA", "LeavedMediumB", "LeavedLargeA", "LeavedLargeB" };
+		var hues = new[] { 0.0f, 0.05f, 0.08f, 0.33f, 0.6f, 0.75f, 0.83f, 0.92f };
+		var placed = new List<GameObject>();
+
+		for ( var i = 0; i < names.Length; i++ )
+		{
+			var prefab = Resources.Load<GameObject>( "Lifeforms/" + names[ i ] );
+
+			if ( prefab == null )
+			{
+				continue;
+			}
+
+			var angle = i * ( 360.0f / names.Length ) * Mathf.Deg2Rad;
+			var place = vehicle + new Vector3( Mathf.Sin( angle ), 0.0f, Mathf.Cos( angle ) ) * 28.0f;
+			var ground = vehicle.y;
+
+			if ( populator != null )
+			{
+				populator.GetGround( place, out ground );
+			}
+
+			var instance = Instantiate( prefab, new Vector3( place.x, ground, place.z ), Quaternion.Euler( 0.0f, i * 47.0f, 0.0f ) );
+
+			instance.transform.localScale = Vector3.one * ( names[ i ].StartsWith( "Leaved" ) ? 9.0f : 6.0f );
+
+			var colour = Color.HSVToRGB( hues[ i % hues.Length ], 0.8f, 0.85f );
+			var block = new MaterialPropertyBlock();
+
+			foreach ( var renderer in instance.GetComponentsInChildren<Renderer>() )
+			{
+				var materials = renderer.sharedMaterials;
+
+				for ( var index = 0; index < materials.Length; index++ )
+				{
+					if ( ( materials[ index ] != null ) && materials[ index ].name.EndsWith( " Skin" ) )
+					{
+						renderer.GetPropertyBlock( block, index );
+						block.SetColor( "SF_AlbedoColor", colour );
+						renderer.SetPropertyBlock( block, index );
+					}
+				}
+			}
+
+			placed.Add( instance );
+		}
+
+		yield return Frames( 5 );
+
+		pictureCamera.CopyFrom( Camera.main );
+		pictureCamera.rect = new Rect( 0.0f, 0.0f, 1.0f, 1.0f );
+
+		RenderCameraPicture( pictureCamera, System.IO.Path.Combine( folder, "02_game_view_all_models.png" ) );
+		pictures++;
+
+		// ---- 3. close-ups: the picture camera low over the ground, looking at each model in turn
+		var closeUp = pictureCamera;
+
+		for ( var i = 0; i < placed.Count; i++ )
+		{
+			var target = placed[ i ].transform.position;
+			var outward = ( target - vehicle );
+
+			outward.y = 0.0f;
+			outward = outward.normalized;
+
+			var height = placed[ i ].transform.localScale.y;
+
+			closeUp.transform.position = target - outward * height * 1.8f + Vector3.up * height * 0.9f + Vector3.Cross( Vector3.up, outward ) * height * 0.8f;
+			closeUp.transform.LookAt( target + Vector3.up * height * 0.35f );
+			closeUp.fieldOfView = 45.0f;
+
+			RenderCameraPicture( closeUp, System.IO.Path.Combine( folder, ( 3 + i ).ToString( "00" ) + "_closeup_" + placed[ i ].name.Replace( "(Clone)", "" ) + ".png" ) );
+			pictures++;
+
+			yield return null;
+		}
+
+		Destroy( pictureCameraObject );
+
+		foreach ( var instance in placed )
+		{
+			Destroy( instance );
+		}
+
+		Log( "lifeformpictures: " + pictures + " pictures in " + folder );
+
+		Check( "lifeformpictures: a picture of the game view and a close-up of every model", pictures == 2 + names.Length, pictures.ToString() );
+
+		Finish( "scenario=lifeformpictures pictures=" + pictures, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
