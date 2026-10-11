@@ -102,7 +102,7 @@ Small items, each documented in the sources.
 | 1.7 | Science skill decides whether an analysis succeeds | starship.txt (DRAFT formula: skill / 2); Ask on the formula | science skill unused |
 | 1.8 | Flares: checked every day while the ship is in a system; a flare with the ship there ends the game ("incinerated"); Analysis shows "UNSTABLE, est. time to flare" under 1000 days | disys.txt `?FLARE`, STRINFO 2.14, notes | PR 122: every star flares at a ship in its system on its day; the Analysis text: Ask, it is only in starship.txt (DRAFT) |
 | 1.9 | Nebulae act on the shields | priority.txt; ruled 2026-10-10: the shields cannot be up inside a nebula, no damage | PR 136 |
-| 1.10 | Starmap shows a fuel estimate | alpha.txt | no estimate |
+| 1.10 | Starmap shows a fuel estimate | alpha.txt | PR 141 |
 | 1.11 | Alien vessels use their own armor, shields and speed from the data | xls Vessels; `GD_Vessel.m_armor`, `m_shields`, `m_moveDelay` | PR 140 (a move delay of 2200 at the old speed: the port's choice) |
 | 1.12 | Salvage from debris | wrecks leave debris (communic.txt); what can be taken: Ask | "Salvage collection not yet implemented" |
 
