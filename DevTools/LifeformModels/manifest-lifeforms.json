@@ -1,0 +1,388 @@
+{
+	"forward": "Unity +Z",
+	"up": "Unity +Y",
+	"lifeforms": [
+		{
+			"name": "Snakelike",
+			"plan": "Snakelike",
+			"kind": "animal",
+			"model": "Assets/Game Objects/Lifeforms/Snakelike.fbx",
+			"triangles": 3910,
+			"size": {
+				"width": 0.468,
+				"height": 0.359,
+				"length": 1.0
+			},
+			"materials": [
+				"Snakelike Skin",
+				"Snakelike Detail"
+			],
+			"textures": {
+				"albedo": "Snakelike - Albedo.png",
+				"normal": "Snakelike - Normal.png",
+				"occlusion": "Snakelike - Occlusion.png",
+				"specular": "Snakelike - Specular.png"
+			}
+		},
+		{
+			"name": "BilateralNoLegs",
+			"plan": "BilateralNoLegs",
+			"kind": "animal",
+			"model": "Assets/Game Objects/Lifeforms/BilateralNoLegs.fbx",
+			"triangles": 2800,
+			"size": {
+				"width": 0.351,
+				"height": 0.321,
+				"length": 1.0
+			},
+			"materials": [
+				"BilateralNoLegs Skin",
+				"BilateralNoLegs Detail"
+			],
+			"textures": {
+				"albedo": "BilateralNoLegs - Albedo.png",
+				"emissive": "BilateralNoLegs - Emissive.png",
+				"normal": "BilateralNoLegs - Normal.png",
+				"occlusion": "BilateralNoLegs - Occlusion.png",
+				"specular": "BilateralNoLegs - Specular.png"
+			}
+		},
+		{
+			"name": "BilateralOneLeg",
+			"plan": "BilateralOneLeg",
+			"kind": "animal",
+			"model": "Assets/Game Objects/Lifeforms/BilateralOneLeg.fbx",
+			"triangles": 3076,
+			"size": {
+				"width": 0.219,
+				"height": 0.831,
+				"length": 1.0
+			},
+			"materials": [
+				"BilateralOneLeg Skin",
+				"BilateralOneLeg Detail"
+			],
+			"textures": {
+				"albedo": "BilateralOneLeg - Albedo.png",
+				"normal": "BilateralOneLeg - Normal.png",
+				"occlusion": "BilateralOneLeg - Occlusion.png",
+				"specular": "BilateralOneLeg - Specular.png"
+			}
+		},
+		{
+			"name": "BilateralTwoLegs",
+			"plan": "BilateralTwoLegs",
+			"kind": "animal",
+			"model": "Assets/Game Objects/Lifeforms/BilateralTwoLegs.fbx",
+			"triangles": 3640,
+			"size": {
+				"width": 0.278,
+				"height": 0.808,
+				"length": 1.0
+			},
+			"materials": [
+				"BilateralTwoLegs Skin",
+				"BilateralTwoLegs Detail"
+			],
+			"textures": {
+				"albedo": "BilateralTwoLegs - Albedo.png",
+				"normal": "BilateralTwoLegs - Normal.png",
+				"occlusion": "BilateralTwoLegs - Occlusion.png",
+				"specular": "BilateralTwoLegs - Specular.png"
+			}
+		},
+		{
+			"name": "BilateralFourLegs",
+			"plan": "BilateralFourLegs",
+			"kind": "animal",
+			"model": "Assets/Game Objects/Lifeforms/BilateralFourLegs.fbx",
+			"triangles": 3618,
+			"size": {
+				"width": 0.337,
+				"height": 0.54,
+				"length": 1.0
+			},
+			"materials": [
+				"BilateralFourLegs Skin",
+				"BilateralFourLegs Detail"
+			],
+			"textures": {
+				"albedo": "BilateralFourLegs - Albedo.png",
+				"normal": "BilateralFourLegs - Normal.png",
+				"occlusion": "BilateralFourLegs - Occlusion.png",
+				"specular": "BilateralFourLegs - Specular.png"
+			}
+		},
+		{
+			"name": "BilateralManyLegs",
+			"plan": "BilateralManyLegs",
+			"kind": "animal",
+			"model": "Assets/Game Objects/Lifeforms/BilateralManyLegs.fbx",
+			"triangles": 3380,
+			"size": {
+				"width": 0.615,
+				"height": 0.406,
+				"length": 1.0
+			},
+			"materials": [
+				"BilateralManyLegs Skin",
+				"BilateralManyLegs Detail"
+			],
+			"textures": {
+				"albedo": "BilateralManyLegs - Albedo.png",
+				"emissive": "BilateralManyLegs - Emissive.png",
+				"normal": "BilateralManyLegs - Normal.png",
+				"occlusion": "BilateralManyLegs - Occlusion.png",
+				"specular": "BilateralManyLegs - Specular.png"
+			}
+		},
+		{
+			"name": "RadialNoLegs",
+			"plan": "RadialNoLegs",
+			"kind": "animal",
+			"model": "Assets/Game Objects/Lifeforms/RadialNoLegs.fbx",
+			"triangles": 3818,
+			"size": {
+				"width": 0.994,
+				"height": 0.524,
+				"length": 1.0
+			},
+			"materials": [
+				"RadialNoLegs Skin",
+				"RadialNoLegs Detail"
+			],
+			"textures": {
+				"albedo": "RadialNoLegs - Albedo.png",
+				"emissive": "RadialNoLegs - Emissive.png",
+				"normal": "RadialNoLegs - Normal.png",
+				"occlusion": "RadialNoLegs - Occlusion.png",
+				"specular": "RadialNoLegs - Specular.png"
+			}
+		},
+		{
+			"name": "RadialFewLegs",
+			"plan": "RadialFewLegs",
+			"kind": "animal",
+			"model": "Assets/Game Objects/Lifeforms/RadialFewLegs.fbx",
+			"triangles": 3902,
+			"size": {
+				"width": 0.876,
+				"height": 1.0,
+				"length": 0.489
+			},
+			"materials": [
+				"RadialFewLegs Skin",
+				"RadialFewLegs Detail"
+			],
+			"textures": {
+				"albedo": "RadialFewLegs - Albedo.png",
+				"emissive": "RadialFewLegs - Emissive.png",
+				"normal": "RadialFewLegs - Normal.png",
+				"occlusion": "RadialFewLegs - Occlusion.png",
+				"specular": "RadialFewLegs - Specular.png"
+			}
+		},
+		{
+			"name": "RadialManyLegs",
+			"plan": "RadialManyLegs",
+			"kind": "animal",
+			"model": "Assets/Game Objects/Lifeforms/RadialManyLegs.fbx",
+			"triangles": 3944,
+			"size": {
+				"width": 0.977,
+				"height": 0.563,
+				"length": 1.0
+			},
+			"materials": [
+				"RadialManyLegs Skin",
+				"RadialManyLegs Detail"
+			],
+			"textures": {
+				"albedo": "RadialManyLegs - Albedo.png",
+				"emissive": "RadialManyLegs - Emissive.png",
+				"normal": "RadialManyLegs - Normal.png",
+				"occlusion": "RadialManyLegs - Occlusion.png",
+				"specular": "RadialManyLegs - Specular.png"
+			}
+		},
+		{
+			"name": "AmorphousNoLegs",
+			"plan": "AmorphousNoLegs",
+			"kind": "animal",
+			"model": "Assets/Game Objects/Lifeforms/AmorphousNoLegs.fbx",
+			"triangles": 3340,
+			"size": {
+				"width": 1.0,
+				"height": 0.699,
+				"length": 0.871
+			},
+			"materials": [
+				"AmorphousNoLegs Skin",
+				"AmorphousNoLegs Detail"
+			],
+			"textures": {
+				"albedo": "AmorphousNoLegs - Albedo.png",
+				"normal": "AmorphousNoLegs - Normal.png",
+				"occlusion": "AmorphousNoLegs - Occlusion.png",
+				"specular": "AmorphousNoLegs - Specular.png"
+			}
+		},
+		{
+			"name": "AmorphousLegs",
+			"plan": "AmorphousLegs",
+			"kind": "animal",
+			"model": "Assets/Game Objects/Lifeforms/AmorphousLegs.fbx",
+			"triangles": 3168,
+			"size": {
+				"width": 1.0,
+				"height": 0.746,
+				"length": 0.964
+			},
+			"materials": [
+				"AmorphousLegs Skin",
+				"AmorphousLegs Detail"
+			],
+			"textures": {
+				"albedo": "AmorphousLegs - Albedo.png",
+				"normal": "AmorphousLegs - Normal.png",
+				"occlusion": "AmorphousLegs - Occlusion.png",
+				"specular": "AmorphousLegs - Specular.png"
+			}
+		},
+		{
+			"name": "LeavedSmallA",
+			"plan": "LeavedSmall",
+			"kind": "plant",
+			"model": "Assets/Game Objects/Lifeforms/LeavedSmallA.fbx",
+			"triangles": 1292,
+			"size": {
+				"width": 1.0,
+				"height": 0.699,
+				"length": 1.0
+			},
+			"materials": [
+				"LeavedSmallA Skin",
+				"LeavedSmallA Detail"
+			],
+			"textures": {
+				"albedo": "LeavedSmallA - Albedo.png",
+				"emissive": "LeavedSmallA - Emissive.png",
+				"normal": "LeavedSmallA - Normal.png",
+				"occlusion": "LeavedSmallA - Occlusion.png",
+				"specular": "LeavedSmallA - Specular.png"
+			}
+		},
+		{
+			"name": "LeavedSmallB",
+			"plan": "LeavedSmall",
+			"kind": "plant",
+			"model": "Assets/Game Objects/Lifeforms/LeavedSmallB.fbx",
+			"triangles": 1948,
+			"size": {
+				"width": 0.669,
+				"height": 1.0,
+				"length": 0.708
+			},
+			"materials": [
+				"LeavedSmallB Skin",
+				"LeavedSmallB Detail"
+			],
+			"textures": {
+				"albedo": "LeavedSmallB - Albedo.png",
+				"normal": "LeavedSmallB - Normal.png",
+				"occlusion": "LeavedSmallB - Occlusion.png",
+				"specular": "LeavedSmallB - Specular.png"
+			}
+		},
+		{
+			"name": "LeavedMediumA",
+			"plan": "LeavedMedium",
+			"kind": "plant",
+			"model": "Assets/Game Objects/Lifeforms/LeavedMediumA.fbx",
+			"triangles": 2536,
+			"size": {
+				"width": 0.974,
+				"height": 0.844,
+				"length": 1.0
+			},
+			"materials": [
+				"LeavedMediumA Skin",
+				"LeavedMediumA Detail"
+			],
+			"textures": {
+				"albedo": "LeavedMediumA - Albedo.png",
+				"normal": "LeavedMediumA - Normal.png",
+				"occlusion": "LeavedMediumA - Occlusion.png",
+				"specular": "LeavedMediumA - Specular.png"
+			}
+		},
+		{
+			"name": "LeavedMediumB",
+			"plan": "LeavedMedium",
+			"kind": "plant",
+			"model": "Assets/Game Objects/Lifeforms/LeavedMediumB.fbx",
+			"triangles": 2352,
+			"size": {
+				"width": 0.804,
+				"height": 1.0,
+				"length": 0.757
+			},
+			"materials": [
+				"LeavedMediumB Skin",
+				"LeavedMediumB Detail"
+			],
+			"textures": {
+				"albedo": "LeavedMediumB - Albedo.png",
+				"emissive": "LeavedMediumB - Emissive.png",
+				"normal": "LeavedMediumB - Normal.png",
+				"occlusion": "LeavedMediumB - Occlusion.png",
+				"specular": "LeavedMediumB - Specular.png"
+			}
+		},
+		{
+			"name": "LeavedLargeA",
+			"plan": "LeavedLarge",
+			"kind": "plant",
+			"model": "Assets/Game Objects/Lifeforms/LeavedLargeA.fbx",
+			"triangles": 3588,
+			"size": {
+				"width": 1.0,
+				"height": 0.912,
+				"length": 0.999
+			},
+			"materials": [
+				"LeavedLargeA Skin",
+				"LeavedLargeA Detail"
+			],
+			"textures": {
+				"albedo": "LeavedLargeA - Albedo.png",
+				"normal": "LeavedLargeA - Normal.png",
+				"occlusion": "LeavedLargeA - Occlusion.png",
+				"specular": "LeavedLargeA - Specular.png"
+			}
+		},
+		{
+			"name": "LeavedLargeB",
+			"plan": "LeavedLarge",
+			"kind": "plant",
+			"model": "Assets/Game Objects/Lifeforms/LeavedLargeB.fbx",
+			"triangles": 3264,
+			"size": {
+				"width": 1.0,
+				"height": 0.946,
+				"length": 1.0
+			},
+			"materials": [
+				"LeavedLargeB Skin",
+				"LeavedLargeB Detail"
+			],
+			"textures": {
+				"albedo": "LeavedLargeB - Albedo.png",
+				"emissive": "LeavedLargeB - Emissive.png",
+				"normal": "LeavedLargeB - Normal.png",
+				"occlusion": "LeavedLargeB - Occlusion.png",
+				"specular": "LeavedLargeB - Specular.png"
+			}
+		}
+	]
+}
