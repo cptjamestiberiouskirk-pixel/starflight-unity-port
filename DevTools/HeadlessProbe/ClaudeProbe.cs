@@ -13786,9 +13786,13 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 1: alien vessels with their own armor, shields and speed
 
-	// enters an encounter of a race and returns how far its first ship travels per real second over some seconds, and whether its ships have the armor and shield
-	// points of their vessels in the game data
-	static IEnumerator AlienShipTravel( GameData.Race race, float seconds, float[] perSecond, string[] points )
+	// enters an encounter of a race and returns how far its first ship travels per second of game time over some seconds of game time, the name and move delay of
+	// that ship's vessel, and whether its ships have the armor and shield points of their vessels in the game data
+	// each ship's vessel is picked at random from the encounter's vessels, and the vessels of one race do not all have the same move delay (the Elowan warship has
+	// 2700, the transport and the scout 2200), so the speed has to be compared with the move delay of the ship that was watched
+	// game time and not real time: the coroutine runs after the encounter's Update of the same frame, so the ship has moved by this frame's Time.deltaTime, which
+	// Unity caps on a slow frame (on such a frame real time runs ahead of the ship)
+	static IEnumerator AlienShipTravel( GameData.Race race, float seconds, float[] perSecond, int[] moveDelay, string[] vesselName, string[] points )
 	{
 		var gameData = DataController.m_instance.m_gameData;
 		var encounter = SpaceflightController.m_instance.m_encounter;
@@ -13809,19 +13813,27 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		var watched = ships[ 0 ];
+
+		moveDelay[ 0 ] = gameData.m_vesselList[ watched.m_vesselId ].m_moveDelay;
+		vesselName[ 0 ] = gameData.m_vesselList[ watched.m_vesselId ].m_name;
+
 		var last = watched.m_coordinates;
 		var travelled = 0.0f;
-		var end = Time.realtimeSinceStartup + seconds;
+		var elapsed = 0.0f;
 
-		while ( Time.realtimeSinceStartup < end )
+		// a limit in real time in case game time stands still
+		var giveUp = Time.realtimeSinceStartup + seconds * 10.0f;
+
+		while ( ( elapsed < seconds ) && ( Time.realtimeSinceStartup < giveUp ) )
 		{
 			yield return null;
 
 			travelled += Vector3.Distance( last, watched.m_coordinates );
+			elapsed += Time.deltaTime;
 			last = watched.m_coordinates;
 		}
 
-		perSecond[ 0 ] = travelled / seconds;
+		perSecond[ 0 ] = ( elapsed > 0.0f ) ? ( travelled / elapsed ) : 0.0f;
 
 		ClearMissiles();
 		LeaveEncounter();
@@ -13831,21 +13843,31 @@ public class ClaudeProbe : MonoBehaviour
 	IEnumerator ScenarioVesselStats()
 	{
 		var perSecond = new float[ 1 ];
+		var moveDelay = new int[ 1 ];
+		var vesselName = new string[ 1 ];
 		var points = new string[ 1 ];
 
 		EnsureCrew();
 
-		yield return AlienShipTravel( GameData.Race.Spemin, 3.0f, perSecond, points );
+		yield return AlienShipTravel( GameData.Race.Spemin, 3.0f, perSecond, moveDelay, vesselName, points );
 
 		var speminSpeed = perSecond[ 0 ];
+		var speminDelay = moveDelay[ 0 ];
+		var speminVessel = vesselName[ 0 ];
 		var speminPoints = points[ 0 ];
 
-		yield return AlienShipTravel( GameData.Race.Elowan, 3.0f, perSecond, points );
+		yield return AlienShipTravel( GameData.Race.Elowan, 3.0f, perSecond, moveDelay, vesselName, points );
 
 		var elowanSpeed = perSecond[ 0 ];
+		var elowanDelay = moveDelay[ 0 ];
+		var elowanVessel = vesselName[ 0 ];
 		var elowanPoints = points[ 0 ];
 
 		var ratio = ( elowanSpeed > 0.0f ) ? ( speminSpeed / elowanSpeed ) : -1.0f;
+
+		// the shorter the move delay the faster: the speeds go as the inverse of the delays (2200 / 1500 = 1.47 for an Elowan transport or scout, 2700 / 1500 = 1.80
+		// for an Elowan warship)
+		var expected = ( speminDelay > 0 ) ? ( (float) elowanDelay / speminDelay ) : -1.0f;
 
 		// every ship has the points of its vessel: "armor/vessel's armor shields/vessel's shields" with the two halves equal
 		var allMatch = true;
@@ -13865,12 +13887,12 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		Log( "vesselstats: spemin ships " + speminPoints + "| elowan ships " + elowanPoints + "| travel per second: spemin " + speminSpeed.ToString( "0.0" ) + ", elowan " + elowanSpeed.ToString( "0.0" ) + ", ratio " + ratio.ToString( "0.00" ) + " (move delays 1500 and 2200: 1.47)" );
+		Log( "vesselstats: spemin ships " + speminPoints + "| elowan ships " + elowanPoints + "| travel per second of game time: " + speminVessel + " (move delay " + speminDelay + ") " + speminSpeed.ToString( "0.0" ) + ", " + elowanVessel + " (move delay " + elowanDelay + ") " + elowanSpeed.ToString( "0.0" ) + ", ratio " + ratio.ToString( "0.000" ) + " (expected " + expected.ToString( "0.000" ) + ")" );
 
 		Check( "vesselstats: every alien ship has the armor and shield points of its vessel in the game data", allMatch, speminPoints + elowanPoints );
-		Check( "vesselstats: an alien ship moves at the speed of its vessel's move delay (a Spemin ship 2200 / 1500 times as fast as an Elowan one)", ( ratio > 1.3f ) && ( ratio < 1.65f ), ratio.ToString( "0.00" ) );
+		Check( "vesselstats: an alien ship moves at the speed of its vessel's move delay (a Spemin ship is as many times as fast as an Elowan one as the Elowan vessel's move delay is longer)", ( expected > 1.0f ) && ( Mathf.Abs( ratio - expected ) < 0.02f * expected ), ratio.ToString( "0.000" ) + " (expected " + expected.ToString( "0.000" ) + ", " + speminVessel + " " + speminDelay + ", " + elowanVessel + " " + elowanDelay + ")" );
 
-		Finish( "scenario=vesselstats ratio=" + ratio.ToString( "0.00" ) + " points=" + allMatch, 0 );
+		Finish( "scenario=vesselstats ratio=" + ratio.ToString( "0.000" ) + " expected=" + expected.ToString( "0.000" ) + " elowan=" + elowanDelay + " points=" + allMatch, 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 1: the starmap's fuel estimate
