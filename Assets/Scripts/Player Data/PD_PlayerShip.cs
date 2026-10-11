@@ -52,6 +52,22 @@ public class PD_PlayerShip
 	// the part of an armor point that has been repaired so far
 	public float m_repairProgress;
 
+	// the ship's systems other than the hull, whose damage is the armor points (the original's damage screen has a bar for the hull, engines, sensors, comm,
+	// shield, missile and laser - SS Damage) - the order is saved, append and never reorder
+	public enum ShipSystem
+	{
+		Engines,
+		Sensors,
+		Comm,
+		Shields,
+		Missiles,
+		Lasers,
+		Count
+	}
+
+	// how whole each system is, from 0 (destroyed) to 100 (undamaged), by ShipSystem (null in save files from before the systems could be damaged)
+	public int[] m_systemHealth;
+
 	public void Reset()
 	{
 		// reset the ship name
@@ -69,6 +85,11 @@ public class PD_PlayerShip
 
 		// reset fuel used to zero
 		m_fuelUsed = 0.0f;
+
+		// every system is whole
+		m_systemHealth = null;
+
+		EnsureSystemHealth();
 
 		// reset other stuff
 		m_shieldsAreUp = false;
@@ -174,6 +195,142 @@ public class PD_PlayerShip
 
 		// rounded up, so that a repair is never free
 		return (int) ( ( (long) missingPoints * armor.m_buyPrice + armor.m_points - 1 ) / armor.m_points );
+	}
+
+	// make sure there is a health for every system (save files from before the systems could be damaged have none: their systems are whole)
+	void EnsureSystemHealth()
+	{
+		if ( ( m_systemHealth != null ) && ( m_systemHealth.Length == (int) ShipSystem.Count ) )
+		{
+			return;
+		}
+
+		var health = new int[ (int) ShipSystem.Count ];
+
+		for ( var system = 0; system < health.Length; system++ )
+		{
+			health[ system ] = ( ( m_systemHealth != null ) && ( system < m_systemHealth.Length ) ) ? m_systemHealth[ system ] : 100;
+		}
+
+		m_systemHealth = health;
+	}
+
+	// how whole a system is, from 0 to 100
+	public int GetSystemHealth( ShipSystem system )
+	{
+		EnsureSystemHealth();
+
+		return m_systemHealth[ (int) system ];
+	}
+
+	// set how whole a system is (kept between 0 and 100)
+	public void SetSystemHealth( ShipSystem system, int health )
+	{
+		EnsureSystemHealth();
+
+		m_systemHealth[ (int) system ] = Mathf.Clamp( health, 0, 100 );
+	}
+
+	// true if the ship has this system (the engines, the sensors and the comm always; the shields, the missiles and the lasers once they are installed)
+	public bool HasSystem( ShipSystem system )
+	{
+		switch ( system )
+		{
+			case ShipSystem.Shields: return m_shieldingClass > 0;
+			case ShipSystem.Missiles: return m_missileLauncherClass > 0;
+			case ShipSystem.Lasers: return m_laserCannonClass > 0;
+			case ShipSystem.Count: return false;
+			default: return true;
+		}
+	}
+
+	// the name of a system, as the damage report shows it (the shields, the missiles and the lasers by their equipment, as the report also shows the shields' charge)
+	public static string GetSystemName( ShipSystem system )
+	{
+		switch ( system )
+		{
+			case ShipSystem.Engines: return "Engines";
+			case ShipSystem.Sensors: return "Sensors";
+			case ShipSystem.Comm: return "Comm";
+			case ShipSystem.Shields: return "Shield generator";
+			case ShipSystem.Missiles: return "Missile launcher";
+			case ShipSystem.Lasers: return "Laser cannon";
+			default: return "?";
+		}
+	}
+
+	// true if every system is whole
+	public bool AllSystemsAreWhole()
+	{
+		for ( var system = 0; system < (int) ShipSystem.Count; system++ )
+		{
+			if ( GetSystemHealth( (ShipSystem) system ) < 100 )
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	// make every system whole again
+	public void RestoreSystems()
+	{
+		for ( var system = 0; system < (int) ShipSystem.Count; system++ )
+		{
+			SetSystemHealth( (ShipSystem) system, 100 );
+		}
+	}
+
+	// a hit that has got through the shields damages the hull (the armor points) and one of the ship's other systems, chosen at random, by the same share of it as of
+	// the hull (the owner's ruling of 2026-10-11 for roadmap 1.2; the share is the port's choice) - returns the system it damaged (Count if none)
+	public ShipSystem DamageRandomSystem( int damage )
+	{
+		var maximumArmor = GetMaximumArmorPoints();
+
+		if ( ( damage <= 0 ) || ( maximumArmor <= 0 ) )
+		{
+			return ShipSystem.Count;
+		}
+
+		// how many systems the ship has
+		var installed = 0;
+
+		for ( var system = 0; system < (int) ShipSystem.Count; system++ )
+		{
+			if ( HasSystem( (ShipSystem) system ) )
+			{
+				installed++;
+			}
+		}
+
+		if ( installed == 0 )
+		{
+			return ShipSystem.Count;
+		}
+
+		// pick one of them
+		var pick = UnityEngine.Random.Range( 0, installed );
+
+		for ( var system = 0; system < (int) ShipSystem.Count; system++ )
+		{
+			if ( !HasSystem( (ShipSystem) system ) )
+			{
+				continue;
+			}
+
+			if ( pick-- == 0 )
+			{
+				// the same share as of the hull, rounded up so that every hit leaves a mark
+				var share = Mathf.CeilToInt( damage * 100.0f / maximumArmor );
+
+				SetSystemHealth( (ShipSystem) system, GetSystemHealth( (ShipSystem) system ) - share );
+
+				return (ShipSystem) system;
+			}
+		}
+
+		return ShipSystem.Count;
 	}
 
 	public int GetMaximumArmorPoints()

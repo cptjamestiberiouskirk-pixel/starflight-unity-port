@@ -53,6 +53,22 @@ public class DamageButton : ShipButton
 			report += "Hull: " + armorStatus;
 		}
 
+		// and how whole each of the ship's other systems is (SS Damage: hull, engines, sensors, comm, shield, missile, laser)
+		for ( var system = 0; system < (int) PD_PlayerShip.ShipSystem.Count; system++ )
+		{
+			var shipSystem = (PD_PlayerShip.ShipSystem) system;
+
+			if ( !ship.HasSystem( shipSystem ) )
+			{
+				continue;
+			}
+
+			var health = ship.GetSystemHealth( shipSystem );
+			var healthColor = health >= 75 ? "#00FF00" : ( health >= 25 ? "#FFFF00" : "#FF0000" );
+
+			report += "\n" + PD_PlayerShip.GetSystemName( shipSystem ) + ": <color=" + healthColor + ">" + health + "%</color>";
+		}
+
 		SpaceflightController.m_instance.m_messages.AddText( report );
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 		SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
