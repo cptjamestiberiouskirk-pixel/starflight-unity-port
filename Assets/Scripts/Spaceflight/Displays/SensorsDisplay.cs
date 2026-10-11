@@ -54,6 +54,9 @@ public class SensorsDisplay : ShipDisplay
 	// the disc of the planet mask is 501 of its 512 rows high
 	const float c_planetMaskDiscFraction = 501.0f / 512.0f;
 
+	// how fast the planet in the window turns (turns per second: once in two minutes, as the planet in the orbit view turns at 3 degrees a second)
+	const float c_planetTurnsPerSecond = 1.0f / 120.0f;
+
 	// the mass text
 	public TextMeshProUGUI m_massText;
 
@@ -117,6 +120,21 @@ public class SensorsDisplay : ShipDisplay
 	// the mask material
 	Material m_maskMaterial;
 
+	// the material that draws a planet's own surface in the disc of the planet mask (the Sensor Planet shader)
+	public Material m_planetMaterial;
+
+	// our copy of it (made the first time the display is shown, so the file doesn't get updated)
+	Material m_planetSurfaceMaterial;
+
+	// the material the picture is drawn with for this scan (the mask material, or the planet surface material for a planet that has its maps)
+	Material m_pictureMaterial;
+
+	// the albedo map of the planet in the picture (the planet's generator destroys it when the maps are no longer needed, and the picture goes back to the noise then)
+	Texture m_planetAlbedoTexture;
+
+	// how far the planet in the picture has turned (in turns)
+	float m_planetSpin;
+
 	// the inside of the window when a scan has no picture: black inside a magenta border, as the original shows an unidentified object
 	// (a copy of the panel, made the first time the display is shown)
 	Image m_emptyImage;
@@ -154,6 +172,9 @@ public class SensorsDisplay : ShipDisplay
 	// unity update
 	public override void Update()
 	{
+		// the planet in the picture keeps turning once the scan is over
+		UpdatePlanetSurface();
+
 		// are we doing the cinematics?
 		if ( !m_isDoingCinematics )
 		{
@@ -221,7 +242,13 @@ public class SensorsDisplay : ShipDisplay
 		m_maskImage.color = new Color( r, g, b );
 
 		// give the main (noise) texture a random posititon
-		m_maskMaterial.SetTextureOffset( "_MainTex", new Vector2( Random.Range( 0.0f, 1.0f ), Random.Range( 0.0f, 1.0f ) ) );
+		m_pictureMaterial.SetTextureOffset( "_MainTex", new Vector2( Random.Range( 0.0f, 1.0f ), Random.Range( 0.0f, 1.0f ) ) );
+
+		// the noise fades into the planet's surface as the scan goes on (slowly at first, so the scan starts as the noise)
+		if ( m_pictureMaterial == m_planetSurfaceMaterial )
+		{
+			m_planetSurfaceMaterial.SetFloat( "_Reveal", alpha * alpha );
+		}
 
 		// is the cinematics done?
 		if ( !m_isDoingCinematics )
@@ -399,6 +426,18 @@ public class SensorsDisplay : ShipDisplay
 			m_maskImage.material = m_maskMaterial;
 		}
 
+		// make a copy of the planet surface material so the file doesn't get updated
+		if ( ( m_planetSurfaceMaterial == null ) && ( m_planetMaterial != null ) )
+		{
+			m_planetSurfaceMaterial = new Material( m_planetMaterial );
+		}
+
+		// until something is scanned the picture is drawn with the mask material
+		if ( m_pictureMaterial == null )
+		{
+			m_pictureMaterial = m_maskMaterial;
+		}
+
 		// clip everything in the window to the panel (once)
 		if ( ( m_windowClip == null ) && ( m_panelImage != null ) )
 		{
@@ -540,6 +579,83 @@ public class SensorsDisplay : ShipDisplay
 		return discPixels / c_originalWindowHeight * windowHeight / pictureDiscHeight;
 	}
 
+	// puts the surface of the planet the ship is at into the picture, if that planet has its maps (otherwise the picture stays the noise)
+	void ShowPlanetSurface()
+	{
+		if ( ( m_planetSurfaceMaterial == null ) || ( SpaceflightController.m_instance == null ) || ( SpaceflightController.m_instance.m_starSystem == null ) )
+		{
+			return;
+		}
+
+		// the planet the ship is at
+		var planetId = DataController.m_instance.m_playerData.m_general.m_currentPlanetId;
+		var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( planetId );
+
+		// a planet whose maps are still being made, or could not be made, has no surface to show (the grey ball of a planet that could not be mapped is not its surface)
+		if ( ( planetController == null ) || !planetController.HasMaps() )
+		{
+			return;
+		}
+
+		var planetGenerator = planetController.GetPlanetGenerator();
+
+		if ( ( planetGenerator.m_albedoTexture == null ) || ( planetGenerator.m_waterMaskTexture == null ) || ( planetGenerator.m_normalTexture == null ) )
+		{
+			return;
+		}
+
+		// the planet's maps
+		m_planetSurfaceMaterial.SetTexture( "_PlanetTex", planetGenerator.m_albedoTexture );
+		m_planetSurfaceMaterial.SetTexture( "_WaterTex", planetGenerator.m_waterMaskTexture );
+		m_planetSurfaceMaterial.SetTexture( "_NormalTex", planetGenerator.m_normalTexture );
+
+		// the rim of its atmosphere (a gas giant has none)
+		var planet = planetController.m_planet;
+
+		m_planetSurfaceMaterial.SetColor( "_AtmosphereColor", planet.HasAtmosphere() ? planet.GetAtmosphereColor() : Color.black );
+
+		// the scan starts as the noise
+		m_planetSurfaceMaterial.SetFloat( "_Reveal", 0.0f );
+		m_planetSurfaceMaterial.SetFloat( "_Spin", m_planetSpin );
+
+		m_planetAlbedoTexture = planetGenerator.m_albedoTexture;
+		m_pictureMaterial = m_planetSurfaceMaterial;
+	}
+
+	// turns the planet in the picture, and goes back to the noise if its maps have been destroyed (the ship has left the star system)
+	void UpdatePlanetSurface()
+	{
+		if ( ( m_pictureMaterial == null ) || ( m_pictureMaterial != m_planetSurfaceMaterial ) )
+		{
+			return;
+		}
+
+		// a destroyed texture compares equal to null
+		if ( m_planetAlbedoTexture == null )
+		{
+			m_pictureMaterial = m_maskMaterial;
+			m_maskImage.material = m_maskMaterial;
+
+			return;
+		}
+
+		// the planet stands still while the game is paused
+		if ( ( SpaceflightController.m_instance != null ) && SpaceflightController.m_instance.m_gameIsPaused )
+		{
+			return;
+		}
+
+		m_planetSpin += Time.deltaTime * c_planetTurnsPerSecond;
+
+		// wrap the spin around to avoid FP issues
+		if ( m_planetSpin >= 1.0f )
+		{
+			m_planetSpin -= 1.0f;
+		}
+
+		m_planetSurfaceMaterial.SetFloat( "_Spin", m_planetSpin );
+	}
+
 	// call this to start the scanning cinematics (vessel id is the vessel that left the debris, for a debris scan)
 	public void StartScanning( ScanType scanType, int massPowerBase, int mass, int bioDensity, int mineralDensity, int vesselId = -1 )
 	{
@@ -601,6 +717,17 @@ public class SensorsDisplay : ShipDisplay
 
 			m_maskMaterial.SetTexture( "_MaskTex", maskTexture );
 		}
+
+		// a planet that has its maps shows its own surface in the disc, anything else the noise
+		m_pictureMaterial = m_maskMaterial;
+		m_planetAlbedoTexture = null;
+
+		if ( hasPicture && ( scanType == ScanType.Planet ) )
+		{
+			ShowPlanetSurface();
+		}
+
+		m_maskImage.material = m_pictureMaterial;
 
 		// reset background and mask image scale
 		m_maskImage.transform.localScale = m_backgroundImage.transform.localScale = Vector3.one;
