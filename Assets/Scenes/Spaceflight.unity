@@ -55300,6 +55300,7 @@ MonoBehaviour:
   m_maxDuration: 8
   m_hasSensorData: 0
   m_scanType: 0
+  m_planetMaterial: {fileID: 2100000, guid: a087aed4fe7c4228ac2e96cc7a839b72, type: 2}
 --- !u!1 &1411654653
 GameObject:
   m_ObjectHideFlags: 0

@@ -757,6 +757,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLifeBehaviour();
 				break;
 
+			case "sensorplanet":
+				yield return ScenarioSensorPlanet();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -17119,6 +17123,182 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lifebehaviour: a wimpy one flees it", fleeAfter > fleeBefore + 5.0f, fleeBefore + " -> " + fleeAfter );
 
 		Finish( "scenario=lifebehaviour approach=" + approachBefore + "/" + approachAfter + " flee=" + fleeBefore + "/" + fleeAfter, 0 );
+	}
+
+	// ---------------------------------------------------------------- the planet's own surface in the sensor window
+
+	// the material the sensor picture is drawn with: its shader, the albedo map on it, how far the noise has faded into the planet, how far it has turned
+	static string SensorMaterial( SensorsDisplay sensors )
+	{
+		var material = sensors.m_maskImage.material;
+
+		if ( material == null )
+		{
+			return "material=null";
+		}
+
+		var planetTexture = material.HasProperty( "_PlanetTex" ) ? material.GetTexture( "_PlanetTex" ) : null;
+		var reveal = material.HasProperty( "_Reveal" ) ? material.GetFloat( "_Reveal" ).ToString( "F3" ) : "-";
+		var spin = material.HasProperty( "_Spin" ) ? material.GetFloat( "_Spin" ).ToString( "F5" ) : "-";
+
+		return "shader=" + material.shader.name + " planetTex=" + ( ( planetTexture != null ) ? planetTexture.name + "#" + planetTexture.GetInstanceID() : "none" ) + " reveal=" + reveal + " spin=" + spin;
+	}
+
+	static bool ShowsPlanetSurface( SensorsDisplay sensors )
+	{
+		var material = sensors.m_maskImage.material;
+
+		return ( material != null ) && ( material.shader.name == "Custom/UI/Sensor Planet" );
+	}
+
+	static bool ShowsNoise( SensorsDisplay sensors )
+	{
+		var material = sensors.m_maskImage.material;
+
+		return ( material != null ) && ( material.shader.name == "Custom/UI/Masked Image" );
+	}
+
+	IEnumerator ScenarioSensorPlanet()
+	{
+		var spaceflightController = SpaceflightController.m_instance;
+		var sensors = spaceflightController.m_displayController.m_sensorsDisplay;
+		var starSystem = spaceflightController.m_starSystem;
+		var gameData = DataController.m_instance.m_gameData;
+
+		EnsureCrew();
+
+		var exceptionsBefore = s_exceptionCount;
+
+		// ---- a planet that has its maps (94, the small rock planet of the Arth system): its own surface fades in out of the noise and keeps turning
+		yield return EnterOrbit( 94 );
+
+		var planetController = starSystem.GetPlanetController( 94 );
+		var hasMaps = ( planetController != null ) && planetController.HasMaps();
+		var albedo = hasMaps ? planetController.GetPlanetGenerator().m_albedoTexture : null;
+		var planet = gameData.m_planetList[ 94 ];
+
+		spaceflightController.m_displayController.ChangeDisplay( sensors );
+		yield return Frames( 3 );
+
+		sensors.m_hasSensorData = false;
+		sensors.StartScanning( SensorsDisplay.ScanType.Planet, 18, planet.m_mass, planet.m_bioDensity, planet.m_mineralDensity );
+		yield return Frames( 2 );
+
+		var atStart = SensorMaterial( sensors );
+		var planetTexture = ShowsPlanetSurface( sensors ) ? sensors.m_maskImage.material.GetTexture( "_PlanetTex" ) : null;
+
+		Check( "a planet with maps is drawn with the sensor planet shader", hasMaps && ShowsPlanetSurface( sensors ), "hasMaps=" + hasMaps + " " + atStart );
+		Check( "the picture has the planet's own albedo map", ( albedo != null ) && ( planetTexture == albedo ), "albedo=" + ( ( albedo != null ) ? albedo.GetInstanceID().ToString() : "none" ) + " " + atStart );
+		Check( "the scan starts as the noise", ShowsPlanetSurface( sensors ) && ( sensors.m_maskImage.material.GetFloat( "_Reveal" ) < 0.2f ), atStart );
+		Check( "the planet's disc keeps the size the original gives it", Mathf.Approximately( sensors.m_maskImage.transform.localScale.y, sensors.GetPlanetPictureScale( 18, planet.m_mass ) ), "scale=" + sensors.m_maskImage.transform.localScale.y + " expected=" + sensors.GetPlanetPictureScale( 18, planet.m_mass ) );
+
+		var until = Time.realtimeSinceStartup + sensors.m_maxDuration + 5.0f;
+
+		while ( !sensors.m_hasSensorData && ( Time.realtimeSinceStartup < until ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 2 );
+
+		var atEnd = SensorMaterial( sensors );
+		var spinAtEnd = ShowsPlanetSurface( sensors ) ? sensors.m_maskImage.material.GetFloat( "_Spin" ) : -1.0f;
+
+		Check( "at the end of the scan the planet has replaced the noise", sensors.m_hasSensorData && ShowsPlanetSurface( sensors ) && Mathf.Approximately( sensors.m_maskImage.material.GetFloat( "_Reveal" ), 1.0f ), "finished=" + sensors.m_hasSensorData + " " + atEnd );
+		Check( "control: the readout is still there", sensors.m_massText.text.Contains( "Mass: " ) && sensors.m_bioMinText.text.Contains( "Min: " ), "mass=[" + sensors.m_massText.text + "] bioMin=[" + sensors.m_bioMinText.text + "]" );
+
+		// it turns once the scan is over
+		var turnUntil = Time.realtimeSinceStartup + 1.5f;
+
+		while ( Time.realtimeSinceStartup < turnUntil )
+		{
+			yield return null;
+		}
+
+		var spinLater = ShowsPlanetSurface( sensors ) ? sensors.m_maskImage.material.GetFloat( "_Spin" ) : -1.0f;
+
+		Check( "the planet keeps turning after the scan", ( spinAtEnd >= 0.0f ) && ( spinLater > spinAtEnd ), "spin at the end " + spinAtEnd.ToString( "F5" ) + ", 1.5 s later " + spinLater.ToString( "F5" ) );
+
+		// and stands still while the game is paused
+		spaceflightController.m_gameIsPaused = true;
+
+		var spinPaused = ShowsPlanetSurface( sensors ) ? sensors.m_maskImage.material.GetFloat( "_Spin" ) : -1.0f;
+
+		yield return Frames( 20 );
+
+		var spinPausedLater = ShowsPlanetSurface( sensors ) ? sensors.m_maskImage.material.GetFloat( "_Spin" ) : -1.0f;
+
+		spaceflightController.m_gameIsPaused = false;
+
+		Check( "the planet stands still while the game is paused", ( spinPaused >= 0.0f ) && Mathf.Approximately( spinPaused, spinPausedLater ), "spin " + spinPaused.ToString( "F5" ) + " then " + spinPausedLater.ToString( "F5" ) );
+
+		// ---- a vessel scan is the noise, as before (control)
+		spaceflightController.m_displayController.ChangeDisplay( sensors );
+		sensors.StartScanning( SensorsDisplay.ScanType.SpeminScout, 1, 400, 100, 100 );
+		yield return Frames( 2 );
+
+		Check( "control: a vessel scan is drawn with the noise", ShowsNoise( sensors ) && PictureShown( sensors ), SensorMaterial( sensors ) + " | " + SensorPicture( sensors ) );
+
+		// ---- the maps of the planet in the picture are destroyed (the ship leaves the star system): the picture goes back to the noise instead of a missing texture
+		spaceflightController.m_displayController.ChangeDisplay( sensors );
+		sensors.StartScanning( SensorsDisplay.ScanType.Planet, 18, planet.m_mass, planet.m_bioDensity, planet.m_mineralDensity );
+		yield return Frames( 2 );
+
+		var beforeRelease = ShowsPlanetSurface( sensors );
+
+		if ( planetController != null )
+		{
+			planetController.GetPlanetGenerator().Release();
+		}
+
+		yield return Frames( 3 );
+
+		Check( "a picture whose maps are destroyed goes back to the noise", beforeRelease && ShowsNoise( sensors ), "planet surface before " + beforeRelease + ", now " + SensorMaterial( sensors ) );
+
+		// ---- a planet whose maps could not be generated (planet 90 is given a file that cannot be read) is the noise, not its grey placeholder ball
+		var garbage = new byte[ 4096 ];
+
+		new System.Random( 12345 ).NextBytes( garbage );
+
+		RegeneratePlanets();
+
+		var badPlanet = starSystem.GetPlanetController( 90 );
+
+		StartProcessing( badPlanet.GetPlanetGenerator(), garbage );
+
+		var start = Time.realtimeSinceStartup;
+
+		while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 30.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return EnterOrbit( 90 );
+
+		var arthSeven = gameData.m_planetList[ 90 ];
+
+		spaceflightController.m_displayController.ChangeDisplay( sensors );
+		sensors.StartScanning( SensorsDisplay.ScanType.Planet, 18, arthSeven.m_mass, arthSeven.m_bioDensity, arthSeven.m_mineralDensity );
+		yield return Frames( 2 );
+
+		Check( "a planet that could not be mapped is drawn with the noise", badPlanet.CouldNotBeMapped() && ShowsNoise( sensors ) && PictureShown( sensors ), "could not be mapped " + badPlanet.CouldNotBeMapped() + " " + SensorMaterial( sensors ) );
+
+		// ---- and a planet with maps after it shows its surface again
+		yield return EnterOrbit( 94 );
+
+		spaceflightController.m_displayController.ChangeDisplay( sensors );
+		sensors.StartScanning( SensorsDisplay.ScanType.Planet, 18, planet.m_mass, planet.m_bioDensity, planet.m_mineralDensity );
+		yield return Frames( 2 );
+
+		var newAlbedo = starSystem.GetPlanetController( 94 ).HasMaps() ? starSystem.GetPlanetController( 94 ).GetPlanetGenerator().m_albedoTexture : null;
+
+		Check( "after it a planet with maps shows its own surface again", ShowsPlanetSurface( sensors ) && ( newAlbedo != null ) && ( sensors.m_maskImage.material.GetTexture( "_PlanetTex" ) == newAlbedo ), SensorMaterial( sensors ) );
+
+		var exceptions = s_exceptionCount - exceptionsBefore;
+
+		Check( "nothing throws", exceptions == 0, "exceptions " + exceptions );
+
+		Finish( "scenario=sensorplanet start=[" + atStart + "] end=[" + atEnd + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
