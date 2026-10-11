@@ -62,7 +62,7 @@ These decide how much of the roadmap can go ahead without asking item by item.
 
 Still open:
 
-- **D3. Lifeforms.** The original did not store lifeforms as a table. The STARB.COM map in the xls shows overlays that created them per planet: VITA-OV (ecosystem), HP-OV and LP-OV (lifeform classes and species), SEED-OV (minerals, lifeforms and ruins) and BEHAV-OV (behaviour), plus text tables of lifeform descriptions. None of that code or text is in the repository. The sources available are the 1984 notes (`planet.txt`, `lf-behav.txt`, `lf-words.txt`, 874 lines in total). Options:
+- **D3. Lifeforms. Ruled 2026-10-11: (a), rebuild from the notes, with procedural stand-in models made by script (like the ship models) for the notes' body plans.** The original did not store lifeforms as a table. The STARB.COM map in the xls shows overlays that created them per planet: VITA-OV (ecosystem), HP-OV and LP-OV (lifeform classes and species), SEED-OV (minerals, lifeforms and ruins) and BEHAV-OV (behaviour), plus text tables of lifeform descriptions. None of that code or text is in the repository. The sources available are the 1984 notes (`planet.txt`, `lf-behav.txt`, `lf-words.txt`, 874 lines in total). Options:
   - (a) Rebuild the lifeforms from the notes. This is a reconstruction, not a copy.
   - (b) Work from a copy of the original game files, if you own one.
   - (c) Leave lifeforms out.

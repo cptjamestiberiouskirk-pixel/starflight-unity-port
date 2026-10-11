@@ -212,8 +212,51 @@ public class ScanButton : ShipButton
 			}
 		}
 
+		// scan for lifeforms: the nearest one is read as the 1984 notes' scan has it (planet.txt, info display 3)
+		var lifeformCount = 0;
+		TerrainLifeform nearestLifeform = null;
+		var nearestDistance = float.MaxValue;
+
+		if ( terrainGrid.m_terrainLifeforms != null )
+		{
+			foreach ( Transform child in terrainGrid.m_terrainLifeforms.transform )
+			{
+				var lifeform = child.GetComponent<TerrainLifeform>();
+				var distance = Vector3.Distance( child.position, vehiclePos );
+
+				if ( ( lifeform == null ) || ( distance > c_scanRange ) )
+				{
+					continue;
+				}
+
+				lifeformCount++;
+
+				ShowLabelOnObject( child.gameObject, "Lifeform", Color.magenta );
+
+				if ( distance < nearestDistance )
+				{
+					nearestDistance = distance;
+					nearestLifeform = lifeform;
+				}
+			}
+		}
+
 		// build the report
 		var report = "";
+
+		// the lifeforms, and the reading of the nearest
+		if ( nearestLifeform != null )
+		{
+			var species = nearestLifeform.m_species;
+
+			report += "<color=#FF80FF>Lifeform" + ( lifeformCount > 1 ? "s" : "" ) + ": " + lifeformCount + "</color>\n";
+			report += "Nearest: <color=white>" + species.GetBodyPlanText() + " (" + nearestLifeform.GetStatusText() + ")</color>\n";
+			report += "Volume: <color=white>" + Tools.VolumeToText( species.m_volume ) + " cubic meters</color>\n";
+			report += "Aggression analog: <color=white>" + species.GetAggressionAnalog() + "</color>\n";
+			report += "Intelligence analog: <color=white>" + species.GetIntelligenceAnalog() + "</color>\n";
+			report += "Niche: <color=white>" + species.GetNicheText() + "</color>\n";
+			report += "Composition: <color=white>" + string.Join( ", ", species.m_composition ) + "</color>\n";
+		}
 
 		// list ruins (the messages in them are recorded with the cargo button)
 		if ( ruinCount > 0 )
