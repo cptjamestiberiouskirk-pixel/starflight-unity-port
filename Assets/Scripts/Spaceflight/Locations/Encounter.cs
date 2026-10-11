@@ -2097,6 +2097,9 @@ public class Encounter : MonoBehaviour
 				// compute the training level (in 0 to 1 range)
 				var trainingLevel = personnelFile.m_communications / 250.0f;
 
+				// damaged comm equipment garbles more: the officer's training counts in proportion to its health
+				trainingLevel *= playerData.m_playerShip.GetSystemFactor( PD_PlayerShip.ShipSystem.Comm );
+
 				// create and seed the noise generator
 				var fastNoise = new FastNoise( comm.m_id );
 

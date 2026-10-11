@@ -249,8 +249,8 @@ public class CombatController : MonoBehaviour
 			return false;
 		}
 
-		// must have laser cannon
-		if ( playerData.m_playerShip.m_laserCannonClass <= 0 )
+		// must have laser cannon (and one that has not been destroyed)
+		if ( ( playerData.m_playerShip.m_laserCannonClass <= 0 ) || ( playerData.m_playerShip.GetSystemHealth( PD_PlayerShip.ShipSystem.Lasers ) <= 0 ) )
 		{
 			return false;
 		}
@@ -289,8 +289,8 @@ public class CombatController : MonoBehaviour
 			return false;
 		}
 
-		// must have missile launcher
-		if ( playerData.m_playerShip.m_missileLauncherClass <= 0 )
+		// must have missile launcher (and one that has not been destroyed)
+		if ( ( playerData.m_playerShip.m_missileLauncherClass <= 0 ) || ( playerData.m_playerShip.GetSystemHealth( PD_PlayerShip.ShipSystem.Missiles ) <= 0 ) )
 		{
 			return false;
 		}
@@ -377,6 +377,10 @@ public class CombatController : MonoBehaviour
 		if ( !targetVessel.m_immuneToLasers )
 		{
 			int damage = c_laserDamage[ Mathf.Clamp( playerData.m_playerShip.m_laserCannonClass, 0, c_laserDamage.Length - 1 ) ];
+
+			// a damaged laser cannon does damage in proportion to its health
+			damage = Mathf.Max( 1, Mathf.RoundToInt( damage * playerData.m_playerShip.GetSystemFactor( PD_PlayerShip.ShipSystem.Lasers ) ) );
+
 			ApplyDamageToAlien( m_currentTargetIndex, damage );
 		}
 
@@ -456,6 +460,9 @@ public class CombatController : MonoBehaviour
 		var targetModel = encounter.GetAlienShipModel( m_currentTargetIndex );
 		int targetIndex = m_currentTargetIndex;
 		int damage = c_missileDamage[ Mathf.Clamp( playerData.m_playerShip.m_missileLauncherClass, 0, c_missileDamage.Length - 1 ) ];
+
+		// a damaged missile launcher's missiles do damage in proportion to its health
+		damage = Mathf.Max( 1, Mathf.RoundToInt( damage * playerData.m_playerShip.GetSystemFactor( PD_PlayerShip.ShipSystem.Missiles ) ) );
 
 		// this is called when the missile reaches the target
 		System.Action<Vector3, bool> onMissileHit = ( hitPosition, didHit ) =>
