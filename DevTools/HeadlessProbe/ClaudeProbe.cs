@@ -707,6 +707,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioRivals();
 				break;
 
+			case "transmissions":
+				yield return ScenarioTransmissions();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -15553,6 +15557,96 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "rivals: with an Elowan aboard the Thrynn greet with \"most regrettable\", and start in their hostile band", regrettable.Contains( CommText( 297 ) ) && ( thrynnMood >= 65.0f ), thrynnMood + " | " + regrettable );
 
 		Finish( "scenario=rivals first=" + firstAfter + " elowanMood=" + elowanMood + " thrynnMood=" + thrynnMood, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 2: the races that transmit rather than talk
+
+	// true if each of these texts holds the comm of the game data at the same place, in order
+	static bool InOrder( List<string> said, int first, params int[] commIds )
+	{
+		if ( said.Count < first + commIds.Length )
+		{
+			return false;
+		}
+
+		for ( var i = 0; i < commIds.Length; i++ )
+		{
+			if ( !said[ first + i ].Contains( CommText( commIds[ i ] ) ) )
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	IEnumerator ScenarioTransmissions()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var encounter = controller.m_encounter;
+
+		EnsureCrew();
+
+		// an officer who understands every word
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		// ---- 1. a Minstrel: once the comm link is up, its seven verses in order, and then the link ends
+		var minstrel = new List<string>();
+
+		yield return MeetAndConnect( FindEncounterOfRace( GameData.Race.Minstrel ), GD_Comm.Stance.Friendly, minstrel );
+		yield return LetAliensSpeak( 8, minstrel );
+
+		var minstrelConnected = encounter.m_pdEncounter.m_connected;
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 2. a Nomad probe: its six planetary reports in order, and then the link ends
+		var nomad = new List<string>();
+
+		yield return MeetAndConnect( FindEncounterOfRace( GameData.Race.NomadProbe ), GD_Comm.Stance.Friendly, nomad );
+		yield return LetAliensSpeak( 7, nomad );
+
+		var nomadConnected = encounter.m_pdEncounter.m_connected;
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 3. the Noah 9 derelict in orbit 3 of 175,94: its distress beacon, and once the ship answers it (the comm link is up at once), the two parts of its
+		// recorded message
+		var noahStar = StarAt( 175, 94 );
+
+		yield return GoIntoOrbit( noahStar, PlanetInOrbit( noahStar, 3 ) );
+
+		var noahBegun = ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == 316 );
+		var noah = new List<string>();
+
+		yield return LetAliensSpeak( 1, noah );
+
+		encounter.Hail( GD_Comm.Stance.Friendly, true );
+
+		yield return LetAliensSpeak( 3, noah );
+
+		var noahConnected = encounter.m_pdEncounter.m_connected;
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "transmissions: minstrel " + string.Join( " | ", minstrel ) + " (connected after " + minstrelConnected + ") || nomad " + string.Join( " | ", nomad ) + " (connected after " + nomadConnected + ") || noah 9 begun " + noahBegun + ": " + string.Join( " | ", noah ) + " (connected after " + noahConnected + ")" );
+
+		Check( "transmissions: a Minstrel sings its seven verses in order once the comm link is up, and then ends the link", InOrder( minstrel, 1, 504, 505, 506, 507, 508, 509, 510 ) && !minstrelConnected, string.Join( " | ", minstrel ) );
+		Check( "transmissions: a Nomad probe sends its six planetary reports in order, and then ends the link", InOrder( nomad, 1, 188, 189, 190, 191, 192, 193 ) && !nomadConnected, string.Join( " | ", nomad ) );
+		Check( "transmissions: the Noah 9 derelict sends its distress beacon, and once answered its recorded message, and then ends the link", noahBegun && ( noah[ 0 ].Contains( "distress beacon signal" ) || SaysOneOf( noah[ 0 ], 556 ) ) && InOrder( noah, 1, 551, 552 ) && !noahConnected, string.Join( " | ", noah ) );
+
+		Finish( "scenario=transmissions minstrel=" + minstrel.Count + " nomad=" + nomad.Count + " noah=" + noah.Count, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
