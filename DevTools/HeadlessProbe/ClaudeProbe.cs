@@ -16,6 +16,8 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.SceneManagement;
 
 public class ClaudeProbe : MonoBehaviour
@@ -469,6 +471,14 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "savepanel":
 				yield return ScenarioSavePanel();
+				break;
+
+			case "input":
+				yield return ScenarioInput();
+				break;
+
+			case "starport-input":
+				yield return ScenarioStarportInput();
 				break;
 
 			case "visual":
@@ -7191,6 +7201,369 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "savepanel: a game that is over stays paused", gameOver && pausedAfterGameOver && pausedAfterAPanelClosed, "game over " + gameOver + ", paused " + pausedAfterGameOver + ", paused after a panel closed " + pausedAfterAPanelClosed );
 
 		Finish( "scenario=savepanel space=" + opensInSpace + " landing=" + openedDuringLanding + "/" + pausedDuringLanding + " ground=" + opensOnTheGround + " explosion=" + openedDuringExplosion + "/" + pausedAfterGameOver + "/" + pausedAfterAPanelClosed + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- input: the keys of the old input manager, read through the Input System
+
+	static Keyboard s_probeKeyboard;
+
+	// a keyboard of the probe's own (a headless run has none), whose keys reach the game although no game view has the focus
+	static Keyboard ProbeKeyboard()
+	{
+		if ( s_probeKeyboard == null )
+		{
+			// these settings live in memory only (the project has no Input System settings asset), so they end with the run
+			InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+			InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+
+			s_probeKeyboard = InputSystem.AddDevice<Keyboard>( "ProbeKeyboard" );
+		}
+
+		return s_probeKeyboard;
+	}
+
+	// hold these keys of the probe keyboard down, and every other key up, from the next input update on
+	static void HoldKeys( params Key[] keys )
+	{
+		InputSystem.QueueStateEvent( ProbeKeyboard(), new KeyboardState( keys ) );
+	}
+
+	// press the keys for three frames and let them go for three
+	static IEnumerator Tap( params Key[] keys )
+	{
+		HoldKeys( keys );
+
+		yield return Frames( 3 );
+
+		HoldKeys();
+
+		yield return Frames( 3 );
+	}
+
+	// what the input controller reports: the buttons it has down and the stick position
+	static string InputReport()
+	{
+		var input = InputController.m_instance;
+		var held = new List<string>();
+
+		if ( input.m_northWest ) held.Add( "NW" );
+		if ( input.m_north ) held.Add( "N" );
+		if ( input.m_northEast ) held.Add( "NE" );
+		if ( input.m_east ) held.Add( "E" );
+		if ( input.m_southEast ) held.Add( "SE" );
+		if ( input.m_south ) held.Add( "S" );
+		if ( input.m_southWest ) held.Add( "SW" );
+		if ( input.m_west ) held.Add( "W" );
+		if ( input.m_submit ) held.Add( "Submit" );
+		if ( input.m_cancel ) held.Add( "Cancel" );
+
+		return ( ( held.Count == 0 ) ? "nothing" : string.Join( "+", held ) ) + " x=" + input.m_x.ToString( "0" ) + " y=" + input.m_y.ToString( "0" );
+	}
+
+	// the name of the UI object the event system has selected
+	static string Selected()
+	{
+		var selected = ( EventSystem.current != null ) ? EventSystem.current.currentSelectedGameObject : null;
+
+		return ( selected != null ) ? selected.name : "none";
+	}
+
+	// the type of the event system's input module
+	static string InputModule()
+	{
+		var module = ( EventSystem.current != null ) ? EventSystem.current.currentInputModule : null;
+
+		return ( module != null ) ? module.GetType().Name : "none";
+	}
+
+	IEnumerator ScenarioInput()
+	{
+		var controller = SpaceflightController.m_instance;
+		var playerData = DataController.m_instance.m_playerData;
+
+		EnsureCrew();
+
+		ProbeKeyboard();
+
+		Log( "input: probe keyboard added, Keyboard.current is it " + ( Keyboard.current == s_probeKeyboard ) + ", input module " + InputModule() );
+
+		// ---- 1. every key of ProjectSettings/InputManager.asset (the positive and the alternate positive button of each axis), and keys that had no axis.
+		// The spaceflight controller and the console would act on the keys and debounce them, so they sit this part out
+		controller.enabled = false;
+		controller.m_buttonController.enabled = false;
+
+		HoldKeys();
+
+		yield return Frames( 3 );
+
+		var keys = new[]
+		{
+			new KeyValuePair<Key, string>( Key.Numpad7, "NW x=-1 y=1" ), new KeyValuePair<Key, string>( Key.Home, "NW x=-1 y=1" ),
+			new KeyValuePair<Key, string>( Key.Numpad8, "N x=0 y=1" ), new KeyValuePair<Key, string>( Key.UpArrow, "N x=0 y=1" ),
+			new KeyValuePair<Key, string>( Key.Numpad9, "NE x=1 y=1" ), new KeyValuePair<Key, string>( Key.PageUp, "NE x=1 y=1" ),
+			new KeyValuePair<Key, string>( Key.Numpad6, "E x=1 y=0" ), new KeyValuePair<Key, string>( Key.RightArrow, "E x=1 y=0" ),
+			new KeyValuePair<Key, string>( Key.Numpad3, "SE x=1 y=-1" ), new KeyValuePair<Key, string>( Key.PageDown, "SE x=1 y=-1" ),
+			new KeyValuePair<Key, string>( Key.Numpad2, "S x=0 y=-1" ), new KeyValuePair<Key, string>( Key.DownArrow, "S x=0 y=-1" ),
+			new KeyValuePair<Key, string>( Key.Numpad1, "SW x=-1 y=-1" ), new KeyValuePair<Key, string>( Key.End, "SW x=-1 y=-1" ),
+			new KeyValuePair<Key, string>( Key.Numpad4, "W x=-1 y=0" ), new KeyValuePair<Key, string>( Key.LeftArrow, "W x=-1 y=0" ),
+			new KeyValuePair<Key, string>( Key.Enter, "Submit x=0 y=0" ), new KeyValuePair<Key, string>( Key.NumpadEnter, "Submit x=0 y=0" ),
+			new KeyValuePair<Key, string>( Key.Escape, "Cancel x=0 y=0" ),
+		};
+
+		var others = new[] { Key.W, Key.A, Key.S, Key.D, Key.Space, Key.Numpad5, Key.Numpad0, Key.Tab };
+
+		var wrongKeys = new List<string>();
+		var wrongOthers = new List<string>();
+
+		foreach ( var pair in keys )
+		{
+			HoldKeys( pair.Key );
+
+			yield return Frames( 2 );
+
+			var held = InputReport();
+
+			HoldKeys();
+
+			yield return Frames( 2 );
+
+			var released = InputReport();
+
+			if ( ( held != pair.Value ) || ( released != "nothing x=0 y=0" ) )
+			{
+				wrongKeys.Add( pair.Key + ": " + held + " / released " + released );
+			}
+		}
+
+		foreach ( var key in others )
+		{
+			HoldKeys( key );
+
+			yield return Frames( 2 );
+
+			var held = InputReport();
+
+			HoldKeys();
+
+			yield return Frames( 2 );
+
+			if ( held != "nothing x=0 y=0" )
+			{
+				wrongOthers.Add( key + ": " + held );
+			}
+		}
+
+		Log( "input: " + ( keys.Length - wrongKeys.Count ) + " of " + keys.Length + " keys gave their input; wrong: " + string.Join( " | ", wrongKeys ) );
+		Log( "input: keys with no input that gave one: " + string.Join( " | ", wrongOthers ) );
+
+		Check( "input: each key of the old input manager gives its input, and only while it is held", wrongKeys.Count == 0, string.Join( " | ", wrongKeys ) );
+		Check( "input: keys the old input manager did not have give no input", wrongOthers.Count == 0, string.Join( " | ", wrongOthers ) );
+
+		// ---- 2. two keys of one input, and the debounce: an input that has been debounced stays off until every key has been let go
+		HoldKeys( Key.Numpad8, Key.UpArrow );
+
+		yield return Frames( 2 );
+
+		HoldKeys( Key.UpArrow );
+
+		yield return Frames( 2 );
+
+		var oneOfTwoLetGo = InputReport();
+
+		InputController.m_instance.Debounce();
+
+		yield return Frames( 2 );
+
+		var debounced = InputReport();
+
+		HoldKeys();
+
+		yield return Frames( 2 );
+
+		HoldKeys( Key.Numpad8 );
+
+		yield return Frames( 2 );
+
+		var pressedAgain = InputReport();
+
+		HoldKeys();
+
+		yield return Frames( 2 );
+
+		Log( "input: up arrow held after numpad 8 was let go: " + oneOfTwoLetGo + "; debounced while held: " + debounced + "; pressed again after letting go: " + pressedAgain );
+
+		Check( "input: one key of an input still holds it when the other is let go", oneOfTwoLetGo == "N x=0 y=1", oneOfTwoLetGo );
+		Check( "input: a debounced input stays off while held and comes back once it has been let go", ( debounced == "nothing x=0 y=0" ) && ( pressedAgain == "N x=0 y=1" ), debounced + " / " + pressedAgain );
+
+		controller.enabled = true;
+		controller.m_buttonController.enabled = true;
+
+		yield return Frames( 3 );
+
+		// ---- 3. the UI: Escape opens the save panel, the arrows and the numpad move the selection (A and D do not), Return and the numpad Enter press Resume.
+		// The buttons of the save panel are in a row with explicit left and right neighbours, so up and down leave the selection where it is
+		yield return Tap( Key.Escape );
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var panelOpened = PanelController.m_instance.HasActivePanel() && controller.m_gameIsPaused;
+		var atOpen = Selected();
+
+		yield return Tap( Key.RightArrow );
+
+		var afterRight = Selected();
+
+		yield return Tap( Key.LeftArrow );
+
+		var afterLeft = Selected();
+
+		yield return Tap( Key.Numpad6 );
+
+		var afterNumpad6 = Selected();
+
+		yield return Tap( Key.Numpad4 );
+
+		var afterNumpad4 = Selected();
+
+		yield return Tap( Key.D );
+
+		var afterD = Selected();
+
+		yield return Tap( Key.A );
+
+		var afterA = Selected();
+
+		yield return Tap( Key.DownArrow );
+
+		var afterDown = Selected();
+
+		yield return Tap( Key.Enter );
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var closedByReturn = !PanelController.m_instance.HasActivePanel() && !controller.m_gameIsPaused;
+
+		yield return Tap( Key.Escape );
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var panelOpenedAgain = PanelController.m_instance.HasActivePanel();
+
+		yield return Tap( Key.NumpadEnter );
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var closedByNumpadEnter = !PanelController.m_instance.HasActivePanel() && !controller.m_gameIsPaused;
+
+		if ( PanelController.m_instance.HasActivePanel() )
+		{
+			yield return CloseTheSavePanel();
+		}
+
+		Log( "input: module " + InputModule() + "; Escape opened the save panel " + panelOpened + ", selected " + atOpen + ", right arrow " + afterRight + ", left arrow " + afterLeft + ", numpad 6 " + afterNumpad6 + ", numpad 4 " + afterNumpad4 + ", D " + afterD + ", A " + afterA + ", down arrow " + afterDown + "; Return closed it " + closedByReturn + "; opened again " + panelOpenedAgain + ", numpad Enter closed it " + closedByNumpadEnter );
+
+		Check( "input: Escape opens the save panel", panelOpened && panelOpenedAgain, "opened " + panelOpened + ", again " + panelOpenedAgain );
+		Check( "input: the arrow keys and the numpad move the UI selection, A and D do not", ( atOpen != "none" ) && ( afterRight != atOpen ) && ( afterRight != "none" ) && ( afterLeft == atOpen ) && ( afterNumpad6 == afterRight ) && ( afterNumpad4 == atOpen ) && ( afterD == atOpen ) && ( afterA == atOpen ) && ( afterDown == atOpen ), atOpen + " > " + afterRight + " > " + afterLeft + " > " + afterNumpad6 + " > " + afterNumpad4 + " > " + afterD + " > " + afterA + " > " + afterDown );
+		Check( "input: Return and the numpad Enter press the selected button", panelOpened && closedByReturn && panelOpenedAgain && closedByNumpadEnter, "opened " + panelOpened + ", Return closed it " + closedByReturn + ", opened again " + panelOpenedAgain + ", numpad Enter closed it " + closedByNumpadEnter );
+
+		// ---- 4. the keys the spaceflight controller reads itself: F9 and F10 (Editor only) and Escape once the game is over
+		var messagesBefore = MessageList();
+
+		yield return Tap( Key.F9 );
+
+		var f9Message = MessageList().Length > messagesBefore.Length && MessageList().Substring( messagesBefore.Length ).Contains( "DEBUG:" );
+		var locationAfterF9 = playerData.m_general.m_location;
+
+		yield return Tap( Key.F10 );
+
+		var destroyed = CombatController.m_instance.PlayerIsDestroyed();
+
+		for ( var i = 0; ( i < 100 ) && !controller.m_gameOver; i++ )
+		{
+			yield return new WaitForSecondsRealtime( 0.1f );
+		}
+
+		var gameOver = controller.m_gameOver;
+
+		yield return Tap( Key.Escape );
+
+		var gameOverAfterEscape = controller.m_gameOver;
+
+		yield return WaitForScene( "Intro" );
+
+		var sceneAfterEscape = SceneManager.GetActiveScene().name;
+
+		Log( "input: F9 left a DEBUG message " + f9Message + " (" + locationAfterF9 + "), F10 destroyed the ship " + destroyed + ", game over " + gameOver + ", game over after Escape " + gameOverAfterEscape + ", scene " + sceneAfterEscape );
+
+		Check( "input: F9 runs the debug encounter spawn", f9Message, MessageList() );
+		Check( "input: F10 destroys the ship", destroyed, "destroyed " + destroyed );
+		Check( "input: Escape at game over restarts the game", gameOver && !gameOverAfterEscape && ( sceneAfterEscape == "Intro" ), "game over " + gameOver + ", after Escape " + gameOverAfterEscape + ", scene " + sceneAfterEscape );
+
+		HoldKeys();
+
+		Finish( "scenario=input keys=" + ( keys.Length - wrongKeys.Count ) + "/" + keys.Length + " others=" + wrongOthers.Count + " ui=" + atOpen + ">" + afterRight + "/" + closedByReturn + "/" + closedByNumpadEnter + " f9=" + f9Message + " f10=" + destroyed + " restart=" + sceneAfterEscape + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioStarportInput()
+	{
+		ProbeKeyboard();
+
+		var module = InputModule();
+
+		// the Operations panel selects its Notices button when it opens
+		var operationsPanel = FindPanel<OperationsPanel>();
+
+		yield return OpenPanel( operationsPanel, "starport-input" );
+
+		var atOpen = Selected();
+
+		yield return Tap( Key.DownArrow );
+
+		var afterDown = Selected();
+
+		yield return Tap( Key.UpArrow );
+
+		var afterUp = Selected();
+
+		yield return Tap( Key.Numpad2 );
+
+		var afterNumpad2 = Selected();
+
+		yield return Tap( Key.Numpad8 );
+
+		var afterNumpad8 = Selected();
+
+		yield return Tap( Key.S );
+
+		var afterS = Selected();
+
+		yield return ClosePanel( operationsPanel, "starport-input" );
+
+		// the crew's name field: a legacy InputField reads Input.compositionString (the IME) in every frame it has the focus, the one use of the old Input class left in UGUI
+		var personnelPanel = FindPanel<PersonnelPanel>();
+
+		yield return OpenPanel( personnelPanel, "starport-input" );
+
+		var exceptionsBefore = s_exceptionCount;
+
+		Call( personnelPanel, "SwitchToGiveNameState" );
+
+		yield return Frames( 30 );
+
+		var nameFieldFocused = personnelPanel.m_nameInputField.isFocused;
+		var exceptionsWhileFocused = s_exceptionCount - exceptionsBefore;
+
+		yield return ClosePanel( personnelPanel, "starport-input" );
+
+		Log( "starport-input: module " + module + "; Operations panel selected " + atOpen + ", down arrow " + afterDown + ", up arrow " + afterUp + ", numpad 2 " + afterNumpad2 + ", numpad 8 " + afterNumpad8 + ", S " + afterS + "; crew name field focused " + nameFieldFocused + ", exceptions while it had the focus " + exceptionsWhileFocused );
+
+		Check( "starport-input: the event system reads the Input System", module == "InputSystemUIInputModule", module );
+		Check( "starport-input: the arrow keys and the numpad move the UI selection, S does not", ( atOpen != "none" ) && ( afterDown != atOpen ) && ( afterDown != "none" ) && ( afterUp == atOpen ) && ( afterNumpad2 == afterDown ) && ( afterNumpad8 == atOpen ) && ( afterS == atOpen ), atOpen + " > " + afterDown + " > " + afterUp + " > " + afterNumpad2 + " > " + afterNumpad8 + " > " + afterS );
+		Check( "starport-input: the crew name field takes the focus without an exception", nameFieldFocused && ( exceptionsWhileFocused == 0 ), "focused " + nameFieldFocused + ", exceptions " + exceptionsWhileFocused );
+
+		HoldKeys();
+
+		Finish( "scenario=starport-input module=" + module + " ui=" + atOpen + ">" + afterDown + ">" + afterUp + " nameField=" + nameFieldFocused + "/" + exceptionsWhileFocused + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- Low: visual (a floating object when its timer wraps, the end of an explosion, the speed of the landing site crosshair)

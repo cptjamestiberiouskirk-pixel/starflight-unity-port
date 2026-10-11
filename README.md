@@ -15,7 +15,7 @@ The project has been refactored to a clean, **root-directory architecture** to e
 - **Engine Upgrade**: Fully migrated to Unity 6 (6000.3.13f1).
 - **Dependency Management**: Removed deprecated third-party libraries (`JsonDotNet`, legacy `FbxExporters`) in favor of official Unity Registry packages.
 - **UI System**: Migrated to official Unity UI & TextMeshPro packages.
-- **Input Handling**: Restored and configured the EventSystem to support modern input modules.
+- **Input Handling**: All input goes through the Input System package (Active Input Handling is "Input System Package (New)", so the Input Manager deprecation warning is gone). `Assets/Input/Starflight Input.inputactions` keeps the original key layout: the numpad or the arrow, Home, End, Page Up and Page Down keys steer, Return or the numpad Enter fires, Escape cancels, and the UI moves on the arrows and numpad 8, 2, 4 and 6. Bindings can be changed in that asset.
 
 ---
 
