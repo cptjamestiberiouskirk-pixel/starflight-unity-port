@@ -683,6 +683,9 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_homeworldWarningsGiven = false;
 			m_pdEncounter.m_aliensAreCowardly = false;
 			m_pdEncounter.m_specialQuestionAsked = false;
+			m_pdEncounter.m_moodSet = false;
+			m_pdEncounter.m_playerPhrasesInPosture = 0;
+			m_pdEncounter.m_alienPhrasesLeft = 0;
 
 			// initialize race encounter
 			switch ( m_gdEncounter.m_race )
@@ -1108,6 +1111,8 @@ public class Encounter : MonoBehaviour
 			AnswerElowanEnergyQuestion();
 		}
 
+		UpdateMood();
+
 		DefaultEncounterUpdate();
 	}
 
@@ -1307,6 +1312,8 @@ public class Encounter : MonoBehaviour
 	{
 		UpdateCowardice();
 
+		UpdateMood();
+
 		DefaultEncounterUpdate();
 	}
 
@@ -1358,6 +1365,8 @@ public class Encounter : MonoBehaviour
 		UpdateCowardice();
 
 		UpdateThrynnTrade();
+
+		UpdateMood();
 
 		DefaultEncounterUpdate();
 	}
@@ -1539,6 +1548,8 @@ public class Encounter : MonoBehaviour
 		UpdateCowardice();
 
 		UpdateVeloxDemand();
+
+		UpdateMood();
 
 		DefaultEncounterUpdate();
 	}
@@ -1878,11 +1889,19 @@ public class Encounter : MonoBehaviour
 					// reset the conversation timer
 					m_pdEncounter.m_conversationTimer = Random.Range( 10.0f, 30.0f );
 
+					// have aliens with a personality said all the phrases they will? then they are tired of talking (compart.txt 11)
+					if ( m_pdEncounter.m_connected && IsTiredOfTalking() )
+					{
+						AddComm( GD_Comm.Subject.Terminate, false );
+					}
 					// are we connected?
-					if ( m_pdEncounter.m_connected )
+					else if ( m_pdEncounter.m_connected )
 					{
 						// the aliens will have said something
 						aliensSaidSomething = true;
+
+						// one phrase fewer left to say
+						m_pdEncounter.m_alienPhrasesLeft--;
 
 						// was there a pending question from the player?
 						if ( ( m_pdEncounter.m_lastSubjectFromPlayer >= GD_Comm.Subject.Themselves ) && ( m_pdEncounter.m_lastSubjectFromPlayer <= GD_Comm.Subject.TheAncients ) )
@@ -1944,8 +1963,8 @@ public class Encounter : MonoBehaviour
 					}
 				}
 
-				// are we connected?
-				if ( m_pdEncounter.m_connected )
+				// are we connected? (aliens with a personality tire of talking by the number of their phrases instead)
+				if ( m_pdEncounter.m_connected && ( AlienPersonality.Find( m_gdEncounter.m_race ) == null ) )
 				{
 					// yes - update connection timer
 					m_pdEncounter.m_connectionTimer -= Time.deltaTime;
@@ -2239,6 +2258,173 @@ public class Encounter : MonoBehaviour
 		SpaceflightController.m_instance.m_playerCamera.SetCameraFollow( SpaceflightController.m_instance.m_playerShip.gameObject, Vector3.up * m_currentOffset );
 	}
 
+	// the aliens' mood decides their posture unless a rule has decided it: the player has fired on them, they have turned cowardly, they are a home fleet, Elan is
+	// gone (the Elowan), or they have turned to fight
+	bool MoodDecides()
+	{
+		if ( m_pdEncounter.m_attackedByPlayer || m_pdEncounter.m_aliensAreCowardly || IsHomeFleet() )
+		{
+			return false;
+		}
+
+		if ( ( m_gdEncounter.m_race == GameData.Race.Elowan ) && BlackEgg.IsElanDestroyed() )
+		{
+			return false;
+		}
+
+		return m_pdEncounter.m_alienStance != GD_Comm.Stance.Hostile;
+	}
+
+	// the mood of a new encounter (and of one from a save file written before the aliens had moods)
+	void EnsureMood( AlienPersonality personality )
+	{
+		if ( !m_pdEncounter.m_moodSet )
+		{
+			m_pdEncounter.m_mood = personality.m_startingMood;
+			m_pdEncounter.m_moodSet = true;
+		}
+	}
+
+	// the notes' "strength differential": the player's strength less the aliens' weighed by their aggression / 5 - positive, and the aliens grovel where they would
+	// threaten (compart.txt 5) - a strength is the port's: the armor and shield points of the player's ship, and those of the aliens' living ships
+	float GetStrengthDifferential( AlienPersonality personality )
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+		var playerStrength = (float) ( Mathf.Max( 0, ship.m_armorPoints ) + Mathf.Max( 0, ship.m_shieldPoints ) );
+		var alienStrength = 0.0f;
+
+		foreach ( var alienShip in m_pdEncounter.GetAlienShipList() )
+		{
+			if ( alienShip.m_addedToEncounter && !alienShip.m_isDead )
+			{
+				alienStrength += Mathf.Max( 0, alienShip.m_armorPoints ) + Mathf.Max( 0, alienShip.m_shieldPoints );
+			}
+		}
+
+		return playerStrength - alienStrength * personality.m_aggression / 5.0f;
+	}
+
+	// the posture the aliens' mood gives them below "fight or flight": friendly, diplomatic (neutral), or hostile or obsequious by their strength (compart.txt 4)
+	GD_Comm.Stance GetMoodPosture( AlienPersonality personality )
+	{
+		var mood = m_pdEncounter.m_mood;
+
+		if ( mood < personality.m_friendlyBelow )
+		{
+			return GD_Comm.Stance.Friendly;
+		}
+
+		if ( mood < personality.m_hostileFrom )
+		{
+			return GD_Comm.Stance.Neutral;
+		}
+
+		return ( GetStrengthDifferential( personality ) > 0.0f ) ? GD_Comm.Stance.Obsequious : GD_Comm.Stance.Hostile;
+	}
+
+	// the stance whose lines the aliens say: their mood's posture where the mood decides (a hostile posture is abusive talk, not an attack), else their stance
+	GD_Comm.Stance GetAlienTalkStance()
+	{
+		var personality = AlienPersonality.Find( m_gdEncounter.m_race );
+
+		if ( ( personality == null ) || !MoodDecides() )
+		{
+			return m_pdEncounter.m_alienStance;
+		}
+
+		EnsureMood( personality );
+
+		if ( m_pdEncounter.m_mood >= personality.m_fightFrom )
+		{
+			return m_pdEncounter.m_alienStance;
+		}
+
+		return GetMoodPosture( personality );
+	}
+
+	// the mood sets the aliens' stance where it decides: they hold their fire in every posture, and only once they are too agitated to talk do they end the comm
+	// link and fight - or take flight from a stronger ship, still holding their fire (compart.txt 4 and 11; flight is the port's: they stay, and keep quiet)
+	void UpdateMood()
+	{
+		var personality = AlienPersonality.Find( m_gdEncounter.m_race );
+
+		if ( personality == null )
+		{
+			return;
+		}
+
+		EnsureMood( personality );
+
+		if ( !MoodDecides() )
+		{
+			return;
+		}
+
+		if ( m_pdEncounter.m_mood >= personality.m_fightFrom )
+		{
+			if ( m_pdEncounter.m_connected )
+			{
+				AddComm( GD_Comm.Subject.Terminate, false );
+			}
+
+			m_pdEncounter.m_alienStance = ( GetStrengthDifferential( personality ) > 0.0f ) ? GD_Comm.Stance.Obsequious : GD_Comm.Stance.Hostile;
+
+			return;
+		}
+
+		var posture = GetMoodPosture( personality );
+
+		m_pdEncounter.m_alienStance = ( posture == GD_Comm.Stance.Hostile ) ? GD_Comm.Stance.Neutral : posture;
+	}
+
+	// a statement of the player's moves the aliens' mood by the effect of the player's posture on their race, and a question by half of it - the more phrases the
+	// player has made in the posture, the less ("DELTA-EDL = PPE * [1/(#-THIS-POSTURE + 1)]", compart.txt 7)
+	void ApplyPlayerPosture( bool isQuestion )
+	{
+		var personality = AlienPersonality.Find( m_gdEncounter.m_race );
+
+		if ( ( personality == null ) || !MoodDecides() )
+		{
+			return;
+		}
+
+		EnsureMood( personality );
+
+		var effect = personality.GetPostureEffect( m_pdEncounter.m_playerStance ) / ( m_pdEncounter.m_playerPhrasesInPosture + 1 );
+
+		if ( isQuestion )
+		{
+			effect *= 0.5f;
+		}
+
+		m_pdEncounter.m_playerPhrasesInPosture++;
+		m_pdEncounter.m_mood = Mathf.Clamp( m_pdEncounter.m_mood + effect, 0.0f, 100.0f );
+	}
+
+	// how many phrases the aliens say before they are tired of talking: "a random number in the range determined by the alien's initial posture" (compart.txt 11)
+	static int GetPhraseLimit( GD_Comm.Stance posture )
+	{
+		switch ( posture )
+		{
+			case GD_Comm.Stance.Obsequious:
+				return Random.Range( 10, 21 );
+
+			case GD_Comm.Stance.Friendly:
+				return Random.Range( 5, 16 );
+
+			case GD_Comm.Stance.Hostile:
+				return Random.Range( 2, 6 );
+		}
+
+		return Random.Range( 3, 9 );
+	}
+
+	// true once aliens with a personality have said all their phrases
+	bool IsTiredOfTalking()
+	{
+		return ( AlienPersonality.Find( m_gdEncounter.m_race ) != null ) && ( m_pdEncounter.m_alienPhrasesLeft <= 0 );
+	}
+
 	// a comm of the game data by its id, if it is one of the race of this encounter (null if it is not)
 	GD_Comm FindRaceComm( int commId )
 	{
@@ -2425,7 +2611,7 @@ public class Encounter : MonoBehaviour
 		else
 		{
 			race = m_gdEncounter.m_race;
-			stance = m_pdEncounter.m_alienStance;
+			stance = GetAlienTalkStance();
 
 			// a home fleet says only its homeworld's warnings
 			if ( IsHomeFleet() )
@@ -2584,6 +2770,24 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_lastSubjectFromPlayer = lastSubjectFromPlayer;
 
 			return;
+		}
+
+		// nor do the aliens say anything in a posture the game data has no line for (the Spemin have no neutral statements) - this showed the word ERROR - but
+		// aliens with no line to end the comm link with still end it
+		if ( !outgoing && ( comm.m_text == c_noCommFoundText ) )
+		{
+			if ( subject == GD_Comm.Subject.Terminate )
+			{
+				Disconnect();
+			}
+
+			return;
+		}
+
+		// a statement or a question of the player's moves the aliens' mood
+		if ( outgoing && ( ( subject == GD_Comm.Subject.Statement ) || ( ( subject >= GD_Comm.Subject.Themselves ) && ( subject <= GD_Comm.Subject.TheAncients ) ) ) )
+		{
+			ApplyPlayerPosture( subject != GD_Comm.Subject.Statement );
 		}
 
 		// copy the comm text (because we will replace tokens)
@@ -2897,6 +3101,12 @@ public class Encounter : MonoBehaviour
 			SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Comm );
 		}
 
+		// aliens with a personality say only so many phrases, picked by their posture as the conversation begins (compart.txt 11)
+		if ( AlienPersonality.Find( m_gdEncounter.m_race ) != null )
+		{
+			m_pdEncounter.m_alienPhrasesLeft = GetPhraseLimit( GetAlienTalkStance() );
+		}
+
 		// we are connected now
 		m_pdEncounter.m_connected = true;
 	}
@@ -2969,6 +3179,12 @@ public class Encounter : MonoBehaviour
 	// hail (or respond to) the alien ships
 	public void Hail( GD_Comm.Stance stance, bool responding )
 	{
+		// a new posture counts its phrases from the start (each phrase in the same posture moves the aliens' mood less)
+		if ( stance != m_pdEncounter.m_playerStance )
+		{
+			m_pdEncounter.m_playerPhrasesInPosture = 0;
+		}
+
 		// set the stance to what the player selected
 		m_pdEncounter.m_playerStance = stance;
 
