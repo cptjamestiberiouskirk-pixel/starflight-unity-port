@@ -711,6 +711,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioTransmissions();
 				break;
 
+			case "starstability":
+				yield return ScenarioStarStability();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -15647,6 +15651,94 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "transmissions: the Noah 9 derelict sends its distress beacon, and once answered its recorded message, and then ends the link", noahBegun && ( noah[ 0 ].Contains( "distress beacon signal" ) || SaysOneOf( noah[ 0 ], 556 ) ) && InOrder( noah, 1, 551, 552 ) && !noahConnected, string.Join( " | ", noah ) );
 
 		Finish( "scenario=transmissions minstrel=" + minstrel.Count + " nomad=" + nomad.Count + " noah=" + noah.Count, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 1: the stability of a star
+
+	// the first star other than Arth's whose flare day is in this range (-1 if there is none)
+	static int StarFlaringBetween( int firstDay, int lastDay )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		for ( var id = 0; id < gameData.m_starList.Length; id++ )
+		{
+			var flareDay = gameData.m_starList[ id ].m_daysToNextFlare;
+
+			if ( ( id != gameData.m_misc.m_arthStarId ) && ( flareDay >= firstDay ) && ( flareDay <= lastDay ) )
+			{
+				return id;
+			}
+		}
+
+		return -1;
+	}
+
+	// enters a star system, waits for its planets and scans it - returns what the messages show
+	static IEnumerator ScanStarSystem( int starId, List<string> scans )
+	{
+		var controller = SpaceflightController.m_instance;
+
+		EnterStarSystem( starId );
+
+		var end = Time.realtimeSinceStartup + 40.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && controller.m_starSystem.GeneratingPlanets() )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		controller.m_messages.Clear();
+
+		new SensorsButton().Execute();
+
+		scans.Add( MessageList() );
+	}
+
+	IEnumerator ScenarioStarStability()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		var flared = StarThatNeverFlares();
+		var near = StarFlaringBetween( 150, 290 );
+		var nearDay = ( near >= 0 ) ? gameData.m_starList[ near ].m_daysToNextFlare : 0;
+
+		var scans = new List<string>();
+
+		// ---- 1. a star that flared before the game began
+		yield return ScanStarSystem( flared, scans );
+
+		// (no star of the game data is more than 792 days from its flare, so none is ever "slightly unstable")
+
+		// ---- 2. a star with less than 1000 days to its flare: the days to its flare, and 100 of them once the day is 100 before it
+		yield return ScanStarSystem( near, scans );
+
+		SetGameDay( nearDay - 100 );
+
+		yield return Frames( 3 );
+
+		controller.m_messages.Clear();
+
+		new SensorsButton().Execute();
+
+		scans.Add( MessageList() );
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "starstability: flared star " + flared + ", near star " + near + " (flare day " + nearDay + ") || " + string.Join( " || ", scans ) );
+
+		Check( "starstability: a star that has flared is stable", scans[ 0 ].Contains( "Stability: <color=white>Stable (post-flare)" ), scans[ 0 ] );
+		Check( "starstability: a star with less gives the days to its flare", ( near >= 0 ) && scans[ 1 ].Contains( "Unstable - estimated time to flare " + nearDay + " days" ) && scans[ 2 ].Contains( "Unstable - estimated time to flare 100 days" ), scans[ 1 ] + " || " + scans[ 2 ] );
+
+		Finish( "scenario=starstability near=" + near + "/" + nearDay, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

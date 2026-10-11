@@ -78,6 +78,25 @@ public class GD_Star
 	}
 
 	// call this to get the breach distance
+	// the star's stability as the analysis of a star gives it, by the days left to its next flare (the 1984 notes, starship.txt: "STABLE [POSTFLARE]", "SLIGHTLY
+	// UNSTABLE" with more than 1000 Arth days to its flare, "UNSTABLE - ESTIMATED TIME TO FLARE XXX DAYS" with less)
+	public string GetStabilityText( float today )
+	{
+		var days = Mathf.CeilToInt( m_daysToNextFlare - today );
+
+		if ( days <= 0 )
+		{
+			return "Stable (post-flare)";
+		}
+
+		if ( days > 1000 )
+		{
+			return "Slightly unstable";
+		}
+
+		return "Unstable - estimated time to flare " + days + ( ( days == 1 ) ? " day" : " days" );
+	}
+
 	public float GetBreachDistance()
 	{
 		return ( 1.0f + m_spectralClass.m_scale / 0.6f ) * 48.0f;

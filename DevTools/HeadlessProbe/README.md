@@ -139,8 +139,9 @@ What the probe does:
 | `mood` | the aliens' mood: the Spemin met in peace by a weak ship (a hostile statement, no attack; the code before showed ERROR) and by a far stronger one (an obsequious statement), two friendly statements and a question to the Elowan (45, 35, 30, 28.3: friendly), the Elowan at 94 given a hostile statement by a stronger ship (the link ends, flight) and by a weaker one (the link ends, they fight), the Thrynn with one phrase left (their last phrase, then their farewell) and the Gazurtoid at the end of their time (the control: no farewell line, and the link still ends) (about 65 s) |
 | `rivals` | the Elowan and the Thrynn and a crew that is friends with the other race: the first comm link of the game with the Thrynn (remembered), then the Elowan ("friends of the evil Thrynn", mood 75), a Thrynn in the crew (the Elowan's "no dealings", the link closed, no attack), an officer of skill 0 with a Thrynn aboard (the Thrynn's greeting whole) and without (the control, garbled), and an Elowan in the crew (the Thrynn's "most regrettable", mood 65) (about 50 s) |
 | `transmissions` | the races that transmit rather than talk, each once the comm link is up: a Minstrel (its seven verses in order, then the link ends), a Nomad probe (its six planetary reports) and the Noah 9 derelict in orbit 3 of 175,94 (its distress beacon, and once answered the two parts of its recorded message) (about 45 s) |
+| `starstability` | the stability line of the star system scan: a star that flared before the game began (stable, post-flare) and one that flares on day 284 (its days to the flare, and 100 once the day is 100 before it); no star of the game data is more than 792 days from its flare, so "slightly unstable" is not shown (about 30 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (98 scenarios, about 65 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (99 scenarios, about 66 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
