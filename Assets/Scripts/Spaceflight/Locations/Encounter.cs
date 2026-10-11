@@ -320,6 +320,12 @@ public class Encounter : MonoBehaviour
 				UpdateUhlekEncounter();
 				break;
 
+			case GameData.Race.NoahDerelict:
+
+				// the derelict's distress beacon, and its recorded message once the ship answers (STRINFO 2.11)
+				DefaultEncounterUpdate();
+				break;
+
 			default:
 
 				// everyone else has nothing to say, but they do shoot back once they have been fired on
@@ -744,6 +750,12 @@ public class Encounter : MonoBehaviour
 				case GameData.Race.Uhlek:
 
 					InitializeUhlekEncounter();
+					break;
+
+				case GameData.Race.NoahDerelict:
+
+					// the derelict's conversation timers (without them its comm link ended the moment it opened)
+					DefaultEncounterInitialize();
 					break;
 			}
 
@@ -1986,6 +1998,22 @@ public class Encounter : MonoBehaviour
 					{
 						AddComm( GD_Comm.Subject.Terminate, false );
 					}
+					// do they transmit rather than talk? their next line, and when the transmission is over they end the comm link
+					else if ( m_pdEncounter.m_connected && IsTransmitter() )
+					{
+						aliensSaidSomething = true;
+
+						var transmission = FindNextTransmission();
+
+						if ( transmission != null )
+						{
+							AddComm( GD_Comm.Subject.Statement, false, transmission );
+						}
+						else
+						{
+							AddComm( GD_Comm.Subject.Terminate, false );
+						}
+					}
 					// are we connected?
 					else if ( m_pdEncounter.m_connected )
 					{
@@ -2521,6 +2549,40 @@ public class Encounter : MonoBehaviour
 	bool IsTiredOfTalking()
 	{
 		return ( AlienPersonality.Find( m_gdEncounter.m_race ) != null ) && ( m_pdEncounter.m_alienPhrasesLeft <= 0 );
+	}
+
+	// true if the aliens transmit rather than talk: the Minstrels' song, the Nomad probe's planetary data, the Noah 9 derelict's recorded message and the Mysterions'
+	// signal - STRINFO 2.8 to 2.11 give them as what follows the greeting, in order, and the game data has them as the race's lines for when it has no more to
+	// say (subject 5), which the port only gave as the answer to a question it had no answer for
+	bool IsTransmitter()
+	{
+		switch ( m_gdEncounter.m_race )
+		{
+			case GameData.Race.Minstrel:
+			case GameData.Race.NomadProbe:
+			case GameData.Race.NoahDerelict:
+			case GameData.Race.Mysterion:
+
+				return true;
+		}
+
+		return false;
+	}
+
+	// the next line of a transmission, in the order of the game data - null once all of it has been sent in this encounter
+	GD_Comm FindNextTransmission()
+	{
+		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
+		{
+			if ( ( comm.m_race == m_gdEncounter.m_race ) && ( comm.m_subject == GD_Comm.Subject.NoMoreInformation ) && !m_pdEncounter.m_shownCommList.Contains( comm.m_id ) )
+			{
+				m_pdEncounter.m_shownCommList.Add( comm.m_id );
+
+				return comm;
+			}
+		}
+
+		return null;
 	}
 
 	// a comm of the game data by its id, if it is one of the race of this encounter (null if it is not)
@@ -3181,6 +3243,19 @@ public class Encounter : MonoBehaviour
 		}
 	}
 
+	// the model of the race of the aliens in this encounter, for the comm screen - null if the race has none (or no slot in the list)
+	GameObject GetAlienRaceModel()
+	{
+		var race = (int) m_gdEncounter.m_race;
+
+		if ( ( m_alienRaceModelList == null ) || ( race < 0 ) || ( race >= m_alienRaceModelList.Length ) )
+		{
+			return null;
+		}
+
+		return m_alienRaceModelList[ race ];
+	}
+
 	// connect the aliens and the players
 	public void Connect()
 	{
@@ -3194,10 +3269,12 @@ public class Encounter : MonoBehaviour
 		// instantly black out the viewer
 		SpaceflightController.m_instance.m_viewport.StartFade( 0.0f, 0.0f );
 
-		// show the race of the aliens in this encounter
-		if ( m_alienRaceModelList[ (int) m_gdEncounter.m_race ] != null )
+		// show the race of the aliens in this encounter (the list has no slot for the races after the Minstrels, such as the Noah 9 derelict)
+		var raceModel = GetAlienRaceModel();
+
+		if ( raceModel != null )
 		{
-			m_alienRaceModelList[ (int) m_gdEncounter.m_race ].SetActive( true );
+			raceModel.SetActive( true );
 		}
 		else
 		{
@@ -3238,9 +3315,11 @@ public class Encounter : MonoBehaviour
 	public void Disconnect()
 	{
 		// hide the race of the aliens in this encounter
-		if ( m_alienRaceModelList[ (int) m_gdEncounter.m_race ] != null )
+		var raceModel = GetAlienRaceModel();
+
+		if ( raceModel != null )
 		{
-			m_alienRaceModelList[ (int) m_gdEncounter.m_race ].SetActive( false );
+			raceModel.SetActive( false );
 		}
 
 		// show the encounter location
