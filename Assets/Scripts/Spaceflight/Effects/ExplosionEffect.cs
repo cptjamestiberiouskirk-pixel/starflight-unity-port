@@ -174,15 +174,15 @@ public class ExplosionEffect : MonoBehaviour
 		colorOverLifetime.color = gradient;
 	}
 
-	// create the shockwave: a ring that races out flat and fades
+	// create the shockwave: a faint ring that races out flat and fades
 	void CreateRingParticles()
 	{
 		m_ringParticles = CreateParticleSystem( "Shockwave", m_ringMaterial, 3, 1 );
 
 		var main = m_ringParticles.main;
-		main.startLifetime = 0.55f;
+		main.startLifetime = 0.45f;
 		main.startSpeed = 0.0f;
-		main.startSize = 340.0f;
+		main.startSize = 300.0f;
 
 		var emission = m_ringParticles.emission;
 		emission.SetBursts( new ParticleSystem.Burst[] { new ParticleSystem.Burst( 0.0f, 1 ) } );
@@ -197,7 +197,7 @@ public class ExplosionEffect : MonoBehaviour
 
 		var colorOverLifetime = m_ringParticles.colorOverLifetime;
 		colorOverLifetime.enabled = true;
-		colorOverLifetime.color = MakeGradient( new Color( 1.0f, 0.9f, 0.7f ), new Color( 1.0f, 0.65f, 0.3f ), new Color( 1.0f, 0.45f, 0.15f ), 0.55f, 0.3f, 0.0f );
+		colorOverLifetime.color = MakeGradient( new Color( 1.0f, 0.9f, 0.7f ), new Color( 1.0f, 0.65f, 0.3f ), new Color( 1.0f, 0.45f, 0.15f ), 0.3f, 0.12f, 0.0f );
 
 		// the camera looks down on the plane the ships fly in, so the ring lies in that plane
 		var renderer = m_ringParticles.GetComponent<ParticleSystemRenderer>();
@@ -380,10 +380,10 @@ public class ExplosionEffect : MonoBehaviour
 			shader = Shader.Find( "Sprites/Default" );
 		}
 
-		// the flash and the sparks only add light, the fire also hides some of what is behind it (so it stays orange over a blue planet), smoke and debris cover it
+		// the flash, the sparks and the shockwave only add light, the fire also hides some of what is behind it (so it stays orange over a blue planet), smoke and debris cover it
 		m_glowMaterial = CreateMaterial( "Explosion Glow", shader, MakeTexture( "Explosion Glow", 64, GlowAlpha ), 0.0f );
 		m_fireMaterial = CreateMaterial( "Explosion Fire", shader, MakeTexture( "Explosion Fire", c_textureSize, FireAlpha ), 0.6f );
-		m_ringMaterial = CreateMaterial( "Explosion Shockwave", shader, MakeTexture( "Explosion Shockwave", c_textureSize, RingAlpha ), 0.15f );
+		m_ringMaterial = CreateMaterial( "Explosion Shockwave", shader, MakeTexture( "Explosion Shockwave", c_textureSize, RingAlpha ), 0.0f );
 		m_smokeMaterial = CreateMaterial( "Explosion Smoke", shader, MakeTexture( "Explosion Smoke", c_textureSize, SmokeAlpha ), 1.0f );
 		m_debrisMaterial = CreateMaterial( "Explosion Debris", shader, MakeShadeTexture(), 1.0f );
 
@@ -474,9 +474,9 @@ public class ExplosionEffect : MonoBehaviour
 	// the shockwave: a bright thin ring near the edge with a faint haze inside it
 	static float RingAlpha( float distance, float u, float v )
 	{
-		var ringOffset = ( distance - 0.85f ) / 0.05f;
+		var ringOffset = ( distance - 0.85f ) / 0.035f;
 		var ring = Mathf.Exp( -ringOffset * ringOffset );
-		var haze = 0.12f * Mathf.SmoothStep( 0.0f, 0.85f, distance ) * ( ( distance < 0.85f ) ? 1.0f : 0.0f );
+		var haze = 0.06f * Mathf.SmoothStep( 0.0f, 0.85f, distance ) * ( ( distance < 0.85f ) ? 1.0f : 0.0f );
 
 		return ( ring + haze ) * Mathf.Clamp01( ( 1.0f - distance ) * 8.0f );
 	}
