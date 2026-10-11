@@ -161,8 +161,9 @@ What the probe does:
 | `lifeformdata` | recording lifeform data on planet 92: Cargo beside a plant offers it and Record collects its data (a new class, worth 50 and the plant's bonus), the same species again (worth nothing), a test animal beside the vehicle that wanders off (it got away), and the payment at the Starport (about 50 s) |
 | `capture` | capturing a lifeform on planet 92: Cargo beside a living plant offers Capture, Record and Ignore, the capture puts it in stasis in the terrain vehicle's hold (off the surface, worth five times its data), Cargo beside a dead lifeform offers only Record, and back in the ship the specimen goes into the ship's hold (about 50 s) |
 | `starport-specimens` | a specimen in the ship's hold is listed for sale at the Trade Depot under Specimens, and selling it pays its value and frees its room (about 25 s) |
+| `look` | Look on planet 92 with one lifeform at a time beside the vehicle: a living plant (its body plan, not moving, alive), a test animal that wanders (wandering) and the plant made dead (dead) (about 40 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (114 scenarios, about 81 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (115 scenarios, about 82 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

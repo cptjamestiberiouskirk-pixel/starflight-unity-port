@@ -58,7 +58,12 @@ public class TerrainLifeform : MonoBehaviour
 		Wandering,
 		ApproachingMate,
 		FleeingMate,
-		AttackingMate
+		AttackingMate,
+
+		// the response to the player, for Look (the notes' "Other")
+		ApproachingPlayer,
+		FleeingPlayer,
+		AttackingPlayer
 	}
 
 	// its mate (lf-behav.txt: "Pair all un-paired lifeforms in the encounter area"): another lifeform of any species that it may hunt, flee, attack or eat by the
@@ -119,6 +124,33 @@ public class TerrainLifeform : MonoBehaviour
 		var angle = species.m_index * 137.0f * Mathf.Deg2Rad;
 
 		m_moveDirection = new Vector3( Mathf.Sin( angle ), 0.0f, Mathf.Cos( angle ) );
+	}
+
+	// "any current Movement behavior" in words, for Look (planet.txt)
+	public string GetMovementText()
+	{
+		if ( m_status == Status.Dead )
+		{
+			return "It does not move.";
+		}
+
+		if ( m_status == Status.Stunned )
+		{
+			return "It lies stunned.";
+		}
+
+		switch ( m_behaviour )
+		{
+			case Behaviour.Wandering: return "It is wandering.";
+			case Behaviour.ApproachingMate: return "It is stalking another lifeform.";
+			case Behaviour.FleeingMate: return "It is fleeing another lifeform.";
+			case Behaviour.AttackingMate: return "It is attacking another lifeform.";
+			case Behaviour.ApproachingPlayer: return "It is coming at the terrain vehicle.";
+			case Behaviour.FleeingPlayer: return "It is fleeing from the terrain vehicle.";
+			case Behaviour.AttackingPlayer: return "It is attacking the terrain vehicle!";
+		}
+
+		return "It is not moving.";
 	}
 
 	// the status in words, as the scan gives it
@@ -295,6 +327,8 @@ public class TerrainLifeform : MonoBehaviour
 		// "ATTACK-PLAYER <-- ?ALIVE TRUE ?STUNNED FALSE ?NOTICE-PLAYER TRUE ?DANGEROUS TRUE ?NEXT-TO-PLAYER TRUE"
 		if ( m_noticedPlayer && dangerous && ( distance <= c_nextToPlayer ) )
 		{
+			m_behaviour = Behaviour.AttackingPlayer;
+
 			AttackPlayer();
 
 			return;
@@ -305,6 +339,7 @@ public class TerrainLifeform : MonoBehaviour
 		{
 			m_moveDirection = toVehicle / distance;
 			m_moving = true;
+			m_behaviour = Behaviour.ApproachingPlayer;
 
 			return;
 		}
@@ -314,6 +349,7 @@ public class TerrainLifeform : MonoBehaviour
 		{
 			m_moveDirection = -toVehicle / distance;
 			m_moving = true;
+			m_behaviour = Behaviour.FleeingPlayer;
 
 			return;
 		}
