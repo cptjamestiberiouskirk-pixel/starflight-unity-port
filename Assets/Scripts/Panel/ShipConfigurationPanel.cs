@@ -703,7 +703,7 @@ public class ShipConfigurationPanel : Panel
 		var shieldsAreWhole = ship.m_shieldPoints >= ship.GetMaximumShieldPoints();
 
 		// nothing to repair?
-		if ( armorIsWhole && shieldsAreWhole )
+		if ( armorIsWhole && shieldsAreWhole && ship.AllSystemsAreWhole() )
 		{
 			SwitchToErrorMessageState( "The ship needs no repairs" );
 
@@ -729,6 +729,9 @@ public class ShipConfigurationPanel : Panel
 
 		ship.m_shieldPoints = ship.GetMaximumShieldPoints();
 		ship.m_repairsAreUnderWay = false;
+
+		// the ship's other systems are repaired with the armor, for nothing (as the shields)
+		ship.RestoreSystems();
 
 		SwitchToErrorMessageState( "Repairs complete" + ( ( cost > 0 ) ? ( " - " + cost + " M.U." ) : "" ), false );
 

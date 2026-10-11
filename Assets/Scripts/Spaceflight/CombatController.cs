@@ -621,6 +621,9 @@ public class CombatController : MonoBehaviour
 		{
 			playerData.m_playerShip.m_armorPoints -= damage;
 
+			// and one of the ship's other systems takes its share
+			playerData.m_playerShip.DamageRandomSystem( damage );
+
 			// show hull hit
 			var hullHit = GetAvailableHullHit();
 			if ( hullHit != null )

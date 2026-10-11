@@ -667,6 +667,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioColonies();
 				break;
 
+			case "systemdamage":
+				yield return ScenarioSystemDamage();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -14007,6 +14011,107 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "colonies: a later unsuitable planet is fined heavily, 5000 MU for each reason, with no warning", ledger.Contains( "Colony fine " + ( 5000 * reasonCountB ) + "-" ) && ( change == 50000 - 100 - 5000 * reasonCountB ) && ( pendingAfter == 0 ), ledger + " | " + change + " | pending " + pendingAfter );
 
 		Finish( "scenario=colonies asked=" + askedForHeaven + " pending=" + pendingCount + " change=" + change + " pendingAfter=" + pendingAfter, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 1: damage to the ship's systems
+
+	// the health of each system the code knows (none on the code before the systems could be damaged) - "Engines 100, Sensors 100, ..."
+	static int[] SystemHealth()
+	{
+		var field = typeof( PD_PlayerShip ).GetField( "m_systemHealth" );
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+
+		// (a getter makes sure the list is there)
+		var getter = typeof( PD_PlayerShip ).GetMethod( "AllSystemsAreWhole" );
+
+		if ( getter != null )
+		{
+			getter.Invoke( ship, null );
+		}
+
+		return ( field == null ) ? new int[ 0 ] : ( (int[]) field.GetValue( ship ) ).Clone() as int[];
+	}
+
+	IEnumerator ScenarioSystemDamage()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var ship = playerData.m_playerShip;
+		var combat = CombatController.m_instance;
+
+		EnsureCrew();
+
+		// a bare hull (250 points) with shields and lasers but no missile launcher, the shields down
+		ship.m_armorClass = 0;
+		ship.m_shieldingClass = 1;
+		ship.m_laserCannonClass = 1;
+		ship.m_missileLauncherClass = 0;
+		ship.m_shieldsAreUp = false;
+		ship.m_armorPoints = ship.GetMaximumArmorPoints();
+
+		var whole = SystemHealth();
+
+		// ---- 1. one hit of 50 (a fifth of the hull): the hull loses 50 and one system a fifth of itself
+		combat.ApplyDamageToPlayer( 50, Vector3.forward );
+
+		var afterOne = SystemHealth();
+		var dropped = 0;
+		var totalDrop = 0;
+
+		for ( var system = 0; ( system < afterOne.Length ) && ( system < whole.Length ); system++ )
+		{
+			if ( afterOne[ system ] < whole[ system ] )
+			{
+				dropped++;
+				totalDrop += whole[ system ] - afterOne[ system ];
+			}
+		}
+
+		// ---- 2. many small hits: only the systems the ship has are damaged (the missiles, index 4, stay whole)
+		for ( var hit = 0; hit < 40; hit++ )
+		{
+			ship.m_armorPoints = ship.GetMaximumArmorPoints();
+
+			combat.ApplyDamageToPlayer( 5, Vector3.forward );
+		}
+
+		var afterMany = SystemHealth();
+		var missilesWhole = ( afterMany.Length > 4 ) && ( afterMany[ 4 ] == 100 );
+		var othersHit = 0;
+
+		for ( var system = 0; system < afterMany.Length; system++ )
+		{
+			if ( ( system != 4 ) && ( afterMany[ system ] < 100 ) )
+			{
+				othersHit++;
+			}
+		}
+
+		// ---- 3. the damage report lists the systems
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		new DamageButton().Execute();
+
+		var report = MessageList();
+
+		// ---- 4. the systems' health is saved
+		var roundTrip = JsonUtility.FromJson<PD_PlayerShip>( JsonUtility.ToJson( ship ) );
+		var savedField = typeof( PD_PlayerShip ).GetField( "m_systemHealth" );
+		var saved = ( savedField == null ) ? null : (int[]) savedField.GetValue( roundTrip );
+		var survives = ( saved != null ) && ( saved.Length == afterMany.Length ) && ( string.Join( ",", saved ) == string.Join( ",", afterMany ) );
+
+		ship.m_armorPoints = ship.GetMaximumArmorPoints();
+
+		yield return Frames( 2 );
+
+		Log( "systemdamage: whole " + string.Join( ",", whole ) + " | after a hit of 50 on a hull of 250: " + string.Join( ",", afterOne ) + " (" + dropped + " system lost " + totalDrop + ") | after 40 hits of 5: " + string.Join( ",", afterMany ) + " | saved and loaded " + survives + " | " + report.Replace( '\n', '/' ) );
+
+		Check( "systemdamage: a new ship's systems are whole", ( whole.Length == 6 ) && ( string.Join( ",", whole ) == "100,100,100,100,100,100" ), string.Join( ",", whole ) );
+		Check( "systemdamage: a hit that gets through the shields also damages one system, by the same share as the hull (50 of 250: 20)", ( dropped == 1 ) && ( totalDrop == 20 ), dropped + " systems, " + totalDrop );
+		Check( "systemdamage: only the systems the ship has are damaged (no missile launcher: the missiles stay whole)", missilesWhole && ( othersHit >= 3 ), string.Join( ",", afterMany ) );
+		Check( "systemdamage: the damage report lists the systems, and their health is saved", report.Contains( "Engines:" ) && report.Contains( "Laser cannon:" ) && !report.Contains( "Missile launcher:" ) && survives, survives + " | " + report.Replace( '\n', '/' ) );
+
+		Finish( "scenario=systemdamage afterOne=" + string.Join( ",", afterOne ) + " afterMany=" + string.Join( ",", afterMany ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

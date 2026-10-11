@@ -128,8 +128,9 @@ What the probe does:
 | `vesselstats` | alien vessels with their own armor, shields and speed: the armor and shield points of every ship of a Spemin and an Elowan encounter against their vessels in the game data, and how far the first ship of each travels per second (a Spemin ship, move delay 1500, about 2200 / 1500 times as fast as an Elowan one, 2200) (about 25 s) |
 | `starmapfuel` | the starmap's fuel estimate, with class 1 engines in hyperspace at 40, 40: the viewport label on opening the starmap (the cursor on the ship, Fuel 0.0), with the cursor 20 coordinates away (Fuel 9.6) and with the Tesseract (Fuel 4.8) (about 20 s) |
 | `colonies` | colony recommendations through the real Log Planet button: the question after logging, Yes for Mardan 4 (optimal, on Interstel's list) and two planets of the Uhlek system that are not on it, No for a third (the control); docking at the Starport (the 50000 MU bonus, the first unsuitable planet's 100 MU warning with its reasons, the second fined 5000 MU a reason without the warning, the ledger and the evaluations, nothing left pending) (about 60 s) |
+| `systemdamage` | damage to the ship's systems, on a bare hull with shields and lasers and no missile launcher: a new ship's systems whole, one hit of 50 (one system loses 20, the hull's share), 40 hits of 5 (only installed systems damaged, the missiles whole), the Damage report listing the systems, and their health through a save and load (about 15 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (87 scenarios, about 54 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (88 scenarios, about 55 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
