@@ -196,19 +196,32 @@ public class TerrainVehicle : MonoBehaviour
 			steeringJoint.transform.localPosition = Vector3.zero;
 		}
 
-		// lava destroys the terrain vehicle that enters it: the liquid of a molten planet (the 1984 notes, planet.txt: a surface with a movement factor of 0 "indicated
-		// that the vehicle is destroyed if it enters that surface", lava among them) - one that comes out of the ship into it can still drive out
-		var inLava = IsInLava( playerData.m_general.m_coordinates );
-
-		if ( inLava && m_lavaChecked && !m_wasInLava )
+		// lava destroys the terrain vehicle that stays in it: the liquid of a molten planet (the 1984 notes, planet.txt: "If the TV moves into a lava terrain a
+		// warning message is given ('The heat from the lava is too much - we're burning up'). If the TV still does not move off it is destroyed.")
+		if ( IsInLava( playerData.m_general.m_coordinates ) )
 		{
-			LoseToLava();
+			if ( m_timeInLava <= 0.0f )
+			{
+				SoundController.m_instance.PlaySound( SoundController.Sound.Error );
 
-			return;
+				SpaceflightController.m_instance.m_messages.AddText( "<color=red>The heat from the lava is too much - we're burning up!</color>" );
+			}
+
+			m_timeInLava += Time.deltaTime;
+
+			if ( m_timeInLava >= c_lavaGraceTime )
+			{
+				m_timeInLava = 0.0f;
+
+				LoseToLava();
+
+				return;
+			}
 		}
-
-		m_wasInLava = inLava;
-		m_lavaChecked = true;
+		else
+		{
+			m_timeInLava = 0.0f;
+		}
 
 		// update the fuel efficiency
 		var maximumElevation = 1.25f * m_elevationScale;
@@ -331,14 +344,14 @@ public class TerrainVehicle : MonoBehaviour
 		return worldCoordinates;
 	}
 
-	// whether the terrain vehicle was in lava in the last frame, and whether that has been found out since it came out of the ship
-	bool m_wasInLava;
-	bool m_lavaChecked;
+	// how long the terrain vehicle has been in lava, and how long it can stay before it is destroyed (the notes give no time: the port's)
+	float m_timeInLava;
+	const float c_lavaGraceTime = 3.0f;
 
-	// a terrain vehicle that comes out of the ship starts the check of the lava again
+	// a terrain vehicle that comes out of the ship has not been in lava yet
 	void OnEnable()
 	{
-		m_lavaChecked = false;
+		m_timeInLava = 0.0f;
 	}
 
 	// true if this place of a molten planet is under its liquid, which is lava

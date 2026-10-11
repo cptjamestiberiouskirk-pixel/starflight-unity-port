@@ -16213,9 +16213,25 @@ public class ClaudeProbe : MonoBehaviour
 
 		controller.m_messages.Clear();
 
+		// into the lava: the warning, and out of it again in time
 		playerData.m_general.m_coordinates = lava;
 
 		yield return Frames( 5 );
+
+		var warning = MessageList();
+
+		playerData.m_general.m_coordinates = FindPlaceByTheLiquid( false );
+
+		yield return new WaitForSecondsRealtime( 4.0f );
+
+		var savedByLeaving = ( playerData.m_general.m_location == PD_General.Location.Disembarked ) && !TerrainVehicleIsLost();
+
+		// into it again, and staying there
+		controller.m_messages.Clear();
+
+		playerData.m_general.m_coordinates = lava;
+
+		yield return new WaitForSecondsRealtime( 4.0f );
 
 		var afterLava = playerData.m_general.m_location;
 		var lostInLava = TerrainVehicleIsLost();
@@ -16246,10 +16262,11 @@ public class ClaudeProbe : MonoBehaviour
 
 		controller.m_encounterRange = encounterRange;
 
-		Log( "lava: water at " + water + " -> " + afterWater + ", lost " + lostInWater + " || planet 29 molten " + molten + ", landed " + landed + ", on solid ground " + onSolidGround + ", lava at " + lava + " -> " + afterLava + ", lost " + lostInLava + ", carried " + carriedBefore + " -> " + carriedAfter + " | " + lavaMessage + " || disembark: " + disembarkMessage + " (" + afterDisembark + ") || balance " + balanceBefore + " -> " + balanceAfter + ", lost after docking " + lostAfterDocking + ", evaluated " + evaluated );
+		Log( "lava: water at " + water + " -> " + afterWater + ", lost " + lostInWater + " || planet 29 molten " + molten + ", landed " + landed + ", on solid ground " + onSolidGround + ", warning " + warning + ", saved by leaving " + savedByLeaving + ", lava at " + lava + " -> " + afterLava + ", lost " + lostInLava + ", carried " + carriedBefore + " -> " + carriedAfter + " | " + lavaMessage + " || disembark: " + disembarkMessage + " (" + afterDisembark + ") || balance " + balanceBefore + " -> " + balanceAfter + ", lost after docking " + lostAfterDocking + ", evaluated " + evaluated );
 
 		Check( "lava: the terrain vehicle driven into water floats (control)", ( water != Vector3.zero ) && ( afterWater == PD_General.Location.Disembarked ) && !lostInWater, water + " " + afterWater + " " + lostInWater );
-		Check( "lava: driven into the lava of a molten planet it is destroyed with its cargo, and the crew is back in the ship", landed && onSolidGround && ( lava != Vector3.zero ) && lostInLava && ( carriedAfter == 0 ) && ( afterLava == PD_General.Location.Planetside ) && lavaMessage.Contains( "destroyed by lava" ), lava + " " + afterLava + " " + lostInLava + " " + carriedAfter + " | " + lavaMessage );
+		Check( "lava: the heat of the lava gives a warning first, and leaving it in time saves the vehicle", warning.Contains( "we're burning up" ) && savedByLeaving, savedByLeaving + " | " + warning );
+		Check( "lava: staying in the lava of a molten planet it is destroyed with its cargo, and the crew is back in the ship", landed && onSolidGround && ( lava != Vector3.zero ) && lostInLava && ( carriedAfter == 0 ) && ( afterLava == PD_General.Location.Planetside ) && lavaMessage.Contains( "destroyed by lava" ), lava + " " + afterLava + " " + lostInLava + " " + carriedAfter + " | " + lavaMessage );
 		Check( "lava: with the terrain vehicle lost there is no disembarking", disembarkMessage.Contains( "no terrain vehicle" ) && ( afterDisembark == PD_General.Location.Planetside ), afterDisembark + " | " + disembarkMessage );
 		Check( "lava: at the Starport a new terrain vehicle is installed for a fine of 10,000 MU, with Interstel's evaluation", !lostAfterDocking && ( balanceBefore - balanceAfter == 10000 ) && evaluated, ( balanceBefore - balanceAfter ) + " " + lostAfterDocking + " " + evaluated );
 
