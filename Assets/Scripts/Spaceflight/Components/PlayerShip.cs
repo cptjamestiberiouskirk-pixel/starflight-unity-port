@@ -100,10 +100,13 @@ public class PlayerShip : MonoBehaviour
 			if ( m_enginesAreOn )
 			{
 				// update the current maximum speed of the player
-				playerData.m_general.m_currentMaximumSpeed = m_maximumSpeed * ( ( playerData.m_general.m_location == PD_General.Location.StarSystem ) ? 4.0f : 1.0f );
+				// (damaged engines are slower, and accelerate more slowly, in proportion to their health)
+				var enginesFactor = playerData.m_playerShip.GetSystemFactor( PD_PlayerShip.ShipSystem.Engines );
+
+				playerData.m_general.m_currentMaximumSpeed = m_maximumSpeed * ( ( playerData.m_general.m_location == PD_General.Location.StarSystem ) ? 4.0f : 1.0f ) * enginesFactor;
 
 				// calculate the acceleration
-				var acceleration = Time.deltaTime * playerData.m_playerShip.m_acceleration / ( m_minimumTimeToReachMaximumSpeed * 25.0f );
+				var acceleration = Time.deltaTime * playerData.m_playerShip.m_acceleration * enginesFactor / ( m_minimumTimeToReachMaximumSpeed * 25.0f );
 
 				// increase the current speed
 				playerData.m_general.m_currentSpeed = Mathf.Lerp( playerData.m_general.m_currentSpeed, playerData.m_general.m_currentMaximumSpeed, acceleration );

@@ -671,6 +671,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSystemDamage();
 				break;
 
+			case "systemeffects":
+				yield return ScenarioSystemEffects();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -2503,6 +2507,14 @@ public class ClaudeProbe : MonoBehaviour
 		combat.ApplyDamageToPlayer( 50, Vector3.forward );
 
 		var hullDamageWhileDown = armorBefore - ship.m_armorPoints;
+
+		// (the hit also damaged one of the ship's systems at random - make them whole, so that a damaged shield generator does not change what follows)
+		var restoreSystems = typeof( PD_PlayerShip ).GetMethod( "RestoreSystems" );
+
+		if ( restoreSystems != null )
+		{
+			restoreSystems.Invoke( ship, null );
+		}
 
 		// raise them again
 		ship.RaiseShields();
@@ -12654,6 +12666,14 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "racelosses: the Uhlek attack (control)", uhlekDamageBefore > 0, uhlekDamageBefore.ToString() );
 		Check( "racelosses: once the planet of their mind-ganglion has been destroyed the Uhlek are harmless", uhlekDamageAfter == 0, uhlekDamageAfter.ToString() );
 
+		// (the Uhlek's fire damaged the ship's systems as well as its hull - the comm among them would garble what the Elowan say)
+		var restoreSystems = typeof( PD_PlayerShip ).GetMethod( "RestoreSystems" );
+
+		if ( restoreSystems != null )
+		{
+			restoreSystems.Invoke( ship, null );
+		}
+
 		// ---- 3. the control: the Elowan meet a ship without hostility, and hail it
 		var elowanId = FindEncounter( 0, 1, 1, 0, GameData.Race.Elowan );
 
@@ -14113,6 +14133,190 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "systemdamage: the damage report lists the systems, and their health is saved", report.Contains( "Engines:" ) && report.Contains( "Laser cannon:" ) && !report.Contains( "Missile launcher:" ) && survives, survives + " | " + report.Replace( '\n', '/' ) );
 
 		Finish( "scenario=systemdamage afterOne=" + string.Join( ",", afterOne ) + " afterMany=" + string.Join( ",", afterMany ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 1: what a damaged system does
+
+	// sets the health of a system (by its index in PD_PlayerShip.ShipSystem: 0 engines, 1 sensors, 2 comm, 3 shields, 4 missiles, 5 lasers) - nothing on the code
+	// before the systems could be damaged
+	static void SetSystemHealth( int system, int health )
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+		var field = typeof( PD_PlayerShip ).GetField( "m_systemHealth" );
+
+		if ( field == null )
+		{
+			return;
+		}
+
+		var values = field.GetValue( ship ) as int[];
+
+		if ( ( values == null ) || ( values.Length < 6 ) )
+		{
+			values = new[] { 100, 100, 100, 100, 100, 100 };
+		}
+
+		values[ system ] = health;
+
+		field.SetValue( ship, values );
+	}
+
+	IEnumerator ScenarioSystemEffects()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var combat = CombatController.m_instance;
+
+		EnsureCrew();
+
+		ship.m_shieldingClass = 1;
+		ship.m_laserCannonClass = 1;
+		ship.AddElement( 5, 200 );
+
+		// ---- 1. the shield generator: its maximum charge in proportion to its health
+		SetSystemHealth( 3, 100 );
+
+		var shieldsWhole = ship.GetMaximumShieldPoints();
+
+		SetSystemHealth( 3, 50 );
+
+		var shieldsHalf = ship.GetMaximumShieldPoints();
+
+		SetSystemHealth( 3, 100 );
+
+		// ---- 2. the engines: the top speed in proportion to their health (in hyperspace, with no encounter able to begin)
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 4.0f, 0.0f, 4.0f ) );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 5 );
+
+		controller.m_playerShip.TurnOnEngines();
+
+		SetSystemHealth( 0, 100 );
+
+		yield return Frames( 3 );
+
+		var speedWhole = playerData.m_general.m_currentMaximumSpeed;
+
+		SetSystemHealth( 0, 50 );
+
+		yield return Frames( 3 );
+
+		var speedHalf = playerData.m_general.m_currentMaximumSpeed;
+
+		controller.m_playerShip.TurnOffEngines();
+
+		SetSystemHealth( 0, 100 );
+
+		// ---- 3. the laser cannon: the damage of a shot in proportion to its health, and no shot once it is destroyed
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		EnterEncounter( speminId );
+		yield return Frames( 10 );
+
+		var alien = playerData.FindEncounter( speminId ).GetAlienShipList()[ 0 ];
+		var laserHits = new int[ 2 ];
+
+		for ( var pass = 0; pass < 2; pass++ )
+		{
+			SetSystemHealth( 5, ( pass == 0 ) ? 100 : 50 );
+
+			alien.m_armorPoints = 100000;
+			alien.m_shieldPoints = 0;
+
+			combat.SetTarget( FirstLivingAlien() );
+
+			BringAliensClose();
+
+			SetField( combat, "m_playerLaserCooldown", 0.0f );
+
+			combat.FirePlayerLaser();
+
+			laserHits[ pass ] = 100000 - alien.m_armorPoints;
+		}
+
+		SetSystemHealth( 5, 0 );
+
+		SetField( combat, "m_playerLaserCooldown", 0.0f );
+
+		var firesDestroyed = combat.CanFireLaser();
+
+		SetSystemHealth( 5, 100 );
+
+		// ---- 4. the comm: a statement of the Spemin with an officer of full skill, the comm whole and destroyed
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+
+		GD_Comm speminComm = null;
+
+		foreach ( var comm in gameData.m_commList )
+		{
+			if ( ( speminComm == null ) && ( comm.m_race == GameData.Race.Spemin ) && ( comm.m_subject == GD_Comm.Subject.Statement ) && ( comm.m_text.IndexOfAny( new[] { '&', '*', '/', '(', ')' } ) < 0 ) )
+			{
+				speminComm = comm;
+			}
+		}
+
+		SetSystemHealth( 2, 100 );
+
+		var commWhole = AlienCommShown( speminComm );
+
+		SetSystemHealth( 2, 0 );
+
+		var commDestroyed = AlienCommShown( speminComm );
+
+		SetSystemHealth( 2, 100 );
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 5. the sensors: no readings below a quarter of their health (in a star system)
+		EnterStarSystem( StarThatNeverFlares() );
+
+		var end = Time.realtimeSinceStartup + 40.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && controller.m_starSystem.GeneratingPlanets() )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		SetSystemHealth( 1, 100 );
+		controller.m_messages.Clear();
+
+		new SensorsButton().Execute();
+
+		var sensorsWhole = MessageList();
+
+		SetSystemHealth( 1, 20 );
+		controller.m_messages.Clear();
+
+		new SensorsButton().Execute();
+
+		var sensorsBroken = MessageList();
+
+		SetSystemHealth( 1, 100 );
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "systemeffects: maximum shields " + shieldsWhole + " whole, " + shieldsHalf + " at half | top speed " + speedWhole + " whole, " + speedHalf + " at half | laser hit " + laserHits[ 0 ] + " whole, " + laserHits[ 1 ] + " at half, can fire when destroyed " + firesDestroyed + " | comm whole: " + commWhole + " | destroyed: " + commDestroyed + " | sensors whole: " + sensorsWhole + " | at 20: " + sensorsBroken );
+
+		Check( "systemeffects: a damaged shield generator holds less charge (half of it at half its health)", ( shieldsWhole > 0 ) && ( shieldsHalf == shieldsWhole / 2 ), shieldsWhole + " -> " + shieldsHalf );
+		Check( "systemeffects: damaged engines are slower (half the top speed at half their health)", ( speedWhole > 0.0f ) && Mathf.Abs( speedHalf - speedWhole / 2.0f ) < 0.01f, speedWhole + " -> " + speedHalf );
+		Check( "systemeffects: a damaged laser cannon does less damage, and a destroyed one does not fire", ( laserHits[ 0 ] > 0 ) && ( laserHits[ 1 ] == Mathf.RoundToInt( laserHits[ 0 ] / 2.0f ) ) && !firesDestroyed, laserHits[ 0 ] + " -> " + laserHits[ 1 ] + ", " + firesDestroyed );
+		Check( "systemeffects: destroyed comm equipment garbles what a fully trained officer understands", commWhole.Contains( speminComm.m_text ) && !commDestroyed.Contains( speminComm.m_text ), commDestroyed );
+		Check( "systemeffects: badly damaged sensors give no readings", sensorsWhole.Contains( "Star System Scan" ) && sensorsBroken.Contains( "too badly damaged" ), sensorsBroken );
+
+		Finish( "scenario=systemeffects shields=" + shieldsWhole + "/" + shieldsHalf + " speed=" + speedWhole + "/" + speedHalf + " laser=" + laserHits[ 0 ] + "/" + laserHits[ 1 ], 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

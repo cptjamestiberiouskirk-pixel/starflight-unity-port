@@ -29,6 +29,21 @@ public class SensorsButton : ShipButton
 		// get to the game data
 		var gameData = DataController.m_instance.m_gameData;
 
+		// badly damaged sensors give no readings
+		var sensorsHealth = DataController.m_instance.m_playerData.m_playerShip.GetSystemHealth( PD_PlayerShip.ShipSystem.Sensors );
+
+		if ( sensorsHealth < PD_PlayerShip.c_sensorsNeedHealth )
+		{
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+			SpaceflightController.m_instance.m_messages.Clear();
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>The sensors are too badly damaged, Captain.</color>" );
+
+			SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
+			return false;
+		}
+
 		// get to the player data
 		var playerData = DataController.m_instance.m_playerData;
 

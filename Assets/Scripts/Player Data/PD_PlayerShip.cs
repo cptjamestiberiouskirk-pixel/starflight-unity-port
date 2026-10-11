@@ -231,6 +231,15 @@ public class PD_PlayerShip
 		m_systemHealth[ (int) system ] = Mathf.Clamp( health, 0, 100 );
 	}
 
+	// how much of its work a system does, from 0 to 1: a damaged system works in proportion to its health (the owner's ruling of 2026-10-11 for roadmap 1.2)
+	public float GetSystemFactor( ShipSystem system )
+	{
+		return GetSystemHealth( system ) / 100.0f;
+	}
+
+	// the health below which the sensors give no readings (the owner's ruling of 2026-10-11)
+	public const int c_sensorsNeedHealth = 25;
+
 	// true if the ship has this system (the engines, the sensors and the comm always; the shields, the missiles and the lasers once they are installed)
 	public bool HasSystem( ShipSystem system )
 	{
@@ -357,7 +366,8 @@ public class PD_PlayerShip
 	// the most shield points this ship can have - the full charge of the shielding that is installed (zero if there is none)
 	public int GetMaximumShieldPoints()
 	{
-		return Mathf.Max( 0, GetShielding().m_points );
+		// a damaged shield generator holds less charge
+		return Mathf.Max( 0, Mathf.RoundToInt( GetShielding().m_points * GetSystemFactor( ShipSystem.Shields ) ) );
 	}
 
 	// what the armor points belong to, for the messages - the armor plating, or the hull itself if no plating is installed
