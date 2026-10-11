@@ -2,3 +2,8 @@
 # (the arrow in the "Starport clear" message). Checked out with LF, the file Unity writes is the file git has, and the working tree stays clean.
 # Without this line a checkout with core.autocrlf=true gets CRLF, and after such a play session git status lists the file as modified with an empty diff.
 Assets/TextMesh[[:space:]]Pro/Resources/Fonts[[:space:]]&[[:space:]]Materials/LiberationSans[[:space:]]SDF[[:space:]]-[[:space:]]Fallback.asset text eol=lf
+
+# Unity writes the project settings with LF line endings whenever it saves them, also when no value changes.
+# Git keeps the size of the file it checked out, and a file whose size changed is listed as modified without its content being compared:
+# with core.autocrlf=true the CRLF checkout and the LF file Unity writes differ in size, so git status lists the file with an empty diff.
+ProjectSettings/** text eol=lf
