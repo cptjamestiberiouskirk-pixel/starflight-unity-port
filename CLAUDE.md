@@ -89,7 +89,7 @@ In the Spaceflight scene the Cancel input (the Escape key) opens the save panel,
 `CombatController` (Spaceflight scene singleton) owns weapon cooldowns, damage (shields then armor), and object pools for lasers, missiles, and hit/explosion effects. `Encounter.cs` (~2,000 lines) runs alien AI, comms, stance, and calls into `CombatController`.
 
 Combat rules:
-- Alien ships have saved armor and shield points, 100 per vessel class (`PD_AlienShip`). Shields absorb first.
+- Alien ships have saved armor and shield points, those of their vessel in the game data (`GD_Vessel.m_armor`, `m_shields`; `PD_AlienShip.ResetHitPoints`), and move at a speed that follows the vessel's move delay (`GD_Vessel.GetSpeedFactor`). Shields absorb first.
 - Firing on any alien calls `Encounter.PlayerAttacked()`, which keeps that encounter hostile until the player leaves it (`PD_Encounter.m_attackedByPlayer`). The Uhlek are hostile on sight and never talk: the game data has no comm lines for them.
 - Alien fire is only reached through the race switch in `Encounter.Update`. A race without its own case gets the `default` case, which only shoots back. All of it ends in `Encounter.UpdateAlienCombat`, and the aliens hold their fire there for as long as the comm link is up.
 - Player weapons have no ammunition. Every shot uses Endurium through `PD_PlayerShip.UseUpFuel` and needs `HasFuel()`.

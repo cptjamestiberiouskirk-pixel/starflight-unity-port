@@ -16,6 +16,16 @@ public class GD_Vessel
 	public int m_mass;
 
 	public int m_moveDelay;
+
+	// the move delay at which an alien ship moves at the encounter's alien ship speed (the delay of most of the vessels between the fastest and the slowest - the
+	// port's choice: the game data gives how the vessels' speeds compare, not how fast any of them is)
+	public const float c_referenceMoveDelay = 2200.0f;
+
+	// how fast this vessel moves compared with the encounter's alien ship speed: the shorter its move delay in the game data, the faster
+	public float GetSpeedFactor()
+	{
+		return ( m_moveDelay > 0 ) ? ( c_referenceMoveDelay / m_moveDelay ) : 1.0f;
+	}
 	public int m_fireDelay;
 
 	public int m_armor;

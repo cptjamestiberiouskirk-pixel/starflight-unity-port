@@ -655,6 +655,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioDistress();
 				break;
 
+			case "vesselstats":
+				yield return ScenarioVesselStats();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -2384,10 +2388,10 @@ public class ClaudeProbe : MonoBehaviour
 			{
 				var ship = encounter.m_pdEncounter.GetAlienShipList()[ index ];
 				var vessel = gameData.m_vesselList[ ship.m_vesselId ];
-				var expected = Mathf.CeilToInt( ( Mathf.Max( 1, Mathf.RoundToInt( vessel.m_armorClass * 100 ) ) + Mathf.Max( 0, vessel.m_shieldClass * 100 ) ) / 20.0f );
+				var expected = Mathf.CeilToInt( ( Mathf.Max( 1, vessel.m_armor ) + Mathf.Max( 0, vessel.m_shields ) ) / 20.0f );
 				var hits = HitsToKill( index, 20, 400 );
 
-				Log( vessel.m_name + " (armor " + vessel.m_armorClass + ", shield " + vessel.m_shieldClass + "): " + ( ( hits < 0 ) ? "still alive after 400 hits of 20" : ( "destroyed by hit " + hits + " of 20" ) ) + ", 100 points per class would be " + expected );
+				Log( vessel.m_name + " (armor " + vessel.m_armorClass + ", shield " + vessel.m_shieldClass + "): " + ( ( hits < 0 ) ? "still alive after 400 hits of 20" : ( "destroyed by hit " + hits + " of 20" ) ) + ", the points of the game data would be " + expected );
 
 				result += " " + vessel.m_name.Replace( " ", "" ) + "=" + hits + "/" + expected;
 			}
@@ -13679,6 +13683,95 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "distress: after the Starport has been destroyed there is no response, no fine and no tow (control)", ( fineAfterStarport == 0 ) && !whereAfterStarport.StartsWith( "DockingBay" ) && textAfterStarport.Contains( "NO RESPONSE" ), fineAfterStarport + ", " + whereAfterStarport );
 
 		Finish( "scenario=distress far=" + fineFar + " near=" + fineNear + " afterStarport=" + fineAfterStarport, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 1: alien vessels with their own armor, shields and speed
+
+	// enters an encounter of a race and returns how far its first ship travels per real second over some seconds, and whether its ships have the armor and shield
+	// points of their vessels in the game data
+	static IEnumerator AlienShipTravel( GameData.Race race, float seconds, float[] perSecond, string[] points )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var encounterId = FindEncounter( 1, 6, 3, 0, race );
+
+		EnterEncounter( encounterId );
+		yield return Frames( 10 );
+
+		var ships = encounter.m_pdEncounter.GetAlienShipList();
+
+		points[ 0 ] = "";
+
+		foreach ( var ship in ships )
+		{
+			var vessel = gameData.m_vesselList[ ship.m_vesselId ];
+
+			points[ 0 ] += vessel.m_name + " " + ship.m_armorPoints + "/" + vessel.m_armor + " " + ship.m_shieldPoints + "/" + vessel.m_shields + "; ";
+		}
+
+		var watched = ships[ 0 ];
+		var last = watched.m_coordinates;
+		var travelled = 0.0f;
+		var end = Time.realtimeSinceStartup + seconds;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			yield return null;
+
+			travelled += Vector3.Distance( last, watched.m_coordinates );
+			last = watched.m_coordinates;
+		}
+
+		perSecond[ 0 ] = travelled / seconds;
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+	}
+
+	IEnumerator ScenarioVesselStats()
+	{
+		var perSecond = new float[ 1 ];
+		var points = new string[ 1 ];
+
+		EnsureCrew();
+
+		yield return AlienShipTravel( GameData.Race.Spemin, 3.0f, perSecond, points );
+
+		var speminSpeed = perSecond[ 0 ];
+		var speminPoints = points[ 0 ];
+
+		yield return AlienShipTravel( GameData.Race.Elowan, 3.0f, perSecond, points );
+
+		var elowanSpeed = perSecond[ 0 ];
+		var elowanPoints = points[ 0 ];
+
+		var ratio = ( elowanSpeed > 0.0f ) ? ( speminSpeed / elowanSpeed ) : -1.0f;
+
+		// every ship has the points of its vessel: "armor/vessel's armor shields/vessel's shields" with the two halves equal
+		var allMatch = true;
+
+		foreach ( var entry in ( speminPoints + elowanPoints ).Split( new[] { "; " }, StringSplitOptions.RemoveEmptyEntries ) )
+		{
+			var parts = entry.Split( ' ' );
+
+			for ( var part = 0; part < parts.Length; part++ )
+			{
+				if ( parts[ part ].Contains( "/" ) )
+				{
+					var halves = parts[ part ].Split( '/' );
+
+					allMatch = allMatch && ( halves[ 0 ] == halves[ 1 ] );
+				}
+			}
+		}
+
+		Log( "vesselstats: spemin ships " + speminPoints + "| elowan ships " + elowanPoints + "| travel per second: spemin " + speminSpeed.ToString( "0.0" ) + ", elowan " + elowanSpeed.ToString( "0.0" ) + ", ratio " + ratio.ToString( "0.00" ) + " (move delays 1500 and 2200: 1.47)" );
+
+		Check( "vesselstats: every alien ship has the armor and shield points of its vessel in the game data", allMatch, speminPoints + elowanPoints );
+		Check( "vesselstats: an alien ship moves at the speed of its vessel's move delay (a Spemin ship 2200 / 1500 times as fast as an Elowan one)", ( ratio > 1.3f ) && ( ratio < 1.65f ), ratio.ToString( "0.00" ) );
+
+		Finish( "scenario=vesselstats ratio=" + ratio.ToString( "0.00" ) + " points=" + allMatch, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

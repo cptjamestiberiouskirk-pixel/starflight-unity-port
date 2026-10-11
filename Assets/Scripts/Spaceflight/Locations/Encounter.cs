@@ -1754,8 +1754,11 @@ public class Encounter : MonoBehaviour
 
 		alienShip.m_currentDirection = Vector3.Slerp( alienShip.m_currentDirection, desiredDirection, Time.deltaTime * m_alienShipTurnRate );
 
-		// move the alien ship forward
-		alienShip.m_coordinates += alienShip.m_currentDirection * Time.deltaTime * m_alienShipSpeed * alienShipSpeedMultiplier;
+		// move the alien ship forward, at the speed of its vessel
+		var gameData = DataController.m_instance.m_gameData;
+		var speedFactor = ( ( alienShip.m_vesselId >= 0 ) && ( alienShip.m_vesselId < gameData.m_vesselList.Length ) ) ? gameData.m_vesselList[ alienShip.m_vesselId ].GetSpeedFactor() : 1.0f;
+
+		alienShip.m_coordinates += alienShip.m_currentDirection * Time.deltaTime * m_alienShipSpeed * alienShipSpeedMultiplier * speedFactor;
 	}
 
 	void FinalizeAlienShips()
