@@ -102,6 +102,9 @@ public class SensorsDisplay : ShipDisplay
 	// do we have sensor data to analyze?
 	public bool m_hasSensorData;
 
+	// counts the sensor readings taken (each one can be analyzed once, see AnalysisButton)
+	public int m_readingCount;
+
 	// what are we currently scanning
 	public ScanType m_scanType;
 
@@ -549,6 +552,9 @@ public class SensorsDisplay : ShipDisplay
 				maskTexture = m_maskTextures[ textureIndex ];
 			}
 		}
+
+		// a new reading
+		m_readingCount++;
 
 		// remember the scan type, mass, bio density, and mineral density
 		m_scanType = scanType;

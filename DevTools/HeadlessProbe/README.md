@@ -140,8 +140,9 @@ What the probe does:
 | `rivals` | the Elowan and the Thrynn and a crew that is friends with the other race: the first comm link of the game with the Thrynn (remembered), then the Elowan ("friends of the evil Thrynn", mood 75), a Thrynn in the crew (the Elowan's "no dealings", the link closed, no attack), an officer of skill 0 with a Thrynn aboard (the Thrynn's greeting whole) and without (the control, garbled), and an Elowan in the crew (the Thrynn's "most regrettable", mood 65) (about 50 s) |
 | `transmissions` | the races that transmit rather than talk, each once the comm link is up: a Minstrel (its seven verses in order, then the link ends), a Nomad probe (its six planetary reports) and the Noah 9 derelict in orbit 3 of 175,94 (its distress beacon, and once answered the two parts of its recorded message) (about 45 s) |
 | `starstability` | the stability line of the star system scan: a star that flared before the game began (stable, post-flare) and one that flares on day 284 (its days to the flare, and 100 once the day is 100 before it); no star of the game data is more than 792 days from its flare, so "slightly unstable" is not shown (about 30 s) |
+| `analysisskill` | the science officer's skill and the analysis, in orbit of planet 90: skill 250 (every line, the control), the same reading again ("already attempted"), skill 0 (only the object's class, 6 lines unknown), skill 100 over 20 readings (about half of 120 lines unknown) and an alien ship analyzed twice (allowed) (about 25 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (99 scenarios, about 66 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (100 scenarios, about 67 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

@@ -26,6 +26,17 @@ public class AnalysisButton : ShipButton
 		return ratio.ToString( "F1", System.Globalization.CultureInfo.InvariantCulture );
 	}
 
+	// the reading of a planet the science officer has analyzed last (the 1984 notes, starship.txt: "I have already attempted analysis of this data, Captain" - alien
+	// ships "may be read and analyzed as often as desired")
+	static int s_analyzedReading = -1;
+
+	// a line of the analysis the science officer gives with a chance of their science skill / 2 percent, else "Unknown" (starship.txt: "For each header there is a
+	// chance that the Science Officer will give some information. That % chance is = the Science Officer's skill / 2")
+	static string Known( string value, int scienceSkill )
+	{
+		return ( UnityEngine.Random.Range( 0.0f, 100.0f ) < scienceSkill / 2.0f ) ? value : "Unknown";
+	}
+
 	public override bool Execute()
 	{
 		// get to the game data
@@ -37,8 +48,44 @@ public class AnalysisButton : ShipButton
 		// new message text
 		string text;
 
+		// the analysis is the science officer's
+		var scienceOfficer = playerData.m_crewAssignment.IsAssigned( PD_CrewAssignment.Role.ScienceOfficer ) ? playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer ) : null;
+		var sensorsDisplay = SpaceflightController.m_instance.m_displayController.m_sensorsDisplay;
+
+		if ( ( scienceOfficer == null ) || ( scienceOfficer.m_vitality <= 0 ) )
+		{
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+			SpaceflightController.m_instance.m_messages.Clear();
+			SpaceflightController.m_instance.m_messages.AddText( ( scienceOfficer == null ) ? "<color=red>No science officer assigned!</color>" : "<color=red>The science officer is incapacitated!</color>" );
+
+			SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
+			return false;
+		}
+
+		var skill = scienceOfficer.m_science;
+
+		// a planet's reading is analyzed once
+		if ( sensorsDisplay.m_hasSensorData && ( sensorsDisplay.m_scanType == SensorsDisplay.ScanType.Planet ) )
+		{
+			if ( sensorsDisplay.m_readingCount == s_analyzedReading )
+			{
+				SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+				SpaceflightController.m_instance.m_messages.Clear();
+				SpaceflightController.m_instance.m_messages.AddText( "<color=white>I have already attempted analysis of this data, Captain.</color>" );
+
+				SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
+				return false;
+			}
+
+			s_analyzedReading = sensorsDisplay.m_readingCount;
+		}
+
 		// do we have sensor data to analyze?
-		if ( SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.m_hasSensorData )
+		if ( sensorsDisplay.m_hasSensorData )
 		{
 			// yes - start building the new messages text
 			text = "<color=white>Analysis of Last Sensor Reading</color>\n";
@@ -52,22 +99,23 @@ public class AnalysisButton : ShipButton
 					GD_Planet planet = gameData.m_planetList[ playerData.m_general.m_currentPlanetId ];
 
 					// object and orbit number
-					text += "Object: <color=white>Planet</color>   Orbit Number: <color=white>" + planet.m_orbitPosition + "</color>\n";
+					// (the object's class is given whatever the science officer's skill, every other line by the skill's chance)
+					text += "Object: <color=white>Planet</color>   Orbit Number: <color=white>" + Known( planet.m_orbitPosition.ToString(), skill ) + "</color>\n";
 
 					// surface
-					text += "Predominant Surface: <color=white>" + planet.GetSurfaceText() + "</color>\n";
+					text += "Predominant Surface: <color=white>" + Known( planet.GetSurfaceText(), skill ) + "</color>\n";
 
 					// gravity
-					text += "Gravity: <color=white>" + planet.GetGravityText() + "</color>\n";
+					text += "Gravity: <color=white>" + Known( planet.GetGravityText(), skill ) + "</color>\n";
 
 					// atmospheric density
-					text += "Atmospheric Density: <color=white>" + planet.GetAtmosphericDensityText() + "</color>\n";
+					text += "Atmospheric Density: <color=white>" + Known( planet.GetAtmosphericDensityText(), skill ) + "</color>\n";
 
 					// temperature
-					text += "Temperature: <color=white>" + planet.GetTemperatureText() + "</color>\n";
+					text += "Temperature: <color=white>" + Known( planet.GetTemperatureText(), skill ) + "</color>\n";
 
 					// weather
-					text += "Global Weather: <color=white>" + planet.GetGlobalWeatherText() + "</color>";
+					text += "Global Weather: <color=white>" + Known( planet.GetGlobalWeatherText(), skill ) + "</color>";
 
 					break;
 				}
@@ -137,10 +185,10 @@ public class AnalysisButton : ShipButton
 					text += "Object: <color=white>" + vessel.m_object + "</color>\n";
 
 					// type
-					text += "Type: <color=white>" + vessel.m_type + "</color>\n";
+					text += "Type: <color=white>" + Known( vessel.m_type, skill ) + "</color>\n";
 
 					// size
-					text += "Size: <color=white>" + GetSizeText( vessel.m_mass, playerData.m_playerShip.m_mass ) + " times the size of our ship</color>\n";
+					text += "Size: <color=white>" + Known( GetSizeText( vessel.m_mass, playerData.m_playerShip.m_mass ) + " times the size of our ship", skill ) + "</color>\n";
 
 					// shields
 					text += "Shields: <color=yellow>Not certain</color>\n";
