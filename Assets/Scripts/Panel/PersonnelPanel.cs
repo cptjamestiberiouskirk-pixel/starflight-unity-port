@@ -497,6 +497,12 @@ public class PersonnelPanel : Panel
 			// update the personnel file number
 			m_fileNumberText.text = "File # " + ( m_currentFileIndex + 1 ) + ": " + personnelFile.m_name;
 
+			// a dead crew member's file "has a DEAD stamp" (the 1984 notes, starship.txt; alpha.txt: "a DEAD blit that looks like a stamp")
+			if ( personnelFile.m_isDead )
+			{
+				m_fileNumberText.text += "  <color=red>DEAD</color>";
+			}
+
 			// enable the previous button if we are not looking at the first personnel file
 			if ( m_currentFileIndex > 0 )
 			{

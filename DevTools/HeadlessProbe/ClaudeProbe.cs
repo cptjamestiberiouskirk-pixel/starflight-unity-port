@@ -757,6 +757,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLifeBehaviour();
 				break;
 
+			case "crewdeath":
+				yield return ScenarioCrewDeath();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -17119,6 +17123,97 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lifebehaviour: a wimpy one flees it", fleeAfter > fleeBefore + 5.0f, fleeBefore + " -> " + fleeAfter );
 
 		Finish( "scenario=lifebehaviour approach=" + approachBefore + "/" + approachAfter + " flee=" + fleeBefore + "/" + fleeAfter, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 6: the crew's deaths
+
+	// whether a crew member is dead ("missing" on the code before deaths)
+	static string IsDead( PD_Personnel.PD_PersonnelFile file )
+	{
+		var value = FieldOrNull( file, "m_isDead" );
+
+		return ( value == null ) ? "missing" : value.ToString();
+	}
+
+	IEnumerator ScenarioCrewDeath()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var crewAssignment = playerData.m_crewAssignment;
+		var done = new bool[ 1 ];
+
+		// a crew of two: Ada the captain, and Ben everything else
+		var ada = AddPerson( "Ada", 100.0f, 100 );
+		var ben = AddPerson( "Ben", 100.0f, 100 );
+
+		crewAssignment.Assign( PD_CrewAssignment.Role.Captain, ada.m_fileId );
+
+		for ( var role = PD_CrewAssignment.Role.ScienceOfficer; role < PD_CrewAssignment.Role.Count; role++ )
+		{
+			crewAssignment.Assign( role, ben.m_fileId );
+		}
+
+		// planet 92 of the Arth system, landed beside its first lifeform
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var firstPlace = ( LifeformsOnTheGround().Count > 0 ) ? LifeformsOnTheGround()[ 0 ].position : Vector3.zero;
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
+
+		// ---- 1. the captain dies of an injury: the next in the chain of command takes command
+		var injure = typeof( PD_CrewAssignment ).GetMethod( "InjureCrewMember" );
+
+		controller.m_messages.Clear();
+
+		if ( injure != null )
+		{
+			injure.Invoke( crewAssignment, new object[] { ada, 200.0f } );
+		}
+
+		var deathMessages = MessageList();
+		var adaDead = IsDead( ada );
+		var captainAfter = crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Captain ).m_name;
+
+		// ---- 2. the last of the crew, at 1 vitality, next to a dangerous lifeform: its attacks kill him, and the game is lost
+		Transform lifeform = null;
+
+		foreach ( var candidate in LifeformsOnTheGround() )
+		{
+			if ( ( lifeform == null ) || ( DistanceToVehicle( candidate ) < DistanceToVehicle( lifeform ) ) )
+			{
+				lifeform = candidate;
+			}
+		}
+
+		ben.m_vitality = 1.0f;
+
+		if ( lifeform != null )
+		{
+			SetLifeformField( lifeform, "m_aggression", 100 );
+			SetLifeformField( lifeform, "m_noticedPlayer", true );
+			PutAt( lifeform, 8.0f );
+		}
+
+		controller.m_messages.Clear();
+
+		var end = Time.realtimeSinceStartup + 20.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !controller.m_gameOver )
+		{
+			yield return null;
+		}
+
+		var gameOverText = MessageList();
+
+		Log( "crewdeath: injury: " + deathMessages + " (Ada dead " + adaDead + ", captain " + captainAfter + ") || the last: Ben dead " + IsDead( ben ) + ", vitality " + ben.m_vitality + ", game over " + controller.m_gameOver + ", armor " + playerData.m_playerShip.m_armorPoints + " | " + gameOverText );
+
+		Check( "crewdeath: a captain who dies of an injury is dead, and the next in the chain of command takes command", ( adaDead == "True" ) && deathMessages.Contains( "Ada is dead" ) && ( captainAfter == "Ben" ) && deathMessages.Contains( "Ben takes command" ), adaDead + ", " + captainAfter + " | " + deathMessages );
+		Check( "crewdeath: when the last of the crew dies the game is lost, and it cannot be saved", ( IsDead( ben ) == "True" ) && controller.m_gameOver && gameOverText.Contains( "The entire crew has died" ) && ( playerData.m_playerShip.m_armorPoints <= 0 ), IsDead( ben ) + ", " + controller.m_gameOver + ", " + playerData.m_playerShip.m_armorPoints + " | " + gameOverText );
+
+		Finish( "scenario=crewdeath captain=" + captainAfter + " gameover=" + controller.m_gameOver, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

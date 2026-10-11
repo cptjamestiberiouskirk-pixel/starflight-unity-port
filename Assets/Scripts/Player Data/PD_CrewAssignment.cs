@@ -249,6 +249,91 @@ public class PD_CrewAssignment
 		}
 	}
 
+	// the chain of command (the 1984 notes, starship.txt: "When the captain dies the next in command automatically becomes captain. Chain of command: Captain,
+	// Sci.Off., Navig., Engin., Commun., Doctor")
+	static readonly Role[] c_chainOfCommand = { Role.ScienceOfficer, Role.Navigator, Role.Engineer, Role.CommunicationsOfficer, Role.Doctor };
+
+	// a crew member takes an injury: their vitality falls, and at 0 they are dead - a dead captain's command passes down the chain of command, and with nobody
+	// left alive the game is lost - returns true if the injury killed them
+	public bool InjureCrewMember( PD_Personnel.PD_PersonnelFile file, float damage )
+	{
+		if ( ( file == null ) || file.m_isDead )
+		{
+			return false;
+		}
+
+		file.m_vitality = Mathf.Max( 0.0f, file.m_vitality - damage );
+
+		if ( file.m_vitality > 0.0f )
+		{
+			return false;
+		}
+
+		file.m_isDead = true;
+
+		var messages = ( SpaceflightController.m_instance != null ) ? SpaceflightController.m_instance.m_messages : null;
+
+		if ( messages != null )
+		{
+			messages.AddText( "<color=red>" + file.m_name + " is dead!</color>" );
+		}
+
+		// a dead captain's command passes down the chain of command
+		if ( IsAssigned( Role.Captain ) && ( GetPersonnelFile( Role.Captain ) == file ) )
+		{
+			foreach ( var role in c_chainOfCommand )
+			{
+				if ( !IsAssigned( role ) )
+				{
+					continue;
+				}
+
+				var next = GetPersonnelFile( role );
+
+				if ( ( next != null ) && !next.m_isDead && ( next.m_vitality > 0.0f ) )
+				{
+					Assign( Role.Captain, next.m_fileId );
+
+					if ( messages != null )
+					{
+						messages.AddText( "<color=yellow>" + next.m_name + " takes command.</color>" );
+					}
+
+					break;
+				}
+			}
+		}
+
+		// with nobody left alive the game is lost
+		if ( !HasLivingCrew() && ( CombatController.m_instance != null ) )
+		{
+			CombatController.m_instance.EndGame( "The entire crew has died." );
+		}
+
+		return true;
+	}
+
+	// true if a crew member on board is alive
+	public bool HasLivingCrew()
+	{
+		for ( var role = Role.First; role < Role.Count; role++ )
+		{
+			if ( !IsAssigned( role ) )
+			{
+				continue;
+			}
+
+			var file = GetPersonnelFile( role );
+
+			if ( ( file != null ) && !file.m_isDead && ( file.m_vitality > 0.0f ) )
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	// return true if there is at least one (living) crew member of this race (by the race of the game data's crew race: an Elowan, a Thrynn, a Veloxi)
 	public bool HasCrewOfRace( GameData.Race race )
 	{

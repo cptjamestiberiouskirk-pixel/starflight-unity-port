@@ -23,6 +23,10 @@ public class PD_Personnel
 
 		public float m_vitality;
 
+		// set when the crew member has died of an injury (the 1984 notes, starship.txt: "If the Character is dead, his file has a DEAD stamp") - false in older
+		// save files
+		public bool m_isDead;
+
 		public PD_PersonnelFile( PD_Personnel personnel )
 		{
 			// set the id of this personnel file

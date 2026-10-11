@@ -150,8 +150,9 @@ What the probe does:
 | `lifeforms` | the lifeforms of a planet, in the Arth system: planet 90 (no life, the control: none), planet 92 (bio density 7: its lifeforms, 3 to 8 of each species, on dry ground near the equator, at the same places on a second visit) and Scan landed beside one (the notes' reading: aggression and intelligence analogs, niche, composition) (about 45 s) |
 | `tvweapons` | the terrain vehicle's laser and stunner, landed beside a plant of planet 92: Weapon (its buttons), Switch (the stunner mounted), the stunner (what the species record says), the laser (8 units of energy, 20 to 100 hit points a shot, until the plant is dead) and the laser with nothing in range ("hits nothing") (about 40 s) |
 | `lifebehaviour` | how a lifeform responds to the terrain vehicle, a plant of planet 92 set up through its fields: middling aggression next to the vehicle (the control: it neither moves nor attacks), dangerous (it attacks the crew), made mobile 40 units away (it comes at the vehicle) and made wimpy 30 away (it flees) (about 45 s) |
+| `crewdeath` | the crew's deaths: Ada the captain killed by an injury (dead, and Ben, next in the chain of command, takes command), then Ben, the last of the crew, at 1 vitality beside a dangerous plant of planet 92 (its attacks kill him, the game over says the entire crew has died, and the ship's armor is 0 so the game is not saved) (about 45 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (107 scenarios, about 74 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (108 scenarios, about 75 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
