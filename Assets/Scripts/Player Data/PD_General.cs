@@ -101,6 +101,11 @@ public class PD_General
 	// Interstel's supplemental evaluations (towing charges and the like - STRINFO 1.2), as the Operations evaluation screen shows them, oldest first
 	public List<string> m_supplementalEvaluationList;
 
+	// the planets recommended for colonization that Interstel has not evaluated yet (it does when the ship is back at the Starport), and how many recommended
+	// planets have proved unsuitable so far (the first one is only a warning - STRINFO 1.2)
+	public List<int> m_colonyRecommendationList;
+	public int m_unsuitableRecommendationCount;
+
 	// the day and the hour the two stardate texts were last made for (not saved - they are made again in the first update after a load)
 	[NonSerialized] int m_stardateDay = -1;
 	[NonSerialized] int m_stardateHour = -1;
@@ -171,6 +176,9 @@ public class PD_General
 		m_messageList = new List<string>();
 
 		m_supplementalEvaluationList = new List<string>();
+
+		m_colonyRecommendationList = new List<int>();
+		m_unsuitableRecommendationCount = 0;
 	}
 
 	// get the id of the last comm used to answer a question about this subject for this race
@@ -306,6 +314,21 @@ public class PD_General
 		}
 
 		m_supplementalEvaluationList.Add( evaluation );
+	}
+
+	// call this when a planet is recommended for colonization
+	public void AddColonyRecommendation( int planetId )
+	{
+		// save files from before the list have none
+		if ( m_colonyRecommendationList == null )
+		{
+			m_colonyRecommendationList = new List<int>();
+		}
+
+		if ( !m_colonyRecommendationList.Contains( planetId ) )
+		{
+			m_colonyRecommendationList.Add( planetId );
+		}
 	}
 
 	public void UpdateGameTime( float deltaTime )
