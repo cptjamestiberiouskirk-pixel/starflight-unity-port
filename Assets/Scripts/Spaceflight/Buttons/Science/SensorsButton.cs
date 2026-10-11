@@ -122,7 +122,8 @@ public class SensorsButton : ShipButton
 					"<color=yellow>Star System Scan:</color>\n" +
 					"Coordinates: <color=white>" + star.m_xCoordinate + ", " + star.m_yCoordinate + "</color>\n" +
 					"Spectral Class: <color=white>" + star.m_class + "</color>\n" +
-					"Planets: <color=white>" + numPlanets + "</color>"
+					"Planets: <color=white>" + numPlanets + "</color>\n" +
+					"Stability: <color=white>" + star.GetStabilityText( playerData.m_general.m_gameTime ) + "</color>"
 				);
 
 				SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
