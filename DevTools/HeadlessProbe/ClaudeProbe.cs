@@ -679,6 +679,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSystemRepairs();
 				break;
 
+			case "homeworlds":
+				yield return ScenarioHomeworlds();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -14500,6 +14504,162 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "systemrepairs: a whole ship needs no repairs", wholeText.Contains( "No repairs are required" ), wholeText );
 
 		Finish( "scenario=systemrepairs molybdenum=" + molybdenumAfterNo + "/" + molybdenumAfterYes + " engines=" + enginesAfter, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 2: the home fleets' warnings
+
+	// the id of the star at these coordinates (-1 if there is none)
+	static int StarAt( int x, int y )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		for ( var starId = 0; starId < gameData.m_starList.Length; starId++ )
+		{
+			if ( ( gameData.m_starList[ starId ].m_xCoordinate == x ) && ( gameData.m_starList[ starId ].m_yCoordinate == y ) )
+			{
+				return starId;
+			}
+		}
+
+		return -1;
+	}
+
+	// the text of a comm of the game data ("missing" if there is none)
+	static string CommText( int commId )
+	{
+		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
+		{
+			if ( comm.m_id == commId )
+			{
+				return comm.m_text;
+			}
+		}
+
+		return "missing";
+	}
+
+	// lets the aliens of the current encounter speak at once (their conversation timer runs out), a number of times, and adds what the messages show after each
+	static IEnumerator LetAliensSpeak( int times, List<string> said )
+	{
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		for ( var i = 0; i < times; i++ )
+		{
+			SpaceflightController.m_instance.m_messages.Clear();
+
+			if ( encounter.m_pdEncounter != null )
+			{
+				encounter.m_pdEncounter.m_conversationTimer = 0.0f;
+			}
+
+			yield return Frames( 3 );
+
+			said.Add( MessageList() );
+		}
+	}
+
+	IEnumerator ScenarioHomeworlds()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var encounter = controller.m_encounter;
+
+		EnsureCrew();
+
+		// an officer who understands every word, and a ship that survives an attack
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		// ---- 1. the Thrynn home fleet (encounter 165, orbit 4 of 129,33): the ship does not answer, and each hail is the next warning, then the attack
+		var thrynnStar = StarAt( 129, 33 );
+
+		yield return GoIntoOrbit( thrynnStar, PlanetInOrbit( thrynnStar, 4 ) );
+
+		var thrynnBegun = ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == 165 );
+		var thrynnSaid = new List<string>();
+
+		yield return LetAliensSpeak( 3, thrynnSaid );
+
+		var hostileBeforeLast = thrynnBegun && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile );
+
+		yield return LetAliensSpeak( 1, thrynnSaid );
+
+		yield return Frames( 3 );
+
+		var thrynnHostile = thrynnBegun && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile ) && encounter.m_pdEncounter.m_disconnected;
+		var thrynnWarnings = new[] { 386, 387, 388, 394 };
+		var thrynnInOrder = thrynnSaid.Count == thrynnWarnings.Length;
+
+		for ( var i = 0; thrynnInOrder && ( i < thrynnWarnings.Length ); i++ )
+		{
+			thrynnInOrder = thrynnSaid[ i ].Contains( CommText( thrynnWarnings[ i ] ) );
+		}
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 2. the Veloxi home fleet (encounter 233, orbit 3 of 150,148): the ship hails first, and their one homeworld response is the last warning
+		var veloxStar = StarAt( 150, 148 );
+
+		yield return GoIntoOrbit( veloxStar, PlanetInOrbit( veloxStar, 3 ) );
+
+		var veloxBegun = ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == 233 );
+		var veloxSaid = new List<string>();
+
+		if ( veloxBegun )
+		{
+			encounter.Hail( GD_Comm.Stance.Friendly, false );
+		}
+
+		yield return LetAliensSpeak( 1, veloxSaid );
+
+		yield return Frames( 3 );
+
+		var veloxResponse = ( veloxSaid.Count > 0 ) && veloxSaid[ 0 ].Contains( CommText( 483 ) );
+		var veloxHostile = veloxBegun && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile ) && !encounter.m_pdEncounter.m_connected;
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 3. the control: a Thrynn patrol in their home system (encounter 157, met in flight) hails as any Thrynn ship does
+		EnterEncounter( 157 );
+		yield return Frames( 10 );
+
+		var patrolSaid = new List<string>();
+
+		yield return LetAliensSpeak( 1, patrolSaid );
+
+		var patrolLine = ( patrolSaid.Count > 0 ) ? patrolSaid[ 0 ] : "";
+		var patrolWarned = false;
+
+		foreach ( var comm in dataController.m_gameData.m_commList )
+		{
+			patrolWarned = patrolWarned || ( comm.m_homeworld && patrolLine.Contains( comm.m_text ) );
+		}
+
+		var patrolHostile = encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile;
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "homeworlds: thrynn fleet begun " + thrynnBegun + ", said " + string.Join( " | ", thrynnSaid ) + " | hostile before the last " + hostileBeforeLast + ", after " + thrynnHostile + " || veloxi fleet begun " + veloxBegun + ", said " + string.Join( " | ", veloxSaid ) + " | hostile " + veloxHostile + " || thrynn patrol: " + patrolLine + " | hostile " + patrolHostile );
+
+		Check( "homeworlds: the Thrynn home fleet gives its homeworld warnings one after the other while the ship does not answer", thrynnBegun && thrynnInOrder, string.Join( " | ", thrynnSaid ) );
+		Check( "homeworlds: the Thrynn hold their fire until the last warning, then end the comm link and attack", thrynnBegun && !hostileBeforeLast && thrynnHostile, hostileBeforeLast + " -> " + thrynnHostile );
+		Check( "homeworlds: the Veloxi home fleet answers a hail with its homeworld response and attacks", veloxBegun && veloxResponse && veloxHostile, veloxResponse + ", " + veloxHostile + " | " + string.Join( " | ", veloxSaid ) );
+		Check( "homeworlds: a Thrynn patrol met in flight speaks no homeworld line and does not attack (control)", ( patrolLine.Contains( "Receiving" ) ) && !patrolWarned && !patrolHostile, patrolLine );
+
+		Finish( "scenario=homeworlds thrynn=" + thrynnSaid.Count + " velox=" + veloxSaid.Count, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

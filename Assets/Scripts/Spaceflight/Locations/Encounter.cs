@@ -679,6 +679,8 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_numCorrectAnswers = 0;
 			m_pdEncounter.m_mechan9NoHumansWarningDone = false;
 			m_pdEncounter.m_attackedByPlayer = false;
+			m_pdEncounter.m_homeworldWarningCount = 0;
+			m_pdEncounter.m_homeworldWarningsGiven = false;
 
 			// initialize race encounter
 			switch ( m_gdEncounter.m_race )
@@ -737,6 +739,12 @@ public class Encounter : MonoBehaviour
 
 					InitializeUhlekEncounter();
 					break;
+			}
+
+			// a home fleet only warns the ship off - it asks no questions
+			if ( IsHomeFleet() )
+			{
+				m_pdEncounter.m_questionLikelihood = 0;
 			}
 
 			// play the alarm sound
@@ -1591,6 +1599,23 @@ public class Encounter : MonoBehaviour
 			}
 		}
 
+		// has a home fleet given its last warning? it ends the comm link and attacks
+		if ( m_pdEncounter.m_homeworldWarningsGiven )
+		{
+			m_pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+
+			if ( m_pdEncounter.m_connected )
+			{
+				Disconnect();
+			}
+			else if ( !m_pdEncounter.m_disconnected )
+			{
+				m_pdEncounter.m_disconnected = true;
+				m_pdEncounter.m_playerWantsToConnect = false;
+				m_pdEncounter.m_aliensWantToConnect = false;
+			}
+		}
+
 		// handle combat if aliens are hostile
 		UpdateAlienCombat();
 
@@ -1842,6 +1867,80 @@ public class Encounter : MonoBehaviour
 		SpaceflightController.m_instance.m_playerCamera.SetCameraFollow( SpaceflightController.m_instance.m_playerShip.gameObject, Vector3.up * m_currentOffset );
 	}
 
+	// true if this encounter is a race's home fleet: it is met in orbit, and the game data has homeworld lines for its race (the Spemin, the Thrynn and the Veloxi,
+	// whose lines STRINFO 2.7, 2.5 and 2.2 give "while in orbit of" their homeworlds - the encounters 139, 165 and 233)
+	bool IsHomeFleet()
+	{
+		if ( ( m_pdEncounter == null ) || ( m_gdEncounter == null ) || ( m_pdEncounter.GetLocation() != PD_General.Location.InOrbit ) )
+		{
+			return false;
+		}
+
+		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
+		{
+			if ( comm.m_homeworld && ( comm.m_race == m_gdEncounter.m_race ) )
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	// the next warning of a home fleet: a hail or a statement from its homeworld hails, the answer to the player's hail from its homeworld responses, and the answer
+	// to a question from its homeworld refusals ("Us are not answer the questions") - each list in the order of the game data, and every warning one step further
+	// along than the one before, whichever list it comes from - the last line of a list is the last warning, and the fleet attacks after it ("You must pay the
+	// consequences") - null if the game data has no homeworld line for the subject
+	GD_Comm FindHomeworldWarning( GD_Comm.Subject subject )
+	{
+		GD_Comm.Subject homeworldSubject;
+
+		if ( ( ( subject >= GD_Comm.Subject.Themselves ) && ( subject <= GD_Comm.Subject.TheAncients ) ) || ( subject == GD_Comm.Subject.NoMoreInformation ) )
+		{
+			homeworldSubject = GD_Comm.Subject.NoMoreInformation;
+		}
+		else if ( subject == GD_Comm.Subject.GreetingResponse )
+		{
+			homeworldSubject = GD_Comm.Subject.GreetingResponse;
+		}
+		else if ( ( subject == GD_Comm.Subject.GreetingHail ) || ( subject == GD_Comm.Subject.Statement ) || ( subject == GD_Comm.Subject.Question ) )
+		{
+			homeworldSubject = GD_Comm.Subject.GreetingHail;
+		}
+		else
+		{
+			return null;
+		}
+
+		// the homeworld lines of the race for this subject (the comm list is in the order of the ids)
+		var warnings = new List<GD_Comm>();
+
+		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
+		{
+			if ( comm.m_homeworld && ( comm.m_race == m_gdEncounter.m_race ) && ( comm.m_subject == homeworldSubject ) )
+			{
+				warnings.Add( comm );
+			}
+		}
+
+		if ( warnings.Count == 0 )
+		{
+			return null;
+		}
+
+		// one step further than the last warning (the last line once they have all been given)
+		var index = Mathf.Clamp( m_pdEncounter.m_homeworldWarningCount, 0, warnings.Count - 1 );
+
+		m_pdEncounter.m_homeworldWarningCount++;
+
+		if ( index == warnings.Count - 1 )
+		{
+			m_pdEncounter.m_homeworldWarningsGiven = true;
+		}
+
+		return warnings[ index ];
+	}
+
 	// find a comm based on the subject
 	GD_Comm FindComm( GD_Comm.Subject subject, bool outgoing )
 	{
@@ -1872,6 +1971,17 @@ public class Encounter : MonoBehaviour
 		{
 			race = m_gdEncounter.m_race;
 			stance = m_pdEncounter.m_alienStance;
+
+			// a home fleet says only its homeworld's warnings
+			if ( IsHomeFleet() )
+			{
+				var warning = FindHomeworldWarning( subject );
+
+				if ( warning != null )
+				{
+					return warning;
+				}
+			}
 		}
 
 		// go through each comm in the comm list and build a list of possible comms to choose from

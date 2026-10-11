@@ -48,6 +48,10 @@ public class PD_Encounter : IComparable
 	// set when the player fires on the aliens - they stay hostile until the player leaves the encounter (false in older save files)
 	public bool m_attackedByPlayer;
 
+	// how many of their homeworld's warnings a home fleet has given, and whether it has given its last one (it attacks then) - 0 and false in older save files
+	public int m_homeworldWarningCount;
+	public bool m_homeworldWarningsGiven;
+
 	public void Reset( int encounterId )
 	{
 		// get access to the game data
