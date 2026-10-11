@@ -20,6 +20,26 @@ public class TerrainLifeforms : TerrainGridPopulator
 	// the elevation scale of the planet (for the lifeforms that move)
 	float m_elevationScale;
 
+	// "You must be directly beside an object to put it into Cargo" (the manual, page 21): within the notes' adjacent square
+	public const float c_besideRange = 12.0f;
+
+	// a recording (planet.txt, the lifeform options of Cargo): "recording takes about 3" seconds and "uses 2 units of energy" (of a full terrain vehicle's 999); "If
+	// the alien runs away before the process is completed then the attempt is aborted and the message is given :"it got away"" - once it is half again as far as
+	// beside the vehicle (the port's) - and "If the alien attacks before the process is completed, completion of the process is delayed" - by a second for each
+	// attack (the port's)
+	const float c_recordingTime = 3.0f;
+	const float c_recordingEnergy = 2.0f / 999.0f;
+	const float c_getAwayRange = c_besideRange * 1.5f;
+	const float c_attackDelay = 1.0f;
+
+	// the lifeform Cargo offered (the console shows Record and Ignore for it)
+	public TerrainLifeform m_offeredLifeform;
+
+	// the recording under way
+	bool m_recording;
+	TerrainLifeform m_recordingTarget;
+	float m_recordingTimeLeft;
+
 	// the lifeforms placed (for the pairing of mates: lf-behav.txt, "Pair all un-paired lifeforms in the encounter area")
 	public readonly List<TerrainLifeform> m_lifeformList = new List<TerrainLifeform>();
 
@@ -164,6 +184,136 @@ public class TerrainLifeforms : TerrainGridPopulator
 		lifeform.Initialize( species, this );
 
 		m_lifeformList.Add( lifeform );
+	}
+
+	// the lifeform nearest the terrain vehicle, if one is beside it (null otherwise)
+	public TerrainLifeform FindLifeformBeside( Vector3 vehiclePosition )
+	{
+		TerrainLifeform nearest = null;
+		var nearestDistance = c_besideRange;
+
+		foreach ( var lifeform in m_lifeformList )
+		{
+			if ( lifeform == null )
+			{
+				continue;
+			}
+
+			var delta = lifeform.transform.position - vehiclePosition;
+
+			delta.y = 0.0f;
+
+			if ( delta.magnitude <= nearestDistance )
+			{
+				nearest = lifeform;
+				nearestDistance = delta.magnitude;
+			}
+		}
+
+		return nearest;
+	}
+
+	// true while a recording is under way
+	public bool IsRecording()
+	{
+		return m_recording;
+	}
+
+	// starts recording this lifeform's data, if the terrain vehicle has the energy for it - returns true if it started
+	public bool StartRecording( TerrainLifeform lifeform )
+	{
+		var terrainVehicle = DataController.m_instance.m_playerData.m_terrainVehicle;
+		var messages = SpaceflightController.m_instance.m_messages;
+
+		messages.Clear();
+
+		if ( terrainVehicle.m_fuelRemaining < c_recordingEnergy )
+		{
+			messages.AddText( "<color=red>There is not enough energy to record the lifeform.</color>" );
+
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+			return false;
+		}
+
+		terrainVehicle.UseUpFuel( c_recordingEnergy );
+
+		m_recording = true;
+		m_recordingTarget = lifeform;
+		m_recordingTimeLeft = c_recordingTime;
+
+		// "there is a whiring noise while the word "Recording" is presented"
+		messages.AddText( "<color=white>Recording...</color>" );
+
+		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+
+		return true;
+	}
+
+	// the recording under way: it fails if the lifeform gets away, waits while it attacks, and when it is done the data is Interstel's
+	void Update()
+	{
+		if ( !m_recording || ( SpaceflightController.m_instance == null ) || SpaceflightController.m_instance.m_gameIsPaused )
+		{
+			return;
+		}
+
+		var playerData = DataController.m_instance.m_playerData;
+		var messages = SpaceflightController.m_instance.m_messages;
+		var vehicle = SpaceflightController.m_instance.m_terrainVehicle;
+
+		// back in the ship: the recording is abandoned
+		if ( ( playerData.m_general.m_location != PD_General.Location.Disembarked ) || ( vehicle == null ) )
+		{
+			m_recording = false;
+
+			return;
+		}
+
+		// gone (eaten) or out of reach: "it got away"
+		var gotAway = m_recordingTarget == null;
+
+		if ( !gotAway )
+		{
+			var delta = m_recordingTarget.transform.position - vehicle.transform.position;
+
+			delta.y = 0.0f;
+
+			gotAway = delta.magnitude > c_getAwayRange;
+		}
+
+		if ( gotAway )
+		{
+			m_recording = false;
+
+			messages.AddText( "<color=yellow>It got away.</color>" );
+
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+			return;
+		}
+
+		// an attack delays it
+		if ( Time.time - m_recordingTarget.m_lastAttackTime < c_attackDelay )
+		{
+			return;
+		}
+
+		m_recordingTimeLeft -= Time.deltaTime;
+
+		if ( m_recordingTimeLeft > 0.0f )
+		{
+			return;
+		}
+
+		m_recording = false;
+
+		// the data is worth what is new in it, paid at the Starport
+		playerData.m_general.m_unpaidLifeformDataValue += playerData.m_general.LearnLifeform( m_recordingTarget.m_species, playerData.m_general.m_currentPlanetId, m_recordingTarget.m_status == TerrainLifeform.Status.Dead );
+
+		messages.AddText( "<color=white>Data collection completed, sir.</color>" );
+
+		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 	}
 
 	// a lifeform has been eaten: it is gone at once (taken out of the list and off the surface, so that neither Scan nor Fire finds it before it is destroyed)

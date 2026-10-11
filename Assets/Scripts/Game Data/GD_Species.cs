@@ -227,4 +227,49 @@ public class GD_Species
 	{
 		return m_niche == Niche.Producer;
 	}
+
+	// its class, for the value of its data (planet.txt: "A new class", "A new order", "A new species") - the notes give no taxonomy: the port takes the families of
+	// body plans as the classes (snakelike, bilateral, radial, amorphous and leaved) and the body plans as the orders
+	public int GetBodyClass()
+	{
+		if ( m_bodyPlan == BodyPlan.Snakelike )
+		{
+			return 0;
+		}
+
+		if ( m_bodyPlan <= BodyPlan.BilateralManyLegs )
+		{
+			return 1;
+		}
+
+		if ( m_bodyPlan <= BodyPlan.RadialManyLegs )
+		{
+			return 2;
+		}
+
+		return ( m_bodyPlan <= BodyPlan.AmorphousLegs ) ? 3 : 4;
+	}
+
+	// the base values of a lifeform's data (planet.txt: "A new class - 50 + X", "A new order - 20 + X", "A new species - 5 + X", "Same species - 0")
+	public const int c_newClassValue = 50;
+	public const int c_newOrderValue = 20;
+	public const int c_newSpeciesValue = 5;
+
+	// the value of its data from this base (planet.txt): "X is a bonus given for valuable attributes and is given in the form of a % of the base value" - its
+	// intelligence as the %, 25% if its highest niche is B (a herbivore) and 50% if it is C (a meat eater), its size as a % ("its size in cubic decimeters (with a
+	// max of 100)": the port takes its volume in tenths of a cubic metre, since in cubic decimetres every lifeform would have the full 100), and 50%, 30%, 10% or
+	// nothing for carbon nowhere, third, second or first in its composition
+	public int GetDataValue( int baseValue )
+	{
+		var bonus = m_intelligence;
+
+		bonus += ( m_niche == Niche.Herbivore ) ? 25 : ( ( m_niche == Niche.Producer ) ? 0 : 50 );
+		bonus += System.Math.Min( 100, m_volume );
+
+		var carbon = ( m_composition == null ) ? -1 : System.Array.IndexOf( m_composition, "Carbon" );
+
+		bonus += ( carbon < 0 ) ? 50 : ( ( carbon >= 2 ) ? 30 : ( ( carbon == 1 ) ? 10 : 0 ) );
+
+		return baseValue + baseValue * bonus / 100;
+	}
 }
