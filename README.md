@@ -148,6 +148,7 @@ The project features a **deterministic visualization system** that renders plane
 - Encounters that guard planets from orbit; a Veloxi drone grants permission to orbit to a crew that answers its numbers the Veloxi way
 - The Spemin, Thrynn and Veloxi home fleets warn a ship off their homeworlds, more sternly each time, and attack after the last warning
 - The Spemin, Thrynn and Veloxi give up after losing half of their ships: they stop fighting and surrender
+- The Elowan give 15 cubic meters of Endurium to a crew whose need for energy is dire, and see through one that has 20 or more
 - Complete combat system with lasers, missiles, shields, armor
 - Ship destruction with debris spawning
 - A model with debris for every alien vessel of the game data (hand-made or procedural stand-ins)
