@@ -72,7 +72,7 @@ Assets/
 ├── _MyCombatAssets/       # Custom combat audio, materials, and weapon VFX
 ├── 3rd Party/             # External plugins and legacy effect packages
 ├── Exported/              # Debug textures and terrain/heightmap exports
-├── Fonts/                 # Project fonts
+├── Fonts/                 # Project fonts (Orbitron, Rajdhani and Share Tech Mono of the UI kit, with their OFL licences)
 ├── Game Objects/          # Prefab categories and 3D models
 │   └── Aliens/            # High-fidelity alien assets (Thrynn, Spemin, etc.)
 ├── Music/                 # Game music and atmospheric tracks
@@ -93,6 +93,7 @@ Assets/
 ├── TextMesh Pro/          # TMP Font assets and style definitions
 ├── Tools/                 # Editor utilities and mass-generation tools
 ├── UI/                    # Bridge graphics and UI specific sprite assets
+├── UI Kit/                # Sliced sprites of the remake's UI kit (UIKitTheme, Starflight Remake > UI Kit > Rebuild)
 ├── UI Toolkit/            # Unity 6 UI Toolkit themes and UXML documents
 └── Unity Player/          # Build-specific assets (Icons and Splash screens)
 ```
