@@ -31,7 +31,7 @@ Copies `ClaudeProbe.cs` into `Assets/`, launches Unity with `-executeMethod Clau
 
 Unity is stopped if it has not come back after 420 seconds. `-TimeoutSeconds 100` shortens that, for a scenario that is expected to hang on the old code: a hang on the main thread also stops the probe's own 120 second watchdog.
 
-`-Graphics` runs Unity without `-nographics`, so it has a graphics device (it still opens no window). A scenario can then render the game's camera into PNG files: `explosionpictures` writes its pictures to `Logs/explosion-pictures/` (or the folder given with `-probePictures`). The probe cannot judge how a picture looks; a person has to.
+`-Graphics` runs Unity without `-nographics`, so it has a graphics device (it still opens no window). A scenario can then render the game's camera into PNG files: `explosionpictures` writes its pictures to `Logs/explosion-pictures/` and `hitpictures` to `Logs/hit-pictures/` (or the folder given with `-probePictures`). The probe cannot judge how a picture looks; a person has to.
 
 What the probe does:
 
@@ -86,6 +86,7 @@ What the probe does:
 | `starport-input` | the Starport event system's input module, and the arrows and the numpad (not S) moving the selection in the Operations panel, and the crew name field taking the focus without an exception (a legacy `InputField` reads `Input.compositionString`) |
 | `visual` | a floating object when its timer starts again, when an explosion is switched off, and how far the landing site crosshair moves in a second |
 | `explosionpictures` | every part of an explosion is textured and transparent, no part draws cubes, every part follows the explosion's scale, and making an explosion leaves `Random.state` alone (a control); with `-Graphics` it also renders a half size explosion and the F10 destruction of the ship at fixed game times |
+| `hitpictures` | the hull and shield hits are drawn transparent and not with the `Standard` or untextured particle shaders, a hull hit's particles are gone before it is switched off, both hits land on the side the shot came from, and making them leaves `Random.state` alone (a control); with `-Graphics` it also renders them zoomed in, alone and through `ApplyDamageToPlayer` |
 | `perframe` | how much memory a frame of the status display and of the terrain vehicle display takes when nothing changes, with a control that shows the measurement works, and that both still follow what changes |
 | `starport-transport` | the docking bay transporter: how much memory an update of the astronaut's opacity takes, that the fade reaches the astronaut, and that the material assets are left alone |
 | `shipslog` | a ship's log of forty entries scrolled to its end, then an empty log, then the first one again: that it opens (the review thought it could hang) and where it is scrolled to |
@@ -157,7 +158,7 @@ What the probe does:
 | `crewdeath` | the crew's deaths: Ada the captain killed by an injury (dead, and Ben, next in the chain of command, takes command), then Ben, the last of the crew, at 1 vitality beside a dangerous plant of planet 92 (its attacks kill him, the game over says the entire crew has died, and the ship's armor is 0 so the game is not saved) (about 45 s) |
 | `mates` | the lifeforms' mates on planet 92, everything else moved out of the encounter area: a grazer placed where its own wandering would take it away from a plant (it comes at the plant, bites it and in time eats it, which leaves the plant gone), then made a large carnivore beside a small herbivore placed where its wandering would take it towards the hunter (it flees) (about 60 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (111 scenarios, about 78 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (112 scenarios, about 79 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
