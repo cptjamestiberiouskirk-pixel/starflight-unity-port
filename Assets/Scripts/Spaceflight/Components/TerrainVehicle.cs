@@ -196,6 +196,33 @@ public class TerrainVehicle : MonoBehaviour
 			steeringJoint.transform.localPosition = Vector3.zero;
 		}
 
+		// lava destroys the terrain vehicle that stays in it: the liquid of a molten planet (the 1984 notes, planet.txt: "If the TV moves into a lava terrain a
+		// warning message is given ('The heat from the lava is too much - we're burning up'). If the TV still does not move off it is destroyed.")
+		if ( IsInLava( playerData.m_general.m_coordinates ) )
+		{
+			if ( m_timeInLava <= 0.0f )
+			{
+				SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+				SpaceflightController.m_instance.m_messages.AddText( "<color=red>The heat from the lava is too much - we're burning up!</color>" );
+			}
+
+			m_timeInLava += Time.deltaTime;
+
+			if ( m_timeInLava >= c_lavaGraceTime )
+			{
+				m_timeInLava = 0.0f;
+
+				LoseToLava();
+
+				return;
+			}
+		}
+		else
+		{
+			m_timeInLava = 0.0f;
+		}
+
 		// update the fuel efficiency
 		var maximumElevation = 1.25f * m_elevationScale;
 		var waterElevation = m_planetGenerator.m_waterElevation * m_elevationScale;
@@ -315,6 +342,52 @@ public class TerrainVehicle : MonoBehaviour
 		}
 
 		return worldCoordinates;
+	}
+
+	// how long the terrain vehicle has been in lava, and how long it can stay before it is destroyed (the notes give no time: the port's)
+	float m_timeInLava;
+	const float c_lavaGraceTime = 3.0f;
+
+	// a terrain vehicle that comes out of the ship has not been in lava yet
+	void OnEnable()
+	{
+		m_timeInLava = 0.0f;
+	}
+
+	// true if this place of a molten planet is under its liquid, which is lava
+	bool IsInLava( Vector3 worldCoordinates )
+	{
+		if ( ( m_planetGenerator == null ) || ( m_planetGenerator.GetPlanet() == null ) || !m_planetGenerator.GetPlanet().IsMolten() )
+		{
+			return false;
+		}
+
+		var x = worldCoordinates.x * 0.25f + m_planetGenerator.m_textureMapWidth * 0.5f - 0.5f;
+		var y = worldCoordinates.z * 0.25f + m_planetGenerator.m_textureMapHeight * 0.5f - 0.5f;
+
+		return m_planetGenerator.GetBicubicSmoothedElevation( x, y ) < m_planetGenerator.m_waterElevation;
+	}
+
+	// the terrain vehicle is lost in the lava with everything in its hold, and the crew gets back to the ship, which has no terrain vehicle until the Starport
+	// installs a new one and fines the crew (STRINFO 1.2) - how the crew gets back is the port's choice
+	void LoseToLava()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		TurnOffEngines();
+
+		SoundController.m_instance.StopSound( SoundController.Sound.DieselEngine );
+		SoundController.m_instance.PlaySound( SoundController.Sound.Explosion );
+
+		playerData.m_terrainVehicle.Reset();
+		playerData.m_terrainVehicle.m_isLost = true;
+		playerData.m_general.m_currentSpeed = 0.0f;
+
+		SpaceflightController.m_instance.m_buttonController.ClearCurrentButton();
+		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.Planetside );
+
+		SpaceflightController.m_instance.m_messages.Clear();
+		SpaceflightController.m_instance.m_messages.AddText( "<color=red>The terrain vehicle has been destroyed by lava, with everything it carried!</color>\n<color=white>The crew made it back to the ship.</color>" );
 	}
 
 	// call this to turn on the engines (accelerate)

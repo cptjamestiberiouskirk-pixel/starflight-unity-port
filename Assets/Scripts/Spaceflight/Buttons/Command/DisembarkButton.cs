@@ -61,6 +61,20 @@ public class DisembarkButton : ShipButton
 
 			case PD_General.Location.Planetside:
 
+				// a ship whose terrain vehicle has been lost has none until the Starport installs a new one
+				if ( playerData.m_terrainVehicle.m_isLost )
+				{
+					SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+					SpaceflightController.m_instance.m_messages.Clear();
+
+					SpaceflightController.m_instance.m_messages.AddText( "<color=white>We have no terrain vehicle, Captain.\nThe Starport will install a new one.</color>" );
+
+					SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
+					break;
+				}
+
 				// the terrain vehicle has nothing to drive on if the maps of this planet could not be generated (a saved game can be on such a planet if its planet file was damaged later)
 				var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( playerData.m_general.m_currentPlanetId );
 

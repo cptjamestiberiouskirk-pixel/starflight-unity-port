@@ -143,8 +143,9 @@ What the probe does:
 | `analysisskill` | the science officer's skill and the analysis, in orbit of planet 90: skill 250 (every line, the control), the same reading again ("already attempted"), skill 0 (only the object's class, 6 lines unknown), skill 100 over 20 readings (about half of 120 lines unknown) and an alien ship analyzed twice (allowed) (about 25 s) |
 | `salvage` | salvage from debris, two Spemin ships destroyed in a star system with a hold of 16 pods: a wreck 2000 units away (the control, not taken), the wreck under the ship (its vessel's Endurium and debris come aboard, with the message), the same wreck again (nothing more), a wreck with the hold full ("no room") and the sensor reading of a wreck (its constituents) (about 25 s) |
 | `randomruins` | the random ruins of the 1984 notes on planet 94 of the Arth system (no message of the original's, one random ruin): the ruin is there, landed beside it Cargo takes what it holds ("Captain, we have discovered..."), a second press and a later visit find nothing more, and the ruin is at the same place on every visit (about 40 s) |
+| `lava` | lava and the loss of the terrain vehicle: on planet 90 the vehicle driven into the sea floats (the control), on planet 29 (molten) it is driven into the lava and out again (the warning, and it is saved), then into it carrying 5 cubic meters of iron and left there (lost with its cargo after 3 seconds, the crew back in the ship), Disembark then finds no vehicle, and at the Starport a new one is installed for 10,000 MU with Interstel's evaluation (about 45 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (102 scenarios, about 69 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (103 scenarios, about 70 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
