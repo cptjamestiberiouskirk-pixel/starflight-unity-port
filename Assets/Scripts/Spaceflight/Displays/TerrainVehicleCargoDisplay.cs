@@ -50,7 +50,7 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 		// has the hold changed since the text was made? (making it every frame makes garbage every frame)
 		var terrainVehicle = DataController.m_instance.m_playerData.m_terrainVehicle;
 		var volumeUsed = DataController.m_instance.m_gameData.m_misc.m_terrainVehicleVolume - terrainVehicle.GetRemainingVolume();
-		var itemCount = ( ( terrainVehicle.m_elementStorage != null ) && ( terrainVehicle.m_elementStorage.m_elementList != null ) ? terrainVehicle.m_elementStorage.m_elementList.Count : 0 ) + ( ( terrainVehicle.m_artifactStorage != null ) && ( terrainVehicle.m_artifactStorage.m_artifactList != null ) ? terrainVehicle.m_artifactStorage.m_artifactList.Count : 0 );
+		var itemCount = ( ( terrainVehicle.m_elementStorage != null ) && ( terrainVehicle.m_elementStorage.m_elementList != null ) ? terrainVehicle.m_elementStorage.m_elementList.Count : 0 ) + ( ( terrainVehicle.m_artifactStorage != null ) && ( terrainVehicle.m_artifactStorage.m_artifactList != null ) ? terrainVehicle.m_artifactStorage.m_artifactList.Count : 0 ) + ( ( terrainVehicle.m_specimenStorage != null ) ? terrainVehicle.m_specimenStorage.GetCount() : 0 );
 
 		if ( ( volumeUsed == m_shownVolumeUsed ) && ( itemCount == m_shownItemCount ) )
 		{
@@ -96,10 +96,22 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 			}
 		}
 
+		// list the specimens in stasis
+		var specimenStorage = playerData.m_terrainVehicle.GetSpecimenStorage();
+
+		if ( specimenStorage.GetCount() > 0 )
+		{
+			foreach ( var specimen in specimenStorage.m_specimenList )
+			{
+				labels += "<color=#00FF00>" + specimen.m_name + "</color>\n";
+				values += Tools.VolumeToText( specimen.m_volume ) + " m³\n";
+			}
+		}
+
 		// show empty message if nothing (with null checks)
 		int elementCount = ( elementStorage?.m_elementList?.Count ) ?? 0;
 		int artifactCount = ( artifactStorage?.m_artifactList?.Count ) ?? 0;
-		if ( elementCount == 0 && artifactCount == 0 )
+		if ( elementCount == 0 && artifactCount == 0 && specimenStorage.GetCount() == 0 )
 		{
 			labels += "<color=#808080>Empty</color>\n";
 			values += "\n";

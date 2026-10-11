@@ -777,6 +777,14 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLifeformData();
 				break;
 
+			case "capture":
+				yield return ScenarioCapture();
+				break;
+
+			case "starport-specimens":
+				yield return ScenarioStarportSpecimens();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -17889,6 +17897,190 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lifeformdata: at the Starport Interstel pays for the data", ( unpaidAfterFirst > 0 ) && ( balanceAfter == balanceBefore + unpaidAfterRunner ) && ( unpaidAfterDocking == 0 ) && ( ledger == "Lifeform data" ), balanceBefore + " -> " + balanceAfter + ", unpaid " + unpaidAfterDocking + ", " + ledger );
 
 		Finish( "scenario=lifeformdata value=" + unpaidAfterFirst + " paid=" + ( balanceAfter - balanceBefore ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 6: capturing lifeforms
+
+	// the specimens in a hold (-1 on the code before them)
+	static int SpecimenCount( object hold )
+	{
+		var storage = FieldOrNull( hold, "m_specimenStorage" );
+		var method = ( storage == null ) ? null : storage.GetType().GetMethod( "GetCount" );
+
+		return ( method == null ) ? -1 : (int) method.Invoke( storage, null );
+	}
+
+	// a field of the first specimen in a hold ("" if there is none)
+	static string FirstSpecimenField( object hold, string name )
+	{
+		var list = FieldOrNull( FieldOrNull( hold, "m_specimenStorage" ), "m_specimenList" ) as IList;
+
+		return ( ( list == null ) || ( list.Count == 0 ) ) ? "" : ( FieldOrNull( list[ 0 ], name ) ?? "" ).ToString();
+	}
+
+	IEnumerator ScenarioCapture()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// planet 92 of the Arth system, landed beside its first lifeform
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var firstPlace = ( LifeformsOnTheGround().Count > 0 ) ? LifeformsOnTheGround()[ 0 ].position : Vector3.zero;
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
+
+		var all = LifeformsOnTheGround();
+
+		if ( all.Count < 2 )
+		{
+			Finish( "scenario=capture abort: " + all.Count + " lifeforms", 2 );
+			yield break;
+		}
+
+		var vehicle = controller.m_terrainVehicle.transform.position;
+		var plant = all[ 0 ].GetComponent<TerrainLifeform>();
+		var corpse = all[ 1 ].GetComponent<TerrainLifeform>();
+
+		// everything but the plant far away
+		for ( var i = 1; i < all.Count; i++ )
+		{
+			all[ i ].position = vehicle + Vector3.right * 600.0f + Vector3.forward * ( i * 10.0f );
+		}
+
+		plant.transform.position = new Vector3( vehicle.x + 6.0f, plant.transform.position.y, vehicle.z );
+
+		yield return Frames( 2 );
+
+		// ---- 1. Cargo beside a living plant offers Capture, and the capture puts it in stasis in the terrain vehicle, worth five times its data
+		var expected = DataValue( plant.m_species, 50 ) * 5;
+		var offer = Press( "TVCargoButton" );
+		var buttons = controller.m_buttonController.GetCurrentButtonSet().ToString();
+		var labels = "";
+
+		foreach ( var label in new[] { "TVCaptureButton", "TVRecordButton", "TVIgnoreButton" } )
+		{
+			var button = MakeButton( label );
+
+			labels += ( ( button == null ) ? "missing" : button.GetLabel() ) + " ";
+		}
+
+		Press( "TVCaptureButton" );
+
+		var end = Time.realtimeSinceStartup + 9.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !MessageList().Contains( "stored as item" ) )
+		{
+			yield return null;
+		}
+
+		// (a destroyed object is gone at the end of the frame)
+		yield return Frames( 1 );
+
+		var captured = MessageList();
+		var inVehicle = SpecimenCount( playerData.m_terrainVehicle );
+		var value = FirstSpecimenField( playerData.m_terrainVehicle, "m_value" );
+		var plantGone = plant == null;
+
+		// ---- 2. Cargo beside a dead lifeform offers only Record
+		corpse.m_status = TerrainLifeform.Status.Dead;
+		corpse.transform.position = new Vector3( vehicle.x + 6.0f, corpse.transform.position.y, vehicle.z );
+
+		yield return Frames( 2 );
+
+		var deadOffer = Press( "TVCargoButton" );
+		var deadButtons = controller.m_buttonController.GetCurrentButtonSet().ToString();
+
+		Press( "TVIgnoreButton" );
+
+		// ---- 3. back in the ship, the specimen goes into the ship's hold
+		controller.m_planetside.TransferTerrainVehicleCargo();
+
+		var inShip = SpecimenCount( playerData.m_playerShip );
+		var leftInVehicle = SpecimenCount( playerData.m_terrainVehicle );
+
+		Log( "capture: offer " + offer + " [" + buttons + "] (" + labels + ") -> " + captured + " | in vehicle " + inVehicle + ", value " + value + " (expected " + expected + "), plant gone " + plantGone + " || dead: " + deadOffer + " [" + deadButtons + "] || in ship " + inShip + ", left in vehicle " + leftInVehicle );
+
+		Check( "capture: Cargo beside a living lifeform offers Capture, Record and Ignore", offer.Contains( "A lifeform" ) && ( buttons == "TerrainVehicleLifeform" ) && ( labels == "Capture Record Ignore " ), offer + " [" + buttons + "] " + labels );
+		Check( "capture: the capture puts it in stasis in the terrain vehicle, off the surface", captured.Contains( "captured and put in stasis" ) && captured.Contains( "stored as item" ) && ( inVehicle == 1 ) && plantGone, inVehicle + ", gone " + plantGone + " | " + captured );
+		Check( "capture: a captured specimen is worth five times its data", ( expected > 0 ) && ( value == expected.ToString() ), value + " (expected " + expected + ")" );
+		Check( "capture: Cargo beside a dead lifeform offers only Record", deadOffer.Contains( "A dead lifeform" ) && ( deadButtons == "TerrainVehicleDeadLifeform" ), deadOffer + " [" + deadButtons + "]" );
+		Check( "capture: back in the ship, the specimen goes into the ship's hold", ( inShip == 1 ) && ( leftInVehicle == 0 ), inShip + " / " + leftInVehicle );
+
+		Finish( "scenario=capture inVehicle=" + inVehicle + " value=" + value + " inShip=" + inShip, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 6: specimens sold at the Trade Depot
+
+	IEnumerator ScenarioStarportSpecimens()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var depot = FindPanel<TradeDepotPanel>();
+
+		// a specimen in the ship's hold, worth 1234 MU
+		var specimenType = typeof( PlayerData ).Assembly.GetType( "PD_Specimen" );
+		var addSpecimen = typeof( PD_PlayerShip ).GetMethod( "AddSpecimen" );
+
+		if ( ( specimenType != null ) && ( addSpecimen != null ) )
+		{
+			var specimen = Activator.CreateInstance( specimenType );
+
+			SetField( specimen, "m_name", "Radial, many legs" );
+			SetField( specimen, "m_volume", 16 );
+			SetField( specimen, "m_value", 1234 );
+
+			addSpecimen.Invoke( playerData.m_playerShip, new[] { specimen } );
+		}
+
+		var heldBefore = SpecimenCount( playerData.m_playerShip );
+		var volumeBefore = playerData.m_playerShip.m_volumeUsed;
+
+		yield return OpenPanel( depot, "trade depot" );
+
+		// the sale list shows it, and selling it pays what it is worth
+		Call( depot, "SwitchToSellItemState", true );
+
+		var items = GetField( depot, "m_itemList" ) as IList;
+		var index = -1;
+
+		for ( var i = 0; i < items.Count; i++ )
+		{
+			if ( (int) GetField( items[ i ], "m_type" ) == 2 )
+			{
+				index = i;
+			}
+		}
+
+		var listed = depot.m_itemListText.text;
+		var balanceBefore = playerData.m_bank.m_currentBalance;
+
+		if ( index >= 0 )
+		{
+			SetField( depot, "m_currentItemIndex", index );
+
+			Call( depot, "SellSelectedItem" );
+		}
+
+		var paid = playerData.m_bank.m_currentBalance - balanceBefore;
+		var heldAfter = SpecimenCount( playerData.m_playerShip );
+		var volumeAfter = playerData.m_playerShip.m_volumeUsed;
+
+		Call( depot, "SwitchToMenuBarState" );
+
+		yield return ClosePanel( depot, "trade depot" );
+
+		Log( "starport-specimens: held " + heldBefore + " (volume " + volumeBefore + "), listed at " + index + " | paid " + paid + ", held " + heldAfter + " (volume " + volumeAfter + ") | " + listed.Replace( "\n", "/" ) );
+
+		Check( "starport-specimens: the Trade Depot lists a specimen in the ship's hold for sale", ( heldBefore == 1 ) && ( index >= 0 ) && listed.Contains( "Specimens" ) && listed.Contains( "Radial, many legs" ), heldBefore + ", " + index );
+		Check( "starport-specimens: selling it pays its value and frees its room in the hold", ( paid == 1234 ) && ( heldAfter == 0 ) && ( volumeAfter == volumeBefore - 16 ), paid + ", " + heldAfter + ", " + volumeBefore + " -> " + volumeAfter );
+
+		Finish( "scenario=starport-specimens paid=" + paid, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

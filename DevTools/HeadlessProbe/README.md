@@ -157,8 +157,10 @@ What the probe does:
 | `crewdeath` | the crew's deaths: Ada the captain killed by an injury (dead, and Ben, next in the chain of command, takes command), then Ben, the last of the crew, at 1 vitality beside a dangerous plant of planet 92 (its attacks kill him, the game over says the entire crew has died, and the ship's armor is 0 so the game is not saved) (about 45 s) |
 | `mates` | the lifeforms' mates on planet 92, everything else moved out of the encounter area: a grazer placed where its own wandering would take it away from a plant (it comes at the plant, bites it and in time eats it, which leaves the plant gone), then made a large carnivore beside a small herbivore placed where its wandering would take it towards the hunter (it flees) (about 60 s) |
 | `lifeformdata` | recording lifeform data on planet 92: Cargo beside a plant offers it and Record collects its data (a new class, worth 50 and the plant's bonus), the same species again (worth nothing), a test animal beside the vehicle that wanders off (it got away), and the payment at the Starport (about 50 s) |
+| `capture` | capturing a lifeform on planet 92: Cargo beside a living plant offers Capture, Record and Ignore, the capture puts it in stasis in the terrain vehicle's hold (off the surface, worth five times its data), Cargo beside a dead lifeform offers only Record, and back in the ship the specimen goes into the ship's hold (about 50 s) |
+| `starport-specimens` | a specimen in the ship's hold is listed for sale at the Trade Depot under Specimens, and selling it pays its value and frees its room (about 25 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (112 scenarios, about 79 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (114 scenarios, about 81 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

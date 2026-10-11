@@ -225,6 +225,25 @@ public class Planetside : MonoBehaviour
 			}
 		}
 
+		// transfer the specimens from TV to ship, as far as there is room
+		var tvSpecimens = playerData.m_terrainVehicle.GetSpecimenStorage();
+
+		if ( tvSpecimens.m_specimenList != null )
+		{
+			var specimensToTransfer = new System.Collections.Generic.List<PD_Specimen>( tvSpecimens.m_specimenList );
+
+			foreach ( var specimen in specimensToTransfer )
+			{
+				if ( playerData.m_playerShip.GetRemainingVolume() >= specimen.m_volume )
+				{
+					playerData.m_playerShip.AddSpecimen( specimen );
+					playerData.m_terrainVehicle.RemoveSpecimen( specimen );
+
+					totalVolumeTransferred += specimen.m_volume;
+				}
+			}
+		}
+
 		// play transporter sound if anything was transferred
 		if ( totalVolumeTransferred > 0 )
 		{
