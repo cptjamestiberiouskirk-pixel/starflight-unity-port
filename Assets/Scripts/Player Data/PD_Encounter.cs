@@ -66,6 +66,9 @@ public class PD_Encounter : IComparable
 	public int m_playerPhrasesInPosture;
 	public int m_alienPhrasesLeft;
 
+	// set once the Elowan or the Thrynn have said what they think of the crew's other friends (false in older save files)
+	public bool m_rivalLineSaid;
+
 	public void Reset( int encounterId )
 	{
 		// get access to the game data

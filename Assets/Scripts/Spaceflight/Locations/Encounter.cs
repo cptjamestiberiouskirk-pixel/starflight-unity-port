@@ -686,6 +686,7 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_moodSet = false;
 			m_pdEncounter.m_playerPhrasesInPosture = 0;
 			m_pdEncounter.m_alienPhrasesLeft = 0;
+			m_pdEncounter.m_rivalLineSaid = false;
 
 			// initialize race encounter
 			switch ( m_gdEncounter.m_race )
@@ -1105,6 +1106,14 @@ public class Encounter : MonoBehaviour
 			return;
 		}
 
+		// a Thrynn aboard: they say so in place of a greeting, and end the comm link (STRINFO 2.4: "we wouldst have no dealings with thee") - they do not attack
+		if ( DataController.m_instance.m_playerData.m_crewAssignment.HasCrewOfRace( GameData.Race.Thrynn ) && !m_pdEncounter.m_attackedByPlayer )
+		{
+			UpdateElowanNoDealings();
+
+			return;
+		}
+
 		// has the player answered their question about energy?
 		if ( ( m_pdEncounter.m_lastQuestionFromAliens == c_elowanEnergyQuestionCommId ) && ( m_pdEncounter.m_lastSubjectFromPlayer == GD_Comm.Subject.Yes ) )
 		{
@@ -1114,6 +1123,89 @@ public class Encounter : MonoBehaviour
 		UpdateMood();
 
 		DefaultEncounterUpdate();
+	}
+
+	// the Elowan with a Thrynn in the crew: they say their one line for it in place of a hail, and the comm link is not open to the player again in the encounter
+	void UpdateElowanNoDealings()
+	{
+		if ( !m_pdEncounter.m_disconnected )
+		{
+			m_pdEncounter.m_conversationTimer -= Time.deltaTime;
+
+			if ( m_pdEncounter.m_conversationTimer <= 0.0f )
+			{
+				SayRaceComm( c_elowanThrynnAboardCommId );
+
+				if ( m_pdEncounter.m_connected )
+				{
+					Disconnect();
+				}
+				else
+				{
+					m_pdEncounter.m_disconnected = true;
+					m_pdEncounter.m_playerWantsToConnect = false;
+					m_pdEncounter.m_aliensWantToConnect = false;
+				}
+			}
+		}
+
+		UpdateAlienCombat();
+	}
+
+	// what the Elowan and the Thrynn say of a crew that is friends with the other race (STRINFO 2.4 and 2.5): a crew member aboard, or a first comm link opened
+	// with the other race
+	const int c_elowanThrynnAboardCommId = 1;
+	const int c_elowanThrynnFirstCommId = 2;
+	const int c_thrynnElowanAboardCommId = 297;
+	const int c_thrynnElowanFirstCommId = 298;
+
+	// the rival race of the Elowan or the Thrynn (None for any other race)
+	static GameData.Race GetRivalRace( GameData.Race race )
+	{
+		if ( race == GameData.Race.Elowan )
+		{
+			return GameData.Race.Thrynn;
+		}
+
+		if ( race == GameData.Race.Thrynn )
+		{
+			return GameData.Race.Elowan;
+		}
+
+		return GameData.Race.None;
+	}
+
+	// true if the crew is friends with the aliens' rival race: one of the rival race is aboard, or the crew opened a comm link with the rival race first
+	bool IsFriendOfRival()
+	{
+		var rival = GetRivalRace( m_gdEncounter.m_race );
+
+		if ( rival == GameData.Race.None )
+		{
+			return false;
+		}
+
+		var playerData = DataController.m_instance.m_playerData;
+
+		return playerData.m_crewAssignment.HasCrewOfRace( rival ) || ( playerData.m_general.m_firstContactRace == rival );
+	}
+
+	// the line the Elowan or the Thrynn say once in an encounter, in place of a greeting, to a crew that is friends with their rival race - null if there is none
+	GD_Comm FindRivalLine()
+	{
+		if ( m_pdEncounter.m_rivalLineSaid || !IsFriendOfRival() )
+		{
+			return null;
+		}
+
+		var rivalAboard = DataController.m_instance.m_playerData.m_crewAssignment.HasCrewOfRace( GetRivalRace( m_gdEncounter.m_race ) );
+
+		if ( m_gdEncounter.m_race == GameData.Race.Elowan )
+		{
+			return FindRaceComm( rivalAboard ? c_elowanThrynnAboardCommId : c_elowanThrynnFirstCommId );
+		}
+
+		return FindRaceComm( rivalAboard ? c_thrynnElowanAboardCommId : c_thrynnElowanFirstCommId );
 	}
 
 	// the Elowan's question of their own, and their answers to a yes (STRINFO 2.4)
@@ -2282,6 +2374,12 @@ public class Encounter : MonoBehaviour
 		{
 			m_pdEncounter.m_mood = personality.m_startingMood;
 			m_pdEncounter.m_moodSet = true;
+
+			// the Elowan and the Thrynn hold the crew's friendship with their rival race against it: they start in their hostile band (the owner's ruling of 2026-10-11)
+			if ( IsFriendOfRival() )
+			{
+				m_pdEncounter.m_mood = Mathf.Max( m_pdEncounter.m_mood, personality.m_hostileFrom );
+			}
 		}
 	}
 
@@ -2624,6 +2722,19 @@ public class Encounter : MonoBehaviour
 				}
 			}
 
+			// the Elowan and the Thrynn greet a crew that is friends with their rival race with what they think of it, once
+			if ( ( subject == GD_Comm.Subject.GreetingHail ) || ( subject == GD_Comm.Subject.GreetingResponse ) )
+			{
+				var rivalLine = FindRivalLine();
+
+				if ( rivalLine != null )
+				{
+					m_pdEncounter.m_rivalLineSaid = true;
+
+					return rivalLine;
+				}
+			}
+
 			// cowardly aliens say each of their surrender lines for the subject first, in whichever stance the game data has it (the Thrynn's is neutral)
 			if ( m_pdEncounter.m_aliensAreCowardly )
 			{
@@ -2871,6 +2982,10 @@ public class Encounter : MonoBehaviour
 			// Spemin language.") - nothing they say is garbled with it aboard
 			var translated = ( m_gdEncounter.m_race == GameData.Race.Spemin ) && playerData.m_playerShip.HasArtifact( "Whining Orb" );
 
+			// and a crew member of their own race understands every word: "all phrases will be un-scrambled if any member of the player's crew is the same race as
+			// the race of the alien" (compart.txt 13; alpha.txt: the officer's skill and race affect the translation - the owner's ruling of 2026-10-11)
+			translated = translated || playerData.m_crewAssignment.HasCrewOfRace( m_gdEncounter.m_race );
+
 			// did we find any?
 			if ( ( possibleGarbles.Count > 0 ) && !translated )
 			{
@@ -3105,6 +3220,14 @@ public class Encounter : MonoBehaviour
 		if ( AlienPersonality.Find( m_gdEncounter.m_race ) != null )
 		{
 			m_pdEncounter.m_alienPhrasesLeft = GetPhraseLimit( GetAlienTalkStance() );
+		}
+
+		// the first comm link with the Thrynn or the Elowan is remembered for the rest of the game
+		var playerGeneral = DataController.m_instance.m_playerData.m_general;
+
+		if ( ( playerGeneral.m_firstContactRace == GameData.Race.None ) && ( GetRivalRace( m_gdEncounter.m_race ) != GameData.Race.None ) )
+		{
+			playerGeneral.m_firstContactRace = m_gdEncounter.m_race;
 		}
 
 		// we are connected now
