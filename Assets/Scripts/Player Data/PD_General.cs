@@ -78,6 +78,16 @@ public class PD_General
 	// (STRINFO 2.4 and 2.5)
 	public GameData.Race m_firstContactRace;
 
+	// the lifeforms whose data the crew has collected, for the value of new data (GD_Species.GetBodyClass; a species is its planet's id x 16 + its index) - null in
+	// older save files
+	public List<int> m_knownLifeformClassList;
+	public List<int> m_knownLifeformOrderList;
+	public List<int> m_knownLifeformSpeciesList;
+
+	// what the lifeform data recorded since the last visit to the Starport is worth (planet.txt: "When the player returns to starport recorded information is
+	// automatically paid for") - 0 in older save files
+	public int m_unpaidLifeformDataValue;
+
 	// true once a Black Egg has destroyed the Crystal Planet at its control nexus: the game is won, and no star flares any more (the original's ?WIN, disys.txt ?FLARE)
 	public bool m_gameWon;
 
@@ -124,6 +134,64 @@ public class PD_General
 	public const int c_originalCalendar = 1;
 	public int m_stardateCalendar;
 
+	// the value of the data of a lifeform of this species, which becomes known (planet.txt): its base is that of a new class, order or species, or nothing for a
+	// species already known, and "If the lifeform was recorded and it is dead cut its value in half"
+	public int LearnLifeform( GD_Species species, int planetId, bool dead )
+	{
+		if ( m_knownLifeformClassList == null )
+		{
+			m_knownLifeformClassList = new List<int>();
+		}
+
+		if ( m_knownLifeformOrderList == null )
+		{
+			m_knownLifeformOrderList = new List<int>();
+		}
+
+		if ( m_knownLifeformSpeciesList == null )
+		{
+			m_knownLifeformSpeciesList = new List<int>();
+		}
+
+		var bodyClass = species.GetBodyClass();
+		var order = (int) species.m_bodyPlan;
+		var speciesKey = planetId * 16 + species.m_index;
+
+		var baseValue = 0;
+
+		if ( !m_knownLifeformClassList.Contains( bodyClass ) )
+		{
+			baseValue = GD_Species.c_newClassValue;
+		}
+		else if ( !m_knownLifeformOrderList.Contains( order ) )
+		{
+			baseValue = GD_Species.c_newOrderValue;
+		}
+		else if ( !m_knownLifeformSpeciesList.Contains( speciesKey ) )
+		{
+			baseValue = GD_Species.c_newSpeciesValue;
+		}
+
+		if ( !m_knownLifeformClassList.Contains( bodyClass ) )
+		{
+			m_knownLifeformClassList.Add( bodyClass );
+		}
+
+		if ( !m_knownLifeformOrderList.Contains( order ) )
+		{
+			m_knownLifeformOrderList.Add( order );
+		}
+
+		if ( !m_knownLifeformSpeciesList.Contains( speciesKey ) )
+		{
+			m_knownLifeformSpeciesList.Add( speciesKey );
+		}
+
+		var value = species.GetDataValue( baseValue );
+
+		return dead ? value / 2 : value;
+	}
+
 	// this resets everything to initial game state
 	public void Reset()
 	{
@@ -159,6 +227,12 @@ public class PD_General
 		// reset current ids
 		m_currentStarId = gameData.m_misc.m_arthStarId;
 		m_currentPlanetId = 0;
+
+		// no lifeform data yet
+		m_knownLifeformClassList = new List<int>();
+		m_knownLifeformOrderList = new List<int>();
+		m_knownLifeformSpeciesList = new List<int>();
+		m_unpaidLifeformDataValue = 0;
 
 		// the game has not been won yet, and the Starport is still there
 		m_gameWon = false;

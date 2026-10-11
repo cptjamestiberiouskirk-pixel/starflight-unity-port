@@ -91,6 +91,14 @@ public class DockingBay : MonoBehaviour
 			SpaceflightController.m_instance.m_messages.AddText( "<color=white>A new terrain vehicle has been installed. Interstel has fined you " + PD_TerrainVehicle.c_lossFine.ToString( "N0", System.Globalization.CultureInfo.InvariantCulture ) + " MU - see Operations.</color>" );
 		}
 
+		// back at the Starport with lifeform data: Interstel pays for it
+		var lifeformDataValue = playerData.PayLifeformData();
+
+		if ( lifeformDataValue > 0 )
+		{
+			SpaceflightController.m_instance.m_messages.AddText( "<color=green>Interstel has paid " + lifeformDataValue.ToString( "N0", System.Globalization.CultureInfo.InvariantCulture ) + " MU for the lifeform data you recorded.</color>" );
+		}
+
 		// back at the Starport after the win: Interstel pays the bonus that comes with its medal
 		if ( playerData.PayWinBonus() )
 		{

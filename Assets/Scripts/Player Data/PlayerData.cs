@@ -139,6 +139,26 @@ public class PlayerData
 
 	// call this when the ship is back at the Starport: after the win Interstel pays the bonus that comes with its medal, once ("this award includes a special bonus of
 	// 500,000 MU when you return to Starport" - STRINFO 2.12) - returns true if it was paid now
+	// Interstel pays for the lifeform data recorded since the last visit (planet.txt: "When the player returns to starport recorded information is automatically
+	// paid for") - returns what it paid
+	public int PayLifeformData()
+	{
+		var value = m_general.m_unpaidLifeformDataValue;
+
+		m_general.m_unpaidLifeformDataValue = 0;
+
+		if ( value <= 0 )
+		{
+			return 0;
+		}
+
+		m_bank.m_currentBalance += value;
+
+		m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Lifeform data", value.ToString() + "+" ) );
+
+		return value;
+	}
+
 	public bool PayWinBonus()
 	{
 		if ( !m_general.m_gameWon || !m_general.m_winBonusPending )

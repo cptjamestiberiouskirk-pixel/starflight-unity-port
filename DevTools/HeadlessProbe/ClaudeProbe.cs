@@ -773,6 +773,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioMates();
 				break;
 
+			case "lifeformdata":
+				yield return ScenarioLifeformData();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -17762,6 +17766,129 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "mates: a small herbivore flees the carnivore that comes at it", preyBehaviours.Contains( "FleeingMate" ) && hunterBehaviours.Contains( "ApproachingMate" ) && ( awayFromHunter > 5.0f ), preyBehaviours + " | " + hunterBehaviours + " | " + awayFromHunter );
 
 		Finish( "scenario=mates closest=" + closest + " eaten=" + plantEaten + " fled=" + awayFromHunter, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 6: recording the lifeforms' data
+
+	// the lifeform data not paid for yet (-1 on the code before it)
+	static int UnpaidLifeformData()
+	{
+		var value = FieldOrNull( DataController.m_instance.m_playerData.m_general, "m_unpaidLifeformDataValue" );
+
+		return ( value == null ) ? -1 : (int) value;
+	}
+
+	// what a species' data is worth from this base (-1 on the code before it)
+	static int DataValue( GD_Species species, int baseValue )
+	{
+		var method = typeof( GD_Species ).GetMethod( "GetDataValue" );
+
+		return ( method == null ) ? -1 : (int) method.Invoke( species, new object[] { baseValue } );
+	}
+
+	IEnumerator ScenarioLifeformData()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// planet 92 of the Arth system, landed beside its first lifeform
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var firstPlace = ( LifeformsOnTheGround().Count > 0 ) ? LifeformsOnTheGround()[ 0 ].position : Vector3.zero;
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
+
+		var all = LifeformsOnTheGround();
+
+		if ( all.Count < 2 )
+		{
+			Finish( "scenario=lifeformdata abort: " + all.Count + " lifeforms", 2 );
+			yield break;
+		}
+
+		var vehicle = controller.m_terrainVehicle.transform.position;
+		var plant = all[ 0 ].GetComponent<TerrainLifeform>();
+		var runner = all[ 1 ].GetComponent<TerrainLifeform>();
+
+		// everything but the plant far away
+		for ( var i = 1; i < all.Count; i++ )
+		{
+			all[ i ].position = vehicle + Vector3.right * 600.0f + Vector3.forward * ( i * 10.0f );
+		}
+
+		// the plant beside the vehicle
+		plant.transform.position = new Vector3( vehicle.x + 6.0f, plant.transform.position.y, vehicle.z );
+
+		yield return Frames( 2 );
+
+		// ---- 1. Cargo beside a living plant offers it, and Record records its data: a new class, worth 50 and its bonus, to be paid at the Starport
+		var unpaidBefore = UnpaidLifeformData();
+		var offer = Press( "TVCargoButton" );
+		var buttons = controller.m_buttonController.GetCurrentButtonSet().ToString();
+		var record = Press( "TVRecordButton" );
+
+		yield return new WaitForSecondsRealtime( 4.0f );
+
+		var recorded = MessageList();
+		var unpaidAfterFirst = UnpaidLifeformData();
+		var expected = DataValue( plant.m_species, 50 );
+
+		// ---- 2. the same species again is worth nothing
+		Press( "TVCargoButton" );
+		Press( "TVRecordButton" );
+
+		yield return new WaitForSecondsRealtime( 4.0f );
+
+		var unpaidAfterSecond = UnpaidLifeformData();
+
+		// ---- 3. a lifeform that wanders off before the recording is done got away
+		plant.transform.position = vehicle + Vector3.left * 600.0f;
+		runner.m_species = MakeTestAnimal( GD_Species.Niche.Herbivore, 3 );
+		runner.m_aggression = 50;
+		runner.transform.position = new Vector3( vehicle.x + 6.0f, vehicle.y, vehicle.z );
+
+		yield return Frames( 2 );
+
+		Press( "TVCargoButton" );
+		Press( "TVRecordButton" );
+
+		var end = Time.realtimeSinceStartup + 5.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !MessageList().Contains( "got away" ) )
+		{
+			yield return null;
+		}
+
+		var gotAway = MessageList();
+		var unpaidAfterRunner = UnpaidLifeformData();
+
+		// ---- 4. at the Starport Interstel pays for the data
+		var balanceBefore = playerData.m_bank.m_currentBalance;
+
+		controller.SwitchLocation( PD_General.Location.DockingBay );
+
+		yield return Frames( 10 );
+
+		var balanceAfter = playerData.m_bank.m_currentBalance;
+		var docked = MessageList();
+		var unpaidAfterDocking = UnpaidLifeformData();
+		var ledger = playerData.m_bank.m_transactionList.Count > 0 ? playerData.m_bank.m_transactionList[ playerData.m_bank.m_transactionList.Count - 1 ].m_description : "";
+
+		Log( "lifeformdata: offer " + offer + " [" + buttons + "] record " + record + " -> " + recorded + " | unpaid " + unpaidBefore + " -> " + unpaidAfterFirst + " (expected " + expected + ") -> " + unpaidAfterSecond + " -> " + unpaidAfterRunner + " | " + gotAway + " || balance " + balanceBefore + " -> " + balanceAfter + ", unpaid " + unpaidAfterDocking + ", ledger " + ledger + " | " + docked );
+
+		Check( "lifeformdata: Cargo beside a lifeform offers it, and Record collects its data", offer.Contains( "A lifeform" ) && ( buttons == "TerrainVehicleLifeform" ) && recorded.Contains( "Data collection completed" ), offer + " [" + buttons + "] " + recorded );
+		Check( "lifeformdata: the first of a class is worth 50 and its bonus", ( expected > 50 ) && ( unpaidAfterFirst == unpaidBefore + expected ), unpaidBefore + " -> " + unpaidAfterFirst + " (expected " + expected + ")" );
+		Check( "lifeformdata: the same species again is worth nothing", ( unpaidAfterFirst > 0 ) && ( unpaidAfterSecond == unpaidAfterFirst ), unpaidAfterFirst + " -> " + unpaidAfterSecond );
+		Check( "lifeformdata: a lifeform that wanders off before the recording is done got away", gotAway.Contains( "got away" ) && ( unpaidAfterRunner == unpaidAfterSecond ), gotAway + " | " + unpaidAfterRunner );
+		Check( "lifeformdata: at the Starport Interstel pays for the data", ( unpaidAfterFirst > 0 ) && ( balanceAfter == balanceBefore + unpaidAfterRunner ) && ( unpaidAfterDocking == 0 ) && ( ledger == "Lifeform data" ), balanceBefore + " -> " + balanceAfter + ", unpaid " + unpaidAfterDocking + ", " + ledger );
+
+		Finish( "scenario=lifeformdata value=" + unpaidAfterFirst + " paid=" + ( balanceAfter - balanceBefore ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

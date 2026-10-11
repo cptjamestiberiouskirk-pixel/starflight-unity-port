@@ -33,6 +33,12 @@ public class TVCargoButton : ShipButton
 			return false;
 		}
 
+		// is a lifeform beside the terrain vehicle? (the manual, page 21: Cargo makes "holographic recordings of lifeforms")
+		if ( OfferLifeform() )
+		{
+			return false;
+		}
+
 		// find all elements in pickup range
 		var elementsInRange = FindElementsInRange();
 
@@ -83,6 +89,49 @@ public class TVCargoButton : ShipButton
 		}
 
 		return false;
+	}
+
+	// offers the lifeform beside the terrain vehicle, if there is one, for its data to be recorded (planet.txt: a dead one, "A dead lifeform. Shall we record it in
+	// our data banks?", and a living one, "A lifeform.") - returns true if it did
+	bool OfferLifeform()
+	{
+		var terrainGrid = SpaceflightController.m_instance.m_disembarked.m_terrainGrid;
+		var terrainVehicle = SpaceflightController.m_instance.m_terrainVehicle;
+
+		if ( ( terrainGrid == null ) || ( terrainGrid.m_terrainLifeforms == null ) || ( terrainVehicle == null ) )
+		{
+			return false;
+		}
+
+		var lifeforms = terrainGrid.m_terrainLifeforms;
+		var messages = SpaceflightController.m_instance.m_messages;
+
+		// one at a time
+		if ( lifeforms.IsRecording() )
+		{
+			messages.Clear();
+			messages.AddText( "<color=white>Recording...</color>" );
+
+			return true;
+		}
+
+		var lifeform = lifeforms.FindLifeformBeside( terrainVehicle.transform.position );
+
+		if ( lifeform == null )
+		{
+			return false;
+		}
+
+		lifeforms.m_offeredLifeform = lifeform;
+
+		messages.Clear();
+		messages.AddText( ( lifeform.m_status == TerrainLifeform.Status.Dead ) ? "<color=white>A dead lifeform. Shall we record it in our data banks?</color>" : "<color=white>A lifeform.</color>" );
+
+		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+
+		SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.TerrainVehicleLifeform );
+
+		return true;
 	}
 
 	// records the messages of the ruin the terrain vehicle is beside, if it has any that have not been recorded yet - returns true if it did

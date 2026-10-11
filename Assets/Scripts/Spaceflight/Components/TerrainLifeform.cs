@@ -83,6 +83,10 @@ public class TerrainLifeform : MonoBehaviour
 	const int c_aggressiveEnough = 40;
 	const float c_breakAwayChance = 0.1f;
 
+	// when it last attacked the crew (a recording of it is delayed: planet.txt, "If the alien attacks before the process is completed, completion of the process is
+	// delayed")
+	public float m_lastAttackTime = -100.0f;
+
 	// when the player last fired the laser (for "?PLAYER-FIRING-LASER : Set to True when player fires. Set back to false shortly after")
 	public static float s_laserFiredTime = -100.0f;
 
@@ -556,6 +560,8 @@ public class TerrainLifeform : MonoBehaviour
 	// (aggression + 2 x hit points) / 3 / the crew member's durability
 	void AttackPlayer()
 	{
+		m_lastAttackTime = Time.time;
+
 		var gameData = DataController.m_instance.m_gameData;
 		var playerData = DataController.m_instance.m_playerData;
 		var messages = SpaceflightController.m_instance.m_messages;
