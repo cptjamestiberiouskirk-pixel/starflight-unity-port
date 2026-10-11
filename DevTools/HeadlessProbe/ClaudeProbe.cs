@@ -1568,6 +1568,23 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "a planet's disc is as high in the window as in the original", discsRight == discMasses.Length, discText );
 
+		// the gas giant in orbit 3 of 123,101 (planet 99) reads 5x10^23 tons in the original (seen 2026-10-10; the survey the game data comes from says 4x10^23)
+		var gasGiant = DataController.m_instance.m_gameData.m_planetList[ 99 ];
+
+		spaceflightController.m_displayController.ChangeDisplay( sensors );
+		sensors.m_hasSensorData = false;
+		sensors.StartScanning( SensorsDisplay.ScanType.Planet, 18, gasGiant.m_mass, gasGiant.m_bioDensity, gasGiant.m_mineralDensity );
+
+		// the readout counts up to its values while the scan runs (at most m_maxDuration seconds)
+		var readoutUntil = Time.realtimeSinceStartup + sensors.m_maxDuration + 5.0f;
+
+		while ( !sensors.m_hasSensorData && ( Time.realtimeSinceStartup < readoutUntil ) )
+		{
+			yield return null;
+		}
+
+		Check( "the gas giant in orbit 3 of 123,101 reads 5x10^23 tons, as in the original", sensors.m_hasSensorData && sensors.m_massText.text.Contains( "5x10<sup>23</sup>" ), "finished=" + sensors.m_hasSensorData + " mass=[" + sensors.m_massText.text + "] gameData=" + gasGiant.m_mass );
+
 		// a vessel that has its own picture (control)
 		spaceflightController.m_displayController.ChangeDisplay( sensors );
 		sensors.StartScanning( SensorsDisplay.ScanType.SpeminScout, 1, 400, 100, 100 );
