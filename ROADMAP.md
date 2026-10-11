@@ -111,7 +111,7 @@ Small items, each documented in the sources.
 | # | Item | Original (source) | Port today |
 |---|---|---|---|
 | 2.1 | Posture moves the aliens' mood (0 to 100, with friendly, diplomatic and hostile or obsequious bands; your strength decides between hostile and grovelling) | compart.txt, Notes.txt | posture only picks the lines (`Encounter.cs:1543`) |
-| 2.2 | Homeworld warnings and surrender (22 and 8 lines in the data); the Spemin surrender after losses | STRINFO 2.x | lines skipped (`Encounter.cs:1561`, `1577`) |
+| 2.2 | Homeworld warnings and surrender (22 and 8 lines in the data); the Spemin surrender after losses | STRINFO 2.x | the homeworld warnings: PR 150 (the attack after the last warning is read from the lines); the surrender lines: still skipped |
 | 2.3 | Trade and tribute: the Thrynn buy artifacts and plutonium for Endurium and sell the Black Box for 30; the Veloxi demand 3 Endurium; the Elowan give 15 if you carry under 20 | STRINFO 2.x; `GD_Artifact.m_thrynnPrice` unused | MISSING |
 | 2.4 | Race rules: a crew member of the race removes the garbling; the Elowan refuse a ship with a Thrynn aboard; the Mechans will not deal without humans; Gazurtoid ships are immune to missiles; a comm link that is ended cannot reopen in the same encounter | compart.txt, alpha.txt, STRINFO 2.x, 7.x | garbling by comm skill only; the rest MISSING |
 | 2.5 | The Noah 9 derelict (SOS) and the other races that now fall to the `default` case | STRINFO 2.x | they only fight back |
