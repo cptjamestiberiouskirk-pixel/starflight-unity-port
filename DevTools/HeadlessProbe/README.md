@@ -126,8 +126,9 @@ What the probe does:
 | `starport-repair` | Repair in ship configuration: a whole ship (no repairs, nothing paid), class 1 armor at 200 of 500 with the shields empty (900 M.U., whole again with full shields), a bare hull at 100 of 250 (450 M.U. at the class 1 price) and with 10 M.U. in the bank (refused, nothing changes) (about 20 s) |
 | `distress` | Distress: from the star farthest from Arth (towed to the docking bay, fined 80000 M.U., the ledger's towing charges and Interstel's supplemental evaluation with the amount), from Arth's own system (15000 M.U.) and, as the control, after the Starport has been destroyed (no response, no fine, no tow) (about 50 s) |
 | `vesselstats` | alien vessels with their own armor, shields and speed: the armor and shield points of every ship of a Spemin and an Elowan encounter against their vessels in the game data, and how far the first ship of each travels per second (a Spemin ship, move delay 1500, about 2200 / 1500 times as fast as an Elowan one, 2200) (about 25 s) |
+| `starmapfuel` | the starmap's fuel estimate, with class 1 engines in hyperspace at 40, 40: the viewport label on opening the starmap (the cursor on the ship, Fuel 0.0), with the cursor 20 coordinates away (Fuel 9.6) and with the Tesseract (Fuel 4.8) (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (85 scenarios, about 52 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (86 scenarios, about 53 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
