@@ -134,8 +134,9 @@ What the probe does:
 | `homeworlds` | the home fleets' warnings: the Thrynn fleet in orbit 4 of 129,33 with the ship silent (its four homeworld hails in order, holding fire until the last, then the comm link ends and they attack), the Veloxi fleet in orbit 3 of 150,148 hailed first (its homeworld response, then the attack) and a Thrynn patrol met in flight (the control: no homeworld line, no attack) (about 25 s) |
 | `cowardice` | the Spemin, Thrynn and Veloxi after their losses: three Spemin ships in a star system fired on: one lost (the control, they fight on), two lost (the survivor turns obsequious), its hail (one of the cowardly lines, the surrender among them), its statement once the player answers (one of the obsequious ones) and the player firing again (they still do not fight), then three Thrynn and three Veloxi ships, two of each destroyed and hailed (each answers with its surrender line) (about 30 s) |
 | `elowangift` | the Elowan's question of energy, asked as their first question once the comm link is up: a yes with 5 cubic meters of Endurium in the hold (15 given), a yes with 30 (their reproach, nothing given) and a no with 5 (the control, nothing given) (about 25 s) |
+| `veloxdemands` | the Veloxi's demands, each in a new meeting with the comm link up: the tribute of 3 paid from 5 cubic meters (their thanks, no attack), refused (an attack), answered yes with 1 (an attack), the Crystal Orb aboard and handed over (no attack), and the Ellipsoid aboard with the comm link ended unanswered (an attack, the Ellipsoid kept) (about 40 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (93 scenarios, about 60 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (94 scenarios, about 61 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

@@ -521,6 +521,22 @@ public class PD_PlayerShip
 		RecalculateVolumeUsed();
 	}
 
+	// takes this artifact (by its name in the game data) out of the cargo hold - false if it is not there
+	public bool RemoveArtifact( string artifactName )
+	{
+		if ( !HasArtifact( artifactName ) )
+		{
+			return false;
+		}
+
+		m_artifactStorage.Remove( DataController.m_instance.m_gameData.FindArtifactId( artifactName ) );
+
+		// recalculate the used up space in the cargo hold
+		RecalculateVolumeUsed();
+
+		return true;
+	}
+
 	// true if this artifact (by its name in the game data) is in the cargo hold
 	public bool HasArtifact( string artifactName )
 	{

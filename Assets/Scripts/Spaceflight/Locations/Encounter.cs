@@ -1365,7 +1365,101 @@ public class Encounter : MonoBehaviour
 	{
 		UpdateCowardice();
 
+		UpdateVeloxDemand();
+
 		DefaultEncounterUpdate();
+	}
+
+	// the Veloxi's demands (STRINFO 2.2), their question of their own: the Crystal Orb ("most precious Small Egg of Veloxi"), the Ellipsoid ("focusing stone of
+	// Veloxi"), or else a tribute of 3 Arth energy crystals ("the veloxi always ask for tribute", alpha.txt) - and the thanks for a tribute paid
+	const int c_veloxEllipsoidDemandCommId = 397;
+	const int c_veloxCrystalOrbDemandCommId = 398;
+	const int c_veloxTributeDemandCommId = 399;
+	const int c_veloxTributeThanksCommId = 415;
+
+	// the tribute, in tenths of a cubic meter of Endurium
+	const int c_veloxTribute = 30;
+
+	// the answer to a Veloxi demand: a yes hands over what they demand, and anything else - a no, or ending the comm link with no answer - "will result in a Veloxi
+	// attack" (STRINFO 2.2 for the Crystal Orb and the Ellipsoid; for the tribute, and for a yes with less than 3 cubic meters of Endurium, the owner's ruling of
+	// 2026-10-11)
+	void UpdateVeloxDemand()
+	{
+		var demand = m_pdEncounter.m_lastQuestionFromAliens;
+
+		if ( ( demand != c_veloxEllipsoidDemandCommId ) && ( demand != c_veloxCrystalOrbDemandCommId ) && ( demand != c_veloxTributeDemandCommId ) )
+		{
+			return;
+		}
+
+		// not answered yet?
+		var answer = m_pdEncounter.m_lastSubjectFromPlayer;
+
+		if ( answer == GD_Comm.Subject.None )
+		{
+			return;
+		}
+
+		var gameData = DataController.m_instance.m_gameData;
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+		var messages = SpaceflightController.m_instance.m_messages;
+		var handedOver = false;
+
+		if ( answer == GD_Comm.Subject.Yes )
+		{
+			if ( demand == c_veloxCrystalOrbDemandCommId )
+			{
+				handedOver = ship.RemoveArtifact( "Crystal Orb" );
+
+				if ( handedOver )
+				{
+					messages.AddText( "<color=white>The Veloxi take the Crystal Orb aboard.</color>" );
+				}
+			}
+			else if ( demand == c_veloxEllipsoidDemandCommId )
+			{
+				handedOver = ship.RemoveArtifact( "Ellipsoid" );
+
+				if ( handedOver )
+				{
+					messages.AddText( "<color=white>The Veloxi take the Ellipsoid aboard.</color>" );
+				}
+			}
+			else
+			{
+				var enduriumId = gameData.m_misc.m_enduriumElementId;
+				var endurium = ( ship.m_elementStorage == null ) ? null : ship.m_elementStorage.Find( enduriumId );
+
+				if ( ( endurium != null ) && ( endurium.m_volume >= c_veloxTribute ) )
+				{
+					ship.RemoveElement( enduriumId, c_veloxTribute );
+
+					handedOver = true;
+
+					SayRaceComm( c_veloxTributeThanksCommId );
+				}
+			}
+		}
+
+		// the question has been answered
+		m_pdEncounter.m_lastQuestionFromAliens = 0;
+
+		if ( handedOver )
+		{
+			return;
+		}
+
+		// the attack - they end the comm link, since the aliens hold their fire while it is up
+		m_pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+
+		if ( m_pdEncounter.m_connected )
+		{
+			Disconnect();
+		}
+		else
+		{
+			m_pdEncounter.m_disconnected = true;
+		}
 	}
 
 	// update encounter with a veloxi drone - before it lets a ship into orbit it asks the player to confirm a series of numbers, and only a yes to the multiples of 6
@@ -2010,9 +2104,45 @@ public class Encounter : MonoBehaviour
 			case GameData.Race.Elowan:
 
 				return FindRaceComm( c_elowanEnergyQuestionCommId );
+
+			case GameData.Race.Velox:
+			{
+				// the most precious of what they want first
+				var ship = DataController.m_instance.m_playerData.m_playerShip;
+
+				if ( ship.HasArtifact( "Crystal Orb" ) )
+				{
+					return FindRaceComm( c_veloxCrystalOrbDemandCommId );
+				}
+
+				if ( ship.HasArtifact( "Ellipsoid" ) )
+				{
+					return FindRaceComm( c_veloxEllipsoidDemandCommId );
+				}
+
+				// the game data writes the amount of the tribute as X (STRINFO: "pay tribute of 3 Arth energy crystals")
+				return WithAmount( FindRaceComm( c_veloxTributeDemandCommId ), "X", ( c_veloxTribute / 10 ).ToString() );
+			}
 		}
 
 		return null;
+	}
+
+	// a copy of a comm with a placeholder of the game data filled in (the game data writes the amounts the aliens name as X and Y) - null for null
+	static GD_Comm WithAmount( GD_Comm comm, string placeholder, string amount )
+	{
+		if ( comm == null )
+		{
+			return null;
+		}
+
+		return new GD_Comm( comm.m_text.Replace( " " + placeholder + " ", " " + amount + " " ) )
+		{
+			m_id = comm.m_id,
+			m_race = comm.m_race,
+			m_subject = comm.m_subject,
+			m_stance = comm.m_stance
+		};
 	}
 
 	// true if this encounter is a race's home fleet: it is met in orbit, and the game data has homeworld lines for its race (the Spemin, the Thrynn and the Veloxi,
