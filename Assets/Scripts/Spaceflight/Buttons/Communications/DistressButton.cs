@@ -42,15 +42,32 @@ public class DistressButton : ShipButton
 			return false;
 		}
 
-		// send distress signal
-		SpaceflightController.m_instance.m_messages.AddText(
-			"<color=yellow>DISTRESS SIGNAL SENT</color>\n" +
-			"<color=white>Broadcasting on all frequencies...</color>\n" +
-			"<color=red>Warning: Signal may attract hostiles!</color>"
-		);
+		// the distress call is answered: Interstel tows the ship back to the Starport, and the crew pays for the rescue (STRINFO 1.2, the supplemental evaluation
+		// on towing charges)
+		var fine = playerData.GetTowingFine();
+
+		playerData.m_bank.m_currentBalance -= fine;
+		playerData.m_bank.m_transactionList.Add( new PD_Bank.Transaction( playerData.m_general.m_currentStardateYMD, "Towing charges", fine + "-" ) );
+
+		var towingCharges = DataController.m_instance.m_gameData.FindStoryText( "TowingCharges" );
+
+		if ( towingCharges != null )
+		{
+			playerData.m_general.AddSupplementalEvaluation( towingCharges.m_text.Replace( "[AMOUNT]", fine.ToString() ) );
+		}
+
+		SpaceflightController.m_instance.m_messages.AddText( "<color=yellow>Distress signal sent.</color>" );
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Interstel has towed the ship back to Starport. Towing charges: " + fine + " M.U.</color>" );
 
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
-		SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
+		// back in Arth's docking bay
+		var gameData = DataController.m_instance.m_gameData;
+
+		playerData.m_general.m_currentStarId = gameData.m_misc.m_arthStarId;
+		playerData.m_general.m_currentPlanetId = gameData.m_misc.m_arthPlanetId;
+
+		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.DockingBay );
 
 		return false;
 	}

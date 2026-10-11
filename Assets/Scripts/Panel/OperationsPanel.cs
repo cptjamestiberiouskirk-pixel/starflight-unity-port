@@ -208,9 +208,26 @@ public class OperationsPanel : Panel
 			m_evaluationSceneText = m_evaluationText.text;
 		}
 
-		var storyText = DataController.m_instance.m_playerData.m_general.m_gameWon ? DataController.m_instance.m_gameData.FindStoryText( "MissionComplete" ) : null;
+		// Interstel's supplemental evaluations, oldest first, and the one on the completion of the mission after the win
+		var general = DataController.m_instance.m_playerData.m_general;
+		var evaluations = "";
 
-		m_evaluationText.text = ( storyText != null ) ? storyText.m_text : m_evaluationSceneText;
+		if ( general.m_supplementalEvaluationList != null )
+		{
+			foreach ( var evaluation in general.m_supplementalEvaluationList )
+			{
+				evaluations += ( ( evaluations.Length > 0 ) ? "\n\n" : "" ) + evaluation;
+			}
+		}
+
+		var storyText = general.m_gameWon ? DataController.m_instance.m_gameData.FindStoryText( "MissionComplete" ) : null;
+
+		if ( storyText != null )
+		{
+			evaluations += ( ( evaluations.Length > 0 ) ? "\n\n" : "" ) + storyText.m_text;
+		}
+
+		m_evaluationText.text = ( evaluations.Length > 0 ) ? evaluations : m_evaluationSceneText;
 	}
 
 	// this is called if we clicked on the notices button
