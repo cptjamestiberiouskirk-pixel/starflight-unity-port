@@ -699,6 +699,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioThrynnTrades();
 				break;
 
+			case "mood":
+				yield return ScenarioMood();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -2923,7 +2927,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "M12 spemin encounter " + speminId + " (" + VesselIds() + "): stance " + speminStanceAtStart + ", damage taken in 4 s before firing " + speminDamageBefore + " | laser fired=" + laserFired + " stance " + speminStanceAfterLaser + ", damage taken in the next 8 s " + speminDamageAfter );
 
-		Check( "M12 aliens that have not been fired on leave the player alone", ( speminStanceAtStart == "Neutral" ) && ( speminDamageBefore == 0 ), "stance " + speminStanceAtStart + ", damage " + speminDamageBefore );
+		// (not hostile: since the aliens have moods the Spemin may start neutral or grovel to a strong ship)
+		Check( "M12 aliens that have not been fired on leave the player alone", ( speminStanceAtStart != "Hostile" ) && ( speminDamageBefore == 0 ), "stance " + speminStanceAtStart + ", damage " + speminDamageBefore );
 		Check( "M12 firing the laser makes the aliens hostile and they shoot back", laserFired && ( speminStanceAfterLaser == "Hostile" ) && ( speminDamageAfter > 0 ), "fired " + laserFired + ", stance " + speminStanceAfterLaser + ", damage in 8 s " + speminDamageAfter );
 
 		// ---- they stay hostile for the rest of the encounter, whatever else changes their stance
@@ -2950,7 +2955,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var damageAfterReturn = damage;
 
-		Check( "M12 leaving the encounter ends the hostility", ( stanceAfterReturn == "Neutral" ) && ( damageAfterReturn == 0 ), "stance " + stanceAfterReturn + ", attacked flag " + attackedAfterReturn + ", damage in 4 s " + damageAfterReturn );
+		Check( "M12 leaving the encounter ends the hostility", ( stanceAfterReturn != "Hostile" ) && ( damageAfterReturn == 0 ), "stance " + stanceAfterReturn + ", attacked flag " + attackedAfterReturn + ", damage in 4 s " + damageAfterReturn );
 
 		// ---- a missile counts too, at launch
 		combat.SetTarget( FirstLivingAlien() );
@@ -15183,6 +15188,227 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "thrynntrades: a yes without 30 cubic meters gets \"you do not have enough\"", tooLittle[ 1 ].Contains( CommText( 302 ) ) && ( tooLittle[ 2 ] == "100" ) && ( tooLittle[ 5 ] == "no black box" ), string.Join( " | ", tooLittle ) );
 
 		Finish( "scenario=thrynntrades sold=" + sold[ 2 ] + " plutonium=" + plutonium[ 2 ] + " blackbox=" + bought[ 5 ], 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 2: the aliens' mood
+
+	// a field of the current encounter's player data, by name (the fallback on the code before the field)
+	static T EncounterField<T>( string name, T fallback )
+	{
+		var field = typeof( PD_Encounter ).GetField( name );
+		var pdEncounter = SpaceflightController.m_instance.m_encounter.m_pdEncounter;
+
+		return ( ( field == null ) || ( pdEncounter == null ) ) ? fallback : (T) field.GetValue( pdEncounter );
+	}
+
+	// sets a field of the current encounter's player data, by name (nothing on the code before the field)
+	static void SetEncounterField( string name, object value )
+	{
+		var field = typeof( PD_Encounter ).GetField( name );
+		var pdEncounter = SpaceflightController.m_instance.m_encounter.m_pdEncounter;
+
+		if ( ( field != null ) && ( pdEncounter != null ) )
+		{
+			field.SetValue( pdEncounter, value );
+		}
+	}
+
+	// true if the text holds one of the game data's lines of this race, subject and stance
+	static bool SaysALineOf( string text, GameData.Race race, GD_Comm.Subject subject, GD_Comm.Stance stance )
+	{
+		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
+		{
+			if ( ( comm.m_race == race ) && ( comm.m_subject == subject ) && ( comm.m_stance == stance ) && text.Contains( comm.m_text ) )
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	// meets the aliens of an encounter, hails them in this posture and lets them answer (the comm link is up then) - adds what the messages show
+	static IEnumerator MeetAndConnect( int encounterId, GD_Comm.Stance posture, List<string> said )
+	{
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		EnterEncounter( encounterId );
+		yield return Frames( 10 );
+
+		DataController.m_instance.m_playerData.m_playerShip.RestoreSystems();
+
+		encounter.Hail( posture, false );
+
+		yield return LetAliensSpeak( 1, said );
+
+		encounter.m_pdEncounter.m_questionLikelihood = 0;
+	}
+
+	IEnumerator ScenarioMood()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var encounter = controller.m_encounter;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+
+		// an officer who understands every word
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+		var elowanId = FindEncounterOfRace( GameData.Race.Elowan );
+		var thrynnId = FindEncounter( 1, 6, 3, 0, GameData.Race.Thrynn );
+
+		// ---- 1. the Spemin met in peace by a ship weaker than them: they talk tough (a hostile statement, which they have and no neutral one), and hold their fire
+		ship.m_armorPoints = 250;
+		ship.m_shieldPoints = 0;
+
+		var weakSaid = new List<string>();
+
+		yield return MeetAndConnect( speminId, GD_Comm.Stance.Friendly, weakSaid );
+		yield return LetAliensSpeak( 1, weakSaid );
+
+		var weakStatement = ( weakSaid.Count > 1 ) ? weakSaid[ 1 ] : "nothing said";
+		var weakStance = encounter.m_pdEncounter.m_alienStance;
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 2. the same Spemin met by a far stronger ship: they grovel
+		ship.m_armorPoints = 100000;
+
+		var strongSaid = new List<string>();
+
+		yield return MeetAndConnect( speminId, GD_Comm.Stance.Friendly, strongSaid );
+		yield return LetAliensSpeak( 1, strongSaid );
+
+		var strongStatement = ( strongSaid.Count > 1 ) ? strongSaid[ 1 ] : "nothing said";
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 3. the Elowan: two friendly statements calm them, the second by half as much as the first, and a question by half again of the third
+		var elowanSaid = new List<string>();
+
+		yield return MeetAndConnect( elowanId, GD_Comm.Stance.Friendly, elowanSaid );
+
+		var moodAtStart = EncounterField( "m_mood", -1.0f );
+
+		new StatementButton().Execute();
+		yield return Frames( 2 );
+
+		var moodAfterOne = EncounterField( "m_mood", -1.0f );
+
+		new StatementButton().Execute();
+		yield return Frames( 2 );
+
+		var moodAfterTwo = EncounterField( "m_mood", -1.0f );
+
+		new QThemselvesButton().Execute();
+		yield return Frames( 2 );
+
+		var moodAfterQuestion = EncounterField( "m_mood", -1.0f );
+		var elowanStance = encounter.m_pdEncounter.m_alienStance;
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 4. the Elowan too agitated to talk: a hostile statement at 94 - against a stronger ship they take flight (no attack), against a weaker one they fight
+		var flight = new List<string>();
+
+		yield return MeetAndConnect( elowanId, GD_Comm.Stance.Friendly, flight );
+
+		SetEncounterField( "m_mood", 94.0f );
+
+		encounter.Hail( GD_Comm.Stance.Hostile, false );
+
+		new StatementButton().Execute();
+		yield return Frames( 3 );
+
+		var flightConnected = encounter.m_pdEncounter.m_connected;
+		var flightStance = encounter.m_pdEncounter.m_alienStance;
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		ship.m_armorPoints = 1000;
+
+		var fight = new List<string>();
+
+		yield return MeetAndConnect( elowanId, GD_Comm.Stance.Friendly, fight );
+
+		foreach ( var alienShip in encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			alienShip.m_armorPoints = 1000000;
+		}
+
+		SetEncounterField( "m_mood", 94.0f );
+
+		encounter.Hail( GD_Comm.Stance.Hostile, false );
+
+		new StatementButton().Execute();
+		yield return Frames( 3 );
+
+		var fightConnected = encounter.m_pdEncounter.m_connected;
+		var fightStance = encounter.m_pdEncounter.m_alienStance;
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		ship.m_armorPoints = 100000;
+
+		// ---- 5. the Thrynn tired of talking: with one phrase left, they say it, and then end the comm link
+		var thrynnSaid = new List<string>();
+
+		yield return MeetAndConnect( thrynnId, GD_Comm.Stance.Friendly, thrynnSaid );
+
+		SetEncounterField( "m_alienPhrasesLeft", 1 );
+
+		yield return LetAliensSpeak( 2, thrynnSaid );
+
+		var thrynnConnectedAfter = encounter.m_pdEncounter.m_connected;
+		var thrynnLast = ( thrynnSaid.Count > 2 ) ? thrynnSaid[ 2 ] : "nothing said";
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 6. the control: the Gazurtoid have no line to end a conversation with, and still end it when their time is up
+		var gazurtoidSaid = new List<string>();
+
+		yield return MeetAndConnect( FindEncounterOfRace( GameData.Race.Gazurtoid ), GD_Comm.Stance.Friendly, gazurtoidSaid );
+
+		var gazurtoidConnected = encounter.m_pdEncounter.m_connected;
+
+		encounter.m_pdEncounter.m_connectionTimer = 0.0f;
+
+		yield return Frames( 3 );
+
+		var gazurtoidConnectedAfter = encounter.m_pdEncounter.m_connected;
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "mood: spemin, weak ship: " + weakStatement + " (stance " + weakStance + ") | strong ship: " + strongStatement + " || elowan mood " + moodAtStart + " -> " + moodAfterOne + " -> " + moodAfterTwo + " -> question " + moodAfterQuestion + " (stance " + elowanStance + ") || too agitated, stronger ship: connected " + flightConnected + ", stance " + flightStance + " | weaker ship: connected " + fightConnected + ", stance " + fightStance + " || thrynn: " + string.Join( " | ", thrynnSaid ) + " (connected after " + thrynnConnectedAfter + ")" );
+
+		Check( "mood: the Spemin met in peace by a weaker ship talk tough and hold their fire", SaysALineOf( weakStatement, GameData.Race.Spemin, GD_Comm.Subject.Statement, GD_Comm.Stance.Hostile ) && ( weakStance != GD_Comm.Stance.Hostile ), weakStance + " | " + weakStatement );
+		Check( "mood: the Spemin met by a far stronger ship grovel", SaysALineOf( strongStatement, GameData.Race.Spemin, GD_Comm.Subject.Statement, GD_Comm.Stance.Obsequious ), strongStatement );
+		Check( "mood: friendly statements calm the Elowan, each by less than the one before, and a question by half", ( moodAtStart == 45.0f ) && ( moodAfterOne == 35.0f ) && ( moodAfterTwo == 30.0f ) && Mathf.Abs( moodAfterQuestion - ( 30.0f - 10.0f / 3.0f / 2.0f ) ) < 0.01f && ( elowanStance == GD_Comm.Stance.Friendly ), moodAtStart + " -> " + moodAfterOne + " -> " + moodAfterTwo + " -> " + moodAfterQuestion + ", " + elowanStance );
+		Check( "mood: too agitated to talk, the Elowan end the comm link and take flight from a stronger ship", !flightConnected && ( flightStance == GD_Comm.Stance.Obsequious ), flightConnected + ", " + flightStance );
+		Check( "mood: too agitated to talk, the Elowan end the comm link and fight a weaker ship", !fightConnected && ( fightStance == GD_Comm.Stance.Hostile ), fightConnected + ", " + fightStance );
+		Check( "mood: the Thrynn say their last phrase and then end the comm link, tired of talking", !thrynnConnectedAfter && SaysALineOf( thrynnLast, GameData.Race.Thrynn, GD_Comm.Subject.Terminate, GD_Comm.Stance.Neutral ), thrynnConnectedAfter + " | " + thrynnLast );
+
+		Check( "mood: aliens with no line to end a conversation with still end it when their time is up (control)", gazurtoidConnected && !gazurtoidConnectedAfter, gazurtoidConnected + " -> " + gazurtoidConnectedAfter );
+
+		Finish( "scenario=mood elowan=" + moodAtStart + "/" + moodAfterOne + "/" + moodAfterTwo + "/" + moodAfterQuestion + " flight=" + flightStance + " fight=" + fightStance, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

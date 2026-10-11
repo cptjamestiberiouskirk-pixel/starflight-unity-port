@@ -58,6 +58,14 @@ public class PD_Encounter : IComparable
 	// set once the aliens have asked the question of their race's own (the Elowan's "Is thine need for energy dire?") - false in older save files
 	public bool m_specialQuestionAsked;
 
+	// the aliens' mood (the original's "emotional disposition level", from 0 most calm to 100 most agitated, see AlienPersonality) and whether it has been set for
+	// this encounter, how many statements and questions the player has made in the current posture, and how many more phrases the aliens will say before they are
+	// tired of talking - 0 and false in older save files, and the mood is set again then
+	public float m_mood;
+	public bool m_moodSet;
+	public int m_playerPhrasesInPosture;
+	public int m_alienPhrasesLeft;
+
 	public void Reset( int encounterId )
 	{
 		// get access to the game data

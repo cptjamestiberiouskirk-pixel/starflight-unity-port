@@ -151,6 +151,7 @@ The project features a **deterministic visualization system** that renders plane
 - The Elowan give 15 cubic meters of Endurium to a crew whose need for energy is dire, and see through one that has 20 or more
 - The Veloxi demand a tribute of Endurium, and the Crystal Orb or the Ellipsoid when the ship carries one, and attack a crew that refuses
 - The Thrynn buy artifacts at their own prices and plutonium for Endurium, and sell the Black Box for 30 Endurium
+- The Elowan, Thrynn, Spemin and Veloxi have moods: the player's posture calms or angers them, they grovel to a stronger ship, tire of talking, and fight or flee once too agitated to talk
 - Complete combat system with lasers, missiles, shields, armor
 - Ship destruction with debris spawning
 - A model with debris for every alien vessel of the game data (hand-made or procedural stand-ins)
