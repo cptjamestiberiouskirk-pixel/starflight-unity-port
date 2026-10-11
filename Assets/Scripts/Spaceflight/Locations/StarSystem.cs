@@ -459,6 +459,9 @@ public class StarSystem : MonoBehaviour
 			// unpause the game
 			SpaceflightController.m_instance.m_gameIsPaused = false;
 
+			// the system map shows the planets with their own maps now
+			SpaceflightController.m_instance.m_displayController.m_systemDisplay.ShowPlanetMaps();
+
 			// get to the player data
 			var playerData = DataController.m_instance.m_playerData;
 

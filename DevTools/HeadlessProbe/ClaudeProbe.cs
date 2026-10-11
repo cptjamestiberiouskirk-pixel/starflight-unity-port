@@ -429,6 +429,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioM16();
 				break;
 
+			case "systemmap":
+				yield return ScenarioSystemMap();
+				break;
+
 			case "nomaps":
 				yield return ScenarioNoMaps();
 				break;
@@ -5143,6 +5147,233 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "M16 leaving the spaceflight scene leaves no planet map behind and logs no error", ( planetSizedAfterLeaving - otherPlanetSized == 0 ) && ( s_errorsLogged == 0 ) && ( leavingExceptions == 0 ), ( planetSizedAfterLeaving - otherPlanetSized ) + " planet maps left, errors " + s_errorsLogged + ", exceptions " + leavingExceptions );
 
 		Finish( "scenario=m16 visits=[" + visits + "] mostLeftOver=" + mostLeftOver + " memory=" + ( bytesAtStart >> 20 ) + "MB->" + ( bytesAtEnd >> 20 ) + "MB filesLoaded=" + mostFilesLoaded + " elevationMapOutlived=" + elevationTextureOutlivedItsSystem + " landed=" + landed + " afterLeaving=" + ( planetSizedAfterLeaving - otherPlanetSized ) + "maps/" + s_errorsLogged + "errors checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the system map
+
+	// the system map (SystemDisplay): each planet drawn from its own albedo map, lit from the star and sized by its mass, the star in the colour of
+	// real stars of its class, the ecosphere of the class, a ring image on each orbit, the star field, the ship marker turned to the heading,
+	// and the maps of the next system once it has been entered (it reaches the map's objects through the scene and the material properties,
+	// so that it also runs on the old map)
+	IEnumerator ScenarioSystemMap()
+	{
+		var controller = SpaceflightController.m_instance;
+		var playerData = DataController.m_instance.m_playerData;
+		var systemDisplay = controller.m_displayController.m_systemDisplay;
+
+		// star 156 (class A, ecosphere 5 to 7): a planet in every orbit, a gas giant of mass 400000 in orbit 4 and a rocky planet of mass 3000 in orbit 3
+		EnterStarSystem( 156 );
+
+		yield return WaitForPlanetMaps( 60.0f );
+
+		// the ship heads east, then south
+		playerData.m_general.m_currentDirection = Vector3.right;
+
+		yield return Frames( 5 );
+
+		var eastAngle = systemDisplay.m_player.rectTransform.localEulerAngles.z;
+
+		playerData.m_general.m_currentDirection = Vector3.back;
+
+		yield return Frames( 5 );
+
+		var southAngle = systemDisplay.m_player.rectTransform.localEulerAngles.z;
+
+		// ---- 1. the planets of star 156
+		var mapped = 0;
+		var planets = 0;
+		var sizedByMass = 0;
+		var litFromTheStar = 0;
+		var upright = 0;
+		var detail = "";
+
+		for ( var i = 0; i < 8; i++ )
+		{
+			var planetController = controller.m_starSystem.m_planetController[ i ];
+
+			if ( ( planetController.m_planet == null ) || ( planetController.m_planet.m_id == -1 ) )
+			{
+				continue;
+			}
+
+			planets++;
+
+			var image = systemDisplay.m_planetList[ i ];
+			var material = image.material;
+
+			// its own albedo map
+			var texture = material.HasProperty( "_PlanetTex" ) ? material.GetTexture( "_PlanetTex" ) : null;
+			var generator = planetController.GetPlanetGenerator();
+
+			if ( ( texture != null ) && ( generator != null ) && ( texture == generator.m_albedoTexture ) )
+			{
+				mapped++;
+			}
+
+			// its size from its mass (18 to 34 map units)
+			var expectedSize = Mathf.Lerp( 18.0f, 34.0f, Mathf.Sqrt( Mathf.Max( 0.0f, planetController.m_planet.m_mass - 6.0f ) / 500000.0f ) );
+			var size = image.rectTransform.rect.width;
+
+			if ( Mathf.Abs( size - expectedSize ) < 0.01f )
+			{
+				sizedByMass++;
+			}
+
+			// the light comes from the star in the middle of the map
+			var position = systemDisplay.transform.InverseTransformPoint( image.transform.position );
+			var towardsTheStar = -new Vector2( position.x, position.y ).normalized;
+			var light = material.HasProperty( "_LightDirection" ) ? (Vector2) material.GetVector( "_LightDirection" ) : Vector2.zero;
+
+			if ( Vector2.Dot( light.normalized, towardsTheStar ) > 0.999f )
+			{
+				litFromTheStar++;
+			}
+
+			// the planet image is upright, whatever the angle of its orbit
+			var tilt = Quaternion.Angle( systemDisplay.transform.rotation, image.transform.rotation );
+
+			if ( tilt < 0.5f )
+			{
+				upright++;
+			}
+
+			detail += " o" + ( i + 1 ) + ":size " + size.ToString( "F1" ) + "/" + expectedSize.ToString( "F1" ) + " tilt " + tilt.ToString( "F1" ) + " map " + ( texture != null );
+		}
+
+		Log( "systemmap: star 156" + detail );
+
+		Check( "systemmap: every planet on the map shows its own albedo map", ( planets == 8 ) && ( mapped == planets ), mapped + " of " + planets );
+		Check( "systemmap: the planets are sized by their mass (the gas giant of orbit 4 is the largest)", ( planets == 8 ) && ( sizedByMass == planets ) && ( systemDisplay.m_planetList[ 3 ].rectTransform.rect.width > systemDisplay.m_planetList[ 2 ].rectTransform.rect.width ), sizedByMass + " of " + planets + detail );
+		Check( "systemmap: each planet is lit from the star and stays upright as it goes round", ( planets == 8 ) && ( litFromTheStar == planets ) && ( upright == planets ), litFromTheStar + " lit, " + upright + " upright of " + planets );
+
+		// ---- 2. the star: the colour of a real class A star (blue-white)
+		var starMaterial = systemDisplay.m_star.material;
+		var starColorA = starMaterial.HasProperty( "_StarColor" ) ? starMaterial.GetColor( "_StarColor" ) : Color.clear;
+
+		Check( "systemmap: a class A star is blue-white", ( starColorA.b > 0.95f ) && ( starColorA.r < starColorA.b ) && ( starColorA.g > 0.7f ), starColorA.ToString() );
+
+		// ---- 3. the ecosphere of class A: orbits 5 to 7, half way to the orbits on either side (137.5 to 212.5 map units)
+		var ecosphereTransform = systemDisplay.transform.Find( "Ecosphere" );
+		var ecosphere = ( ecosphereTransform != null ) ? ecosphereTransform.GetComponent<UnityEngine.UI.Image>() : null;
+		var innerRadius = -1.0f;
+		var outerRadius = -1.0f;
+
+		if ( ( ecosphere != null ) && ecosphere.material.HasProperty( "_InnerRadius" ) )
+		{
+			var halfSize = ecosphere.rectTransform.rect.width * 0.5f;
+
+			innerRadius = ecosphere.material.GetFloat( "_InnerRadius" ) * halfSize;
+			outerRadius = ecosphere.material.GetFloat( "_OuterRadius" ) * halfSize;
+		}
+
+		Check( "systemmap: the ecosphere band covers the ecosphere of the star's class", ( ecosphere != null ) && ecosphere.enabled && ( Mathf.Abs( innerRadius - 137.5f ) < 0.05f ) && ( Mathf.Abs( outerRadius - 212.5f ) < 0.05f ), "inner " + innerRadius.ToString( "F2" ) + ", outer " + outerRadius.ToString( "F2" ) );
+
+		// ---- 4. a ring image on each orbit, at the radius of the orbit
+		var rings = 0;
+
+		for ( var i = 0; i < systemDisplay.m_orbitList.Length; i++ )
+		{
+			var ringTransform = systemDisplay.m_orbitList[ i ].transform.Find( "Ring" );
+			var ring = ( ringTransform != null ) ? ringTransform.GetComponent<UnityEngine.UI.Image>() : null;
+
+			if ( ( ring != null ) && ring.material.HasProperty( "_Radius" ) )
+			{
+				var radius = ring.material.GetFloat( "_Radius" ) * ring.rectTransform.rect.width * 0.5f;
+
+				if ( Mathf.Abs( radius - Mathf.Lerp( 50.0f, 225.0f, i / 7.0f ) ) < 0.05f )
+				{
+					rings++;
+				}
+			}
+		}
+
+		Check( "systemmap: each orbit has a ring image at its radius", rings == 8, rings + " of 8" );
+
+		// ---- 5. the ship marker points where the ship is heading
+		Check( "systemmap: the ship marker turns to the ship's heading (east 270 degrees, south 180)", ( Mathf.Abs( Mathf.DeltaAngle( eastAngle, 270.0f ) ) < 0.5f ) && ( Mathf.Abs( Mathf.DeltaAngle( southAngle, 180.0f ) ) < 0.5f ), "east " + eastAngle.ToString( "F1" ) + ", south " + southAngle.ToString( "F1" ) );
+
+		// ---- 6. the star field
+		var starFieldTransform = systemDisplay.transform.Find( "Star Field" );
+		var starField = ( starFieldTransform != null ) ? starFieldTransform.GetComponent<UnityEngine.UI.RawImage>() : null;
+		var starFieldRect156 = ( starField != null ) ? starField.uvRect : Rect.zero;
+
+		// ---- 7. star 25 (class G, Arth's sun): orbits 2, 4 and 8 are empty, and the map takes the maps of the new planets
+		var texturesOf156 = new System.Collections.Generic.List<Texture>();
+
+		foreach ( var image in systemDisplay.m_planetList )
+		{
+			if ( image.material.HasProperty( "_PlanetTex" ) )
+			{
+				texturesOf156.Add( image.material.GetTexture( "_PlanetTex" ) );
+			}
+		}
+
+		EnterStarSystem( 25 );
+
+		yield return WaitForPlanetMaps( 60.0f );
+
+		yield return Frames( 5 );
+
+		var mapped25 = 0;
+		var planets25 = 0;
+		var stale = 0;
+		var emptyOrbitsHidden = 0;
+
+		for ( var i = 0; i < 8; i++ )
+		{
+			var planetController = controller.m_starSystem.m_planetController[ i ];
+			var hasPlanet = ( planetController.m_planet != null ) && ( planetController.m_planet.m_id != -1 );
+
+			if ( !hasPlanet )
+			{
+				if ( !systemDisplay.m_orbitList[ i ].activeSelf )
+				{
+					emptyOrbitsHidden++;
+				}
+
+				continue;
+			}
+
+			planets25++;
+
+			var material = systemDisplay.m_planetList[ i ].material;
+			var texture = material.HasProperty( "_PlanetTex" ) ? material.GetTexture( "_PlanetTex" ) : null;
+			var generator = planetController.GetPlanetGenerator();
+
+			if ( ( texture != null ) && ( generator != null ) && ( texture == generator.m_albedoTexture ) )
+			{
+				mapped25++;
+			}
+
+			if ( ( texture != null ) && texturesOf156.Contains( texture ) )
+			{
+				stale++;
+			}
+		}
+
+		var starColorG = starMaterial.HasProperty( "_StarColor" ) ? starMaterial.GetColor( "_StarColor" ) : Color.clear;
+		var starFieldRect25 = ( starField != null ) ? starField.uvRect : Rect.zero;
+
+		Check( "systemmap: in the next system every planet shows its own new map, none of the last system's", ( planets25 == 5 ) && ( mapped25 == planets25 ) && ( stale == 0 ), mapped25 + " of " + planets25 + ", " + stale + " from star 156" );
+		Check( "systemmap: the empty orbits of Arth's system are hidden (control)", emptyOrbitsHidden == 3, emptyOrbitsHidden + " of 3" );
+		Check( "systemmap: a class G star is yellow-white", ( starColorG.r > 0.95f ) && ( starColorG.b < starColorG.r ) && ( starColorG.g > 0.8f ), starColorG.ToString() );
+		Check( "systemmap: the star field shows a part of its own for each star", ( starField != null ) && ( starField.texture != null ) && ( starFieldRect156 != starFieldRect25 ) && ( starFieldRect25.width > 0.0f ), starFieldRect156 + " / " + starFieldRect25 );
+
+		Finish( "scenario=systemmap planets156=" + mapped + "/" + planets + " planets25=" + mapped25 + "/" + planets25 + " heading=" + eastAngle.ToString( "F0" ) + "," + southAngle.ToString( "F0" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// waits until the planets of the star system have their maps
+	static IEnumerator WaitForPlanetMaps( float seconds )
+	{
+		var starSystem = SpaceflightController.m_instance.m_starSystem;
+		var deadline = Time.realtimeSinceStartup + seconds;
+
+		yield return null;
+
+		while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup < deadline ) )
+		{
+			yield return null;
+		}
 	}
 
 	// ---------------------------------------------------------------- a planet whose maps could not be generated cannot be landed on
