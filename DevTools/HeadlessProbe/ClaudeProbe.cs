@@ -753,6 +753,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioTVWeapons();
 				break;
 
+			case "lifebehaviour":
+				yield return ScenarioLifeBehaviour();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -16974,6 +16978,147 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "tvweapons: with no living lifeform within range the laser hits nothing (control)", nothingText.Contains( "hits nothing" ), nothingText );
 
 		Finish( "scenario=tvweapons stun=" + stunEffect + " end=" + statusAtTheEnd, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 6: how the lifeforms respond to the terrain vehicle
+
+	// sets a field of a lifeform's component or of its species (nothing on the code before them)
+	static void SetLifeformField( Transform lifeform, string name, object value, bool onSpecies = false )
+	{
+		var component = lifeform.GetComponent( "TerrainLifeform" );
+		var target = onSpecies ? FieldOrNull( component, "m_species" ) : component;
+
+		if ( target == null )
+		{
+			return;
+		}
+
+		var field = target.GetType().GetField( name );
+
+		if ( field != null )
+		{
+			field.SetValue( target, value );
+		}
+	}
+
+	// the horizontal distance between a lifeform and the terrain vehicle
+	static float DistanceToVehicle( Transform lifeform )
+	{
+		var delta = lifeform.position - SpaceflightController.m_instance.m_terrainVehicle.transform.position;
+
+		delta.y = 0.0f;
+
+		return delta.magnitude;
+	}
+
+	// puts a lifeform this far from the terrain vehicle, on the far side from where it is
+	static void PutAt( Transform lifeform, float distance )
+	{
+		var vehicle = SpaceflightController.m_instance.m_terrainVehicle.transform.position;
+		var direction = lifeform.position - vehicle;
+
+		direction.y = 0.0f;
+
+		if ( direction.magnitude < 0.01f )
+		{
+			direction = Vector3.forward;
+		}
+
+		lifeform.position = vehicle + direction.normalized * distance + Vector3.up * 2.0f;
+	}
+
+	IEnumerator ScenarioLifeBehaviour()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// planet 92 of the Arth system: landed beside its first lifeform (a plant)
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var firstPlace = ( LifeformsOnTheGround().Count > 0 ) ? LifeformsOnTheGround()[ 0 ].position : Vector3.zero;
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
+
+		Transform lifeform = null;
+
+		foreach ( var candidate in LifeformsOnTheGround() )
+		{
+			if ( ( lifeform == null ) || ( DistanceToVehicle( candidate ) < DistanceToVehicle( lifeform ) ) )
+			{
+				lifeform = candidate;
+			}
+		}
+
+		if ( lifeform == null )
+		{
+			Finish( "scenario=lifebehaviour abort: no lifeform", 2 );
+			yield break;
+		}
+
+		var crewMember = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Captain );
+
+		// ---- 1. the control: a plant of middling aggression next to the vehicle neither moves nor attacks
+		SetLifeformField( lifeform, "m_aggression", 50 );
+		SetLifeformField( lifeform, "m_noticedPlayer", true );
+		PutAt( lifeform, 8.0f );
+
+		var placeBefore = lifeform.position;
+
+		controller.m_messages.Clear();
+
+		yield return new WaitForSecondsRealtime( 2.0f );
+
+		var calmMoved = Vector3.Distance( placeBefore, lifeform.position );
+		var calmAttacked = MessageList().Contains( "being attacked" );
+
+		// ---- 2. made dangerous, it attacks the crew
+		crewMember.m_vitality = 100.0f;
+
+		SetLifeformField( lifeform, "m_aggression", 95 );
+
+		controller.m_messages.Clear();
+
+		yield return new WaitForSecondsRealtime( 4.0f );
+
+		var attackMessages = MessageList();
+		var vitalityAfter = crewMember.m_vitality;
+
+		crewMember.m_vitality = 100.0f;
+
+		// ---- 3. made to move, and dangerous, 40 units away: it comes at the vehicle
+		SetLifeformField( lifeform, "m_movementRate", 3, true );
+		PutAt( lifeform, 40.0f );
+
+		var approachBefore = DistanceToVehicle( lifeform );
+
+		yield return new WaitForSecondsRealtime( 2.0f );
+
+		var approachAfter = DistanceToVehicle( lifeform );
+
+		// ---- 4. made wimpy: it flees
+		SetLifeformField( lifeform, "m_aggression", 10 );
+		PutAt( lifeform, 30.0f );
+
+		var fleeBefore = DistanceToVehicle( lifeform );
+
+		yield return new WaitForSecondsRealtime( 2.0f );
+
+		var fleeAfter = DistanceToVehicle( lifeform );
+
+		Log( "lifebehaviour: calm moved " + calmMoved + ", attacked " + calmAttacked + " | dangerous: " + attackMessages + " (vitality " + vitalityAfter + ") | approach " + approachBefore + " -> " + approachAfter + " | flee " + fleeBefore + " -> " + fleeAfter );
+
+		Check( "lifebehaviour: a plant of middling aggression neither moves nor attacks (control)", ( calmMoved < 0.5f ) && !calmAttacked, calmMoved + ", " + calmAttacked );
+		Check( "lifebehaviour: a dangerous lifeform next to the vehicle attacks the crew", attackMessages.Contains( "being attacked" ) && attackMessages.Contains( "lifeform attacks" ), attackMessages );
+		Check( "lifebehaviour: a dangerous lifeform that moves comes at the vehicle", approachAfter < approachBefore - 5.0f, approachBefore + " -> " + approachAfter );
+		Check( "lifebehaviour: a wimpy one flees it", fleeAfter > fleeBefore + 5.0f, fleeBefore + " -> " + fleeAfter );
+
+		Finish( "scenario=lifebehaviour approach=" + approachBefore + "/" + approachAfter + " flee=" + fleeBefore + "/" + fleeAfter, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

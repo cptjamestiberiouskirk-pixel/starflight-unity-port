@@ -40,6 +40,12 @@ public class TVFireButton : ShipButton
 
 		SoundController.m_instance.PlaySound( stunner ? SoundController.Sound.PhaserFire : SoundController.Sound.LaserFire );
 
+		// the lifeforms near by notice the laser (lf-behav.txt: ?PLAYER-FIRING-LASER)
+		if ( !stunner )
+		{
+			TerrainLifeform.s_laserFiredTime = Time.time;
+		}
+
 		var target = FindNearestLifeform( stunner ? c_stunnerRange : c_laserRange );
 
 		if ( target == null )

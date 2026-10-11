@@ -16,9 +16,14 @@ public class TerrainLifeforms : TerrainGridPopulator
 	// the size of the smallest lifeform's marker, in world units (and as much again for each step of size)
 	const float c_markerScale = 1.5f;
 
+	// the elevation scale of the planet (for the lifeforms that move)
+	float m_elevationScale;
+
 	// place the lifeforms of this planet
 	public void Initialize( PlanetGenerator planetGenerator, float elevationScale, int randomSeed )
 	{
+		m_elevationScale = elevationScale;
+
 		// remove the lifeforms of the last planet
 		Tools.DestroyChildrenOf( gameObject );
 
@@ -74,6 +79,28 @@ public class TerrainLifeforms : TerrainGridPopulator
 		Random.state = randomState;
 	}
 
+	// the height of the ground at this place, and whether it is dry ground a lifeform can walk on (planet.txt: lifeforms on the ground never move onto "liquid" or
+	// "lava") - false off the planet's maps
+	public bool GetGround( Vector3 worldPosition, out float height )
+	{
+		var planetGenerator = GetPlanetGenerator();
+
+		height = 0.0f;
+
+		if ( planetGenerator == null )
+		{
+			return false;
+		}
+
+		Tools.WorldToMapCoordinates( worldPosition, out var mapX, out var mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
+
+		var elevation = planetGenerator.GetBilinearSmoothedElevation( mapX, mapY );
+
+		height = elevation * m_elevationScale;
+
+		return elevation >= planetGenerator.m_waterElevation;
+	}
+
 	// a lifeform at this place: a plain shape in its species' colour stands in for it until there are models (a pillar for a plant, a ball for a radial animal,
 	// a box for an amorphous one, and a capsule for a bilateral one), as large as its size
 	void PlaceLifeform( GD_Species species, float mapX, float mapY, float elevationScale )
@@ -126,6 +153,6 @@ public class TerrainLifeforms : TerrainGridPopulator
 			renderer.material.color = new Color( species.m_red, species.m_green, species.m_blue );
 		}
 
-		lifeformObject.AddComponent<TerrainLifeform>().Initialize( species );
+		lifeformObject.AddComponent<TerrainLifeform>().Initialize( species, this );
 	}
 }
