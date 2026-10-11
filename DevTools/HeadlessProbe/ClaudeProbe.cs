@@ -2989,6 +2989,11 @@ public class ClaudeProbe : MonoBehaviour
 
 		var enterpriseDamageBefore = damage;
 
+		// the Uhlek's hits may have destroyed the laser cannon, which then does not fire (hits damage the ship's systems since PR 145)
+		var laserHealthBeforeEnterprise = playerData.m_playerShip.GetSystemHealth( PD_PlayerShip.ShipSystem.Lasers );
+
+		playerData.m_playerShip.RestoreSystems();
+
 		combat.SetTarget( FirstLivingAlien() );
 
 		BringAliensClose();
@@ -2999,7 +3004,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var enterpriseDamageAfter = damage;
 
-		Log( "M12 enterprise encounter " + enterpriseId + ": stance " + enterpriseStance + ", damage in 4 s before firing " + enterpriseDamageBefore + " | fired on=" + enterpriseFiredOn + " stance " + Stance() + ", damage in the next 8 s " + enterpriseDamageAfter );
+		Log( "M12 enterprise encounter " + enterpriseId + ": stance " + enterpriseStance + ", damage in 4 s before firing " + enterpriseDamageBefore + ", laser cannon health after the Uhlek " + laserHealthBeforeEnterprise + " (restored) | fired on=" + enterpriseFiredOn + " stance " + Stance() + ", damage in the next 8 s " + enterpriseDamageAfter );
 
 		Check( "M12 a race with no update of its own shoots back when fired on", ( enterpriseDamageBefore == 0 ) && enterpriseFiredOn && ( enterpriseDamageAfter > 0 ), "damage before " + enterpriseDamageBefore + ", fired on " + enterpriseFiredOn + ", stance " + Stance() + ", damage after " + enterpriseDamageAfter );
 
