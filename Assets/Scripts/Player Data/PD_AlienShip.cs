@@ -7,9 +7,6 @@ using System;
 
 public class PD_AlienShip
 {
-	// how many hit points one armor class (or one shield class) of a vessel is worth
-	public const int c_hitPointsPerClass = 100;
-
 	// the vessel id
 	public int m_vesselId;
 
@@ -105,14 +102,15 @@ public class PD_AlienShip
 		m_addedToEncounter = false;
 	}
 
-	// give this ship the full armor and shields of its vessel
+	// give this ship the full armor and shields of its vessel - the points of the game data (xls Vessels), which are 200 for each armor or shield class (this used
+	// to be 100 for each class, half of them)
 	public void ResetHitPoints( GD_Vessel vessel )
 	{
-		// every vessel has at least one armor point (the weakest ones have an armor class well below 1)
-		m_armorPoints = Mathf.Max( 1, Mathf.RoundToInt( vessel.m_armorClass * c_hitPointsPerClass ) );
+		// every vessel has at least one armor point
+		m_armorPoints = Mathf.Max( 1, vessel.m_armor );
 
-		// some vessels have a negative shield class which means they have no shields at all
-		m_shieldPoints = Mathf.Max( 0, vessel.m_shieldClass * c_hitPointsPerClass );
+		// and some have no shields at all
+		m_shieldPoints = Mathf.Max( 0, vessel.m_shields );
 	}
 
 	// make sure this ship has its hit points (a living ship without any comes from a save file made before alien ships had hit points)
