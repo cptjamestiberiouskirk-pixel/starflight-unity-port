@@ -36,6 +36,20 @@ public class SensorsDisplay : ShipDisplay
 		Unknown
 	};
 
+	// below 10^22 tons the original draws a planet's disc this many pixels across, plus this many for each unit of the leading digit of its mass
+	const float c_planetDiscBasePixels = 2.0f;
+	const float c_planetDiscPixelsPerDigit = 4.0f;
+
+	// from 10^22 tons up the original draws the disc this many pixels across
+	const int c_fullPlanetDiscMassPower = 22;
+	const float c_fullPlanetDiscPixels = 62.0f;
+
+	// the original's window is 57 pixels high, and on a 4:3 screen its pixels are 1.2 times as high as they are wide
+	const float c_originalWindowHeight = 57.0f * 1.2f;
+
+	// the disc of the planet mask is 501 of its 512 rows high
+	const float c_planetMaskDiscFraction = 501.0f / 512.0f;
+
 	// the mass text
 	public TextMeshProUGUI m_massText;
 
@@ -371,14 +385,8 @@ public class SensorsDisplay : ShipDisplay
 			}
 
 			// the panel is inset in the window by its offsets (left, bottom, right, top), and its magenta starts inside the sprite's transparent edge
-			// (a sliced sprite's edge is drawn at the canvas's reference pixels per unit over the sprite's pixels per unit)
 			var panelRect = m_panelImage.rectTransform;
-			var margin = 0.0f;
-
-			if ( ( m_panelImage.sprite != null ) && ( m_panelImage.canvas != null ) && ( m_panelImage.sprite.pixelsPerUnit > 0.0f ) && ( m_panelImage.pixelsPerUnitMultiplier > 0.0f ) )
-			{
-				margin = m_panelSpriteMargin * m_panelImage.canvas.referencePixelsPerUnit / ( m_panelImage.sprite.pixelsPerUnit * m_panelImage.pixelsPerUnitMultiplier );
-			}
+			var margin = GetPanelMargin();
 
 			m_windowClip.padding = new Vector4( panelRect.offsetMin.x + margin, panelRect.offsetMin.y + margin, -panelRect.offsetMax.x + margin, -panelRect.offsetMax.y + margin );
 		}
@@ -455,15 +463,51 @@ public class SensorsDisplay : ShipDisplay
 		return textureList[ index ];
 	}
 
+	// how far the magenta of the panel starts inside the panel's rectangle, in canvas units
+	// (a sliced sprite's edge is drawn at the canvas's reference pixels per unit over the sprite's pixels per unit)
+	float GetPanelMargin()
+	{
+		if ( ( m_panelImage == null ) || ( m_panelImage.sprite == null ) || ( m_panelImage.canvas == null ) || ( m_panelImage.sprite.pixelsPerUnit <= 0.0f ) || ( m_panelImage.pixelsPerUnitMultiplier <= 0.0f ) )
+		{
+			return 0.0f;
+		}
+
+		return m_panelSpriteMargin * m_panelImage.canvas.referencePixelsPerUnit / ( m_panelImage.sprite.pixelsPerUnit * m_panelImage.pixelsPerUnitMultiplier );
+	}
+
+	// the scale of a planet's picture that makes its disc as large in the window as the original draws it
+	// (measured in the original on nine planets on 2026-10-10: below 10^22 tons the disc is 2 + 4 x the leading digit of the mass pixels across,
+	// from 2x10^20 to 6x10^21 tons, and from 10^22 tons up it is 62 pixels across, up to 5x10^23 tons; masses under 10^20 tons were not seen)
+	public float GetPlanetPictureScale( int massPowerBase, int mass )
+	{
+		// the leading digit and the power of ten of the mass, as the readout shows them
+		var massDigit = Mathf.Max( 1, mass );
+		var massPower = massPowerBase;
+
+		for ( var i = 0; ( massDigit >= 10 ) && ( i < 10 ); i++ )
+		{
+			massDigit /= 10;
+			massPower++;
+		}
+
+		// how many of the original's pixels the disc is across
+		var discPixels = ( massPower >= c_fullPlanetDiscMassPower ) ? c_fullPlanetDiscPixels : Mathf.Min( c_fullPlanetDiscPixels, c_planetDiscBasePixels + c_planetDiscPixelsPerDigit * massDigit );
+
+		// the magenta inside the panel is the original's window, and the planet's disc is most of the picture's height at scale 1
+		var windowHeight = ( m_panelImage != null ) ? m_panelImage.rectTransform.rect.height - 2.0f * GetPanelMargin() : 0.0f;
+		var pictureDiscHeight = m_maskImage.rectTransform.rect.height * c_planetMaskDiscFraction;
+
+		if ( ( windowHeight <= 0.0f ) || ( pictureDiscHeight <= 0.0f ) )
+		{
+			return 1.0f;
+		}
+
+		return discPixels / c_originalWindowHeight * windowHeight / pictureDiscHeight;
+	}
+
 	// call this to start the scanning cinematics (vessel id is the vessel that left the debris, for a debris scan)
 	public void StartScanning( ScanType scanType, int massPowerBase, int mass, int bioDensity, int mineralDensity, int vesselId = -1 )
 	{
-		// get to the game data
-		var gameData = DataController.m_instance.m_gameData;
-
-		// get to the player data
-		var playerData = DataController.m_instance.m_playerData;
-
 		// the picture for this scan
 		Texture backgroundTexture = null;
 		Texture maskTexture = null;
@@ -520,14 +564,10 @@ public class SensorsDisplay : ShipDisplay
 		// reset background and mask image scale
 		m_maskImage.transform.localScale = m_backgroundImage.transform.localScale = Vector3.one;
 
-		// if we are scanning a planet scale the mask image
+		// if we are scanning a planet scale the picture so that its disc is as large in the window as the original draws it
 		if ( m_scanType == ScanType.Planet )
 		{
-			// get the planet we are currently orbiting about
-			var planet = gameData.m_planetList[ playerData.m_general.m_currentPlanetId ];
-
-			// change the size of the background and mask images based on the size of the planet
-			m_backgroundImage.transform.localScale = m_maskImage.transform.localScale = planet.GetScale() / 320.0f * 0.5f + new Vector3( 0.5f, 0.5f, 0.5f );
+			m_backgroundImage.transform.localScale = m_maskImage.transform.localScale = Vector3.one * GetPlanetPictureScale( massPowerBase, mass );
 		}
 		else if ( m_scanType == ScanType.Debris )
 		{
