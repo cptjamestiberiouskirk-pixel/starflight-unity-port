@@ -161,7 +161,7 @@ After this phase the game can be played from start to win.
 | 5.2 | The Crystal Planet (192,152 planet 1): its field damages a ship without the Orb. PR 115: 5 points a second in orbit without the Orb (the rate is the port's choice) | STRINFO 5.1; disys.txt `'HEAT` (crystal planet heating routine) |
 | 5.3 | Drop the armed Black Egg at 47N 45E to win. Anywhere else on the Crystal Planet: "damaged but not destroyed". On the Uhlek brain world (55,32 planet 2) the Uhlek fall silent. On Elan the Elowan young die. PR 117: the egg, the nexus, the damaged planet and the crew's two reports; PR 123: the Uhlek harmless, the Elowan mortal enemies | STRINFO 2.12, 5.1, SS Story; disys.txt `?BOMB` |
 | 5.4 | Win sequence: the message, 500,000 MU, the Interstel medal, a supplemental evaluation; no more flares after the win. PR 120: the win saved, no flares, the bonus paid on docking, the evaluation in Operations | STRINFO 1.2, 2.12; disys.txt `?WIN`, `?FLARE`, `WMSG` |
-| 5.5 | Every way to lose (flare, ship destroyed, all crew dead) ends through the same game over. PR 122: one destruction path, the game over says the cause; all crew dead waits for Phase 6 (crew death is only in the 1984 drafts) | STRINFO, disys.txt |
+| 5.5 | Every way to lose (flare, ship destroyed, all crew dead) ends through the same game over. PR 122: one destruction path, the game over says the cause; all crew dead waits for Phase 6 (crew death is only in the 1984 drafts); Phase 6 crew death: all crew dead ends through the same game over (`CombatController.EndGame`) | STRINFO, disys.txt |
 
 ## Phase 6: Lifeforms and crew injury
 
@@ -173,7 +173,7 @@ Depends on D3. This is the largest piece and is not on the path to winning, whic
 | 6.2 | Scan reports them (volume, aggression, intelligence, niche); Look describes them | planet.txt, lf-words.txt |
 | 6.3 | Behaviour: approach, attack, flee, predator and prey, flying | lf-behav.txt |
 | 6.4 | Stunner and laser; capture into stasis; sale at the Trade Depot; payment for recorded data | planet.txt (DRAFT values) |
-| 6.5 | Attacks hurt the crew, scaled by durability; the Doctor treats them; death, the chain of command, DEAD on the personnel file | lf-words.txt, starship.txt, disys.txt |
+| 6.5 | Attacks hurt the crew, scaled by durability; the Doctor treats them; death, the chain of command, DEAD on the personnel file. Done: the lifeforms' attacks by the notes' formula, death at 0 vitality, the chain of command, DEAD on the file, the game lost with the whole crew | lf-words.txt, starship.txt, disys.txt |
 | 6.6 | Weather and terrain hazards: storms, lava destroys the vehicle, uphill is slow | planet.txt, alpha.txt, dir.txt STORM-OV |
 
 ## Phase 7: Fidelity pass

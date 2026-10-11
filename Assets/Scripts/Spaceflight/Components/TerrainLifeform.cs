@@ -378,9 +378,18 @@ public class TerrainLifeform : MonoBehaviour
 			var maximumDamage = Mathf.Max( 1, ( m_aggression + 2 * m_hits ) / 3 / durability );
 			var damage = Random.Range( 1, maximumDamage + 1 );
 
-			victim.m_vitality = Mathf.Max( 0.0f, victim.m_vitality - damage );
+			messages.AddText( "<color=red>" + phrase + ". " + victim.m_name + "'s vitality is " + Mathf.CeilToInt( Mathf.Max( 0.0f, victim.m_vitality - damage ) ) + "%.</color>" );
 
-			messages.AddText( "<color=red>" + phrase + ". " + victim.m_name + "'s vitality is " + Mathf.CeilToInt( victim.m_vitality ) + "%.</color>" );
+			// (at 0 the crew member dies, see PD_CrewAssignment.InjureCrewMember)
+			if ( playerData.m_crewAssignment.InjureCrewMember( victim, damage ) )
+			{
+				crew.Remove( victim );
+
+				if ( crew.Count == 0 )
+				{
+					return;
+				}
+			}
 		}
 	}
 

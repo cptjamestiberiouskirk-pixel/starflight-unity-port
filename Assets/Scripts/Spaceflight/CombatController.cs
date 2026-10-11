@@ -713,6 +713,25 @@ public class CombatController : MonoBehaviour
 		DestroyPlayer( playerData.m_general.m_coordinates );
 	}
 
+	// the game is lost without the ship being destroyed (the whole crew has died): the game over screen with its cause, and the ship's armor at 0, so that the
+	// lost game is never saved (DataController.SavePlayerData refuses a destroyed ship, and the game over reloads the last save)
+	public void EndGame( string cause )
+	{
+		if ( m_playerIsDestroyed )
+		{
+			return;
+		}
+
+		m_playerIsDestroyed = true;
+		m_gameOverCause = cause;
+
+		DataController.m_instance.m_playerData.m_playerShip.m_armorPoints = 0;
+
+		ClearMissiles();
+
+		ShowGameOver();
+	}
+
 	// the player ship is destroyed: it explodes, and then the game is over
 	void DestroyPlayer( Vector3 playerPosition )
 	{
