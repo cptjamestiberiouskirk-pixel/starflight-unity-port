@@ -170,7 +170,7 @@ Depends on D3. This is the largest piece and is not on the path to winning, whic
 | # | Item | Original (source) |
 |---|---|---|
 | 6.1 | Lifeforms created per planet from its seed, the same every visit | dir.txt VITA-OV, HP-OV, LP-OV, SEED-OV; planet.txt |
-| 6.2 | Scan reports them (volume, aggression, intelligence, niche); Look describes them | planet.txt, lf-words.txt |
+| 6.2 | Scan reports them (volume, aggression, intelligence, niche); Look describes them. Done: Scan (PR 167); Look gives the nearest lifeform's body plan, size, colour, movement and status, and the notes' lines for minerals, ruins and dropped cargo | planet.txt, lf-words.txt |
 | 6.3 | Behaviour: approach, attack, flee, predator and prey, flying. Done: the response to the player (approach, attack, flee, wander), the laser's effect on aggression, the mates (hunt, flee, bite, eat), flyers over water | lf-behav.txt |
 | 6.4 | Stunner and laser; capture into stasis; sale at the Trade Depot; payment for recorded data. Done: the stunner and the laser, recording and its payment at the Starport (the manual, page 21: Cargo makes "holographic recordings of lifeforms"; the kernel's BIO-DATA); capture into stasis and the sale of specimens at the Trade Depot (the manual, page 21: Cargo picks up "any item (including lifeforms)"; the kernel's specimen objects) | planet.txt (DRAFT values), the manual page 21, disys.txt (specimens and BIO-DATA objects) |
 | 6.5 | Attacks hurt the crew, scaled by durability; the Doctor treats them; death, the chain of command, DEAD on the personnel file. Done: the lifeforms' attacks by the notes' formula, death at 0 vitality, the chain of command, DEAD on the file, the game lost with the whole crew | lf-words.txt, starship.txt, disys.txt |

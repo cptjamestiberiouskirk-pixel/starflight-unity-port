@@ -196,6 +196,52 @@ public class GD_Species
 		return analogs[ System.Math.Min( analogs.Length - 1, ( m_intelligence - 1 ) * analogs.Length / 100 ) ];
 	}
 
+	// its size in a word (for Look)
+	public string GetSizeText()
+	{
+		var words = new[] { "tiny", "small", "small", "medium-sized", "medium-sized", "large", "large", "huge", "huge" };
+
+		return words[ System.Math.Max( 0, System.Math.Min( words.Length - 1, m_size - 1 ) ) ];
+	}
+
+	// its colour in a word (for Look; planet.txt: "the particular color or icon for any given species is part of its species record")
+	public string GetColourText()
+	{
+		UnityEngine.Color.RGBToHSV( new UnityEngine.Color( m_red, m_green, m_blue ), out var hue, out var saturation, out var value );
+
+		if ( ( hue < 0.03f ) || ( hue >= 0.96f ) )
+		{
+			return "red";
+		}
+
+		if ( hue < 0.065f )
+		{
+			return "red-orange";
+		}
+
+		if ( hue < 0.15f )
+		{
+			return "orange";
+		}
+
+		if ( hue < 0.45f )
+		{
+			return "green";
+		}
+
+		if ( hue < 0.7f )
+		{
+			return "blue";
+		}
+
+		if ( hue < 0.8f )
+		{
+			return "violet";
+		}
+
+		return ( hue < 0.88f ) ? "purple" : "magenta";
+	}
+
 	// its niche, as the scan gives it ("Niche : Photosynthetic Herbiverore")
 	public string GetNicheText()
 	{

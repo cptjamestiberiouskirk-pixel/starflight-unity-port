@@ -1,4 +1,5 @@
-﻿
+﻿using UnityEngine;
+
 public class LookButton : ShipButton
 {
 	public override string GetLabel()
@@ -43,10 +44,104 @@ public class LookButton : ShipButton
 		report += "Atmosphere: <color=white>" + atmosphere + "</color>\n";
 		report += "Gravity: <color=white>" + gravityDesc + " (" + gravity + "%)</color>";
 
+		// what is next to the terrain vehicle (planet.txt, LOOK: "a description of the icon the eyeball is over is given" - the port describes what is nearest)
+		report += DescribeNearby();
+
 		SpaceflightController.m_instance.m_messages.AddText( report );
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 		SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
 
 		return false;
+	}
+
+	// how far Look sees a lifeform: the notes' "within 5 squares" (TerrainLifeform's close enough)
+	const float c_lookRange = 45.0f;
+
+	// the nearest lifeform in sight and what lies next to the terrain vehicle, in the notes' words (planet.txt, LOOK) - "" if there is nothing
+	static string DescribeNearby()
+	{
+		var terrainGrid = SpaceflightController.m_instance.m_disembarked.m_terrainGrid;
+		var terrainVehicle = SpaceflightController.m_instance.m_terrainVehicle;
+
+		if ( ( terrainGrid == null ) || ( terrainVehicle == null ) )
+		{
+			return "";
+		}
+
+		var vehiclePosition = terrainVehicle.transform.position;
+		var text = "";
+
+		// "Lifeforms : The detailed description is used from the template. In addition to the physical description any current Movement behavior is given as well
+		// as Alive/Dead/Stunned info is given."
+		if ( terrainGrid.m_terrainLifeforms != null )
+		{
+			TerrainLifeform nearest = null;
+			var nearestDistance = c_lookRange;
+
+			foreach ( var lifeform in terrainGrid.m_terrainLifeforms.m_lifeformList )
+			{
+				if ( ( lifeform == null ) || ( lifeform.m_species == null ) )
+				{
+					continue;
+				}
+
+				var delta = lifeform.transform.position - vehiclePosition;
+
+				delta.y = 0.0f;
+
+				if ( delta.magnitude <= nearestDistance )
+				{
+					nearest = lifeform;
+					nearestDistance = delta.magnitude;
+				}
+			}
+
+			if ( nearest != null )
+			{
+				var species = nearest.m_species;
+
+				text += "\n\n<color=#FFFF00>A lifeform (" + species.GetBodyPlanText() + "):</color> <color=white>" + species.GetSizeText() + " and " + species.GetColourText() + ". " + nearest.GetMovementText() + " Status: " + nearest.GetStatusText() + ".</color>";
+			}
+		}
+
+		// "Minerals : "An outcropping of minerals. Possibly incredibly valuable and useful""
+		if ( terrainGrid.m_terrainElements != null )
+		{
+			foreach ( Transform child in terrainGrid.m_terrainElements.transform )
+			{
+				var element = child.GetComponent<TerrainElement>();
+
+				if ( ( element != null ) && element.IsInPickupRange() )
+				{
+					text += "\n\n<color=white>An outcropping of minerals. Possibly incredibly valuable and useful.</color>";
+
+					break;
+				}
+			}
+		}
+
+		// "Ancient Ruins : "A very ancient looking crystaline structure, beautiful and mysterious."", the others of the Old Empire (the notes' scan: "Ruins from the
+		// period of the Old Empire"), and "Dropped Cargo : "Ex-Cargo (good with garlic and butter sauce)""
+		if ( terrainGrid.m_terrainRuins != null )
+		{
+			foreach ( Transform child in terrainGrid.m_terrainRuins.transform )
+			{
+				var ruin = child.GetComponent<TerrainRuin>();
+
+				if ( ( ruin != null ) && ruin.IsInReach( vehiclePosition ) )
+				{
+					text += ruin.m_isAncient ? "\n\n<color=white>A very ancient looking crystalline structure, beautiful and mysterious.</color>" : "\n\n<color=white>Ruins from the period of the Old Empire.</color>";
+				}
+
+				var dropped = child.GetComponent<TerrainDroppedCargo>();
+
+				if ( ( dropped != null ) && dropped.IsInReach( vehiclePosition ) )
+				{
+					text += "\n\n<color=white>Ex-Cargo (good with garlic and butter sauce).</color>";
+				}
+			}
+		}
+
+		return text;
 	}
 }

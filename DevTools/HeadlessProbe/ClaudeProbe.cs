@@ -793,6 +793,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportSpecimens();
 				break;
 
+			case "look":
+				yield return ScenarioLook();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -18507,6 +18511,79 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-specimens: selling it pays its value and frees its room in the hold", ( paid == 1234 ) && ( heldAfter == 0 ) && ( volumeAfter == volumeBefore - 16 ), paid + ", " + heldAfter + ", " + volumeBefore + " -> " + volumeAfter );
 
 		Finish( "scenario=starport-specimens paid=" + paid, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 6: Look describes the lifeforms
+
+	IEnumerator ScenarioLook()
+	{
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// planet 92 of the Arth system, landed beside its first lifeform
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var firstPlace = ( LifeformsOnTheGround().Count > 0 ) ? LifeformsOnTheGround()[ 0 ].position : Vector3.zero;
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
+
+		var all = LifeformsOnTheGround();
+
+		if ( all.Count < 2 )
+		{
+			Finish( "scenario=look abort: " + all.Count + " lifeforms", 2 );
+			yield break;
+		}
+
+		var vehicle = controller.m_terrainVehicle.transform.position;
+		var plant = all[ 0 ].GetComponent<TerrainLifeform>();
+		var animal = all[ 1 ].GetComponent<TerrainLifeform>();
+
+		// everything but the plant far away
+		for ( var i = 1; i < all.Count; i++ )
+		{
+			all[ i ].position = vehicle + Vector3.right * 600.0f + Vector3.forward * ( i * 10.0f );
+		}
+
+		plant.transform.position = new Vector3( vehicle.x + 10.0f, plant.transform.position.y, vehicle.z );
+
+		yield return Frames( 2 );
+
+		// ---- 1. a living plant: its body plan, size and colour, that it is not moving, and that it is alive
+		var plantLook = Press( "LookButton" );
+		var bodyPlan = plant.m_species.GetBodyPlanText();
+
+		// ---- 2. a wandering animal
+		plant.transform.position = vehicle + Vector3.left * 600.0f;
+		animal.m_species = MakeTestAnimal( GD_Species.Niche.Herbivore, 3 );
+		animal.m_aggression = 50;
+		animal.transform.position = new Vector3( vehicle.x + 15.0f, vehicle.y, vehicle.z );
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var animalLook = Press( "LookButton" );
+
+		// ---- 3. a dead lifeform
+		animal.transform.position = vehicle + Vector3.left * 700.0f;
+		plant.m_status = TerrainLifeform.Status.Dead;
+		plant.transform.position = new Vector3( vehicle.x + 10.0f, plant.transform.position.y, vehicle.z );
+
+		yield return Frames( 2 );
+
+		var deadLook = Press( "LookButton" );
+
+		Log( "look: plant (" + bodyPlan + ") " + plantLook + " || animal " + animalLook + " || dead " + deadLook );
+
+		Check( "look: Look describes a living plant beside the vehicle: its body plan, that it is not moving, and that it is alive", plantLook.Contains( "A lifeform (" + bodyPlan + ")" ) && plantLook.Contains( "It is not moving" ) && plantLook.Contains( "Status: Alive" ), plantLook );
+		Check( "look: Look says what a moving lifeform is doing", animalLook.Contains( "It is wandering" ), animalLook );
+		Check( "look: Look says when a lifeform is dead", deadLook.Contains( "It does not move" ) && deadLook.Contains( "Status: Dead" ), deadLook );
+
+		Finish( "scenario=look", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
