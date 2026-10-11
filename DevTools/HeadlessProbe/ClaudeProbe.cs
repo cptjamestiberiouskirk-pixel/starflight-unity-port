@@ -691,6 +691,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioElowanGift();
 				break;
 
+			case "veloxdemands":
+				yield return ScenarioVeloxDemands();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -14943,6 +14947,119 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "elowangift: a no gets nothing (control)", !noAnswer.Contains( CommText( 5 ) ) && ( noAfter == 50 ), noAfter + " | " + noAnswer );
 
 		Finish( "scenario=elowangift low=" + lowAfter + " high=" + highAfter + " no=" + noAfter, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 2: the Veloxi's demands
+
+	// meets the Veloxi with this much Endurium (in tenths) and these artifacts in the hold, lets them make their demand and answers it with this button - returns
+	// what was said, and what the hold and the aliens' stance are afterwards, through the list
+	static IEnumerator AnswerTheVeloxi( int encounterId, int endurium, string artifact, ShipButton answer, List<string> results )
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var ship = playerData.m_playerShip;
+		var enduriumId = dataController.m_gameData.m_misc.m_enduriumElementId;
+
+		SetEndurium( endurium );
+
+		foreach ( var name in new[] { "Crystal Orb", "Ellipsoid" } )
+		{
+			for ( var i = 0; ( i < 10 ) && ship.HasArtifact( name ); i++ )
+			{
+				ship.m_artifactStorage.Remove( dataController.m_gameData.FindArtifactId( name ) );
+			}
+		}
+
+		if ( artifact != null )
+		{
+			ship.AddArtifact( dataController.m_gameData.FindArtifactId( artifact ) );
+		}
+
+		ship.RestoreSystems();
+
+		var said = new List<string>();
+
+		yield return MeetAndLetThemAsk( encounterId, said );
+
+		var demand = ( said.Count > 1 ) ? said[ 1 ] : "nothing said";
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		answer.Execute();
+		yield return Frames( 3 );
+
+		var reply = MessageList();
+		var stance = encounter.m_pdEncounter.m_alienStance;
+		var connected = encounter.m_pdEncounter.m_connected;
+
+		results.Add( demand );
+		results.Add( reply );
+		results.Add( HeldElement( enduriumId ).ToString() );
+		results.Add( ( artifact != null ) && ship.HasArtifact( artifact ) ? "kept" : "gone" );
+		results.Add( stance.ToString() );
+		results.Add( connected.ToString() );
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+	}
+
+	IEnumerator ScenarioVeloxDemands()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// an officer who understands every word, and a ship that survives an attack
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		var veloxId = FindEncounter( 1, 6, 3, 0, GameData.Race.Velox );
+
+		// ---- 1. the tribute of 3 cubic meters, paid from 5 (the control: they thank, and do not attack)
+		var paid = new List<string>();
+
+		yield return AnswerTheVeloxi( veloxId, 50, null, new AnswerYesButton(), paid );
+
+		// ---- 2. the tribute refused
+		var refused = new List<string>();
+
+		yield return AnswerTheVeloxi( veloxId, 50, null, new AnswerNoButton(), refused );
+
+		// ---- 3. a yes with 1 cubic meter in the hold
+		var tooLittle = new List<string>();
+
+		yield return AnswerTheVeloxi( veloxId, 10, null, new AnswerYesButton(), tooLittle );
+
+		// ---- 4. the Crystal Orb in the hold: their demand for it, and a yes
+		var orb = new List<string>();
+
+		yield return AnswerTheVeloxi( veloxId, 50, "Crystal Orb", new AnswerYesButton(), orb );
+
+		// ---- 5. the Ellipsoid in the hold: their demand for it, and the comm link ended with no answer
+		var ellipsoid = new List<string>();
+
+		yield return AnswerTheVeloxi( veloxId, 50, "Ellipsoid", new TerminateButton(), ellipsoid );
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "veloxdemands: encounter " + veloxId + " || paid: " + string.Join( " | ", paid ) + " || refused: " + string.Join( " | ", refused ) + " || too little: " + string.Join( " | ", tooLittle ) + " || orb: " + string.Join( " | ", orb ) + " || ellipsoid: " + string.Join( " | ", ellipsoid ) );
+
+		var tribute = "pay tribute of 3 Arth energy crystals";
+
+		Check( "veloxdemands: the Veloxi demand a tribute of 3, and a yes pays it and gets their thanks without an attack (control of the attacks)", paid[ 0 ].Contains( tribute ) && paid[ 1 ].Contains( CommText( 415 ) ) && ( paid[ 2 ] == "20" ) && ( paid[ 4 ] != "Hostile" ), string.Join( " | ", paid ) );
+		Check( "veloxdemands: a refused tribute brings an attack and keeps the Endurium", refused[ 0 ].Contains( tribute ) && ( refused[ 2 ] == "50" ) && ( refused[ 4 ] == "Hostile" ) && ( refused[ 5 ] == "False" ), string.Join( " | ", refused ) );
+		Check( "veloxdemands: a yes with less than 3 cubic meters is refused like a no", tooLittle[ 0 ].Contains( tribute ) && ( tooLittle[ 2 ] == "10" ) && ( tooLittle[ 4 ] == "Hostile" ), string.Join( " | ", tooLittle ) );
+		Check( "veloxdemands: with the Crystal Orb aboard they demand it, and a yes hands it over without an attack", orb[ 0 ].Contains( CommText( 398 ) ) && ( orb[ 3 ] == "gone" ) && ( orb[ 4 ] != "Hostile" ), string.Join( " | ", orb ) );
+		Check( "veloxdemands: with the Ellipsoid aboard they demand it, and ending the comm link with no answer brings an attack", ellipsoid[ 0 ].Contains( CommText( 397 ) ) && ( ellipsoid[ 3 ] == "kept" ) && ( ellipsoid[ 4 ] == "Hostile" ), string.Join( " | ", ellipsoid ) );
+
+		Finish( "scenario=veloxdemands paid=" + paid[ 2 ] + "/" + paid[ 4 ] + " refused=" + refused[ 4 ] + " orb=" + orb[ 3 ] + " ellipsoid=" + ellipsoid[ 4 ], 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
