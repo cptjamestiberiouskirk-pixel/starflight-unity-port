@@ -163,7 +163,7 @@ What the probe does:
 | `starport-specimens` | a specimen in the ship's hold is listed for sale at the Trade Depot under Specimens, and selling it pays its value and frees its room (about 25 s) |
 | `look` | Look on planet 92 with one lifeform at a time beside the vehicle: a living plant (its body plan, not moving, alive), a test animal that wanders (wandering) and the plant made dead (dead) (about 40 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (115 scenarios, about 82 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (117 scenarios, about 84 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
