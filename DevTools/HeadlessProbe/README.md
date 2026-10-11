@@ -141,8 +141,9 @@ What the probe does:
 | `transmissions` | the races that transmit rather than talk, each once the comm link is up: a Minstrel (its seven verses in order, then the link ends), a Nomad probe (its six planetary reports) and the Noah 9 derelict in orbit 3 of 175,94 (its distress beacon, and once answered the two parts of its recorded message) (about 45 s) |
 | `starstability` | the stability line of the star system scan: a star that flared before the game began (stable, post-flare) and one that flares on day 284 (its days to the flare, and 100 once the day is 100 before it); no star of the game data is more than 792 days from its flare, so "slightly unstable" is not shown (about 30 s) |
 | `analysisskill` | the science officer's skill and the analysis, in orbit of planet 90: skill 250 (every line, the control), the same reading again ("already attempted"), skill 0 (only the object's class, 6 lines unknown), skill 100 over 20 readings (about half of 120 lines unknown) and an alien ship analyzed twice (allowed) (about 25 s) |
+| `salvage` | salvage from debris, two Spemin ships destroyed in a star system with a hold of 16 pods: a wreck 2000 units away (the control, not taken), the wreck under the ship (its vessel's Endurium and debris come aboard, with the message), the same wreck again (nothing more), a wreck with the hold full ("no room") and the sensor reading of a wreck (its constituents) (about 25 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (100 scenarios, about 67 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (101 scenarios, about 68 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

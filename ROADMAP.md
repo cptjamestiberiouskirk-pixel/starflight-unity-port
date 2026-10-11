@@ -70,7 +70,7 @@ Still open:
 - **D5. Conflicts in the sources.**
   - The Rod Device site: STRINFO gives two different coordinates. Ruled 2026-10-09: 54N x 13E, Harrison's base 2, as New Scotland's own entry says.
   - The Red Cylinder and Koann 3: STRINFO prints planet 4 of 112,200 three times (1.2, 4.1, 5.1), but the name Koann 3, the orbit number 5 of its 5.1 entry (the third planet from that sun) and the Elowan message (3.1, "planet 3") all point to orbit 5. Ruled 2026-10-09: the third planet (orbit 5).
-  - The real effects of the Black Box, the Hypercube and the Ellipsoid.
+  - The real effects of the Black Box, the Hypercube and the Ellipsoid. Resolved 2026-10-11 (Claude's recommendation, by the owner's leave): none beyond their documented roles. STRINFO 4.1 gives no effect, and their analyses read as curios ("It slices, it dices", "decorative", "a 4-dimensional puzzle"); the Black Box is the Thrynn's sale (PR 156) and the Ellipsoid a Veloxi demand (PR 155).
   - The flare deadline: resolved 2026-10-09. The data does not disagree with itself: the year, month and day fields of every star still to flare are its flare day in the original's calendar of 10 months of 30 days (234 of 234), so Arth's day 300 is 01-01-4621. The original looks for a flare as a day ends, so Arth's comes as 30-10-4620, the last day of the year, ends: the Elowan's "final week of your Ten-month". See item 0.7.
 
 Reading STRINFO: its "PLANET N OF SYSTEM X, Y" is the N-th planet from the sun, not the orbit number. This holds in 15 of the 16 entries that also print an orbit number; the 16th is Koann, see D5. To find the JSON's `m_orbitPosition`, sort the star's planets by orbit.
@@ -104,7 +104,7 @@ Small items, each documented in the sources.
 | 1.9 | Nebulae act on the shields | priority.txt; ruled 2026-10-10: the shields cannot be up inside a nebula, no damage | PR 136 |
 | 1.10 | Starmap shows a fuel estimate | alpha.txt | PR 141 |
 | 1.11 | Alien vessels use their own armor, shields and speed from the data | xls Vessels; `GD_Vessel.m_armor`, `m_shields`, `m_moveDelay` | PR 140 (a move delay of 2200 at the old speed: the port's choice) |
-| 1.12 | Salvage from debris | wrecks leave debris (communic.txt); what can be taken: Ask | "Salvage collection not yet implemented" |
+| 1.12 | Salvage from debris | wrecks leave debris (communic.txt); what can be taken: the original's vessel records ("Endurium Debris", "Debris 1" to "3"), and a Thrynn line about salvaging wrecked Elowan ships | the debris of the records, taken aboard by flying over the wreck (the way it is collected is the port's choice) |
 
 ## Phase 2: Encounters that matter
 

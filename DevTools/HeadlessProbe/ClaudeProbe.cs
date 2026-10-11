@@ -719,6 +719,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAnalysisSkill();
 				break;
 
+			case "salvage":
+				yield return ScenarioSalvage();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -15847,6 +15851,137 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "analysisskill: an alien ship's reading may be analyzed again", !shipTwice.Contains( "already attempted" ) && shipTwice.Contains( "Analysis of Last Sensor Reading" ), shipTwice );
 
 		Finish( "scenario=analysisskill unknown100=" + unknownOfHalf, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 1: salvage from debris
+
+	// a summary of the hold's elements: "id:volume" for each, in the order of the element list
+	static string HoldSummary()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var text = "";
+
+		for ( var elementId = 0; elementId < gameData.m_elementList.Length; elementId++ )
+		{
+			var volume = HeldElement( elementId );
+
+			if ( volume > 0 )
+			{
+				text += elementId + ":" + volume + " ";
+			}
+		}
+
+		return text.Trim();
+	}
+
+	IEnumerator ScenarioSalvage()
+	{
+		var dataController = DataController.m_instance;
+		var gameData = dataController.m_gameData;
+		var playerData = dataController.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var encounter = controller.m_encounter;
+		var ship = playerData.m_playerShip;
+		var sensors = controller.m_displayController.m_sensorsDisplay;
+
+		EnsureCrew();
+
+		ship.m_armorPoints = 100000;
+		ship.m_numCargoPods = 16;
+		ship.RecalculateVolume();
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		EnterEncounter( FindEncounter( 1, 6, 3, 0 ) );
+		yield return Frames( 10 );
+
+		var alienShips = encounter.m_pdEncounter.GetAlienShipList();
+
+		// ---- 1. a wreck far from the ship is not taken aboard
+		var first = FirstLivingAlien();
+		var vessel = gameData.m_vesselList[ alienShips[ first ].m_vesselId ];
+
+		Kill( first );
+
+		alienShips[ first ].m_coordinates = playerData.m_general.m_coordinates + Vector3.forward * 2000.0f;
+
+		var holdBefore = HoldSummary();
+
+		yield return Frames( 5 );
+
+		var holdFar = HoldSummary();
+
+		// ---- 2. flown over, its debris comes aboard, as the vessel's record has it
+		controller.m_messages.Clear();
+
+		alienShips[ first ].m_coordinates = playerData.m_general.m_coordinates;
+
+		var enduriumBefore = HeldElement( gameData.m_misc.m_enduriumElementId );
+		var elementBefore = HeldElement( vessel.m_elementIdA );
+
+		yield return Frames( 5 );
+
+		var enduriumAfter = HeldElement( gameData.m_misc.m_enduriumElementId );
+		var elementAfter = HeldElement( vessel.m_elementIdA );
+		var salvageMessage = MessageList();
+
+		// ---- 3. the same wreck again: nothing more
+		alienShips[ first ].m_coordinates = playerData.m_general.m_coordinates + Vector3.forward * 2000.0f;
+
+		yield return Frames( 3 );
+
+		alienShips[ first ].m_coordinates = playerData.m_general.m_coordinates;
+
+		var holdOnce = HoldSummary();
+
+		yield return Frames( 5 );
+
+		var holdAgain = HoldSummary();
+
+		// ---- 4. a full hold: no room for the debris
+		var second = FirstLivingAlien();
+
+		Kill( second );
+
+		ship.AddElement( gameData.FindElementId( "Aluminum" ), Mathf.Max( 0, ship.GetRemainingVolume() ) );
+
+		controller.m_messages.Clear();
+
+		alienShips[ second ].m_coordinates = playerData.m_general.m_coordinates;
+
+		yield return Frames( 5 );
+
+		var fullMessage = MessageList();
+
+		// ---- 5. the sensors read what a wreck is made of
+		controller.m_displayController.ChangeDisplay( sensors );
+		yield return Frames( 3 );
+
+		sensors.StartScanning( SensorsDisplay.ScanType.Debris, 0, vessel.m_mass, 0, 0, alienShips[ first ].m_vesselId );
+
+		yield return new WaitForSecondsRealtime( sensors.m_minDuration + 1.5f );
+
+		var readout = MessageList();
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "salvage: " + vessel.m_name + " (endurium " + vessel.m_enduriumVolume + ", element " + vessel.m_elementIdA + " " + vessel.m_elementVolumeA + ") | hold " + holdBefore + " -> far " + holdFar + " | endurium " + enduriumBefore + " -> " + enduriumAfter + ", element " + elementBefore + " -> " + elementAfter + " | " + salvageMessage + " | again " + holdOnce + " -> " + holdAgain + " | full hold: " + fullMessage + " | wreck readout: " + readout );
+
+		var elementName = gameData.m_elementList[ vessel.m_elementIdA ].m_name;
+
+		Check( "salvage: a wreck far from the ship is not taken aboard (control)", holdFar == holdBefore, holdBefore + " -> " + holdFar );
+		Check( "salvage: flown over, a wreck's debris comes aboard as its vessel's record has it", ( enduriumAfter - enduriumBefore == vessel.m_enduriumVolume ) && ( elementAfter - elementBefore == vessel.m_elementVolumeA ) && salvageMessage.Contains( "Salvaged from the wreck" ) && salvageMessage.Contains( elementName ), ( enduriumAfter - enduriumBefore ) + " and " + ( elementAfter - elementBefore ) + " | " + salvageMessage );
+		Check( "salvage: a wreck is salvaged once", holdAgain == holdOnce, holdOnce + " -> " + holdAgain );
+		Check( "salvage: with the hold full there is no room for the debris", fullMessage.Contains( "no room in the cargo hold" ), fullMessage );
+		Check( "salvage: the sensors read what a wreck is made of", readout.Contains( "Object Constituents" ) && readout.Contains( elementName ), readout );
+
+		Finish( "scenario=salvage endurium=" + ( enduriumAfter - enduriumBefore ) + " element=" + ( elementAfter - elementBefore ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

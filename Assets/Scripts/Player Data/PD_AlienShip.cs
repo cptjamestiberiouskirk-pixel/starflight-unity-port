@@ -38,6 +38,9 @@ public class PD_AlienShip
 	// is this ship in the encounter already?
 	public bool m_addedToEncounter;
 
+	// has the player's ship taken the debris of this destroyed ship aboard? (false in older save files)
+	public bool m_salvaged;
+
 	// this is called when the player data is created
 	public void Initialize( GD_Encounter encounter )
 	{
@@ -100,6 +103,7 @@ public class PD_AlienShip
 		m_timeSinceLastTargetCoordinateChange = 0.0f;
 		m_isDead = false;
 		m_addedToEncounter = false;
+		m_salvaged = false;
 	}
 
 	// give this ship the full armor and shields of its vessel - the points of the game data (xls Vessels), which are 200 for each armor or shield class (this used

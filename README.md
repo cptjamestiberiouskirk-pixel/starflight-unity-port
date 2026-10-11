@@ -141,6 +141,7 @@ The project features a **deterministic visualization system** that renders plane
 - Alien ships have the armor, shields and speed of their vessels in the game data
 - The starmap shows the fuel needed to fly to the cursor
 - Planets can be recommended for colonization, and Interstel pays a bonus or fines the crew at the Starport
+- Destroyed ships leave debris the ship can salvage by flying over it
 - The science officer's skill decides how much of an analysis is known, and a planet's reading is analyzed once
 - Hits damage the ship's systems (engines, sensors, comm, shield generator, missile launcher, laser cannon) as well as the hull, and damaged systems work in proportion to their health; the engineer repairs them worst first with minerals from the hold
 - The game can be won: destroying the Crystal Planet ends the flares, and Interstel pays its 500,000 MU bonus and its supplemental evaluation at the Starport
