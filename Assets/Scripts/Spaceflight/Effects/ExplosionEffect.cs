@@ -168,8 +168,8 @@ public class ExplosionEffect : MonoBehaviour
 		colorOverLifetime.enabled = true;
 		var gradient = new Gradient();
 		gradient.SetKeys(
-			new GradientColorKey[] { new GradientColorKey( new Color( 1.0f, 0.95f, 0.75f ), 0.0f ), new GradientColorKey( new Color( 1.0f, 0.75f, 0.3f ), 0.2f ), new GradientColorKey( new Color( 1.0f, 0.4f, 0.08f ), 0.5f ), new GradientColorKey( new Color( 0.55f, 0.1f, 0.03f ), 1.0f ) },
-			new GradientAlphaKey[] { new GradientAlphaKey( 1.0f, 0.0f ), new GradientAlphaKey( 0.9f, 0.4f ), new GradientAlphaKey( 0.0f, 1.0f ) }
+			new GradientColorKey[] { new GradientColorKey( new Color( 1.0f, 0.9f, 0.6f ), 0.0f ), new GradientColorKey( new Color( 1.0f, 0.6f, 0.2f ), 0.15f ), new GradientColorKey( new Color( 0.9f, 0.3f, 0.06f ), 0.45f ), new GradientColorKey( new Color( 0.35f, 0.07f, 0.03f ), 1.0f ) },
+			new GradientAlphaKey[] { new GradientAlphaKey( 0.8f, 0.0f ), new GradientAlphaKey( 0.7f, 0.4f ), new GradientAlphaKey( 0.0f, 1.0f ) }
 		);
 		colorOverLifetime.color = gradient;
 	}
@@ -197,7 +197,7 @@ public class ExplosionEffect : MonoBehaviour
 
 		var colorOverLifetime = m_ringParticles.colorOverLifetime;
 		colorOverLifetime.enabled = true;
-		colorOverLifetime.color = MakeGradient( new Color( 1.0f, 0.9f, 0.7f ), new Color( 1.0f, 0.65f, 0.3f ), new Color( 1.0f, 0.45f, 0.15f ), 0.85f, 0.5f, 0.0f );
+		colorOverLifetime.color = MakeGradient( new Color( 1.0f, 0.9f, 0.7f ), new Color( 1.0f, 0.65f, 0.3f ), new Color( 1.0f, 0.45f, 0.15f ), 0.55f, 0.3f, 0.0f );
 
 		// the camera looks down on the plane the ships fly in, so the ring lies in that plane
 		var renderer = m_ringParticles.GetComponent<ParticleSystemRenderer>();
@@ -246,7 +246,7 @@ public class ExplosionEffect : MonoBehaviour
 		var main = m_debrisParticles.main;
 		main.startLifetime = new ParticleSystem.MinMaxCurve( 1.5f, 2.0f );
 		main.startSpeed = new ParticleSystem.MinMaxCurve( 35.0f, 110.0f );
-		main.startSize = new ParticleSystem.MinMaxCurve( 3.0f, 7.0f );
+		main.startSize = new ParticleSystem.MinMaxCurve( 4.0f, 10.0f );
 		main.startRotation3D = true;
 		main.startRotationX = new ParticleSystem.MinMaxCurve( 0.0f, Mathf.PI * 2.0f );
 		main.startRotationY = new ParticleSystem.MinMaxCurve( 0.0f, Mathf.PI * 2.0f );
@@ -333,7 +333,7 @@ public class ExplosionEffect : MonoBehaviour
 		colorOverLifetime.enabled = true;
 		var gradient = new Gradient();
 		gradient.SetKeys(
-			new GradientColorKey[] { new GradientColorKey( new Color( 0.3f, 0.2f, 0.15f ), 0.0f ), new GradientColorKey( new Color( 0.16f, 0.14f, 0.13f ), 0.4f ), new GradientColorKey( new Color( 0.1f, 0.1f, 0.1f ), 1.0f ) },
+			new GradientColorKey[] { new GradientColorKey( new Color( 0.4f, 0.26f, 0.17f ), 0.0f ), new GradientColorKey( new Color( 0.2f, 0.17f, 0.15f ), 0.4f ), new GradientColorKey( new Color( 0.1f, 0.1f, 0.1f ), 1.0f ) },
 			new GradientAlphaKey[] { new GradientAlphaKey( 0.0f, 0.0f ), new GradientAlphaKey( 0.6f, 0.12f ), new GradientAlphaKey( 0.35f, 0.5f ), new GradientAlphaKey( 0.0f, 1.0f ) }
 		);
 		colorOverLifetime.color = gradient;
@@ -380,24 +380,23 @@ public class ExplosionEffect : MonoBehaviour
 			shader = Shader.Find( "Sprites/Default" );
 		}
 
-		// glowing parts add their light to what is behind them, smoke and debris cover it
-		m_glowMaterial = CreateMaterial( "Explosion Glow", shader, MakeTexture( "Explosion Glow", 64, GlowAlpha ), true );
-		m_fireMaterial = CreateMaterial( "Explosion Fire", shader, MakeTexture( "Explosion Fire", c_textureSize, FireAlpha ), true );
-		m_ringMaterial = CreateMaterial( "Explosion Shockwave", shader, MakeTexture( "Explosion Shockwave", c_textureSize, RingAlpha ), true );
-		m_smokeMaterial = CreateMaterial( "Explosion Smoke", shader, MakeTexture( "Explosion Smoke", c_textureSize, SmokeAlpha ), false );
-		m_debrisMaterial = CreateMaterial( "Explosion Debris", shader, MakeShadeTexture(), false );
+		// the flash and the sparks only add light, the fire also hides some of what is behind it (so it stays orange over a blue planet), smoke and debris cover it
+		m_glowMaterial = CreateMaterial( "Explosion Glow", shader, MakeTexture( "Explosion Glow", 64, GlowAlpha ), 0.0f );
+		m_fireMaterial = CreateMaterial( "Explosion Fire", shader, MakeTexture( "Explosion Fire", c_textureSize, FireAlpha ), 0.6f );
+		m_ringMaterial = CreateMaterial( "Explosion Shockwave", shader, MakeTexture( "Explosion Shockwave", c_textureSize, RingAlpha ), 0.15f );
+		m_smokeMaterial = CreateMaterial( "Explosion Smoke", shader, MakeTexture( "Explosion Smoke", c_textureSize, SmokeAlpha ), 1.0f );
+		m_debrisMaterial = CreateMaterial( "Explosion Debris", shader, MakeShadeTexture(), 1.0f );
 
 		m_debrisMeshes = new Mesh[] { MakeShardMesh(), MakeSliverMesh() };
 	}
 
-	// make a material for the explosion particles
-	static Material CreateMaterial( string name, Shader shader, Texture2D texture, bool additive )
+	// make a material for the explosion particles (occlusion: how much of what is behind a particle it hides, from 0 for pure glow to 1 for ordinary transparency)
+	static Material CreateMaterial( string name, Shader shader, Texture2D texture, float occlusion )
 	{
 		var material = new Material( shader );
 		material.name = name;
 		material.mainTexture = texture;
-		material.SetFloat( "_SrcBlend", (float) UnityEngine.Rendering.BlendMode.SrcAlpha );
-		material.SetFloat( "_DstBlend", (float) ( additive ? UnityEngine.Rendering.BlendMode.One : UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha ) );
+		material.SetFloat( "_Occlusion", occlusion );
 		material.renderQueue = 3000;
 
 		// kept for the whole session, like the textures (Resources.UnloadUnusedAssets would otherwise free them between scenes)
@@ -454,10 +453,10 @@ public class ExplosionEffect : MonoBehaviour
 		var edgeNoise = FractalNoise( u * 3.0f, v * 3.0f, 11 );
 		var innerNoise = FractalNoise( u * 6.0f + 17.0f, v * 6.0f + 5.0f, 23 );
 
-		var ragged = distance + ( edgeNoise - 0.5f ) * 0.55f;
-		var shape = 1.0f - Mathf.SmoothStep( 0.3f, 0.95f, ragged );
+		var ragged = distance + ( edgeNoise - 0.5f ) * 0.75f;
+		var shape = 1.0f - Mathf.SmoothStep( 0.25f, 0.9f, ragged );
 
-		return shape * ( 0.55f + 0.45f * innerNoise ) * Mathf.Clamp01( ( 1.0f - distance ) * 4.0f );
+		return shape * ( 0.3f + 0.7f * innerNoise * innerNoise ) * Mathf.Clamp01( ( 1.0f - distance ) * 4.0f );
 	}
 
 	// a puff of smoke: softer and lumpier than the fire
@@ -475,9 +474,9 @@ public class ExplosionEffect : MonoBehaviour
 	// the shockwave: a bright thin ring near the edge with a faint haze inside it
 	static float RingAlpha( float distance, float u, float v )
 	{
-		var ringOffset = ( distance - 0.82f ) / 0.07f;
+		var ringOffset = ( distance - 0.85f ) / 0.05f;
 		var ring = Mathf.Exp( -ringOffset * ringOffset );
-		var haze = 0.15f * Mathf.SmoothStep( 0.0f, 0.82f, distance ) * ( ( distance < 0.82f ) ? 1.0f : 0.0f );
+		var haze = 0.12f * Mathf.SmoothStep( 0.0f, 0.85f, distance ) * ( ( distance < 0.85f ) ? 1.0f : 0.0f );
 
 		return ( ring + haze ) * Mathf.Clamp01( ( 1.0f - distance ) * 8.0f );
 	}

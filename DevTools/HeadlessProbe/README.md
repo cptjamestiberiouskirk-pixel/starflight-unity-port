@@ -31,6 +31,8 @@ Copies `ClaudeProbe.cs` into `Assets/`, launches Unity with `-executeMethod Clau
 
 Unity is stopped if it has not come back after 420 seconds. `-TimeoutSeconds 100` shortens that, for a scenario that is expected to hang on the old code: a hang on the main thread also stops the probe's own 120 second watchdog.
 
+`-Graphics` runs Unity without `-nographics`, so it has a graphics device (it still opens no window). A scenario can then render the game's camera into PNG files: `explosionpictures` writes its pictures to `Logs/explosion-pictures/` (or the folder given with `-probePictures`). The probe cannot judge how a picture looks; a person has to.
+
 What the probe does:
 
 - Opens `Spaceflight.unity` (or `Starport.unity` for scenarios whose name starts with `starport`) and enters play mode.
@@ -83,6 +85,7 @@ What the probe does:
 | `input` | real key presses on a virtual Input System keyboard: each of the 19 keys of the old Input Manager axes gives its input and the stick position (8 other keys give none), two keys of one input, the debounce, the save panel opened with Escape and its selection moved with the arrows and the numpad (not A or D), Return and the numpad Enter on Resume, F9, F10 and Escape at game over (about 35 s) |
 | `starport-input` | the Starport event system's input module, and the arrows and the numpad (not S) moving the selection in the Operations panel, and the crew name field taking the focus without an exception (a legacy `InputField` reads `Input.compositionString`) |
 | `visual` | a floating object when its timer starts again, when an explosion is switched off, and how far the landing site crosshair moves in a second |
+| `explosionpictures` | every part of an explosion is textured and transparent, no part draws cubes, every part follows the explosion's scale, and making an explosion leaves `Random.state` alone (a control); with `-Graphics` it also renders a half size explosion and the F10 destruction of the ship at fixed game times |
 | `perframe` | how much memory a frame of the status display and of the terrain vehicle display takes when nothing changes, with a control that shows the measurement works, and that both still follow what changes |
 | `starport-transport` | the docking bay transporter: how much memory an update of the astronaut's opacity takes, that the fade reaches the astronaut, and that the material assets are left alone |
 | `shipslog` | a ship's log of forty entries scrolled to its end, then an empty log, then the first one again: that it opens (the review thought it could hang) and where it is scrolled to |

@@ -1,20 +1,21 @@
 // unlit particle shader for the explosions (ExplosionEffect)
 // it is in a Resources folder so that it is always in a build: Shader.Find only finds a shader that something in the build refers to
-// the blend factors are properties, so one shader does both the additive glow (fire, sparks) and the alpha blended smoke and debris
+// it blends premultiplied: the particle adds its light, and _Occlusion says how much of what is behind it the particle hides
+// (0 is pure glow that only adds light, for the flash and the sparks; 1 is ordinary transparency, for the smoke and the debris; the fire is in between,
+// so that it keeps its own colour over a bright planet and still glows over black space)
 Shader "Starflight/Explosion Particle"
 {
 	Properties
 	{
 		_MainTex( "Texture", 2D ) = "white" {}
-		[Enum(UnityEngine.Rendering.BlendMode)] _SrcBlend( "Source Blend", Float ) = 5
-		[Enum(UnityEngine.Rendering.BlendMode)] _DstBlend( "Destination Blend", Float ) = 1
+		_Occlusion( "Occlusion", Range( 0, 1 ) ) = 0
 	}
 
 	SubShader
 	{
 		Tags { "Queue" = "Transparent" "RenderType" = "Transparent" "IgnoreProjector" = "True" "PreviewType" = "Plane" }
 
-		Blend [_SrcBlend] [_DstBlend]
+		Blend One OneMinusSrcAlpha
 		ZWrite Off
 		Cull Off
 		Lighting Off
@@ -28,6 +29,7 @@ Shader "Starflight/Explosion Particle"
 
 			sampler2D _MainTex;
 			float4 _MainTex_ST;
+			fixed _Occlusion;
 
 			struct appdata
 			{
@@ -55,7 +57,10 @@ Shader "Starflight/Explosion Particle"
 			fixed4 frag( v2f i ) : SV_Target
 			{
 				// the texture gives the shape, the particle gives the colour
-				return tex2D( _MainTex, i.uv ) * i.color;
+				fixed4 colour = tex2D( _MainTex, i.uv ) * i.color;
+
+				// the light it adds, and how much of the background it hides
+				return fixed4( colour.rgb * colour.a, colour.a * _Occlusion );
 			}
 			ENDCG
 		}
