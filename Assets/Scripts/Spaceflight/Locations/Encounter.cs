@@ -682,6 +682,7 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_homeworldWarningCount = 0;
 			m_pdEncounter.m_homeworldWarningsGiven = false;
 			m_pdEncounter.m_aliensAreCowardly = false;
+			m_pdEncounter.m_specialQuestionAsked = false;
 
 			// initialize race encounter
 			switch ( m_gdEncounter.m_race )
@@ -1101,7 +1102,51 @@ public class Encounter : MonoBehaviour
 			return;
 		}
 
+		// has the player answered their question about energy?
+		if ( ( m_pdEncounter.m_lastQuestionFromAliens == c_elowanEnergyQuestionCommId ) && ( m_pdEncounter.m_lastSubjectFromPlayer == GD_Comm.Subject.Yes ) )
+		{
+			AnswerElowanEnergyQuestion();
+		}
+
 		DefaultEncounterUpdate();
+	}
+
+	// the Elowan's question of their own, and their answers to a yes (STRINFO 2.4)
+	const int c_elowanEnergyQuestionCommId = 6;
+	const int c_elowanNeedNotDireCommId = 4;
+	const int c_elowanEnergyGiftCommId = 5;
+
+	// "answering yes when carrying less than 20 units of Endurium" gets "15 Arth units of fuel", with 20 or more the Elowan see through it - in tenths of a cubic meter
+	// (an Arth unit is a cubic meter, as in the Starport's prices)
+	const int c_elowanEnergyDireBelow = 200;
+	const int c_elowanEnergyGift = 150;
+
+	// a yes to "Is thine need for energy dire?": the Elowan scan the hold, and give 15 cubic meters of Endurium to a ship with less than 20 (as much of it as the hold
+	// has room for) - a no gets nothing
+	void AnswerElowanEnergyQuestion()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+
+		var enduriumId = gameData.m_misc.m_enduriumElementId;
+		var endurium = ( ship.m_elementStorage == null ) ? null : ship.m_elementStorage.Find( enduriumId );
+		var held = ( endurium == null ) ? 0 : endurium.m_volume;
+
+		if ( held >= c_elowanEnergyDireBelow )
+		{
+			SayRaceComm( c_elowanNeedNotDireCommId );
+
+			return;
+		}
+
+		var gift = Mathf.Min( c_elowanEnergyGift, Mathf.Max( 0, ship.GetRemainingVolume() ) );
+
+		if ( gift > 0 )
+		{
+			ship.AddElement( enduriumId, gift );
+		}
+
+		SayRaceComm( c_elowanEnergyGiftCommId );
 	}
 
 	// the comm of the Elowan for a ship that has destroyed Elan ("Thou hast done a deed most unthinkably foul... We are now and forever mortal enemies.")
@@ -1591,8 +1636,19 @@ public class Encounter : MonoBehaviour
 							}
 							else
 							{
-								// yes - ask a question
-								AddComm( GD_Comm.Subject.Question, false );
+								// yes - ask a question (the first time, the race's own question if it has one)
+								var specialQuestion = FindSpecialQuestion();
+
+								if ( specialQuestion != null )
+								{
+									m_pdEncounter.m_specialQuestionAsked = true;
+
+									AddComm( GD_Comm.Subject.Question, false, specialQuestion );
+								}
+								else
+								{
+									AddComm( GD_Comm.Subject.Question, false );
+								}
 							}
 						}
 					}
@@ -1914,6 +1970,49 @@ public class Encounter : MonoBehaviour
 
 		// update the camera follow altitude
 		SpaceflightController.m_instance.m_playerCamera.SetCameraFollow( SpaceflightController.m_instance.m_playerShip.gameObject, Vector3.up * m_currentOffset );
+	}
+
+	// a comm of the game data by its id, if it is one of the race of this encounter (null if it is not)
+	GD_Comm FindRaceComm( int commId )
+	{
+		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
+		{
+			if ( ( comm.m_id == commId ) && ( comm.m_race == m_gdEncounter.m_race ) )
+			{
+				return comm;
+			}
+		}
+
+		return null;
+	}
+
+	// the aliens say a comm of their race's own (nothing if the game data does not have it)
+	void SayRaceComm( int commId )
+	{
+		var comm = FindRaceComm( commId );
+
+		if ( comm != null )
+		{
+			AddComm( GD_Comm.Subject.Custom, false, comm );
+		}
+	}
+
+	// the question of a race's own that the aliens ask the first time they ask a question in an encounter - null if the race has none or has asked it
+	GD_Comm FindSpecialQuestion()
+	{
+		if ( m_pdEncounter.m_specialQuestionAsked )
+		{
+			return null;
+		}
+
+		switch ( m_gdEncounter.m_race )
+		{
+			case GameData.Race.Elowan:
+
+				return FindRaceComm( c_elowanEnergyQuestionCommId );
+		}
+
+		return null;
 	}
 
 	// true if this encounter is a race's home fleet: it is met in orbit, and the game data has homeworld lines for its race (the Spemin, the Thrynn and the Veloxi,

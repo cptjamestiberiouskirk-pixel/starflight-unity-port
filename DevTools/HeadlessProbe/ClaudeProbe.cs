@@ -687,6 +687,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCowardice();
 				break;
 
+			case "elowangift":
+				yield return ScenarioElowanGift();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -14816,6 +14820,129 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "cowardice: the Veloxi, two of three lost, stop fighting and answer a hail with their surrender", veloxSurrender, string.Join( " | ", velox ) );
 
 		Finish( "scenario=cowardice after1=" + stanceAfterOne + " after2=" + stanceAfterTwo + " firing=" + stanceAfterFiring, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 2: the Elowan's gift of energy
+
+	// sets how much Endurium is in the hold, in tenths of a cubic meter
+	static void SetEndurium( int volume )
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+		var enduriumId = DataController.m_instance.m_gameData.m_misc.m_enduriumElementId;
+
+		ship.RemoveElement( enduriumId, HeldElement( enduriumId ) );
+
+		if ( volume > 0 )
+		{
+			ship.AddElement( enduriumId, volume );
+		}
+	}
+
+	// meets the aliens of an encounter again, opens the comm link, and lets them ask their first question - adds what the messages show then
+	static IEnumerator MeetAndLetThemAsk( int encounterId, List<string> said )
+	{
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		EnterEncounter( encounterId );
+		yield return Frames( 10 );
+
+		encounter.Hail( GD_Comm.Stance.Friendly, false );
+
+		yield return LetAliensSpeak( 1, said );
+
+		encounter.m_pdEncounter.m_questionLikelihood = 100;
+
+		yield return LetAliensSpeak( 1, said );
+	}
+
+	IEnumerator ScenarioElowanGift()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var encounter = controller.m_encounter;
+		var enduriumId = dataController.m_gameData.m_misc.m_enduriumElementId;
+
+		EnsureCrew();
+
+		// an officer who understands every word
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		var elowanId = FindEncounterOfRace( GameData.Race.Elowan );
+		var question = CommText( 6 );
+
+		// ---- 1. 5 cubic meters of Endurium in the hold: the Elowan ask, and a yes gets 15 cubic meters
+		SetEndurium( 50 );
+
+		var lowSaid = new List<string>();
+
+		yield return MeetAndLetThemAsk( elowanId, lowSaid );
+
+		var lowAsked = ( lowSaid.Count > 1 ) && lowSaid[ 1 ].Contains( question ) && ( encounter.m_pdEncounter.m_lastQuestionFromAliens == 6 );
+
+		controller.m_messages.Clear();
+
+		new AnswerYesButton().Execute();
+		yield return Frames( 3 );
+
+		var lowAnswer = MessageList();
+		var lowAfter = HeldElement( enduriumId );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 2. 30 cubic meters: a yes gets the Elowan's "thy need does not seem dire", and nothing
+		SetEndurium( 300 );
+
+		var highSaid = new List<string>();
+
+		yield return MeetAndLetThemAsk( elowanId, highSaid );
+
+		var highAsked = ( highSaid.Count > 1 ) && highSaid[ 1 ].Contains( question );
+
+		controller.m_messages.Clear();
+
+		new AnswerYesButton().Execute();
+		yield return Frames( 3 );
+
+		var highAnswer = MessageList();
+		var highAfter = HeldElement( enduriumId );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 3. the control: 5 cubic meters again, and a no gets nothing
+		SetEndurium( 50 );
+
+		var noSaid = new List<string>();
+
+		yield return MeetAndLetThemAsk( elowanId, noSaid );
+
+		controller.m_messages.Clear();
+
+		new AnswerNoButton().Execute();
+		yield return Frames( 3 );
+
+		var noAnswer = MessageList();
+		var noAfter = HeldElement( enduriumId );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "elowangift: encounter " + elowanId + " | 5 m3: " + string.Join( " | ", lowSaid ) + " -> yes: " + lowAnswer + " (endurium " + lowAfter + ") || 30 m3: " + string.Join( " | ", highSaid ) + " -> yes: " + highAnswer + " (endurium " + highAfter + ") || 5 m3, no: " + noAnswer + " (endurium " + noAfter + ")" );
+
+		Check( "elowangift: once the comm link is up the Elowan's first question is whether the ship's need for energy is dire", lowAsked && highAsked, ( ( lowSaid.Count > 1 ) ? lowSaid[ 1 ] : "nothing" ) );
+		Check( "elowangift: a yes with less than 20 cubic meters of Endurium gets 15 cubic meters", lowAnswer.Contains( CommText( 5 ) ) && ( lowAfter == 200 ), lowAfter + " | " + lowAnswer );
+		Check( "elowangift: a yes with 20 or more gets their reproach and nothing", highAnswer.Contains( CommText( 4 ) ) && ( highAfter == 300 ), highAfter + " | " + highAnswer );
+		Check( "elowangift: a no gets nothing (control)", !noAnswer.Contains( CommText( 5 ) ) && ( noAfter == 50 ), noAfter + " | " + noAnswer );
+
+		Finish( "scenario=elowangift low=" + lowAfter + " high=" + highAfter + " no=" + noAfter, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

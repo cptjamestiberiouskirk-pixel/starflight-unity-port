@@ -55,6 +55,9 @@ public class PD_Encounter : IComparable
 	// set once the aliens have lost some of their ships and act cowardly (the Spemin, the Thrynn and the Veloxi) - false in older save files
 	public bool m_aliensAreCowardly;
 
+	// set once the aliens have asked the question of their race's own (the Elowan's "Is thine need for energy dire?") - false in older save files
+	public bool m_specialQuestionAsked;
+
 	public void Reset( int encounterId )
 	{
 		// get access to the game data
