@@ -105,6 +105,9 @@ public class SensorsDisplay : ShipDisplay
 	// counts the sensor readings taken (each one can be analyzed once, see AnalysisButton)
 	public int m_readingCount;
 
+	// the vessel whose wreck the sensors read (-1 for any other reading)
+	public int m_debrisVesselId = -1;
+
 	// what are we currently scanning
 	public ScanType m_scanType;
 
@@ -246,13 +249,28 @@ public class SensorsDisplay : ShipDisplay
 
 				case ScanType.Debris:
 				{
-					// debris scanning shows salvageable materials
+					// a wreck shows what it is made of: the debris of its vessel (the original's vessel records)
 					SpaceflightController.m_instance.m_messages.Clear();
 
-					string text = "<color=#FFFF00>Debris Analysis:</color>\n";
-					text += "<color=white>Wreckage detected.</color>\n";
-					text += "Salvage potential: <color=white>" + m_mineralDensity + "%</color>\n";
-					text += "<color=#808080>Debris may contain recoverable materials.</color>";
+					string text = "Object Constituents:";
+
+					if ( ( m_debrisVesselId >= 0 ) && ( m_debrisVesselId < gameData.m_vesselList.Length ) )
+					{
+						var wreck = gameData.m_vesselList[ m_debrisVesselId ];
+
+						if ( wreck.m_enduriumVolume > 0 )
+						{
+							text += "\n<color=white>" + gameData.m_elementList[ gameData.m_misc.m_enduriumElementId ].m_name + "</color>";
+						}
+
+						foreach ( var debris in new[] { new[] { wreck.m_elementIdA, wreck.m_elementVolumeA }, new[] { wreck.m_elementIdB, wreck.m_elementVolumeB }, new[] { wreck.m_elementIdC, wreck.m_elementVolumeC } } )
+						{
+							if ( ( debris[ 1 ] > 0 ) && ( debris[ 0 ] >= 0 ) && ( debris[ 0 ] < gameData.m_elementList.Length ) )
+							{
+								text += "\n<color=white>" + gameData.m_elementList[ debris[ 0 ] ].m_name + "</color>";
+							}
+						}
+					}
 
 					SpaceflightController.m_instance.m_messages.AddText( text );
 
@@ -555,6 +573,9 @@ public class SensorsDisplay : ShipDisplay
 
 		// a new reading
 		m_readingCount++;
+
+		// the vessel of a wreck
+		m_debrisVesselId = ( scanType == ScanType.Debris ) ? vesselId : -1;
 
 		// remember the scan type, mass, bio density, and mineral density
 		m_scanType = scanType;

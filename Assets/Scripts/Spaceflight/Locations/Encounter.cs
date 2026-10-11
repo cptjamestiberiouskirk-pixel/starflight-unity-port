@@ -237,6 +237,9 @@ public class Encounter : MonoBehaviour
 		// get to the player data
 		var playerData = DataController.m_instance.m_playerData;
 
+		// take aboard the debris of a wreck the ship flies over
+		UpdateSalvage();
+
 		// check if all enemy ships are destroyed
 		if ( AllEnemyShipsDestroyed() )
 		{
@@ -477,6 +480,95 @@ public class Encounter : MonoBehaviour
 	// flag to prevent multiple victory messages
 	bool m_victoryHandled = false;
 
+	// the debris a destroyed ship leaves is in the original's vessel records ("Endurium Debris" and "Debris 1" to "Debris 3": GD_Vessel.m_enduriumVolume and
+	// m_elementVolumeA to C, of the elements m_elementIdA to C), and the Thrynn tell the crew that wrecked Elowan ships "you could salvage" for their plutonium - the
+	// ship takes a wreck's debris aboard by flying over it, once, as much of it as the hold has room for (the way it is collected is the port's choice: the
+	// sources do not say)
+	const float c_salvageRange = 64.0f;
+
+	void UpdateSalvage()
+	{
+		if ( ( m_pdEncounter == null ) || m_pdEncounter.m_connected )
+		{
+			return;
+		}
+
+		var gameData = DataController.m_instance.m_gameData;
+		var shipCoordinates = DataController.m_instance.m_playerData.m_general.m_coordinates;
+
+		foreach ( var alienShip in m_pdEncounter.GetAlienShipList() )
+		{
+			if ( !alienShip.m_addedToEncounter || !alienShip.m_isDead || alienShip.m_salvaged )
+			{
+				continue;
+			}
+
+			if ( Vector3.Distance( alienShip.m_coordinates, shipCoordinates ) > c_salvageRange )
+			{
+				continue;
+			}
+
+			alienShip.m_salvaged = true;
+
+			if ( ( alienShip.m_vesselId >= 0 ) && ( alienShip.m_vesselId < gameData.m_vesselList.Length ) )
+			{
+				SalvageWreck( gameData.m_vesselList[ alienShip.m_vesselId ] );
+			}
+		}
+	}
+
+	// takes the debris of a vessel's wreck aboard, and says what was taken
+	void SalvageWreck( GD_Vessel vessel )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var taken = new List<string>();
+		var hadDebris = false;
+
+		hadDebris |= TakeDebris( gameData.m_misc.m_enduriumElementId, vessel.m_enduriumVolume, taken );
+		hadDebris |= TakeDebris( vessel.m_elementIdA, vessel.m_elementVolumeA, taken );
+		hadDebris |= TakeDebris( vessel.m_elementIdB, vessel.m_elementVolumeB, taken );
+		hadDebris |= TakeDebris( vessel.m_elementIdC, vessel.m_elementVolumeC, taken );
+
+		if ( !hadDebris )
+		{
+			return;
+		}
+
+		var messages = SpaceflightController.m_instance.m_messages;
+
+		if ( taken.Count == 0 )
+		{
+			messages.AddText( "<color=white>There is no room in the cargo hold for the debris, Captain.</color>" );
+
+			return;
+		}
+
+		messages.AddText( "<color=green>Salvaged from the wreck: " + string.Join( ", ", taken ) + ".</color>" );
+	}
+
+	// takes debris of an element aboard, as much of it as the hold has room for, and adds what was taken to the list - returns whether there was any
+	static bool TakeDebris( int elementId, int volume, List<string> taken )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+
+		if ( ( volume <= 0 ) || ( elementId < 0 ) || ( elementId >= gameData.m_elementList.Length ) )
+		{
+			return false;
+		}
+
+		var amount = Mathf.Min( volume, Mathf.Max( 0, ship.GetRemainingVolume() ) );
+
+		if ( amount > 0 )
+		{
+			ship.AddElement( elementId, amount );
+
+			taken.Add( ( amount / 10 ) + "." + ( amount % 10 ) + " cubic meters of " + gameData.m_elementList[ elementId ].m_name );
+		}
+
+		return true;
+	}
+
 	// handle victory when all enemies are destroyed
 	void HandleVictory( PlayerData playerData )
 	{
@@ -490,7 +582,7 @@ public class Encounter : MonoBehaviour
 
 		// show victory message - player can scan debris for salvage before leaving manually
 		SpaceflightController.m_instance.m_messages.AddText( "<color=#00FF00>All enemy ships destroyed!</color>" );
-		SpaceflightController.m_instance.m_messages.AddText( "<color=#FFFF00>Scan debris for salvage, then leave when ready.</color>" );
+		SpaceflightController.m_instance.m_messages.AddText( "<color=#FFFF00>Fly over the debris to salvage it, then leave when ready.</color>" );
 	}
 
 	// call this when the player fires on the aliens - they turn hostile and stay hostile until the player leaves the encounter

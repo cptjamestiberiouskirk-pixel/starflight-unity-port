@@ -146,11 +146,8 @@ public class AnalysisButton : ShipButton
 
 				case SensorsDisplay.ScanType.Debris:
 				{
-					// display debris analysis
-					text += "Object: <color=white>Debris Field</color>\n";
-					text += "Type: <color=white>Destroyed Vessel Wreckage</color>\n";
-					text += "Status: <color=#FFFF00>Salvageable materials detected</color>\n";
-					text += "Recommendation: <color=white>Salvage collection not yet implemented</color>";
+					// debris is only its class (the 1984 notes, starship.txt: "DEBRIS - Nothing") - what it holds is in the sensor reading
+					text += "Object: <color=white>Debris</color>";
 
 					break;
 				}
