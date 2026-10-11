@@ -735,6 +735,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAlienNames();
 				break;
 
+			case "lifeforms":
+				yield return ScenarioLifeforms();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -16362,6 +16366,122 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "aliennames: the Thrynn name theirs too", !thrynn[ 0 ].Contains( "%" ) && !thrynn[ 0 ].Contains( "+" ) && ( thrynnCaptain.Length >= 2 ), thrynn[ 0 ] );
 
 		Finish( "scenario=aliennames veloxi=" + veloxCaptain + "/" + veloxShip + " thrynn=" + thrynnCaptain, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 6: the lifeforms of a planet
+
+	// the lifeforms on the ground (none on the code before lifeforms)
+	static List<Transform> LifeformsOnTheGround()
+	{
+		var lifeforms = new List<Transform>();
+		var populator = FieldOrNull( SpaceflightController.m_instance.m_disembarked.m_terrainGrid, "m_terrainLifeforms" ) as Component;
+
+		if ( populator != null )
+		{
+			foreach ( Transform child in populator.transform )
+			{
+				lifeforms.Add( child );
+			}
+		}
+
+		return lifeforms;
+	}
+
+	// lands on a planet of the Arth system at this place (world x and z), and gets into the terrain vehicle
+	static IEnumerator LandInTheArthSystemAt( int planetId, Vector3 place, bool[] done )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		// (the port's "latitude" is the east-west coordinate - see Tools.LatLongToWorldCoordinates)
+		Tools.WorldToLatLongCoordinates( place, out var x, out var z );
+
+		playerData.m_general.m_selectedLatitude = x;
+		playerData.m_general.m_selectedLongitude = z;
+
+		yield return GoIntoOrbit( 25, planetId );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+	}
+
+	// the places of the lifeforms on the ground, rounded
+	static string LifeformPlaces( List<Transform> lifeforms )
+	{
+		var places = "";
+
+		foreach ( var lifeform in lifeforms )
+		{
+			places += Mathf.RoundToInt( lifeform.position.x ) + "/" + Mathf.RoundToInt( lifeform.position.z ) + " ";
+		}
+
+		return places.Trim();
+	}
+
+	IEnumerator ScenarioLifeforms()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// ---- 1. the control: planet 90 of the Arth system has no life (bio density 0)
+		yield return LandInTheArthSystemAt( 90, Vector3.zero, done );
+
+		var on90 = LifeformsOnTheGround().Count;
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+
+		// ---- 2. planet 92 (bio density 7): its lifeforms, on dry ground near the equator
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var lifeforms = LifeformsOnTheGround();
+		var placesFirst = LifeformPlaces( lifeforms );
+		var allDryAndTemperate = lifeforms.Count > 0;
+		var planetGenerator = FieldOrNull( controller.m_terrainVehicle, "m_planetGenerator" ) as PlanetGenerator;
+
+		foreach ( var lifeform in lifeforms )
+		{
+			Tools.WorldToMapCoordinates( lifeform.position, out var mapX, out var mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
+
+			var dry = planetGenerator.GetBilinearSmoothedElevation( mapX, mapY ) >= planetGenerator.m_waterElevation;
+			var temperate = ( mapY >= planetGenerator.m_textureMapHeight * 0.35f - 1.0f ) && ( mapY <= planetGenerator.m_textureMapHeight * 0.65f + 1.0f );
+
+			allDryAndTemperate = allDryAndTemperate && dry && temperate;
+		}
+
+		// ---- 3. landed beside the first one, Scan reads it
+		var firstPlace = ( lifeforms.Count > 0 ) ? lifeforms[ 0 ].position : Vector3.zero;
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
+
+		var placesAgain = LifeformPlaces( LifeformsOnTheGround() );
+
+		controller.m_messages.Clear();
+
+		new ScanButton().Execute();
+
+		yield return Frames( 2 );
+
+		var scan = MessageList();
+
+		Log( "lifeforms: planet 90 has " + on90 + " | planet 92 has " + lifeforms.Count + " at " + placesFirst + " (all dry and temperate " + allDryAndTemperate + ") | again at " + placesAgain + " | scan: " + scan );
+
+		Check( "lifeforms: a planet with no life has no lifeforms (control)", on90 == 0, on90 + " lifeforms" );
+		Check( "lifeforms: a planet with life has its lifeforms, 3 to 8 of each species, on dry ground near the equator", ( lifeforms.Count >= 3 ) && ( lifeforms.Count <= 8 * 6 ) && allDryAndTemperate, lifeforms.Count + " lifeforms, all dry and temperate " + allDryAndTemperate );
+		Check( "lifeforms: they are at the same places on every visit", ( placesFirst != "" ) && ( placesFirst == placesAgain ), placesFirst + " | " + placesAgain );
+		Check( "lifeforms: Scan beside one reads it as the notes' scan has it", scan.Contains( "Lifeform" ) && scan.Contains( "Aggression analog" ) && scan.Contains( "Intelligence analog" ) && scan.Contains( "Niche" ) && scan.Contains( "Composition" ), scan );
+
+		Finish( "scenario=lifeforms on92=" + lifeforms.Count, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

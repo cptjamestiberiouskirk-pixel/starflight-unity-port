@@ -145,8 +145,9 @@ What the probe does:
 | `randomruins` | the random ruins of the 1984 notes on planet 94 of the Arth system (no message of the original's, one random ruin): the ruin is there, landed beside it Cargo takes what it holds ("Captain, we have discovered..."), a second press and a later visit find nothing more, and the ruin is at the same place on every visit (about 40 s) |
 | `lava` | lava and the loss of the terrain vehicle: on planet 90 the vehicle driven into the sea floats (the control), on planet 29 (molten) it is driven into the lava and out again (the warning, and it is saved), then into it carrying 5 cubic meters of iron and left there (lost with its cargo after 3 seconds, the crew back in the ship), Disembark then finds no vehicle, and at the Starport a new one is installed for 10,000 MU with Interstel's evaluation (about 45 s) |
 | `aliennames` | the names of the aliens' captains and ships: the Veloxi's "Me is naming captain % of ... ship naming +" said twice (names made of their syllables in place of % and +, the same both times) and the Thrynn's "This is captain % of the Thrynn ship +" (about 20 s) |
+| `lifeforms` | the lifeforms of a planet, in the Arth system: planet 90 (no life, the control: none), planet 92 (bio density 7: its lifeforms, 3 to 8 of each species, on dry ground near the equator, at the same places on a second visit) and Scan landed beside one (the notes' reading: aggression and intelligence analogs, niche, composition) (about 45 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (104 scenarios, about 71 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (105 scenarios, about 72 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

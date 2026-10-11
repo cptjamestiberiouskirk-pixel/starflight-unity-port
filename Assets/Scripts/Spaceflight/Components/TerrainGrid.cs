@@ -16,6 +16,9 @@ public class TerrainGrid : MonoBehaviour
 	public TerrainTrees m_terrainTrees;
 	public TerrainRuins m_terrainRuins;
 
+	// the lifeforms of the planet (made when the planet is populated, next to the ruins, so the scene needs no object for it)
+	public TerrainLifeforms m_terrainLifeforms;
+
 	Mesh m_mesh;
 	MeshFilter m_meshFilter;
 	MeshRenderer m_meshRenderer;
@@ -148,6 +151,24 @@ public class TerrainGrid : MonoBehaviour
 
 			// a ruin stands on its own (taking the rocks and trees next to it away moves nothing else)
 			m_terrainRuins.ClearAroundRuins( new TerrainGridPopulator[] { m_terrainRocks, m_terrainTrees } );
+		}
+
+		// populate the lifeforms (last, so nothing else moves)
+		if ( ( m_terrainLifeforms == null ) && ( m_terrainRuins != null ) )
+		{
+			var lifeformsObject = new GameObject( "Terrain Lifeforms" );
+
+			lifeformsObject.transform.SetParent( m_terrainRuins.transform.parent, false );
+			lifeformsObject.transform.localPosition = m_terrainRuins.transform.localPosition;
+			lifeformsObject.transform.localRotation = m_terrainRuins.transform.localRotation;
+			lifeformsObject.transform.localScale = m_terrainRuins.transform.localScale;
+
+			m_terrainLifeforms = lifeformsObject.AddComponent<TerrainLifeforms>();
+		}
+
+		if ( m_terrainLifeforms != null )
+		{
+			m_terrainLifeforms.Initialize( m_planetGenerator, m_elevationScale, planet.m_id + 5 );
 		}
 	}
 
