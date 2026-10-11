@@ -25,6 +25,9 @@ public class PD_PlanetSurfaces
 	// the artifact sites (ids into the game data's artifact site list) whose artifact has been taken
 	public List<int> m_takenArtifactSiteList;
 
+	// what has been taken from the random ruins (by TerrainRuin.GetRandomItemKey: the planet, the ruin and the item - null in older save files)
+	public List<int> m_takenRandomRuinItemList;
+
 	[Serializable]
 
 	public class DroppedCargo
@@ -54,6 +57,7 @@ public class PD_PlanetSurfaces
 	{
 		m_depositList = new List<Deposit>();
 		m_takenArtifactSiteList = new List<int>();
+		m_takenRandomRuinItemList = new List<int>();
 		m_droppedCargoList = new List<DroppedCargo>();
 		m_nextDroppedCargoId = 0;
 		m_destroyedPlanetList = new List<int>();
@@ -70,6 +74,11 @@ public class PD_PlanetSurfaces
 		if ( m_takenArtifactSiteList == null )
 		{
 			m_takenArtifactSiteList = new List<int>();
+		}
+
+		if ( m_takenRandomRuinItemList == null )
+		{
+			m_takenRandomRuinItemList = new List<int>();
 		}
 
 		if ( m_droppedCargoList == null )
@@ -161,6 +170,25 @@ public class PD_PlanetSurfaces
 		if ( !m_takenArtifactSiteList.Contains( artifactSiteId ) )
 		{
 			m_takenArtifactSiteList.Add( artifactSiteId );
+		}
+	}
+
+	// true if this item of a random ruin has been taken
+	public bool IsRandomRuinItemTaken( int itemKey )
+	{
+		Validate();
+
+		return m_takenRandomRuinItemList.Contains( itemKey );
+	}
+
+	// call this when an item of a random ruin has been taken
+	public void TakeRandomRuinItem( int itemKey )
+	{
+		Validate();
+
+		if ( !m_takenRandomRuinItemList.Contains( itemKey ) )
+		{
+			m_takenRandomRuinItemList.Add( itemKey );
 		}
 	}
 

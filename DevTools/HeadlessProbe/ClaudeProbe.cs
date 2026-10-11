@@ -723,6 +723,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSalvage();
 				break;
 
+			case "randomruins":
+				yield return ScenarioRandomRuins();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -15982,6 +15986,117 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "salvage: the sensors read what a wreck is made of", readout.Contains( "Object Constituents" ) && readout.Contains( elementName ), readout );
 
 		Finish( "scenario=salvage endurium=" + ( enduriumAfter - enduriumBefore ) + " element=" + ( elementAfter - elementBefore ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 3: random ruins
+
+	// the ruins on the ground that hold random items (none on the code before random ruins)
+	static List<Component> RandomRuinsOnTheGround()
+	{
+		var randomRuins = new List<Component>();
+
+		foreach ( var ruin in RuinsOnTheGround() )
+		{
+			var items = FieldOrNull( ruin, "m_randomItems" ) as System.Collections.IList;
+
+			if ( ( items != null ) && ( items.Count > 0 ) )
+			{
+				randomRuins.Add( ruin );
+			}
+		}
+
+		return randomRuins;
+	}
+
+	// lands on planet 94 of the Arth system at this place (world x and z of the planet's surface), and gets into the terrain vehicle
+	static IEnumerator LandOnPlanet94At( Vector3 place, bool[] done )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		// (the port's "latitude" is the east-west coordinate - see Tools.LatLongToWorldCoordinates)
+		Tools.WorldToLatLongCoordinates( place, out var x, out var z );
+
+		playerData.m_general.m_selectedLatitude = x;
+		playerData.m_general.m_selectedLongitude = z;
+
+		yield return GoIntoOrbit( 25, 94 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+	}
+
+	// presses Cargo where the terrain vehicle is - adds what the messages show
+	static IEnumerator PressCargo( List<string> said )
+	{
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		new TVCargoButton().Execute();
+
+		yield return Frames( 2 );
+
+		said.Add( MessageList() );
+	}
+
+	IEnumerator ScenarioRandomRuins()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// ---- 1. planet 94, the small rock planet of the Arth system, has no message of the original's and one random ruin
+		yield return LandOnPlanet94At( Vector3.zero, done );
+
+		var randomRuins = RandomRuinsOnTheGround();
+		var place = ( randomRuins.Count > 0 ) ? randomRuins[ 0 ].transform.position : Vector3.zero;
+		var placeBefore = ( randomRuins.Count > 0 ) ? Mathf.RoundToInt( place.x ) + "/" + Mathf.RoundToInt( place.z ) : "none";
+		var name = ( randomRuins.Count > 0 ) ? randomRuins[ 0 ].name : "none";
+
+		// ---- 2. landed beside it, Cargo takes what it holds aboard, and a second press nothing more
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandOnPlanet94At( place + Vector3.forward * 5.0f, done );
+
+		var said = new List<string>();
+		var roomBefore = playerData.m_terrainVehicle.GetRemainingVolume();
+
+		yield return PressCargo( said );
+
+		var roomAfter = playerData.m_terrainVehicle.GetRemainingVolume();
+
+		yield return PressCargo( said );
+
+		var roomAgain = playerData.m_terrainVehicle.GetRemainingVolume();
+
+		// ---- 3. back into the ship and out again at the same place: the ruin is where it was, and what was taken is gone
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		var randomRuinsAgain = RandomRuinsOnTheGround();
+		var placeAfter = ( randomRuinsAgain.Count > 0 ) ? Mathf.RoundToInt( randomRuinsAgain[ 0 ].transform.position.x ) + "/" + Mathf.RoundToInt( randomRuinsAgain[ 0 ].transform.position.z ) : "none";
+
+		yield return PressCargo( said );
+
+		Log( "randomruins: planet 94 has " + randomRuins.Count + " random ruin (" + name + ") at " + placeBefore + " | room " + roomBefore + " -> " + roomAfter + " -> " + roomAgain + " | " + string.Join( " || ", said ) + " | after landing again at " + placeAfter );
+
+		var first = said[ 0 ];
+		var second = said[ 1 ];
+		var third = said[ 2 ];
+
+		Check( "randomruins: planet 94 has a random ruin", randomRuins.Count == 1, randomRuins.Count + " random ruins" );
+		Check( "randomruins: Cargo beside it takes what it holds aboard", first.Contains( "Captain, we have discovered" ) && ( roomAfter < roomBefore ), roomBefore + " -> " + roomAfter + " | " + first );
+		Check( "randomruins: what has been taken is not there again", !second.Contains( "Captain, we have discovered" ) && ( roomAgain == roomAfter ) && !third.Contains( "Captain, we have discovered" ), second + " || " + third );
+		Check( "randomruins: the ruin is at the same place on every visit", ( placeBefore != "none" ) && ( placeBefore == placeAfter ), placeBefore + " | " + placeAfter );
+
+		Finish( "scenario=randomruins ruin=" + name + " at=" + placeBefore, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
