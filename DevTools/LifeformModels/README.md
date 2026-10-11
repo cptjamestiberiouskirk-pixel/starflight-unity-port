@@ -41,6 +41,10 @@ Unity makes the `.meta` files the first time it imports new files (run the headl
 - **Materials and tint.** Every model has up to two materials, in this order: `<Model> Skin`, the part to tint with the species colour (multiply the albedo by it, e.g. `SF_AlbedoColor`), and `<Model> Detail`, never tinted (eyes, claws, horns, spines, bark, seed pods). Both use the same maps. The albedo of the skin is a near white ground with the pattern in darker greys, so any tint gives a two tone animal; the detail parts carry their own colours. On animals the body is the skin; on plants the leaves (and soft stems, and the succulent trunk of LeavedMediumB) are the skin and the wood is the detail.
 - **Maps**, next to each FBX: `<Model> - Albedo.png` (sRGB), `<Model> - Specular.png` (RGB the specular colour, sRGB coded, A the smoothness: the layout of `SF_SpecularMap`), `<Model> - Normal.png` (to be imported as a normal map), `<Model> - Occlusion.png` (UV2, `SF_OcclusionMap`), and `<Model> - Emissive.png` for the models with glowing eyes or pods (`SF_EmissiveMap`).
 
+## In the game
+
+Run `& "DevTools\LifeformModels\wire.ps1"` from the project root (the project must not be open in an Editor) after the models are built or rebuilt. It copies `LifeformModelWiring.cs` into Assets/ and runs Unity in batch mode: for each model of `manifest-lifeforms.json` it makes (or updates) `Materials/<Model> Skin.mat` and `<Model> Detail.mat` (SF - Standard with the model's maps, keywords set by the material Inspector's own logic), remaps the FBX's materials to them, and saves `Assets/Resources/Lifeforms/<Model>.prefab` (the model under a root of its own). `TerrainLifeforms` loads those prefabs. `probe.ps1 -Scenario lifeformpictures -Graphics` renders the models on a planet into `Logs/lifeform-pictures/`.
+
 ## The models
 
 | Model | Body plan (notes icon) | What it is |
