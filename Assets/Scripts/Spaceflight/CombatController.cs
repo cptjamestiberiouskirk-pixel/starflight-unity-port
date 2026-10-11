@@ -547,7 +547,8 @@ public class CombatController : MonoBehaviour
 			var hullHit = GetAvailableHullHit();
 			if ( hullHit != null )
 			{
-				hullHit.Play( targetShip.m_coordinates );
+				// the player's shot came from the player ship, so the sparks fly back that way
+				hullHit.Play( targetShip.m_coordinates, targetShip.m_coordinates - DataController.m_instance.m_playerData.m_general.m_coordinates );
 			}
 
 			// let the player know whether the hit got through the shields
@@ -611,7 +612,7 @@ public class CombatController : MonoBehaviour
 			var shieldHit = GetAvailableShieldHit();
 			if ( shieldHit != null )
 			{
-				shieldHit.Play( playerPosition );
+				shieldHit.Play( playerPosition, hitDirection );
 			}
 
 			// play shield hit sound

@@ -493,6 +493,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioExplosionPictures();
 				break;
 
+			case "hitpictures":
+				yield return ScenarioHitPictures();
+				break;
+
 			case "perframe":
 				yield return ScenarioPerFrame();
 				break;
@@ -8002,15 +8006,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "explosionpictures: a half size explosion (a missile hit) is drawn at half size", ( particleSystems.Length > 0 ) && ( scaledSystems == particleSystems.Length ), scaledSystems + " of " + particleSystems.Length + " parts follow the scale" );
 
 		// ---- 2. control: making the explosion's textures does not draw from the game's random numbers (the planets depend on them)
-		foreach ( var name in new string[] { "m_glowMaterial", "m_fireMaterial", "m_smokeMaterial", "m_ringMaterial", "m_debrisMaterial", "m_debrisMeshes" } )
-		{
-			var field = typeof( ExplosionEffect ).GetField( name, c_any );
-
-			if ( field != null )
-			{
-				field.SetValue( null, null );
-			}
-		}
+		ForgetEffectMaterials();
 
 		var stateBefore = JsonUtility.ToJson( UnityEngine.Random.state );
 		var madeObject = new GameObject( "Probe Explosion" );
@@ -8093,6 +8089,236 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "explosionpictures: " + pictures + " pictures in " + folder );
 
 		Finish( "scenario=explosionpictures parts=" + renderers.Length + " opaqueOrUntextured=" + opaqueOrUntextured.Count + " cubes=" + cubes + " scaled=" + scaledSystems + "/" + particleSystems.Length + " pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: hit pictures (what the hull and shield hit effects are drawn with, where they land, and pictures of them with -Graphics)
+
+	// forget the shared effect materials, wherever they are kept (the explosion kept them itself before they moved to EffectMaterials), so the next effect makes them again
+	static void ForgetEffectMaterials()
+	{
+		var holders = new Type[] { typeof( ExplosionEffect ), Type.GetType( "EffectMaterials, Assembly-CSharp" ) };
+
+		foreach ( var holder in holders )
+		{
+			if ( holder == null )
+			{
+				continue;
+			}
+
+			foreach ( var name in new string[] { "m_glowMaterial", "m_fireMaterial", "m_smokeMaterial", "m_ringMaterial", "m_debrisMaterial", "m_debrisMeshes" } )
+			{
+				var field = holder.GetField( name, c_any );
+
+				if ( ( field != null ) && field.IsStatic )
+				{
+					field.SetValue( null, null );
+				}
+			}
+		}
+	}
+
+	// play a hit effect with the direction of the shot if it takes one (the old shield hit had only a position)
+	static void PlayHitEffect( object effect, Vector3 position, Vector3 direction )
+	{
+		var withDirection = effect.GetType().GetMethod( "Play", new Type[] { typeof( Vector3 ), typeof( Vector3 ) } );
+
+		if ( withDirection != null )
+		{
+			withDirection.Invoke( effect, new object[] { position, direction } );
+		}
+		else
+		{
+			effect.GetType().GetMethod( "Play", new Type[] { typeof( Vector3 ) } ).Invoke( effect, new object[] { position } );
+		}
+	}
+
+	// render the main camera zoomed in (a narrower field of view around the same middle)
+	static void RenderZoomedPicture( Camera camera, string path, float fieldOfView )
+	{
+		var normalFieldOfView = camera.fieldOfView;
+
+		camera.fieldOfView = fieldOfView;
+
+		RenderCameraPicture( camera, path );
+
+		camera.fieldOfView = normalFieldOfView;
+	}
+
+	// draw a zoomed picture at each of the given frames after this one, then let the effect end
+	static IEnumerator HitPictureSeries( Camera camera, string folder, string prefix, int[] frameTimes )
+	{
+		var start = Time.frameCount;
+
+		foreach ( var frameTime in frameTimes )
+		{
+			while ( Time.frameCount - start < frameTime )
+			{
+				yield return null;
+			}
+
+			RenderZoomedPicture( camera, System.IO.Path.Combine( folder, prefix + "t" + ( frameTime * 1000 / 30 ).ToString( "D4" ) + "ms.png" ), 9.0f );
+			s_explosionPictures++;
+		}
+
+		yield return Frames( 30 );
+	}
+
+	IEnumerator ScenarioHitPictures()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var combat = CombatController.m_instance;
+		var controller = SpaceflightController.m_instance;
+
+		var hullHit = Call( combat, "GetAvailableHullHit" ) as HullHitEffect;
+		var shieldHit = Call( combat, "GetAvailableShieldHit" ) as ShieldHitEffect;
+
+		// ---- 1. what the hits are drawn with: nothing with the lit Standard shader or the untextured opaque particle shader, everything transparent
+		var drawnWrong = new List<string>();
+		var parts = 0;
+
+		foreach ( var effect in new Component[] { hullHit, shieldHit } )
+		{
+			foreach ( var renderer in effect.GetComponentsInChildren<Renderer>( true ) )
+			{
+				var material = renderer.sharedMaterial;
+
+				parts++;
+
+				if ( ( material == null ) || ( material.shader.name == "Standard" ) || ( material.shader.name == "Particles/Standard Unlit" ) || ( material.renderQueue < 3000 ) )
+				{
+					drawnWrong.Add( effect.GetType().Name + "/" + renderer.name + " (" + ( ( material == null ) ? "no material" : material.shader.name + ", queue " + material.renderQueue ) + ")" );
+				}
+			}
+		}
+
+		Log( "hitpictures: " + parts + " parts, drawn with the lit or opaque shaders: " + ( ( drawnWrong.Count == 0 ) ? "none" : string.Join( ", ", drawnWrong ) ) );
+
+		Check( "hitpictures: the hull and shield hits are drawn transparent, not with the Standard or untextured particle shaders", ( parts > 0 ) && ( drawnWrong.Count == 0 ), ( drawnWrong.Count == 0 ) ? "all " + parts + " parts" : string.Join( ", ", drawnWrong ) );
+
+		// ---- 2. every particle of a hull hit is gone before the effect is switched off (it cut its debris off in mid air)
+		var hullDuration = (float) GetField( hullHit, "m_duration" );
+		var longestLife = 0.0f;
+		var longestName = "";
+
+		foreach ( var particleSystem in hullHit.GetComponentsInChildren<ParticleSystem>( true ) )
+		{
+			var life = particleSystem.main.startLifetime.constantMax;
+
+			if ( life > longestLife )
+			{
+				longestLife = life;
+				longestName = particleSystem.name;
+			}
+		}
+
+		Log( "hitpictures: a hull hit is switched off after " + hullDuration.ToString( "F2" ) + " s; its longest lived particles (" + longestName + ") live " + longestLife.ToString( "F2" ) + " s" );
+
+		Check( "hitpictures: a hull hit's particles are gone before it is switched off", longestLife <= hullDuration, longestName + " live " + longestLife.ToString( "F2" ) + " s, switched off after " + hullDuration.ToString( "F2" ) + " s" );
+
+		// ---- 3. the hits land on the side the shot came from (a shot from the upper left, travelling down and to the right)
+		var shipPosition = playerData.m_general.m_coordinates;
+		var shotDirection = new Vector3( 1.0f, 0.0f, -1.0f ).normalized;
+
+		hullHit.Play( shipPosition, shotDirection );
+
+		var hullSide = Vector3.Dot( hullHit.transform.position - shipPosition, -shotDirection );
+
+		PlayHitEffect( shieldHit, shipPosition, shotDirection );
+
+		var impact = shieldHit.transform.Find( "Impact" );
+		var shieldSide = ( impact != null ) ? Vector3.Dot( impact.position - shipPosition, -shotDirection ) : 0.0f;
+
+		Log( "hitpictures: a shot from the upper left strikes the hull " + hullSide.ToString( "F1" ) + " and the shield bubble " + shieldSide.ToString( "F1" ) + " towards the shooter from the middle of the ship" );
+
+		Check( "hitpictures: a hull hit is on the side of the hull the shot came from", hullSide > 1.0f, "offset towards the shot " + hullSide.ToString( "F1" ) );
+		Check( "hitpictures: a shield hit lights the side of the bubble the shot came from", shieldSide > 1.0f, ( impact != null ) ? "offset towards the shot " + shieldSide.ToString( "F1" ) : "no impact point" );
+
+		yield return Frames( 30 );
+
+		// ---- 4. control: making the hit effects does not draw from the game's random numbers
+		ForgetEffectMaterials();
+
+		var stateBefore = JsonUtility.ToJson( UnityEngine.Random.state );
+		var madeObject = new GameObject( "Probe Hits" );
+
+		madeObject.AddComponent<HullHitEffect>();
+		madeObject.AddComponent<ShieldHitEffect>();
+
+		var stateAfter = JsonUtility.ToJson( UnityEngine.Random.state );
+
+		Destroy( madeObject );
+
+		Check( "hitpictures: making the hit effects leaves the game's random numbers alone", stateBefore == stateAfter, ( stateBefore == stateAfter ) ? "Random.state unchanged" : "Random.state changed" );
+
+		// ---- 5. pictures, when there is a graphics device to draw them with
+		if ( SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null )
+		{
+			Log( "hitpictures: no graphics device (-nographics), so no pictures; run probe.ps1 with -Graphics for them" );
+
+			Finish( "scenario=hitpictures parts=" + parts + " drawnWrong=" + drawnWrong.Count + " longestLife=" + longestLife.ToString( "F2" ) + "/" + hullDuration.ToString( "F2" ) + " side=" + hullSide.ToString( "F1" ) + "/" + shieldSide.ToString( "F1" ) + " pictures=0 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+			yield break;
+		}
+
+		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "hit-pictures" ) );
+
+		System.IO.Directory.CreateDirectory( folder );
+
+		var camera = Camera.main;
+		var frameTimes = new int[] { 1, 3, 6, 9, 13 };
+
+		s_explosionPictures = 0;
+
+		// out in dark hyperspace, with no encounter able to begin
+		controller.m_encounterRange = 0.0f;
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 4.0f, 0.0f, 4.0f ) );
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 30 );
+
+		// game time goes up by a thirtieth of a second a frame, so the pictures are at the same moments in every run
+		Time.captureDeltaTime = 1.0f / 30.0f;
+
+		// the shield hit, then the hull hit, each on its own, from a shot from the upper left
+		PlayHitEffect( Call( combat, "GetAvailableShieldHit" ), playerData.m_general.m_coordinates, shotDirection );
+
+		yield return HitPictureSeries( camera, folder, "shield_", frameTimes );
+
+		( Call( combat, "GetAvailableHullHit" ) as HullHitEffect ).Play( playerData.m_general.m_coordinates, shotDirection );
+
+		yield return HitPictureSeries( camera, folder, "hull_", frameTimes );
+
+		// and through the game's own way: a hit on raised shields, then one on the hull with the shields down
+		playerData.m_playerShip.m_shieldsAreUp = true;
+		playerData.m_playerShip.m_shieldPoints = 500;
+
+		combat.ApplyDamageToPlayer( 10, shotDirection );
+
+		yield return HitPictureSeries( camera, folder, "game_shield_", new int[] { 3 } );
+
+		playerData.m_playerShip.m_shieldsAreUp = false;
+
+		combat.ApplyDamageToPlayer( 10, shotDirection );
+
+		yield return HitPictureSeries( camera, folder, "game_hull_", new int[] { 3 } );
+
+		// one at the size the game shows it
+		combat.ApplyDamageToPlayer( 10, shotDirection );
+
+		var start = Time.frameCount;
+
+		while ( Time.frameCount - start < 3 )
+		{
+			yield return null;
+		}
+
+		RenderCameraPicture( camera, System.IO.Path.Combine( folder, "game_hull_unzoomed_t0100ms.png" ) );
+		s_explosionPictures++;
+
+		Time.captureDeltaTime = 0.0f;
+
+		Log( "hitpictures: " + s_explosionPictures + " pictures in " + folder );
+
+		Finish( "scenario=hitpictures parts=" + parts + " drawnWrong=" + drawnWrong.Count + " longestLife=" + longestLife.ToString( "F2" ) + "/" + hullDuration.ToString( "F2" ) + " side=" + hullSide.ToString( "F1" ) + "/" + shieldSide.ToString( "F1" ) + " pictures=" + s_explosionPictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- Low: what the displays cost every frame (the status display, the terrain vehicle display)

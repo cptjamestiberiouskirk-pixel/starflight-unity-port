@@ -2,26 +2,42 @@
 using UnityEngine;
 
 /// <summary>
-/// Shield hit effect - expanding energy sphere.
+/// Shield hit effect - the shield bubble around the ship lights up where the shot struck it, a ripple runs across it, and blue sparks fly off.
 /// </summary>
 public class ShieldHitEffect : MonoBehaviour
 {
-	// particle system for shield impact
-	ParticleSystem m_shieldParticles;
+	// the flash and the sparks where the shot strikes the bubble
+	ParticleSystem m_flashParticles;
+	ParticleSystem m_sparkParticles;
+
+	// where the shot strikes the bubble (the particles are under it)
+	Transform m_impactPoint;
 
 	// shield sphere mesh
 	GameObject m_shieldSphere;
 	Material m_shieldMaterial;
 
 	// effect parameters
-	float m_duration = 0.4f;
+	float m_duration = 0.45f;
 	float m_timer;
 	bool m_isPlaying;
-	float m_maxScale = 80.0f;
+
+	// how big the bubble is across (the player ship is about 51 long), and how much it swells as the ripple runs
+	const float c_bubbleSize = 70.0f;
+	const float c_bubbleSwell = 0.04f;
+
+	// how far above the plane the ships fly in the shot strikes the bubble (as a share of the way to the top)
+	const float c_impactLift = 0.7f;
+
+	// the shield bubble shader's properties
+	static readonly int m_impactDirectionId = Shader.PropertyToID( "_ImpactDirection" );
+	static readonly int m_progressId = Shader.PropertyToID( "_Progress" );
 
 	// unity awake
 	void Awake()
 	{
+		EffectMaterials.Initialize();
+
 		CreateShieldSphere();
 		CreateShieldParticles();
 		gameObject.SetActive( false );
@@ -31,9 +47,11 @@ public class ShieldHitEffect : MonoBehaviour
 	void CreateShieldSphere()
 	{
 		m_shieldSphere = GameObject.CreatePrimitive( PrimitiveType.Sphere );
+		m_shieldSphere.name = "Shield Bubble";
 		m_shieldSphere.transform.SetParent( transform );
 		m_shieldSphere.transform.localPosition = Vector3.zero;
-		m_shieldSphere.transform.localScale = Vector3.one * m_maxScale;
+		m_shieldSphere.transform.localRotation = Quaternion.identity;
+		m_shieldSphere.transform.localScale = Vector3.one * c_bubbleSize;
 
 		// remove collider
 		var collider = m_shieldSphere.GetComponent<Collider>();
@@ -42,65 +60,88 @@ public class ShieldHitEffect : MonoBehaviour
 			Destroy( collider );
 		}
 
-		// create transparent additive material
-		var renderer = m_shieldSphere.GetComponent<Renderer>();
-		m_shieldMaterial = new Material( Shader.Find( "Standard" ) );
-		m_shieldMaterial.SetFloat( "_Mode", 3 ); // transparent
-		m_shieldMaterial.SetInt( "_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha );
-		m_shieldMaterial.SetInt( "_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha );
-		m_shieldMaterial.SetInt( "_ZWrite", 0 );
-		m_shieldMaterial.DisableKeyword( "_ALPHATEST_ON" );
-		m_shieldMaterial.EnableKeyword( "_ALPHABLEND_ON" );
-		m_shieldMaterial.DisableKeyword( "_ALPHAPREMULTIPLY_ON" );
+		// the bubble shader is in a Resources folder, so it is in every build
+		var shader = Resources.Load<Shader>( "Shaders/Shield Bubble" );
+
+		if ( shader == null )
+		{
+			Debug.LogWarning( "ShieldHitEffect: the shield bubble shader was not found, the shield hit shows only its sparks" );
+
+			m_shieldSphere.SetActive( false );
+			return;
+		}
+
+		// one material for each effect, since each one is at its own point of its ripple
+		m_shieldMaterial = new Material( shader );
+		m_shieldMaterial.name = "Shield Bubble";
 		m_shieldMaterial.renderQueue = 3000;
-		m_shieldMaterial.SetColor( "_Color", new Color( 0.3f, 0.6f, 1.0f, 0.5f ) );
-		m_shieldMaterial.SetColor( "_EmissionColor", new Color( 0.3f, 0.6f, 1.0f ) * 2.0f );
-		m_shieldMaterial.EnableKeyword( "_EMISSION" );
-		renderer.material = m_shieldMaterial;
+
+		var renderer = m_shieldSphere.GetComponent<Renderer>();
+		renderer.sharedMaterial = m_shieldMaterial;
+		renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+		renderer.receiveShadows = false;
 
 		m_shieldSphere.SetActive( false );
 	}
 
-	// create particle ripples
+	// create the flash and the sparks where the shot strikes
 	void CreateShieldParticles()
 	{
-		var particleObject = new GameObject( "Particles" );
-		particleObject.transform.SetParent( transform );
-		particleObject.transform.localPosition = Vector3.zero;
+		var impactObject = new GameObject( "Impact" );
+		impactObject.transform.SetParent( transform );
+		m_impactPoint = impactObject.transform;
 
-		m_shieldParticles = particleObject.AddComponent<ParticleSystem>();
+		// the flash
+		m_flashParticles = EffectMaterials.CreateParticleSystem( m_impactPoint, "Flash", EffectMaterials.m_glowMaterial, 5, 1 );
 
-		var main = m_shieldParticles.main;
-		main.startLifetime = 0.5f;
-		main.startSpeed = 50.0f;
-		main.startSize = 5.0f;
-		main.startColor = new Color( 0.5f, 0.8f, 1.0f, 1.0f );
-		main.maxParticles = 50;
-		main.playOnAwake = false;
-		main.simulationSpace = ParticleSystemSimulationSpace.World;
+		var flashMain = m_flashParticles.main;
+		flashMain.startLifetime = 0.15f;
+		flashMain.startSpeed = 0.0f;
+		flashMain.startSize = 26.0f;
 
-		var emission = m_shieldParticles.emission;
-		emission.rateOverTime = 0;
-		emission.SetBursts( new ParticleSystem.Burst[] { new ParticleSystem.Burst( 0.0f, 30 ) } );
+		var flashEmission = m_flashParticles.emission;
+		flashEmission.SetBursts( new ParticleSystem.Burst[] { new ParticleSystem.Burst( 0.0f, 1 ) } );
 
-		var shape = m_shieldParticles.shape;
-		shape.shapeType = ParticleSystemShapeType.Sphere;
-		shape.radius = 30.0f;
+		var flashShape = m_flashParticles.shape;
+		flashShape.enabled = false;
 
-		var colorOverLifetime = m_shieldParticles.colorOverLifetime;
+		var flashSize = m_flashParticles.sizeOverLifetime;
+		flashSize.enabled = true;
+		flashSize.size = new ParticleSystem.MinMaxCurve( 1.0f, AnimationCurve.EaseInOut( 0.0f, 0.5f, 1.0f, 1.0f ) );
+
+		var flashColour = m_flashParticles.colorOverLifetime;
+		flashColour.enabled = true;
+		flashColour.color = EffectMaterials.MakeGradient( new Color( 0.9f, 0.97f, 1.0f ), new Color( 0.5f, 0.8f, 1.0f ), new Color( 0.2f, 0.45f, 1.0f ), 1.0f, 0.7f, 0.0f );
+
+		// the sparks: blue streaks that fly off the bubble
+		m_sparkParticles = EffectMaterials.CreateParticleSystem( m_impactPoint, "Sparks", EffectMaterials.m_glowMaterial, 4, 40 );
+
+		var main = m_sparkParticles.main;
+		main.startLifetime = new ParticleSystem.MinMaxCurve( 0.15f, 0.35f );
+		main.startSpeed = new ParticleSystem.MinMaxCurve( 60.0f, 160.0f );
+		main.startSize = new ParticleSystem.MinMaxCurve( 0.8f, 1.6f );
+
+		var emission = m_sparkParticles.emission;
+		emission.SetBursts( new ParticleSystem.Burst[] { new ParticleSystem.Burst( 0.0f, 24 ) } );
+
+		// off the bubble and along it
+		var shape = m_sparkParticles.shape;
+		shape.shapeType = ParticleSystemShapeType.Cone;
+		shape.angle = 75.0f;
+		shape.radius = 3.0f;
+
+		var velocityOverLifetime = m_sparkParticles.velocityOverLifetime;
+		velocityOverLifetime.enabled = true;
+		velocityOverLifetime.speedModifier = new ParticleSystem.MinMaxCurve( 1.0f, AnimationCurve.EaseInOut( 0.0f, 1.0f, 1.0f, 0.2f ) );
+
+		var colorOverLifetime = m_sparkParticles.colorOverLifetime;
 		colorOverLifetime.enabled = true;
-		var gradient = new Gradient();
-		gradient.SetKeys(
-			new GradientColorKey[] { new GradientColorKey( new Color( 0.5f, 0.8f, 1.0f ), 0.0f ), new GradientColorKey( new Color( 0.2f, 0.4f, 1.0f ), 1.0f ) },
-			new GradientAlphaKey[] { new GradientAlphaKey( 1.0f, 0.0f ), new GradientAlphaKey( 0.0f, 1.0f ) }
-		);
-		colorOverLifetime.color = gradient;
+		colorOverLifetime.color = EffectMaterials.MakeGradient( new Color( 0.9f, 0.97f, 1.0f ), new Color( 0.5f, 0.8f, 1.0f ), new Color( 0.2f, 0.4f, 1.0f ), 1.0f, 1.0f, 0.0f );
 
-		// create material
-		var renderer = m_shieldParticles.GetComponent<ParticleSystemRenderer>();
-		var material = new Material( Shader.Find( "Particles/Standard Unlit" ) );
-		material.SetColor( "_Color", Color.white );
-		renderer.material = material;
+		var renderer = m_sparkParticles.GetComponent<ParticleSystemRenderer>();
+		renderer.renderMode = ParticleSystemRenderMode.Stretch;
+		renderer.velocityScale = 0.06f;
+		renderer.lengthScale = 1.5f;
 	}
 
 	// unity update
@@ -109,15 +150,14 @@ public class ShieldHitEffect : MonoBehaviour
 		if ( m_isPlaying )
 		{
 			m_timer += Time.deltaTime;
-			float t = m_timer / m_duration;
+			float t = Mathf.Clamp01( m_timer / m_duration );
 
-			// animate shield sphere
-			float scale = Mathf.Lerp( m_maxScale * 0.5f, m_maxScale, t );
-			m_shieldSphere.transform.localScale = Vector3.one * scale;
-
-			// fade out
-			float alpha = Mathf.Lerp( 0.5f, 0.0f, t );
-			m_shieldMaterial.SetColor( "_Color", new Color( 0.3f, 0.6f, 1.0f, alpha ) );
+			// the ripple runs across the bubble as it fades, and the bubble swells a little
+			if ( m_shieldMaterial != null )
+			{
+				m_shieldMaterial.SetFloat( m_progressId, t );
+				m_shieldSphere.transform.localScale = Vector3.one * ( c_bubbleSize * ( 1.0f + c_bubbleSwell * t ) );
+			}
 
 			if ( m_timer >= m_duration )
 			{
@@ -129,20 +169,50 @@ public class ShieldHitEffect : MonoBehaviour
 	}
 
 	/// <summary>
-	/// Play the shield hit effect at the specified position.
+	/// Play the shield hit effect at the specified position (struck on the front of the bubble).
 	/// </summary>
 	public void Play( Vector3 position )
 	{
+		Play( position, Vector3.back );
+	}
+
+	/// <summary>
+	/// Play the shield hit effect at the specified position, struck by a shot travelling in the given direction.
+	/// </summary>
+	public void Play( Vector3 position, Vector3 hitDirection )
+	{
+		// the side of the bubble that faces the shot, in the plane the ships fly in (a shot from straight above or below strikes the front)
+		var flatDirection = new Vector3( hitDirection.x, 0.0f, hitDirection.z );
+		var towardsTheShot = ( flatDirection.sqrMagnitude > 0.01f ) ? -flatDirection.normalized : Vector3.forward;
+
+		// struck a little above the plane, on the half of the bubble the camera looks down on: the ripple's circle is then seen at a slant and reads as a ring (struck on the rim, it was seen edge on, as a straight band)
+		var impactDirection = ( towardsTheShot + Vector3.up * c_impactLift ).normalized;
+
 		transform.position = position;
+		transform.rotation = Quaternion.identity;
+
+		// the flash and the sparks are on the bubble, the sparks fly off it towards the shot
+		m_impactPoint.localPosition = impactDirection * ( c_bubbleSize * 0.5f );
+		m_impactPoint.localRotation = Quaternion.LookRotation( impactDirection, Vector3.up );
+
 		m_timer = 0.0f;
 		m_isPlaying = true;
 
-		m_shieldSphere.SetActive( true );
-		m_shieldSphere.transform.localScale = Vector3.one * m_maxScale * 0.5f;
-		m_shieldMaterial.SetColor( "_Color", new Color( 0.3f, 0.6f, 1.0f, 0.5f ) );
+		if ( m_shieldMaterial != null )
+		{
+			m_shieldSphere.SetActive( true );
+			m_shieldSphere.transform.localScale = Vector3.one * c_bubbleSize;
+			m_shieldMaterial.SetVector( m_impactDirectionId, impactDirection );
+			m_shieldMaterial.SetFloat( m_progressId, 0.0f );
+		}
 
 		gameObject.SetActive( true );
-		m_shieldParticles.Play();
+
+		// start every part from the beginning
+		m_flashParticles.Stop( true, ParticleSystemStopBehavior.StopEmittingAndClear );
+		m_flashParticles.Play();
+		m_sparkParticles.Stop( true, ParticleSystemStopBehavior.StopEmittingAndClear );
+		m_sparkParticles.Play();
 	}
 
 	/// <summary>
