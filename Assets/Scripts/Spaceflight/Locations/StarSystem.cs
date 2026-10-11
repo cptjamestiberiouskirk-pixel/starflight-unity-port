@@ -245,22 +245,8 @@ public class StarSystem : MonoBehaviour
 		// turn skybox autorotate back on
 		StarflightSkybox.m_instance.m_autorotateSkybox = true;
 
-		// change the color of the sun
-		Color color;
-
-		switch ( m_currentStar.m_class )
-		{
-			case "M": color = new Color( 1.0f, 0.0f, 0.0f ); break;
-			case "K": color = new Color( 1.0f, 0.4f, 0.0f ); break;
-			case "G": color = new Color( 1.0f, 1.0f, 0.0f ); break;
-			case "F": color = new Color( 1.0f, 1.0f, 1.0f ); break;
-			case "A": color = new Color( 0.0f, 1.0f, 0.0f ); break;
-			case "B": color = new Color( 0.4f, 0.4f, 1.0f ); break;
-			case "O": color = new Color( 0.0f, 0.0f, 0.8f ); break;
-			default: color = new Color( 1.0f, 0.5f, 1.0f ); break;
-		}
-
-		m_shine.SetColor( color );
+		// change the color of the sun (the colour of real stars of its class, the same as the system map's star)
+		m_shine.SetColor( SystemDisplay.GetStarColor( m_currentStar.m_class ) );
 
 		// turn off all the planets
 		for ( var i = 0; i < GD_Star.c_maxNumPlanets; i++ )
