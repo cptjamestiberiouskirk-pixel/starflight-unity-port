@@ -74,6 +74,10 @@ public class PD_General
 	// various game play variables
 	public bool m_mechan9Unlocked;
 
+	// the first of the Thrynn and the Elowan the crew opened a comm link with (None until then, and in older save files) - the other race holds it against the crew
+	// (STRINFO 2.4 and 2.5)
+	public GameData.Race m_firstContactRace;
+
 	// true once a Black Egg has destroyed the Crystal Planet at its control nexus: the game is won, and no star flares any more (the original's ?WIN, disys.txt ?FLARE)
 	public bool m_gameWon;
 

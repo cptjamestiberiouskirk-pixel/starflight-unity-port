@@ -249,6 +249,34 @@ public class PD_CrewAssignment
 		}
 	}
 
+	// return true if there is at least one (living) crew member of this race (by the race of the game data's crew race: an Elowan, a Thrynn, a Veloxi)
+	public bool HasCrewOfRace( GameData.Race race )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		for ( var role = Role.First; role < Role.Count; role++ )
+		{
+			if ( !IsAssigned( role ) )
+			{
+				continue;
+			}
+
+			var personnelFile = GetPersonnelFile( role );
+
+			if ( ( personnelFile == null ) || ( personnelFile.m_vitality <= 0 ) || ( personnelFile.m_crewRaceId < 0 ) || ( personnelFile.m_crewRaceId >= gameData.m_crewRaceList.Length ) )
+			{
+				continue;
+			}
+
+			if ( gameData.m_crewRaceList[ personnelFile.m_crewRaceId ].m_race == race )
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	// return true if there is at least one (living) human crew member
 	public bool HasAtLeastOneHumanCrew()
 	{

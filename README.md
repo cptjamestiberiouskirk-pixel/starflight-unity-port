@@ -152,6 +152,7 @@ The project features a **deterministic visualization system** that renders plane
 - The Veloxi demand a tribute of Endurium, and the Crystal Orb or the Ellipsoid when the ship carries one, and attack a crew that refuses
 - The Thrynn buy artifacts at their own prices and plutonium for Endurium, and sell the Black Box for 30 Endurium
 - The Elowan, Thrynn, Spemin and Veloxi have moods: the player's posture calms or angers them, they grovel to a stronger ship, tire of talking, and fight or flee once too agitated to talk
+- The Elowan and the Thrynn hold the crew's friendship with the other race against it, and a crew member of the aliens' own race understands every word they say
 - Complete combat system with lasers, missiles, shields, armor
 - Ship destruction with debris spawning
 - A model with debris for every alien vessel of the game data (hand-made or procedural stand-ins)
