@@ -17,6 +17,10 @@ public class PD_TerrainVehicle
 	// false in older save files)
 	public bool m_isLost;
 
+	// whether the stunner is mounted rather than the laser (the manual, page 21: "Your Terrain Vehicle is equipped with a laser and a stunner") - the laser in older
+	// save files
+	public bool m_stunnerMounted;
+
 	// the fine for a lost terrain vehicle (STRINFO 1.2: "you have been fined 10,000 MU")
 	public const int c_lossFine = 10000;
 

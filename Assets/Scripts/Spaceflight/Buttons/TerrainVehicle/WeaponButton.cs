@@ -1,4 +1,5 @@
-﻿
+// the terrain vehicle's weapons: Fire, Switch (the laser or the stunner) and Back (the manual, page 21: "Your Terrain Vehicle is equipped with a laser and a stunner.
+// You can choose which one to fire through the Weapons option.")
 public class WeaponButton : ShipButton
 {
 	public override string GetLabel()
@@ -8,18 +9,14 @@ public class WeaponButton : ShipButton
 
 	public override bool Execute()
 	{
-		SpaceflightController.m_instance.m_messages.Clear();
+		var terrainVehicle = DataController.m_instance.m_playerData.m_terrainVehicle;
 
-		// check for hostile lifeforms (currently none implemented)
-		// in the future, this would check for nearby hostile creatures
-		SpaceflightController.m_instance.m_messages.AddText(
-			"<color=yellow>Weapon Systems:</color>\n" +
-			"<color=white>No hostile lifeforms detected.\n" +
-			"Terrain vehicle weapons standing by.</color>"
-		);
+		SpaceflightController.m_instance.m_messages.Clear();
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>The " + ( terrainVehicle.m_stunnerMounted ? "stunner" : "laser" ) + " is mounted. Fire hits the nearest lifeform within its range.</color>" );
 
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
-		SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
+		SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.TerrainVehicleWeapon );
 
 		return false;
 	}
