@@ -27,6 +27,10 @@ public class ClaudeProbe : MonoBehaviour
 	const string c_tag = "[ClaudeProbe] ";
 
 	static int s_exceptionCount;
+
+	// errors logged with Debug.LogError or by Unity itself (not exceptions), and the last of them
+	static int s_errorCount;
+	static string s_lastError;
 	static readonly Dictionary<string, int> s_exceptions = new Dictionary<string, int>();
 	static bool s_saveSystemSwapped;
 	static bool s_spaceflightReady;
@@ -141,6 +145,14 @@ public class ClaudeProbe : MonoBehaviour
 
 	static void OnLog( string condition, string stackTrace, LogType type )
 	{
+		if ( type == LogType.Error )
+		{
+			s_errorCount++;
+			s_lastError = condition;
+
+			return;
+		}
+
 		if ( type != LogType.Exception )
 		{
 			return;
@@ -503,6 +515,10 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "weaponpictures":
 				yield return ScenarioWeaponPictures();
+				break;
+
+			case "transporterpictures":
+				yield return ScenarioTransporterPictures();
 				break;
 
 			case "perframe":
@@ -8796,6 +8812,219 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=weaponpictures parts=" + parts + " drawnWrong=" + drawnWrong.Count + " exhaust=" + exhaustAtPause + "/" + exhaustAfterASecond + " pictures=" + s_explosionPictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
+	// ---------------------------------------------------------------- Low: transporter pictures (what a pickup's transporter effect is drawn with, what it does to the object, and pictures of it with -Graphics)
+
+	// render the main camera into a PNG with the camera covering the whole picture (with its own rect, an image effect between the opaque and the transparent objects puts the transparent ones in the wrong place in the picture)
+	static void RenderWholeFramePicture( Camera camera, string path )
+	{
+		var rect = camera.rect;
+
+		camera.rect = new Rect( 0.0f, 0.0f, 1.0f, 1.0f );
+
+		RenderCameraPicture( camera, path );
+
+		camera.rect = rect;
+	}
+
+	// the renderers of a transporter effect: those under the object that are not its own, and those of a shimmer object of its own in the world
+	static List<Renderer> TransporterRenderers( GameObject pickedUp, List<Renderer> objectRenderers )
+	{
+		var renderers = new List<Renderer>();
+
+		if ( pickedUp != null )
+		{
+			foreach ( var renderer in pickedUp.GetComponentsInChildren<Renderer>( true ) )
+			{
+				if ( !objectRenderers.Contains( renderer ) )
+				{
+					renderers.Add( renderer );
+				}
+			}
+		}
+
+		var shimmer = GameObject.Find( "Transporter Shimmer" );
+
+		if ( shimmer != null )
+		{
+			renderers.AddRange( shimmer.GetComponentsInChildren<Renderer>( true ) );
+		}
+
+		return renderers;
+	}
+
+	IEnumerator ScenarioTransporterPictures()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+
+		EnsureCrew();
+
+		// ---- into the terrain vehicle on planet 90, the way the terrain scenario does it
+		yield return EnterOrbit( 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		PressButton( ButtonController.ButtonSet.CommandA, 1 );
+
+		yield return WaitForLocation( PD_General.Location.Disembarked, 15.0f );
+		yield return Frames( 10 );
+
+		if ( playerData.m_general.m_location != PD_General.Location.Disembarked )
+		{
+			Finish( "scenario=transporterpictures abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var terrainGrid = controller.m_disembarked.m_terrainGrid;
+		var terrainVehicle = controller.m_terrainVehicle;
+		var deposits = terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true );
+
+		if ( deposits.Length < 1 )
+		{
+			Finish( "scenario=transporterpictures abort: the planet has no deposits", 2 );
+			yield break;
+		}
+
+		// one deposit in front of the terrain vehicle, every other deposit out of reach
+		var near = deposits[ 0 ];
+
+		foreach ( var other in deposits )
+		{
+			if ( ( other != near ) && ( Vector3.Distance( other.transform.position, terrainVehicle.transform.position ) < 60.0f ) )
+			{
+				other.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		// in front of the terrain vehicle as the camera sees it (up the screen), at the same height
+		var screenUp = Camera.main.transform.up;
+		var upTheScreen = new Vector3( screenUp.x, 0.0f, screenUp.z ).normalized;
+
+		near.transform.position = terrainVehicle.transform.position + upTheScreen * 7.0f;
+
+		var pickedUp = near.gameObject;
+		var objectRenderers = new List<Renderer>( pickedUp.GetComponentsInChildren<Renderer>( true ) );
+		var size = 0.0f;
+		var rendererNames = new List<string>();
+
+		foreach ( var renderer in objectRenderers )
+		{
+			size = Mathf.Max( size, renderer.bounds.size.magnitude );
+			rendererNames.Add( renderer.name + " at " + renderer.bounds.center.ToString( "F1" ) + " size " + renderer.bounds.size.ToString( "F1" ) );
+		}
+
+		Log( "transporterpictures: terrain vehicle at " + terrainVehicle.transform.position.ToString( "F1" ) + ", deposit at " + near.transform.position.ToString( "F1" ) + ", its renderers: " + string.Join( "; ", rendererNames ) );
+
+		yield return Frames( 5 );
+
+		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "transporter-pictures" ) );
+		var camera = Camera.main;
+
+		if ( hasGraphics )
+		{
+			System.IO.Directory.CreateDirectory( folder );
+
+			// game time goes up by a thirtieth of a second a frame, so the pictures are at the same moments in every run
+			Time.captureDeltaTime = 1.0f / 30.0f;
+
+			RenderWholeFramePicture( camera, System.IO.Path.Combine( folder, "t0000ms.png" ) );
+		}
+
+		// ---- pick it up: the transporter effect takes a second and a half, then the object is gone
+		var errorsBefore = s_errorCount;
+
+		new TVCargoButton().Execute();
+
+		var start = Time.frameCount;
+		var pictures = 0;
+		var drawnWrong = new List<string>();
+		var parts = 0;
+		var objectQueue = -1;
+
+		foreach ( var frameTime in new int[] { 3, 9, 18, 27, 36, 43 } )
+		{
+			while ( Time.frameCount - start < frameTime )
+			{
+				yield return null;
+			}
+
+			// ---- 1. what the effect is drawn with, and what it did to the object's own materials (looked at once, while it plays)
+			if ( frameTime == 9 )
+			{
+				foreach ( var renderer in TransporterRenderers( pickedUp, objectRenderers ) )
+				{
+					var material = renderer.sharedMaterial;
+
+					parts++;
+
+					if ( ( material == null ) || ( material.shader.name == "Standard" ) || ( material.shader.name == "Particles/Standard Unlit" ) || ( material.renderQueue < 3000 ) )
+					{
+						drawnWrong.Add( renderer.name + " (" + ( ( material == null ) ? "no material" : material.shader.name + ", queue " + material.renderQueue ) + ")" );
+					}
+				}
+
+				foreach ( var renderer in objectRenderers )
+				{
+					if ( ( renderer != null ) && ( renderer.sharedMaterial != null ) )
+					{
+						objectQueue = Mathf.Max( objectQueue, renderer.sharedMaterial.renderQueue );
+					}
+				}
+			}
+
+			if ( hasGraphics )
+			{
+				RenderWholeFramePicture( camera, System.IO.Path.Combine( folder, "t" + ( frameTime * 1000 / 30 ).ToString( "D4" ) + "ms.png" ) );
+				pictures++;
+			}
+		}
+
+		Time.captureDeltaTime = 0.0f;
+
+		// the effect runs on game time, which headless runs can make run slower than real time: wait for 3 s of it (and 20 s of real time at the most)
+		var gameWaitEnd = Time.time + 3.0f;
+		var realWaitEnd = Time.realtimeSinceStartup + 20.0f;
+
+		while ( ( pickedUp != null ) && ( Time.time < gameWaitEnd ) && ( Time.realtimeSinceStartup < realWaitEnd ) )
+		{
+			yield return null;
+		}
+
+		var goneAfter = Time.frameCount - start;
+		var errorsDuring = s_errorCount - errorsBefore;
+
+
+		Log( "transporterpictures: a deposit " + size.ToString( "F2" ) + " across picked up: " + parts + " effect parts, drawn with the lit or opaque shaders: " + ( ( drawnWrong.Count == 0 ) ? "none" : string.Join( ", ", drawnWrong ) ) + "; the object's materials in queue " + objectQueue + " while it plays; the object gone " + ( pickedUp == null ) + " after " + goneAfter + " frames" );
+
+		Check( "transporterpictures: the transporter effect is drawn transparent, not with the Standard or untextured particle shaders", ( parts > 0 ) && ( drawnWrong.Count == 0 ), ( drawnWrong.Count == 0 ) ? "all " + parts + " parts" : string.Join( ", ", drawnWrong ) );
+		Check( "transporterpictures: the object keeps its own rendering while it is beamed up (no depth writes switched off)", ( objectQueue > 0 ) && ( objectQueue < 3000 ), "queue " + objectQueue );
+		Check( "transporterpictures: the object is gone once the effect is over (control)", pickedUp == null, "gone " + ( pickedUp == null ) );
+		Check( "transporterpictures: no error is logged while the effect plays", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		// ---- 2. control: the effect does not draw from the game's random numbers
+		var probeObject = GameObject.CreatePrimitive( PrimitiveType.Cube );
+
+		probeObject.transform.position = terrainVehicle.transform.position + Vector3.right * 30.0f;
+
+		var stateBefore = JsonUtility.ToJson( UnityEngine.Random.state );
+
+		probeObject.AddComponent<TransporterEffect>().Play();
+
+		var stateAfter = JsonUtility.ToJson( UnityEngine.Random.state );
+
+		Check( "transporterpictures: the transporter effect leaves the game's random numbers alone", stateBefore == stateAfter, ( stateBefore == stateAfter ) ? "Random.state unchanged" : "Random.state changed" );
+
+		yield return new WaitForSecondsRealtime( 2.0f );
+
+		Log( "transporterpictures: " + pictures + " pictures" + ( hasGraphics ? " in " + folder : " (no graphics device; run probe.ps1 with -Graphics for them)" ) );
+
+		Finish( "scenario=transporterpictures parts=" + parts + " drawnWrong=" + drawnWrong.Count + " objectQueue=" + objectQueue + " gone=" + ( pickedUp == null ) + " errors=" + errorsDuring + " pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
 	// ---------------------------------------------------------------- Low: what the displays cost every frame (the status display, the terrain vehicle display)
 
 	// something for the control measurement to hold on to
@@ -9170,7 +9399,7 @@ public class ClaudeProbe : MonoBehaviour
 			yield break;
 		}
 
-		// ---- 1. the materials of a deposit that is picked up: its transporter effect makes its own copies of them
+		// ---- 1. the materials of a deposit that is picked up: its transporter effect used to make its own copies of them (and had to destroy them); it uses the shared effect materials now and copies none
 		yield return Frames( 5 );
 
 		var materialsBefore = MaterialCount();
@@ -9188,7 +9417,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "leaks: materials in memory: " + materialsBefore + " before the pickup, " + materialsDuring + " during the transporter effect, " + materialsAfter + " after the deposit is gone" );
 
-		Check( "leaks: the materials of a transporter effect go with it", ( materialsDuring > materialsBefore ) && ( materialsAfter <= materialsBefore ), materialsBefore + " before, " + materialsDuring + " during, " + materialsAfter + " after" );
+		Check( "leaks: a transporter effect leaves no materials behind", materialsAfter <= materialsBefore, materialsBefore + " before, " + materialsDuring + " during, " + materialsAfter + " after" );
 
 		// ---- 2. leaving the spaceflight scene. The save panel is opened and closed first, as a player who saves does (the panel lives in the persistent scene)
 		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.Planetside );
