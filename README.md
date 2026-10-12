@@ -130,7 +130,7 @@ The project features a **deterministic visualization system** that renders plane
 - The original's special artifacts in the ruins of their sites, picked up by the terrain vehicle, with the Most Magnificent Hexagon and the City of the Ancients around two of them
 - The terrain vehicle drops cargo from its hold and picks it up again, with a cargo display while the cargo list is open
 - The Crystal Planet's field damages a ship in orbit that does not carry the Crystal Orb
-- The Black Egg: dropped by the terrain vehicle it is armed, and back in orbit it counts down and destroys the planet (the Crystal Planet only at its control nexus)
+- The Black Egg: the terrain vehicle takes it out of the ship's hold when it goes out (as it takes the Flat Device), dropped by the terrain vehicle it is armed, and back in orbit it counts down and destroys the planet (the Crystal Planet only at its control nexus)
 - The Crystal Cone locates the Crystal Planet's control nexus from orbit
 - The Tesseract halves the fuel the engines use in hyperspace
 - The Whining Orb translates the Spemin
@@ -140,11 +140,12 @@ The project features a **deterministic visualization system** that renders plane
 - The Shimmering Ball cloaks the ship in combat until it fires
 - The Flat Device shields the terrain vehicle: lifeforms hit its crew half as often
 - The Red Cylinder flashes on the landing map near the planet's ancient ruins
+- The ancient ruins STRINFO's editors place, on the Mechans' ice planet and deep in Elowan space, hold their Endurium
 - Continuum fluxes can be seen only with the Ring Device aboard
 - The price of Endurium rises with the notices of 20-02 and 15-05, and the Starport buys it back for what it sells it for
 - Nebulae keep the shields down
 - The Starport repairs the ship at the price of its armor
-- A distress call gets the ship towed home, for a fine that grows with the distance from Arth
+- A distress call, once confirmed, gets the ship towed home, for a fine that grows with the distance from Arth
 - Alien ships have the armor, shields and speed of their vessels in the game data
 - The starmap shows the fuel needed to fly to the cursor
 - Planets can be recommended for colonization, and Interstel pays a bonus or fines the crew at the Starport
@@ -162,6 +163,7 @@ The project features a **deterministic visualization system** that renders plane
 - Encounters that guard planets from orbit, fought over the planet's own surface; a Veloxi drone grants permission to orbit to a crew that answers its numbers the Veloxi way
 - The Spemin, Thrynn and Veloxi home fleets warn a ship off their homeworlds, more sternly each time, and attack after the last warning
 - The Spemin, Thrynn and Veloxi give up after losing half of their ships: they stop fighting and surrender
+- The crew tells the captain when the aliens raise or lower their shields and arm or disarm their weapons, and Analysis gives their shields' class and whether they are up
 - The Elowan give 15 cubic meters of Endurium to a crew whose need for energy is dire, and see through one that has 20 or more
 - The Veloxi demand a tribute of Endurium, and the Crystal Orb or the Ellipsoid when the ship carries one, and attack a crew that refuses
 - The Thrynn buy artifacts at their own prices and plutonium for Endurium, and sell the Black Box for 30 Endurium

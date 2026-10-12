@@ -3,6 +3,11 @@ using UnityEngine;
 
 public class DisembarkButton : ShipButton
 {
+	// the artifacts the terrain vehicle takes out of the ship's hold every time it goes out (the original's disembark, TV-OV WEE39): the Flat Device, whose shield is
+	// around the terrain vehicle, and the Black Egg, which is armed by dropping it from the terrain vehicle's cargo; they come back on board with the rest of its cargo
+	// (Planetside.TransferTerrainVehicleCargo)
+	static readonly string[] c_artifactsTheTerrainVehicleTakes = { "Flat Device", "Black Egg" };
+
 	// if this is true we are transitioning to disembarked
 	bool m_isTransitioning;
 
@@ -112,10 +117,14 @@ public class DisembarkButton : ShipButton
 				// display message
 				SpaceflightController.m_instance.m_messages.Clear();
 
-				SpaceflightController.m_instance.m_messages.AddText( "<color=white>Stand by, scanning planet...</color>" );
+				// the original's words (SHIPBUTTONS: "STANDBY...SCANNING PLANET.")
+				SpaceflightController.m_instance.m_messages.AddText( "<color=white>Standby...scanning planet.</color>" );
 
 				// refuel the terrain vehicle
 				playerData.m_terrainVehicle.Refuel();
+
+				// it takes the Black Egg and the Flat Device with it
+				TakeArtifactsIntoTerrainVehicle( playerData );
 
 				// reset the message state and timer
 				m_messageState = 0;
@@ -134,9 +143,10 @@ public class DisembarkButton : ShipButton
 		{
 			m_messageTimer += Time.deltaTime;
 
-			if ( m_messageTimer >= 0.65f )
+			// (the four lines come within the map's fade of 2 seconds)
+			if ( m_messageTimer >= 0.4f )
 			{
-				m_messageTimer -= 0.65f;
+				m_messageTimer -= 0.4f;
 
 				switch ( m_messageState )
 				{
@@ -149,6 +159,11 @@ public class DisembarkButton : ShipButton
 						break;
 
 					case 2:
+						// the hull check ends before the terrain vehicle goes out, as the original's (HP-OV, C+OPARMS: "HULL CHECK COMPLETE")
+						SpaceflightController.m_instance.m_messages.AddText( "<color=white>Hull check complete.</color>" );
+						break;
+
+					case 3:
 						SpaceflightController.m_instance.m_messages.AddText( "<color=white>Activating terrain vehicle.</color>" );
 						break;
 
@@ -170,5 +185,25 @@ public class DisembarkButton : ShipButton
 
 		// always return true to prevent player from chagning buttons while transitioning to the docking bay
 		return true;
+	}
+
+	// moves one of each of the artifacts the terrain vehicle takes from the ship's hold into the terrain vehicle's (as the original does, without a message and
+	// whatever room is left in the terrain vehicle)
+	static void TakeArtifactsIntoTerrainVehicle( PlayerData playerData )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		foreach ( var artifactName in c_artifactsTheTerrainVehicleTakes )
+		{
+			var artifactId = gameData.FindArtifactId( artifactName );
+
+			// only an artifact the ship has on board
+			if ( ( artifactId >= 0 ) && playerData.m_playerShip.RemoveArtifact( artifactName ) )
+			{
+				playerData.m_terrainVehicle.AddArtifact( artifactId );
+
+				Debug.Log( "The terrain vehicle takes the " + artifactName + " out of the ship's hold." );
+			}
+		}
 	}
 }

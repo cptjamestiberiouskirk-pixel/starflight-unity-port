@@ -70,6 +70,11 @@ public class Encounter : MonoBehaviour
 	// current dolly distance
 	float m_currentOffset;
 
+	// whether the aliens' shields and weapons have been looked at since the encounter was shown, and what they were (a change is reported, as the original's <AUX>)
+	bool m_shieldsAndWeaponsKnown;
+	bool m_aliensHadShieldsUp;
+	bool m_aliensWereArmed;
+
 	// unity start
 	void Start()
 	{
@@ -350,6 +355,9 @@ public class Encounter : MonoBehaviour
 				UpdateAlienCombat();
 				break;
 		}
+
+		// tell the captain when the aliens raise or lower their shields, or arm or disarm their weapons
+		UpdateShieldsAndWeaponsNews();
 
 		// do we want to update the ships (both alien and player)?
 		if ( !m_pdEncounter.m_connected )
@@ -658,6 +666,9 @@ public class Encounter : MonoBehaviour
 
 		// show the hyperspace objects
 		gameObject.SetActive( true );
+
+		// the aliens' shields and weapons are taken as they are when the encounter shows, without a word (the original's IAPWR sets them without one)
+		m_shieldsAndWeaponsKnown = false;
 
 		// show the main encounter location stuff
 		m_main.SetActive( true );
@@ -2604,6 +2615,114 @@ public class Encounter : MonoBehaviour
 		}
 
 		return ( GetStrengthDifferential( personality ) > 0.0f ) ? GD_Comm.Stance.Obsequious : GD_Comm.Stance.Hostile;
+	}
+
+	// true if a ship of this encounter that is still there matches (the original's IAPWR looks over the encounter's ships for shields and for weapons)
+	bool AnyAlienShipHas( System.Func<GD_Vessel, bool> match )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		var alienShipList = m_pdEncounter.GetAlienShipList();
+
+		if ( alienShipList == null )
+		{
+			return false;
+		}
+
+		foreach ( var alienShip in alienShipList )
+		{
+			if ( ( alienShip == null ) || alienShip.m_isDead || ( alienShip.m_vesselId < 0 ) || ( alienShip.m_vesselId >= gameData.m_vesselList.Length ) )
+			{
+				continue;
+			}
+
+			if ( match( gameData.m_vesselList[ alienShip.m_vesselId ] ) )
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	// true while the aliens surrender: cowardly and obsequious (the original's WEA24 lowers their shields and disarms their weapons then)
+	bool AliensAreSurrendering( GD_Comm.Stance posture )
+	{
+		return m_pdEncounter.m_aliensAreCowardly && ( posture == GD_Comm.Stance.Obsequious );
+	}
+
+	// reports a change of the aliens' shields or weapons, in the original's words (COMM-OV: RAISE-SHIELDS, LOWER-SHIELDS, ARM-WEAPONS and DISARM-WEAPONS say
+	// "CAPTAIN, THEY'VE RAISED THEIR SHIELDS." and so on) - the state the encounter begins with is taken without a word, as is everything once no alien ship is left
+	void UpdateShieldsAndWeaponsNews()
+	{
+		if ( !HasLivingAlienShips() )
+		{
+			return;
+		}
+
+		var shieldsUp = AliensHaveShieldsUp();
+		var armed = AliensAreArmed();
+
+		if ( !m_shieldsAndWeaponsKnown )
+		{
+			m_shieldsAndWeaponsKnown = true;
+			m_aliensHadShieldsUp = shieldsUp;
+			m_aliensWereArmed = armed;
+
+			return;
+		}
+
+		if ( shieldsUp != m_aliensHadShieldsUp )
+		{
+			m_aliensHadShieldsUp = shieldsUp;
+
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Captain, they've " + ( shieldsUp ? "raised" : "lowered" ) + " their shields.</color>" );
+		}
+
+		if ( armed != m_aliensWereArmed )
+		{
+			m_aliensWereArmed = armed;
+
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Captain, they've " + ( armed ? "armed" : "disarmed" ) + " their weapons.</color>" );
+		}
+	}
+
+	// whether the aliens have raised their shields, as the original's ?A-SHIELDS-UP (COMM-OV, <AUX>): up when a ship of the encounter has shields and their
+	// posture is not friendly, never for the Spemin, and down once they surrender
+	public bool AliensHaveShieldsUp()
+	{
+		if ( ( m_pdEncounter == null ) || ( m_gdEncounter == null ) || ( m_gdEncounter.m_race == GameData.Race.Spemin ) )
+		{
+			return false;
+		}
+
+		var posture = GetAlienTalkStance();
+
+		if ( ( posture == GD_Comm.Stance.Friendly ) || AliensAreSurrendering( posture ) )
+		{
+			return false;
+		}
+
+		return AnyAlienShipHas( vessel => vessel.m_shields > 0 );
+	}
+
+	// whether the aliens have armed their weapons, as the original's ?A-WEAP (COMM-OV, <AUX>): armed when a ship of the encounter has weapons and their
+	// posture is hostile, never while they surrender
+	public bool AliensAreArmed()
+	{
+		if ( ( m_pdEncounter == null ) || ( m_gdEncounter == null ) )
+		{
+			return false;
+		}
+
+		var posture = GetAlienTalkStance();
+
+		if ( ( posture != GD_Comm.Stance.Hostile ) || AliensAreSurrendering( posture ) )
+		{
+			return false;
+		}
+
+		return AnyAlienShipHas( vessel => ( vessel.m_laserClass > 0 ) || ( vessel.m_missileClass > 0 ) || vessel.m_hasPlasmaBolts );
 	}
 
 	// the stance whose lines the aliens say: their mood's posture where the mood decides (a hostile posture is abusive talk, not an attack), else their stance
