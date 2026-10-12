@@ -5264,6 +5264,11 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "systemmap: a class A star is blue-white", ( starColorA.b > 0.95f ) && ( starColorA.r < starColorA.b ) && ( starColorA.g > 0.7f ), starColorA.ToString() );
 
+		// the sun of the star system (its shine) has the colour of the map's star
+		var sunColorA = SunColor();
+
+		Check( "systemmap: the sun of a class A star system has the colour of the map's star", ( starColorA.a > 0.0f ) && ( Vector4.Distance( sunColorA, starColorA ) < 0.001f ), "sun " + sunColorA + ", map " + starColorA );
+
 		// ---- 3. the ecosphere of class A: orbits 5 to 7, half way to the orbits on either side (137.5 to 212.5 map units)
 		var ecosphereTransform = systemDisplay.transform.Find( "Ecosphere" );
 		var ecosphere = ( ecosphereTransform != null ) ? ecosphereTransform.GetComponent<UnityEngine.UI.Image>() : null;
@@ -5375,9 +5380,22 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "systemmap: in the next system every planet shows its own new map, none of the last system's", ( planets25 == 5 ) && ( mapped25 == planets25 ) && ( stale == 0 ), mapped25 + " of " + planets25 + ", " + stale + " from star 156" );
 		Check( "systemmap: the empty orbits of Arth's system are hidden (control)", emptyOrbitsHidden == 3, emptyOrbitsHidden + " of 3" );
 		Check( "systemmap: a class G star is yellow-white", ( starColorG.r > 0.95f ) && ( starColorG.b < starColorG.r ) && ( starColorG.g > 0.8f ), starColorG.ToString() );
+
+		var sunColorG = SunColor();
+
+		Check( "systemmap: the sun of a class G star system has the colour of the map's star", ( starColorG.a > 0.0f ) && ( Vector4.Distance( sunColorG, starColorG ) < 0.001f ), "sun " + sunColorG + ", map " + starColorG );
 		Check( "systemmap: the star field shows a part of its own for each star", ( starField != null ) && ( starField.texture != null ) && ( starFieldRect156 != starFieldRect25 ) && ( starFieldRect25.width > 0.0f ), starFieldRect156 + " / " + starFieldRect25 );
 
 		Finish( "scenario=systemmap planets156=" + mapped + "/" + planets + " planets25=" + mapped25 + "/" + planets25 + " heading=" + eastAngle.ToString( "F0" ) + "," + southAngle.ToString( "F0" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the colour of the shine of the star system's sun (what StarSystem.Show set last)
+	static Color SunColor()
+	{
+		var shine = SpaceflightController.m_instance.m_starSystem.m_shine;
+		var renderer = ( shine != null ) ? shine.GetComponent<MeshRenderer>() : null;
+
+		return ( renderer != null ) ? renderer.material.GetColor( "_Color" ) : Color.clear;
 	}
 
 	// waits until the planets of the star system have their maps

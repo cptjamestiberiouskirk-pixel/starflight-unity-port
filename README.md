@@ -32,7 +32,7 @@ The project has been refactored to a clean, **root-directory architecture** to e
 - **Cargo Management**: Real-time volume tracking for minerals and elements with automatic transfer to the ship. A mineral deposit holds 1 to 5 cubic meters.
 - **Original Economy in Builds**: A new game in a build starts with the original 12,000 MU (the Editor keeps 1,000,000 for testing), and the bank and the notices show stardates as the original did (`26-03-4620`).
 - **Debris Scanning**: Scan destroyed vessel wreckage for salvage analysis.
-- **Realistic System Map**: The console's System Map shows each planet with its own surface, lit from its star and sized by its mass, a glowing star in the colour of real stars of its class, orbit trails, the star's ecosphere, a star field, and the ship's heading (built by `DevTools/SystemMap`, see its [README](DevTools/SystemMap/README.md)).
+- **Realistic System Map**: The console's System Map shows each planet with its own surface, lit from its star and sized by its mass, a glowing star in the colour of real stars of its class (the sun of the star system view has the same colour), orbit trails, the star's ecosphere, a star field, and the ship's heading (built by `DevTools/SystemMap`, see its [README](DevTools/SystemMap/README.md)).
 
 ---
 
