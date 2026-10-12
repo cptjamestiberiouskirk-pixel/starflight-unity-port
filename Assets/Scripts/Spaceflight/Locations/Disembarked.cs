@@ -80,6 +80,9 @@ public class Disembarked : MonoBehaviour
 		// hide this location
 		gameObject.SetActive( false );
 
+		// back in the ship: no more weather
+		PlanetWeather.End();
+
 		// reset the buttons
 		SpaceflightController.m_instance.m_buttonController.SetBridgeButtons();
 
@@ -157,6 +160,9 @@ public class Disembarked : MonoBehaviour
 
 		// change the ship display
 		SpaceflightController.m_instance.m_displayController.ChangeDisplay( SpaceflightController.m_instance.m_displayController.m_terrainVehicleDisplay );
+
+		// the weather of the surface begins (PlanetWeather)
+		PlanetWeather.Begin();
 	}
 
 	// this is called when the planet generator is ready

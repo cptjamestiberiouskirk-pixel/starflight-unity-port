@@ -41,6 +41,7 @@ public class LookButton : ShipButton
 		var report = "<color=#FFFF00>You observe your surroundings:</color>\n";
 		report += "Surface: <color=white>" + surface + "</color>\n";
 		report += "Weather: <color=white>" + weather + "</color>\n";
+		report += "Sky: <color=white>" + PlanetWeather.GetSkyText() + "</color>\n";
 		report += "Atmosphere: <color=white>" + atmosphere + "</color>\n";
 		report += "Gravity: <color=white>" + gravityDesc + " (" + gravity + "%)</color>";
 

@@ -97,6 +97,9 @@ public class TerrainVehicle : MonoBehaviour
 			return;
 		}
 
+		// the weather of the surface, rolled every game hour (a storm halves the vehicle's efficiency)
+		PlanetWeather.Update();
+
 		// get to the player data
 		var playerData = DataController.m_instance.m_playerData;
 
@@ -113,7 +116,7 @@ public class TerrainVehicle : MonoBehaviour
 			playerData.m_general.m_currentSpeed = Mathf.Lerp( playerData.m_general.m_currentSpeed, effectiveMaxSpeed, acceleration );
 
 			// use up fuel
-			var fuelAmount = Time.deltaTime * ( m_fuelConsumptionRate * playerData.m_general.m_currentSpeed / m_fuelEfficiency );
+			var fuelAmount = Time.deltaTime * ( m_fuelConsumptionRate * playerData.m_general.m_currentSpeed / GetFuelEfficiency() );
 
 			playerData.m_terrainVehicle.UseUpFuel( fuelAmount );
 		}
@@ -135,8 +138,8 @@ public class TerrainVehicle : MonoBehaviour
 			// uphill is slow
 			m_slopeEfficiency = GetSlopeEfficiency( playerData.m_general.m_coordinates, playerData.m_general.m_currentDirection );
 
-			// calculate the new position of the player (from where it is saved, which holds every push-back)
-			var newPosition = playerData.m_general.m_coordinates + (Vector3) playerData.m_general.m_currentDirection * m_wheelEfficiency * m_slopeEfficiency * playerData.m_general.m_currentSpeed * Time.deltaTime;
+			// calculate the new position of the player (from where it is saved, which holds every push-back; the weather takes its share of the speed)
+			var newPosition = playerData.m_general.m_coordinates + (Vector3) playerData.m_general.m_currentDirection * m_wheelEfficiency * m_slopeEfficiency * PlanetWeather.GetEfficiency() * playerData.m_general.m_currentSpeed * Time.deltaTime;
 
 			// wrap player around the planet
 			var planetWidth = 2048.0f * 4.0f;
@@ -316,7 +319,8 @@ public class TerrainVehicle : MonoBehaviour
 	// return the current fuel efficiency
 	public float GetFuelEfficiency()
 	{
-		return m_fuelEfficiency;
+		// (the weather takes its share: EFF 14% falls to 7% in a storm, as the original shows it)
+		return m_fuelEfficiency * PlanetWeather.GetEfficiency();
 	}
 
 	// an object on the terrain overlaps the terrain vehicle by this much (a negative separation): push the vehicle out of it and slow it down
