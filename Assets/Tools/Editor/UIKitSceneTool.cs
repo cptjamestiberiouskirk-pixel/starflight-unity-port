@@ -368,9 +368,125 @@ public static class UIKitSceneTool
 
 		report.AppendLine( amberLights + " siren lights in the kit's amber" );
 
+		// the target bracket in the viewport (the Figma file's Encounter and Combat mockups)
+		report.AppendLine( MakeTargetBracket( canvas ) );
+
 		EditorSceneManager.MarkSceneDirty( canvas.gameObject.scene );
 
 		return report.ToString();
+	}
+
+	// the length and thickness of a target bracket corner's arms, and the label's size under it
+	const float c_bracketArm = 16.0f;
+	const float c_bracketThickness = 2.0f;
+	const float c_bracketLabelSize = 16.0f;
+
+	// makes (or remakes) the viewport's target bracket: a TargetBracket that covers the viewport, a bracket of four corners (two bars each) that it places
+	// around the target, and a label under it; drawn under the viewport's fade, so that a fade covers it too
+	static string MakeTargetBracket( Transform canvas )
+	{
+		var viewport = canvas.Find( c_viewport.TrimEnd( '/' ) );
+
+		if ( viewport == null )
+		{
+			return "target bracket not made (no viewport at " + c_viewport + ")";
+		}
+
+		var root = viewport.Find( "UI Kit Target" );
+
+		if ( root != null )
+		{
+			Undo.DestroyObjectImmediate( root.gameObject );
+		}
+
+		// (the mask keeps a bracket and its label near the edge inside the viewport, off the console)
+		var rootObject = new GameObject( "UI Kit Target", typeof( RectTransform ), typeof( RectMask2D ), typeof( TargetBracket ) );
+
+		Undo.RegisterCreatedObjectUndo( rootObject, "UI kit" );
+
+		var rootRect = (RectTransform) rootObject.transform;
+
+		rootRect.SetParent( viewport, false );
+		rootRect.anchorMin = Vector2.zero;
+		rootRect.anchorMax = Vector2.one;
+		rootRect.offsetMin = Vector2.zero;
+		rootRect.offsetMax = Vector2.zero;
+
+		// under the fade (the last thing the viewport draws when it fades out)
+		var fade = viewport.Find( "Fade" );
+
+		if ( fade != null )
+		{
+			rootRect.SetSiblingIndex( fade.GetSiblingIndex() );
+		}
+
+		// the bracket, placed and sized by the TargetBracket
+		var bracket = new GameObject( "Bracket", typeof( RectTransform ) );
+		var bracketRect = (RectTransform) bracket.transform;
+
+		bracketRect.SetParent( rootRect, false );
+		bracketRect.anchorMin = new Vector2( 0.5f, 0.5f );
+		bracketRect.anchorMax = new Vector2( 0.5f, 0.5f );
+		bracketRect.pivot = new Vector2( 0.5f, 0.5f );
+		bracketRect.sizeDelta = new Vector2( 120.0f, 80.0f );
+
+		// four corners, each a horizontal and a vertical bar along the bracket's edges
+		var bars = new System.Collections.Generic.List<Graphic>();
+
+		foreach ( var corner in new[] { new Vector2( 0, 1 ), new Vector2( 1, 1 ), new Vector2( 0, 0 ), new Vector2( 1, 0 ) } )
+		{
+			bars.Add( MakeBar( bracketRect, corner, new Vector2( c_bracketArm, c_bracketThickness ) ) );
+			bars.Add( MakeBar( bracketRect, corner, new Vector2( c_bracketThickness, c_bracketArm ) ) );
+		}
+
+		// the label under the bracket, in the kit's small label style (its colour is the TargetBracket's)
+		var label = new GameObject( "Label", typeof( RectTransform ), typeof( CanvasRenderer ), typeof( TMPro.TextMeshProUGUI ) );
+		var labelRect = (RectTransform) label.transform;
+		var labelText = label.GetComponent<TMPro.TextMeshProUGUI>();
+
+		labelRect.SetParent( bracketRect, false );
+		labelRect.anchorMin = new Vector2( 0.5f, 0.0f );
+		labelRect.anchorMax = new Vector2( 0.5f, 0.0f );
+		labelRect.pivot = new Vector2( 0.5f, 1.0f );
+		labelRect.anchoredPosition = new Vector2( 0.0f, -6.0f );
+		labelRect.sizeDelta = new Vector2( 600.0f, 24.0f );
+		labelText.alignment = TMPro.TextAlignmentOptions.Top;
+		labelText.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+		labelText.raycastTarget = false;
+		labelText.text = "Vessel · Range 0";
+
+		Style( labelText, UIText.LabelS, c_bracketLabelSize, UISprite.None, UIColor.Keep );
+
+		var targetBracket = rootObject.GetComponent<TargetBracket>();
+
+		targetBracket.m_bracket = bracketRect;
+		targetBracket.m_bars = bars.ToArray();
+		targetBracket.m_label = labelText;
+
+		// hidden until there is a target
+		bracket.SetActive( false );
+
+		EditorUtility.SetDirty( targetBracket );
+
+		return "target bracket made";
+	}
+
+	// one bar of a target bracket corner: anchored at the corner, reaching into the bracket
+	static Graphic MakeBar( RectTransform bracket, Vector2 corner, Vector2 size )
+	{
+		var bar = new GameObject( "Bar", typeof( RectTransform ), typeof( CanvasRenderer ), typeof( Image ) );
+		var rect = (RectTransform) bar.transform;
+		var image = bar.GetComponent<Image>();
+
+		rect.SetParent( bracket, false );
+		rect.anchorMin = corner;
+		rect.anchorMax = corner;
+		rect.pivot = corner;
+		rect.anchoredPosition = Vector2.zero;
+		rect.sizeDelta = size;
+		image.raycastTarget = false;
+
+		return image;
 	}
 
 	// gives each element of a table its UIKitStyle (a new one, or the one it has) and returns how many were styled; what is not found goes into the report
