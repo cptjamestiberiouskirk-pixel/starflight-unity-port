@@ -8219,7 +8219,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 0
-  m_Color: {r: 1, g: 0.6687182, b: 0, a: 1}
+  m_Color: {r: 1, g: 0.721569, b: 0.301961, a: 1}
   m_Intensity: 1.25
   m_Range: 256
   m_SpotAngle: 90
@@ -9198,7 +9198,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 0
-  m_Color: {r: 1, g: 0.6687182, b: 0, a: 1}
+  m_Color: {r: 1, g: 0.721569, b: 0.301961, a: 1}
   m_Intensity: 1.25
   m_Range: 256
   m_SpotAngle: 90
@@ -18016,7 +18016,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 65535
-  m_fontColor: {r: 1, g: 1, b: 0, a: 0}
+  m_fontColor: {r: 1, g: 0.72156864, b: 0.3019608, a: 0}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -18136,8 +18136,8 @@ MonoBehaviour:
   m_fontSize: 240
   m_lineHeight: 0
   m_sprite: 0
-  m_color: 0
-  m_alpha: 1
+  m_color: 15
+  m_alpha: 0
 --- !u!1 &509318669 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 100000, guid: 587eacac152c1bb4ab15027cb5c69ab4,
@@ -22044,7 +22044,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 0
-  m_Color: {r: 1, g: 0.6687182, b: 0, a: 1}
+  m_Color: {r: 1, g: 0.721569, b: 0.301961, a: 1}
   m_Intensity: 1.25
   m_Range: 256
   m_SpotAngle: 90
@@ -33034,7 +33034,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &974050036
 RectTransform:
   m_ObjectHideFlags: 0
@@ -41660,7 +41660,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 0
-  m_Color: {r: 1, g: 0.6687182, b: 0, a: 1}
+  m_Color: {r: 1, g: 0.721569, b: 0.301961, a: 1}
   m_Intensity: 1.25
   m_Range: 256
   m_SpotAngle: 90
@@ -56908,7 +56908,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 0
-  m_Color: {r: 1, g: 0.6687182, b: 0, a: 1}
+  m_Color: {r: 1, g: 0.721569, b: 0.301961, a: 1}
   m_Intensity: 1.25
   m_Range: 256
   m_SpotAngle: 90
@@ -75357,7 +75357,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 0
-  m_Color: {r: 1, g: 0.6687182, b: 0, a: 1}
+  m_Color: {r: 1, g: 0.721569, b: 0.301961, a: 1}
   m_Intensity: 1.25
   m_Range: 256
   m_SpotAngle: 90
@@ -89347,7 +89347,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 0
-  m_Color: {r: 1, g: 0.6687182, b: 0, a: 1}
+  m_Color: {r: 1, g: 0.721569, b: 0.301961, a: 1}
   m_Intensity: 1.25
   m_Range: 256
   m_SpotAngle: 90
@@ -96131,7 +96131,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 0
-  m_Color: {r: 1, g: 0.6687182, b: 0, a: 1}
+  m_Color: {r: 1, g: 0.721569, b: 0.301961, a: 1}
   m_Intensity: 1.25
   m_Range: 256
   m_SpotAngle: 90
