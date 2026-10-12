@@ -102,7 +102,8 @@ public class Messages : MonoBehaviour
 				m_messagesUI.text += "\n<line-height=25%>\n</line-height>";
 			}
 
-			m_messagesUI.text += playerData.m_general.m_messageList[ i ];
+			// the messages keep the colour tags they were written with, and show in the UI kit's colours
+			m_messagesUI.text += UIKitTheme.KitColors( playerData.m_general.m_messageList[ i ] );
 		}
 
 		m_messagesUI.ForceMeshUpdate();

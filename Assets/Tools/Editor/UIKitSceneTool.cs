@@ -69,6 +69,15 @@ public static class UIKitSceneTool
 			new Entry( c_display + "Sensors/C/Bio \\/ Min", UIText.BodyM, 28, UISprite.None, UIColor.TextSecondary ),
 			new Entry( c_display + "Sensors/B/Instructions", UIText.BodyM, 30, UISprite.None, UIColor.TextAccent ),
 
+			// the terrain map: the display's background, the frames around the map and its legend, the crosshairs of the site selection
+			new Entry( c_display + "Terrain Map", UIText.None, 0, UISprite.None, UIColor.BackgroundPanel ),
+			new Entry( c_display + "Terrain Map/GameObject/Map Frame", UIText.None, 0, UISprite.None, UIColor.BorderDefault ),
+			new Entry( c_display + "Terrain Map/GameObject/Legend Frame", UIText.None, 0, UISprite.None, UIColor.BorderDefault ),
+			new Entry( c_display + "Terrain Map/Select Site/Horizontal Crosshair/Outline", UIText.None, 0, UISprite.None, UIColor.BackgroundApp ),
+			new Entry( c_display + "Terrain Map/Select Site/Horizontal Crosshair/Center", UIText.None, 0, UISprite.None, UIColor.AccentPrimary ),
+			new Entry( c_display + "Terrain Map/Select Site/Vertical Crosshair/Outline", UIText.None, 0, UISprite.None, UIColor.BackgroundApp ),
+			new Entry( c_display + "Terrain Map/Select Site/Vertical Crosshair/Center", UIText.None, 0, UISprite.None, UIColor.AccentPrimary ),
+
 			// the terrain map's site selection
 			new Entry( c_display + "Terrain Map/Select Site/Label", UIText.HeadingM, 26, UISprite.None, UIColor.TextAccent ),
 			new Entry( c_display + "Terrain Map/Select Site/Coordinates/Latitude Label", UIText.LabelM, 26, UISprite.None, UIColor.TextSecondary ),
@@ -101,6 +110,8 @@ public static class UIKitSceneTool
 			new Entry( c_viewport + "Ships Log/GameObject/GameObject/Entries Mask/Selection Xform/Panel", UIText.None, 0, UISprite.Panel, UIColor.BackgroundHover ),
 			new Entry( c_viewport + "Ships Log/GameObject/Divider", UIText.None, 0, UISprite.None, UIColor.BorderDefault ),
 			new Entry( c_viewport + "Ships Log/GameObject/Message", UIText.BodyM, 30, UISprite.None, UIColor.TextSecondary ),
+			new Entry( c_viewport + "Ships Log/GameObject/GameObject/Entries Mask/Selection Xform/Up Arrow Image", UIText.None, 0, UISprite.None, UIColor.AccentPrimary ),
+			new Entry( c_viewport + "Ships Log/GameObject/GameObject/Entries Mask/Selection Xform/Down Arrow Image", UIText.None, 0, UISprite.None, UIColor.AccentPrimary ),
 
 			// the launch countdown keeps its colour
 			new Entry( c_viewport + "Countdown", UIText.DisplayXL, 240, UISprite.None, UIColor.Keep ),
