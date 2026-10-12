@@ -15,8 +15,19 @@ public class DisplayController : MonoBehaviour
 	public TerrainVehicleDisplay m_terrainVehicleDisplay;
 	public TerrainVehicleCargoDisplay m_terrainVehicleCargoDisplay;
 
+	// the original's DAMAGE display (the scene has no object for it: it is made here)
+	[System.NonSerialized]
+	public DamageDisplay m_damageDisplay;
+
 	// the current display
 	ShipDisplay m_currentDisplay;
+
+	// unity awake
+	void Awake()
+	{
+		// make the damage display, under the other displays
+		m_damageDisplay = DamageDisplay.Create( transform );
+	}
 
 	// unity start
 	void Start()
@@ -43,6 +54,11 @@ public class DisplayController : MonoBehaviour
 		if ( m_terrainVehicleCargoDisplay != null )
 		{
 			m_terrainVehicleCargoDisplay.Hide();
+		}
+
+		if ( m_damageDisplay != null )
+		{
+			m_damageDisplay.Hide();
 		}
 
 		// change the current display
