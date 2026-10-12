@@ -6,7 +6,8 @@ public class AnalysisButton : ShipButton
 		return "Analysis";
 	}
 
-	// how many times the mass of our ship something has, with one decimal (dividing the two whole numbers made everything smaller than our ship "0 times the size")
+	// how many times the mass of our ship something has, as the original's .SIZE (ANALYZE-OV): the whole number when it is at least as big as our ship ("2", "38"),
+	// else "0." and the decimals up to the first one that is not zero ("0.8", "0.04", "0.004")
 	static string GetSizeText( int mass, int shipMass )
 	{
 		// never divide by zero (our ship always has the mass of its hull)
@@ -15,15 +16,67 @@ public class AnalysisButton : ShipButton
 			return "?";
 		}
 
-		var ratio = (float) mass / (float) shipMass;
+		var whole = mass / shipMass;
 
-		// something that has a mass is never "0.0 times" our size
-		if ( ( mass > 0 ) && ( ratio < 0.05f ) )
+		if ( ( whole > 0 ) || ( mass <= 0 ) )
 		{
-			return "less than 0.1";
+			return whole.ToString( System.Globalization.CultureInfo.InvariantCulture );
 		}
 
-		return ratio.ToString( "F1", System.Globalization.CultureInfo.InvariantCulture );
+		var text = "0.";
+		var remainder = mass;
+
+		// (a mass of at least 1 has a digit that is not zero within as many decimals as our ship's mass has digits - 10 is more than enough)
+		for ( var decimalPlace = 0; decimalPlace < 10; decimalPlace++ )
+		{
+			remainder = ( remainder % shipMass ) * 10;
+
+			var digit = remainder / shipMass;
+
+			text += digit.ToString( System.Globalization.CultureInfo.InvariantCulture );
+
+			if ( digit != 0 )
+			{
+				break;
+			}
+		}
+
+		return text;
+	}
+
+	// a line of an alien ship's analysis, or the original's "NOT CERTAIN" when the science officer cannot tell (?.CERTAIN, rolled for each line)
+	static string Certain( string value, int scienceSkill )
+	{
+		return ( UnityEngine.Random.Range( 0.0f, 100.0f ) < scienceSkill / 2.0f ) ? value : "Not certain";
+	}
+
+	// an alien ship's shields, as the original's .SHIELDS (ANALYZE-OV): none apparent with no shields, unknown for the Gazurtoids, else the class equivalent of the
+	// vessel's shields (200 points a class) and whether the aliens have raised them
+	static string GetAlienShieldsText( GD_Vessel vessel )
+	{
+		if ( vessel.m_shields <= 0 )
+		{
+			return "None apparent";
+		}
+
+		if ( vessel.m_race == GameData.Race.Gazurtoid )
+		{
+			return "Unknown";
+		}
+
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var raised = ( DataController.m_instance.m_playerData.m_general.m_location == PD_General.Location.Encounter ) && ( encounter != null ) && encounter.AliensHaveShieldsUp();
+
+		return "Class " + ( vessel.m_shields / 200 ) + " equivalent " + ( raised ? "raised" : "lowered" );
+	}
+
+	// an alien ship's weapons, as the original's .WEAP (ANALYZE-OV)
+	static string GetAlienWeaponsText()
+	{
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var armed = ( DataController.m_instance.m_playerData.m_general.m_location == PD_General.Location.Encounter ) && ( encounter != null ) && encounter.AliensAreArmed();
+
+		return armed ? "Armed" : "Not armed";
 	}
 
 	// the reading of a planet the science officer has analyzed last (the 1984 notes, starship.txt: "I have already attempted analysis of this data, Captain" - alien
@@ -133,8 +186,8 @@ public class AnalysisButton : ShipButton
 						// object
 						text += "Object: <color=white>" + vessel.m_object + "</color>\n";
 
-						// size
-						text += "Size: <color=white>" + GetSizeText( vessel.m_mass, playerData.m_playerShip.m_mass ) + " times the size of our ship</color>\n";
+						// size (the original's line has no label)
+						text += "<color=white>" + GetSizeText( vessel.m_mass, playerData.m_playerShip.m_mass ) + " times the size of our ship.</color>\n";
 					}
 					else
 					{
@@ -182,16 +235,16 @@ public class AnalysisButton : ShipButton
 					text += "Object: <color=white>" + vessel.m_object + "</color>\n";
 
 					// type
-					text += "Type: <color=white>" + Known( vessel.m_type, skill ) + "</color>\n";
+					text += "Type: <color=white>" + Certain( vessel.m_type, skill ) + "</color>\n";
 
-					// size
-					text += "Size: <color=white>" + Known( GetSizeText( vessel.m_mass, playerData.m_playerShip.m_mass ) + " times the size of our ship", skill ) + "</color>\n";
+					// size (the original's line has no label, and the science officer is always sure of it)
+					text += "<color=white>" + GetSizeText( vessel.m_mass, playerData.m_playerShip.m_mass ) + " times the size of our ship.</color>\n";
 
 					// shields
-					text += "Shields: <color=yellow>Not certain</color>\n";
+					text += "Shields: <color=white>" + Certain( GetAlienShieldsText( vessel ), skill ) + "</color>\n";
 
 					// weapon status
-					text += "Weapon Status: <color=yellow>Not certain</color>\n";
+					text += "Weapon Status: <color=white>" + Certain( GetAlienWeaponsText(), skill ) + "</color>\n";
 
 					break;
 				}

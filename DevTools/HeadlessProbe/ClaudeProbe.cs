@@ -877,12 +877,24 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCoordinates();
 				break;
 
+			case "alienanalysis":
+				yield return ScenarioAlienAnalysis();
+				break;
+
 			case "tvdisplay":
 				yield return ScenarioTVDisplay();
 				break;
 
 			case "coordinatebar":
 				yield return ScenarioCoordinateBar();
+				break;
+
+			case "statusdisplay":
+				yield return ScenarioStatusDisplay();
+				break;
+
+			case "systemtravel":
+				yield return ScenarioSystemTravel();
 				break;
 
 			default:
@@ -4319,7 +4331,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "M11 bare hull message when done: " + doneMessage );
 		Log( "M11 bare hull repair message with nothing to repair: " + nothingToRepairMessage );
 
-		Check( "M11 a bare hull at 200 of 250 shows 20% damage and a gauge at four fifths", hurtDamageLine.Contains( ">20% Hull Damage<" ) && Mathf.Approximately( hurtArmorGauge, 0.8f ), "status damage line '" + hurtDamageLine + "', armor gauge " + hurtArmorGauge.ToString( "F3" ) );
+		Check( "M11 a bare hull at 200 of 250 shows slight damage (the original's word for four fifths of the hull) and a gauge at four fifths", hurtDamageLine.Contains( ">Slight<" ) && Mathf.Approximately( hurtArmorGauge, 0.8f ), "status damage line '" + hurtDamageLine + "', armor gauge " + hurtArmorGauge.ToString( "F3" ) );
 		Check( "M11 the engineer repairs a bare hull", repairsStarted && ( armorAfter10s == 220 ), "repair started " + repairsStarted + ", armor after 10 s " + armorAfter10s + " (was 200) | " + repairMessage );
 		Check( "M11 the repair of a bare hull stops at its 250 points", ( armorWhenDone == 250 ) && !stillUnderWay && doneMessage.Contains( "completed" ), "armor when done " + armorWhenDone + ", still under way " + stillUnderWay + " | " + doneMessage );
 		Check( "M11 an undamaged bare hull needs no repairs", !startedWithNothingToRepair && nothingToRepairMessage.Contains( "No repairs" ), "started " + startedWithNothingToRepair + " | " + nothingToRepairMessage );
@@ -4343,7 +4355,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "M11 class 2 armor damage report at 300/750: " + class2Report );
 
 		Check( "M11 undamaged class 2 armor shows no damage and a full gauge", ( class2FullDamageLine == "None" ) && Mathf.Approximately( class2FullArmorGauge, 1.0f ), "status damage line '" + class2FullDamageLine + "', armor gauge " + class2FullArmorGauge.ToString( "F3" ) );
-		Check( "M11 class 2 armor at 300 of 750 shows 60% damage and a gauge at two fifths", class2HurtDamageLine.Contains( ">60% Hull Damage<" ) && Mathf.Approximately( class2HurtArmorGauge, 0.4f ), "status damage line '" + class2HurtDamageLine + "', armor gauge " + class2HurtArmorGauge.ToString( "F3" ) );
+		Check( "M11 class 2 armor at 300 of 750 shows heavy damage (the original's word for two fifths of the hull) and a gauge at two fifths", class2HurtDamageLine.Contains( ">Heavy<" ) && Mathf.Approximately( class2HurtArmorGauge, 0.4f ), "status damage line '" + class2HurtDamageLine + "', armor gauge " + class2HurtArmorGauge.ToString( "F3" ) );
 		Check( "M11 the damage report still gives installed armor its own points", class2Report.Contains( "40% (300/750)" ), class2Report );
 
 		// ---- 4. shields: class 1 (500 points) half charged, class 5 (2500 points) fully charged, and none
@@ -7136,13 +7148,23 @@ public class ClaudeProbe : MonoBehaviour
 		sensors.m_hasSensorData = hadSensorData;
 		sensors.m_scanType = scanType;
 
-		var expectedSmall = ( (float) gameData.m_vesselList[ 6 ].m_mass / shipMass ).ToString( "F1", System.Globalization.CultureInfo.InvariantCulture );
-		var expectedLarge = ( (float) gameData.m_vesselList[ 1 ].m_mass / shipMass ).ToString( "F1", System.Globalization.CultureInfo.InvariantCulture );
+		// (the original's size: the whole number, or "0." and the decimals to the first that is not zero - worked out here with decimal, apart from the button's code)
+		var smallRatio = (decimal) gameData.m_vesselList[ 6 ].m_mass / shipMass;
+		var largeRatio = (decimal) gameData.m_vesselList[ 1 ].m_mass / shipMass;
+		var smallDecimals = 1;
+
+		while ( ( smallRatio < 1.0m ) && ( decimal.Truncate( smallRatio * (decimal) Math.Pow( 10, smallDecimals ) ) == 0 ) && ( smallDecimals < 10 ) )
+		{
+			smallDecimals++;
+		}
+
+		var expectedSmall = ( smallRatio >= 1.0m ) ? decimal.Truncate( smallRatio ).ToString( System.Globalization.CultureInfo.InvariantCulture ) : ( decimal.Truncate( smallRatio * (decimal) Math.Pow( 10, smallDecimals ) ) / (decimal) Math.Pow( 10, smallDecimals ) ).ToString( "0." + new string( '0', smallDecimals ), System.Globalization.CultureInfo.InvariantCulture );
+		var expectedLarge = decimal.Truncate( largeRatio ).ToString( System.Globalization.CultureInfo.InvariantCulture );
 
 		Log( "cargo: our ship has a mass of " + shipMass + "; analysis of a vessel of mass " + gameData.m_vesselList[ 6 ].m_mass + ": " + smallVessel );
 		Log( "cargo: analysis of a vessel of mass " + gameData.m_vesselList[ 1 ].m_mass + ": " + largeVessel );
 
-		Check( "cargo: the analysis gives the size of a vessel with one decimal", smallVessel.Contains( ">" + expectedSmall + " times the size" ) && largeVessel.Contains( ">" + expectedLarge + " times the size" ), "expected " + expectedSmall + " and " + expectedLarge + " | " + smallVessel + " | " + largeVessel );
+		Check( "cargo: the analysis gives the size of a vessel as the original does", smallVessel.Contains( ">" + expectedSmall + " times the size of our ship." ) && largeVessel.Contains( ">" + expectedLarge + " times the size of our ship." ), "expected " + expectedSmall + " and " + expectedLarge + " | " + smallVessel + " | " + largeVessel );
 
 		// ---- 3. down to planet 90 and into the terrain vehicle
 		yield return EnterOrbit( 90 );
@@ -10378,7 +10400,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "perframe: status display with half the armor gone: " + damagedText.Replace( '\n', '/' ) );
 
 		Check( "perframe: the status display takes no memory while nothing changes", ( statusBytes == 0 ) && ( statusText == statusTextAfter ) && ( statusText.Length > 20 ), statusBytes + " bytes per frame" );
-		Check( "perframe: the status display still shows what changes", damagedText.Contains( "50% Hull Damage" ) && ( armedText != statusText ) && ( statusTextAtTheEnd == statusText ), "damaged: " + damagedText.Replace( '\n', '/' ) + " | back to: " + statusTextAtTheEnd.Replace( '\n', '/' ) );
+		Check( "perframe: the status display still shows what changes", damagedText.Contains( "Moderate" ) && ( armedText != statusText ) && ( statusTextAtTheEnd == statusText ), "damaged: " + damagedText.Replace( '\n', '/' ) + " | back to: " + statusTextAtTheEnd.Replace( '\n', '/' ) );
 
 		// ---- 2. the terrain vehicle display (planet 90 in the arth system, the way the m10 scenario gets there)
 		yield return EnterOrbit( 90 );
@@ -11740,7 +11762,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "unmapped: next to planet 90 in the star system (" + locationAtThePlanet + "): " + rangeMessage );
 		Log( "unmapped: in orbit around planet 90 (" + playerData.m_general.m_location + "): " + orbitMessage + " | the albedo map of the planet model in orbit is " + orbitAlbedoSize );
 
-		Check( "unmapped: within orbital range the player is told that the planet could not be mapped", rangeMessage.Contains( "within orbital range" ) && rangeMessage.Contains( "could not be mapped" ), rangeMessage );
+		Check( "unmapped: within orbital range the player is told that the planet could not be mapped", rangeMessage.Contains( "Standing by to orbit" ) && rangeMessage.Contains( "could not be mapped" ), rangeMessage );
 		Check( "unmapped: in orbit the player is told so too, and the planet model has the plain maps", orbitMessage.Contains( "Orbit established" ) && orbitMessage.Contains( "could not be mapped" ) && ( orbitAlbedoSize == "4x4" ), orbitMessage + " | albedo " + orbitAlbedoSize );
 
 		// a planet with maps gets no such message (control)
@@ -21473,6 +21495,114 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=coordinates bar=" + bar + " lat=" + latitude + " long=" + longitude, 0 );
 	}
 
+	// ---------------------------------------------------------------- phase 7: the analysis of an alien ship in the original's words
+
+	// the science officer's analysis of a sensor reading of the given kind
+	static string AnalyzeScan( SensorsDisplay.ScanType scanType )
+	{
+		var sensors = SpaceflightController.m_instance.m_displayController.m_sensorsDisplay;
+
+		sensors.m_hasSensorData = true;
+		sensors.m_scanType = scanType;
+
+		new AnalysisButton().Execute();
+
+		return MessageList();
+	}
+
+	IEnumerator ScenarioAlienAnalysis()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// (a science officer of full skill, who gives every line of the analysis)
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer ).m_science = 250;
+
+		// a mechan encounter: its scouts have shields of class 2 and missiles, and the mechans have no mood, so their stance is their posture
+		var mechanId = -1;
+
+		for ( var i = 0; i < gameData.m_encounterList.Length; i++ )
+		{
+			if ( gameData.m_encounterList[ i ].m_race == GameData.Race.Mechan )
+			{
+				mechanId = i;
+
+				break;
+			}
+		}
+
+		EnterStarSystem( gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		EnterEncounter( mechanId );
+
+		yield return Frames( 10 );
+
+		var pdEncounter = controller.m_encounter.m_pdEncounter;
+
+		// ---- 1. the shields and weapons in each posture
+		pdEncounter.m_aliensAreCowardly = false;
+		pdEncounter.m_alienStance = GD_Comm.Stance.Neutral;
+
+		var neutral = AnalyzeScan( SensorsDisplay.ScanType.MechanScout );
+
+		pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+
+		var hostile = AnalyzeScan( SensorsDisplay.ScanType.MechanScout );
+
+		pdEncounter.m_alienStance = GD_Comm.Stance.Friendly;
+
+		var friendly = AnalyzeScan( SensorsDisplay.ScanType.MechanScout );
+
+		pdEncounter.m_aliensAreCowardly = true;
+		pdEncounter.m_alienStance = GD_Comm.Stance.Obsequious;
+
+		var surrendering = AnalyzeScan( SensorsDisplay.ScanType.MechanScout );
+
+		pdEncounter.m_aliensAreCowardly = false;
+		pdEncounter.m_alienStance = GD_Comm.Stance.Neutral;
+
+		// ---- 2. a Gazurtoid warship and a Spemin scout
+		var gazurtoid = AnalyzeScan( SensorsDisplay.ScanType.GazurtoidWarship );
+		var spemin = AnalyzeScan( SensorsDisplay.ScanType.SpeminScout );
+
+		// ---- 3. the size line, next to a ship of 500 tons
+		var shipMass = playerData.m_playerShip.m_mass;
+
+		playerData.m_playerShip.m_mass = 500;
+
+		var nomad = AnalyzeScan( SensorsDisplay.ScanType.NomadProbe );
+		var veloxi = AnalyzeScan( SensorsDisplay.ScanType.VeloxiWarship );
+		var enterprise = AnalyzeScan( SensorsDisplay.ScanType.TheEnterprise );
+		var minstrel = AnalyzeScan( SensorsDisplay.ScanType.Minstrel );
+
+		playerData.m_playerShip.m_mass = shipMass;
+
+		Log( "alienanalysis: in encounter " + mechanId + " (" + playerData.m_general.m_location + ")" );
+		Log( "alienanalysis: neutral: " + neutral );
+		Log( "alienanalysis: hostile: " + hostile );
+		Log( "alienanalysis: friendly: " + friendly );
+		Log( "alienanalysis: surrendering: " + surrendering );
+		Log( "alienanalysis: gazurtoid warship: " + gazurtoid + " | spemin scout: " + spemin );
+		Log( "alienanalysis: sizes: " + nomad + " | " + veloxi + " | " + enterprise + " | " + minstrel );
+
+		Check( "alienanalysis: neutral aliens have their shields of class 2 raised and are not armed, as the original", neutral.Contains( "Shields: <color=white>Class 2 equivalent raised<" ) && neutral.Contains( "Weapon Status: <color=white>Not armed<" ), neutral );
+		Check( "alienanalysis: hostile aliens have their shields raised and are armed, as the original", hostile.Contains( "Class 2 equivalent raised<" ) && hostile.Contains( "Weapon Status: <color=white>Armed<" ), hostile );
+		Check( "alienanalysis: friendly aliens have their shields lowered and are not armed, as the original", friendly.Contains( "Class 2 equivalent lowered<" ) && friendly.Contains( "Weapon Status: <color=white>Not armed<" ), friendly );
+		Check( "alienanalysis: surrendering aliens have their shields lowered and are not armed, as the original", surrendering.Contains( "Class 2 equivalent lowered<" ) && surrendering.Contains( "Weapon Status: <color=white>Not armed<" ), surrendering );
+		Check( "alienanalysis: a Gazurtoid ship's shields are unknown and a Spemin scout has none apparent, as the original", gazurtoid.Contains( "Shields: <color=white>Unknown<" ) && spemin.Contains( "Shields: <color=white>None apparent<" ), gazurtoid + " | " + spemin );
+		Check( "alienanalysis: the size is a whole number or the decimals to the first that is not zero, with no label, as the original", nomad.Contains( ">0.04 times the size of our ship.<" ) && veloxi.Contains( ">1 times the size of our ship.<" ) && enterprise.Contains( ">38 times the size of our ship.<" ) && minstrel.Contains( ">0.004 times the size of our ship.<" ) && !( nomad + veloxi + enterprise + minstrel ).Contains( "Size:" ), nomad + " | " + veloxi + " | " + enterprise + " | " + minstrel );
+
+		Finish( "scenario=alienanalysis", 0 );
+	}
+
 	// ---------------------------------------------------------------- phase 7: the terrain vehicle's display in the original's words
 
 	IEnumerator ScenarioTVDisplay()
@@ -21542,6 +21672,208 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "coordinatebar: in the star system the bar has the ship's coordinates", System.Text.RegularExpressions.Regex.IsMatch( inTheSystem, @"^\d+ +\d+$" ), inTheSystem );
 
 		Finish( "scenario=coordinatebar", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the Status display in the original's words
+
+	IEnumerator ScenarioStatusDisplay()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var displays = controller.m_displayController;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		// a ship with no shields and no weapons, at 90% of its hull, with 20 cubic meters of Endurium
+		ship.m_shieldingClass = 0;
+		ship.m_missileLauncherClass = 0;
+		ship.m_laserCannonClass = 0;
+		ship.m_armorPoints = Mathf.RoundToInt( ship.GetMaximumArmorPoints() * 0.9f );
+
+		var endurium = ship.m_elementStorage.Find( 5 );
+
+		if ( endurium != null )
+		{
+			ship.RemoveElement( 5, endurium.m_volume );
+		}
+
+		ship.AddElement( 5, 200 );
+
+		displays.ChangeDisplay( displays.m_statusDisplay );
+
+		yield return Frames( 10 );
+
+		var values = displays.m_statusDisplay.m_values.text.Split( '\n' );
+		var shown = string.Join( " / ", values );
+
+		// the rows: date, damage, cargo, energy, shields, weapons
+		var damage = ( values.Length > 1 ) ? values[ 1 ] : "";
+		var cargo = ( values.Length > 2 ) ? values[ 2 ] : "";
+		var energy = ( values.Length > 3 ) ? values[ 3 ] : "";
+		var shields = ( values.Length > 4 ) ? values[ 4 ] : "";
+		var weapons = ( values.Length > 5 ) ? values[ 5 ] : "";
+
+		// ---- the damage words over the hull (the original's table)
+		var words = "";
+
+		foreach ( var percent in new[] { 100, 97, 85, 60, 30, 10 } )
+		{
+			ship.m_armorPoints = Mathf.FloorToInt( ship.GetMaximumArmorPoints() * percent / 100.0f );
+
+			yield return Frames( 3 );
+
+			var rows = displays.m_statusDisplay.m_values.text.Split( '\n' );
+
+			words += percent + "%=" + ( ( rows.Length > 1 ) ? System.Text.RegularExpressions.Regex.Replace( rows[ 1 ], "<[^>]*>", "" ) : "" ) + " ";
+		}
+
+		Log( "statusdisplay: " + shown + " || damage over the hull: " + words );
+
+		Check( "statusdisplay: a ship with no shields reads Down and one with no weapons Unarmed, as the original", ( shields == "Down" ) && ( weapons == "Unarmed" ), shields + " / " + weapons );
+		Check( "statusdisplay: energy has four figures and no unit, and cargo is a whole percent", energy.Contains( ">20.00<" ) && System.Text.RegularExpressions.Regex.IsMatch( cargo, @">\d+ %<" ), energy + " / " + cargo );
+		Check( "statusdisplay: damage is the original's word for what is left of the hull", words.Trim() == "100%=None 97%=Minimal 85%=Slight 60%=Moderate 30%=Heavy 10%=Critical", words );
+
+		Finish( "scenario=statusdisplay", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the messages of travel in a star system in the original's words
+
+	// put the ship at a place in the star system it is in
+	static void PlaceShipInTheSystem( Vector3 position )
+	{
+		DataController.m_instance.m_playerData.m_general.m_coordinates = position;
+		DataController.m_instance.m_playerData.m_general.m_currentSpeed = 0.0f;
+
+		SpaceflightController.m_instance.m_playerShip.transform.position = position;
+	}
+
+	IEnumerator ScenarioSystemTravel()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var starSystem = controller.m_starSystem;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// ---- 1. just launched from the Starport, then Maneuver
+		controller.SwitchLocation( PD_General.Location.JustLaunched );
+
+		var end = Time.realtimeSinceStartup + 60.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && starSystem.GeneratingPlanets() )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 10 );
+
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.NavigationA, 0 );
+
+		yield return Frames( 10 );
+
+		var launched = MessageList();
+		var locationAfterManeuver = playerData.m_general.m_location;
+
+		// ---- 2. over Arth, then away from every planet, then over another planet of Arth's system
+		var arth = starSystem.GetPlanetController( gameData.m_misc.m_arthPlanetId );
+		var other = starSystem.GetPlanetController( 94 );
+
+		PlaceShipInTheSystem( arth.transform.localPosition );
+
+		yield return Frames( 5 );
+
+		var overArth = MessageList();
+
+		// the place on a circle around the sun furthest from every planet
+		var away = Vector3.zero;
+		var awayDistance = 0.0f;
+
+		for ( var angle = 0; angle < 360; angle += 5 )
+		{
+			var place = Quaternion.Euler( 0.0f, angle, 0.0f ) * Vector3.forward * 4000.0f;
+			var nearest = float.MaxValue;
+
+			foreach ( var planet in starSystem.m_planetController )
+			{
+				if ( planet.gameObject.activeInHierarchy )
+				{
+					nearest = Mathf.Min( nearest, Vector3.Distance( place, planet.transform.localPosition ) );
+				}
+			}
+
+			if ( nearest > awayDistance )
+			{
+				awayDistance = nearest;
+				away = place;
+			}
+		}
+
+		PlaceShipInTheSystem( away );
+
+		yield return Frames( 5 );
+
+		var awayText = MessageList();
+
+		PlaceShipInTheSystem( other.transform.localPosition );
+
+		yield return Frames( 5 );
+
+		var overPlanet = MessageList();
+
+		// ---- 3. into orbit around it, and out again
+		ConsoleFrameWith( "m_submit" );
+
+		yield return WaitForLocation( PD_General.Location.InOrbit, 15.0f );
+		yield return Frames( 10 );
+
+		var locationInOrbit = playerData.m_general.m_location;
+
+		PressButton( ButtonController.ButtonSet.NavigationA, 0 );
+
+		yield return WaitForLocation( PD_General.Location.StarSystem, 15.0f );
+		yield return Frames( 10 );
+
+		var leftOrbit = MessageList();
+
+		// ---- 4. docking at the Starport
+		PlaceShipInTheSystem( arth.transform.localPosition );
+
+		yield return Frames( 5 );
+
+		ConsoleFrameWith( "m_submit" );
+
+		yield return WaitForLocation( PD_General.Location.DockingBay, 15.0f );
+		yield return Frames( 10 );
+
+		var docked = MessageList();
+		var locationDocked = playerData.m_general.m_location;
+
+		Log( "systemtravel: after Maneuver (" + locationAfterManeuver + "): " + launched );
+		Log( "systemtravel: over Arth: " + overArth );
+		Log( "systemtravel: " + awayDistance.ToString( "F0" ) + " from the nearest planet: " + awayText );
+		Log( "systemtravel: over planet 94: " + overPlanet );
+		Log( "systemtravel: out of orbit (" + locationInOrbit + " before): " + leftOrbit );
+		Log( "systemtravel: docked (" + locationDocked + "): " + docked );
+
+		Check( "systemtravel: Maneuver after the launch says Leaving orbit... and ...Commencing system travel, as the original", ( locationAfterManeuver == PD_General.Location.StarSystem ) && launched.Contains( "Leaving orbit..." ) && launched.Contains( "...Commencing system travel" ), launched );
+		Check( "systemtravel: over Arth the ship is standing by to dock with Starport, as the original", overArth.Contains( "Standing by to dock with Starport" ) && !overArth.Contains( "to orbit" ), overArth );
+		Check( "systemtravel: away from the planets the ship is outside orbital range, as the original", awayText.Contains( "Outside orbital range" ), awayText );
+		Check( "systemtravel: over another planet the ship is standing by to orbit and the key is named, as the original", overPlanet.Contains( "Standing by to orbit" ) && overPlanet.Contains( "Press Enter to orbit" ), overPlanet );
+		Check( "systemtravel: leaving orbit says Leaving orbit... and ...Commencing system travel, as the original", ( locationInOrbit == PD_General.Location.InOrbit ) && leftOrbit.Contains( "Leaving orbit..." ) && leftOrbit.Contains( "...Commencing system travel" ), locationInOrbit + ": " + leftOrbit );
+		Check( "systemtravel: docking at the Starport says Closing docking bay doors, as the original", ( locationDocked == PD_General.Location.DockingBay ) && docked.Contains( "Closing docking bay doors" ), locationDocked + ": " + docked );
+
+		Finish( "scenario=systemtravel", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

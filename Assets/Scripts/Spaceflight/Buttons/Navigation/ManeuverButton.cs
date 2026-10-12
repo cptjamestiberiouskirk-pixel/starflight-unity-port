@@ -47,6 +47,10 @@ public class ManeuverButton : ShipButton
 				// yes - switch to the star system location
 				SpaceflightController.m_instance.SwitchLocation( PD_General.Location.StarSystem );
 
+				// display message (the original's "LEAVING ORBIT..." and "...COMMENCING SYSTEM TRAVEL" after the Starport's "STANDING BY TO MANEUVER")
+				SpaceflightController.m_instance.m_messages.AddText( "<color=white>Leaving orbit...</color>" );
+				SpaceflightController.m_instance.m_messages.AddText( "<color=white>...Commencing system travel.</color>" );
+
 				break;
 
 			case PD_General.Location.StarSystem:
@@ -135,6 +139,9 @@ public class ManeuverButton : ShipButton
 
 						// switch to the in orbit location
 						SpaceflightController.m_instance.SwitchLocation( PD_General.Location.StarSystem );
+
+						// display message (the original's "...COMMENCING SYSTEM TRAVEL" after "LEAVING ORBIT...")
+						SpaceflightController.m_instance.m_messages.AddText( "<color=white>...Commencing system travel.</color>" );
 
 						break;
 				}
