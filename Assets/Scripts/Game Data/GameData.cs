@@ -330,7 +330,40 @@ public class GameData
 					UnityEngine.Debug.LogError( "Recovered comm posture names comm " + commPosture.m_commId + ", which the game data does not have" );
 				}
 			}
+
+			// the homeworld lines are the ones the shipped game says only at a race's homeworld (the context of the line, LSC, holds only that bit): the game data's
+			// homeworld flag misses the Gazurtoid's two ("the holy land, the planet of the Gazurtoid") and gives it to a Thrynn and a Veloxi line the shipped game says in
+			// space (394 "You arre nnot wellcome in thiss ssspace", 483 "Of course us is Veloxi")
+			foreach ( var commPosture in recoveredData.m_commPostureList )
+			{
+				if ( commsById.TryGetValue( commPosture.m_commId, out var comm ) )
+				{
+					comm.m_homeworld = ( commPosture.m_contextMask == c_homeworldContext );
+				}
+			}
 		}
+	}
+
+	// the context bits of a comm line (GD_CommPosture.m_contextMask): said in space, said at the race's homeworld
+	public const int c_spaceContext = 1;
+	public const int c_homeworldContext = 2;
+
+	// the races' homeworlds, the planets their home fleets wait in orbit around (STRINFO 5.2: the star and the planet counted from the sun) - the Spemin, the Thrynn,
+	// the Veloxi and the Gazurtoid (encounters 139, 165, 233 and 65)
+	static readonly int[,] c_homeworlds = { { (int) Race.Spemin, 82, 148, 1 }, { (int) Race.Thrynn, 129, 33, 4 }, { (int) Race.Velox, 150, 148, 2 }, { (int) Race.Gazurtoid, 86, 55, 4 } };
+
+	// true if this planet is the race's homeworld
+	public bool IsHomeworldOf( Race race, int planetId )
+	{
+		for ( var i = 0; i < c_homeworlds.GetLength( 0 ); i++ )
+		{
+			if ( ( c_homeworlds[ i, 0 ] == (int) race ) && ( planetId >= 0 ) && ( FindPlanetFromSun( c_homeworlds[ i, 1 ], c_homeworlds[ i, 2 ], c_homeworlds[ i, 3 ] ) == planetId ) )
+			{
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	// this finds the element in the list by its name
