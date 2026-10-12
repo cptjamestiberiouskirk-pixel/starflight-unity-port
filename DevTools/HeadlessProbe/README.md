@@ -31,7 +31,7 @@ Copies `ClaudeProbe.cs` into `Assets/`, launches Unity with `-executeMethod Clau
 
 Unity is stopped if it has not come back after 420 seconds. `-TimeoutSeconds 100` shortens that, for a scenario that is expected to hang on the old code: a hang on the main thread also stops the probe's own 120 second watchdog.
 
-`-Graphics` runs Unity without `-nographics`, so it has a graphics device (it still opens no window). A scenario can then render the game's camera into PNG files: `explosionpictures` writes its pictures to `Logs/explosion-pictures/`, `hitpictures` to `Logs/hit-pictures/`, `weaponpictures` to `Logs/weapon-pictures/` `transporterpictures` to `Logs/transporter-pictures/`, `debrispictures` to `Logs/debris-pictures/` and `atmospherepictures` to `Logs/atmosphere-pictures/` (or the folder given with `-probePictures`). The probe cannot judge how a picture looks; a person has to.
+`-Graphics` runs Unity without `-nographics`, so it has a graphics device (it still opens no window). A scenario can then render the game's camera into PNG files: `explosionpictures` writes its pictures to `Logs/explosion-pictures/`, `hitpictures` to `Logs/hit-pictures/`, `weaponpictures` to `Logs/weapon-pictures/` `transporterpictures` to `Logs/transporter-pictures/`, `debrispictures` to `Logs/debris-pictures/` and `atmospherepictures` to `Logs/atmosphere-pictures/` (or the folder given with `-probePictures`). `screenpictures` and `starport-screenpictures` render the whole screen as the player sees it (every camera in its order of depth: the views, the console and its displays, the panels) into `Logs/screen-pictures/spaceflight/` and `Logs/screen-pictures/starport/`, for comparing the port's screens with the original's in `Research/Screenshots/`. The probe cannot judge how a picture looks; a person has to.
 
 What the probe does:
 
@@ -87,6 +87,8 @@ What the probe does:
 | `input` | real key presses on a virtual Input System keyboard: each of the 19 keys of the old Input Manager axes gives its input and the stick position (8 other keys give none), two keys of one input, the debounce, the save panel opened with Escape and its selection moved with the arrows and the numpad (not A or D), Return and the numpad Enter on Resume, F9, F10 and Escape at game over (about 35 s) |
 | `starport-input` | the Starport event system's input module, and the arrows and the numpad (not S) moving the selection in the Operations panel, and the crew name field taking the focus without an exception (a legacy `InputField` reads `Input.compositionString`) |
 | `visual` | a floating object when its timer starts again, when an explosion is switched off, and how far the landing site crosshair moves in a second |
+| `screenpictures` | with `-Graphics`, the whole screen of the star system (with the system display and the status display), orbit and its sensors, the landing map, the terrain vehicle, hyperspace and an encounter, into `Logs/screen-pictures/spaceflight/`; without a graphics device it does nothing (about 60 s) |
+| `starport-screenpictures` | with `-Graphics`, the whole screen of the Starport and of each of its rooms (Operations, Personnel, Crew Assignment, Bank, Ship Configuration, Trade Depot, Docking Bay) into `Logs/screen-pictures/starport/` (about 40 s) |
 | `explosionpictures` | every part of an explosion is textured and transparent, no part draws cubes, every part follows the explosion's scale, and making an explosion leaves `Random.state` alone (a control); with `-Graphics` it also renders a half size explosion and the F10 destruction of the ship at fixed game times |
 | `hitpictures` | the hull and shield hits are drawn transparent and not with the `Standard` or untextured particle shaders, a hull hit's particles are gone before it is switched off, both hits land on the side the shot came from, and making them leaves `Random.state` alone (a control); with `-Graphics` it also renders them zoomed in, alone and through `ApplyDamageToPlayer` |
 | `weaponpictures` | the laser and the missile are drawn transparent and not with the `Standard` or untextured particle shaders, a paused missile's exhaust stands still, and making them leaves `Random.state` alone (a control); with `-Graphics` it also renders a laser, a plasma bolt and a missile crossing the view |
@@ -177,7 +179,7 @@ What the probe does:
 | `lifeformpictures` | with `-Graphics`, renders the game view of planet 92 with the planet's lifeforms, then with all 17 models in a ring around the terrain vehicle, and a close-up of each model, into `Logs/lifeform-pictures/` (or `-probePictures`); without a graphics device it only lands (about 60 s) |
 | `look` | Look on planet 92 with one lifeform at a time beside the vehicle: a living plant (its body plan, not moving, alive), a test animal that wanders (wandering) and the plant made dead (dead) (about 40 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (131 scenarios, about 97 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (133 scenarios, about 100 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
