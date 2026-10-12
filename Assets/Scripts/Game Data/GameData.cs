@@ -305,6 +305,22 @@ public class GameData
 			m_ancientRuinSiteList = recoveredData.m_ancientRuinSiteList;
 		}
 
+		// the shipped game's strengths of the vessels (recovered from the original's VESSEL records)
+		if ( recoveredData.m_vesselStrengthList != null )
+		{
+			foreach ( var vesselStrength in recoveredData.m_vesselStrengthList )
+			{
+				if ( ( vesselStrength.m_vesselId > 0 ) && ( vesselStrength.m_vesselId < m_vesselList.Length ) )
+				{
+					m_vesselList[ vesselStrength.m_vesselId ].m_strength = vesselStrength.m_strength;
+				}
+				else
+				{
+					UnityEngine.Debug.LogError( "Recovered vessel strength names vessel " + vesselStrength.m_vesselId + ", which the game data does not have" );
+				}
+			}
+		}
+
 		// the shipped game's posture masks, actions and answers' mood changes of the comm lines (recovered from STARB.COM)
 		if ( recoveredData.m_commPostureList != null )
 		{

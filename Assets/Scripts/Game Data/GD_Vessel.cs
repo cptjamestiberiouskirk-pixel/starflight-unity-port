@@ -52,4 +52,7 @@ public class GD_Vessel
 	public int m_elementVolumeC;
 
 	public int m_enduriumVolume;
+
+	// the shipped game's strength of one ship of this vessel at full armor and shields (GD_VesselStrength, from the recovered data - 0 for none)
+	[NonSerialized] public int m_strength;
 }

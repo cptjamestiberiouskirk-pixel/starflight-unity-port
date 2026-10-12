@@ -2,7 +2,7 @@
 // sections 4 to 7): the alien's "emotional disposition level" - its mood, from 0 (most calm) to 100 (most agitated), which the original keeps as EDL - is divided
 // into postures by three thresholds, and each of the player's postures moves it by an effect of its own - the numbers are the shipped game's, from each race's
 // record in the original's STARB.COM (its ORIGINATOR: BASE-EDL, AET, BET, CET, OPE, FPE, HPE; DevTools/OriginalRecords), by the owner's ruling of 2026-10-12;
-// the race's aggression, which weighs its strength against the player's, is still the port's (the shipped game's rule of strength is a step of its own)
+// the strengths that decide between hostile and obsequious are the shipped game's too (Encounter.GetStrengthDifferential)
 public class AlienPersonality
 {
 	// below this mood the aliens are friendly, below the next diplomatic, below the last hostile or obsequious (by their strength against the player's), and from
@@ -19,22 +19,19 @@ public class AlienPersonality
 	public float m_hostileEffect;
 	public float m_obsequiousEffect;
 
-	// the aggression level (the notes weigh the alien's strength by aggression / 5)
-	public float m_aggression;
-
 	// the Elowan: their hostile band is empty (BET = CET = 60), so they go from talking straight to fight or flight; friendship calms them, hostility angers them
-	// (EDL 44, AET 25, BET 60, CET 60, OPE 0, FPE -10, HPE 20) - the aggression is the port's, little
+	// (EDL 44, AET 25, BET 60, CET 60, OPE 0, FPE -10, HPE 20)
 	static readonly AlienPersonality s_elowan = new AlienPersonality
 	{
 		m_friendlyBelow = 25.0f, m_hostileFrom = 60.0f, m_fightFrom = 60.0f, m_startingMood = 44.0f,
-		m_friendlyEffect = -10.0f, m_hostileEffect = 20.0f, m_obsequiousEffect = 0.0f, m_aggression = 2.0f
+		m_friendlyEffect = -10.0f, m_hostileEffect = 20.0f, m_obsequiousEffect = 0.0f
 	};
 
 	// the Thrynn: calmed a little by friendship, angered by hostility and a little by grovelling (EDL 44, AET 30, BET 60, CET 80, OPE 5, FPE -8, HPE 20)
 	static readonly AlienPersonality s_thrynn = new AlienPersonality
 	{
 		m_friendlyBelow = 30.0f, m_hostileFrom = 60.0f, m_fightFrom = 80.0f, m_startingMood = 44.0f,
-		m_friendlyEffect = -8.0f, m_hostileEffect = 20.0f, m_obsequiousEffect = 5.0f, m_aggression = 5.0f
+		m_friendlyEffect = -8.0f, m_hostileEffect = 20.0f, m_obsequiousEffect = 5.0f
 	};
 
 	// the Spemin: never friendly (AET 0), they start neutral and turn hostile from 20, which a ship that meets them with its shields up and its weapons armed
@@ -42,14 +39,14 @@ public class AlienPersonality
 	static readonly AlienPersonality s_spemin = new AlienPersonality
 	{
 		m_friendlyBelow = 0.0f, m_hostileFrom = 20.0f, m_fightFrom = 80.0f, m_startingMood = 10.0f,
-		m_friendlyEffect = 0.0f, m_hostileEffect = 30.0f, m_obsequiousEffect = -8.0f, m_aggression = 3.0f
+		m_friendlyEffect = 0.0f, m_hostileEffect = 30.0f, m_obsequiousEffect = -8.0f
 	};
 
 	// the Veloxi: calmed by grovelling, angered by hostility (EDL 44, AET 20, BET 60, CET 80, OPE -8, FPE 0, HPE 20)
 	static readonly AlienPersonality s_velox = new AlienPersonality
 	{
 		m_friendlyBelow = 20.0f, m_hostileFrom = 60.0f, m_fightFrom = 80.0f, m_startingMood = 44.0f,
-		m_friendlyEffect = 0.0f, m_hostileEffect = 20.0f, m_obsequiousEffect = -8.0f, m_aggression = 6.0f
+		m_friendlyEffect = 0.0f, m_hostileEffect = 20.0f, m_obsequiousEffect = -8.0f
 	};
 
 	// the races whose shipped starting posture is friendly: their mood (BASE-EDL) is below every threshold (the Mysterions 1 under 99, the Nomad probes 1 under

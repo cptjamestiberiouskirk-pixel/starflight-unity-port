@@ -965,6 +965,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLineActions();
 				break;
 
+			case "shippedstrength":
+				yield return ScenarioShippedStrength();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -8112,10 +8116,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		controller.m_encounter.m_pdEncounter.m_mood = 55.0f;
 		playerData.m_playerShip.m_armorPoints = 100000;
+		SetShipClassesAndCaptain( 5, 250 );
 
 		var answers = AlienComms( GD_Comm.Subject.OtherRaces, 40 );
 
 		playerData.m_playerShip.m_armorPoints = armorBefore;
+		SetShipClassesAndCaptain( 0, 250 );
 		controller.m_encounter.m_pdEncounter.m_mood = 10.0f;
 
 		// the same question with a captain whose name has two spaces in a row (names are used as they were typed): the message is
@@ -19320,8 +19326,10 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 2. the same Spemin met by a far stronger ship with its shields up and its weapons armed (their hostile band, 10 + 15): they grovel
+		// ---- 2. the same Spemin met by a far stronger ship (the best equipment and a skilled captain, which is what the shipped game weighs) with its shields up and
+		// its weapons armed (their hostile band, 10 + 15): they grovel
 		ship.m_armorPoints = 100000;
+		SetShipClassesAndCaptain( 5, 250 );
 		ship.m_shieldsAreUp = true;
 		ship.m_weaponsAreArmed = true;
 
@@ -19370,6 +19378,13 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return MeetAndConnect( elowanId, GD_Comm.Stance.Friendly, flight );
 
+		// (their ships nearly destroyed, so that the best equipment is far stronger than whatever ships the encounter has)
+		foreach ( var alienShip in encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			alienShip.m_armorPoints = 1;
+			alienShip.m_shieldPoints = 0;
+		}
+
 		SetEncounterField( "m_mood", 94.0f );
 
 		encounter.Hail( GD_Comm.Stance.Hostile, false );
@@ -19384,6 +19399,7 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 10 );
 
 		ship.m_armorPoints = 1000;
+		SetShipClassesAndCaptain( 0, 250 );
 
 		var fight = new List<string>();
 
@@ -24676,6 +24692,122 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lineactions: a line with no action leaves the aliens' mood as it was (control)", moodAfterStatement == 44.0f, moodAfterStatement.ToString() );
 
 		Finish( "scenario=lineactions", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 2: the aliens weigh the player's strength by the shipped game's rule
+
+	// sets the classes of the player ship's armor, shields, missile launcher and laser cannon, and the captain's five skills
+	static void SetShipClassesAndCaptain( int shipClass, int skill )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+
+		ship.m_armorClass = shipClass;
+		ship.m_shieldingClass = shipClass;
+		ship.m_missileLauncherClass = shipClass;
+		ship.m_laserCannonClass = shipClass;
+
+		var captain = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Captain );
+
+		captain.m_science = skill;
+		captain.m_navigation = skill;
+		captain.m_engineering = skill;
+		captain.m_communications = skill;
+		captain.m_medicine = skill;
+	}
+
+	// the stance of the aliens in this encounter after a few frames at this mood
+	static IEnumerator SettleAtMood( float mood, string[] result )
+	{
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		encounter.m_pdEncounter.m_mood = mood;
+		encounter.m_pdEncounter.m_alienStance = GD_Comm.Stance.Neutral;
+
+		yield return Frames( 3 );
+
+		result[ 0 ] = Call( encounter, "GetAlienTalkStance" ) + "/" + encounter.m_pdEncounter.m_alienStance;
+	}
+
+	IEnumerator ScenarioShippedStrength()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var result = new string[ 1 ];
+
+		EnsureCrew();
+
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+		ship.m_shieldPoints = 0;
+
+		var encounterRange = SpaceflightController.m_instance.m_encounterRange;
+
+		SpaceflightController.m_instance.m_encounterRange = 0.0f;
+
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		// ---- 1. a ship with no armor plating, shields or weapons, and a captain of little skill, but 100,000 armor points: the shipped game counts the classes of
+		// the equipment, not the points, and the Spemin in their hostile band (25) threaten it
+		SetShipClassesAndCaptain( 0, 50 );
+
+		ship.m_armorPoints = 100000;
+
+		yield return MeetWithMood( speminId, 25.0f );
+		yield return SettleAtMood( 25.0f, result );
+
+		var bareShip = result[ 0 ];
+		// (the aliens' strength, on the code that has it)
+		var strengthMethod = typeof( Encounter ).GetMethod( "GetAlienStrength", c_any );
+		var alienStrength = ( strengthMethod == null ) ? "missing" : Call( SpaceflightController.m_instance.m_encounter, "GetAlienStrength" );
+
+		LeaveEncounter();
+
+		yield return Frames( 10 );
+
+		// ---- 2. the best equipment there is (class 5 of all four) and a captain with 250 in every skill (48 against at most 30 for three Spemin warships), but only
+		// 250 armor points: the Spemin grovel
+		SetShipClassesAndCaptain( 5, 250 );
+
+		ship.m_armorPoints = 250;
+
+		yield return MeetWithMood( speminId, 25.0f );
+		yield return SettleAtMood( 25.0f, result );
+
+		var strongShip = result[ 0 ];
+
+		// ---- 3. the same ship against Spemin too agitated to talk (94): they take flight
+		yield return SettleAtMood( 94.0f, result );
+
+		var strongShipFight = result[ 0 ];
+
+		LeaveEncounter();
+
+		yield return Frames( 10 );
+
+		// ---- 4. the control: the bare ship with 250 armor points against Spemin too agitated to talk fights
+		SetShipClassesAndCaptain( 0, 50 );
+
+		yield return MeetWithMood( speminId, 25.0f );
+		yield return SettleAtMood( 94.0f, result );
+
+		var bareShipFight = result[ 0 ];
+
+		ClearMissiles();
+		LeaveEncounter();
+
+		yield return Frames( 10 );
+
+		SpaceflightController.m_instance.m_encounterRange = encounterRange;
+
+		Log( "shippedstrength: spemin strength " + alienStrength + " | bare ship with 100000 armor points, hostile band: " + bareShip + " | best equipment, hostile band: " + strongShip + ", fight band: " + strongShipFight + " | bare ship, fight band: " + bareShipFight );
+
+		Check( "shippedstrength: the Spemin threaten a ship with no equipment however many armor points it has, as the original weighs the equipment's classes", bareShip.StartsWith( "Hostile" ), bareShip );
+		Check( "shippedstrength: the Spemin grovel before the best equipment and a skilled captain, as the original", strongShip.StartsWith( "Obsequious" ), strongShip );
+		Check( "shippedstrength: too agitated to talk, the Spemin take flight from the best equipment and a skilled captain, as the original", strongShipFight.EndsWith( "Obsequious" ), strongShipFight );
+		Check( "shippedstrength: too agitated to talk, the Spemin fight a ship with no equipment (control)", bareShipFight.EndsWith( "Hostile" ), bareShipFight );
+
+		Finish( "scenario=shippedstrength", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
