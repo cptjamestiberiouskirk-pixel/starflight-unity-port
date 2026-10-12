@@ -86,6 +86,7 @@ What the probe does:
 | `savepanel` | the Escape key in space, two seconds into a landing, after the landing and while the ship explodes, and whether a game that is over stays paused |
 | `input` | real key presses on a virtual Input System keyboard: each of the 19 keys of the old Input Manager axes gives its input and the stick position (8 other keys give none), two keys of one input, the debounce, the save panel opened with Escape and its selection moved with the arrows and the numpad (not A or D), Return and the numpad Enter on Resume, F9, F10 and Escape at game over (about 35 s) |
 | `starport-input` | the Starport event system's input module, and the arrows and the numpad (not S) moving the selection in the Operations panel, and the crew name field taking the focus without an exception (a legacy `InputField` reads `Input.compositionString`) |
+| `coordinates` | latitude and longitude as the original gives them: the terrain vehicle at 15 north, 30 west reads `15N x 30W` above the main view, and the landing map's LAT reads `15N` and LONG `30W` (about 35 s) |
 | `visual` | a floating object when its timer starts again, when an explosion is switched off, and how far the landing site crosshair moves in a second |
 | `screenpictures` | with `-Graphics`, the whole screen of the star system (with the system display and the status display), orbit and its sensors, the landing map, the terrain vehicle, hyperspace and an encounter, into `Logs/screen-pictures/spaceflight/`; without a graphics device it does nothing (about 60 s) |
 | `starport-screenpictures` | with `-Graphics`, the whole screen of the Starport and of each of its rooms (Operations, Personnel, Crew Assignment, Bank, Ship Configuration, Trade Depot, Docking Bay) into `Logs/screen-pictures/starport/` (about 40 s) |
@@ -179,7 +180,7 @@ What the probe does:
 | `lifeformpictures` | with `-Graphics`, renders the game view of planet 92 with the planet's lifeforms, then with all 17 models in a ring around the terrain vehicle, and a close-up of each model, into `Logs/lifeform-pictures/` (or `-probePictures`); without a graphics device it only lands (about 60 s) |
 | `look` | Look on planet 92 with one lifeform at a time beside the vehicle: a living plant (its body plan, not moving, alive), a test animal that wanders (wandering) and the plant made dead (dead) (about 40 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (133 scenarios, about 100 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (134 scenarios, about 101 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

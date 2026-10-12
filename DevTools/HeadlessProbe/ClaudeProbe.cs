@@ -873,6 +873,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportScreenPictures();
 				break;
 
+			case "coordinates":
+				yield return ScenarioCoordinates();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -21418,6 +21422,47 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-screenpictures: a picture of the Starport and of each of its rooms", pictures.Count == 8, pictures.Count.ToString() );
 
 		Finish( "scenario=starport-screenpictures pictures=" + pictures.Count, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: latitude and longitude as the original gives them
+
+	IEnumerator ScenarioCoordinates()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// on planet 92 of Arth
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		yield return Frames( 5 );
+
+		// ---- 1. the terrain vehicle at 15 north, 30 west: the coordinates above the main view (the original: "15N x 30W")
+		playerData.m_general.m_lastDisembarkedCoordinates = Tools.LatLongToWorldCoordinates( -30.0f, 15.0f );
+		controller.m_viewport.UpdateCoordinates();
+
+		var label = FieldOrNull( controller.m_viewport, "m_label" ) as TMPro.TMP_Text;
+		var bar = ( label != null ) ? label.text : "";
+
+		// ---- 2. the landing map's crosshair at the same place (the original: "LAT 15N  LONG 30W")
+		var map = controller.m_displayController.m_terrainMapDisplay;
+
+		playerData.m_general.m_selectedLatitude = -30.0f;
+		playerData.m_general.m_selectedLongitude = 15.0f;
+
+		map.MoveCrosshairs();
+
+		var latitude = map.m_latitudeText.text;
+		var longitude = map.m_longitudeText.text;
+
+		Log( "coordinates: the bar above the main view reads '" + bar + "', the landing map LAT '" + latitude + "' LONG '" + longitude + "'" );
+
+		Check( "coordinates: the terrain vehicle's coordinates read north-south first, as the original's 15N x 30W", bar == "15N x 30W", bar );
+		Check( "coordinates: the landing map's LAT is the north-south place and its LONG the east-west one", ( latitude == "15N" ) && ( longitude == "30W" ), latitude + " / " + longitude );
+
+		Finish( "scenario=coordinates bar=" + bar + " lat=" + latitude + " long=" + longitude, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

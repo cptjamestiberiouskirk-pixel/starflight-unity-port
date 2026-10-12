@@ -198,8 +198,10 @@ public class TerrainMapDisplay : ShipDisplay
 		// the Red Cylinder flashes near an ancient ruin
 		RedCylinder.Look( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude );
 
-		m_latitudeText.text = Mathf.FloorToInt( Mathf.Abs( playerData.m_general.m_selectedLatitude ) ).ToString() + ( ( playerData.m_general.m_selectedLatitude < 0.0f ) ? "W" : "E" );
-		m_longitudeText.text = Mathf.RoundToInt( Mathf.Abs( playerData.m_general.m_selectedLongitude ) ).ToString() + ( ( playerData.m_general.m_selectedLongitude < 0.0f ) ? "S" : "N" );
+		// the latitude is the north-south place and the longitude the east-west one, as the original's map gives them ("LAT 15N  LONG 30W") - the port's
+		// m_selectedLatitude holds the east-west place and its m_selectedLongitude the north-south one, so each text takes the other
+		m_latitudeText.text = Mathf.RoundToInt( Mathf.Abs( playerData.m_general.m_selectedLongitude ) ).ToString() + ( ( playerData.m_general.m_selectedLongitude < 0.0f ) ? "S" : "N" );
+		m_longitudeText.text = Mathf.FloorToInt( Mathf.Abs( playerData.m_general.m_selectedLatitude ) ).ToString() + ( ( playerData.m_general.m_selectedLatitude < 0.0f ) ? "W" : "E" );
 
 		x = playerData.m_general.m_selectedLatitude / 180.0f * 224.0f;
 		y = playerData.m_general.m_selectedLongitude / 90.0f * 112.0f;
