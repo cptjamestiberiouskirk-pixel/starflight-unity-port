@@ -81,8 +81,8 @@ public class StarflightSkybox : MonoBehaviour
 		// get to the player data
 		var playerData = DataController.m_instance.m_playerData;
 
-		// check if skybox autorotation is enabled
-		if ( m_autorotateSkybox )
+		// check if skybox autorotation is enabled (not on a frame that took no time, or with no maximum speed: both divide by zero below, and a rotation that is not a number stays that way and turns the sky black)
+		if ( m_autorotateSkybox && ( Time.deltaTime > 0.0f ) && ( playerData.m_general.m_currentMaximumSpeed > 0.0f ) )
 		{
 			// yes - figure out how fast to rotate the skybox
 			var multiplier = playerData.m_general.m_location != PD_General.Location.Encounter ? m_regularRotationsSpeed : m_encounterRotationSpeed;
@@ -108,6 +108,16 @@ public class StarflightSkybox : MonoBehaviour
 
 		// apply constant rotation
 		m_currentRotation = Quaternion.Euler( m_constantRotation * Time.deltaTime ) * m_currentRotation;
+
+		// keep the rotation a rotation (a product of many rotations drifts away from unit length, which would scale the sky), and start again from none if it is not a finite number
+		if ( !float.IsFinite( m_currentRotation.x ) || !float.IsFinite( m_currentRotation.y ) || !float.IsFinite( m_currentRotation.z ) || !float.IsFinite( m_currentRotation.w ) )
+		{
+			m_currentRotation = Quaternion.identity;
+		}
+		else
+		{
+			m_currentRotation = Quaternion.Normalize( m_currentRotation );
+		}
 
 		// get the current hyperspace coordinates (if in hyperspace get it from the player transform due to flux travel not updating m_hyperspaceCoordinates)
 		var hyperspaceCoordinates = playerData.m_general.m_lastHyperspaceCoordinates;
