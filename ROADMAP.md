@@ -147,7 +147,7 @@ Only the effects that matter for winning have to come before Phase 5. The others
 | Rod Device | stronger laser shield: PR 127 (half of every alien laser hit; the amount is the port's choice) | New Scotland (site: D5) | no |
 | Tesseract | doubles engine efficiency: PR 124 (half the engines' fuel in hyperspace) | 18,50 planet 5 | no |
 | Crystal Pearl | warps a badly damaged ship away: PR 128 (out of an encounter below a tenth of the armor; the tenth is the port's choice) | City of the Ancients | no |
-| Red Cylinder | finds ancient ruins from orbit | Koann (planet: D5) | no |
+| Red Cylinder | finds ancient ruins from orbit: flashes on the landing map near an ancient ruin (the shipped game's "THE RED CYLINDER IS FLASHING" is in its landing map code; how near is the port's) | Koann (planet: D5) | no |
 | Dodecahedron | attracts every ship nearby: PR 129 (twice the alien radar distance; the factor is the port's choice) | 118,146 planet 4 | no |
 | Black Box, Hypercube, Ellipsoid | unclear (D5) | Thrynn trade, Earth, 81,98 | Ask |
 

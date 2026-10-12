@@ -337,8 +337,40 @@ public class TerrainRuins : TerrainGridPopulator
 		return ( chance < 0.6f ) ? 1 : ( ( chance < 0.85f ) ? 2 : ( ( chance < 0.95f ) ? 3 : 4 ) );
 	}
 
+	// a random ruin as the planet's random numbers make it: its place on the map, its kind, its model and turn, and what it holds
+	public class RandomRuin
+	{
+		public float m_mapX;
+		public float m_mapY;
+		public bool m_isAncient;
+		public int m_templateIndex;
+		public int m_rotation;
+		public System.Collections.Generic.List<TerrainRuin.RandomItem> m_items = new System.Collections.Generic.List<TerrainRuin.RandomItem>();
+	}
+
 	void PlaceRandomRuins( PlanetGenerator planetGenerator, float elevationScale, GD_Planet planet )
 	{
+		var randomRuins = MakeRandomRuins( planetGenerator, elevationScale, planet, m_ruinTemplates.Length );
+
+		for ( var ruinIndex = 0; ruinIndex < randomRuins.Count; ruinIndex++ )
+		{
+			var randomRuin = randomRuins[ ruinIndex ];
+			var ruinObject = PlaceObjectAt( m_ruinTemplates[ randomRuin.m_templateIndex ], randomRuin.m_mapX, randomRuin.m_mapY, elevationScale, randomRuin.m_rotation );
+
+			ruinObject.name = ( randomRuin.m_isAncient ? "Ancient ruin " : "Old Empire ruin " ) + ( ruinIndex + 1 );
+
+			var ruin = ruinObject.AddComponent<TerrainRuin>();
+
+			ruin.m_isAncient = randomRuin.m_isAncient;
+			ruin.m_randomItems.AddRange( randomRuin.m_items );
+		}
+	}
+
+	// the random ruins of a planet, made with the random numbers as they stand (seeded by the caller) - every draw in the order the surface makes them, so that
+	// they can be worked out without placing them (the Red Cylinder does that from orbit) - templateCount only picks a model, one draw whatever it is
+	static System.Collections.Generic.List<RandomRuin> MakeRandomRuins( PlanetGenerator planetGenerator, float elevationScale, GD_Planet planet, int templateCount )
+	{
+		var randomRuins = new System.Collections.Generic.List<RandomRuin>();
 		var count = GetRandomRuinCount( planet );
 		var gameData = DataController.m_instance.m_gameData;
 
@@ -347,19 +379,14 @@ public class TerrainRuins : TerrainGridPopulator
 			FindPlaceForRuin( planetGenerator, elevationScale, out var mapX, out var mapY );
 
 			var isAncient = Random.value < 0.5f;
-			var template = m_ruinTemplates[ Random.Range( 0, m_ruinTemplates.Length ) ];
-			var ruinObject = PlaceObjectAt( template, mapX, mapY, elevationScale, Random.Range( 0, 360 ) );
+			var ruin = new RandomRuin { m_mapX = mapX, m_mapY = mapY, m_isAncient = isAncient, m_templateIndex = Random.Range( 0, Mathf.Max( 1, templateCount ) ), m_rotation = Random.Range( 0, 360 ) };
 
-			ruinObject.name = ( isAncient ? "Ancient ruin " : "Old Empire ruin " ) + ( ruinIndex + 1 );
-
-			var ruin = ruinObject.AddComponent<TerrainRuin>();
-
-			ruin.m_isAncient = isAncient;
+			randomRuins.Add( ruin );
 
 			// an ancient ruin: lumps of Endurium, or truly amazing artifacts
 			if ( isAncient && ( Random.value < 0.5f ) )
 			{
-				ruin.m_randomItems.Add( new TerrainRuin.RandomItem { m_key = TerrainRuin.GetRandomItemKey( planet.m_id, ruinIndex, 0 ), m_enduriumVolume = Random.Range( 1, 6 ) * 10 } );
+				ruin.m_items.Add( new TerrainRuin.RandomItem { m_key = TerrainRuin.GetRandomItemKey( planet.m_id, ruinIndex, 0 ), m_enduriumVolume = Random.Range( 1, 6 ) * 10 } );
 
 				continue;
 			}
@@ -382,13 +409,78 @@ public class TerrainRuins : TerrainGridPopulator
 				var error = ( Random.value + Random.value - 1.0f ) * 0.5f;
 				var estimate = Mathf.Max( 100, Mathf.RoundToInt( value * ( 1.0f + error ) / 100.0f ) * 100 );
 
-				ruin.m_randomItems.Add( new TerrainRuin.RandomItem { m_key = TerrainRuin.GetRandomItemKey( planet.m_id, ruinIndex, itemIndex ), m_artifactId = artifactId, m_estimatedValue = estimate } );
+				ruin.m_items.Add( new TerrainRuin.RandomItem { m_key = TerrainRuin.GetRandomItemKey( planet.m_id, ruinIndex, itemIndex ), m_artifactId = artifactId, m_estimatedValue = estimate } );
 			}
 		}
+
+		return randomRuins;
+	}
+
+	// the places of a planet's random ruins, worked out as the surface places them (with the planet's random numbers, seeded as TerrainGrid seeds this populator),
+	// in degrees as the landing map gives them (x east-west, y north-south), and whether each one is ancient - the game's random numbers are left as they were
+	public static System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<Vector2, bool>> GetRandomRuinPlaces( PlanetGenerator planetGenerator, float elevationScale, GD_Planet planet )
+	{
+		var places = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<Vector2, bool>>();
+
+		if ( GetRandomRuinCount( planet ) == 0 )
+		{
+			return places;
+		}
+
+		var randomState = Random.state;
+
+		// (the random ruins are the only random numbers of this populator on a planet that has them, so they start from its seed)
+		Random.InitState( TerrainGrid.GetRuinSeed( planet ) );
+
+		foreach ( var randomRuin in MakeRandomRuins( planetGenerator, elevationScale, planet, 1 ) )
+		{
+			var world = Tools.MapToWorldCoordinates( randomRuin.m_mapX, randomRuin.m_mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
+
+			Tools.WorldToLatLongCoordinates( world, out var eastWest, out var northSouth );
+
+			places.Add( new System.Collections.Generic.KeyValuePair<Vector2, bool>( new Vector2( eastWest, northSouth ), randomRuin.m_isAncient ) );
+		}
+
+		Random.state = randomState;
+
+		return places;
+	}
+
+	// the places of a planet's ancient ruins, in degrees as the landing map gives them: its random ancient ruins and the formations of ancient ruins (STRINFO 4.1)
+	public static System.Collections.Generic.List<Vector2> GetAncientRuinPlaces( PlanetGenerator planetGenerator, float elevationScale, GD_Planet planet )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var places = new System.Collections.Generic.List<Vector2>();
+
+		foreach ( var ruinFormation in gameData.m_ruinFormationList )
+		{
+			if ( ( ruinFormation.m_artifactSiteId < 0 ) || ( ruinFormation.m_artifactSiteId >= gameData.m_artifactSiteList.Length ) )
+			{
+				continue;
+			}
+
+			var artifactSite = gameData.m_artifactSiteList[ ruinFormation.m_artifactSiteId ];
+
+			if ( artifactSite.m_planetId == planet.m_id )
+			{
+				// (a site's longitude is the map's east-west, as the formations above are placed)
+				places.Add( new Vector2( artifactSite.m_longitude, artifactSite.m_latitude ) );
+			}
+		}
+
+		foreach ( var place in GetRandomRuinPlaces( planetGenerator, elevationScale, planet ) )
+		{
+			if ( place.Value )
+			{
+				places.Add( place.Key );
+			}
+		}
+
+		return places;
 	}
 
 	// picks a place for a ruin with the planet's random numbers: not steep, and above the water - the last place tried if no place is good
-	void FindPlaceForRuin( PlanetGenerator planetGenerator, float elevationScale, out float mapX, out float mapY )
+	static void FindPlaceForRuin( PlanetGenerator planetGenerator, float elevationScale, out float mapX, out float mapY )
 	{
 		var minimumElevation = ( planetGenerator.m_maximumElevation - planetGenerator.m_waterElevation ) * 0.05f + planetGenerator.m_waterElevation;
 

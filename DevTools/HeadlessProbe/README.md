@@ -129,6 +129,7 @@ What the probe does:
 | `roddevice` | the Rod Device: the armor one alien laser shot and one plasma bolt take off, without the Rod Device (the control) and with it in the hold (half the laser, the plasma bolt unchanged as the control) (about 20 s) |
 | `crystalpearl` | the Crystal Pearl, in a Spemin encounter with the shields down: a hit down to a twentieth of the armor without the Pearl (the control, the ship stays) and with it (warped out of the encounter with that armor and a message), and a hit of twice the armor with the Pearl (warped out with 1 point, not destroyed) (about 25 s) |
 | `dodecahedron` | the Dodecahedron: a Spemin encounter at its home in hyperspace with the ship stopped one and a half alien radar distances away (no encounter able to begin): how much closer it comes in 2 s without the Dodecahedron (the control, not at all) and with it in the hold (it comes) (about 20 s) |
+| `redcylinder` | the Red Cylinder: planet 94 of Arth's random ruin where the surface placed it and where `TerrainRuins.GetRandomRuinPlaces` works it out from the maps (the same), and the Red Cylinder on the landing map without it aboard (the control), 90 degrees away and beside the ancient ruin (flashing) (about 40 s) |
 | `flatdevice` | the Flat Device: 200 attacks of a lifeform with a 96% chance to hit on a crew of one, without the device (the control: nearly all hurt) and with it in the ship's hold (about half hurt, and the shield turns the others away) (about 35 s) |
 | `shimmeringball` | the Shimmering Ball, one alien laser shot at a time: without it (the control, a hit), with it (no shot at the cloaked ship), right after the player fires the laser (a hit) and 4 s later (cloaked again) (about 25 s) |
 | `ringdevice` | the Ring Device, in hyperspace with no encounter able to begin: the fluxes shown without it (none), the ship put at a hidden flux (the control, it goes through) and the fluxes shown with it in the hold (all) (about 30 s) |
@@ -169,7 +170,7 @@ What the probe does:
 | `lifeformpictures` | with `-Graphics`, renders the game view of planet 92 with the planet's lifeforms, then with all 17 models in a ring around the terrain vehicle, and a close-up of each model, into `Logs/lifeform-pictures/` (or `-probePictures`); without a graphics device it only lands (about 60 s) |
 | `look` | Look on planet 92 with one lifeform at a time beside the vehicle: a living plant (its body plan, not moving, alive), a test animal that wanders (wandering) and the plant made dead (dead) (about 40 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (121 scenarios, about 88 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (122 scenarios, about 89 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
