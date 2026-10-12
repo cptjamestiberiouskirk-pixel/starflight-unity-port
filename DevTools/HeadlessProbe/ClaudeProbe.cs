@@ -977,6 +977,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioPhraseLimit();
 				break;
 
+			case "alienwaiting":
+				yield return ScenarioAlienWaiting();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -24944,6 +24948,103 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "phraselimit: the aliens talking does not draw their phrase limit again, only a change of their mood does, as the original", limitAfterTalk == 99, limitAfterTalk.ToString() );
 
 		Finish( "scenario=phraselimit", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 2: how the aliens wait for the player, by the shipped game's rules
+
+	// how many of these texts hold something the aliens said
+	static int CountReceived( List<string> said )
+	{
+		var count = 0;
+
+		foreach ( var text in said )
+		{
+			if ( text.Contains( "Receiving:" ) )
+			{
+				count++;
+			}
+		}
+
+		return count;
+	}
+
+	IEnumerator ScenarioAlienWaiting()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+
+		ship.m_armorPoints = 250;
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+
+		var encounterRange = SpaceflightController.m_instance.m_encounterRange;
+
+		SpaceflightController.m_instance.m_encounterRange = 0.0f;
+
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var thrynnId = FindEncounter( 1, 6, 3, 0, GameData.Race.Thrynn );
+
+		// ---- 1. the Thrynn hail and the player never replies: three hails, then they wait
+		EnterEncounter( thrynnId );
+		yield return Frames( 10 );
+
+		var hails = new List<string>();
+
+		yield return LetAliensSpeak( 6, hails );
+
+		var spoken = CountReceived( hails );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 2. in a comm link the Thrynn ask "You do wissh to becomme alliess do yyou nnot?" (307) and the player does not answer: two reminders, then they wait
+		var said = new List<string>();
+
+		yield return MeetAndConnect( thrynnId, GD_Comm.Stance.Friendly, said );
+
+		encounter.AddComm( GD_Comm.Subject.Question, false, CommById( 307 ) );
+
+		var reminders = new List<string>();
+
+		yield return LetAliensSpeak( 4, reminders );
+
+		var remindersSpoken = CountReceived( reminders );
+		var firstReminder = ( reminders.Count > 0 ) ? reminders[ 0 ] : "nothing";
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 3. the question rate: the Spemin 30 in 100, the Mechans 70 (a crew with humans)
+		EnterEncounter( FindEncounter( 1, 6, 3, 0 ) );
+		yield return Frames( 5 );
+
+		var speminRate = EncounterField( "m_questionLikelihood", -1 );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		EnterEncounter( FindEncounterOfRace( GameData.Race.Mechan ) );
+		yield return Frames( 5 );
+
+		var mechanRate = EncounterField( "m_questionLikelihood", -1 );
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		SpaceflightController.m_instance.m_encounterRange = encounterRange;
+
+		Log( "alienwaiting: thrynn hails without a reply " + spoken + " of 6 turns | reminders " + remindersSpoken + " of 4 turns, the first: " + firstReminder + " | question rates spemin " + speminRate + ", mechan " + mechanRate );
+
+		Check( "alienwaiting: aliens whose hail gets no reply hail three times and then wait, as the original", spoken == 3, spoken.ToString() );
+		Check( "alienwaiting: aliens whose question gets no answer say they are waiting twice and then wait, as the original", ( remindersSpoken == 2 ) && ( firstReminder.Contains( CommText( 371 ) ) || firstReminder.Contains( CommText( 372 ) ) ), remindersSpoken + " | " + firstReminder );
+		Check( "alienwaiting: the aliens ask a question 30 times in 100, the Mechans 70, as the original", ( speminRate == 30 ) && ( mechanRate == 70 ), speminRate + ", " + mechanRate );
+
+		Finish( "scenario=alienwaiting", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
