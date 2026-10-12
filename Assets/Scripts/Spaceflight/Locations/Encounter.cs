@@ -2826,6 +2826,38 @@ public class Encounter : MonoBehaviour
 		m_pdEncounter.m_mood = Mathf.Clamp( m_pdEncounter.m_mood + effect, 0.0f, 100.0f );
 	}
 
+	// moves the aliens' mood by a line of theirs or by the player's answer to their question, kept within 0 to 100 (COMM-OV +!EDL) - only where the mood decides
+	void ChangeMood( float delta )
+	{
+		var personality = AlienPersonality.Find( m_gdEncounter.m_race );
+
+		if ( ( personality == null ) || !MoodDecides() || ( delta == 0.0f ) )
+		{
+			return;
+		}
+
+		EnsureMood( personality );
+
+		m_pdEncounter.m_mood = Mathf.Clamp( m_pdEncounter.m_mood + delta, 0.0f, 100.0f );
+	}
+
+	// the player's Yes or No moves the aliens' mood by the change their question has for it (COMM-OV YES>EDL and NO-EDL: Velox "Of course Veloxi are superior all
+	// the time. Agreeing?" No 10, Yes 0)
+	void ApplyAnswer( bool yes )
+	{
+		if ( m_pdEncounter.m_lastQuestionFromAliens == 0 )
+		{
+			return;
+		}
+
+		var question = FindRaceComm( m_pdEncounter.m_lastQuestionFromAliens );
+
+		if ( question != null )
+		{
+			ChangeMood( yes ? question.m_deltaYes : question.m_deltaNo );
+		}
+	}
+
 	// how many phrases the aliens say before they are tired of talking: "a random number in the range determined by the alien's initial posture" (compart.txt 11)
 	static int GetPhraseLimit( GD_Comm.Stance posture )
 	{
@@ -2871,6 +2903,39 @@ public class Encounter : MonoBehaviour
 	// the next line of a transmission, in the order of the game data - null once all of it has been sent in this encounter
 	GD_Comm FindNextTransmission()
 	{
+		var general = DataController.m_instance.m_playerData.m_general;
+		var lines = new List<GD_Comm>();
+		var endsCommLink = false;
+
+		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
+		{
+			if ( ( comm.m_race == m_gdEncounter.m_race ) && ( comm.m_subject == GD_Comm.Subject.NoMoreInformation ) )
+			{
+				lines.Add( comm );
+
+				endsCommLink = endsCommLink || comm.m_endsCommLink;
+			}
+		}
+
+		// a transmission with lines that end the comm link (each of the Nomad probes' planets, every second verse of the Minstrels' song) goes on from the line
+		// after the last one sent, at this meeting or the next, and from the first again after the last: the shipped game says the line used least, and the line
+		// that ends the link ends it (COMM-OV DO-UA)
+		if ( endsCommLink )
+		{
+			var lastCommId = general.GetLastCommId( m_gdEncounter.m_race, GD_Comm.Subject.NoMoreInformation );
+			var nextIndex = lines.FindIndex( line => line.m_id == lastCommId ) + 1;
+
+			if ( nextIndex >= lines.Count )
+			{
+				nextIndex = 0;
+			}
+
+			general.SetLastCommId( m_gdEncounter.m_race, GD_Comm.Subject.NoMoreInformation, lines[ nextIndex ].m_id );
+			m_pdEncounter.m_shownCommList.Add( lines[ nextIndex ].m_id );
+
+			return lines[ nextIndex ];
+		}
+
 		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
 		{
 			if ( ( comm.m_race == m_gdEncounter.m_race ) && ( comm.m_subject == GD_Comm.Subject.NoMoreInformation ) && !m_pdEncounter.m_shownCommList.Contains( comm.m_id ) )
@@ -3333,6 +3398,12 @@ public class Encounter : MonoBehaviour
 			ApplyPlayerPosture( subject != GD_Comm.Subject.Statement );
 		}
 
+		// and so does the player's answer to their question
+		if ( outgoing && ( ( subject == GD_Comm.Subject.Yes ) || ( subject == GD_Comm.Subject.No ) ) )
+		{
+			ApplyAnswer( subject == GD_Comm.Subject.Yes );
+		}
+
 		// copy the comm text (because we will replace tokens)
 		var text = comm.m_text;
 
@@ -3611,10 +3682,21 @@ public class Encounter : MonoBehaviour
 			}
 		}
 
+		// what saying the line does in the shipped game, for a line of the aliens' (COMM-OV DO-UA): it moves their mood (the Spemin's "Enough jabbering. It is
+		// time for a glorious Spemin victory!" by 100, to fight), or it ends the comm link
+		if ( !outgoing )
+		{
+			ChangeMood( comm.m_moodAction );
+		}
+
 		// did we want the communications to terminate?
 		if ( subject == GD_Comm.Subject.Terminate )
 		{
 			// yes - get out of video chat
+			Disconnect();
+		}
+		else if ( !outgoing && comm.m_endsCommLink && m_pdEncounter.m_connected )
+		{
 			Disconnect();
 		}
 	}
