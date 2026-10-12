@@ -865,6 +865,22 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStorms();
 				break;
 
+			case "screenpictures":
+				yield return ScenarioScreenPictures();
+				break;
+
+			case "starport-screenpictures":
+				yield return ScenarioStarportScreenPictures();
+				break;
+
+			case "coordinates":
+				yield return ScenarioCoordinates();
+				break;
+
+			case "tvdisplay":
+				yield return ScenarioTVDisplay();
+				break;
+
 			case "statusdisplay":
 				yield return ScenarioStatusDisplay();
 				break;
@@ -21202,6 +21218,290 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "storms: on a planet whose weather is None storms are rare but come", ( calm[ 0 ] >= 15 ) && ( calm[ 0 ] <= 60 ), calm[ 0 ] + " storms of 300 hours" );
 
 		Finish( "scenario=storms violent=" + violent[ 0 ] + " calm=" + calm[ 0 ], 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: pictures of every screen, for the comparison with the original's (probe.ps1 -Graphics)
+
+	// renders every camera in its order of depth into one picture, as the screen shows them: the views, the console and its displays, the panels (cameras
+	// that draw into a texture of their own are left out: the screens that show those textures draw them)
+	static void RenderScreenPicture( string path )
+	{
+		var renderTexture = new RenderTexture( 1920, 1080, 24, RenderTextureFormat.ARGB32 );
+		var picture = new Texture2D( 1920, 1080, TextureFormat.RGB24, false );
+		var cameras = new List<Camera>( Camera.allCameras );
+
+		cameras.Sort( ( a, b ) => a.depth.CompareTo( b.depth ) );
+
+		var active = RenderTexture.active;
+
+		RenderTexture.active = renderTexture;
+		GL.Clear( true, true, Color.black );
+
+		foreach ( var camera in cameras )
+		{
+			if ( !camera.enabled || ( camera.targetTexture != null ) )
+			{
+				continue;
+			}
+
+			camera.targetTexture = renderTexture;
+			camera.Render();
+			camera.targetTexture = null;
+		}
+
+		RenderTexture.active = renderTexture;
+		picture.ReadPixels( new Rect( 0, 0, 1920, 1080 ), 0, 0 );
+		picture.Apply();
+		RenderTexture.active = active;
+
+		System.IO.File.WriteAllBytes( path, picture.EncodeToPNG() );
+
+		UnityEngine.Object.Destroy( picture );
+		renderTexture.Release();
+		UnityEngine.Object.Destroy( renderTexture );
+	}
+
+	// the folder the screen pictures go into ("" without a graphics device)
+	static string ScreenPictureFolder( string scene )
+	{
+		if ( SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null )
+		{
+			return "";
+		}
+
+		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "screen-pictures", scene ) );
+
+		System.IO.Directory.CreateDirectory( folder );
+
+		return folder;
+	}
+
+	IEnumerator ScenarioScreenPictures()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var displays = controller.m_displayController;
+		var done = new bool[ 1 ];
+		var folder = ScreenPictureFolder( "spaceflight" );
+		var pictures = new List<string>();
+
+		EnsureCrew();
+
+		if ( folder == "" )
+		{
+			Log( "screenpictures: no graphics device (-nographics), so no pictures; run probe.ps1 with -Graphics for them" );
+
+			Finish( "scenario=screenpictures pictures=0", 0 );
+			yield break;
+		}
+
+		// no encounter begins while the pictures are taken
+		controller.m_encounterRange = 0.0f;
+
+		System.Action<string> take = name =>
+		{
+			var path = System.IO.Path.Combine( folder, ( pictures.Count + 1 ).ToString( "00" ) + "_" + name + ".png" );
+
+			RenderScreenPicture( path );
+			pictures.Add( name );
+		};
+
+		// ---- the star system (Arth's), the system display, then the status display
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
+
+		var start = Time.realtimeSinceStartup;
+
+		while ( controller.m_starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 40.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 30 );
+
+		displays.ChangeDisplay( displays.m_systemDisplay );
+
+		yield return Frames( 10 );
+
+		take( "star_system" );
+
+		displays.ChangeDisplay( displays.m_statusDisplay );
+
+		yield return Frames( 10 );
+
+		take( "star_system_status" );
+
+		// ---- in orbit around Arth's planet 90, with its sensor reading
+		yield return EnterOrbit( 90 );
+		yield return Frames( 30 );
+
+		take( "orbit" );
+
+		displays.ChangeDisplay( displays.m_sensorsDisplay );
+
+		yield return Frames( 30 );
+
+		take( "orbit_sensors" );
+
+		// ---- the landing map
+		displays.ChangeDisplay( displays.m_terrainMapDisplay );
+		displays.m_terrainMapDisplay.ShowSelectSite();
+
+		yield return Frames( 10 );
+
+		take( "landing_map" );
+
+		// ---- the terrain vehicle on planet 92 (it has life), with its display
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+		yield return Frames( 30 );
+
+		take( "terrain_vehicle" );
+
+		// ---- hyperspace
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 125.0f, 0.0f, 100.0f ) );
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 60 );
+
+		take( "hyperspace" );
+
+		// ---- an encounter met in hyperspace (Spemin)
+		EnterEncounter( FindEncounter( 1, 6, 3, 0 ) );
+
+		yield return Frames( 60 );
+
+		take( "encounter" );
+
+		Log( "screenpictures: " + pictures.Count + " pictures in " + folder + ": " + string.Join( ", ", pictures ) );
+
+		Check( "screenpictures: a picture of every screen visited", pictures.Count == 8, pictures.Count.ToString() );
+
+		Finish( "scenario=screenpictures pictures=" + pictures.Count, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: pictures of the Starport's screens (probe.ps1 -Graphics)
+
+	IEnumerator ScenarioStarportScreenPictures()
+	{
+		var folder = ScreenPictureFolder( "starport" );
+		var pictures = new List<string>();
+
+		if ( folder == "" )
+		{
+			Log( "starport-screenpictures: no graphics device (-nographics), so no pictures; run probe.ps1 with -Graphics for them" );
+
+			Finish( "scenario=starport-screenpictures pictures=0", 0 );
+			yield break;
+		}
+
+		System.Action<string> take = name =>
+		{
+			var path = System.IO.Path.Combine( folder, ( pictures.Count + 1 ).ToString( "00" ) + "_" + name + ".png" );
+
+			RenderScreenPicture( path );
+			pictures.Add( name );
+		};
+
+		yield return Frames( 60 );
+
+		// ---- the Starport, then each of its rooms
+		take( "starport" );
+
+		var panels = new Panel[] { FindPanel<OperationsPanel>(), FindPanel<PersonnelPanel>(), FindPanel<CrewAssignmentPanel>(), FindPanel<BankPanel>(), FindPanel<ShipConfigurationPanel>(), FindPanel<TradeDepotPanel>(), FindPanel<DockingBayPanel>() };
+		var names = new[] { "operations", "personnel", "crew_assignment", "bank", "ship_configuration", "trade_depot", "docking_bay" };
+
+		for ( var i = 0; i < panels.Length; i++ )
+		{
+			if ( panels[ i ] == null )
+			{
+				continue;
+			}
+
+			yield return OpenPanel( panels[ i ], names[ i ] );
+			yield return Frames( 10 );
+
+			take( names[ i ] );
+
+			yield return ClosePanel( panels[ i ], names[ i ] );
+			yield return Frames( 10 );
+		}
+
+		Log( "starport-screenpictures: " + pictures.Count + " pictures in " + folder + ": " + string.Join( ", ", pictures ) );
+
+		Check( "starport-screenpictures: a picture of the Starport and of each of its rooms", pictures.Count == 8, pictures.Count.ToString() );
+
+		Finish( "scenario=starport-screenpictures pictures=" + pictures.Count, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: latitude and longitude as the original gives them
+
+	IEnumerator ScenarioCoordinates()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// on planet 92 of Arth
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		yield return Frames( 5 );
+
+		// ---- 1. the terrain vehicle at 15 north, 30 west: the coordinates above the main view (the original: "15N x 30W")
+		playerData.m_general.m_lastDisembarkedCoordinates = Tools.LatLongToWorldCoordinates( -30.0f, 15.0f );
+		controller.m_viewport.UpdateCoordinates();
+
+		var label = FieldOrNull( controller.m_viewport, "m_label" ) as TMPro.TMP_Text;
+		var bar = ( label != null ) ? label.text : "";
+
+		// ---- 2. the landing map's crosshair at the same place (the original: "LAT 15N  LONG 30W")
+		var map = controller.m_displayController.m_terrainMapDisplay;
+
+		playerData.m_general.m_selectedLatitude = -30.0f;
+		playerData.m_general.m_selectedLongitude = 15.0f;
+
+		map.MoveCrosshairs();
+
+		var latitude = map.m_latitudeText.text;
+		var longitude = map.m_longitudeText.text;
+
+		Log( "coordinates: the bar above the main view reads '" + bar + "', the landing map LAT '" + latitude + "' LONG '" + longitude + "'" );
+
+		Check( "coordinates: the terrain vehicle's coordinates read north-south first, as the original's 15N x 30W", bar == "15N x 30W", bar );
+		Check( "coordinates: the landing map's LAT is the north-south place and its LONG the east-west one", ( latitude == "15N" ) && ( longitude == "30W" ), latitude + " / " + longitude );
+
+		Finish( "scenario=coordinates bar=" + bar + " lat=" + latitude + " long=" + longitude, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the terrain vehicle's display in the original's words
+
+	IEnumerator ScenarioTVDisplay()
+	{
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// on planet 92 of Arth, in the terrain vehicle
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		// (no weather: a storm would hide the bearing behind LOST!)
+		PlanetWeather.End();
+
+		yield return Frames( 10 );
+
+		var rows = controller.m_displayController.m_terrainVehicleDisplay.m_statusValues.text.Split( '\n' );
+		var date = ( rows.Length > 0 ) ? rows[ 0 ] : "";
+		var ship = ( rows.Length > 0 ) ? System.Text.RegularExpressions.Regex.Replace( rows[ rows.Length - 1 ], "<[^>]*>", "" ) : "";
+		var bearing = ship.Contains( "KM." ) ? ship.Substring( ship.IndexOf( "KM." ) + 3 ).Trim() : "";
+		var words = new[] { "North", "Northeast", "East", "Southeast", "South", "Southwest", "West", "Northwest" };
+
+		Log( "tvdisplay: date '" + date + "', ship '" + ship + "' (bearing '" + bearing + "') | " + string.Join( " / ", rows ) );
+
+		Check( "tvdisplay: the terrain vehicle's date has no hour, as the original's 01-01-4620", System.Text.RegularExpressions.Regex.IsMatch( date, @"^\d\d-\d\d-\d{4}$" ), date );
+		Check( "tvdisplay: the bearing to the ship is spelled out, as the original's NORTH", System.Array.IndexOf( words, bearing ) >= 0, ship );
+
+		Finish( "scenario=tvdisplay date=" + date + " ship=" + ship, 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 7: the Status display in the original's words
