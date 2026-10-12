@@ -109,6 +109,16 @@ public class PD_General
 	// always go through GetLastCommId / SetLastCommId
 	public int[] m_lastCommIds;
 
+	// how many times each comm line has been said in this game, as the shipped game counts them in its phrase records (FC, raised by PHRASE>CT in COMM-OV) to
+	// say the least used line first - by the line's id, for the lines said at least once (save files from before the counts have none: every line at 0)
+	[Serializable] public class CommUse
+	{
+		public int m_commId;
+		public int m_count;
+	}
+
+	public List<CommUse> m_commUseList;
+
 	// lines of messages
 	public List<string> m_messageList;
 
@@ -274,6 +284,9 @@ public class PD_General
 		// allocate memory for last comms
 		m_lastCommIds = new int[ c_numLastCommRaces * c_numLastCommSubjects ];
 
+		// no comm line said yet
+		m_commUseList = new List<CommUse>();
+
 		// message list
 		m_messageList = new List<string>();
 
@@ -286,6 +299,44 @@ public class PD_General
 
 		m_colonyRecommendationRecordList = new List<ColonyRecommendation>();
 		m_colonyRecommendationCount = 0;
+	}
+
+	// how many times this comm line has been said in this game
+	public int GetCommUseCount( int commId )
+	{
+		if ( m_commUseList != null )
+		{
+			foreach ( var commUse in m_commUseList )
+			{
+				if ( commUse.m_commId == commId )
+				{
+					return commUse.m_count;
+				}
+			}
+		}
+
+		return 0;
+	}
+
+	// call this when a comm line is said
+	public void AddCommUse( int commId )
+	{
+		if ( m_commUseList == null )
+		{
+			m_commUseList = new List<CommUse>();
+		}
+
+		foreach ( var commUse in m_commUseList )
+		{
+			if ( commUse.m_commId == commId )
+			{
+				commUse.m_count++;
+
+				return;
+			}
+		}
+
+		m_commUseList.Add( new CommUse { m_commId = commId, m_count = 1 } );
 	}
 
 	// get the id of the last comm used to answer a question about this subject for this race

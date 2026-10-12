@@ -3217,44 +3217,24 @@ public class Encounter : MonoBehaviour
 			return new GD_Comm( c_noCommFoundText );
 		}
 
-		// have we shown all possible comms for this subject?
-		var alreadyShownThemAll = true;
+		// the shipped game does not pick a line at random: it says the line used least in the game so far, the first of them in the order of the data on a tie
+		// (FIND-PHRASE in COMM-OV, the decompiled original; the counts are kept in its phrase records, PHRASE>CT raises them) - so each race's lines take turns, in
+		// order, across all its meetings and saved games (the Noah 9 derelict's officer report comes before its SOS, as STRINFO 2.11 prints them)
+		GD_Comm selectedComm = null;
+		var leastUses = int.MaxValue;
 
 		foreach ( var comm in possibleComms )
 		{
-			if ( !m_pdEncounter.m_shownCommList.Contains( comm.m_id ) )
+			var uses = playerData.m_general.GetCommUseCount( comm.m_id );
+
+			if ( uses < leastUses )
 			{
-				alreadyShownThemAll = false;
-				break;
+				selectedComm = comm;
+				leastUses = uses;
 			}
 		}
 
-		// if we have shown them all then reset them all
-		if ( alreadyShownThemAll )
-		{
-			foreach ( var comm in possibleComms )
-			{
-				m_pdEncounter.m_shownCommList.Remove( comm.m_id );
-			}
-		}
-
-		// remove all of the ones we've shown before from the list
-		for ( var i = 0; i < possibleComms.Count; i++ )
-		{
-			if ( m_pdEncounter.m_shownCommList.Contains( possibleComms[ i ].m_id ) )
-			{
-				possibleComms.RemoveAt( i );
-
-				i--;
-			}
-		}
-
-		// now pick and return a random one - but the Noah 9 derelict's in the order of the game data: the shipped game says the line of a subject used least, the
-		// first of them on a tie (FIND-PHRASE in COMM-OV, the decompiled original), so the officer's "we're picking up a distress beacon signal" comes before the
-		// SOS, and then they take turns (STRINFO 2.11 prints them in that order)
-		var randomNumber = ( race == GameData.Race.NoahDerelict ) ? 0 : Random.Range( 0, possibleComms.Count );
-
-		var selectedComm = possibleComms[ randomNumber ];
+		playerData.m_general.AddCommUse( selectedComm.m_id );
 
 		m_pdEncounter.m_shownCommList.Add( selectedComm.m_id );
 
