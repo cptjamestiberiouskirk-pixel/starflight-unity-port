@@ -2917,23 +2917,29 @@ public class Encounter : MonoBehaviour
 			}
 		}
 
-		// a transmission with lines that end the comm link (each of the Nomad probes' planets, every second verse of the Minstrels' song) goes on from the line
-		// after the last one sent, at this meeting or the next, and from the first again after the last: the shipped game says the line used least, and the line
-		// that ends the link ends it (COMM-OV DO-UA)
-		if ( endsCommLink )
+		// a transmission with lines that end the comm link (each of the Nomad probes' planets, every second verse of the Minstrels' song) goes on with the line used
+		// least in the game so far, the first of them on a tie, at this meeting or the next - so it goes on from the line after the last one sent, and from the first
+		// again after the last - and the line that ends the link ends it (COMM-OV FIND-PHRASE and DO-UA; the counts are FindComm's)
+		if ( ( lines.Count > 0 ) && endsCommLink )
 		{
-			var lastCommId = general.GetLastCommId( m_gdEncounter.m_race, GD_Comm.Subject.NoMoreInformation );
-			var nextIndex = lines.FindIndex( line => line.m_id == lastCommId ) + 1;
+			GD_Comm nextLine = null;
+			var leastUses = int.MaxValue;
 
-			if ( nextIndex >= lines.Count )
+			foreach ( var line in lines )
 			{
-				nextIndex = 0;
+				var uses = general.GetCommUseCount( line.m_id );
+
+				if ( uses < leastUses )
+				{
+					nextLine = line;
+					leastUses = uses;
+				}
 			}
 
-			general.SetLastCommId( m_gdEncounter.m_race, GD_Comm.Subject.NoMoreInformation, lines[ nextIndex ].m_id );
-			m_pdEncounter.m_shownCommList.Add( lines[ nextIndex ].m_id );
+			general.AddCommUse( nextLine.m_id );
+			m_pdEncounter.m_shownCommList.Add( nextLine.m_id );
 
-			return lines[ nextIndex ];
+			return nextLine;
 		}
 
 		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
