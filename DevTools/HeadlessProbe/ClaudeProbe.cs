@@ -909,6 +909,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAlienShields();
 				break;
 
+			case "ancientsites":
+				yield return ScenarioAncientSites();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -22151,6 +22155,101 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "alienshields: turning neutral again, they raise their shields", toNeutral.Contains( "Captain, they've raised their shields." ) && !toNeutral.Contains( "weapons" ), toNeutral );
 
 		Finish( "scenario=alienshields", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the ancient ruins STRINFO's editors place, with their Endurium
+
+	// lands the terrain vehicle at a place on a planet of any star system
+	static IEnumerator LandOnPlanetAt( int starId, int planetId, Vector3 place, bool[] done )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		// (the port's "latitude" is the east-west coordinate - see Tools.LatLongToWorldCoordinates)
+		Tools.WorldToLatLongCoordinates( place, out var x, out var z );
+
+		playerData.m_general.m_selectedLatitude = x;
+		playerData.m_general.m_selectedLongitude = z;
+
+		yield return GoIntoOrbit( starId, planetId );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+	}
+
+	// the Endurium of the ruins within the given distance of a place, nearest first, in tenths of a cubic meter ("-" for a ruin that holds none)
+	static string EnduriumInRuinsNear( Vector3 place, float distance )
+	{
+		var found = new List<KeyValuePair<float, string>>();
+
+		foreach ( var ruin in RuinsOnTheGround() )
+		{
+			var delta = ruin.transform.position - place;
+
+			delta.y = 0.0f;
+
+			if ( delta.magnitude > distance )
+			{
+				continue;
+			}
+
+			var terrainRuin = ruin as TerrainRuin;
+			var endurium = 0;
+
+			if ( terrainRuin != null )
+			{
+				foreach ( var item in terrainRuin.m_randomItems )
+				{
+					endurium += item.m_enduriumVolume;
+				}
+			}
+
+			found.Add( new KeyValuePair<float, string>( delta.magnitude, ( endurium > 0 ) ? endurium.ToString() : "-" ) );
+		}
+
+		found.Sort( ( a, b ) => a.Key.CompareTo( b.Key ) );
+
+		return string.Join( ",", found.ConvertAll( f => f.Value ) );
+	}
+
+	IEnumerator ScenarioAncientSites()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// ---- 1. the Mechans' ice planet: planet 5 of 145,107, a ruin with 3.1 cubic meters at 36N x 90E
+		var mechanStar = StarAt( 145, 107 );
+		var mechanPlanet = gameData.FindPlanetFromSun( 145, 107, 5 );
+		var mechanSite = Tools.LatLongToWorldCoordinates( 90.0f, 36.0f );
+
+		yield return LandOnPlanetAt( mechanStar, mechanPlanet, mechanSite, done );
+
+		var mechanRuins = done[ 0 ] ? EnduriumInRuinsNear( mechanSite, 100.0f ) : "(never got into the terrain vehicle)";
+
+		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+
+		// ---- 2. deep in Elowan space: planet 2 of 154,62, two ruins with 3.1 and 5.9 cubic meters at 42S x 13W
+		var thrynnStar = StarAt( 154, 62 );
+		var thrynnPlanet = gameData.FindPlanetFromSun( 154, 62, 2 );
+		var thrynnSite = Tools.LatLongToWorldCoordinates( -13.0f, -42.0f );
+
+		yield return LandOnPlanetAt( thrynnStar, thrynnPlanet, thrynnSite, done );
+
+		var thrynnRuins = done[ 0 ] ? EnduriumInRuinsNear( thrynnSite, 100.0f ) : "(never got into the terrain vehicle)";
+
+		Log( "ancientsites: planet " + mechanPlanet + " of star " + mechanStar + ", ruins near 36N x 90E (Endurium in tenths): [" + mechanRuins + "] | planet " + thrynnPlanet + " of star " + thrynnStar + ", ruins near 42S x 13W: [" + thrynnRuins + "]" );
+
+		Check( "ancientsites: the Mechans' ice planet has an ancient ruin at 36N x 90E with 3.1 cubic meters of Endurium and nothing else near it", mechanRuins == "31", mechanRuins );
+		Check( "ancientsites: planet 2 of 154,62 has two ancient ruins at 42S x 13W with 3.1 and 5.9 cubic meters of Endurium", thrynnRuins == "31,59", thrynnRuins );
+
+		Finish( "scenario=ancientsites", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
