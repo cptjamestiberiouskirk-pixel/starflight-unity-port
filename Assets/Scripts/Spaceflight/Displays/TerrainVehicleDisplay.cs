@@ -24,7 +24,8 @@ public class TerrainVehicleDisplay : ShipDisplay
 	// for gizmo drawing
 	Vector3[] m_debugVectors;
 
-	public static readonly string[] c_cardinalDirections = { "N", "NE", "E", "SE", "S", "SW", "W", "NW", "N" };
+	// the bearing to the ship, spelled out as the original's ("1KM. NORTH", "NORTHWEST")
+	public static readonly string[] c_cardinalDirections = { "North", "Northeast", "East", "Southeast", "South", "Southwest", "West", "Northwest", "North" };
 
 	TerrainVehicleDisplay()
 	{
@@ -161,7 +162,8 @@ public class TerrainVehicleDisplay : ShipDisplay
 			m_shownShipLost = shipLost;
 
 			// date and time
-			var text = playerData.m_general.m_currentStardateDHMY + "\n";
+			// (the terrain vehicle's date has no hour, as the original's "DATE : 01-01-4620")
+			var text = PD_General.GetDisplayStardate( playerData.m_general.m_currentStardateYMD ) + "\n";
 
 			// the fuel that is left
 			if ( percentFuelRemaining <= -3 )

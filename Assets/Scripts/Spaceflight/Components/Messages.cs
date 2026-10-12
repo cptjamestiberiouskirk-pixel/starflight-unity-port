@@ -140,6 +140,21 @@ public class Messages : MonoBehaviour
 		m_textChanged = true;
 	}
 
+	// call this to put a message before the others
+	public void InsertText( string newMessage )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		if ( playerData.m_general.m_messageList.Count == 10 )
+		{
+			playerData.m_general.m_messageList.RemoveAt( 0 );
+		}
+
+		playerData.m_general.m_messageList.Insert( 0, newMessage );
+
+		m_textChanged = true;
+	}
+
 	// call this to force a refresh
 	public void Refresh()
 	{
