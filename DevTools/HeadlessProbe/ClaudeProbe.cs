@@ -16168,6 +16168,75 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-win: before the win the evaluation is the scene's (control)", texts[ 0 ].Contains( "colony world recommendations" ), texts[ 0 ] );
 		Check( "starport-win: after the win the evaluation is Interstel's supplemental evaluation on the completion of the mission", texts[ 1 ].Contains( "COMPLETION OF MISSION" ) && texts[ 1 ].Contains( "500,000 MU" ), texts[ 1 ] );
 
+		// ---- the evaluation screen's pages, as the original's (OP-OV in the decompiled original): the supplemental evaluations first, each once, then the colony
+		// evaluations one to a page every time, the last followed by END OF EVALUATIONS; More turns the page and is gone on the last
+		SetFieldIfPresent( playerData.m_general, "m_gameWon", true );
+		SetFieldIfPresent( playerData.m_general, "m_missionCompleteShown", false );
+
+		var towing ="SUPPLEMENTAL EVALUATION\nSUBJECT:  TOWING CHARGES\n\nTOWING TEST";
+		var lostVehicle = "SUPPLEMENTAL EVALUATION\nSUBJECT:  LOSS OF TERRAIN VEHICLE\n\nLOST VEHICLE TEST";
+
+		playerData.m_general.m_supplementalEvaluationList = new List<string> { towing };
+		SetFieldIfPresent( playerData.m_general, "m_colonyEvaluationList", new List<string> { "COLONY TEST A", "COLONY TEST B" } );
+
+		var visits = new List<string>[ 3 ];
+
+		for ( var visit = 0; visit < 3; visit++ )
+		{
+			// the third visit is a save file from before the colony evaluations had a list of their own: one of them is among the supplemental ones
+			if ( visit == 2 )
+			{
+				playerData.m_general.m_supplementalEvaluationList = new List<string> { lostVehicle, "COLONY TEST OLD" };
+			}
+
+			visits[ visit ] = new List<string>();
+
+			PanelController.m_instance.Open( operationsPanel );
+
+			yield return new WaitForSecondsRealtime( 1.0f );
+
+			operationsPanel.ShowEvaluations();
+
+			yield return Frames( 2 );
+
+			var textTransform = operationsPanel.m_evaluationGameObject.transform.Find( "Display/Error Text Mask/Error Text" );
+			var text = ( textTransform == null ) ? null : textTransform.GetComponent<TMPro.TextMeshProUGUI>();
+
+			// each page and whether More is there (at most 6 pages)
+			for ( var page = 0; page < 6; page++ )
+			{
+				var more = operationsPanel.m_moreButton.gameObject.activeSelf;
+
+				visits[ visit ].Add( ( ( text == null ) ? "no text" : text.text.Replace( "\r", "" ).Replace( '\n', '/' ) ) + ( more ? " [More]" : "" ) );
+
+				if ( !more )
+				{
+					break;
+				}
+
+				operationsPanel.MoreClicked();
+
+				yield return Frames( 2 );
+			}
+
+			yield return ClosePanel( operationsPanel, "operations" );
+		}
+
+		SetFieldIfPresent( playerData.m_general, "m_gameWon", false );
+
+		for ( var visit = 0; visit < 3; visit++ )
+		{
+			Log( "starport-win: the evaluation pages of visit " + ( visit + 1 ) + ": " + string.Join( " | ", visits[ visit ] ) );
+		}
+
+		var first = visits[ 0 ];
+		var second = visits[ 1 ];
+		var third = visits[ 2 ];
+
+		Check( "starport-win: the evaluation screen shows one evaluation to a page: the towing charges, the completion of the mission, then the two colony evaluations, More on each but the last, which ends in END OF EVALUATIONS", ( first.Count == 4 ) && first[ 0 ].Contains( "TOWING TEST" ) && first[ 0 ].EndsWith( "[More]" ) && first[ 1 ].Contains( "COMPLETION OF MISSION" ) && !first[ 1 ].Contains( "TOWING" ) && first[ 2 ].StartsWith( "COLONY TEST A" ) && !first[ 2 ].Contains( "COLONY TEST B" ) && first[ 3 ].StartsWith( "COLONY TEST B" ) && first[ 3 ].EndsWith( "END OF EVALUATIONS" ), string.Join( " | ", first ) );
+		Check( "starport-win: on the next visit the supplemental evaluations are gone (each is shown once) and the colony evaluations are shown again", ( second.Count == 2 ) && second[ 0 ].StartsWith( "COLONY TEST A" ) && second[ 1 ].StartsWith( "COLONY TEST B" ) && second[ 1 ].EndsWith( "END OF EVALUATIONS" ) && !string.Join( " ", second ).Contains( "TOWING" ) && !string.Join( " ", second ).Contains( "COMPLETION OF MISSION" ), string.Join( " | ", second ) );
+		Check( "starport-win: a colony evaluation of an older save file, kept among the supplemental ones, moves to the colony evaluations and is shown before them", ( third.Count == 4 ) && third[ 0 ].Contains( "LOST VEHICLE TEST" ) && third[ 1 ].StartsWith( "COLONY TEST OLD" ) && third[ 2 ].StartsWith( "COLONY TEST A" ) && third[ 3 ].StartsWith( "COLONY TEST B" ) && third[ 3 ].EndsWith( "END OF EVALUATIONS" ), string.Join( " | ", third ) );
+
 		Finish( "scenario=starport-win before=" + texts[ 0 ].Contains( "colony" ) + " after=" + texts[ 1 ].Contains( "COMPLETION OF MISSION" ), 0 );
 	}
 
@@ -17852,14 +17921,19 @@ public class ClaudeProbe : MonoBehaviour
 			ledger += bank.m_transactionList[ index ].m_description + " " + bank.m_transactionList[ index ].m_amount + "; ";
 		}
 
-		var evaluations = FieldOrNull( playerData.m_general, "m_supplementalEvaluationList" ) as IList;
+		// the colony evaluations have a list of their own since the evaluation screen pages them (before that they were among the supplemental ones)
 		var evaluationText = "";
 
-		if ( evaluations != null )
+		foreach ( var listName in new[] { "m_colonyEvaluationList", "m_supplementalEvaluationList" } )
 		{
-			foreach ( var evaluation in evaluations )
+			var evaluations = FieldOrNull( playerData.m_general, listName ) as IList;
+
+			if ( evaluations != null )
 			{
-				evaluationText += evaluation + " || ";
+				foreach ( var evaluation in evaluations )
+				{
+					evaluationText += evaluation + " || ";
+				}
 			}
 		}
 
@@ -19462,6 +19536,31 @@ public class ClaudeProbe : MonoBehaviour
 
 		LeaveEncounter();
 		yield return Frames( 10 );
+
+		// ---- 4. the derelict's beacon in the shipped game's order (FIND-PHRASE in COMM-OV: the line used least, the first on a tie): in three meetings, its first
+		// two lines are the officer's "we're picking up a distress beacon signal" and then the SOS (a random pick would give that order in all three one time in 8)
+		var beaconOrders = new List<string>();
+
+		for ( var meeting = 0; meeting < 3; meeting++ )
+		{
+			yield return GoIntoOrbit( noahStar, PlanetInOrbit( noahStar, 3 ) );
+
+			var lines = new List<string>();
+
+			yield return LetAliensSpeak( 2, lines );
+
+			var first = ( lines.Count > 0 ) && SaysLine( lines[ 0 ], CommText( 555 ) ) ? "beacon" : ( ( lines.Count > 0 ) && SaysLine( lines[ 0 ], CommText( 556 ) ) ? "SOS" : "other" );
+			var second = ( lines.Count > 1 ) && SaysLine( lines[ 1 ], CommText( 556 ) ) ? "SOS" : ( ( lines.Count > 1 ) && SaysLine( lines[ 1 ], CommText( 555 ) ) ? "beacon" : "other" );
+
+			beaconOrders.Add( first + "," + second );
+
+			LeaveEncounter();
+			yield return Frames( 10 );
+		}
+
+		Log( "transmissions: the first two lines of the Noah 9 derelict in three meetings: " + string.Join( " | ", beaconOrders ) );
+
+		Check( "transmissions: in each of three meetings the Noah 9 derelict's first line is the officer's \"we're picking up a distress beacon signal\" and its second the SOS", string.Join( " ", beaconOrders ) == "beacon,SOS beacon,SOS beacon,SOS", string.Join( " | ", beaconOrders ) );
 
 		controller.m_encounterRange = encounterRange;
 

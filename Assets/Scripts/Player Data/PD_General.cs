@@ -112,8 +112,16 @@ public class PD_General
 	// lines of messages
 	public List<string> m_messageList;
 
-	// Interstel's supplemental evaluations (towing charges and the like - STRINFO 1.2), as the Operations evaluation screen shows them, oldest first
+	// Interstel's supplemental evaluations (towing charges and the like - STRINFO 1.2) the Operations evaluation screen has not shown yet, oldest first - as in the
+	// original (OP-OV in the decompiled original), each is shown once, on a page of its own, before the colony evaluations
 	public List<string> m_supplementalEvaluationList;
+
+	// Interstel's evaluations of the planets recommended for colonization, oldest first - kept, and shown one to a page on every visit to the evaluation screen,
+	// the last followed by "END OF EVALUATIONS" (save files from before this list keep theirs in m_supplementalEvaluationList: GetColonyEvaluationList moves them)
+	public List<string> m_colonyEvaluationList;
+
+	// whether the evaluation screen has shown Interstel's supplemental evaluation on the completion of the mission (the original shows it once, WMSG)
+	public bool m_missionCompleteShown;
 
 	// the planets recommended for colonization that Interstel has not evaluated yet (it does when the ship is back at the Starport), and how many recommended
 	// planets have proved unsuitable so far (the first one is only a warning - STRINFO 1.2)
@@ -270,6 +278,8 @@ public class PD_General
 		m_messageList = new List<string>();
 
 		m_supplementalEvaluationList = new List<string>();
+		m_colonyEvaluationList = new List<string>();
+		m_missionCompleteShown = false;
 
 		m_colonyRecommendationList = new List<int>();
 		m_unsuitableRecommendationCount = 0;
@@ -411,6 +421,31 @@ public class PD_General
 		}
 
 		m_supplementalEvaluationList.Add( evaluation );
+	}
+
+	// the colony evaluations - a save file from before the list kept them among the supplemental ones, which all begin "SUPPLEMENTAL EVALUATION": any other there
+	// moves here, oldest first (whether the loaded list is missing or empty)
+	public List<string> GetColonyEvaluationList()
+	{
+		if ( m_colonyEvaluationList == null )
+		{
+			m_colonyEvaluationList = new List<string>();
+		}
+
+		if ( ( m_supplementalEvaluationList != null ) && m_supplementalEvaluationList.Exists( evaluation => ( evaluation == null ) || !evaluation.StartsWith( "SUPPLEMENTAL EVALUATION" ) ) )
+		{
+			m_colonyEvaluationList.InsertRange( 0, m_supplementalEvaluationList.FindAll( evaluation => ( evaluation != null ) && !evaluation.StartsWith( "SUPPLEMENTAL EVALUATION" ) ) );
+
+			m_supplementalEvaluationList.RemoveAll( evaluation => ( evaluation == null ) || !evaluation.StartsWith( "SUPPLEMENTAL EVALUATION" ) );
+		}
+
+		return m_colonyEvaluationList;
+	}
+
+	// call this to add Interstel's evaluation of a planet recommended for colonization
+	public void AddColonyEvaluation( string evaluation )
+	{
+		GetColonyEvaluationList().Add( evaluation );
 	}
 
 	// call this when a planet is recommended for colonization
