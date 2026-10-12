@@ -601,6 +601,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioFlareData();
 				break;
 
+			case "sunlife":
+				yield return ScenarioSunLife();
+				break;
+
 			case "calendar":
 				yield return ScenarioCalendar();
 				break;
@@ -12638,6 +12642,68 @@ public class ClaudeProbe : MonoBehaviour
 		var material = FieldOrNull( shine, "m_material" ) as Material;
 
 		return ( material == null ) ? float.NaN : material.GetVector( "_Size" ).x;
+	}
+
+	// the living surface of the star system's sun (Shine): a small flare rises from the rim within a few seconds and falls back, the size
+	// of the shine (the game's flares) stays what StarSystem set, the sun takes no numbers from the game's Random, and a frame of it takes
+	// no memory
+	IEnumerator ScenarioSunLife()
+	{
+		var controller = SpaceflightController.m_instance;
+
+		EnterStarSystem( 25 );
+
+		yield return WaitForPlanetMaps( 60.0f );
+
+		var shine = controller.m_starSystem.m_shine;
+		var material = shine.GetComponent<MeshRenderer>().material;
+		var sizeBefore = material.GetVector( "_Size" );
+
+		// ---- 1. within 6 s of real time a flare rises (its strength goes above 0.3) and falls back to nothing
+		var hasFlare = material.HasProperty( "_Flare" );
+		var strongest = 0.0f;
+		var fellBack = false;
+		var highestRise = 0.0f;
+		var start = Time.realtimeSinceStartup;
+
+		while ( hasFlare && ( Time.realtimeSinceStartup - start < 6.0f ) && !fellBack )
+		{
+			yield return null;
+
+			var flare = material.GetVector( "_Flare" );
+
+			strongest = Mathf.Max( strongest, flare.w );
+			highestRise = Mathf.Max( highestRise, flare.y );
+
+			if ( ( strongest > 0.3f ) && ( flare.w < 0.01f ) )
+			{
+				fellBack = true;
+			}
+		}
+
+		Check( "sunlife: a small flare rises from the sun's rim and falls back", hasFlare && ( strongest > 0.3f ) && fellBack && ( highestRise > 0.0f ), "property " + hasFlare + ", strongest " + strongest.ToString( "F2" ) + ", rose " + highestRise.ToString( "F1" ) + " units, fell back " + fellBack );
+
+		// ---- 2. the size of the shine is still what StarSystem set (the flares of the game are not touched)
+		var sizeAfter = material.GetVector( "_Size" );
+
+		Check( "sunlife: the size of the sun's shine is untouched by its small flares (control)", sizeAfter == sizeBefore, sizeBefore + " -> " + sizeAfter );
+
+		// ---- 3. the sun takes no numbers from the game's Random, and a frame of it takes no memory
+		var update = (System.Action) System.Delegate.CreateDelegate( typeof( System.Action ), shine, "Update" );
+		var randomBefore = UnityEngine.Random.state;
+
+		for ( var i = 0; i < 20000; i++ )
+		{
+			update();
+		}
+
+		var randomUntouched = UnityEngine.Random.state.Equals( randomBefore );
+		var controlBytes = AllocatedByTheControl();
+		var sunBytes = Allocated( update, c_meterCalls ) / c_meterCalls;
+
+		Check( "sunlife: the sun takes nothing from the game's Random and no memory in a frame (control)", randomUntouched && ( controlBytes >= 256 ) && ( sunBytes == 0 ), "Random untouched " + randomUntouched + ", " + sunBytes + " bytes per frame, the control measures " + controlBytes );
+
+		Finish( "scenario=sunlife strongest=" + strongest.ToString( "F2" ) + " rise=" + highestRise.ToString( "F1" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	IEnumerator ScenarioFlareData()

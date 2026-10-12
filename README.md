@@ -26,6 +26,7 @@ The project has been refactored to a clean, **root-directory architecture** to e
 - **Combat System**: Laser cannons, missile launchers, shield absorption, armor damage, and AI combat behaviors with victory/defeat detection. Alien ships have armor and shield points, any race turns hostile when fired on (the Uhlek attack on sight), aliens hold their fire while a comm link is up, and every shot uses a little Endurium.
 - **Encounters in Orbit**: Home fleets, drones and a derelict wait in orbit around their planets and meet the ship when it goes into orbit there. The ship drops into the encounter and comes back at the level of the star system, as in the original.
 - **Ship Systems Over Time**: Shields keep their charge and recharge slowly, and the engineer's repairs and the doctor's treatment take time, faster with higher skill.
+- **Living Suns**: The sun of each star system churns, its corona flickers, and small flares rise from its rim and fall back, in the colour of real stars of its class.
 - **Ship Destruction**: Complete death sequences with explosion effects, debris spawning, and salvage opportunities.
 - **Game Over System**: Player ship destruction triggers the game over screen. Returning to the title screen goes back to the last save.
 - **Terrain Scanning**: Enhanced exploration with 3D world-space labels, mineral detection, and Star Trek-style transporter effects.
