@@ -172,9 +172,12 @@ The project features a **deterministic visualization system** that renders plane
 - Save/load system with JSON persistence
 
 ### 🔧 In Progress
-- Salvage collection from debris fields
+- Storms on planet surfaces, being observed in the original game first
+- The fidelity pass: every screen against the original's, and the planet drawn in encounters that begin in orbit (roadmap Phase 7)
 
-### 📊 Completion: ~95%
+### 📊 Completion: 55 of the 59 items of the roadmap to parity
+
+[ROADMAP.md](ROADMAP.md) lists what the port still lacks against the original game: storms, the owner's play test of the early visual changes, and two items of the fidelity pass. No one has yet played the port through to the win by hand.
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
