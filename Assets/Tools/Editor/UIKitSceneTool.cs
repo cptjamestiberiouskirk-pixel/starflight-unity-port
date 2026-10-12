@@ -37,6 +37,11 @@ public static class UIKitSceneTool
 	const string c_buttons = "Main/Right/GameObject/C/GameObject/B/Buttons/";
 	const string c_officerIcon = "Main/Right/GameObject/C/GameObject/A/GameObject/A/GameObject/Image";
 
+	// the selection highlight's margins from the sides of the labels' panel (the labels start 10 px in: the bar on the left stays clear of them), and the width of the bar (as in the kit's Console Button)
+	const float c_selectionInsetLeft = 1.0f;
+	const float c_selectionInsetRight = 6.0f;
+	const float c_selectionBarWidth = 3.0f;
+
 	static Entry[] GetTable()
 	{
 		var table = new System.Collections.Generic.List<Entry>
@@ -130,7 +135,8 @@ public static class UIKitSceneTool
 		{
 			table.Add( new Entry( c_display + "Status/A/Bars/Bar (" + i + ")", UIText.None, 0, UISprite.Panel, UIColor.BackgroundRaised, 0.0f ) );
 			table.Add( new Entry( c_display + "Terrain Vehicle/B/Bars/Bar (" + i + ")", UIText.None, 0, UISprite.Panel, UIColor.BackgroundRaised, 0.0f ) );
-			table.Add( new Entry( c_buttons + "B/GameObject/" + i, UIText.LabelM, 26, UISprite.None, UIColor.TextPrimary ) );
+			// (the console buttons' labels take their colours from the button controller, which shows the selected and the running button)
+			table.Add( new Entry( c_buttons + "B/GameObject/" + i, UIText.LabelM, 26, UISprite.None, UIColor.Keep ) );
 		}
 
 		for ( var i = 1; i <= 5; i++ )
@@ -266,6 +272,83 @@ public static class UIKitSceneTool
 		else
 		{
 			report.AppendLine( "officer icon not set (no button controller or no image at " + c_officerIcon + ")" );
+		}
+
+		// the highlight behind the selected console button: the first child of the labels' panel (above the panel, below the labels), the width of the panel,
+		// moved and coloured by the button controller; a bar on its left edge marks the selected button that is not running
+		var labelPanel = canvas.Find( c_buttons + "B" );
+
+		if ( ( controller != null ) && ( labelPanel != null ) )
+		{
+			var highlight = labelPanel.Find( "UI Kit Selection" );
+
+			if ( highlight == null )
+			{
+				var go = new GameObject( "UI Kit Selection", typeof( RectTransform ), typeof( CanvasRenderer ), typeof( Image ), typeof( LayoutElement ) );
+
+				Undo.RegisterCreatedObjectUndo( go, "UI kit" );
+
+				highlight = go.transform;
+				highlight.SetParent( labelPanel, false );
+			}
+
+			highlight.SetAsFirstSibling();
+
+			var highlightRect = (RectTransform) highlight;
+
+			highlightRect.anchorMin = new Vector2( 0.0f, 0.5f );
+			highlightRect.anchorMax = new Vector2( 1.0f, 0.5f );
+			highlightRect.pivot = new Vector2( 0.5f, 0.5f );
+			highlightRect.anchoredPosition = new Vector2( ( c_selectionInsetLeft - c_selectionInsetRight ) * 0.5f, 0.0f );
+			highlightRect.sizeDelta = new Vector2( -( c_selectionInsetLeft + c_selectionInsetRight ), 40.0f );
+			highlight.GetComponent<LayoutElement>().ignoreLayout = true;
+
+			var highlightImage = highlight.GetComponent<Image>();
+
+			highlightImage.raycastTarget = false;
+			highlightImage.sprite = theme.m_panelSprite;
+			highlightImage.type = Image.Type.Sliced;
+			highlightImage.color = theme.m_backgroundHover;
+
+			var bar = highlight.Find( "Bar" );
+
+			if ( bar == null )
+			{
+				var go = new GameObject( "Bar", typeof( RectTransform ), typeof( CanvasRenderer ), typeof( Image ) );
+
+				Undo.RegisterCreatedObjectUndo( go, "UI kit" );
+
+				bar = go.transform;
+				bar.SetParent( highlight, false );
+			}
+
+			var barRect = (RectTransform) bar;
+
+			barRect.anchorMin = new Vector2( 0.0f, 0.0f );
+			barRect.anchorMax = new Vector2( 0.0f, 1.0f );
+			barRect.pivot = new Vector2( 0.0f, 0.5f );
+			barRect.anchoredPosition = Vector2.zero;
+			barRect.sizeDelta = new Vector2( c_selectionBarWidth, 0.0f );
+
+			var barImage = bar.GetComponent<Image>();
+
+			barImage.raycastTarget = false;
+			barImage.sprite = null;
+			barImage.color = theme.m_accentPrimary;
+
+			Undo.RecordObject( controller, "UI kit" );
+			controller.m_selectionHighlight = highlightImage;
+			controller.m_selectionBar = barImage;
+
+			EditorUtility.SetDirty( controller );
+			EditorUtility.SetDirty( highlightImage );
+			EditorUtility.SetDirty( barImage );
+
+			report.AppendLine( "selection highlight set" );
+		}
+		else
+		{
+			report.AppendLine( "selection highlight not set (no button controller or no label panel at " + c_buttons + "B)" );
 		}
 
 		EditorSceneManager.MarkSceneDirty( canvas.gameObject.scene );

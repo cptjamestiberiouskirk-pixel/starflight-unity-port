@@ -305,8 +305,101 @@ public class Planet : MonoBehaviour
 		return ( m_planetGenerator != null ) && m_planetGenerator.m_abort;
 	}
 
-	// sets up the clouds based on planet properties
-	public void SetupClouds( MeshRenderer planetClouds, GameObject planetAtmosphere, bool updateSkybox, bool enableFog )
+	// the planet atmosphere shader (in a Resources folder, so it is in every build: the atmosphere's material is made in code)
+	static Shader m_atmosphereShader;
+
+	// how high the atmosphere reaches above the planet (a share of its radius), and how much bigger than the halo the quad it is drawn on is (the camera looks at it at a slant)
+	const float c_atmosphereHeight = 0.12f;
+	const float c_atmosphereQuadMargin = 1.3f;
+
+	// how far above the planet's top the quad is (a share of the planet's radius): in front of the planet, below the ships
+	const float c_atmosphereQuadLift = 0.02f;
+
+	/// <summary>
+	/// Draw a planet's atmosphere on its quad: a halo that fades from the planet's edge into space and a haze over the planet that thickens towards its edge, lit by the sun.
+	/// The quad is put just above the planet and made big enough for the halo; the shader works out the rest from the line of sight.
+	/// </summary>
+	public static void FitAtmosphere( GameObject atmosphere, GameObject planetModel, Color atmosphereColor, float atmosphereDensity )
+	{
+		if ( ( atmosphere == null ) || ( planetModel == null ) )
+		{
+			return;
+		}
+
+		var atmosphereRenderer = atmosphere.GetComponent<MeshRenderer>();
+		var atmosphereMesh = atmosphere.GetComponent<MeshFilter>();
+		var planetRenderer = planetModel.GetComponentInChildren<Renderer>();
+		var planetMesh = planetModel.GetComponentInChildren<MeshFilter>();
+
+		if ( ( atmosphereRenderer == null ) || ( atmosphereMesh == null ) || ( atmosphereMesh.sharedMesh == null ) || ( planetRenderer == null ) || ( planetMesh == null ) || ( planetMesh.sharedMesh == null ) )
+		{
+			return;
+		}
+
+		if ( m_atmosphereShader == null )
+		{
+			m_atmosphereShader = Resources.Load<Shader>( "Shaders/Planet Atmosphere" );
+
+			if ( m_atmosphereShader == null )
+			{
+				Debug.LogWarning( "Planet: the planet atmosphere shader was not found" );
+				return;
+			}
+		}
+
+		// a material of its own for this atmosphere, made once (each atmosphere has its own size and colour)
+		if ( ( atmosphereRenderer.sharedMaterial == null ) || ( atmosphereRenderer.sharedMaterial.shader != m_atmosphereShader ) )
+		{
+			var material = new Material( m_atmosphereShader );
+			material.name = "Planet Atmosphere";
+
+			atmosphereRenderer.sharedMaterial = material;
+			atmosphereRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+			atmosphereRenderer.receiveShadows = false;
+		}
+
+		// how big the planet is (from its mesh and its scale: the bounds of a renderer are the mesh's box turned with it, up to 41% too big for a turned sphere), and where its middle is
+		var planetBounds = planetRenderer.bounds;
+		var planetRadius = planetMesh.sharedMesh.bounds.extents.x * planetMesh.transform.lossyScale.x;
+		var atmosphereHeight = planetRadius * c_atmosphereHeight;
+
+		if ( planetRadius <= 0.0f )
+		{
+			return;
+		}
+
+		// the quad just above the planet's top, so that it is in front of the planet
+		var lift = planetRadius * ( 1.0f + c_atmosphereQuadLift );
+
+		atmosphere.transform.position = planetBounds.center + Vector3.up * lift;
+
+		// big enough for the halo (the quad mesh is flat: its half size is its largest extent)
+		var meshExtents = atmosphereMesh.sharedMesh.bounds.extents;
+		var meshHalfSize = Mathf.Max( meshExtents.x, Mathf.Max( meshExtents.y, meshExtents.z ) );
+		var parentScale = ( atmosphere.transform.parent != null ) ? atmosphere.transform.parent.lossyScale.x : 1.0f;
+
+		if ( ( meshHalfSize > 0.0f ) && ( parentScale > 0.0f ) )
+		{
+			atmosphere.transform.localScale = Vector3.one * ( ( planetRadius + atmosphereHeight ) * c_atmosphereQuadMargin / meshHalfSize / parentScale );
+		}
+
+		// the game data's atmosphere colours are often dark, and the atmosphere adds its light: bring the colour up to full brightness, and let the density say how strong it is
+		var brightest = Mathf.Max( atmosphereColor.r, Mathf.Max( atmosphereColor.g, atmosphereColor.b ) );
+		var color = ( brightest > 0.001f ) ? atmosphereColor / brightest : new Color( 0.6f, 0.75f, 1.0f );
+
+		color.a = 1.0f;
+
+		var shared = atmosphereRenderer.sharedMaterial;
+
+		shared.SetColor( "SF_AlbedoColor", color );
+		shared.SetFloat( "_AtmosphereStrength", Mathf.Lerp( 0.35f, 1.1f, Mathf.Clamp01( atmosphereDensity ) ) );
+		shared.SetFloat( "_PlanetRadius", planetRadius );
+		shared.SetFloat( "_AtmosphereHeight", atmosphereHeight );
+		shared.SetFloat( "_CenterDepth", lift );
+	}
+
+	// sets up the clouds based on planet properties (the planet model is the one the atmosphere goes round: this planet's own if none is given)
+	public void SetupClouds( MeshRenderer planetClouds, GameObject planetAtmosphere, bool updateSkybox, bool enableFog, GameObject planetModel = null )
 	{
 		// does the planet have an atmosphere?
 		if ( m_planet.HasAtmosphere() )
@@ -346,10 +439,10 @@ public class Planet : MonoBehaviour
 			// set the opacity of the clouds based on the density
 			Tools.SetOpacity( planetClouds.material, atmosphereDensity * 0.5f + 0.5f );
 
-			// apply the color to the atmosphere
+			// draw the atmosphere round the planet, in its colour
 			if ( planetAtmosphere != null )
 			{
-				planetAtmosphere.GetComponent<MeshRenderer>().material.SetColor( "SF_AlbedoColor", atmosphereColor );
+				FitAtmosphere( planetAtmosphere, ( planetModel != null ) ? planetModel : m_planetModel, atmosphereColor, atmosphereDensity );
 			}
 
 			// update the skybox if needed

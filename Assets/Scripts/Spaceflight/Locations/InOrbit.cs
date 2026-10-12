@@ -238,7 +238,7 @@ public class InOrbit : MonoBehaviour
 		}
 
 		// set up the clouds and atmosphere
-		planetController.SetupClouds( m_clouds, m_planetAtmosphere, true, false );
+		planetController.SetupClouds( m_clouds, m_planetAtmosphere, true, false, m_planetModel.gameObject );
 
 		// make sure skybox blend is off
 		StarflightSkybox.m_instance.m_currentBlendFactor = 0.0f;

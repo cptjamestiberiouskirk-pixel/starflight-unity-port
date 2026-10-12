@@ -315,8 +315,8 @@ public class SaveGamePanel : Panel
 			// get the player data for that save game slot
 			var playerData = DataController.m_instance.m_playerDataList[ i ];
 
-			// the date and time
-			var description = "Date: <color=\"blue\">" + playerData.m_general.m_currentStardateYMD + "</color>   Time: <color=\"blue\">" + playerData.m_general.m_hour.ToString( "D2" ) + ":" + playerData.m_general.m_minute.ToString( "D2" ) + "</color>\n";
+			// the date (stored year-month-day, shown day-month-year as everywhere else in the game) and time
+			var description = "Date: <color=\"blue\">" + PD_General.GetDisplayStardate( playerData.m_general.m_currentStardateYMD ) + "</color>   Time: <color=\"blue\">" + playerData.m_general.m_hour.ToString( "D2" ) + ":" + playerData.m_general.m_minute.ToString( "D2" ) + "</color>\n";
 
 			// the location
 			description += "Location: <color=\"blue\">";
