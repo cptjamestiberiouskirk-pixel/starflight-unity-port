@@ -913,6 +913,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSystemTravel();
 				break;
 
+			case "launchconfirm":
+				yield return ScenarioLaunchConfirm();
+				break;
+
 			case "landinglines":
 				yield return ScenarioLandingLines();
 				break;
@@ -12480,7 +12484,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 3 );
 
-		PressButton( ButtonController.ButtonSet.Launch, 0 );
+		PressButtonLabelled( ButtonController.ButtonSet.Launch, "Yes" );
 
 		// wait for the ship to be in orbit (or for the encounter, if it does not wait)
 		yield return WaitForLocation( PD_General.Location.InOrbit, 25.0f );
@@ -22687,6 +22691,67 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "systemtravel: docking at the Starport says Closing docking bay doors, as the original", ( locationDocked == PD_General.Location.DockingBay ) && docked.Contains( "Closing docking bay doors" ), locationDocked + ": " + docked );
 
 		Finish( "scenario=systemtravel", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the launch's confirmation in the original's words
+
+	// the labels of the buttons of a button set, in their order
+	static string ButtonSetLabels( ButtonController.ButtonSet buttonSet )
+	{
+		var buttonSets = GetField( SpaceflightController.m_instance.m_buttonController, "m_buttonSets" ) as ShipButton[][];
+		var buttons = buttonSets[ (int) buttonSet ];
+		var labels = new List<string>();
+
+		foreach ( var button in buttons )
+		{
+			labels.Add( button.GetLabel() );
+		}
+
+		return string.Join( ",", labels );
+	}
+
+	// press the button of a button set that has the given label (whatever its place)
+	static void PressButtonLabelled( ButtonController.ButtonSet buttonSet, string label )
+	{
+		var labels = ButtonSetLabels( buttonSet ).Split( ',' );
+
+		PressButton( buttonSet, Array.IndexOf( labels, label ) );
+	}
+
+	IEnumerator ScenarioLaunchConfirm()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+
+		EnsureCrew();
+
+		// in the docking bay: Launch, then No
+		controller.SwitchLocation( PD_General.Location.DockingBay );
+
+		yield return Frames( 10 );
+
+		PressButton( ButtonController.ButtonSet.CommandA, 0 );
+
+		yield return Frames( 2 );
+
+		var question = MessageList();
+		var labels = ButtonSetLabels( ButtonController.ButtonSet.Launch );
+
+		PressButtonLabelled( ButtonController.ButtonSet.Launch, "No" );
+
+		yield return Frames( 5 );
+
+		var locationAfterNo = playerData.m_general.m_location;
+		var setAfterNo = buttonController.GetCurrentButtonSet();
+
+		Log( "launchconfirm: Launch asks: " + question + " | buttons " + labels + " | after No: " + locationAfterNo + ", " + setAfterNo );
+
+		Check( "launchconfirm: Launch asks in the original's words, READY TO LAUNCH / CONFIRM", question.Contains( "Ready to launch." ) && question.Contains( "Confirm?" ), question );
+		Check( "launchconfirm: No comes before Yes, as the original's [N Y]", labels == "No,Yes", labels );
+		Check( "launchconfirm: No keeps the ship in the docking bay with the bridge buttons (control)", ( locationAfterNo == PD_General.Location.DockingBay ) && ( setAfterNo == ButtonController.ButtonSet.Bridge ), locationAfterNo + ", " + setAfterNo );
+
+		Finish( "scenario=launchconfirm", 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 7: the landing's lines in the original's order
