@@ -12721,6 +12721,7 @@ MonoBehaviour:
   m_currentBlendFactor: 0
   m_currentSkyboxA: 
   m_currentSkyboxB: 
+  m_milkyWayStrength: 0.035
   m_colorTintA: {r: 1, g: 1, b: 1, a: 1}
   m_colorTintB: {r: 1, g: 1, b: 1, a: 1}
   m_currentRotation: {x: 0, y: 0, z: 0, w: 1}
