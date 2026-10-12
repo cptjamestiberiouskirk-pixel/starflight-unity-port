@@ -19,7 +19,17 @@ public class RecommendYesButton : ShipButton
 	{
 		var playerData = DataController.m_instance.m_playerData;
 
+		// is this a planet not recommended before? (only a new recommendation goes on to the bank)
+		var recommendations = playerData.m_general.m_colonyRecommendationList;
+		var isNew = ( recommendations == null ) || !recommendations.Contains( playerData.m_general.m_currentPlanetId );
+
 		playerData.m_general.AddColonyRecommendation( playerData.m_general.m_currentPlanetId );
+
+		// the bank pays its interest up to today and counts again from today, as the original's does on a new recommendation (CAPTAIN: I-TRANS, then PORTDAT)
+		if ( isNew )
+		{
+			playerData.PayInterest( true );
+		}
 
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 
