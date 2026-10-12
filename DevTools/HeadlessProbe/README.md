@@ -93,7 +93,7 @@ What the probe does:
 | `coordinatebar` | the coordinates above the main view after the terrain vehicle: on planet 92 they are its place, and back in orbit and in the star system, with the ship not moving, the ship's coordinates again (about 25 s) |
 | `coordinates` | latitude and longitude as the original gives them: the terrain vehicle at 15 north, 30 west reads `15N x 30W` above the main view, and the landing map's LAT reads `15N` and LONG `30W` (about 35 s) |
 | `visual` | a floating object when its timer starts again, when an explosion is switched off, and how far the landing site crosshair moves in a second |
-| `screenpictures` | with `-Graphics`, the whole screen of the star system (with the system display and the status display), orbit and its sensors, the landing map, the terrain vehicle, hyperspace and an encounter, into `Logs/screen-pictures/spaceflight/`; without a graphics device it does nothing (about 60 s) |
+| `screenpictures` | with `-Graphics`, the whole screen of the star system (with the system display and the status display), orbit with a real scan of the planet and its analysis, the landing map, the terrain vehicle, hyperspace away from any star, and an encounter of Spemin scouts with a real scan of one, its analysis and the comm link, into `Logs/screen-pictures/spaceflight/` (12 pictures; the folder's older pictures go first); without a graphics device it does nothing (about 70 s) |
 | `starport-screenpictures` | with `-Graphics`, the whole screen of the Starport and of each of its rooms (Operations, Personnel, Crew Assignment, Bank, Ship Configuration, Trade Depot, Docking Bay) into `Logs/screen-pictures/starport/` (about 40 s) |
 | `explosionpictures` | every part of an explosion is textured and transparent, no part draws cubes, every part follows the explosion's scale, and making an explosion leaves `Random.state` alone (a control); with `-Graphics` it also renders a half size explosion and the F10 destruction of the ship at fixed game times |
 | `hitpictures` | the hull and shield hits are drawn transparent and not with the `Standard` or untextured particle shaders, a hull hit's particles are gone before it is switched off, both hits land on the side the shot came from, and making them leaves `Random.state` alone (a control); with `-Graphics` it also renders them zoomed in, alone and through `ApplyDamageToPlayer` |
@@ -193,7 +193,7 @@ What the probe does:
 | `lifeformpictures` | with `-Graphics`, renders the game view of planet 92 with the planet's lifeforms, then with all 17 models in a ring around the terrain vehicle, and a close-up of each model, into `Logs/lifeform-pictures/` (or `-probePictures`); without a graphics device it only lands (about 60 s) |
 | `look` | Look on planet 92 with one lifeform at a time beside the vehicle: a living plant (its body plan, not moving, alive), a test animal that wanders (wandering) and the plant made dead (dead) (about 40 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (145 scenarios, about 112 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (146 scenarios, about 113 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

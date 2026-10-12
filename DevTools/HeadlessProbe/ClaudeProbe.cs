@@ -21637,6 +21637,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		System.IO.Directory.CreateDirectory( folder );
 
+		// the pictures of an earlier run go, so that the folder holds one run's pictures only (their numbers change when a screen is added)
+		foreach ( var oldPicture in System.IO.Directory.GetFiles( folder, "*.png" ) )
+		{
+			System.IO.File.Delete( oldPicture );
+		}
+
 		return folder;
 	}
 
@@ -21700,11 +21706,20 @@ public class ClaudeProbe : MonoBehaviour
 
 		take( "orbit" );
 
-		displays.ChangeDisplay( displays.m_sensorsDisplay );
+		// a real scan of the planet (a science officer of full skill, who gives every line of the analysis), then its analysis
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer ).m_science = 250;
 
-		yield return Frames( 30 );
+		new SensorsButton().Execute();
+
+		yield return new WaitForSecondsRealtime( displays.m_sensorsDisplay.m_minDuration + 1.5f );
 
 		take( "orbit_sensors" );
+
+		new AnalysisButton().Execute();
+
+		yield return Frames( 10 );
+
+		take( "orbit_analysis" );
 
 		// ---- the landing map
 		displays.ChangeDisplay( displays.m_terrainMapDisplay );
@@ -21720,24 +21735,62 @@ public class ClaudeProbe : MonoBehaviour
 
 		take( "terrain_vehicle" );
 
-		// ---- hyperspace
-		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 125.0f, 0.0f, 100.0f ) );
+		// ---- hyperspace, away from any star (125,100 is Arth's own place, where the view was its sun)
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 118.0f, 0.0f, 96.0f ) );
 		controller.SwitchLocation( PD_General.Location.Hyperspace );
 
 		yield return Frames( 60 );
 
 		take( "hyperspace" );
 
-		// ---- an encounter met in hyperspace (Spemin)
-		EnterEncounter( FindEncounter( 1, 6, 3, 0 ) );
+		// ---- an encounter of Spemin scouts in Arth's system, once the ships have come close
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
 
-		yield return Frames( 60 );
+		yield return Frames( 10 );
+
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		ForceVessel( speminId, 2 );
+		EnterEncounter( speminId );
+
+		yield return new WaitForSecondsRealtime( 4.0f );
 
 		take( "encounter" );
 
+		// the sensor reading of the first Spemin scout (selection 0 is our own ship), as the Sensors button takes it, and the analysis of it
+		displays.ChangeDisplay( displays.m_sensorsDisplay );
+		controller.m_encounter.StartScanning( 1 );
+
+		// (the scan of a ship is a cinematic that ends with the reading: wait for the reading itself)
+		var scanEnd = Time.realtimeSinceStartup + 30.0f;
+
+		yield return Frames( 5 );
+
+		while ( !displays.m_sensorsDisplay.m_hasSensorData && ( Time.realtimeSinceStartup < scanEnd ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 30 );
+
+		take( "encounter_sensors" );
+
+		new AnalysisButton().Execute();
+
+		yield return Frames( 10 );
+
+		take( "encounter_analysis" );
+
+		// the comm link with them
+		controller.m_encounter.Connect();
+
+		yield return Frames( 60 );
+
+		take( "encounter_comm" );
+
 		Log( "screenpictures: " + pictures.Count + " pictures in " + folder + ": " + string.Join( ", ", pictures ) );
 
-		Check( "screenpictures: a picture of every screen visited", pictures.Count == 8, pictures.Count.ToString() );
+		Check( "screenpictures: a picture of every screen visited", pictures.Count == 12, pictures.Count.ToString() );
 
 		Finish( "scenario=screenpictures pictures=" + pictures.Count, 0 );
 	}
