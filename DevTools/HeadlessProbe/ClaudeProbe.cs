@@ -533,6 +533,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioDebrisPictures();
 				break;
 
+			case "atmospherepictures":
+				yield return ScenarioAtmospherePictures();
+				break;
+
 			case "perframe":
 				yield return ScenarioPerFrame();
 				break;
@@ -851,6 +855,10 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "redcylinder":
 				yield return ScenarioRedCylinder();
+				break;
+
+			case "orbitplanet":
+				yield return ScenarioOrbitPlanet();
 				break;
 
 			case "storms":
@@ -3789,6 +3797,23 @@ public class ClaudeProbe : MonoBehaviour
 		buttonController.ActivateButton();
 	}
 
+	// where a scenario puts a deposit beside the terrain vehicle: in reach of the Cargo button (a pickup reaches 10, TerrainElement) and clear of the vehicle,
+	// since every deposit pushes a vehicle it touches (TerrainVehicleCollider): the vehicle jumps back and forth every other frame, and now and then it keeps the
+	// push and moves away, which took a deposit 2 in front of it out of reach in some runs of the cargo scenario. The vehicle is a capsule that reaches 4.9 ahead
+	// of its middle and 2.2 to its sides, and a deposit is a sphere of up to 3.8 (Lead on planet 90) whose middle is up to 0.5 from where it stands, so nothing
+	// in front of the vehicle is both in reach and clear of it: the deposit goes 8 to its right
+	static Vector3 BesideTheVehicle( TerrainVehicle terrainVehicle )
+	{
+		var toTheRight = Vector3.Cross( Vector3.up, DataController.m_instance.m_playerData.m_general.m_currentDirection );
+
+		if ( toTheRight.sqrMagnitude < 0.0001f )
+		{
+			toTheRight = Vector3.right;
+		}
+
+		return terrainVehicle.transform.position + toTheRight.normalized * 8.0f;
+	}
+
 	// how much of an element the terrain vehicle is carrying
 	static int TerrainVehicleCargo( int elementId )
 	{
@@ -3857,7 +3882,7 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		deposit.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		deposit.transform.position = BesideTheVehicle( terrainVehicle );
 
 		var elementId = deposit.m_elementId;
 		var volume = deposit.m_volume;
@@ -7128,6 +7153,9 @@ public class ClaudeProbe : MonoBehaviour
 			yield break;
 		}
 
+		// where the terrain vehicle stands: nothing in the scenario moves it
+		var vehicleStart = playerData.m_general.m_coordinates;
+
 		// everything out of reach, then one deposit of 3 tenths next to the vehicle
 		foreach ( var other in deposits )
 		{
@@ -7140,7 +7168,7 @@ public class ClaudeProbe : MonoBehaviour
 		var first = deposits[ 0 ];
 
 		first.m_volume = 3;
-		first.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		first.transform.position = BesideTheVehicle( terrainVehicle );
 
 		new TVCargoButton().Execute();
 
@@ -7168,7 +7196,7 @@ public class ClaudeProbe : MonoBehaviour
 		playerData.m_terrainVehicle.AddElement( second.m_elementId, playerData.m_terrainVehicle.GetRemainingVolume() - 1 );
 
 		second.m_volume = 4;
-		second.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		second.transform.position = BesideTheVehicle( terrainVehicle );
 
 		var cargoBefore = TerrainVehicleCargo( second.m_elementId );
 
@@ -7193,6 +7221,11 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "cargo: a deposit that does not fit is left with what the hold could not take", ( cargoAfterPartial - cargoBefore == 1 ) && secondIsStillThere && ( secondVolume == 3 ) && partialMessage.Contains( "0.3 cubic meters are left" ), "took " + ( cargoAfterPartial - cargoBefore ) + ", still there " + secondIsStillThere + " with " + secondVolume + " tenths | " + partialMessage );
 		Check( "cargo: nothing is taken from it with a full hold", ( cargoAfterFull == cargoAfterPartial ) && fullMessage.Contains( "full" ), "took " + ( cargoAfterFull - cargoAfterPartial ) + " | " + fullMessage );
+
+		// the checks above need the deposits in reach, and the vehicle stands still: if it has moved, something pushed it (the deposits it touches did, see BesideTheVehicle)
+		var vehicleMoved = Vector2.Distance( new Vector2( vehicleStart.x, vehicleStart.z ), new Vector2( playerData.m_general.m_coordinates.x, playerData.m_general.m_coordinates.z ) );
+
+		Check( "cargo: the terrain vehicle stands where it was put down", vehicleMoved < 0.01f, "moved " + vehicleMoved.ToString( "F3" ) + " from " + vehicleStart.ToString( "F2" ) + " to " + playerData.m_general.m_coordinates.ToString( "F2" ) );
 
 		Finish( "scenario=cargo shipList=[" + volumeColumn + "] size=" + expectedSmall + "/" + expectedLarge + " pickup=" + cargoAfterFirst + " partial=" + ( cargoAfterPartial - cargoBefore ) + "/" + secondIsStillThere + "/" + secondVolume + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
@@ -8305,7 +8338,7 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		near.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		near.transform.position = BesideTheVehicle( terrainVehicle );
 		far.transform.position = terrainVehicle.transform.position + Vector3.forward * 20.0f;
 
 		var nearName = near.GetElementName();
@@ -8329,7 +8362,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var labelsInTheVehicle = LabelsShowing();
 
-		Log( "terrain: scan with " + nearName + " 2 away and " + farName + " 20 away: " + scanBefore );
+		Log( "terrain: scan with " + nearName + " 8 away and " + farName + " 20 away: " + scanBefore );
 		Log( "terrain: pickup: " + pickupMessage + " | scan right after it: " + scanDuring );
 
 		var countedBefore = scanBefore.Contains( expectedBefore );
@@ -10032,6 +10065,203 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=debrispictures alienBlank=" + alienBlank.Count + " playerBlank=" + playerBlank.Count + " errors=" + errorsDuring + " pictures=" + ( hasGraphics ? 7 : 0 ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
+	// ---------------------------------------------------------------- Low: atmosphere pictures (what a planet's atmosphere is drawn with, in the star system and in orbit, and pictures of it with -Graphics)
+
+	// what an atmosphere object is drawn with
+	static string DescribeAtmosphere( GameObject atmosphere )
+	{
+		if ( atmosphere == null )
+		{
+			return "no atmosphere object";
+		}
+
+		var renderer = atmosphere.GetComponent<MeshRenderer>();
+		var material = ( renderer != null ) ? renderer.sharedMaterial : null;
+
+		if ( material == null )
+		{
+			return "no material";
+		}
+
+		var text = "active " + atmosphere.activeInHierarchy + ", " + material.name + " (" + material.shader.name + "), queue " + material.renderQueue + ", scale " + atmosphere.transform.lossyScale.x.ToString( "F1" );
+
+		foreach ( var name in new string[] { "SF_AlbedoColor", "SF_EmissiveColor" } )
+		{
+			if ( material.HasProperty( name ) )
+			{
+				text += ", " + name + " " + material.GetColor( name ).ToString( "F2" );
+			}
+		}
+
+		foreach ( var name in new string[] { "SF_BlendSrc", "SF_BlendDst", "SF_CullMode", "SF_ZWriteOn", "SF_Density", "SF_NormalMapStrength" } )
+		{
+			if ( material.HasProperty( name ) )
+			{
+				text += ", " + name + " " + material.GetFloat( name ).ToString( "F2" );
+			}
+		}
+
+		if ( material.HasProperty( "SF_AlbedoMap" ) && ( material.GetTexture( "SF_AlbedoMap" ) != null ) )
+		{
+			text += ", albedo map " + material.GetTexture( "SF_AlbedoMap" ).name;
+		}
+
+		return text;
+	}
+
+	// how an atmosphere sits on its planet: the halo room (the quad's half size over the planet's radius), the quad's height over the planet's top (in planet radii), and the brightest channel of its colour
+	static void MeasureAtmosphere( GameObject atmosphere, GameObject planetModel, out float room, out float lift, out float brightest )
+	{
+		room = 0.0f;
+		lift = -1.0f;
+		brightest = 0.0f;
+
+		if ( ( atmosphere == null ) || ( planetModel == null ) )
+		{
+			return;
+		}
+
+		var planetMesh = planetModel.GetComponentInChildren<MeshFilter>();
+		var planetRenderer = planetModel.GetComponentInChildren<Renderer>();
+		var quadMesh = atmosphere.GetComponent<MeshFilter>();
+		var quadRenderer = atmosphere.GetComponent<MeshRenderer>();
+
+		if ( ( planetMesh == null ) || ( planetRenderer == null ) || ( quadMesh == null ) || ( quadRenderer == null ) )
+		{
+			return;
+		}
+
+		var planetRadius = planetMesh.sharedMesh.bounds.extents.x * planetMesh.transform.lossyScale.x;
+		var quadExtents = quadMesh.sharedMesh.bounds.extents;
+		var quadHalfSize = Mathf.Max( quadExtents.x, Mathf.Max( quadExtents.y, quadExtents.z ) ) * atmosphere.transform.lossyScale.x;
+
+		room = quadHalfSize / planetRadius;
+		lift = ( atmosphere.transform.position.y - ( planetRenderer.bounds.center.y + planetRadius ) ) / planetRadius;
+
+		var material = quadRenderer.sharedMaterial;
+
+		if ( ( material != null ) && material.HasProperty( "SF_AlbedoColor" ) )
+		{
+			var color = material.GetColor( "SF_AlbedoColor" );
+
+			brightest = Mathf.Max( color.r, Mathf.Max( color.g, color.b ) );
+		}
+	}
+
+	IEnumerator ScenarioAtmospherePictures()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+
+		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "atmosphere-pictures" ) );
+		var camera = Camera.main;
+
+		if ( hasGraphics )
+		{
+			System.IO.Directory.CreateDirectory( folder );
+		}
+
+		// the planets of the star system with an atmosphere, the first of each colour
+		var star = gameData.m_starList[ playerData.m_general.m_currentStarId ];
+		var chosen = new List<GD_Planet>();
+		var colours = new List<Color>();
+
+		foreach ( var planet in star.GetPlanetList() )
+		{
+			if ( ( planet != null ) && planet.HasAtmosphere() && !colours.Contains( planet.GetAtmosphereColor() ) )
+			{
+				chosen.Add( planet );
+				colours.Add( planet.GetAtmosphereColor() );
+			}
+		}
+
+		Log( "atmospherepictures: " + chosen.Count + " planets with an atmosphere of their own colour in star " + star.m_id );
+
+		var errorsBefore = s_errorCount;
+		var noRoom = new List<string>();
+		var hidden = new List<string>();
+		var dim = new List<string>();
+
+		System.Action<string, GameObject, GameObject> measure = ( where, atmosphere, planetModel ) =>
+		{
+			float room, lift, brightest;
+
+			MeasureAtmosphere( atmosphere, planetModel, out room, out lift, out brightest );
+
+			Log( "atmospherepictures: " + where + ": the quad is " + room.ToString( "F3" ) + " planet radii across from the middle, " + lift.ToString( "F3" ) + " planet radii above the planet's top, colour at most " + brightest.ToString( "F2" ) );
+
+			// the halo reaches 12% of the radius beyond the planet's edge: the quad has to be bigger than that
+			if ( room < 1.12f )
+			{
+				noRoom.Add( where + " " + room.ToString( "F2" ) );
+			}
+
+			// below the planet's top, the planet hides the haze over it
+			if ( lift < 0.0f )
+			{
+				hidden.Add( where + " " + lift.ToString( "F2" ) );
+			}
+
+			// a dark colour adds next to nothing to what is behind it
+			if ( brightest < 0.5f )
+			{
+				dim.Add( where + " " + brightest.ToString( "F2" ) );
+			}
+		};
+
+		// ---- 1. in the star system: each planet from a camera of its own over it
+		foreach ( var planet in chosen )
+		{
+			var planetController = controller.m_starSystem.GetPlanetController( planet.m_id );
+
+			Log( "atmospherepictures: planet " + planet.m_id + " (atmosphere colour " + planet.GetAtmosphereColor().ToString( "F2" ) + ", density " + planet.GetAtmosphereDensity().ToString( "F2" ) + ") in the star system: " + DescribeAtmosphere( ( planetController != null ) ? planetController.m_planetAtmosphere : null ) );
+
+			if ( planetController != null )
+			{
+				measure( "planet " + planet.m_id + " in the star system", planetController.m_planetAtmosphere, planetController.m_planetModel );
+			}
+
+			if ( hasGraphics && ( planetController != null ) )
+			{
+				var size = planetController.m_planetModel.transform.lossyScale.x;
+
+				RenderFromAbove( planetController.transform.position, size * 4.0f, System.IO.Path.Combine( folder, "system_planet" + planet.m_id + ".png" ) );
+			}
+		}
+
+		// ---- 2. in orbit around each of them
+		foreach ( var planet in chosen )
+		{
+			yield return EnterOrbit( planet.m_id );
+
+			yield return Frames( 30 );
+
+			Log( "atmospherepictures: planet " + planet.m_id + " in orbit: " + DescribeAtmosphere( controller.m_inOrbit.m_planetAtmosphere ) );
+
+			measure( "planet " + planet.m_id + " in orbit", controller.m_inOrbit.m_planetAtmosphere, controller.m_inOrbit.m_planetModel.gameObject );
+
+			if ( hasGraphics )
+			{
+				RenderCameraPicture( camera, System.IO.Path.Combine( folder, "orbit_planet" + planet.m_id + ".png" ) );
+			}
+
+			controller.SwitchLocation( PD_General.Location.StarSystem );
+
+			yield return Frames( 10 );
+		}
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "atmospherepictures: an atmosphere leaves room for a halo beyond the planet's edge", ( chosen.Count > 0 ) && ( noRoom.Count == 0 ), ( noRoom.Count == 0 ) ? "all " + ( chosen.Count * 2 ) : string.Join( ", ", noRoom ) );
+		Check( "atmospherepictures: an atmosphere is in front of its planet, so the haze over the planet is not hidden in it", ( chosen.Count > 0 ) && ( hidden.Count == 0 ), ( hidden.Count == 0 ) ? "all " + ( chosen.Count * 2 ) : string.Join( ", ", hidden ) );
+		Check( "atmospherepictures: an atmosphere of a dark colour is drawn bright enough to show", ( chosen.Count > 0 ) && ( dim.Count == 0 ), ( dim.Count == 0 ) ? "all " + ( chosen.Count * 2 ) : string.Join( ", ", dim ) );
+		Check( "atmospherepictures: no error is logged while the atmospheres are set up", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=atmospherepictures planets=" + chosen.Count + " noRoom=" + noRoom.Count + " hidden=" + hidden.Count + " dim=" + dim.Count + " errors=" + errorsDuring + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
 	// ---------------------------------------------------------------- Low: what the displays cost every frame (the status display, the terrain vehicle display)
 
 	// something for the control measurement to hold on to
@@ -10362,7 +10592,7 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		deposits[ 0 ].transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		deposits[ 0 ].transform.position = BesideTheVehicle( terrainVehicle );
 
 		return true;
 	}
@@ -11297,7 +11527,7 @@ public class ClaudeProbe : MonoBehaviour
 		var first = deposits[ 0 ];
 		var firstVolume = first.m_volume;
 
-		first.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		first.transform.position = BesideTheVehicle( terrainVehicle );
 
 		new TVCargoButton().Execute();
 
@@ -11315,7 +11545,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		for ( var i = 1; ( i < deposits.Length ) && ( i < 700 ) && ( playerData.m_terrainVehicle.GetRemainingVolume() > 0 ); i++ )
 		{
-			deposits[ i ].transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+			deposits[ i ].transform.position = BesideTheVehicle( terrainVehicle );
 
 			new TVCargoButton().Execute();
 
@@ -11330,7 +11560,7 @@ public class ClaudeProbe : MonoBehaviour
 		var holdUsed = holdSize - playerData.m_terrainVehicle.GetRemainingVolume();
 
 		// one more press with the hold full and a fresh deposit in reach
-		deposits[ deposits.Length - 1 ].transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		deposits[ deposits.Length - 1 ].transform.position = BesideTheVehicle( terrainVehicle );
 
 		new TVCargoButton().Execute();
 
@@ -13805,7 +14035,7 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		// ---- 1. all of the first deposit, through the real Cargo button
-		whole.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		whole.transform.position = BesideTheVehicle( terrainVehicle );
 
 		new TVCargoButton().Execute();
 
@@ -13818,7 +14048,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		playerData.m_terrainVehicle.AddElement( part.m_elementId, room - 10 );
 
-		part.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		part.transform.position = BesideTheVehicle( terrainVehicle );
 
 		new TVCargoButton().Execute();
 
@@ -20743,6 +20973,100 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "redcylinder: the Red Cylinder flashes on the landing map near an ancient ruin, not far from it, and only aboard", ( atTheRuin is bool ) && (bool) atTheRuin && !(bool) farAway && !(bool) withoutIt && messages.Contains( "The Red Cylinder is flashing" ), withoutIt + ", " + farAway + ", " + atTheRuin + " | " + messages );
 
 		Finish( "scenario=redcylinder placed=" + placed.Count + " worked=" + worked.Count, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the planet under an encounter that began in orbit
+
+	// the planet drawn under the encounter (null if there is none)
+	static Transform PlanetBackdrop()
+	{
+		return SpaceflightController.m_instance.m_encounter.transform.Find( "Planet Backdrop" );
+	}
+
+	IEnumerator ScenarioOrbitPlanet()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var starSystem = controller.m_starSystem;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// ---- 1. a Spemin encounter met in hyperspace (the control: no planet)
+		EnterEncounter( FindEncounter( 1, 6, 3, 0 ) );
+
+		yield return Frames( 5 );
+
+		var backdropInHyperspace = PlanetBackdrop();
+		var shownInHyperspace = ( backdropInHyperspace != null ) && backdropInHyperspace.gameObject.activeInHierarchy;
+
+		yield return FlyOutOfEncounter();
+
+		// ---- 2. the derelict that waits in orbit 3 of star 30 (encounter 316): into orbit around its planet, and the encounter begins
+		const int c_encounterId = 316;
+		const int c_starId = 30;
+
+		var guardedPlanetId = -1;
+
+		foreach ( var planet in gameData.m_planetList )
+		{
+			if ( ( planet.m_starId == c_starId ) && ( planet.m_orbitPosition == gameData.m_encounterList[ c_encounterId ].m_orbitPosition ) )
+			{
+				guardedPlanetId = planet.m_id;
+			}
+		}
+
+		EnterStarSystem( c_starId );
+
+		var start = Time.realtimeSinceStartup;
+
+		while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 40.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+		yield return EnterOrbit( guardedPlanetId );
+		yield return Frames( 5 );
+
+		var inEncounter = playerData.m_general.m_location == PD_General.Location.Encounter;
+		var backdrop = PlanetBackdrop();
+		var shown = ( backdrop != null ) && backdrop.gameObject.activeInHierarchy;
+		var below = shown && ( backdrop.position.y + backdrop.localScale.y < playerData.m_general.m_coordinates.y - 100.0f );
+		var planetController = starSystem.GetPlanetController( guardedPlanetId );
+		var samePlanet = shown && ( planetController != null ) && ( backdrop.GetComponent<MeshRenderer>().sharedMaterial == planetController.GetMaterial() );
+
+		// ---- 3. with a graphics device, a picture of it (probe.ps1 -Graphics)
+		var picture = "none (no graphics device)";
+
+		if ( inEncounter && ( SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null ) )
+		{
+			var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "orbit-encounter-pictures" ) );
+
+			System.IO.Directory.CreateDirectory( folder );
+
+			var pictureCameraObject = new GameObject( "Orbit Encounter Picture Camera" );
+			var pictureCamera = pictureCameraObject.AddComponent<Camera>();
+
+			pictureCamera.CopyFrom( Camera.main );
+			pictureCamera.rect = new Rect( 0.0f, 0.0f, 1.0f, 1.0f );
+
+			picture = System.IO.Path.Combine( folder, "orbit_encounter.png" );
+
+			RenderCameraPicture( pictureCamera, picture );
+
+			Destroy( pictureCameraObject );
+		}
+
+		Log( "orbitplanet: hyperspace encounter: planet shown " + shownInHyperspace + " || encounter in orbit: in it " + inEncounter + ", planet shown " + shown + ", below the ships " + below + ", the planet's own surface " + samePlanet + ( shown ? " (radius " + backdrop.localScale.x + ", at " + backdrop.position + ", ship at " + playerData.m_general.m_coordinates + ")" : "" ) + " | picture " + picture );
+
+		Check( "orbitplanet: an encounter met in hyperspace has no planet under it (control)", !shownInHyperspace, shownInHyperspace.ToString() );
+		Check( "orbitplanet: an encounter that began in orbit is drawn over its planet's own surface, below the ships", inEncounter && shown && below && samePlanet, inEncounter + ", " + shown + ", " + below + ", " + samePlanet );
+
+		Finish( "scenario=orbitplanet shown=" + shown, 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 6: storms on the surface

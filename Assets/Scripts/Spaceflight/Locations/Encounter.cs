@@ -30,6 +30,15 @@ public class Encounter : MonoBehaviour
 	// the main encounter map
 	public GameObject m_main;
 
+	// an encounter that began in orbit is drawn over its planet (the 1984 notes, gameflow.txt: "If an encounter occurs when a ship is in orbit the ship drops to a
+	// tactical map which has a planet in it ... Ships and weapons move OVER the planet, and it scrolls around and does not affect anything"; the later step of
+	// ruling 5) - the port draws the planet's own surface, the orbit view's sphere with its material, as large as the planet's mass makes it there; how large and
+	// how deep below the ships it lies are the port's
+	GameObject m_planetBackdrop;
+
+	const float c_backdropRadiusPerScale = 8.0f;
+	const float c_backdropDepth = 600.0f;
+
 	// the race models
 	public GameObject[] m_alienRaceModelList;
 
@@ -902,11 +911,62 @@ public class Encounter : MonoBehaviour
 			Connect();
 		}
 
+		// an encounter that began in orbit is drawn over the planet
+		ShowPlanetBackdrop();
+
 		// slide the message box out
 		SpaceflightController.m_instance.m_messages.SlideOut();
 
 		// force an update now
 		Update();
+	}
+
+	// puts the planet under an encounter that began in orbit, centred under the ship where the encounter began (it then scrolls with everything else), and takes
+	// it away for any other encounter
+	void ShowPlanetBackdrop()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var inOrbit = ( m_pdEncounter != null ) && ( m_pdEncounter.GetLocation() == PD_General.Location.InOrbit );
+		var planetController = inOrbit ? SpaceflightController.m_instance.m_starSystem.GetPlanetController( playerData.m_general.m_currentPlanetId ) : null;
+		var orbitModel = SpaceflightController.m_instance.m_inOrbit.m_planetModel;
+
+		if ( ( planetController == null ) || ( planetController.m_planet == null ) || ( orbitModel == null ) )
+		{
+			if ( m_planetBackdrop != null )
+			{
+				m_planetBackdrop.SetActive( false );
+			}
+
+			return;
+		}
+
+		if ( m_planetBackdrop == null )
+		{
+			m_planetBackdrop = new GameObject( "Planet Backdrop" );
+			m_planetBackdrop.layer = gameObject.layer;
+			m_planetBackdrop.transform.SetParent( transform, false );
+
+			var orbitMeshFilter = orbitModel.GetComponent<MeshFilter>();
+
+			m_planetBackdrop.AddComponent<MeshFilter>().sharedMesh = ( orbitMeshFilter != null ) ? orbitMeshFilter.sharedMesh : null;
+			m_planetBackdrop.AddComponent<MeshRenderer>();
+		}
+
+		m_planetBackdrop.GetComponent<MeshRenderer>().sharedMaterial = planetController.GetMaterial();
+		m_planetBackdrop.SetActive( true );
+
+		// (the orbit view's sphere has a radius of one; Show runs when the encounter is entered or loaded, so the planet is placed under the ship then)
+		var radius = planetController.m_planet.GetScale().x * c_backdropRadiusPerScale;
+
+		m_planetBackdrop.transform.localScale = Vector3.one * radius;
+		m_planetBackdrop.transform.rotation = Quaternion.identity;
+		m_planetBackdrop.transform.position = playerData.m_general.m_coordinates + Vector3.down * ( radius + c_backdropDepth );
+	}
+
+	// true while the planet is drawn under the encounter (for the probe)
+	public bool IsPlanetBackdropShown()
+	{
+		return ( m_planetBackdrop != null ) && m_planetBackdrop.activeInHierarchy;
 	}
 
 	// adds a number of alien ships to the encounter - up to the maximum allowed by the encounter
