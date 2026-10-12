@@ -13965,6 +13965,25 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "recovereddata: the original game data is unchanged (control)", sizes == "811/51/558", sizes );
 
+		// ---- the game data's notices and Starport analyses were typed from STRINFO, and six of their words are STRINFO's slips: they read as the shipped game
+		// has them (its notice records in the decompiled original's instance.txt, its analyses in data.h; the owner's ruling of 2026-10-12)
+		var noticeText = "";
+
+		foreach ( var notice in gameData.m_noticeList )
+		{
+			noticeText += notice.m_message + "\n";
+		}
+
+		var hypercubeAnalysis = gameData.m_artifactList[ gameData.FindArtifactId( "Hypercube" ) ].m_analysisText;
+		var rodDeviceAnalysis = gameData.m_artifactList[ gameData.FindArtifactId( "Rod Device" ) ].m_analysisText;
+
+		var shippedWords = noticeText.Contains( "penalized for recommendations of planets" ) && noticeText.Contains( "lost several ships in its vicinity." ) && noticeText.Contains( "Extensive experience as communications officer on board the ISS Intrepid" )
+			&& noticeText.Contains( "indicate that minimal or no life" ) && !noticeText.Contains( "minimial" ) && hypercubeAnalysis.Contains( "feeling of ataraxia." ) && rodDeviceAnalysis.Contains( "enhanced laser shield" );
+
+		Log( "recovereddata: the Hypercube's analysis: " + hypercubeAnalysis + " | the Rod Device's: " + rodDeviceAnalysis );
+
+		Check( "recovereddata: the notices and the Starport's analyses have the shipped game's words (penalized for, its vicinity, as communications officer, minimal, ataraxia, laser shield)", shippedWords, hypercubeAnalysis + " | " + rodDeviceAnalysis );
+
 		Finish( "scenario=recovereddata counts=" + counts + " unresolved=" + ( ( unresolved == "" ) ? "none" : unresolved.Trim().Replace( ' ', ',' ) ) + " planets=" + planets.Replace( ' ', ',' ) + " gameData=" + sizes, 0 );
 	}
 

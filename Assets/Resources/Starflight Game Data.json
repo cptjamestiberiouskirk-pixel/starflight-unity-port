@@ -23,7 +23,7 @@
     {
       "m_id": "1",
       "m_stardate": "4620-01-02",
-      "m_message": "It is necessary to give you some unpleasant news.  You may have been aware that for the last several years scientists have been observing anomalous fluctuations in the radiation levels of our sun.\nWhile you have been away it has been ascertained that the stability of our sun is definitely deteriorating.  How much time we have until there is a fatally large flare, we are still not sure, but there is little doubt that this will eventually occur.\nAs yet, we have no clue as to the cause of this instability.  Therefore, we must assume there is nothing we can do to change the situation.  In view of this the only option available to us is to get as many colonists off of arth as we can.\nYou can be invaluable to us in this.  First we need endurium to power the ships we will build.  We will pay well for any that you can bring back.  Secondly, we need to know where to send the colonists.\nAs you may have already discovered, your ship is equipped with homing drones which you may use to log your recommendations.  This is so that we can move the colonists out as quickly as possible.\nIn addition, a sensor has been installed which will inform you of the stellar condition upon entering a system.  Your ship computer will inform you in the event that a flare is imminent.\nWe advise caution while in systems which are more than slightly unstable.  Being caught in a solar flare would certainly be fatal.\nIn your manual we have outlined the criteria which will be important in your evaluation of viable colony worlds.  You will be rewarded for recommendations of valuable planets and penalized recommendations of planets which turn out to be uninhabitable.\nConsider carefully before logging a planet."
+      "m_message": "It is necessary to give you some unpleasant news.  You may have been aware that for the last several years scientists have been observing anomalous fluctuations in the radiation levels of our sun.\nWhile you have been away it has been ascertained that the stability of our sun is definitely deteriorating.  How much time we have until there is a fatally large flare, we are still not sure, but there is little doubt that this will eventually occur.\nAs yet, we have no clue as to the cause of this instability.  Therefore, we must assume there is nothing we can do to change the situation.  In view of this the only option available to us is to get as many colonists off of arth as we can.\nYou can be invaluable to us in this.  First we need endurium to power the ships we will build.  We will pay well for any that you can bring back.  Secondly, we need to know where to send the colonists.\nAs you may have already discovered, your ship is equipped with homing drones which you may use to log your recommendations.  This is so that we can move the colonists out as quickly as possible.\nIn addition, a sensor has been installed which will inform you of the stellar condition upon entering a system.  Your ship computer will inform you in the event that a flare is imminent.\nWe advise caution while in systems which are more than slightly unstable.  Being caught in a solar flare would certainly be fatal.\nIn your manual we have outlined the criteria which will be important in your evaluation of viable colony worlds.  You will be rewarded for recommendations of valuable planets and penalized for recommendations of planets which turn out to be uninhabitable.\nConsider carefully before logging a planet."
     },
     {
       "m_id": "2",
@@ -33,7 +33,7 @@
     {
       "m_id": "3",
       "m_stardate": "4620-01-05",
-      "m_message": "We have received reports of an area outward and downspin of Arth about 40 sectors distant.  There is a constellation here in the shape of a cross which seems to mark a nexus of continuum fluxes.\nWe suggest however, that unless you are properly prepared you avoid this area since we have already lost several ships in this vicinity."
+      "m_message": "We have received reports of an area outward and downspin of Arth about 40 sectors distant.  There is a constellation here in the shape of a cross which seems to mark a nexus of continuum fluxes.\nWe suggest however, that unless you are properly prepared you avoid this area since we have already lost several ships in its vicinity."
     },
     {
       "m_id": "4",
@@ -63,7 +63,7 @@
     {
       "m_id": "9",
       "m_stardate": "4620-01-23",
-      "m_message": "Highly qualified female thrynn, Ihsss T’larra, seeks employment on outgoing exploration vessel.  Extensive experience on board the ISS Intrepid and has a class 5 navigator’s rating."
+      "m_message": "Highly qualified female thrynn, Ihsss T’larra, seeks employment on outgoing exploration vessel.  Extensive experience as communications officer on board the ISS Intrepid and has a class 5 navigator’s rating."
     },
     {
       "m_id": "10",
@@ -88,7 +88,7 @@
     {
       "m_id": "14",
       "m_stardate": "4620-03-06",
-      "m_message": "We have received to date, many reports which indicate that minimial or no life exists coreward of here.  Any ships acquiring more information are instructed to report on this immediately."
+      "m_message": "We have received to date, many reports which indicate that minimal or no life exists coreward of here.  Any ships acquiring more information are instructed to report on this immediately."
     },
     {
       "m_id": "15",
@@ -732,7 +732,7 @@
       "m_actualValue": "15000",
       "m_availableInStarport": "",
       "m_knownAtStart": "",
-      "m_analysisText": "This appears to be a 4-dimensional puzzle composed of many multi-colored cubes. Its use produces an over-whelming feeling of atarxia."
+      "m_analysisText": "This appears to be a 4-dimensional puzzle composed of many multi-colored cubes. Its use produces an over-whelming feeling of ataraxia."
     },
     {
       "m_id": "23",
@@ -886,7 +886,7 @@
       "m_actualValue": "18000",
       "m_availableInStarport": "",
       "m_knownAtStart": "",
-      "m_analysisText": "This appears to be a device of the old empire that projects an enhanced laer shield around a spaceship."
+      "m_analysisText": "This appears to be a device of the old empire that projects an enhanced laser shield around a spaceship."
     },
     {
       "m_id": "37",
