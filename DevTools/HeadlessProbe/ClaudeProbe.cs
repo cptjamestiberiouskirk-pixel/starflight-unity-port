@@ -957,6 +957,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioFlyers();
 				break;
 
+			case "shippedmoods":
+				yield return ScenarioShippedMoods();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -8077,7 +8081,7 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 10 );
 
 		// (in their neutral band, the posture of the question with the captain's name in the shipped game: comm 203)
-		controller.m_encounter.m_pdEncounter.m_mood = 30.0f;
+		controller.m_encounter.m_pdEncounter.m_mood = 10.0f;
 		controller.m_encounter.m_pdEncounter.m_moodSet = true;
 
 		var questions = AlienComms( GD_Comm.Subject.Question, 40 );
@@ -8091,7 +8095,7 @@ public class ClaudeProbe : MonoBehaviour
 		var answers = AlienComms( GD_Comm.Subject.OtherRaces, 40 );
 
 		playerData.m_playerShip.m_armorPoints = armorBefore;
-		controller.m_encounter.m_pdEncounter.m_mood = 30.0f;
+		controller.m_encounter.m_pdEncounter.m_mood = 10.0f;
 
 		// the same question with a captain whose name has two spaces in a row (names are used as they were typed): the message is
 		// split into words at the spaces, which leaves an empty word, and the code looks at the last character of every word
@@ -19088,7 +19092,7 @@ public class ClaudeProbe : MonoBehaviour
 		var elowanId = FindEncounterOfRace( GameData.Race.Elowan );
 		var thrynnId = FindEncounter( 1, 6, 3, 0, GameData.Race.Thrynn );
 
-		// ---- 1. the Spemin met in peace by a ship weaker than them: they talk tough (a hostile statement, which they have and no neutral one), and hold their fire
+		// ---- 1. the Spemin met in peace by a ship weaker than them: they talk tough (a statement the game data files as hostile, which the shipped game says in their neutral posture), and hold their fire
 		ship.m_armorPoints = 250;
 		ship.m_shieldPoints = 0;
 
@@ -19103,8 +19107,10 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 2. the same Spemin met by a far stronger ship: they grovel
+		// ---- 2. the same Spemin met by a far stronger ship with its shields up and its weapons armed (their hostile band, 10 + 15): they grovel
 		ship.m_armorPoints = 100000;
+		ship.m_shieldsAreUp = true;
+		ship.m_weaponsAreArmed = true;
 
 		var strongSaid = new List<string>();
 
@@ -19113,10 +19119,14 @@ public class ClaudeProbe : MonoBehaviour
 
 		var strongStatement = ( strongSaid.Count > 1 ) ? strongSaid[ 1 ] : "nothing said";
 
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 3. the Elowan: two friendly statements calm them, the second by half as much as the first, and a question by half again of the third
+		// ---- 3. the Elowan (44, neutral above their 25): two friendly statements calm them, the second by half as much as the first, and a question by half again of
+		// the third
 		var elowanSaid = new List<string>();
 
 		yield return MeetAndConnect( elowanId, GD_Comm.Stance.Friendly, elowanSaid );
@@ -19224,7 +19234,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "mood: the Spemin met in peace by a weaker ship talk tough and hold their fire", SaysALineOf( weakStatement, GameData.Race.Spemin, GD_Comm.Subject.Statement, GD_Comm.Stance.Hostile ) && ( weakStance != GD_Comm.Stance.Hostile ), weakStance + " | " + weakStatement );
 		Check( "mood: the Spemin met by a far stronger ship grovel", SaysALineOf( strongStatement, GameData.Race.Spemin, GD_Comm.Subject.Statement, GD_Comm.Stance.Obsequious ), strongStatement );
-		Check( "mood: friendly statements calm the Elowan, each by less than the one before, and a question by half", ( moodAtStart == 45.0f ) && ( moodAfterOne == 35.0f ) && ( moodAfterTwo == 30.0f ) && Mathf.Abs( moodAfterQuestion - ( 30.0f - 10.0f / 3.0f / 2.0f ) ) < 0.01f && ( elowanStance == GD_Comm.Stance.Friendly ), moodAtStart + " -> " + moodAfterOne + " -> " + moodAfterTwo + " -> " + moodAfterQuestion + ", " + elowanStance );
+		Check( "mood: friendly statements calm the Elowan, each by less than the one before, and a question by half", ( moodAtStart == 44.0f ) && ( moodAfterOne == 34.0f ) && ( moodAfterTwo == 29.0f ) && Mathf.Abs( moodAfterQuestion - ( 29.0f - 10.0f / 3.0f / 2.0f ) ) < 0.01f && ( elowanStance == GD_Comm.Stance.Neutral ), moodAtStart + " -> " + moodAfterOne + " -> " + moodAfterTwo + " -> " + moodAfterQuestion + ", " + elowanStance );
 		Check( "mood: too agitated to talk, the Elowan end the comm link and take flight from a stronger ship", !flightConnected && ( flightStance == GD_Comm.Stance.Obsequious ), flightConnected + ", " + flightStance );
 		Check( "mood: too agitated to talk, the Elowan end the comm link and fight a weaker ship", !fightConnected && ( fightStance == GD_Comm.Stance.Hostile ), fightConnected + ", " + fightStance );
 		Check( "mood: the Thrynn say their last phrase and then end the comm link, tired of talking", !thrynnConnectedAfter && thrynnLast.Contains( "Receiving:" ), thrynnConnectedAfter + " | " + thrynnLast );
@@ -19366,10 +19376,10 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "rivals: first contact " + firstBefore + " -> " + firstAfter + " || elowan after the thrynn: " + elowanGreeting + " (mood " + elowanMood + ") || thrynn aboard: " + noDealings + " (disconnected " + noDealingsDisconnected + ", stance " + noDealingsStance + ") || skill 0, thrynn aboard: " + string.Join( " | ", withThrynn ) + " || skill 0, none aboard: " + string.Join( " | ", withoutThrynn ) + " || elowan aboard: " + regrettable + " (mood " + thrynnMood + ")" );
 
 		Check( "rivals: the first comm link with the Thrynn is remembered", ( firstBefore == "None" ) && ( firstAfter == "Thrynn" ), firstBefore + " -> " + firstAfter );
-		Check( "rivals: after the Thrynn the Elowan greet the crew as friends of the Thrynn, and start in their hostile band", elowanGreeting.Contains( CommText( 2 ) ) && ( elowanMood >= 75.0f ), elowanMood + " | " + elowanGreeting );
+		Check( "rivals: after the Thrynn the Elowan greet the crew as friends of the Thrynn, and start in their hostile band", elowanGreeting.Contains( CommText( 2 ) ) && ( elowanMood >= 60.0f ), elowanMood + " | " + elowanGreeting );
 		Check( "rivals: with a Thrynn aboard the Elowan have no dealings with the ship, end the comm link, and do not attack", noDealings.Contains( CommText( 1 ) ) && noDealingsDisconnected && ( noDealingsStance != GD_Comm.Stance.Hostile ), noDealingsDisconnected + ", " + noDealingsStance + " | " + noDealings );
 		Check( "rivals: with a Thrynn aboard an officer with no skill understands every word of the Thrynn, and without one not (control)", wholeWithThrynn && !wholeWithout, string.Join( " | ", withThrynn ) + " || " + string.Join( " | ", withoutThrynn ) );
-		Check( "rivals: with an Elowan aboard the Thrynn greet with \"most regrettable\", and start in their hostile band", regrettable.Contains( CommText( 297 ) ) && ( thrynnMood >= 65.0f ), thrynnMood + " | " + regrettable );
+		Check( "rivals: with an Elowan aboard the Thrynn greet with \"most regrettable\", and start in their hostile band", regrettable.Contains( CommText( 297 ) ) && ( thrynnMood >= 60.0f ), thrynnMood + " | " + regrettable );
 
 		Finish( "scenario=rivals first=" + firstAfter + " elowanMood=" + elowanMood + " thrynnMood=" + thrynnMood, 0 );
 	}
@@ -23742,8 +23752,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		SpaceflightController.m_instance.m_encounterRange = 0.0f;
 
-		// ---- 1. the Spemin in their neutral band (the port's mood 30): their statements are the shipped game's neutral ones, 208 to 212
-		yield return MeetWithMood( FindEncounter( 1, 6, 3, 0 ), 30.0f );
+		// ---- 1. the Spemin in their neutral band (mood 10, below their 20): their statements are the shipped game's neutral ones, 208 to 212
+		yield return MeetWithMood( FindEncounter( 1, 6, 3, 0 ), 10.0f );
 
 		var speminLines = new List<int>();
 
@@ -24138,6 +24148,99 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "flyers: a flyer killed over a liquid comes down onto its surface", liquidFound && ( deadStatus == "Dead" ) && !deadFlying && ( Mathf.Abs( deadBottom ) < 1.0f ), liquidFound + ", " + deadStatus + ", flying " + deadFlying + ", bottom " + deadBottom );
 
 		Finish( "scenario=flyers landed=" + landed + " attackLanded=" + attackLanded + " hunted=" + approachedAfterFlying, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 2: the aliens' moods by the shipped game's numbers
+
+	// meets an encounter and returns the aliens' mood at the start (the mood is set when they first need their posture)
+	static IEnumerator MeetAndReadMood( int encounterId, float[] mood, string[] posture )
+	{
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 5 );
+
+		EnterEncounter( encounterId );
+
+		yield return Frames( 5 );
+
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		posture[ 0 ] = Call( encounter, "GetAlienTalkStance" ).ToString();
+		mood[ 0 ] = encounter.m_pdEncounter.m_mood;
+
+		LeaveEncounter();
+
+		yield return Frames( 10 );
+	}
+
+	IEnumerator ScenarioShippedMoods()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var mood = new float[ 1 ];
+		var posture = new string[ 1 ];
+
+		EnsureCrew();
+
+		// a weak ship, its shields down and its weapons not armed
+		ship.m_armorPoints = 250;
+		ship.m_shieldPoints = 0;
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+
+		var encounterRange = SpaceflightController.m_instance.m_encounterRange;
+
+		SpaceflightController.m_instance.m_encounterRange = 0.0f;
+
+		// ---- 1. the starting moods of the four races with a mood (the shipped BASE-EDL: Elowan 44, Thrynn 44, Spemin 10, Veloxi 44)
+		var starts = "";
+
+		foreach ( var race in new[] { GameData.Race.Elowan, GameData.Race.Thrynn, GameData.Race.Spemin, GameData.Race.Velox } )
+		{
+			yield return MeetAndReadMood( FindEncounterOfRace( race ), mood, posture );
+
+			starts += race + "=" + mood[ 0 ] + "/" + posture[ 0 ] + " ";
+		}
+
+		// ---- 2. the Spemin met with the shields up and the weapons armed: 10 + 5 + 10 = 25, their hostile band (from 20)
+		ship.m_shieldsAreUp = true;
+		ship.m_weaponsAreArmed = true;
+
+		yield return MeetAndReadMood( FindEncounterOfRace( GameData.Race.Spemin ), mood, posture );
+
+		var armedMood = mood[ 0 ];
+		var armedPosture = posture[ 0 ];
+
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+
+		// ---- 3. the Mysterions start friendly, so their shields are lowered (the original's Mysterion Analysis: "CLASS 75 EQUIVALENT LOWERED")
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 5 );
+
+		EnterEncounter( FindEncounterOfRace( GameData.Race.Mysterion ) );
+
+		yield return Frames( 5 );
+
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer ).m_science = 250;
+
+		var mysterionStance = SpaceflightController.m_instance.m_encounter.m_pdEncounter.m_alienStance;
+		var mysterionAnalysis = AnalyzeScan( SensorsDisplay.ScanType.Mysterion );
+
+		LeaveEncounter();
+
+		yield return Frames( 10 );
+
+		SpaceflightController.m_instance.m_encounterRange = encounterRange;
+
+		Log( "shippedmoods: starting moods " + starts.Trim() + " | spemin met armed with shields up: " + armedMood + " (" + armedPosture + ") | mysterions " + mysterionStance + ": " + mysterionAnalysis );
+
+		Check( "shippedmoods: the four races start at the shipped mood (Elowan 44, Thrynn 44, Spemin 10, Veloxi 44)", starts.Contains( "Elowan=44/" ) && starts.Contains( "Thrynn=44/" ) && starts.Contains( "Spemin=10/" ) && starts.Contains( "Velox=44/" ), starts );
+		Check( "shippedmoods: a ship met with its shields up and its weapons armed adds 15, as the original (Spemin 25, hostile)", ( armedMood == 25.0f ) && ( armedPosture == "Hostile" ), armedMood + " " + armedPosture );
+		Check( "shippedmoods: the Mysterions start friendly and their shields are lowered, as the original's Analysis", ( mysterionStance == GD_Comm.Stance.Friendly ) && mysterionAnalysis.Contains( "equivalent lowered" ), mysterionStance + ": " + mysterionAnalysis );
+
+		Finish( "scenario=shippedmoods", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
