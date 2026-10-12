@@ -611,9 +611,28 @@ public static class UIKitSceneTool
 
 		Style( labelText, UIText.LabelS, c_frameLabelSize, UISprite.None, UIColor.TextAccent );
 
+		// the status, inside the top right corner (the planet in orbit, the orbit to go into, the comm link, the armed weapons)
+		var status = new GameObject( "Status", typeof( RectTransform ), typeof( CanvasRenderer ), typeof( TMPro.TextMeshProUGUI ) );
+		var statusRect = (RectTransform) status.transform;
+		var statusText = status.GetComponent<TMPro.TextMeshProUGUI>();
+
+		statusRect.SetParent( rootRect, false );
+		statusRect.anchorMin = new Vector2( 1.0f, 1.0f );
+		statusRect.anchorMax = new Vector2( 1.0f, 1.0f );
+		statusRect.pivot = new Vector2( 1.0f, 1.0f );
+		statusRect.anchoredPosition = new Vector2( -( c_frameArm + 8.0f ), -6.0f );
+		statusRect.sizeDelta = new Vector2( 600.0f, 24.0f );
+		statusText.alignment = TMPro.TextAlignmentOptions.TopRight;
+		statusText.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+		statusText.raycastTarget = false;
+		statusText.text = "";
+
+		Style( statusText, UIText.LabelS, c_frameLabelSize, UISprite.None, UIColor.TextSecondary );
+
 		var frame = rootObject.GetComponent<ViewportFrame>();
 
 		frame.m_label = labelText;
+		frame.m_status = statusText;
 
 		EditorUtility.SetDirty( frame );
 
