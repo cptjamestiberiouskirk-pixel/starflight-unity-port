@@ -11801,6 +11801,13 @@ public class ClaudeProbe : MonoBehaviour
 
 		BringAliensClose();
 
+		// every hit of steps 1 and 2 also damaged one of the ship's systems at random (a share of the bare hull's 250 points), and now and then the missile launcher
+		// was destroyed, so that neither missile was launched: make the systems whole and the launcher ready before each launch
+		var launcherHealthBefore = ship.GetSystemHealth( PD_PlayerShip.ShipSystem.Missiles );
+
+		ship.RestoreSystems();
+		SetField( combat, "m_playerMissileCooldown", 0.0f );
+
 		var firstLaunched = combat.FirePlayerMissile();
 
 		var waitEnd = Time.realtimeSinceStartup + 3.0f;
@@ -11831,6 +11838,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		BringAliensClose();
 
+		// the spemin have been firing back since the first launch
+		ship.RestoreSystems();
+		SetField( combat, "m_playerMissileCooldown", 0.0f );
+
 		var secondLaunched = combat.FirePlayerMissile();
 		var inTheAir = MissilesInTheAir();
 
@@ -11842,10 +11853,10 @@ public class ClaudeProbe : MonoBehaviour
 		var damageOfATimeOut = armorBefore - target.m_armorPoints;
 		var inTheAirAfter = MissilesInTheAir();
 
-		Log( "missile time out: a player missile that arrives does " + damageOfAHit + " damage (launched " + firstLaunched + "); one that runs out of time (launched " + secondLaunched + ", " + inTheAir + " in the air, " + inTheAirAfter + " after) does " + damageOfATimeOut + " damage, explosions playing before " + explosionsBefore + " and after " + explosionsAfterTimeOut );
+		Log( "missile time out: the missile launcher was at " + launcherHealthBefore + " after steps 1 and 2 (made whole); a player missile that arrives does " + damageOfAHit + " damage (launched " + firstLaunched + "); one that runs out of time (launched " + secondLaunched + ", " + inTheAir + " in the air, " + inTheAirAfter + " after) does " + damageOfATimeOut + " damage, explosions playing before " + explosionsBefore + " and after " + explosionsAfterTimeOut );
 
-		Check( "missile time out: a player missile that arrives still does its damage (control)", firstLaunched && ( damageOfAHit > 0 ), damageOfAHit + " damage" );
-		Check( "missile time out: a player missile that runs out of time explodes where it was and does no damage", secondLaunched && ( inTheAir > 0 ) && ( inTheAirAfter == 0 ) && ( explosionsBefore == 0 ) && ( explosionsAfterTimeOut == 1 ) && ( damageOfATimeOut == 0 ), "explosions " + explosionsBefore + " -> " + explosionsAfterTimeOut + ", damage " + damageOfATimeOut + ", in the air " + inTheAir + " -> " + inTheAirAfter );
+		Check( "missile time out: a player missile that arrives still does its damage (control)", firstLaunched && ( damageOfAHit > 0 ), damageOfAHit + " damage, launched " + firstLaunched );
+		Check( "missile time out: a player missile that runs out of time explodes where it was and does no damage", secondLaunched && ( inTheAir > 0 ) && ( inTheAirAfter == 0 ) && ( explosionsBefore == 0 ) && ( explosionsAfterTimeOut == 1 ) && ( damageOfATimeOut == 0 ), "launched " + secondLaunched + ", explosions " + explosionsBefore + " -> " + explosionsAfterTimeOut + ", damage " + damageOfATimeOut + ", in the air " + inTheAir + " -> " + inTheAirAfter );
 
 		ClearMissiles();
 		LeaveEncounter();
@@ -16164,6 +16175,75 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-win: before the win the evaluation is the scene's (control)", texts[ 0 ].Contains( "colony world recommendations" ), texts[ 0 ] );
 		Check( "starport-win: after the win the evaluation is Interstel's supplemental evaluation on the completion of the mission", texts[ 1 ].Contains( "COMPLETION OF MISSION" ) && texts[ 1 ].Contains( "500,000 MU" ), texts[ 1 ] );
 
+		// ---- the evaluation screen's pages, as the original's (OP-OV in the decompiled original): the supplemental evaluations first, each once, then the colony
+		// evaluations one to a page every time, the last followed by END OF EVALUATIONS; More turns the page and is gone on the last
+		SetFieldIfPresent( playerData.m_general, "m_gameWon", true );
+		SetFieldIfPresent( playerData.m_general, "m_missionCompleteShown", false );
+
+		var towing ="SUPPLEMENTAL EVALUATION\nSUBJECT:  TOWING CHARGES\n\nTOWING TEST";
+		var lostVehicle = "SUPPLEMENTAL EVALUATION\nSUBJECT:  LOSS OF TERRAIN VEHICLE\n\nLOST VEHICLE TEST";
+
+		playerData.m_general.m_supplementalEvaluationList = new List<string> { towing };
+		SetFieldIfPresent( playerData.m_general, "m_colonyEvaluationList", new List<string> { "COLONY TEST A", "COLONY TEST B" } );
+
+		var visits = new List<string>[ 3 ];
+
+		for ( var visit = 0; visit < 3; visit++ )
+		{
+			// the third visit is a save file from before the colony evaluations had a list of their own: one of them is among the supplemental ones
+			if ( visit == 2 )
+			{
+				playerData.m_general.m_supplementalEvaluationList = new List<string> { lostVehicle, "COLONY TEST OLD" };
+			}
+
+			visits[ visit ] = new List<string>();
+
+			PanelController.m_instance.Open( operationsPanel );
+
+			yield return new WaitForSecondsRealtime( 1.0f );
+
+			operationsPanel.ShowEvaluations();
+
+			yield return Frames( 2 );
+
+			var textTransform = operationsPanel.m_evaluationGameObject.transform.Find( "Display/Error Text Mask/Error Text" );
+			var text = ( textTransform == null ) ? null : textTransform.GetComponent<TMPro.TextMeshProUGUI>();
+
+			// each page and whether More is there (at most 6 pages)
+			for ( var page = 0; page < 6; page++ )
+			{
+				var more = operationsPanel.m_moreButton.gameObject.activeSelf;
+
+				visits[ visit ].Add( ( ( text == null ) ? "no text" : text.text.Replace( "\r", "" ).Replace( '\n', '/' ) ) + ( more ? " [More]" : "" ) );
+
+				if ( !more )
+				{
+					break;
+				}
+
+				operationsPanel.MoreClicked();
+
+				yield return Frames( 2 );
+			}
+
+			yield return ClosePanel( operationsPanel, "operations" );
+		}
+
+		SetFieldIfPresent( playerData.m_general, "m_gameWon", false );
+
+		for ( var visit = 0; visit < 3; visit++ )
+		{
+			Log( "starport-win: the evaluation pages of visit " + ( visit + 1 ) + ": " + string.Join( " | ", visits[ visit ] ) );
+		}
+
+		var first = visits[ 0 ];
+		var second = visits[ 1 ];
+		var third = visits[ 2 ];
+
+		Check( "starport-win: the evaluation screen shows one evaluation to a page: the towing charges, the completion of the mission, then the two colony evaluations, More on each but the last, which ends in END OF EVALUATIONS", ( first.Count == 4 ) && first[ 0 ].Contains( "TOWING TEST" ) && first[ 0 ].EndsWith( "[More]" ) && first[ 1 ].Contains( "COMPLETION OF MISSION" ) && !first[ 1 ].Contains( "TOWING" ) && first[ 2 ].StartsWith( "COLONY TEST A" ) && !first[ 2 ].Contains( "COLONY TEST B" ) && first[ 3 ].StartsWith( "COLONY TEST B" ) && first[ 3 ].EndsWith( "END OF EVALUATIONS" ), string.Join( " | ", first ) );
+		Check( "starport-win: on the next visit the supplemental evaluations are gone (each is shown once) and the colony evaluations are shown again", ( second.Count == 2 ) && second[ 0 ].StartsWith( "COLONY TEST A" ) && second[ 1 ].StartsWith( "COLONY TEST B" ) && second[ 1 ].EndsWith( "END OF EVALUATIONS" ) && !string.Join( " ", second ).Contains( "TOWING" ) && !string.Join( " ", second ).Contains( "COMPLETION OF MISSION" ), string.Join( " | ", second ) );
+		Check( "starport-win: a colony evaluation of an older save file, kept among the supplemental ones, moves to the colony evaluations and is shown before them", ( third.Count == 4 ) && third[ 0 ].Contains( "LOST VEHICLE TEST" ) && third[ 1 ].StartsWith( "COLONY TEST OLD" ) && third[ 2 ].StartsWith( "COLONY TEST A" ) && third[ 3 ].StartsWith( "COLONY TEST B" ) && third[ 3 ].EndsWith( "END OF EVALUATIONS" ), string.Join( " | ", third ) );
+
 		Finish( "scenario=starport-win before=" + texts[ 0 ].Contains( "colony" ) + " after=" + texts[ 1 ].Contains( "COMPLETION OF MISSION" ), 0 );
 	}
 
@@ -17848,14 +17928,19 @@ public class ClaudeProbe : MonoBehaviour
 			ledger += bank.m_transactionList[ index ].m_description + " " + bank.m_transactionList[ index ].m_amount + "; ";
 		}
 
-		var evaluations = FieldOrNull( playerData.m_general, "m_supplementalEvaluationList" ) as IList;
+		// the colony evaluations have a list of their own since the evaluation screen pages them (before that they were among the supplemental ones)
 		var evaluationText = "";
 
-		if ( evaluations != null )
+		foreach ( var listName in new[] { "m_colonyEvaluationList", "m_supplementalEvaluationList" } )
 		{
-			foreach ( var evaluation in evaluations )
+			var evaluations = FieldOrNull( playerData.m_general, listName ) as IList;
+
+			if ( evaluations != null )
 			{
-				evaluationText += evaluation + " || ";
+				foreach ( var evaluation in evaluations )
+				{
+					evaluationText += evaluation + " || ";
+				}
 			}
 		}
 
@@ -19503,6 +19588,31 @@ public class ClaudeProbe : MonoBehaviour
 
 		LeaveEncounter();
 		yield return Frames( 10 );
+
+		// ---- 4. the derelict's beacon in the shipped game's order (FIND-PHRASE in COMM-OV: the line used least, the first on a tie): in three meetings, its first
+		// two lines are the officer's "we're picking up a distress beacon signal" and then the SOS (a random pick would give that order in all three one time in 8)
+		var beaconOrders = new List<string>();
+
+		for ( var meeting = 0; meeting < 3; meeting++ )
+		{
+			yield return GoIntoOrbit( noahStar, PlanetInOrbit( noahStar, 3 ) );
+
+			var lines = new List<string>();
+
+			yield return LetAliensSpeak( 2, lines );
+
+			var first = ( lines.Count > 0 ) && SaysLine( lines[ 0 ], CommText( 555 ) ) ? "beacon" : ( ( lines.Count > 0 ) && SaysLine( lines[ 0 ], CommText( 556 ) ) ? "SOS" : "other" );
+			var second = ( lines.Count > 1 ) && SaysLine( lines[ 1 ], CommText( 556 ) ) ? "SOS" : ( ( lines.Count > 1 ) && SaysLine( lines[ 1 ], CommText( 555 ) ) ? "beacon" : "other" );
+
+			beaconOrders.Add( first + "," + second );
+
+			LeaveEncounter();
+			yield return Frames( 10 );
+		}
+
+		Log( "transmissions: the first two lines of the Noah 9 derelict in three meetings: " + string.Join( " | ", beaconOrders ) );
+
+		Check( "transmissions: in each of three meetings the Noah 9 derelict's first line is the officer's \"we're picking up a distress beacon signal\" and its second the SOS", string.Join( " ", beaconOrders ) == "beacon,SOS beacon,SOS beacon,SOS", string.Join( " | ", beaconOrders ) );
 
 		controller.m_encounterRange = encounterRange;
 
@@ -24095,8 +24205,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		HealTheCrew();
 
-		// ---- 5. the flyer of middling aggression again, in the air over dry ground, and a large carnivore on the ground 40 units from it: once the flyer lands,
-		// the hunter comes at it
+		// ---- 5. the flyer of middling aggression again, in the air over dry ground, and a large carnivore on the ground 40 units from it: while the flyer is in
+		// the air the hunter does not come at it (the control), and once the flyer lands the hunter comes at it
 		flyer.m_aggression = 50;
 		flyer.m_noticedPlayer = false;
 		flyer.m_hits = 100;
@@ -24121,35 +24231,83 @@ public class ClaudeProbe : MonoBehaviour
 
 		PutInTheAir( flyer, start );
 
+		// neither keeps a mate from before (the hunter may still be paired with a lifeform it was beside when the vehicle landed)
+		Call( hunter, "BecomeUnpaired" );
+		Call( flyer, "BecomeUnpaired" );
+
+		// the hunter decides with the flyer in the air, the flyer's own decision held so that it cannot land first, until the two are paired (the hunter may
+		// unpair at random on the decision that pairs it): it does not come at the flyer (the control)
+		var airBehaviour = "";
+		var airPaired = false;
+		var airFlying = false;
+
+		for ( var attempt = 0; ( attempt < 5 ) && !airPaired; attempt++ )
+		{
+			SetField( flyer, "m_behaviourTimer", 0.5f );
+			SetField( hunter, "m_behaviourTimer", 0.0f );
+
+			yield return null;
+
+			airBehaviour = MateBehaviour( hunter );
+			airPaired = ( FieldOrNull( hunter, "m_mate" ) as TerrainLifeform ) == flyer;
+			airFlying = IsFlying( flyer );
+		}
+
+		// then the hunter is held where it is until the flyer lands, and decides on the frame after that, 20 units from where the flyer came down towards the
+		// vehicle (in the encounter area, and not next to the flyer): a hunter left to decide wanders on while its prey is in the air, at 12 units a second, and
+		// was out of the encounter area within seconds, so a flyer that landed late found no hunter; if the hunter unpairs at random on that decision, it is held
+		// again until the next landing
 		var huntBehaviours = "";
 		var approachedAfterFlying = false;
 		var preyLandings = 0;
 		var preyWasFlying = true;
+		var hunterDecides = false;
 
 		began = Time.realtimeSinceStartup;
 		end = began + 20.0f;
 
 		while ( ( Time.realtimeSinceStartup < end ) && !approachedAfterFlying )
 		{
+			if ( !hunterDecides )
+			{
+				SetField( hunter, "m_behaviourTimer", 0.5f );
+				SetField( hunter, "m_moving", false );
+			}
+
 			yield return null;
+
+			if ( hunterDecides )
+			{
+				var behaviour = MateBehaviour( hunter );
+
+				huntBehaviours += behaviour + " ";
+				approachedAfterFlying = ( behaviour == "ApproachingMate" ) && ( ( FieldOrNull( hunter, "m_mate" ) as TerrainLifeform ) == flyer );
+				hunterDecides = false;
+			}
 
 			var flying = IsFlying( flyer );
 
 			if ( preyWasFlying && !flying )
 			{
 				preyLandings++;
+
+				var preyPlace = flyer.transform.position;
+				var towardsVehicle = vehicle - preyPlace;
+
+				towardsVehicle.y = 0.0f;
+
+				var huntPlace = preyPlace + towardsVehicle.normalized * 20.0f;
+
+				SurfaceAt( huntPlace, out var huntHeight );
+
+				hunter.transform.position = new Vector3( huntPlace.x, huntHeight + hunter.m_groundOffset, huntPlace.z );
+
+				SetField( hunter, "m_behaviourTimer", 0.0f );
+
+				hunterDecides = true;
 			}
 
 			preyWasFlying = flying;
-
-			var behaviour = MateBehaviour( hunter );
-
-			if ( !huntBehaviours.Contains( behaviour ) )
-			{
-				huntBehaviours += behaviour + " ";
-			}
-
-			approachedAfterFlying = ( behaviour == "ApproachingMate" ) && ( ( FieldOrNull( hunter, "m_mate" ) as TerrainLifeform ) == flyer );
 		}
 
 		var huntedFor = Time.realtimeSinceStartup - began;
@@ -24178,13 +24336,14 @@ public class ClaudeProbe : MonoBehaviour
 		var deadFlying = IsFlying( flyer );
 		var deadBottom = DrawnBounds( flyer.gameObject ).min.y - liquidHeight;
 
-		Log( "flyers: wandered " + wanderedFor + " s, took off " + tookOff + " at " + tookOffAt + " s (highest " + highest + "), landed " + landed + " at " + landedAt + " s || stunned: " + stunnedStatus + ", flying " + stunnedFlying + ", " + stunnedAbove + " above || attacking 8 away (found " + attackFound + "): [" + attackBehaviours + "] landed " + attackLanded + " || 2 away (dry " + besideDry + "): [" + besideBehaviours + "] stayed up " + besideStayedUp + " || hunter (found " + hunterFound + "): [" + huntBehaviours + "] approached " + approachedAfterFlying + " after " + huntedFor + " s, prey landed " + preyLandings + " times || dead over liquid (found " + liquidFound + " at " + liquidPlace + "): " + deadStatus + ", flying " + deadFlying + ", bottom " + deadBottom + " above the surface" );
+		Log( "flyers: wandered " + wanderedFor + " s, took off " + tookOff + " at " + tookOffAt + " s (highest " + highest + "), landed " + landed + " at " + landedAt + " s || stunned: " + stunnedStatus + ", flying " + stunnedFlying + ", " + stunnedAbove + " above || attacking 8 away (found " + attackFound + "): [" + attackBehaviours + "] landed " + attackLanded + " || 2 away (dry " + besideDry + "): [" + besideBehaviours + "] stayed up " + besideStayedUp + " || hunter (found " + hunterFound + "): flyer in the air " + airFlying + ", paired " + airPaired + ", " + airBehaviour + ", after landings [" + huntBehaviours + "] approached " + approachedAfterFlying + " after " + huntedFor + " s, prey landed " + preyLandings + " times || dead over liquid (found " + liquidFound + " at " + liquidPlace + "): " + deadStatus + ", flying " + deadFlying + ", bottom " + deadBottom + " above the surface" );
 
 		Check( "flyers: a flyer that wanders takes to the air (control)", tookOff, tookOff + ", highest " + highest );
 		Check( "flyers: a flyer in the air that wanders lands in time, on the ground", landed, landed + " after " + wanderedFor + " s" );
 		Check( "flyers: a flyer in the air that is stunned comes down to the ground", ( stunnedStatus == "Stunned" ) && !stunnedFlying && ( Mathf.Abs( stunnedAbove ) < 0.5f ), stunnedStatus + ", flying " + stunnedFlying + ", " + stunnedAbove + " above" );
 		Check( "flyers: a flyer that attacks the vehicle comes down to do it", attackFound && attackBehaviours.Contains( "AttackingPlayer" ) && attackLanded, attackFound + " | " + attackBehaviours + "| landed " + attackLanded );
 		Check( "flyers: over the square the vehicle is on it attacks from the air (control)", besideDry && besideBehaviours.Contains( "AttackingPlayer" ) && besideStayedUp, besideDry + " | " + besideBehaviours + "| stayed up " + besideStayedUp );
+		Check( "flyers: a hunter paired with a flyer in the air does not come at it (control)", hunterFound && airFlying && airPaired && ( airBehaviour != "ApproachingMate" ), hunterFound + ", flying " + airFlying + ", paired " + airPaired + " | " + airBehaviour );
 		Check( "flyers: once a flyer has been in the air and lands, a hunter comes at it", hunterFound && approachedAfterFlying && ( preyLandings > 0 ), hunterFound + " | " + huntBehaviours + "| landed " + preyLandings + " times" );
 		Check( "flyers: a flyer killed over a liquid comes down onto its surface", liquidFound && ( deadStatus == "Dead" ) && !deadFlying && ( Mathf.Abs( deadBottom ) < 1.0f ), liquidFound + ", " + deadStatus + ", flying " + deadFlying + ", bottom " + deadBottom );
 

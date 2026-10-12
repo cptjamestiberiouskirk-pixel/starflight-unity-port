@@ -3307,8 +3307,10 @@ public class Encounter : MonoBehaviour
 			}
 		}
 
-		// now pick and return a random one
-		var randomNumber = Random.Range( 0, possibleComms.Count );
+		// now pick and return a random one - but the Noah 9 derelict's in the order of the game data: the shipped game says the line of a subject used least, the
+		// first of them on a tie (FIND-PHRASE in COMM-OV, the decompiled original), so the officer's "we're picking up a distress beacon signal" comes before the
+		// SOS, and then they take turns (STRINFO 2.11 prints them in that order)
+		var randomNumber = ( race == GameData.Race.NoahDerelict ) ? 0 : Random.Range( 0, possibleComms.Count );
 
 		var selectedComm = possibleComms[ randomNumber ];
 

@@ -228,7 +228,7 @@ public class PlayerData
 
 				if ( text != null )
 				{
-					m_general.AddSupplementalEvaluation( heading + text.m_text.Replace( "[REWARD]", colonyEvaluation.m_bonus.ToString() ) );
+					m_general.AddColonyEvaluation( heading + text.m_text.Replace( "[REWARD]", colonyEvaluation.m_bonus.ToString() ) );
 				}
 
 				continue;
@@ -270,7 +270,7 @@ public class PlayerData
 					evaluation = evaluation.Replace( "  THIS IS ONLY A WARNING, YOUR NEXT FINE WILL BE HEAVY.", "" );
 				}
 
-				m_general.AddSupplementalEvaluation( heading + evaluation );
+				m_general.AddColonyEvaluation( heading + evaluation );
 			}
 		}
 
