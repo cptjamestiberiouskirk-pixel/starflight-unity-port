@@ -20698,7 +20698,6 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=redcylinder placed=" + placed.Count + " worked=" + worked.Count, 0 );
 	}
 
-
 	// ---------------------------------------------------------------- batch 1 (starport side)
 
 	struct SellResult
