@@ -13,8 +13,8 @@ public class Shine : MonoBehaviour
 	const float c_firstFlareWait = 3.0f;
 
 	// how high a flare rises (a fraction of the size of the shine) and how wide it is (radians)
-	const float c_flareHeight = 0.35f;
-	const float c_flareWidth = 0.3f;
+	const float c_flareHeight = 0.22f;
+	const float c_flareWidth = 0.55f;
 
 	static readonly int c_flareId = Shader.PropertyToID( "_Flare" );
 

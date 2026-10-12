@@ -124,13 +124,14 @@
 
 						float alpha = gradient.a * _Color.a;
 
-						// the surface: two layers of cells that drift against each other, so that it slowly churns (only on the disc)
+						// the surface: two layers of cells that drift against each other, so that it slowly churns (on the outer part of the disc:
+						// the middle is white under the lens flare of the star)
 						float time = _Time.y;
 						float2 flow = float2( time * 0.05, -time * 0.03 );
 						float cells = 0.5 * ( Fbm( v.local * 9.0 + flow ) + Fbm( v.local * 9.7 - flow + 3.1 ) );
-						float disc = 1.0 - smoothstep( 0.35, 0.6, v.texcoord.x );
+						float disc = smoothstep( 0.2, 0.4, v.texcoord.x ) * ( 1.0 - smoothstep( 0.6, 0.78, v.texcoord.x ) );
 
-						color *= lerp( 1.0, 0.8 + 0.25 * cells, disc );
+						color *= lerp( 1.0, 0.72 + 0.4 * cells, disc );
 
 						// the corona: streamers round the rim that flicker (the noise is read on a circle, so it has no seam)
 						float angle = atan2( v.local.x, v.local.y );
