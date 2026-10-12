@@ -35,6 +35,7 @@ public static class UIKitSceneTool
 	const string c_right = "Main/Right/GameObject/";
 	const string c_display = "Main/Right/GameObject/B/Display/";
 	const string c_buttons = "Main/Right/GameObject/C/GameObject/B/Buttons/";
+	const string c_officerIcon = "Main/Right/GameObject/C/GameObject/A/GameObject/A/GameObject/Image";
 
 	static Entry[] GetTable()
 	{
@@ -93,8 +94,8 @@ public static class UIKitSceneTool
 			new Entry( c_display + "Terrain Vehicle Cargo/A/Labels", UIText.LabelM, 24, UISprite.None, UIColor.TextSecondary , 1.0f, 41.0f ),
 			new Entry( c_display + "Terrain Vehicle Cargo/A/Values", UIText.ReadoutM, 24, UISprite.None, UIColor.TextPrimary , 1.0f, 41.0f ),
 
-			// the ship's name and the officer's logo
-			new Entry( c_right + "C/GameObject/A/GameObject/A/GameObject/Image", UIText.None, 0, UISprite.None, UIColor.TextMuted ),
+			// the ship's name and the officer's icon (the ship's logo on the bridge, the kit's icon of each officer, set by the button controller)
+			new Entry( c_officerIcon, UIText.None, 0, UISprite.None, UIColor.AccentPrimary ),
 			new Entry( c_right + "C/GameObject/A/GameObject/B/GameObject/Current Officer", UIText.HeadingL, 28, UISprite.None, UIColor.TextPrimary ),
 
 			// the console buttons' panel
@@ -244,6 +245,27 @@ public static class UIKitSceneTool
 		else
 		{
 			report.AppendLine( "console bullets not set (no button controller or no bullets in the theme)" );
+		}
+
+		// the officer's icon: the button controller changes it with the officer, and the icons are square where the ship's logo is wide, so it keeps its aspect
+		var officerIcon = canvas.Find( c_officerIcon );
+		var officerImage = ( officerIcon != null ) ? officerIcon.GetComponent<Image>() : null;
+
+		if ( ( controller != null ) && ( officerImage != null ) )
+		{
+			Undo.RecordObject( controller, "UI kit" );
+			controller.m_officerIcon = officerImage;
+			EditorUtility.SetDirty( controller );
+
+			Undo.RecordObject( officerImage, "UI kit" );
+			officerImage.preserveAspect = true;
+			EditorUtility.SetDirty( officerImage );
+
+			report.AppendLine( "officer icon set" );
+		}
+		else
+		{
+			report.AppendLine( "officer icon not set (no button controller or no image at " + c_officerIcon + ")" );
 		}
 
 		EditorSceneManager.MarkSceneDirty( canvas.gameObject.scene );

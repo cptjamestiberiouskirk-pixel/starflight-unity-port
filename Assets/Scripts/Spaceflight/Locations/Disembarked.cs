@@ -146,7 +146,7 @@ public class Disembarked : MonoBehaviour
 		SpaceflightController.m_instance.m_viewport.UpdateCoordinates();
 
 		// change the button panel label
-		SpaceflightController.m_instance.m_buttonController.ChangeOfficerText( "Terrain Vehicle" );
+		SpaceflightController.m_instance.m_buttonController.ChangeOfficerText( "Terrain Vehicle", UIKitTheme.OfficerIcon.TerrainVehicle );
 
 		// change to the terrain vehicle buttons
 		SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.TerrainVehicle );
