@@ -409,9 +409,9 @@
       "m_placement": "Several",
       "m_latitude": 0,
       "m_longitude": 0,
-      "m_text": "SIGN - MARDAN 4 MINING STATION NO. [NUMBER]",
-      "m_note": "STRINFO: \"several locations\" on this planet; [NUMBER] stands for the station number.",
-      "m_source": "STRINFO 3.1"
+      "m_text": "SIGN - MARDAN 4 MINING STATION NO. 17",
+      "m_note": "STRINFO: \"several locations\" on this planet, and NO. [NUMBER]: its editor's field for the station number. The number 17 is the shipped game's own: its message records have this sign twice, NO. 82 (message 28) and NO. 17 (the decompiled original, s-macke/starflight-reverse, starflt1-out/data/instance.txt).",
+      "m_source": "STRINFO 3.1; the shipped game's message record"
     },
     {
       "m_id": 30,
@@ -1272,20 +1272,20 @@
     },
     {
       "m_key": "MissionComplete",
-      "m_text": "SUPPLEMENTAL EVALUATION\nSUBJECT:  COMPLETION OF MISSION\nCONGRATULATIONS!  AS A RESULT OF YOUR EFFORTS, OUR SUN IS ONCE AGAIN STABLE.  ALL OF ARTH, AND INDEED THE ENTIRE GALAXY OWES YOU A DEBT WHICH CAN NEVER BE FULLY REPAID.  YOUR HEROIC EXPLOITS WILL SURELY BECOME INTER-GALACTIC LEGEND.\nOUR TOKEN BONUS OF 500,000 MU WILL ALLOW YOU TO LIVE HERE ON ARTH IN LUXURY FOR MANY YEARS TO COME, ALTHOUGH WE SUSPECT YOU MAY USE IT TO FURTHER YOUR EXPLORATIONS.  ONCE AGAIN, THANK YOU!",
+      "m_text": "SUPPLEMENTAL EVALUATION\nSUBJECT:  COMPLETION OF MISSION\n\nCONGRATULATIONS!  AS A RESULT OF YOUR EFFORTS, OUR SUN IS ONCE AGAIN STABLE.  ALL OF ARTH, AND INDEED THE ENTIRE GALAXY OWES YOU A DEBT WHICH CAN NEVER BE FULLY REPAID.  YOUR HEROIC EXPLOITS WILL SURELY BECOME INTER-GALACTIC LEGEND.\nOUR TOKEN BONUS OF 500,000 MU WILL ALLOW YOU TO LIVE HERE ON ARTH IN LUXURY FOR MANY YEARS TO COME, ALTHOUGH WE SUSPECT YOU MAY USE IT TO FURTHER YOUR EXPLORATIONS.  ONCE AGAIN, THANK YOU!",
       "m_note": "A supplemental evaluation at the Starport after the Crystal Planet is destroyed.",
       "m_source": "STRINFO 1.2"
     },
     {
       "m_key": "TerrainVehicleLost",
-      "m_text": "SUPPLEMENTAL EVALUATION\nSUBJECT:  LOSS OF TERRAIN VEHICLE\nDUE TO YOUR NEGLIGENCE, YOUR SHIP IS NO LONGER EQUIPPED WITH A TERRAIN VEHICLE.  A NEW TERRAIN VEHICLE IS CURRENTLY BEING INSTALLED.  CONSEQUENLY, YOU HAVE BEEN FINED 10,000 MU.",
-      "m_note": "A supplemental evaluation. \"CONSEQUENLY\" as printed.",
+      "m_text": "SUPPLEMENTAL EVALUATION\nSUBJECT:  LOSS OF TERRAIN VEHICLE\n\nDUE TO YOUR NEGLIGENCE, YOUR SHIP IS NO LONGER EQUIPPED WITH A TERRAIN VEHICLE.  A NEW TERRAIN VEHICLE IS CURRENTLY BEING INSTALLED.  CONSEQUENTLY, YOU HAVE BEEN FINED 10,000 MU.",
+      "m_note": "A supplemental evaluation. STRINFO prints \"CONSEQUENLY\"; the shipped game says CONSEQUENTLY (OP-OV in the decompiled original, s-macke/starflight-reverse).",
       "m_source": "STRINFO 1.2"
     },
     {
       "m_key": "TowingCharges",
-      "m_text": "SUPPLEMENTAL EVALUATION\nSUBJECT:  TOWING CHARGES\nI.S. CORP. REG.  12A-7312 EMERGENCY DISTRESS CALLS:  CAPTAIN AND CREW OF ANY VESSEL INVOKING AN EMERGENCY DISTRESS CALL SHALL BE LIABLE FOR ANY COSTS INCURRED BY INTERSTEL CORP. AS A RESULT OF RESCUE OPERATIONS INITIATED ON BEHALF SAID CREW.  YOU HAVE BEEN FINED  [AMOUNT] MU.",
-      "m_note": "STRINFO: fines vary directly with the distance from Arth and range from 15000 to 80000 MU.",
+      "m_text": "SUPPLEMENTAL EVALUATION\nSUBJECT:  TOWING CHARGES\n\nI.S. CORP. REG.  12A-7312 EMERGENCY DISTRESS CALLS:  CAPTAIN AND CREW OF ANY VESSEL INVOKING AN EMERGENCY DISTRESS CALL SHALL BE LIABLE FOR ALL COSTS INCURRED BY INTERSTEL CORP. AS A RESULT OF RESCUE OPERATIONS INITIATED ON BEHALF OF SAID CREW.  YOU HAVE BEEN FINED  [AMOUNT] MU.",
+      "m_note": "STRINFO: fines vary directly with the distance from Arth and range from 15000 to 80000 MU. STRINFO prints \"LIABLE FOR ANY COSTS\" and \"ON BEHALF SAID CREW\"; the words here are the shipped game's (OP-OV in the decompiled original).",
       "m_source": "STRINFO 1.2"
     },
     {

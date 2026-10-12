@@ -463,6 +463,10 @@ public class Encounter : MonoBehaviour
 
 				break;
 		}
+
+		// say so, as the original does ("LEAVING ENCOUNTER..." and "...ENCOUNTER TERMINATED", made in STARB.COM as "LEAVING STARPORT..." and "...STARPORT CLEAR" are)
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Leaving encounter...</color>" );
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>...Encounter terminated.</color>" );
 	}
 
 	// check if all enemy ships in the encounter are destroyed
@@ -1690,6 +1694,15 @@ public class Encounter : MonoBehaviour
 		return ( plutonium == null ) ? 0 : plutonium.m_volume / 10;
 	}
 
+	// the Endurium the Thrynn pay for this artifact of the hold, in tenths of a cubic meter: their price, but no more than the hold has room for once the artifact
+	// is out of it (the shipped game offers the smaller of the two, COMMSPEC-OV)
+	int GetThrynnArtifactPayment( GD_Artifact artifact )
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+
+		return Mathf.Min( artifact.m_thrynnPrice * 10, Mathf.Max( 0, ship.GetRemainingVolume() + artifact.m_volume ) );
+	}
+
 	// the Thrynn's next offer (null if they have nothing to offer)
 	GD_Comm FindThrynnOffer()
 	{
@@ -1697,15 +1710,21 @@ public class Encounter : MonoBehaviour
 
 		if ( artifact != null )
 		{
-			// the game data writes the artifact as X and the price as Y ("you have aboard your ship a(n) [ARTIFACT]. This artifact is of interest to us", STRINFO)
+			// the game data writes the artifact as X, the price as Y and the plural of "unit" as "unitxx" ("you have aboard your ship a(n) [ARTIFACT]. This
+			// artifact is of interest to us. We will buy it from you for [AMOUNT] cubic Arth unit(s)", STRINFO 2.5) - the shipped game fills them in as the port
+			// does here (COMMSPEC-OV in the decompiled original): "a" or "an" by the first letter, the name with a full stop after it, the amount it will pay
+			// (its price, cut down to the room in the hold) and "unitss" for more than one
 			var offer = FindRaceComm( c_thrynnArtifactOfferCommId );
 
 			if ( offer != null )
 			{
 				var article = ( "AEIOU".IndexOf( char.ToUpper( artifact.m_name[ 0 ] ) ) >= 0 ) ? "an " : "a ";
+				var payment = GetThrynnArtifactPayment( artifact );
 
-				offer = WithAmount( offer, "X", article + artifact.m_name );
-				offer = WithAmount( offer, "Y", artifact.m_thrynnPrice.ToString() );
+				offer = WithAmount( offer, "X", article + artifact.m_name + "." );
+				offer = WithAmount( offer, "Y", ( payment / 10 ).ToString() );
+				offer = WithWord( offer, ". thiss ", ". Thiss " );
+				offer = WithWord( offer, " unitxx ", ( payment > 10 ) ? " unitss " : " unit " );
 			}
 
 			return offer;
@@ -1766,10 +1785,11 @@ public class Encounter : MonoBehaviour
 		{
 			var artifact = FindThrynnArtifact();
 
+			// their Endurium, the amount they offered (as much of it as the hold has room for)
+			var payment = ( artifact != null ) ? GetThrynnArtifactPayment( artifact ) : 0;
+
 			if ( ( artifact != null ) && ship.RemoveArtifact( artifact.m_name ) )
 			{
-				// their Endurium, as much of it as the hold has room for
-				var payment = Mathf.Min( artifact.m_thrynnPrice * 10, Mathf.Max( 0, ship.GetRemainingVolume() ) );
 
 				if ( payment > 0 )
 				{
@@ -2970,7 +2990,18 @@ public class Encounter : MonoBehaviour
 			return null;
 		}
 
-		return new GD_Comm( comm.m_text.Replace( " " + placeholder + " ", " " + amount + " " ) )
+		return WithWord( comm, " " + placeholder + " ", " " + amount + " " );
+	}
+
+	// a copy of a comm with these words of its text replaced - null for null
+	static GD_Comm WithWord( GD_Comm comm, string words, string replacement )
+	{
+		if ( comm == null )
+		{
+			return null;
+		}
+
+		return new GD_Comm( comm.m_text.Replace( words, replacement ) )
 		{
 			m_id = comm.m_id,
 			m_race = comm.m_race,
@@ -3652,6 +3683,9 @@ public class Encounter : MonoBehaviour
 		// we are not connected any more
 		m_pdEncounter.m_connected = false;
 		m_pdEncounter.m_disconnected = true;
+
+		// the end of every comm link, in the original's words (COMM-OV: "COMMUNICATIONS HAVE BEEN TERMINATED")
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Communications have been terminated.</color>" );
 
 		// no one wants to connect any more
 		m_pdEncounter.m_playerWantsToConnect = false;
