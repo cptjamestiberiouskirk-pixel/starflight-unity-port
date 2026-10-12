@@ -537,6 +537,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAtmospherePictures();
 				break;
 
+			case "starfieldpictures":
+				yield return ScenarioStarfieldPictures();
+				break;
+
 			case "perframe":
 				yield return ScenarioPerFrame();
 				break;
@@ -10322,6 +10326,197 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "atmospherepictures: no error is logged while the atmospheres are set up", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=atmospherepictures planets=" + chosen.Count + " noRoom=" + noRoom.Count + " hidden=" + hidden.Count + " dim=" + dim.Count + " errors=" + errorsDuring + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: starfield pictures (the stars' sizes, colours, glints and twinkle, and the game's random numbers they take)
+
+	// render the main camera into a texture and read back the brightness of each pixel of its space view (for a comparison of two moments)
+	static float[] RenderBrightness( Camera camera )
+	{
+		var renderTexture = new RenderTexture( 960, 540, 24, RenderTextureFormat.ARGB32 );
+		var picture = new Texture2D( 960, 540, TextureFormat.RGB24, false );
+
+		camera.targetTexture = renderTexture;
+		camera.Render();
+		camera.targetTexture = null;
+
+		var active = RenderTexture.active;
+
+		RenderTexture.active = renderTexture;
+		picture.ReadPixels( new Rect( 0, 0, 960, 540 ), 0, 0 );
+		picture.Apply();
+		RenderTexture.active = active;
+
+		var pixels = picture.GetPixels();
+		var brightness = new float[ pixels.Length ];
+
+		for ( var i = 0; i < pixels.Length; i++ )
+		{
+			brightness[ i ] = Mathf.Max( pixels[ i ].r, Mathf.Max( pixels[ i ].g, pixels[ i ].b ) );
+		}
+
+		UnityEngine.Object.Destroy( picture );
+		renderTexture.Release();
+		UnityEngine.Object.Destroy( renderTexture );
+
+		return brightness;
+	}
+
+	IEnumerator ScenarioStarfieldPictures()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+		var camera = Camera.main;
+
+		// out in dark hyperspace, where there is nothing but the stars, with no encounter able to begin
+		controller.m_encounterRange = 0.0f;
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 4.0f, 0.0f, 4.0f ) );
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 30 );
+
+		var starfield = UnityEngine.Object.FindFirstObjectByType<InfiniteStarfield>();
+
+		if ( starfield == null )
+		{
+			Finish( "scenario=starfieldpictures abort: no starfield", 2 );
+			yield break;
+		}
+
+		var errorsBefore = s_errorCount;
+
+		// ---- 1. control: the starfield takes four of the game's random numbers for each star, as it always has (the planets and the encounters draw from the same numbers)
+		UnityEngine.Random.InitState( 4321 );
+
+		starfield.InitStarField();
+
+		var stateAfterTheStarfield = JsonUtility.ToJson( UnityEngine.Random.state );
+
+		yield return Frames( 2 );
+
+		var particleSystems = GetField( starfield, "m_particleSystems" ) as ParticleSystem[];
+		var starCount = 0;
+
+		foreach ( var layer in GetField( starfield, "m_particles" ) as ParticleSystem.Particle[][] )
+		{
+			starCount += layer.Length;
+		}
+
+		UnityEngine.Random.InitState( 4321 );
+
+		for ( var i = 0; i < starCount * 4; i++ )
+		{
+			var draw = UnityEngine.Random.value;
+		}
+
+		var stateAfterFourEach = JsonUtility.ToJson( UnityEngine.Random.state );
+
+		Check( "starfieldpictures: the starfield takes four of the game's random numbers for each star (control)", stateAfterTheStarfield == stateAfterFourEach, starCount + " stars, " + ( ( stateAfterTheStarfield == stateAfterFourEach ) ? "the same state as after " + ( starCount * 4 ) + " draws" : "a different state" ) );
+
+		// ---- 2. the stars of a layer differ in size and colour, a few have a glint, and the shader gets their random numbers for the twinkle
+		var flatLayers = new List<string>();
+		var glinting = 0;
+		var twinkleStreams = 0;
+
+		for ( var l = 0; l < particleSystems.Length; l++ )
+		{
+			var particles = new ParticleSystem.Particle[ particleSystems[ l ].particleCount ];
+
+			particleSystems[ l ].GetParticles( particles );
+
+			var smallest = float.MaxValue;
+			var largest = 0.0f;
+			var colours = new HashSet<Color32>();
+
+			foreach ( var particle in particles )
+			{
+				smallest = Mathf.Min( smallest, particle.startSize );
+				largest = Mathf.Max( largest, particle.startSize );
+				colours.Add( particle.startColor );
+
+				if ( particle.startColor.a > 0 && particle.startColor.a < 255 )
+				{
+					glinting++;
+				}
+			}
+
+			if ( ( particles.Length == 0 ) || ( largest < smallest * 2.0f ) || ( colours.Count < 4 ) )
+			{
+				flatLayers.Add( "layer " + l + " (" + particles.Length + " stars, sizes " + smallest.ToString( "F0" ) + " to " + largest.ToString( "F0" ) + ", " + colours.Count + " colours)" );
+			}
+
+			var streams = new List<ParticleSystemVertexStream>();
+
+			particleSystems[ l ].GetComponent<ParticleSystemRenderer>().GetActiveVertexStreams( streams );
+
+			if ( streams.Contains( ParticleSystemVertexStream.StableRandomXY ) )
+			{
+				twinkleStreams++;
+			}
+		}
+
+		var glintShare = ( starCount > 0 ) ? glinting / ( float ) starCount : 0.0f;
+
+		Log( "starfieldpictures: " + particleSystems.Length + " layers, " + starCount + " stars; layers whose stars are all alike: " + ( ( flatLayers.Count == 0 ) ? "none" : string.Join( ", ", flatLayers ) ) + "; glinting " + glinting + " (" + ( glintShare * 100.0f ).ToString( "F1" ) + "%); layers with the twinkle's random numbers " + twinkleStreams );
+
+		Check( "starfieldpictures: the stars of each layer differ in size and colour", ( particleSystems.Length > 0 ) && ( flatLayers.Count == 0 ), ( flatLayers.Count == 0 ) ? "all " + particleSystems.Length + " layers" : string.Join( ", ", flatLayers ) );
+		Check( "starfieldpictures: a few bright stars have a glint", ( glintShare > 0.01f ) && ( glintShare < 0.1f ), ( glintShare * 100.0f ).ToString( "F1" ) + "% of the stars" );
+		Check( "starfieldpictures: the star shader gets each star's random numbers for its twinkle", ( particleSystems.Length > 0 ) && ( twinkleStreams == particleSystems.Length ), twinkleStreams + " of " + particleSystems.Length + " layers" );
+
+		// ---- 3. pictures, and the twinkle seen: the same view a third of a second apart
+		var twinkled = -1;
+		var starPixels = 0;
+
+		if ( hasGraphics )
+		{
+			var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "starfield-pictures" ) );
+
+			System.IO.Directory.CreateDirectory( folder );
+
+			Time.captureDeltaTime = 1.0f / 30.0f;
+
+			RenderCameraPicture( camera, System.IO.Path.Combine( folder, "hyperspace.png" ) );
+			RenderZoomedPicture( camera, System.IO.Path.Combine( folder, "hyperspace_zoomed.png" ), 10.0f );
+
+			var first = RenderBrightness( camera );
+
+			var start = Time.frameCount;
+
+			while ( Time.frameCount - start < 10 )
+			{
+				yield return null;
+			}
+
+			var second = RenderBrightness( camera );
+
+			Time.captureDeltaTime = 0.0f;
+
+			twinkled = 0;
+
+			for ( var i = 0; i < first.Length; i++ )
+			{
+				if ( Mathf.Max( first[ i ], second[ i ] ) > 0.15f )
+				{
+					starPixels++;
+
+					if ( Mathf.Abs( first[ i ] - second[ i ] ) > 0.06f )
+					{
+						twinkled++;
+					}
+				}
+			}
+
+			Log( "starfieldpictures: of " + starPixels + " star pixels, " + twinkled + " changed brightness in a third of a second (the camera did not move); pictures in " + folder );
+
+			Check( "starfieldpictures: stars twinkle", ( starPixels > 0 ) && ( twinkled > starPixels / 20 ), twinkled + " of " + starPixels + " star pixels changed" );
+		}
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "starfieldpictures: no error is logged while the starfield is made and drawn", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=starfieldpictures stars=" + starCount + " flatLayers=" + flatLayers.Count + " glint=" + ( glintShare * 100.0f ).ToString( "F1" ) + "% twinkleStreams=" + twinkleStreams + "/" + particleSystems.Length + " twinkled=" + twinkled + "/" + starPixels + " errors=" + errorsDuring + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- Low: what the displays cost every frame (the status display, the terrain vehicle display)

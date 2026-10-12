@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using System.Collections.Generic;
 using Random = UnityEngine.Random;
 
 public class InfiniteStarfield : MonoBehaviour
@@ -22,6 +23,39 @@ public class InfiniteStarfield : MonoBehaviour
 	ParticleSystem.Particle[][] m_particles;
 	Vector3 m_lastPosition;
 
+	// the materials made for the layers (one each), destroyed when the starfield is made again or goes
+	List<Material> m_starMaterials = new List<Material>();
+
+	// the star shader (in a Resources folder, so it is in every build: the materials are made in code)
+	static Shader m_starShader;
+
+	// the faintest star next to the brightest, and how much bigger the brightest are than the smallest
+	const float c_faintest = 0.16f;
+	const float c_smallest = 0.6f;
+	const float c_largest = 1.5f;
+
+	// the share of stars bright enough for a glint, and how much bigger their quad is (the glint reaches out of the halo)
+	const float c_glintShare = 0.035f;
+	const float c_glintRoom = 2.0f;
+
+	// how much bigger the quad of a star is than the star sprite was: the core is drawn in its middle, with room for the halo
+	const float c_quadRoom = 1.5f;
+
+	// how much of the layer's tint each star takes (the rest is the star's own colour)
+	const float c_layerTint = 0.5f;
+
+	// the colours of stars, from blue white to orange, and how often each is picked (they add up to 1)
+	static readonly Color[] c_starColors = new Color[]
+	{
+		new Color( 0.72f, 0.82f, 1.0f ),
+		new Color( 0.9f, 0.94f, 1.0f ),
+		new Color( 1.0f, 1.0f, 1.0f ),
+		new Color( 1.0f, 0.95f, 0.84f ),
+		new Color( 1.0f, 0.85f, 0.62f ),
+		new Color( 1.0f, 0.7f, 0.45f )
+	};
+	static readonly float[] c_starColorShares = new float[] { 0.15f, 0.2f, 0.3f, 0.18f, 0.11f, 0.06f };
+
 	void Start()
 	{
 		InitStarField();
@@ -36,6 +70,22 @@ public class InfiniteStarfield : MonoBehaviour
 	{
 		foreach ( Transform child in transform )
 			Destroy( child.gameObject );
+
+		// the materials of the starfield this one replaces
+		foreach ( var material in m_starMaterials )
+		{
+			if ( material != null )
+			{
+				Destroy( material );
+			}
+		}
+
+		m_starMaterials.Clear();
+
+		if ( m_starShader == null )
+		{
+			m_starShader = Resources.Load<Shader>( "Shaders/Starfield Star" );
+		}
 
 		if ( starfields.Length > 0 )
 			m_starfields = starfields;
@@ -65,8 +115,26 @@ public class InfiniteStarfield : MonoBehaviour
 			main.maxParticles = starfield.m_maxParticles;
 			main.startSize = starfield.m_startSize;
 			main.startColor = starfield.m_color;
-			var partRend = ps.GetComponent<Renderer>();
-			partRend.material = starfield.m_mat;
+			var partRend = ps.GetComponent<ParticleSystemRenderer>();
+
+			if ( m_starShader != null )
+			{
+				// each star drawn by the star shader: a core, a halo, a glint for a bright one, and a twinkle (which needs the particle's stable random numbers)
+				var material = new Material( m_starShader );
+				material.name = "Starfield Star " + i;
+				m_starMaterials.Add( material );
+
+				partRend.sharedMaterial = material;
+				partRend.SetActiveVertexStreams( new List<ParticleSystemVertexStream> { ParticleSystemVertexStream.Position, ParticleSystemVertexStream.Color, ParticleSystemVertexStream.UV, ParticleSystemVertexStream.StableRandomXY } );
+			}
+			else
+			{
+				// the layer's own sprite material, as before
+				partRend.material = starfield.m_mat;
+			}
+
+			// the size, brightness, colour and glint of each star come from a random sequence of their own (the game's random numbers are drawn exactly as before)
+			var starRandom = new System.Random( 1986 + i * 7919 );
 
 			Vector3 startingPosition, bounds;
 			if (m_yIsUp)
@@ -88,12 +156,76 @@ public class InfiniteStarfield : MonoBehaviour
 				m_particles[ i ][ j ].startSize = main.startSize.Evaluate( 0.0f );
 				m_particles[ i ][ j ].rotation = Random.value * 360f;
 				m_particles[ i ][ j ].startLifetime = m_particles[ i ][ j ].remainingLifetime = float.MaxValue;
+
+				if ( m_starShader != null )
+				{
+					MakeStar( ref m_particles[ i ][ j ], starfield, starRandom );
+				}
 			}
 			
 			ps.SetParticles( m_particles[ i ],  m_particles[ i ].Length );
 		}
 	}
 	
+	// give a star its own size, brightness, colour and glint: many faint stars and few bright ones, as in a real sky
+	static void MakeStar( ref ParticleSystem.Particle particle, Starfield starfield, System.Random starRandom )
+	{
+		var magnitude = ( float ) starRandom.NextDouble();
+
+		// brightness and size rise steeply towards the brightest few
+		var brightness = Mathf.Lerp( c_faintest, 1.0f, Mathf.Pow( magnitude, 3.0f ) );
+		var size = Mathf.Lerp( c_smallest, c_largest, Mathf.Pow( magnitude, 2.0f ) );
+
+		// the brightest few have a glint, stronger the brighter they are, and a bigger quad for it
+		var glint = 0.0f;
+
+		if ( magnitude > 1.0f - c_glintShare )
+		{
+			glint = Mathf.Clamp01( ( magnitude - ( 1.0f - c_glintShare ) ) / c_glintShare * 0.7f + 0.3f );
+			size *= c_glintRoom;
+		}
+
+		// the star's own colour, tinted by its layer
+		var pick = ( float ) starRandom.NextDouble();
+		var color = c_starColors[ c_starColors.Length - 1 ];
+
+		for ( var k = 0; k < c_starColors.Length; k++ )
+		{
+			if ( pick < c_starColorShares[ k ] )
+			{
+				color = c_starColors[ k ];
+				break;
+			}
+
+			pick -= c_starColorShares[ k ];
+		}
+
+		color = color * Color.Lerp( Color.white, starfield.m_color, c_layerTint ) * brightness;
+		color.a = glint;
+
+		particle.startColor = color;
+		particle.startSize = starfield.m_startSize * size * c_quadRoom;
+
+		// a glint lies along the screen's axes, so the star is not turned
+		particle.rotation = 0.0f;
+
+		// its stable random numbers, which the shader uses for its twinkle
+		particle.randomSeed = ( uint ) starRandom.Next();
+	}
+
+	void OnDestroy()
+	{
+		foreach ( var material in m_starMaterials )
+		{
+			if ( material != null )
+			{
+				Destroy( material );
+			}
+		}
+
+		m_starMaterials.Clear();
+	}
+
 	void LateUpdate()
 	{
 		if ( m_lastPosition != transform.position )
