@@ -256,7 +256,8 @@ public class AnalysisButton : ShipButton
 			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
 
 			// complain to the player
-			text = "<color=white>I need a current senor reading.</color>";
+			// (the original's ANALYZE-OV: "I NEED A CURRENT SENSOR READING.")
+			text = "<color=white>I need a current sensor reading.</color>";
 		}
 
 		// update the messages text
