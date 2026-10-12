@@ -62,13 +62,17 @@ public class UIKitTheme : ScriptableObject
 	public Color m_accentPrimary = Hex( 0x3DE6FF );
 	public Color m_accentPrimaryStrong = Hex( 0x00C8F0 );
 	public Color m_accentPrimaryDim = Hex( 0x007A99 );
-	public Color m_accentSecondary = Hex( 0xFF4FD8 );
+	public Color m_accentSecondary = Hex( 0xFFB84D );
 
 	[Header( "Status" )]
 	public Color m_statusShield = Hex( 0x3DE6FF );
 	public Color m_statusArmor = Hex( 0xFFB84D );
 	public Color m_statusFuel = Hex( 0x4DFFA6 );
 	public Color m_statusDanger = Hex( 0xFF5A6A );
+
+	[Header( "Sensor window" )]
+	// the window the sensor pictures are drawn on: steel blue, light enough that a vessel's black silhouette stands out on it (the original's was magenta; the owner chose steel blue on 2026-10-11)
+	public Color m_sensorWindow = Hex( 0x2E4A73 );
 
 	[Header( "Text styles" )]
 	public TextStyle m_displayXL = new TextStyle { m_size = 48.0f, m_characterSpacing = 4.0f };
@@ -87,6 +91,100 @@ public class UIKitTheme : ScriptableObject
 	public Sprite m_barSprite;
 	public Sprite m_diamondSprite;
 	public Sprite m_diamondOutlineSprite;
+
+	[Header( "Console button bullets (coloured, made from the colours above by the rebuild)" )]
+	public Sprite m_bulletOffSprite;
+	public Sprite m_bulletOnSprite;
+	public Sprite m_bulletActiveSprite;
+
+	// the kit's colour roles, by name (Keep leaves a colour as it is)
+	public enum ColorRole
+	{
+		Keep,
+		BackgroundApp, BackgroundPanel, BackgroundRaised, BackgroundHover,
+		BorderSubtle, BorderDefault, BorderAccent, BorderAlert,
+		TextPrimary, TextSecondary, TextMuted, TextAccent, TextOnAccent, TextAlert, TextWarning,
+		AccentPrimary, AccentPrimaryStrong, AccentPrimaryDim, AccentSecondary,
+		StatusShield, StatusArmor, StatusFuel, StatusDanger,
+		SensorWindow
+	}
+
+	// the kit's text styles, by name
+	public enum TextStyleRole
+	{
+		None, DisplayXL, HeadingL, HeadingM, LabelM, LabelS, BodyM, ReadoutL, ReadoutM
+	}
+
+	// the kit's sprites, by name
+	public enum SpriteRole
+	{
+		None, Panel, PanelOutline, Glow, Bar, Diamond, DiamondOutline
+	}
+
+	// returns the colour of a role (white for Keep, which callers do not apply)
+	public Color GetColor( ColorRole role )
+	{
+		switch ( role )
+		{
+			case ColorRole.BackgroundApp: return m_backgroundApp;
+			case ColorRole.BackgroundPanel: return m_backgroundPanel;
+			case ColorRole.BackgroundRaised: return m_backgroundRaised;
+			case ColorRole.BackgroundHover: return m_backgroundHover;
+			case ColorRole.BorderSubtle: return m_borderSubtle;
+			case ColorRole.BorderDefault: return m_borderDefault;
+			case ColorRole.BorderAccent: return m_borderAccent;
+			case ColorRole.BorderAlert: return m_borderAlert;
+			case ColorRole.TextPrimary: return m_textPrimary;
+			case ColorRole.TextSecondary: return m_textSecondary;
+			case ColorRole.TextMuted: return m_textMuted;
+			case ColorRole.TextAccent: return m_textAccent;
+			case ColorRole.TextOnAccent: return m_textOnAccent;
+			case ColorRole.TextAlert: return m_textAlert;
+			case ColorRole.TextWarning: return m_textWarning;
+			case ColorRole.AccentPrimary: return m_accentPrimary;
+			case ColorRole.AccentPrimaryStrong: return m_accentPrimaryStrong;
+			case ColorRole.AccentPrimaryDim: return m_accentPrimaryDim;
+			case ColorRole.AccentSecondary: return m_accentSecondary;
+			case ColorRole.StatusShield: return m_statusShield;
+			case ColorRole.StatusArmor: return m_statusArmor;
+			case ColorRole.StatusFuel: return m_statusFuel;
+			case ColorRole.StatusDanger: return m_statusDanger;
+			case ColorRole.SensorWindow: return m_sensorWindow;
+			default: return Color.white;
+		}
+	}
+
+	// returns the text style of a role (null for None)
+	public TextStyle GetTextStyle( TextStyleRole role )
+	{
+		switch ( role )
+		{
+			case TextStyleRole.DisplayXL: return m_displayXL;
+			case TextStyleRole.HeadingL: return m_headingL;
+			case TextStyleRole.HeadingM: return m_headingM;
+			case TextStyleRole.LabelM: return m_labelM;
+			case TextStyleRole.LabelS: return m_labelS;
+			case TextStyleRole.BodyM: return m_bodyM;
+			case TextStyleRole.ReadoutL: return m_readoutL;
+			case TextStyleRole.ReadoutM: return m_readoutM;
+			default: return null;
+		}
+	}
+
+	// returns the sprite of a role (null for None)
+	public Sprite GetSprite( SpriteRole role )
+	{
+		switch ( role )
+		{
+			case SpriteRole.Panel: return m_panelSprite;
+			case SpriteRole.PanelOutline: return m_panelOutlineSprite;
+			case SpriteRole.Glow: return m_glowSprite;
+			case SpriteRole.Bar: return m_barSprite;
+			case SpriteRole.Diamond: return m_diamondSprite;
+			case SpriteRole.DiamondOutline: return m_diamondOutlineSprite;
+			default: return null;
+		}
+	}
 
 	// the loaded theme
 	static UIKitTheme s_instance;

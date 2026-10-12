@@ -32,6 +32,24 @@ public static class UIKitBuilder
 		return characters.ToString();
 	}
 
+	// true while Remake Font Assets runs
+	static bool s_remakeFonts;
+
+	[MenuItem( "Starflight Remake/UI Kit/Remake Font Assets" )]
+	public static void RemakeFontAssets()
+	{
+		s_remakeFonts = true;
+
+		try
+		{
+			Rebuild();
+		}
+		finally
+		{
+			s_remakeFonts = false;
+		}
+	}
+
 	[MenuItem( "Starflight Remake/UI Kit/Rebuild" )]
 	public static void Rebuild()
 	{
@@ -78,10 +96,73 @@ public static class UIKitBuilder
 		theme.m_diamondSprite = diamond;
 		theme.m_diamondOutlineSprite = diamondOutline;
 
+		// the console button bullets take their colours from the theme: an outline for a button that is off, filled for the selected one, glowing for the one that runs
+		theme.m_bulletOffSprite = MakeBullet( "UI Kit - Bullet Off.png", theme.m_textMuted, 0.0f, report );
+		theme.m_bulletOnSprite = MakeBullet( "UI Kit - Bullet On.png", theme.m_accentPrimary, 1.0f, report );
+		theme.m_bulletActiveSprite = MakeBullet( "UI Kit - Bullet Active.png", theme.m_accentPrimary, 2.0f, report );
+
 		EditorUtility.SetDirty( theme );
 		AssetDatabase.SaveAssets();
 
 		Debug.Log( "UI kit rebuilt\n" + report );
+	}
+
+	// draws a console button bullet: a diamond 15 pixels from its centre to a corner (at 2x), in this colour
+	// (fill 0 is an outline 3 pixels wide, 1 is filled, 2 is filled with a glow around it)
+	static Sprite MakeBullet( string fileName, Color color, float fill, System.Text.StringBuilder report )
+	{
+		const int size = 48;
+		const float centre = size / 2.0f;
+		const float radius = 15.0f;
+		var pixels = new Color32[ size * size ];
+
+		for ( var y = 0; y < size; y++ )
+		{
+			for ( var x = 0; x < size; x++ )
+			{
+				var coverage = 0.0f;
+				var glow = 0.0f;
+
+				// 4 x 4 samples per pixel
+				for ( var sy = 0; sy < 4; sy++ )
+				{
+					for ( var sx = 0; sx < 4; sx++ )
+					{
+						var distance = Mathf.Abs( x + ( sx + 0.5f ) / 4.0f - centre ) + Mathf.Abs( y + ( sy + 0.5f ) / 4.0f - centre );
+						var inside = ( fill > 0.0f ) ? ( distance <= radius ) : ( ( distance <= radius ) && ( distance > radius - 3.0f ) );
+
+						coverage += inside ? 1.0f : 0.0f;
+
+						if ( ( fill > 1.0f ) && ( distance > radius ) )
+						{
+							glow += Mathf.Pow( Mathf.Clamp01( 1.0f - ( distance - radius ) / 8.0f ), 2.0f ) * 0.55f;
+						}
+					}
+				}
+
+				coverage /= 16.0f;
+				glow /= 16.0f;
+
+				// the running bullet is brighter at the centre
+				var c = ( fill > 1.0f ) ? Color.Lerp( color, Color.white, 0.35f ) : color;
+
+				c.a = Mathf.Clamp01( coverage + glow * ( 1.0f - coverage ) );
+
+				pixels[ y * size + x ] = c;
+			}
+		}
+
+		var texture = new Texture2D( size, size, TextureFormat.RGBA32, false );
+
+		texture.SetPixels32( pixels );
+		texture.Apply();
+
+		File.WriteAllBytes( c_spriteFolder + "/" + fileName, texture.EncodeToPNG() );
+		Object.DestroyImmediate( texture );
+
+		AssetDatabase.ImportAsset( c_spriteFolder + "/" + fileName );
+
+		return ImportSprite( fileName, Vector4.zero, report );
 	}
 
 	// makes (or remakes) the TextMesh Pro font asset next to a font file, holding the kit's characters, and fixes it so that it never changes at runtime
@@ -96,8 +177,16 @@ public static class UIKitBuilder
 		}
 
 		var assetPath = Path.ChangeExtension( fontPath, null ) + " SDF.asset";
+		var existing = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>( assetPath );
 
-		if ( AssetDatabase.LoadAssetAtPath<TMP_FontAsset>( assetPath ) != null )
+		// an existing font asset is kept (remaking it rewrites 2 MB of atlas), unless the fonts are being remade on purpose
+		if ( ( existing != null ) && !s_remakeFonts )
+		{
+			report.AppendLine( existing.name + ": kept" );
+			return existing;
+		}
+
+		if ( existing != null )
 		{
 			AssetDatabase.DeleteAsset( assetPath );
 		}
