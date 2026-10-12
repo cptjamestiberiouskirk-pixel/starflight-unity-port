@@ -3777,6 +3777,23 @@ public class ClaudeProbe : MonoBehaviour
 		buttonController.ActivateButton();
 	}
 
+	// where a scenario puts a deposit beside the terrain vehicle: in reach of the Cargo button (a pickup reaches 10, TerrainElement) and clear of the vehicle,
+	// since every deposit pushes a vehicle it touches (TerrainVehicleCollider): the vehicle jumps back and forth every other frame, and now and then it keeps the
+	// push and moves away, which took a deposit 2 in front of it out of reach in some runs of the cargo scenario. The vehicle is a capsule that reaches 4.9 ahead
+	// of its middle and 2.2 to its sides, and a deposit is a sphere of up to 3.8 (Lead on planet 90) whose middle is up to 0.5 from where it stands, so nothing
+	// in front of the vehicle is both in reach and clear of it: the deposit goes 8 to its right
+	static Vector3 BesideTheVehicle( TerrainVehicle terrainVehicle )
+	{
+		var toTheRight = Vector3.Cross( Vector3.up, DataController.m_instance.m_playerData.m_general.m_currentDirection );
+
+		if ( toTheRight.sqrMagnitude < 0.0001f )
+		{
+			toTheRight = Vector3.right;
+		}
+
+		return terrainVehicle.transform.position + toTheRight.normalized * 8.0f;
+	}
+
 	// how much of an element the terrain vehicle is carrying
 	static int TerrainVehicleCargo( int elementId )
 	{
@@ -3845,7 +3862,7 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		deposit.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		deposit.transform.position = BesideTheVehicle( terrainVehicle );
 
 		var elementId = deposit.m_elementId;
 		var volume = deposit.m_volume;
@@ -6371,6 +6388,9 @@ public class ClaudeProbe : MonoBehaviour
 			yield break;
 		}
 
+		// where the terrain vehicle stands: nothing in the scenario moves it
+		var vehicleStart = playerData.m_general.m_coordinates;
+
 		// everything out of reach, then one deposit of 3 tenths next to the vehicle
 		foreach ( var other in deposits )
 		{
@@ -6383,7 +6403,7 @@ public class ClaudeProbe : MonoBehaviour
 		var first = deposits[ 0 ];
 
 		first.m_volume = 3;
-		first.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		first.transform.position = BesideTheVehicle( terrainVehicle );
 
 		new TVCargoButton().Execute();
 
@@ -6411,7 +6431,7 @@ public class ClaudeProbe : MonoBehaviour
 		playerData.m_terrainVehicle.AddElement( second.m_elementId, playerData.m_terrainVehicle.GetRemainingVolume() - 1 );
 
 		second.m_volume = 4;
-		second.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		second.transform.position = BesideTheVehicle( terrainVehicle );
 
 		var cargoBefore = TerrainVehicleCargo( second.m_elementId );
 
@@ -6436,6 +6456,11 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "cargo: a deposit that does not fit is left with what the hold could not take", ( cargoAfterPartial - cargoBefore == 1 ) && secondIsStillThere && ( secondVolume == 3 ) && partialMessage.Contains( "0.3 cubic meters are left" ), "took " + ( cargoAfterPartial - cargoBefore ) + ", still there " + secondIsStillThere + " with " + secondVolume + " tenths | " + partialMessage );
 		Check( "cargo: nothing is taken from it with a full hold", ( cargoAfterFull == cargoAfterPartial ) && fullMessage.Contains( "full" ), "took " + ( cargoAfterFull - cargoAfterPartial ) + " | " + fullMessage );
+
+		// the checks above need the deposits in reach, and the vehicle stands still: if it has moved, something pushed it (the deposits it touches did, see BesideTheVehicle)
+		var vehicleMoved = Vector2.Distance( new Vector2( vehicleStart.x, vehicleStart.z ), new Vector2( playerData.m_general.m_coordinates.x, playerData.m_general.m_coordinates.z ) );
+
+		Check( "cargo: the terrain vehicle stands where it was put down", vehicleMoved < 0.01f, "moved " + vehicleMoved.ToString( "F3" ) + " from " + vehicleStart.ToString( "F2" ) + " to " + playerData.m_general.m_coordinates.ToString( "F2" ) );
 
 		Finish( "scenario=cargo shipList=[" + volumeColumn + "] size=" + expectedSmall + "/" + expectedLarge + " pickup=" + cargoAfterFirst + " partial=" + ( cargoAfterPartial - cargoBefore ) + "/" + secondIsStillThere + "/" + secondVolume + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
@@ -7535,7 +7560,7 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		near.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		near.transform.position = BesideTheVehicle( terrainVehicle );
 		far.transform.position = terrainVehicle.transform.position + Vector3.forward * 20.0f;
 
 		var nearName = near.GetElementName();
@@ -7559,7 +7584,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var labelsInTheVehicle = LabelsShowing();
 
-		Log( "terrain: scan with " + nearName + " 2 away and " + farName + " 20 away: " + scanBefore );
+		Log( "terrain: scan with " + nearName + " 8 away and " + farName + " 20 away: " + scanBefore );
 		Log( "terrain: pickup: " + pickupMessage + " | scan right after it: " + scanDuring );
 
 		var countedBefore = scanBefore.Contains( expectedBefore );
@@ -9592,7 +9617,7 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		deposits[ 0 ].transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		deposits[ 0 ].transform.position = BesideTheVehicle( terrainVehicle );
 
 		return true;
 	}
@@ -10527,7 +10552,7 @@ public class ClaudeProbe : MonoBehaviour
 		var first = deposits[ 0 ];
 		var firstVolume = first.m_volume;
 
-		first.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		first.transform.position = BesideTheVehicle( terrainVehicle );
 
 		new TVCargoButton().Execute();
 
@@ -10545,7 +10570,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		for ( var i = 1; ( i < deposits.Length ) && ( i < 700 ) && ( playerData.m_terrainVehicle.GetRemainingVolume() > 0 ); i++ )
 		{
-			deposits[ i ].transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+			deposits[ i ].transform.position = BesideTheVehicle( terrainVehicle );
 
 			new TVCargoButton().Execute();
 
@@ -10560,7 +10585,7 @@ public class ClaudeProbe : MonoBehaviour
 		var holdUsed = holdSize - playerData.m_terrainVehicle.GetRemainingVolume();
 
 		// one more press with the hold full and a fresh deposit in reach
-		deposits[ deposits.Length - 1 ].transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		deposits[ deposits.Length - 1 ].transform.position = BesideTheVehicle( terrainVehicle );
 
 		new TVCargoButton().Execute();
 
@@ -13035,7 +13060,7 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		// ---- 1. all of the first deposit, through the real Cargo button
-		whole.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		whole.transform.position = BesideTheVehicle( terrainVehicle );
 
 		new TVCargoButton().Execute();
 
@@ -13048,7 +13073,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		playerData.m_terrainVehicle.AddElement( part.m_elementId, room - 10 );
 
-		part.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		part.transform.position = BesideTheVehicle( terrainVehicle );
 
 		new TVCargoButton().Execute();
 
