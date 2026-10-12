@@ -961,6 +961,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioShippedMoods();
 				break;
 
+			case "lineactions":
+				yield return ScenarioLineActions();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -1102,9 +1106,6 @@ public class ClaudeProbe : MonoBehaviour
 		var playerData = DataController.m_instance.m_playerData;
 		var gameData = DataController.m_instance.m_gameData;
 
-		// a crew in every role, as a launched ship always has (what the aliens say names the captain, and with no captain a hail threw)
-		EnsureCrew();
-
 		// star system encounters are the ones that come in waves (6 ships, 3 at a time)
 		var encounterId = FindEncounter( 1, 6, 3, 0 );
 
@@ -1158,9 +1159,6 @@ public class ClaudeProbe : MonoBehaviour
 	{
 		var playerData = DataController.m_instance.m_playerData;
 		var combatController = CombatController.m_instance;
-
-		// a crew in every role, as a launched ship always has (what the aliens say names the captain, and with no captain a hail threw)
-		EnsureCrew();
 
 		var firstId = FindEncounter( 1, 6, 3, 0 );
 		var secondId = FindEncounter( 1, 6, 3, 1 );
@@ -10107,9 +10105,6 @@ public class ClaudeProbe : MonoBehaviour
 		var controller = SpaceflightController.m_instance;
 		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
 
-		// a crew in every role, as a launched ship always has (what the aliens say names the captain, and with no captain a hail threw)
-		EnsureCrew();
-
 		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "debris-pictures" ) );
 		var camera = Camera.main;
 
@@ -13879,9 +13874,6 @@ public class ClaudeProbe : MonoBehaviour
 		var encounter = SpaceflightController.m_instance.m_encounter;
 		var templates = encounter.m_alienShipModelTemplate;
 		var debrisTemplates = encounter.m_alienShipDebrisTemplate;
-
-		// a crew in every role, as a launched ship always has (what the aliens say names the captain, and with no captain a hail threw)
-		EnsureCrew();
 
 		Check( "a model slot for every vessel", templates.Length == gameData.m_vesselList.Length, "slots=" + templates.Length + " vessels=" + gameData.m_vesselList.Length );
 		Check( "a debris slot for every vessel", ( debrisTemplates != null ) && ( debrisTemplates.Length == gameData.m_vesselList.Length ), "slots=" + ( ( debrisTemplates == null ) ? -1 : debrisTemplates.Length ) );
@@ -19642,24 +19634,43 @@ public class ClaudeProbe : MonoBehaviour
 
 		controller.m_encounterRange = 0.0f;
 
-		// ---- 1. a Minstrel: once the comm link is up, its seven verses in order, and then the link ends
+		// ---- 1. a Minstrel: once the comm link is up, the first two verses (the second ends the link, as every second verse does in the shipped game), and at the
+		// next meeting the next two
+		var minstrelId = FindEncounterOfRace( GameData.Race.Minstrel );
 		var minstrel = new List<string>();
 
-		yield return MeetAndConnect( FindEncounterOfRace( GameData.Race.Minstrel ), GD_Comm.Stance.Friendly, minstrel );
-		yield return LetAliensSpeak( 8, minstrel );
+		yield return MeetAndConnect( minstrelId, GD_Comm.Stance.Friendly, minstrel );
+		yield return LetAliensSpeak( 3, minstrel );
 
 		var minstrelConnected = encounter.m_pdEncounter.m_connected;
 
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 2. a Nomad probe: its six planetary reports in order, and then the link ends
+		var minstrelAgain = new List<string>();
+
+		yield return MeetAndConnect( minstrelId, GD_Comm.Stance.Friendly, minstrelAgain );
+		yield return LetAliensSpeak( 2, minstrelAgain );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 2. a Nomad probe: its first planetary report, which ends the link, and at the next meeting the second
+		var nomadId = FindEncounterOfRace( GameData.Race.NomadProbe );
 		var nomad = new List<string>();
 
-		yield return MeetAndConnect( FindEncounterOfRace( GameData.Race.NomadProbe ), GD_Comm.Stance.Friendly, nomad );
-		yield return LetAliensSpeak( 7, nomad );
+		yield return MeetAndConnect( nomadId, GD_Comm.Stance.Friendly, nomad );
+		yield return LetAliensSpeak( 2, nomad );
 
 		var nomadConnected = encounter.m_pdEncounter.m_connected;
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		var nomadAgain = new List<string>();
+
+		yield return MeetAndConnect( nomadId, GD_Comm.Stance.Friendly, nomadAgain );
+		yield return LetAliensSpeak( 1, nomadAgain );
 
 		LeaveEncounter();
 		yield return Frames( 10 );
@@ -19722,10 +19733,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		controller.m_encounterRange = encounterRange;
 
-		Log( "transmissions: minstrel " + string.Join( " | ", minstrel ) + " (connected after " + minstrelConnected + ") || nomad " + string.Join( " | ", nomad ) + " (connected after " + nomadConnected + ") || noah 9 begun " + noahBegun + ": " + string.Join( " | ", noah ) + " (connected after " + noahConnected + ")" );
+		Log( "transmissions: minstrel " + string.Join( " | ", minstrel ) + " (connected after " + minstrelConnected + ") then " + string.Join( " | ", minstrelAgain ) + " || nomad " + string.Join( " | ", nomad ) + " (connected after " + nomadConnected + ") then " + string.Join( " | ", nomadAgain ) + " || noah 9 begun " + noahBegun + ": " + string.Join( " | ", noah ) + " (connected after " + noahConnected + ")" );
 
-		Check( "transmissions: a Minstrel sings its seven verses in order once the comm link is up, and then ends the link", InOrder( minstrel, 1, 504, 505, 506, 507, 508, 509, 510 ) && !minstrelConnected, string.Join( " | ", minstrel ) );
-		Check( "transmissions: a Nomad probe sends its six planetary reports in order, and then ends the link", InOrder( nomad, 1, 188, 189, 190, 191, 192, 193 ) && !nomadConnected, string.Join( " | ", nomad ) );
+		Check( "transmissions: a Minstrel sings two verses once the comm link is up and ends the link, and the next two at the next meeting, as the original", InOrder( minstrel, 1, 504, 505 ) && !minstrel[ 3 ].Contains( CommText( 506 ) ) && !minstrelConnected && InOrder( minstrelAgain, 1, 506, 507 ), string.Join( " | ", minstrel ) + " || " + string.Join( " | ", minstrelAgain ) );
+		Check( "transmissions: a Nomad probe sends one planetary report and ends the link, and the next at the next meeting, as the original", InOrder( nomad, 1, 188 ) && !nomad[ 2 ].Contains( CommText( 189 ) ) && !nomadConnected && InOrder( nomadAgain, 1, 189 ), string.Join( " | ", nomad ) + " || " + string.Join( " | ", nomadAgain ) );
 		Check( "transmissions: the Noah 9 derelict sends its distress beacon, and once answered its recorded message, and then ends the link", noahBegun && ( noah[ 0 ].Contains( "distress beacon signal" ) || SaysOneOf( noah[ 0 ], 556 ) ) && InOrder( noah, 1, 551, 552 ) && !noahConnected, string.Join( " | ", noah ) );
 
 		Finish( "scenario=transmissions minstrel=" + minstrel.Count + " nomad=" + nomad.Count + " noah=" + noah.Count, 0 );
@@ -24565,6 +24576,106 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "shippedmoods: the Mysterions start friendly and their shields are lowered, as the original's Analysis", ( mysterionStance == GD_Comm.Stance.Friendly ) && mysterionAnalysis.Contains( "equivalent lowered" ), mysterionStance + ": " + mysterionAnalysis );
 
 		Finish( "scenario=shippedmoods", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 2: what the aliens' lines and the player's answers do, by the shipped game's numbers
+
+	// a comm of the game data by its id (null if there is none)
+	static GD_Comm CommById( int commId )
+	{
+		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
+		{
+			if ( comm.m_id == commId )
+			{
+				return comm;
+			}
+		}
+
+		return null;
+	}
+
+	IEnumerator ScenarioLineActions()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+
+		// an officer who understands every word, and a weak ship with its shields down and its weapons not armed (so aliens that turn to fight fight)
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+
+		ship.m_armorPoints = 250;
+		ship.m_shieldPoints = 0;
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+
+		var encounterRange = SpaceflightController.m_instance.m_encounterRange;
+
+		SpaceflightController.m_instance.m_encounterRange = 0.0f;
+
+		var veloxId = FindEncounterOfRace( GameData.Race.Velox );
+
+		// ---- 1. the Veloxi ask "Of course Veloxi are superior all the time. Agreeing?" (407): No angers them by 10 (its DEDLN)
+		yield return MeetWithMood( veloxId, 44.0f );
+
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		encounter.AddComm( GD_Comm.Subject.Question, false, CommById( 407 ) );
+
+		new AnswerNoButton().Execute();
+
+		var moodAfterNo = encounter.m_pdEncounter.m_mood;
+
+		// ---- 2. "You are coming to worship of illustrious queen of Veloxi grand lovely?" (405): Yes calms them by 4 (its DEDLY)
+		encounter.m_pdEncounter.m_mood = 44.0f;
+
+		encounter.AddComm( GD_Comm.Subject.Question, false, CommById( 405 ) );
+
+		new AnswerYesButton().Execute();
+
+		var moodAfterYes = encounter.m_pdEncounter.m_mood;
+
+		// ---- 3. the control: a Veloxi statement whose action is nothing (409) leaves their mood as it was
+		encounter.m_pdEncounter.m_mood = 44.0f;
+
+		encounter.AddComm( GD_Comm.Subject.Statement, false, CommById( 409 ) );
+
+		var moodAfterStatement = encounter.m_pdEncounter.m_mood;
+
+		LeaveEncounter();
+
+		yield return Frames( 10 );
+
+		// ---- 4. the Spemin's "Enough jabbering. It is time for a glorious Spemin victory!" (200) adds 100 to their mood: the link ends and they fight
+		var said = new List<string>();
+
+		yield return MeetAndConnect( FindEncounter( 1, 6, 3, 0 ), GD_Comm.Stance.Friendly, said );
+
+		encounter.m_pdEncounter.m_mood = 10.0f;
+
+		encounter.AddComm( GD_Comm.Subject.Terminate, false, CommById( 200 ) );
+
+		yield return Frames( 3 );
+
+		var speminMood = encounter.m_pdEncounter.m_mood;
+		var speminConnected = encounter.m_pdEncounter.m_connected;
+		var speminStance = encounter.m_pdEncounter.m_alienStance;
+
+		ClearMissiles();
+		LeaveEncounter();
+
+		yield return Frames( 10 );
+
+		SpaceflightController.m_instance.m_encounterRange = encounterRange;
+
+		Log( "lineactions: veloxi mood after No to 407 " + moodAfterNo + ", after Yes to 405 " + moodAfterYes + ", after statement 409 " + moodAfterStatement + " | spemin after 200: mood " + speminMood + ", connected " + speminConnected + ", stance " + speminStance );
+
+		Check( "lineactions: No to the Veloxi's \"Veloxi are superior ... Agreeing?\" angers them by 10, as the original", moodAfterNo == 54.0f, moodAfterNo.ToString() );
+		Check( "lineactions: Yes to the Veloxi's \"coming to worship of illustrious queen\" calms them by 4, as the original", moodAfterYes == 40.0f, moodAfterYes.ToString() );
+		Check( "lineactions: the Spemin's \"glorious Spemin victory\" ends the comm link and brings them to fight, as the original", ( speminMood == 100.0f ) && !speminConnected && ( speminStance == GD_Comm.Stance.Hostile ), speminMood + ", " + speminConnected + ", " + speminStance );
+		Check( "lineactions: a line with no action leaves the aliens' mood as it was (control)", moodAfterStatement == 44.0f, moodAfterStatement.ToString() );
+
+		Finish( "scenario=lineactions", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
