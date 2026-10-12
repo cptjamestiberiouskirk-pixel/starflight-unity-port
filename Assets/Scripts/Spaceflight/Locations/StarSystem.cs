@@ -27,9 +27,38 @@ public class StarSystem : MonoBehaviour
 	// true while the ship is within orbital range of a planet (leaving it is reported, as the original's "OUTSIDE ORBITAL RANGE")
 	bool m_inOrbitalRange;
 
+	// the light of the star: a directional light, made in Awake, that lights only the star system's own objects (the planets and their atmospheres); the
+	// scene's sunlight still lights the ship from high above the star, as it always has, so that the ship can be seen from the camera above it
+	Light m_starlight;
+
 	// unity awake
 	void Awake()
 	{
+		// the scene's sunlight is a child of the star system
+		var sunlightTransform = transform.Find( "Sunlight" );
+
+		if ( ( sunlightTransform == null ) || !sunlightTransform.TryGetComponent( out Light sunlight ) )
+		{
+			return;
+		}
+
+		// the light of the star lights the star system's layer, and the sunlight everything else it lit
+		var starSystemLayerMask = 1 << gameObject.layer;
+
+		var starlightObject = new GameObject( "Starlight" );
+
+		starlightObject.layer = gameObject.layer;
+		starlightObject.transform.SetParent( transform, false );
+
+		m_starlight = starlightObject.AddComponent<Light>();
+
+		m_starlight.type = LightType.Directional;
+		m_starlight.intensity = sunlight.intensity;
+		m_starlight.shadows = sunlight.shadows;
+		m_starlight.renderMode = sunlight.renderMode;
+		m_starlight.cullingMask = starSystemLayerMask;
+
+		sunlight.cullingMask &= ~starSystemLayerMask;
 	}
 
 	// unity start
@@ -205,6 +234,36 @@ public class StarSystem : MonoBehaviour
 		SpaceflightController.m_instance.m_gameIsPaused = true;
 	}
 
+	// unity late update (after the ship has moved)
+	void LateUpdate()
+	{
+		PointStarlight();
+	}
+
+	// the light of the star shines from the middle of the star, in the plane of the orbits, toward the ship: the planets in view are near the ship, so each of
+	// them is lit on the side that faces its star and dark on the other, and its atmosphere glows on that side (the shader takes the sun's direction from the
+	// main directional light); straight down while the ship is over the star
+	void PointStarlight()
+	{
+		if ( m_starlight == null )
+		{
+			return;
+		}
+
+		var fromStar = SpaceflightController.m_instance.m_playerShip.transform.position - transform.position;
+
+		fromStar.y = 0.0f;
+
+		if ( fromStar.sqrMagnitude > 1.0f )
+		{
+			m_starlight.transform.rotation = Quaternion.LookRotation( fromStar.normalized, Vector3.up );
+		}
+		else
+		{
+			m_starlight.transform.rotation = Quaternion.LookRotation( Vector3.down, Vector3.forward );
+		}
+	}
+
 	// call this to hide the starsystem objects
 	public void Hide()
 	{
@@ -271,6 +330,14 @@ public class StarSystem : MonoBehaviour
 
 		// change the color of the sun (the colour of real stars of its class, the same as the system map's star)
 		m_shine.SetColor( SystemDisplay.GetStarColor( m_currentStar.m_class ) );
+
+		// the light of the star has its colour, and comes from it
+		if ( m_starlight != null )
+		{
+			m_starlight.color = SystemDisplay.GetStarColor( m_currentStar.m_class );
+		}
+
+		PointStarlight();
 
 		// turn off all the planets
 		for ( var i = 0; i < GD_Star.c_maxNumPlanets; i++ )
