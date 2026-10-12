@@ -913,6 +913,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSystemTravel();
 				break;
 
+			case "examinetreat":
+				yield return ScenarioExamineTreat();
+				break;
+
 			case "launchconfirm":
 				yield return ScenarioLaunchConfirm();
 				break;
@@ -3622,10 +3626,10 @@ public class ClaudeProbe : MonoBehaviour
 			Check( "M20 repairs never touch a destroyed ship, a ship with no armor, or run without an engineer", ( destroyedArmor == 0 ) && ( bareHullArmor == 250 ) && ( armorWithoutEngineer == 300 ), "destroyed ship " + destroyedArmor + ", bare hull " + bareHullArmor + ", no engineer " + armorWithoutEngineer );
 		}
 
-		// ---- treat
+		// ---- treat (the player chooses who: the one hurt the most)
 		SpaceflightController.m_instance.m_messages.Clear();
 
-		new TreatButton().Execute();
+		TreatThroughTheConsole( worse );
 
 		var treatMessage = MessageList();
 		var rightAfterTreat = "Worse " + worse.m_vitality.ToString( "F0" ) + " Hurt " + hurt.m_vitality.ToString( "F0" ) + " Ashore " + ashore.m_vitality.ToString( "F0" );
@@ -3640,7 +3644,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "M20 treat message: " + treatMessage );
 
 		Check( "M20 the treat button does not heal anyone on the spot", rightAfterTreat == "Worse 20 Hurt 50 Ashore 40", rightAfterTreat );
-		Check( "M20 the doctor treats the crew member who is hurt the most, about 2 points a second at skill 100", ( worseAfter5s >= 29.0f ) && ( worseAfter5s <= 32.0f ) && ( hurtAfter5s == 50.0f ), "after 5 s Worse " + worseAfter5s.ToString( "F1" ) + ", Hurt " + hurtAfter5s.ToString( "F1" ) );
+		Check( "M20 the doctor treats the crew member chosen, about 2 points a second at skill 100", ( worseAfter5s >= 29.0f ) && ( worseAfter5s <= 32.0f ) && ( hurtAfter5s == 50.0f ), "after 5 s Worse " + worseAfter5s.ToString( "F1" ) + ", Hurt " + hurtAfter5s.ToString( "F1" ) );
 		Check( "M20 someone who is not on board is not treated", ashoreAfter5s == 40.0f, "Ashore " + ashoreAfter5s.ToString( "F1" ) + " (was 40)" );
 
 		var treat = "n/a";
@@ -3655,8 +3659,8 @@ public class ClaudeProbe : MonoBehaviour
 			var stillUnderWayWhenDone = (bool) treatmentField.GetValue( crew );
 			var doneMessage = MessageList();
 
-			// the next press picks the next patient
-			new TreatButton().Execute();
+			// the next press treats the next one chosen
+			TreatThroughTheConsole( hurt );
 
 			var nextPatient = (int) patientField.GetValue( crew );
 
@@ -3673,7 +3677,7 @@ public class ClaudeProbe : MonoBehaviour
 
 			worse.m_vitality = 0.0f;
 
-			new TreatButton().Execute();
+			TreatThroughTheConsole( worse );
 
 			var treatingTheDead = (bool) treatmentField.GetValue( crew );
 			var nobodyMessage = MessageList();
@@ -3683,8 +3687,8 @@ public class ClaudeProbe : MonoBehaviour
 			Log( "M20 treat: " + treat + " | message when done: " + doneMessage + " | message with only a dead crew member left: " + nobodyMessage );
 
 			Check( "M20 one patient per command, and the treatment stops at full health", ( worseWhenDone == 100.0f ) && ( hurtWhenWorseIsDone == 50.0f ) && !stillUnderWayWhenDone && doneMessage.Contains( "recovered" ), "Worse " + worseWhenDone.ToString( "F0" ) + ", Hurt " + hurtWhenWorseIsDone.ToString( "F0" ) + ", still under way " + stillUnderWayWhenDone );
-			Check( "M20 the next command treats the next patient, and a better doctor is faster", ( nextPatient == hurt.m_fileId ) && ( hurtAfter10sAtSkill250 == 60.0f ), "next patient file " + nextPatient + " (Hurt is " + hurt.m_fileId + "), 10 s at skill 250 took Hurt from 10 to " + hurtAfter10sAtSkill250.ToString( "F0" ) );
-			Check( "M20 a dead crew member is not treated", !treatingTheDead && nobodyMessage.Contains( "healthy" ), "treatment under way " + treatingTheDead + ", message: " + nobodyMessage );
+			Check( "M20 the next command treats the next one chosen, and a better doctor is faster", ( nextPatient == hurt.m_fileId ) && ( hurtAfter10sAtSkill250 == 60.0f ), "next patient file " + nextPatient + " (Hurt is " + hurt.m_fileId + "), 10 s at skill 250 took Hurt from 10 to " + hurtAfter10sAtSkill250.ToString( "F0" ) );
+			Check( "M20 a dead crew member is not treated", !treatingTheDead && nobodyMessage.Contains( "beyond help" ), "treatment under way " + treatingTheDead + ", message: " + nobodyMessage );
 		}
 
 		Finish( "scenario=m20 repairOnThePress=" + ( armorRightAfter - 300 ) + " repairIn5s=" + ( armorAfter5s - 300 ) + " repair=[" + repair + "] treatOnThePress=[" + rightAfterTreat + "] treatIn5s=Worse" + worseAfter5s.ToString( "F1" ) + "/Hurt" + hurtAfter5s.ToString( "F1" ) + "/Ashore" + ashoreAfter5s.ToString( "F1" ) + " treat=[" + treat + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
@@ -22736,6 +22740,188 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "systemtravel: docking at the Starport says Closing docking bay doors, as the original", ( locationDocked == PD_General.Location.DockingBay ) && docked.Contains( "Closing docking bay doors" ), locationDocked + ": " + docked );
 
 		Finish( "scenario=systemtravel", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: Examine and Treat ask who, as the original's doctor
+
+	// the button set that asks whether to stop a treatment (null before it existed)
+	static ButtonController.ButtonSet? StopTreatmentButtonSet()
+	{
+		try
+		{
+			return (ButtonController.ButtonSet) Enum.Parse( typeof( ButtonController.ButtonSet ), "StopTreatment" );
+		}
+		catch ( ArgumentException )
+		{
+			return null;
+		}
+	}
+
+	// the doctor's question is showing this crew member's name
+	static bool ChooserShows( PD_Personnel.PD_PersonnelFile crewMember )
+	{
+		return MessageList().Contains( "<color=white>" + crewMember.m_name + "</color>/Choose crewmember" );
+	}
+
+	// goes to the crew member in the doctor's question with the stick and chooses them with the fire button, as the player does - false if the name never came up
+	static bool ChooseCrewMember( PD_Personnel.PD_PersonnelFile crewMember )
+	{
+		var buttonController = SpaceflightController.m_instance.m_buttonController;
+
+		for ( var step = 0; step < 7; step++ )
+		{
+			if ( ChooserShows( crewMember ) )
+			{
+				ConsoleFrameWith( "m_submit" );
+
+				return true;
+			}
+
+			ConsoleFrameWith( "m_east" );
+
+			// (the stick back in the middle, so that the next push is a step of its own)
+			Call( buttonController, "Update" );
+		}
+
+		return false;
+	}
+
+	// Examine as the player does it: the button, then the crew member - returns the doctor's answer
+	static string ExamineThroughTheConsole( PD_Personnel.PD_PersonnelFile crewMember )
+	{
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.Medical, 0 );
+
+		ChooseCrewMember( crewMember );
+
+		return MessageList();
+	}
+
+	// Treat as the player does it: the button, Yes or No if the doctor asks whether to stop a treatment, then the crew member - returns the doctor's answer
+	static string TreatThroughTheConsole( PD_Personnel.PD_PersonnelFile crewMember, bool stopTheTreatment = true )
+	{
+		var buttonController = SpaceflightController.m_instance.m_buttonController;
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.Medical, 1 );
+
+		var stopTreatment = StopTreatmentButtonSet();
+
+		if ( ( stopTreatment != null ) && ( buttonController.GetCurrentButtonSet() == stopTreatment.Value ) )
+		{
+			PressButton( stopTreatment.Value, stopTheTreatment ? 1 : 0 );
+
+			if ( !stopTheTreatment )
+			{
+				return MessageList();
+			}
+		}
+
+		ChooseCrewMember( crewMember );
+
+		return MessageList();
+	}
+
+	IEnumerator ScenarioExamineTreat()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var crewAssignment = playerData.m_crewAssignment;
+
+		EnsureCrew();
+
+		EnterStarSystem( gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		// a crew of separate people (EnsureCrew puts one person in every role): the captain whole, the science officer at 70, the navigator at 15, the engineer
+		// dead, and a doctor of skill 100
+		playerData.m_personnel.m_personnelList.Clear();
+
+		var captain = AddPerson( "Captain", 100.0f, 100 );
+		var scienceOfficer = AddPerson( "Science", 70.0f, 100 );
+		var navigator = AddPerson( "Navigator", 15.0f, 100 );
+		var engineer = AddPerson( "Engineer", 0.0f, 100 );
+		var communicationsOfficer = AddPerson( "Comms", 100.0f, 100 );
+		var doctor = AddPerson( "Doctor", 100.0f, 100 );
+
+		engineer.m_isDead = true;
+
+		crewAssignment.Assign( PD_CrewAssignment.Role.Captain, captain.m_fileId );
+		crewAssignment.Assign( PD_CrewAssignment.Role.ScienceOfficer, scienceOfficer.m_fileId );
+		crewAssignment.Assign( PD_CrewAssignment.Role.Navigator, navigator.m_fileId );
+		crewAssignment.Assign( PD_CrewAssignment.Role.Engineer, engineer.m_fileId );
+		crewAssignment.Assign( PD_CrewAssignment.Role.CommunicationsOfficer, communicationsOfficer.m_fileId );
+		crewAssignment.Assign( PD_CrewAssignment.Role.Doctor, doctor.m_fileId );
+
+		crewAssignment.m_treatmentIsUnderWay = false;
+
+		var durability = gameData.m_crewRaceList[ scienceOfficer.m_crewRaceId ].m_durability;
+
+		// ---- Examine: the question, then the science officer
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.Medical, 0 );
+
+		var examineQuestion = MessageList();
+		var examined = ChooseCrewMember( scienceOfficer ) ? MessageList() : "(the science officer's name never came up) " + MessageList();
+		var examinedDead = ExamineThroughTheConsole( engineer );
+
+		// ---- Treat: the navigator
+		var treatNavigator = TreatThroughTheConsole( navigator );
+		var patientAfterTreat = crewAssignment.GetPatient();
+		var examinedPatient = ExamineThroughTheConsole( navigator );
+
+		// ---- Treat again: the doctor asks whether to stop - No, then Yes and the captain
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.Medical, 1 );
+
+		var stopQuestion = MessageList();
+		var stopTreatmentSet = StopTreatmentButtonSet();
+		var asked = ( stopTreatmentSet != null ) && ( SpaceflightController.m_instance.m_buttonController.GetCurrentButtonSet() == stopTreatmentSet.Value );
+
+		if ( asked )
+		{
+			PressButton( stopTreatmentSet.Value, 0 );
+		}
+
+		var continuing = MessageList();
+		var patientAfterNo = crewAssignment.GetPatient();
+
+		// Yes: the doctor stops, and asks who to treat instead (the line about stopping stands before the question until the choice)
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.Medical, 1 );
+
+		if ( asked )
+		{
+			PressButton( stopTreatmentSet.Value, 1 );
+		}
+
+		var ceasing = MessageList();
+
+		ChooseCrewMember( captain );
+
+		var treatCaptain = MessageList();
+		var underWayAfterCaptain = crewAssignment.m_treatmentIsUnderWay;
+
+		// ---- Treat the dead engineer
+		var treatEngineer = TreatThroughTheConsole( engineer );
+
+		Log( "examinetreat: Examine asks: " + examineQuestion + " | the science officer (durability " + durability + "): " + examined + " | the dead engineer: " + examinedDead );
+		Log( "examinetreat: Treat the navigator: " + treatNavigator + " | patient " + ( ( patientAfterTreat == null ) ? "none" : patientAfterTreat.m_name ) + " | Examine the navigator: " + examinedPatient );
+		Log( "examinetreat: Treat again asks (" + asked + "): " + stopQuestion + " | No: " + continuing + " | Yes: " + ceasing + " | the captain: " + treatCaptain + " (under way " + underWayAfterCaptain + ") | the engineer: " + treatEngineer );
+
+		Check( "examinetreat: Examine asks who, as the original's WHO SHOULD I EXAMINE? / CHOOSE CREWMEMBER", examineQuestion.Contains( "Who should I examine?" ) && examineQuestion.Contains( "Choose crewmember" ), examineQuestion );
+		Check( "examinetreat: the examination of the one chosen is the original's sentence", examined.Contains( scienceOfficer.m_name + " is moderately wounded, and has a vitality of 70 and a durability of " + durability + "." ) && examinedDead.Contains( engineer.m_name + " is dead." ), examined + " | " + examinedDead );
+		Check( "examinetreat: Treat starts the treatment of the one chosen, and Examine then says so", treatNavigator.Contains( "I am starting treatment on " + navigator.m_name + "." ) && ( patientAfterTreat == navigator ) && examinedPatient.Contains( navigator.m_name + " is currently being treated." ), treatNavigator + " | " + examinedPatient );
+		Check( "examinetreat: with a treatment under way Treat asks whether to stop it, and No continues it", stopQuestion.Contains( "Should I stop treating " + navigator.m_name + " to treat someone else?" ) && asked && continuing.Contains( "I am continuing treatment on " + navigator.m_name + "." ) && ( patientAfterNo == navigator ), stopQuestion + " | " + continuing );
+		Check( "examinetreat: Yes stops it and asks who instead, and a crew member who is whole or dead is not treated", ceasing.Contains( "I am ceasing treatment on " + navigator.m_name + "." ) && ceasing.Contains( "Who should I treat?" ) && treatCaptain.Contains( captain.m_name + " doesn't need medical treatment." ) && !underWayAfterCaptain && treatEngineer.Contains( engineer.m_name + " is beyond help." ), ceasing + " | " + treatCaptain + " | " + treatEngineer );
+
+		Finish( "scenario=examinetreat", 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 7: the launch's confirmation in the original's words

@@ -95,6 +95,7 @@ What the probe does:
 | `visual` | a floating object when its timer starts again, when an explosion is switched off, and how far the landing site crosshair moves in a second |
 | `screenpictures` | with `-Graphics`, the whole screen of the star system (with the system display and the status display), orbit with a real scan of the planet and its analysis, the landing map, the terrain vehicle, hyperspace away from any star, and an encounter of Spemin scouts with a real scan of one, its analysis and the comm link, into `Logs/screen-pictures/spaceflight/` (12 pictures; the folder's older pictures go first); without a graphics device it does nothing (about 70 s) |
 | `starport-screenpictures` | with `-Graphics`, the whole screen of the Starport and of each of its rooms (Operations, Personnel, Crew Assignment, Bank, Ship Configuration, Trade Depot, Docking Bay) into `Logs/screen-pictures/starport/` (about 40 s) |
+| `examinetreat` | Examine and Treat ask who, as the original's doctor: with a crew of separate people, Examine asks and gives the science officer's wound, vitality and durability and the dead engineer's death; Treat starts on the navigator, asks whether to stop that treatment, No continues it, Yes stops it and asks again, and the whole captain and the dead engineer are not treated (about 20 s) |
 | `explosionpictures` | every part of an explosion is textured and transparent, no part draws cubes, every part follows the explosion's scale, and making an explosion leaves `Random.state` alone (a control); with `-Graphics` it also renders a half size explosion and the F10 destruction of the ship at fixed game times |
 | `hitpictures` | the hull and shield hits are drawn transparent and not with the `Standard` or untextured particle shaders, a hull hit's particles are gone before it is switched off, both hits land on the side the shot came from, and making them leaves `Random.state` alone (a control); with `-Graphics` it also renders them zoomed in, alone and through `ApplyDamageToPlayer` |
 | `weaponpictures` | the laser and the missile are drawn transparent and not with the `Standard` or untextured particle shaders, a paused missile's exhaust stands still, and making them leaves `Random.state` alone (a control); with `-Graphics` it also renders a laser, a plasma bolt and a missile crossing the view |
@@ -196,7 +197,7 @@ What the probe does:
 | `lifeformpictures` | with `-Graphics`, renders the game view of planet 92 with the planet's lifeforms, then with all 17 models in a ring around the terrain vehicle, and a close-up of each model, into `Logs/lifeform-pictures/` (or `-probePictures`); without a graphics device it only lands (about 60 s) |
 | `look` | Look on planet 92 with one lifeform at a time beside the vehicle: a living plant (its body plan, not moving, alive), a test animal that wanders (wandering) and the plant made dead (dead) (about 40 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (149 scenarios, about 116 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (150 scenarios, about 117 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
