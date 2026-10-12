@@ -18271,7 +18271,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.2901961, g: 0.38431373, b: 0.5647059, a: 1}
+  m_Color: {r: 0.23921569, g: 0.9019608, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -18312,7 +18312,7 @@ MonoBehaviour:
   m_fontSize: 0
   m_lineHeight: 0
   m_sprite: 0
-  m_color: 11
+  m_color: 16
   m_alpha: 1
 --- !u!1 &516640456
 GameObject:
@@ -42912,6 +42912,7 @@ MonoBehaviour:
   - {fileID: 2090744178}
   - {fileID: 1117387106}
   m_currentOfficer: {fileID: 1729061564}
+  m_officerIcon: {fileID: 512699737}
 --- !u!1 &1138512981
 GameObject:
   m_ObjectHideFlags: 0

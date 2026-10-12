@@ -35,6 +35,7 @@ public static class UIKitSceneTool
 	const string c_right = "Main/Right/GameObject/";
 	const string c_display = "Main/Right/GameObject/B/Display/";
 	const string c_buttons = "Main/Right/GameObject/C/GameObject/B/Buttons/";
+	const string c_officerIcon = "Main/Right/GameObject/C/GameObject/A/GameObject/A/GameObject/Image";
 
 	static Entry[] GetTable()
 	{
@@ -93,8 +94,8 @@ public static class UIKitSceneTool
 			new Entry( c_display + "Terrain Vehicle Cargo/A/Labels", UIText.LabelM, 24, UISprite.None, UIColor.TextSecondary , 1.0f, 41.0f ),
 			new Entry( c_display + "Terrain Vehicle Cargo/A/Values", UIText.ReadoutM, 24, UISprite.None, UIColor.TextPrimary , 1.0f, 41.0f ),
 
-			// the ship's name and the officer's logo
-			new Entry( c_right + "C/GameObject/A/GameObject/A/GameObject/Image", UIText.None, 0, UISprite.None, UIColor.TextMuted ),
+			// the ship's name and the officer's icon (the ship's logo on the bridge, the kit's icon of each officer, set by the button controller)
+			new Entry( c_officerIcon, UIText.None, 0, UISprite.None, UIColor.AccentPrimary ),
 			new Entry( c_right + "C/GameObject/A/GameObject/B/GameObject/Current Officer", UIText.HeadingL, 28, UISprite.None, UIColor.TextPrimary ),
 
 			// the console buttons' panel
@@ -189,48 +190,7 @@ public static class UIKitSceneTool
 			return "missing " + ( ( theme == null ) ? "the UI kit theme" : "the UI canvas" );
 		}
 
-		var styled = 0;
-
-		foreach ( var entry in GetTable() )
-		{
-			// a name with a slash in it (Bio / Min, written "Bio \/ Min" in the table) cannot be found by path, so it is looked for under its parent
-			var target = entry.m_path.Contains( "\\/" ) ? null : canvas.Find( entry.m_path );
-
-			if ( ( target == null ) && entry.m_path.Contains( "\\/" ) )
-			{
-				var split = entry.m_path.LastIndexOf( '/', entry.m_path.IndexOf( "\\/" ) );
-				var parent = canvas.Find( entry.m_path.Substring( 0, split ) );
-				var name = entry.m_path.Substring( split + 1 ).Replace( "\\/", "/" );
-
-				target = ( parent != null ) ? FindChild( parent, name ) : null;
-			}
-
-			if ( target == null )
-			{
-				report.AppendLine( "not found: " + entry.m_path );
-				continue;
-			}
-
-			var style = target.GetComponent<UIKitStyle>();
-
-			if ( style == null )
-			{
-				style = Undo.AddComponent<UIKitStyle>( target.gameObject );
-			}
-
-			Undo.RecordObject( style, "UI kit" );
-
-			style.m_textStyle = entry.m_text;
-			style.m_fontSize = entry.m_size;
-			style.m_sprite = entry.m_sprite;
-			style.m_color = entry.m_color;
-			style.m_alpha = entry.m_alpha;
-			style.m_lineHeight = entry.m_lineHeight;
-
-			Apply( style );
-
-			styled++;
-		}
+		var styled = ApplyEntries( canvas, GetTable(), report );
 
 		report.AppendLine( styled + " elements styled" );
 
@@ -287,9 +247,79 @@ public static class UIKitSceneTool
 			report.AppendLine( "console bullets not set (no button controller or no bullets in the theme)" );
 		}
 
+		// the officer's icon: the button controller changes it with the officer, and the icons are square where the ship's logo is wide, so it keeps its aspect
+		var officerIcon = canvas.Find( c_officerIcon );
+		var officerImage = ( officerIcon != null ) ? officerIcon.GetComponent<Image>() : null;
+
+		if ( ( controller != null ) && ( officerImage != null ) )
+		{
+			Undo.RecordObject( controller, "UI kit" );
+			controller.m_officerIcon = officerImage;
+			EditorUtility.SetDirty( controller );
+
+			Undo.RecordObject( officerImage, "UI kit" );
+			officerImage.preserveAspect = true;
+			EditorUtility.SetDirty( officerImage );
+
+			report.AppendLine( "officer icon set" );
+		}
+		else
+		{
+			report.AppendLine( "officer icon not set (no button controller or no image at " + c_officerIcon + ")" );
+		}
+
 		EditorSceneManager.MarkSceneDirty( canvas.gameObject.scene );
 
 		return report.ToString();
+	}
+
+	// gives each element of a table its UIKitStyle (a new one, or the one it has) and returns how many were styled; what is not found goes into the report
+	static int ApplyEntries( Transform canvas, System.Collections.Generic.IEnumerable<Entry> entries, System.Text.StringBuilder report )
+	{
+		var styled = 0;
+
+		foreach ( var entry in entries )
+		{
+			// a name with a slash in it (Bio / Min, written "Bio \/ Min" in the table) cannot be found by path, so it is looked for under its parent
+			var target = entry.m_path.Contains( "\\/" ) ? null : canvas.Find( entry.m_path );
+
+			if ( ( target == null ) && entry.m_path.Contains( "\\/" ) )
+			{
+				var split = entry.m_path.LastIndexOf( '/', entry.m_path.IndexOf( "\\/" ) );
+				var parent = canvas.Find( entry.m_path.Substring( 0, split ) );
+				var name = entry.m_path.Substring( split + 1 ).Replace( "\\/", "/" );
+
+				target = ( parent != null ) ? FindChild( parent, name ) : null;
+			}
+
+			if ( target == null )
+			{
+				report.AppendLine( "not found: " + entry.m_path );
+				continue;
+			}
+
+			var style = target.GetComponent<UIKitStyle>();
+
+			if ( style == null )
+			{
+				style = Undo.AddComponent<UIKitStyle>( target.gameObject );
+			}
+
+			Undo.RecordObject( style, "UI kit" );
+
+			style.m_textStyle = entry.m_text;
+			style.m_fontSize = entry.m_size;
+			style.m_sprite = entry.m_sprite;
+			style.m_color = entry.m_color;
+			style.m_alpha = entry.m_alpha;
+			style.m_lineHeight = entry.m_lineHeight;
+
+			Apply( style );
+
+			styled++;
+		}
+
+		return styled;
 	}
 
 	// draws the kit's outline over a panel: a child that covers it, is drawn last and takes no part in a layout or in clicks
@@ -491,26 +521,10 @@ public static class UIKitSceneTool
 		// the buttons' tints: navy, dim cyan when the cursor is on them
 		foreach ( var button in buttons )
 		{
-			if ( button.transition != Selectable.Transition.ColorTint )
+			if ( TintButton( button, theme ) )
 			{
-				continue;
+				Count( "button tint" );
 			}
-
-			Undo.RecordObject( button, "UI kit" );
-
-			var colours = button.colors;
-
-			colours.normalColor = theme.m_backgroundRaised;
-			colours.highlightedColor = theme.m_accentPrimaryDim;
-			colours.selectedColor = theme.m_accentPrimaryDim;
-			colours.pressedColor = theme.m_accentPrimaryStrong;
-			colours.disabledColor = new Color( theme.m_backgroundHover.r, theme.m_backgroundHover.g, theme.m_backgroundHover.b, 0.5f );
-			colours.colorMultiplier = 1.0f;
-
-			button.colors = colours;
-
-			EditorUtility.SetDirty( button );
-			Count( "button tint" );
 		}
 
 		foreach ( var text in canvas.GetComponentsInChildren<TMPro.TMP_Text>( true ) )
@@ -576,6 +590,207 @@ public static class UIKitSceneTool
 		EditorSceneManager.MarkSceneDirty( canvas.gameObject.scene );
 
 		return report.ToString();
+	}
+
+	// ---------------------------------------------------------------- the save game panel
+
+	const string c_persistentScenePath = "Assets/Scenes/Persistent.unity";
+	const string c_savePanel = "Save Game Panel/Root/";
+	const string c_saveContent = "Save Game Panel/Root/Xform/";
+
+	// the largest size of a slot's description (it sizes itself down to fit its well: Rajdhani is narrower than the font it had, so it can be larger)
+	const float c_saveDescriptionSize = 30.0f;
+
+	// what each element of the save game panel becomes (its buttons are styled by rule, as the Starport's are)
+	static Entry[] GetSavePanelTable()
+	{
+		var entries = new System.Collections.Generic.List<Entry>
+		{
+			// the panel, Interstel's logo in amber as in the Starport, the heading
+			new Entry( "Save Game Panel/Root", UIText.None, 0, UISprite.Panel, UIColor.BackgroundPanel ),
+			new Entry( c_saveContent + "Heading/Logo Image", UIText.None, 0, UISprite.None, UIColor.AccentSecondary ),
+			new Entry( c_saveContent + "Heading/Heading Text", UIText.HeadingL, 35, UISprite.None, UIColor.TextPrimary ),
+
+			// the shade over the panel behind a dialog, and the dialogs (their questions as the Starport's dialogs have them)
+			new Entry( c_saveContent + "Overlay Panel", UIText.None, 0, UISprite.Panel, UIColor.BackgroundApp, 0.85f ),
+			new Entry( c_saveContent + "Switch Panel", UIText.None, 0, UISprite.Panel, UIColor.BackgroundPanel ),
+			new Entry( c_saveContent + "Switch Panel/Xform/Label Text", UIText.LabelM, 28, UISprite.None, UIColor.TextAccent ),
+			new Entry( c_saveContent + "Copy Panel", UIText.None, 0, UISprite.Panel, UIColor.BackgroundPanel ),
+			new Entry( c_saveContent + "Copy Panel/Xform/Label Text", UIText.LabelM, 28, UISprite.None, UIColor.TextAccent ),
+			new Entry( c_saveContent + "Reset Panel", UIText.None, 0, UISprite.Panel, UIColor.BackgroundPanel ),
+			new Entry( c_saveContent + "Reset Panel/Xform/Label Text", UIText.LabelM, 28, UISprite.None, UIColor.TextAlert ),
+		};
+
+		// the five slots: a raised card, its name as a heading, "Active" in cyan, the description in a darker well
+		foreach ( var slot in new[] { "A", "B", "C", "D", "E" } )
+		{
+			var path = c_saveContent + "Xform/Slot " + slot;
+
+			entries.Add( new Entry( path, UIText.None, 0, UISprite.Panel, UIColor.BackgroundRaised ) );
+			entries.Add( new Entry( path + "/Xform/A/Xform/ID", UIText.HeadingL, 30, UISprite.None, UIColor.TextPrimary ) );
+			entries.Add( new Entry( path + "/Xform/A/Xform/Active", UIText.LabelM, 24, UISprite.None, UIColor.TextAccent ) );
+			entries.Add( new Entry( path + "/Xform/B/Panel", UIText.None, 0, UISprite.Panel, UIColor.BackgroundApp, 0.6f ) );
+			entries.Add( new Entry( path + "/Xform/B/Panel/Description", UIText.BodyM, c_saveDescriptionSize, UISprite.None, UIColor.TextSecondary ) );
+		}
+
+		return entries.ToArray();
+	}
+
+	// the panels of the save game panel that get an outline: path, colour (the reset dialog was red: its outline is the alert colour)
+	static readonly (string path, UIColor color)[] c_savePanelOutlines =
+	{
+		( "Save Game Panel/Root", UIColor.BorderDefault ),
+		( c_saveContent + "Xform/Slot A", UIColor.BorderSubtle ),
+		( c_saveContent + "Xform/Slot B", UIColor.BorderSubtle ),
+		( c_saveContent + "Xform/Slot C", UIColor.BorderSubtle ),
+		( c_saveContent + "Xform/Slot D", UIColor.BorderSubtle ),
+		( c_saveContent + "Xform/Slot E", UIColor.BorderSubtle ),
+		( c_saveContent + "Switch Panel", UIColor.BorderAccent ),
+		( c_saveContent + "Copy Panel", UIColor.BorderAccent ),
+		( c_saveContent + "Reset Panel", UIColor.BorderAlert ),
+	};
+
+	[MenuItem( "Starflight Remake/UI Kit/Apply to the Save Game Panel" )]
+	public static void ApplySavePanelFromMenu()
+	{
+		if ( !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo() )
+		{
+			return;
+		}
+
+		EditorSceneManager.OpenScene( c_persistentScenePath, OpenSceneMode.Single );
+
+		Debug.Log( ApplyToSavePanel() );
+	}
+
+	// for batch mode: open the Persistent scene, apply the kit to the save game panel, save the scene
+	public static void ApplySavePanelAndSave()
+	{
+		EditorSceneManager.OpenScene( c_persistentScenePath, OpenSceneMode.Single );
+
+		Debug.Log( ApplyToSavePanel() );
+
+		EditorSceneManager.SaveScene( EditorSceneManager.GetActiveScene() );
+	}
+
+	// gives the save game panel (in the Persistent scene, shown over the Starport and the Spaceflight scenes) the kit's look and returns a report
+	public static string ApplyToSavePanel()
+	{
+		var report = new System.Text.StringBuilder( "UI kit applied to the save game panel\n" );
+		var theme = UIKitTheme.Get();
+		var canvas = FindCanvas();
+		var panel = ( canvas != null ) ? canvas.Find( "Save Game Panel" ) : null;
+
+		if ( ( theme == null ) || ( panel == null ) )
+		{
+			return "missing " + ( ( theme == null ) ? "the UI kit theme" : "the save game panel" );
+		}
+
+		// the buttons keep their heights: those in a row are sized by their layout from their sprite, and the kit's panel sprite is smaller than theirs
+		foreach ( var button in panel.GetComponentsInChildren<Button>( true ) )
+		{
+			var rect = (RectTransform) button.transform;
+
+			if ( ( button.transform.parent != null ) && ( button.transform.parent.GetComponent<LayoutGroup>() != null ) && ( button.GetComponent<UIKitStyle>() == null ) && ( rect.rect.height > 0.0f ) )
+			{
+				var element = button.GetComponent<LayoutElement>();
+
+				if ( element == null )
+				{
+					element = Undo.AddComponent<LayoutElement>( button.gameObject );
+				}
+
+				Undo.RecordObject( element, "UI kit" );
+				element.minHeight = rect.rect.height;
+				EditorUtility.SetDirty( element );
+			}
+		}
+
+		report.AppendLine( ApplyEntries( canvas, GetSavePanelTable(), report ) + " elements styled" );
+
+		// the descriptions size themselves to fit, up to the kit's size
+		foreach ( var slot in new[] { "A", "B", "C", "D", "E" } )
+		{
+			var description = canvas.Find( c_saveContent + "Xform/Slot " + slot + "/Xform/B/Panel/Description" );
+
+			if ( ( description != null ) && description.TryGetComponent<TMPro.TMP_Text>( out var text ) )
+			{
+				Undo.RecordObject( text, "UI kit" );
+				text.fontSizeMax = c_saveDescriptionSize;
+				EditorUtility.SetDirty( text );
+			}
+		}
+
+		foreach ( var (path, color) in c_savePanelOutlines )
+		{
+			var target = canvas.Find( path );
+
+			if ( target == null )
+			{
+				report.AppendLine( "not found: " + path );
+				continue;
+			}
+
+			AddOutline( target, color );
+		}
+
+		// the buttons, as in the Starport: the kit's panel in white, their colours from their tints, their labels in the kit's label style
+		var buttons = 0;
+
+		foreach ( var button in panel.GetComponentsInChildren<Button>( true ) )
+		{
+			if ( ( button.targetGraphic is Image image ) && ( image.GetComponent<UIKitStyle>() == null ) )
+			{
+				Style( image, UIText.None, 0, UISprite.Panel, UIColor.Keep );
+				Undo.RecordObject( image, "UI kit" );
+				image.color = Color.white;
+				EditorUtility.SetDirty( image );
+			}
+
+			TintButton( button, theme );
+
+			var label = button.GetComponentInChildren<TMPro.TMP_Text>( true );
+
+			// the label keeps its size in proportion (the menu's 48 and the dialogs' 40 become 29 and 24); a label that has its style already keeps it
+			if ( ( label != null ) && ( label.GetComponent<UIKitStyle>() == null ) )
+			{
+				Style( label, UIText.LabelM, Mathf.Round( label.fontSize * 0.6f ), UISprite.None, UIColor.TextPrimary );
+			}
+
+			buttons++;
+		}
+
+		report.AppendLine( buttons + " buttons styled" );
+
+		EditorSceneManager.MarkSceneDirty( canvas.gameObject.scene );
+
+		return report.ToString();
+	}
+
+	// gives a button the kit's tints: navy, dim cyan when the cursor is on it or it is selected (returns false for a button that does not tint)
+	static bool TintButton( Button button, UIKitTheme theme )
+	{
+		if ( button.transition != Selectable.Transition.ColorTint )
+		{
+			return false;
+		}
+
+		Undo.RecordObject( button, "UI kit" );
+
+		var colours = button.colors;
+
+		colours.normalColor = theme.m_backgroundRaised;
+		colours.highlightedColor = theme.m_accentPrimaryDim;
+		colours.selectedColor = theme.m_accentPrimaryDim;
+		colours.pressedColor = theme.m_accentPrimaryStrong;
+		colours.disabledColor = new Color( theme.m_backgroundHover.r, theme.m_backgroundHover.g, theme.m_backgroundHover.b, 0.5f );
+		colours.colorMultiplier = 1.0f;
+
+		button.colors = colours;
+
+		EditorUtility.SetDirty( button );
+
+		return true;
 	}
 
 	// puts a panel of this colour behind everything else in a container: a first child that covers it and takes no part in a layout or in clicks

@@ -51,6 +51,12 @@ public class ButtonController : MonoBehaviour
 	public TextMeshProUGUI[] m_buttonLabelList;
 	public TextMeshProUGUI m_currentOfficer;
 
+	// the icon beside the current officer's name (the scene's logo stands for the ship; the officers and the terrain vehicle have the UI kit's icons)
+	public Image m_officerIcon;
+
+	// the logo the icon shows on the bridge
+	Sprite m_shipIcon;
+
 	// buttons
 	private ShipButton[] m_buttonList;
 	private ShipButton m_currentButton;
@@ -78,6 +84,12 @@ public class ButtonController : MonoBehaviour
 
 		// reset the ignore controller timer
 		m_ignoreControllerTimer = 0.0f;
+
+		// remember the ship's logo, which the officer icon shows on the bridge
+		if ( m_officerIcon != null )
+		{
+			m_shipIcon = m_officerIcon.sprite;
+		}
 
 		// common bridge button
 		var bridgeButton = new ChangeMenuButton( "Bridge", ButtonSet.Bridge );
@@ -240,10 +252,21 @@ public class ButtonController : MonoBehaviour
 		}
 	}
 
-	// call this to change the current officer text
-	public void ChangeOfficerText( string newOfficer )
+	// call this to change the current officer: the name and the icon beside it
+	public void ChangeOfficerText( string newOfficer, UIKitTheme.OfficerIcon officerIcon )
 	{
 		m_currentOfficer.text = newOfficer;
+
+		if ( m_officerIcon == null )
+		{
+			return;
+		}
+
+		// the officer's icon from the UI kit (the ship, or a theme without the icon, shows the ship's logo)
+		var theme = UIKitTheme.Get();
+		var sprite = ( theme != null ) ? theme.GetOfficerIcon( officerIcon ) : null;
+
+		m_officerIcon.sprite = ( sprite != null ) ? sprite : m_shipIcon;
 	}
 
 	// set the bridge buttons
@@ -259,7 +282,7 @@ public class ButtonController : MonoBehaviour
 		ChangeButtonSet( ButtonSet.Bridge );
 
 		// change the current officer label to the name of the ship
-		ChangeOfficerText( "ISS " + playerData.m_playerShip.m_name );
+		ChangeOfficerText( "ISS " + playerData.m_playerShip.m_name, UIKitTheme.OfficerIcon.Ship );
 
 		// update the message
 		switch ( playerData.m_general.m_location )
@@ -304,7 +327,7 @@ public class ButtonController : MonoBehaviour
 		var personnelFile = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Navigator );
 
 		// set the name of the officer
-		SpaceflightController.m_instance.m_buttonController.ChangeOfficerText( "Officer " + personnelFile.m_name );
+		SpaceflightController.m_instance.m_buttonController.ChangeOfficerText( "Officer " + personnelFile.m_name, UIKitTheme.OfficerIcon.Navigator );
 	}
 
 	// update the buttons and change the current button index

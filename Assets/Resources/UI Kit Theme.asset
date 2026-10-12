@@ -30,12 +30,12 @@ MonoBehaviour:
   m_accentPrimary: {r: 0.23921569, g: 0.9019608, b: 1, a: 1}
   m_accentPrimaryStrong: {r: 0, g: 0.78431374, b: 0.9411765, a: 1}
   m_accentPrimaryDim: {r: 0, g: 0.47843137, b: 0.6, a: 1}
-  m_accentSecondary: {r: 1.000000, g: 0.721569, b: 0.301961, a: 1}
+  m_accentSecondary: {r: 1, g: 0.721569, b: 0.301961, a: 1}
   m_statusShield: {r: 0.23921569, g: 0.9019608, b: 1, a: 1}
   m_statusArmor: {r: 1, g: 0.72156864, b: 0.3019608, a: 1}
   m_statusFuel: {r: 0.3019608, g: 1, b: 0.6509804, a: 1}
   m_statusDanger: {r: 1, g: 0.3529412, b: 0.41568628, a: 1}
-  m_sensorWindow: {r: 0.180392, g: 0.290196, b: 0.450980, a: 1}
+  m_sensorWindow: {r: 0.180392, g: 0.290196, b: 0.45098, a: 1}
   m_displayXL:
     m_font: {fileID: 11400000, guid: 837e87a8e408c8c4b8a61880af427289, type: 2}
     m_size: 48
@@ -87,4 +87,18 @@ MonoBehaviour:
   m_bulletOffSprite: {fileID: 21300000, guid: 2605642f58192a44fa3c0cf00e28ff68, type: 3}
   m_bulletOnSprite: {fileID: 21300000, guid: 8e76a2acd528ddd4985a1fd39d4db4e0, type: 3}
   m_bulletActiveSprite: {fileID: 21300000, guid: 6b2869550aafa3a4986ace9ed640484a,
+    type: 3}
+  m_officerCaptainSprite: {fileID: 21300000, guid: 2379898eb0356064abe20ee6461dc70e,
+    type: 3}
+  m_officerScienceSprite: {fileID: 21300000, guid: a3fdd67dd2944e346a37395dfc4bca3e,
+    type: 3}
+  m_officerNavigatorSprite: {fileID: 21300000, guid: 6bc45df5cfa733149ae07f79b166eebc,
+    type: 3}
+  m_officerEngineerSprite: {fileID: 21300000, guid: 23089778acc401e4897f60d01b26415e,
+    type: 3}
+  m_officerCommunicationsSprite: {fileID: 21300000, guid: c41d17886ef42584e8405a6626553314,
+    type: 3}
+  m_officerDoctorSprite: {fileID: 21300000, guid: 9b2b06fab0bf5a8488e3e13f172e0080,
+    type: 3}
+  m_officerTerrainVehicleSprite: {fileID: 21300000, guid: 88f5a2490662ce848a6c93b669363058,
     type: 3}
