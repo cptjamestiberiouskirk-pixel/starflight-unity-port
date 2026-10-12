@@ -901,6 +901,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSystemTravel();
 				break;
 
+			case "alienshields":
+				yield return ScenarioAlienShields();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -22010,6 +22014,81 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "systemtravel: docking at the Starport says Closing docking bay doors, as the original", ( locationDocked == PD_General.Location.DockingBay ) && docked.Contains( "Closing docking bay doors" ), locationDocked + ": " + docked );
 
 		Finish( "scenario=systemtravel", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the captain is told when the aliens raise or lower their shields, or arm or disarm
+
+	IEnumerator ScenarioAlienShields()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// a mechan encounter: its scouts have shields and missiles, and the mechans have no mood, so their stance is their posture
+		var mechanId = -1;
+
+		for ( var i = 0; i < gameData.m_encounterList.Length; i++ )
+		{
+			if ( gameData.m_encounterList[ i ].m_race == GameData.Race.Mechan )
+			{
+				mechanId = i;
+
+				break;
+			}
+		}
+
+		EnterStarSystem( gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		EnterEncounter( mechanId );
+
+		yield return Frames( 10 );
+
+		var pdEncounter = controller.m_encounter.m_pdEncounter;
+		var atTheStart = MessageList();
+
+		// ---- neutral to hostile: they arm (their shields were already up)
+		controller.m_messages.Clear();
+
+		pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+
+		yield return Frames( 5 );
+
+		var toHostile = MessageList();
+
+		// ---- hostile to friendly: they lower their shields and disarm
+		controller.m_messages.Clear();
+
+		pdEncounter.m_alienStance = GD_Comm.Stance.Friendly;
+
+		yield return Frames( 5 );
+
+		var toFriendly = MessageList();
+
+		// ---- friendly to neutral: they raise their shields
+		controller.m_messages.Clear();
+
+		pdEncounter.m_alienStance = GD_Comm.Stance.Neutral;
+
+		yield return Frames( 5 );
+
+		var toNeutral = MessageList();
+
+		Log( "alienshields: at the start: " + atTheStart );
+		Log( "alienshields: to hostile (" + pdEncounter.m_alienStance + " now): " + toHostile + " || to friendly: " + toFriendly + " || to neutral: " + toNeutral );
+
+		Check( "alienshields: the state the encounter begins with is taken without a word", !atTheStart.Contains( "they've" ), atTheStart );
+		Check( "alienshields: turning hostile, they arm their weapons and nothing is said of the shields they already had up", toHostile.Contains( "Captain, they've armed their weapons." ) && !toHostile.Contains( "shields" ), toHostile );
+		Check( "alienshields: turning friendly, they lower their shields and disarm, as the original says", toFriendly.Contains( "Captain, they've lowered their shields." ) && toFriendly.Contains( "Captain, they've disarmed their weapons." ), toFriendly );
+		Check( "alienshields: turning neutral again, they raise their shields", toNeutral.Contains( "Captain, they've raised their shields." ) && !toNeutral.Contains( "weapons" ), toNeutral );
+
+		Finish( "scenario=alienshields", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
