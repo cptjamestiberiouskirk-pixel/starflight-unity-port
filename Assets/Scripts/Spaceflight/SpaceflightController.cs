@@ -412,6 +412,10 @@ public class SpaceflightController : MonoBehaviour
 					m_playerShip.Show();
 					break;
 			}
+
+			// the coordinates above the main view are the new location's (the terrain vehicle's place stayed there in orbit and in the star system until the
+			// ship moved - the original's orbit shows the ship's coordinates, "125 100")
+			m_viewport.UpdateCoordinates();
 		}
 
 		// did we switch to a new location?
