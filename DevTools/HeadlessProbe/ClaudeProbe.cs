@@ -11809,6 +11809,13 @@ public class ClaudeProbe : MonoBehaviour
 
 		BringAliensClose();
 
+		// every hit of steps 1 and 2 also damaged one of the ship's systems at random (a share of the bare hull's 250 points), and now and then the missile launcher
+		// was destroyed, so that neither missile was launched: make the systems whole and the launcher ready before each launch
+		var launcherHealthBefore = ship.GetSystemHealth( PD_PlayerShip.ShipSystem.Missiles );
+
+		ship.RestoreSystems();
+		SetField( combat, "m_playerMissileCooldown", 0.0f );
+
 		var firstLaunched = combat.FirePlayerMissile();
 
 		var waitEnd = Time.realtimeSinceStartup + 3.0f;
@@ -11839,6 +11846,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		BringAliensClose();
 
+		// the spemin have been firing back since the first launch
+		ship.RestoreSystems();
+		SetField( combat, "m_playerMissileCooldown", 0.0f );
+
 		var secondLaunched = combat.FirePlayerMissile();
 		var inTheAir = MissilesInTheAir();
 
@@ -11850,10 +11861,10 @@ public class ClaudeProbe : MonoBehaviour
 		var damageOfATimeOut = armorBefore - target.m_armorPoints;
 		var inTheAirAfter = MissilesInTheAir();
 
-		Log( "missile time out: a player missile that arrives does " + damageOfAHit + " damage (launched " + firstLaunched + "); one that runs out of time (launched " + secondLaunched + ", " + inTheAir + " in the air, " + inTheAirAfter + " after) does " + damageOfATimeOut + " damage, explosions playing before " + explosionsBefore + " and after " + explosionsAfterTimeOut );
+		Log( "missile time out: the missile launcher was at " + launcherHealthBefore + " after steps 1 and 2 (made whole); a player missile that arrives does " + damageOfAHit + " damage (launched " + firstLaunched + "); one that runs out of time (launched " + secondLaunched + ", " + inTheAir + " in the air, " + inTheAirAfter + " after) does " + damageOfATimeOut + " damage, explosions playing before " + explosionsBefore + " and after " + explosionsAfterTimeOut );
 
-		Check( "missile time out: a player missile that arrives still does its damage (control)", firstLaunched && ( damageOfAHit > 0 ), damageOfAHit + " damage" );
-		Check( "missile time out: a player missile that runs out of time explodes where it was and does no damage", secondLaunched && ( inTheAir > 0 ) && ( inTheAirAfter == 0 ) && ( explosionsBefore == 0 ) && ( explosionsAfterTimeOut == 1 ) && ( damageOfATimeOut == 0 ), "explosions " + explosionsBefore + " -> " + explosionsAfterTimeOut + ", damage " + damageOfATimeOut + ", in the air " + inTheAir + " -> " + inTheAirAfter );
+		Check( "missile time out: a player missile that arrives still does its damage (control)", firstLaunched && ( damageOfAHit > 0 ), damageOfAHit + " damage, launched " + firstLaunched );
+		Check( "missile time out: a player missile that runs out of time explodes where it was and does no damage", secondLaunched && ( inTheAir > 0 ) && ( inTheAirAfter == 0 ) && ( explosionsBefore == 0 ) && ( explosionsAfterTimeOut == 1 ) && ( damageOfATimeOut == 0 ), "launched " + secondLaunched + ", explosions " + explosionsBefore + " -> " + explosionsAfterTimeOut + ", damage " + damageOfATimeOut + ", in the air " + inTheAir + " -> " + inTheAirAfter );
 
 		ClearMissiles();
 		LeaveEncounter();
@@ -24176,8 +24187,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		HealTheCrew();
 
-		// ---- 5. the flyer of middling aggression again, in the air over dry ground, and a large carnivore on the ground 40 units from it: once the flyer lands,
-		// the hunter comes at it
+		// ---- 5. the flyer of middling aggression again, in the air over dry ground, and a large carnivore on the ground 40 units from it: while the flyer is in
+		// the air the hunter does not come at it (the control), and once the flyer lands the hunter comes at it
 		flyer.m_aggression = 50;
 		flyer.m_noticedPlayer = false;
 		flyer.m_hits = 100;
@@ -24202,35 +24213,83 @@ public class ClaudeProbe : MonoBehaviour
 
 		PutInTheAir( flyer, start );
 
+		// neither keeps a mate from before (the hunter may still be paired with a lifeform it was beside when the vehicle landed)
+		Call( hunter, "BecomeUnpaired" );
+		Call( flyer, "BecomeUnpaired" );
+
+		// the hunter decides with the flyer in the air, the flyer's own decision held so that it cannot land first, until the two are paired (the hunter may
+		// unpair at random on the decision that pairs it): it does not come at the flyer (the control)
+		var airBehaviour = "";
+		var airPaired = false;
+		var airFlying = false;
+
+		for ( var attempt = 0; ( attempt < 5 ) && !airPaired; attempt++ )
+		{
+			SetField( flyer, "m_behaviourTimer", 0.5f );
+			SetField( hunter, "m_behaviourTimer", 0.0f );
+
+			yield return null;
+
+			airBehaviour = MateBehaviour( hunter );
+			airPaired = ( FieldOrNull( hunter, "m_mate" ) as TerrainLifeform ) == flyer;
+			airFlying = IsFlying( flyer );
+		}
+
+		// then the hunter is held where it is until the flyer lands, and decides on the frame after that, 20 units from where the flyer came down towards the
+		// vehicle (in the encounter area, and not next to the flyer): a hunter left to decide wanders on while its prey is in the air, at 12 units a second, and
+		// was out of the encounter area within seconds, so a flyer that landed late found no hunter; if the hunter unpairs at random on that decision, it is held
+		// again until the next landing
 		var huntBehaviours = "";
 		var approachedAfterFlying = false;
 		var preyLandings = 0;
 		var preyWasFlying = true;
+		var hunterDecides = false;
 
 		began = Time.realtimeSinceStartup;
 		end = began + 20.0f;
 
 		while ( ( Time.realtimeSinceStartup < end ) && !approachedAfterFlying )
 		{
+			if ( !hunterDecides )
+			{
+				SetField( hunter, "m_behaviourTimer", 0.5f );
+				SetField( hunter, "m_moving", false );
+			}
+
 			yield return null;
+
+			if ( hunterDecides )
+			{
+				var behaviour = MateBehaviour( hunter );
+
+				huntBehaviours += behaviour + " ";
+				approachedAfterFlying = ( behaviour == "ApproachingMate" ) && ( ( FieldOrNull( hunter, "m_mate" ) as TerrainLifeform ) == flyer );
+				hunterDecides = false;
+			}
 
 			var flying = IsFlying( flyer );
 
 			if ( preyWasFlying && !flying )
 			{
 				preyLandings++;
+
+				var preyPlace = flyer.transform.position;
+				var towardsVehicle = vehicle - preyPlace;
+
+				towardsVehicle.y = 0.0f;
+
+				var huntPlace = preyPlace + towardsVehicle.normalized * 20.0f;
+
+				SurfaceAt( huntPlace, out var huntHeight );
+
+				hunter.transform.position = new Vector3( huntPlace.x, huntHeight + hunter.m_groundOffset, huntPlace.z );
+
+				SetField( hunter, "m_behaviourTimer", 0.0f );
+
+				hunterDecides = true;
 			}
 
 			preyWasFlying = flying;
-
-			var behaviour = MateBehaviour( hunter );
-
-			if ( !huntBehaviours.Contains( behaviour ) )
-			{
-				huntBehaviours += behaviour + " ";
-			}
-
-			approachedAfterFlying = ( behaviour == "ApproachingMate" ) && ( ( FieldOrNull( hunter, "m_mate" ) as TerrainLifeform ) == flyer );
 		}
 
 		var huntedFor = Time.realtimeSinceStartup - began;
@@ -24259,13 +24318,14 @@ public class ClaudeProbe : MonoBehaviour
 		var deadFlying = IsFlying( flyer );
 		var deadBottom = DrawnBounds( flyer.gameObject ).min.y - liquidHeight;
 
-		Log( "flyers: wandered " + wanderedFor + " s, took off " + tookOff + " at " + tookOffAt + " s (highest " + highest + "), landed " + landed + " at " + landedAt + " s || stunned: " + stunnedStatus + ", flying " + stunnedFlying + ", " + stunnedAbove + " above || attacking 8 away (found " + attackFound + "): [" + attackBehaviours + "] landed " + attackLanded + " || 2 away (dry " + besideDry + "): [" + besideBehaviours + "] stayed up " + besideStayedUp + " || hunter (found " + hunterFound + "): [" + huntBehaviours + "] approached " + approachedAfterFlying + " after " + huntedFor + " s, prey landed " + preyLandings + " times || dead over liquid (found " + liquidFound + " at " + liquidPlace + "): " + deadStatus + ", flying " + deadFlying + ", bottom " + deadBottom + " above the surface" );
+		Log( "flyers: wandered " + wanderedFor + " s, took off " + tookOff + " at " + tookOffAt + " s (highest " + highest + "), landed " + landed + " at " + landedAt + " s || stunned: " + stunnedStatus + ", flying " + stunnedFlying + ", " + stunnedAbove + " above || attacking 8 away (found " + attackFound + "): [" + attackBehaviours + "] landed " + attackLanded + " || 2 away (dry " + besideDry + "): [" + besideBehaviours + "] stayed up " + besideStayedUp + " || hunter (found " + hunterFound + "): flyer in the air " + airFlying + ", paired " + airPaired + ", " + airBehaviour + ", after landings [" + huntBehaviours + "] approached " + approachedAfterFlying + " after " + huntedFor + " s, prey landed " + preyLandings + " times || dead over liquid (found " + liquidFound + " at " + liquidPlace + "): " + deadStatus + ", flying " + deadFlying + ", bottom " + deadBottom + " above the surface" );
 
 		Check( "flyers: a flyer that wanders takes to the air (control)", tookOff, tookOff + ", highest " + highest );
 		Check( "flyers: a flyer in the air that wanders lands in time, on the ground", landed, landed + " after " + wanderedFor + " s" );
 		Check( "flyers: a flyer in the air that is stunned comes down to the ground", ( stunnedStatus == "Stunned" ) && !stunnedFlying && ( Mathf.Abs( stunnedAbove ) < 0.5f ), stunnedStatus + ", flying " + stunnedFlying + ", " + stunnedAbove + " above" );
 		Check( "flyers: a flyer that attacks the vehicle comes down to do it", attackFound && attackBehaviours.Contains( "AttackingPlayer" ) && attackLanded, attackFound + " | " + attackBehaviours + "| landed " + attackLanded );
 		Check( "flyers: over the square the vehicle is on it attacks from the air (control)", besideDry && besideBehaviours.Contains( "AttackingPlayer" ) && besideStayedUp, besideDry + " | " + besideBehaviours + "| stayed up " + besideStayedUp );
+		Check( "flyers: a hunter paired with a flyer in the air does not come at it (control)", hunterFound && airFlying && airPaired && ( airBehaviour != "ApproachingMate" ), hunterFound + ", flying " + airFlying + ", paired " + airPaired + " | " + airBehaviour );
 		Check( "flyers: once a flyer has been in the air and lands, a hunter comes at it", hunterFound && approachedAfterFlying && ( preyLandings > 0 ), hunterFound + " | " + huntBehaviours + "| landed " + preyLandings + " times" );
 		Check( "flyers: a flyer killed over a liquid comes down onto its surface", liquidFound && ( deadStatus == "Dead" ) && !deadFlying && ( Mathf.Abs( deadBottom ) < 1.0f ), liquidFound + ", " + deadStatus + ", flying " + deadFlying + ", bottom " + deadBottom );
 
