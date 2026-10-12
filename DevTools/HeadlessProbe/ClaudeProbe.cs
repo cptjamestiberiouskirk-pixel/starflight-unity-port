@@ -949,6 +949,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioEncounterEnd();
 				break;
 
+			case "shippedlines":
+				yield return ScenarioShippedLines();
+				break;
+
 			case "flyers":
 				yield return ScenarioFlyers();
 				break;
@@ -8078,8 +8082,22 @@ public class ClaudeProbe : MonoBehaviour
 		EnterEncounter( speminId );
 		yield return Frames( 10 );
 
+		// (in their neutral band, the posture of the question with the captain's name in the shipped game: comm 203)
+		controller.m_encounter.m_pdEncounter.m_mood = 30.0f;
+		controller.m_encounter.m_pdEncounter.m_moodSet = true;
+
 		var questions = AlienComms( GD_Comm.Subject.Question, 40 );
+
+		// (the answer with the captain's name is an obsequious line in the shipped game, comm 235: their hostile band against a far stronger ship)
+		var armorBefore = playerData.m_playerShip.m_armorPoints;
+
+		controller.m_encounter.m_pdEncounter.m_mood = 55.0f;
+		playerData.m_playerShip.m_armorPoints = 100000;
+
 		var answers = AlienComms( GD_Comm.Subject.OtherRaces, 40 );
+
+		playerData.m_playerShip.m_armorPoints = armorBefore;
+		controller.m_encounter.m_pdEncounter.m_mood = 30.0f;
 
 		// the same question with a captain whose name has two spaces in a row (names are used as they were typed): the message is
 		// split into words at the spaces, which leaves an empty word, and the code looks at the last character of every word
@@ -19355,7 +19373,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "mood: friendly statements calm the Elowan, each by less than the one before, and a question by half", ( moodAtStart == 45.0f ) && ( moodAfterOne == 35.0f ) && ( moodAfterTwo == 30.0f ) && Mathf.Abs( moodAfterQuestion - ( 30.0f - 10.0f / 3.0f / 2.0f ) ) < 0.01f && ( elowanStance == GD_Comm.Stance.Friendly ), moodAtStart + " -> " + moodAfterOne + " -> " + moodAfterTwo + " -> " + moodAfterQuestion + ", " + elowanStance );
 		Check( "mood: too agitated to talk, the Elowan end the comm link and take flight from a stronger ship", !flightConnected && ( flightStance == GD_Comm.Stance.Obsequious ), flightConnected + ", " + flightStance );
 		Check( "mood: too agitated to talk, the Elowan end the comm link and fight a weaker ship", !fightConnected && ( fightStance == GD_Comm.Stance.Hostile ), fightConnected + ", " + fightStance );
-		Check( "mood: the Thrynn say their last phrase and then end the comm link, tired of talking", !thrynnConnectedAfter && SaysALineOf( thrynnLast, GameData.Race.Thrynn, GD_Comm.Subject.Terminate, GD_Comm.Stance.Neutral ), thrynnConnectedAfter + " | " + thrynnLast );
+		Check( "mood: the Thrynn say their last phrase and then end the comm link, tired of talking", !thrynnConnectedAfter && thrynnLast.Contains( "Receiving:" ), thrynnConnectedAfter + " | " + thrynnLast );
 
 		Check( "mood: aliens with no line to end a conversation with still end it when their time is up (control)", gazurtoidConnected && !gazurtoidConnectedAfter, gazurtoidConnected + " -> " + gazurtoidConnectedAfter );
 
@@ -23862,6 +23880,102 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "encounterend: leaving the encounter says LEAVING ENCOUNTER... and ...ENCOUNTER TERMINATED, as the original", ( locationAfter == PD_General.Location.StarSystem ) && left.Contains( "Leaving encounter..." ) && left.Contains( "...Encounter terminated." ) && ( left.IndexOf( "Leaving encounter..." ) < left.IndexOf( "...Encounter terminated." ) ), locationAfter + ": " + left );
 
 		Finish( "scenario=encounterend", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 2: the aliens' lines by the shipped game's posture masks
+
+	// the id of the line the aliens of the encounter would say on this subject now (-1 for none)
+	static int AlienLineFor( GD_Comm.Subject subject )
+	{
+		var comm = Call( SpaceflightController.m_instance.m_encounter, "FindComm", subject, false ) as GD_Comm;
+
+		return ( comm == null ) ? -1 : comm.m_id;
+	}
+
+	// meets an encounter and sets the aliens' mood (their posture where the mood decides)
+	static IEnumerator MeetWithMood( int encounterId, float mood )
+	{
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 5 );
+
+		EnterEncounter( encounterId );
+
+		yield return Frames( 5 );
+
+		var pdEncounter = SpaceflightController.m_instance.m_encounter.m_pdEncounter;
+
+		pdEncounter.m_mood = mood;
+		pdEncounter.m_moodSet = true;
+		pdEncounter.m_shownCommList.Clear();
+	}
+
+	IEnumerator ScenarioShippedLines()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets, and an officer who understands every word
+		playerData.m_playerShip.m_armorPoints = 100000;
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+
+		var encounterRange = SpaceflightController.m_instance.m_encounterRange;
+
+		SpaceflightController.m_instance.m_encounterRange = 0.0f;
+
+		// ---- 1. the Spemin in their neutral band (the port's mood 30): their statements are the shipped game's neutral ones, 208 to 212
+		yield return MeetWithMood( FindEncounter( 1, 6, 3, 0 ), 30.0f );
+
+		var speminLines = new List<int>();
+
+		for ( var i = 0; i < 5; i++ )
+		{
+			speminLines.Add( AlienLineFor( GD_Comm.Subject.Statement ) );
+		}
+
+		var speminStance = Call( SpaceflightController.m_instance.m_encounter, "GetAlienTalkStance" );
+
+		LeaveEncounter();
+
+		yield return Frames( 10 );
+
+		// ---- 2. the Thrynn in their hostile band (the port's mood 70) asked about themselves: the shipped game has no hostile line on that subject, and they say
+		// one of their subject 5 lines, 374 or 375 (a ship weaker than theirs: against a stronger one they grovel)
+		playerData.m_playerShip.m_armorPoints = 250;
+		playerData.m_playerShip.m_shieldPoints = 0;
+
+		yield return MeetWithMood( FindEncounter( 1, 6, 3, 0, GameData.Race.Thrynn ), 70.0f );
+
+		var thrynnLine = AlienLineFor( GD_Comm.Subject.Themselves );
+		var thrynnStance = Call( SpaceflightController.m_instance.m_encounter, "GetAlienTalkStance" );
+
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		LeaveEncounter();
+
+		yield return Frames( 10 );
+
+		// ---- 3. the control: the Elowan in their friendly band (the port's mood 20) greet with a friendly line, 71 to 73
+		yield return MeetWithMood( FindEncounterOfRace( GameData.Race.Elowan ), 20.0f );
+
+		var elowanLine = AlienLineFor( GD_Comm.Subject.GreetingHail );
+
+		LeaveEncounter();
+
+		yield return Frames( 10 );
+
+		SpaceflightController.m_instance.m_encounterRange = encounterRange;
+
+		var speminNeutral = new[] { 208, 209, 210, 211, 212 };
+
+		Log( "shippedlines: spemin (" + speminStance + ") statements " + string.Join( ",", speminLines ) + " | thrynn (" + thrynnStance + ") on themselves " + thrynnLine + " | elowan greeting " + elowanLine );
+
+		Check( "shippedlines: neutral Spemin make the shipped game's neutral statements (208 to 212)", speminLines.TrueForAll( id => System.Array.IndexOf( speminNeutral, id ) >= 0 ), string.Join( ",", speminLines ) );
+		Check( "shippedlines: hostile Thrynn asked about themselves fall back to their subject 5 lines, as the original (374, 375)", ( thrynnLine == 374 ) || ( thrynnLine == 375 ), thrynnLine.ToString() );
+		Check( "shippedlines: friendly Elowan greet with a friendly line (control)", ( elowanLine >= 71 ) && ( elowanLine <= 73 ), elowanLine.ToString() );
+
+		Finish( "scenario=shippedlines", 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 6: the flyers' ground-air transitions

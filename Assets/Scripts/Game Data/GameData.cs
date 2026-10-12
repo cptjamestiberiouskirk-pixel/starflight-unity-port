@@ -304,6 +304,29 @@ public class GameData
 		{
 			m_ancientRuinSiteList = recoveredData.m_ancientRuinSiteList;
 		}
+
+		// the shipped game's posture masks of the comm lines (recovered from STARB.COM)
+		if ( recoveredData.m_commPostureList != null )
+		{
+			var commsById = new System.Collections.Generic.Dictionary<int, GD_Comm>();
+
+			foreach ( var comm in m_commList )
+			{
+				commsById[ comm.m_id ] = comm;
+			}
+
+			foreach ( var commPosture in recoveredData.m_commPostureList )
+			{
+				if ( commsById.TryGetValue( commPosture.m_commId, out var comm ) )
+				{
+					comm.m_postureMask = commPosture.m_postureMask;
+				}
+				else
+				{
+					UnityEngine.Debug.LogError( "Recovered comm posture names comm " + commPosture.m_commId + ", which the game data does not have" );
+				}
+			}
+		}
 	}
 
 	// this finds the element in the list by its name

@@ -3084,6 +3084,25 @@ public class Encounter : MonoBehaviour
 		return warnings[ index ];
 	}
 
+	// true if the race has a line on this subject in this posture (not a homeworld line, nor a surrender line unless the aliens are cowardly)
+	bool HasLineIn( GameData.Race race, GD_Comm.Subject subject, GD_Comm.Stance stance )
+	{
+		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
+		{
+			if ( comm.m_homeworld || ( comm.m_surrender && !m_pdEncounter.m_aliensAreCowardly ) )
+			{
+				continue;
+			}
+
+			if ( ( comm.m_race == race ) && ( comm.m_subject == subject ) && comm.IsSaidIn( stance ) )
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	// find a comm based on the subject
 	GD_Comm FindComm( GD_Comm.Subject subject, bool outgoing )
 	{
@@ -3164,10 +3183,17 @@ public class Encounter : MonoBehaviour
 				continue;
 			}
 
-			if ( ( comm.m_race == race ) && ( comm.m_subject == subject ) && ( comm.m_stance == stance ) )
+			// in the speaker's posture: by the shipped game's posture mask of the line where it has one (COMM-OV, FIND-PHRASE), else by its stance
+			if ( ( comm.m_race == race ) && ( comm.m_subject == subject ) && comm.IsSaidIn( stance ) )
 			{
 				possibleComms.Add( comm );
 			}
+		}
+
+		// the aliens have no line on this subject in their posture: the original says one of their subject 5 lines in it instead (PHRASE-SEARCH)
+		if ( ( possibleComms.Count == 0 ) && !outgoing && ( subject != GD_Comm.Subject.NoMoreInformation ) && HasLineIn( race, GD_Comm.Subject.NoMoreInformation, stance ) )
+		{
+			return FindComm( GD_Comm.Subject.NoMoreInformation, false );
 		}
 
 		// if we didn't find anything then try the neutral stance
