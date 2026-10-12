@@ -12465,14 +12465,14 @@ public class ClaudeProbe : MonoBehaviour
 
 		// ---- 3. the sun takes no numbers from the game's Random, and a frame of it takes no memory
 		var update = (System.Action) System.Delegate.CreateDelegate( typeof( System.Action ), shine, "Update" );
-		var randomBefore = Random.state;
+		var randomBefore = UnityEngine.Random.state;
 
 		for ( var i = 0; i < 20000; i++ )
 		{
 			update();
 		}
 
-		var randomUntouched = Random.state.Equals( randomBefore );
+		var randomUntouched = UnityEngine.Random.state.Equals( randomBefore );
 		var controlBytes = AllocatedByTheControl();
 		var sunBytes = Allocated( update, c_meterCalls ) / c_meterCalls;
 
