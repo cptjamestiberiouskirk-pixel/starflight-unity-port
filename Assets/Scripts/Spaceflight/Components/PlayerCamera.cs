@@ -242,9 +242,10 @@ public class PlayerCamera : MonoBehaviour
 		SoundController.m_instance.PlaySound( SoundController.Sound.Update );
 	}
 
-	public void RetroRocketsFiring()
+	// the terrain is there below the ship: the original says so then, after the autopilot (ORBIT-OV, DESCEND: "TOPOGRAPHY NET LOCKED ON" when the grid shows)
+	public void TopographyNetLockedOn()
 	{
-		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Retro rockets firing...</color>" );
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Topography net locked on.</color>" );
 
 		SoundController.m_instance.PlaySound( SoundController.Sound.Update );
 	}
