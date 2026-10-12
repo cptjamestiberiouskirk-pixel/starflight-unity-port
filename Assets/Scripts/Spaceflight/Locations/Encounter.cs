@@ -359,6 +359,9 @@ public class Encounter : MonoBehaviour
 		// tell the captain when the aliens raise or lower their shields, or arm or disarm their weapons
 		UpdateShieldsAndWeaponsNews();
 
+		// and let the aliens' mood follow the player's shields and weapons
+		UpdatePlayerShieldsAndWeapons();
+
 		// do we want to update the ships (both alien and player)?
 		if ( !m_pdEncounter.m_connected )
 		{
@@ -674,6 +677,9 @@ public class Encounter : MonoBehaviour
 		// the aliens' shields and weapons are taken as they are when the encounter shows, without a word (the original's IAPWR sets them without one)
 		m_shieldsAndWeaponsKnown = false;
 
+		// and so are the player's, for the aliens' mood
+		m_playerShieldsSeen = false;
+
 		// show the main encounter location stuff
 		m_main.SetActive( true );
 
@@ -812,8 +818,11 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_aliensAreCowardly = false;
 			m_pdEncounter.m_specialQuestionAsked = false;
 			m_pdEncounter.m_moodSet = false;
-			m_pdEncounter.m_playerPhrasesInPosture = 0;
 			m_pdEncounter.m_alienPhrasesLeft = 0;
+			m_pdEncounter.m_playerPhrases = 0;
+			m_pdEncounter.m_playerHailedFirst = false;
+			m_pdEncounter.m_playerPostures = 0;
+			m_pdEncounter.m_alienHails = 0;
 			m_pdEncounter.m_rivalLineSaid = false;
 
 			// initialize race encounter
@@ -2841,28 +2850,83 @@ public class Encounter : MonoBehaviour
 		m_pdEncounter.m_alienStance = ( posture == GD_Comm.Stance.Hostile ) ? GD_Comm.Stance.Neutral : posture;
 	}
 
-	// a statement of the player's moves the aliens' mood by the effect of the player's posture on their race, and a question by half of it - the more phrases the
-	// player has made in the posture, the less ("DELTA-EDL = PPE * [1/(#-THIS-POSTURE + 1)]", compart.txt 7)
+	// a statement of the player's moves the aliens' mood by the effect of the player's posture on their race, divided by the number of phrases the player has made
+	// in this comm link with it, and a question by half of that (COMM-OV STATEMENT-EDL and the question's rule: POSTURE-EFFECT / P-PHRASES, and 2/ for a question)
 	void ApplyPlayerPosture( bool isQuestion )
 	{
+		m_pdEncounter.m_playerPhrases++;
+
 		var personality = AlienPersonality.Find( m_gdEncounter.m_race );
 
-		if ( ( personality == null ) || !MoodDecides() )
+		if ( personality == null )
 		{
 			return;
 		}
 
-		EnsureMood( personality );
-
-		var effect = personality.GetPostureEffect( m_pdEncounter.m_playerStance ) / ( m_pdEncounter.m_playerPhrasesInPosture + 1 );
+		var effect = personality.GetPostureEffect( m_pdEncounter.m_playerStance ) / m_pdEncounter.m_playerPhrases;
 
 		if ( isQuestion )
 		{
 			effect *= 0.5f;
 		}
 
-		m_pdEncounter.m_playerPhrasesInPosture++;
-		m_pdEncounter.m_mood = Mathf.Clamp( m_pdEncounter.m_mood + effect, 0.0f, 100.0f );
+		ChangeMood( effect );
+	}
+
+	// the full effect of the player's posture on the aliens' mood: once for the reply to their hail, and once for every posture the player hails or speaks in after
+	// hailing first (COMM-OV RESPOND>EDL and NEW-POSTURE>EDL)
+	void ApplyFullPostureEffect()
+	{
+		var personality = AlienPersonality.Find( m_gdEncounter.m_race );
+
+		if ( personality != null )
+		{
+			ChangeMood( personality.GetPostureEffect( m_pdEncounter.m_playerStance ) );
+		}
+	}
+
+	// after the player has hailed first, the first use of each posture in the encounter has its full effect on the aliens' mood (COMM-OV NEW-POSTURE>EDL)
+	void ApplyNewPosture()
+	{
+		var postureBit = GD_Comm.GetPostureBit( m_pdEncounter.m_playerStance );
+
+		if ( !m_pdEncounter.m_playerHailedFirst || ( postureBit == 0 ) || ( ( m_pdEncounter.m_playerPostures & postureBit ) != 0 ) )
+		{
+			return;
+		}
+
+		m_pdEncounter.m_playerPostures |= postureBit;
+
+		ApplyFullPostureEffect();
+	}
+
+	// the player's shields and weapons as the aliens' mood last saw them (not saved: they are seen again when an encounter is shown)
+	bool m_playerShieldsSeen;
+	bool m_playerShieldsWereUp;
+	bool m_playerWeaponsWereArmed;
+
+	// raising the shields during an encounter angers the aliens by 5 and lowering them calms them by 5, arming the weapons by 10 (COMM-OV <EDL>: +5>EDL, -5, +10,
+	// -10) - before the mood is set the meeting counts the shields and weapons as they are (AlienPersonality.GetMeetingMood)
+	void UpdatePlayerShieldsAndWeapons()
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+
+		if ( m_playerShieldsSeen && m_pdEncounter.m_moodSet )
+		{
+			if ( ship.m_shieldsAreUp != m_playerShieldsWereUp )
+			{
+				ChangeMood( ship.m_shieldsAreUp ? 5.0f : -5.0f );
+			}
+
+			if ( ship.m_weaponsAreArmed != m_playerWeaponsWereArmed )
+			{
+				ChangeMood( ship.m_weaponsAreArmed ? 10.0f : -10.0f );
+			}
+		}
+
+		m_playerShieldsSeen = true;
+		m_playerShieldsWereUp = ship.m_shieldsAreUp;
+		m_playerWeaponsWereArmed = ship.m_weaponsAreArmed;
 	}
 
 	// moves the aliens' mood by a line of theirs or by the player's answer to their question, kept within 0 to 100 (COMM-OV +!EDL) - only where the mood decides
@@ -3445,6 +3509,35 @@ public class Encounter : MonoBehaviour
 			ApplyAnswer( subject == GD_Comm.Subject.Yes );
 		}
 
+		// and the hails: the player's reply to the aliens' hail has the posture's full effect and counts as a phrase, a hail of the player's before the aliens have
+		// hailed makes the player the hailer, whose postures each have their full effect once, and the aliens' second and third hail without a reply anger them by 4
+		// and by 9 (COMM-OV >RESPOND and RESPOND>EDL, HAILER and NEW-POSTURE>EDL, <TALK> and +4/9>EDL)
+		if ( outgoing && ( subject == GD_Comm.Subject.GreetingResponse ) )
+		{
+			m_pdEncounter.m_playerPhrases++;
+			m_pdEncounter.m_alienHails = 0;
+
+			ApplyFullPostureEffect();
+		}
+		else if ( outgoing && ( subject == GD_Comm.Subject.GreetingHail ) )
+		{
+			if ( !m_pdEncounter.m_aliensWantToConnect )
+			{
+				m_pdEncounter.m_playerHailedFirst = true;
+			}
+
+			ApplyNewPosture();
+		}
+		else if ( !outgoing && ( subject == GD_Comm.Subject.GreetingHail ) )
+		{
+			m_pdEncounter.m_alienHails++;
+
+			if ( ( m_pdEncounter.m_alienHails >= 2 ) && ( m_pdEncounter.m_alienHails < 4 ) )
+			{
+				ChangeMood( m_pdEncounter.m_alienHails * m_pdEncounter.m_alienHails );
+			}
+		}
+
 		// copy the comm text (because we will replace tokens)
 		var text = comm.m_text;
 
@@ -3841,6 +3934,10 @@ public class Encounter : MonoBehaviour
 		// no one wants to connect any more
 		m_pdEncounter.m_playerWantsToConnect = false;
 		m_pdEncounter.m_aliensWantToConnect = false;
+
+		// the next comm link counts its phrases and its hailer again (COMM-OV clears P-PHRASES and HAILER at the end of a link)
+		m_pdEncounter.m_playerPhrases = 0;
+		m_pdEncounter.m_playerHailedFirst = false;
 	}
 
 	// call this to find out if there are living alien ships in the encounter
@@ -3883,14 +3980,14 @@ public class Encounter : MonoBehaviour
 	// hail (or respond to) the alien ships
 	public void Hail( GD_Comm.Stance stance, bool responding )
 	{
-		// a new posture counts its phrases from the start (each phrase in the same posture moves the aliens' mood less)
-		if ( stance != m_pdEncounter.m_playerStance )
-		{
-			m_pdEncounter.m_playerPhrasesInPosture = 0;
-		}
-
 		// set the stance to what the player selected
 		m_pdEncounter.m_playerStance = stance;
+
+		// a posture the player has not used yet, after hailing first, moves the aliens' mood (the hail itself does it in AddComm)
+		if ( m_pdEncounter.m_connected )
+		{
+			ApplyNewPosture();
+		}
 
 		// have we connected already?
 		if ( !m_pdEncounter.m_connected )
