@@ -949,6 +949,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioEncounterEnd();
 				break;
 
+			case "flyers":
+				yield return ScenarioFlyers();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -20708,8 +20712,8 @@ public class ClaudeProbe : MonoBehaviour
 		var hunterBehaviours = "";
 
 		// the prey decides only once the hunter is coming at it: every lifeform decides on the same frame, in an order Unity does not fix, and the hunter may
-		// unpair at random as it pairs; a prey that decided first saw nothing coming, wandered into the air, and a flyer is never approached again (it never
-		// lands), so about one run in ten failed
+		// unpair at random as it pairs; a prey that decided first saw nothing coming and wandered into the air, where no hunter approaches it (before flyers
+		// landed it was never approached again), so about one run in ten failed
 		SetField( prey, "m_flying", false );
 		SetField( prey, "m_moving", false );
 
@@ -23503,6 +23507,350 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "encounterend: leaving the encounter says LEAVING ENCOUNTER... and ...ENCOUNTER TERMINATED, as the original", ( locationAfter == PD_General.Location.StarSystem ) && left.Contains( "Leaving encounter..." ) && left.Contains( "...Encounter terminated." ) && ( left.IndexOf( "Leaving encounter..." ) < left.IndexOf( "...Encounter terminated." ) ), locationAfter + ": " + left );
 
 		Finish( "scenario=encounterend", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 6: the flyers' ground-air transitions
+
+	// the height of what is under a place on the planet, the ground or the surface of a liquid (the terrain grid draws a liquid at its level), worked out here and
+	// not by the game - true on dry ground
+	static bool SurfaceAt( Vector3 place, out float height )
+	{
+		var controller = SpaceflightController.m_instance;
+		var planetGenerator = FieldOrNull( controller.m_terrainVehicle, "m_planetGenerator" ) as PlanetGenerator;
+
+		height = 0.0f;
+
+		if ( planetGenerator == null )
+		{
+			return false;
+		}
+
+		Tools.WorldToMapCoordinates( place, out var mapX, out var mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
+
+		var elevation = planetGenerator.GetBilinearSmoothedElevation( mapX, mapY );
+
+		height = Mathf.Max( elevation, planetGenerator.m_waterElevation ) * controller.m_disembarked.m_terrainGrid.m_elevationScale;
+
+		return elevation >= planetGenerator.m_waterElevation;
+	}
+
+	// a place this far from a centre that is dry (or wet), in the first of 32 directions that has one - false if none has
+	static bool FindPlace( Vector3 centre, float distance, bool dry, out Vector3 place )
+	{
+		for ( var i = 0; i < 32; i++ )
+		{
+			var angle = i * 11.25f * Mathf.Deg2Rad;
+
+			place = centre + new Vector3( Mathf.Sin( angle ), 0.0f, Mathf.Cos( angle ) ) * distance;
+
+			if ( SurfaceAt( place, out _ ) == dry )
+			{
+				return true;
+			}
+		}
+
+		place = centre;
+
+		return false;
+	}
+
+	// whether a lifeform is in the air (false on the code before lifeforms)
+	static bool IsFlying( TerrainLifeform lifeform )
+	{
+		var value = FieldOrNull( lifeform, "m_flying" );
+
+		return ( value is bool ) && (bool) value;
+	}
+
+	// how far a lifeform's pivot is above where it stands on what is under it
+	static float HeightAboveSurface( TerrainLifeform lifeform )
+	{
+		SurfaceAt( lifeform.transform.position, out var height );
+
+		return lifeform.transform.position.y - height - lifeform.m_groundOffset;
+	}
+
+	// puts a lifeform at a place, in the air, not moving
+	static void PutInTheAir( TerrainLifeform lifeform, Vector3 place )
+	{
+		SurfaceAt( place, out var height );
+
+		lifeform.transform.position = new Vector3( place.x, height + lifeform.m_groundOffset + 8.0f, place.z );
+
+		SetField( lifeform, "m_flying", true );
+		SetField( lifeform, "m_moving", false );
+	}
+
+	// gives every crew member full vitality
+	static void HealTheCrew()
+	{
+		foreach ( var file in DataController.m_instance.m_playerData.m_personnel.m_personnelList )
+		{
+			file.m_vitality = 100.0f;
+		}
+	}
+
+	IEnumerator ScenarioFlyers()
+	{
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// planet 92 of the Arth system, landed beside its first lifeform
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var firstPlace = ( LifeformsOnTheGround().Count > 0 ) ? LifeformsOnTheGround()[ 0 ].position : Vector3.zero;
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
+
+		var all = LifeformsOnTheGround();
+
+		if ( all.Count < 2 )
+		{
+			Finish( "scenario=flyers abort: " + all.Count + " lifeforms", 2 );
+			yield break;
+		}
+
+		var vehicle = controller.m_terrainVehicle.transform.position;
+		var flyer = all[ 0 ].GetComponent<TerrainLifeform>();
+		var hunter = all[ 1 ].GetComponent<TerrainLifeform>();
+
+		// everything far outside the encounter area
+		for ( var i = 0; i < all.Count; i++ )
+		{
+			all[ i ].position = vehicle + Vector3.right * 600.0f + Vector3.forward * ( i * 10.0f );
+		}
+
+		// the flyer: a slow herbivore of middling aggression (it neither comes at the vehicle nor flees it) that the stunner stuns
+		var species = MakeTestAnimal( GD_Species.Niche.Herbivore, 4 );
+
+		species.m_movementRate = 1;
+		species.m_stunEffect = GD_Species.StunEffect.Stunned;
+
+		flyer.m_species = species;
+		flyer.m_aggression = 50;
+		flyer.m_hits = 100;
+
+		if ( !FindPlace( vehicle, 30.0f, true, out var start ) )
+		{
+			Finish( "scenario=flyers abort: no dry ground 30 units from the vehicle", 2 );
+			yield break;
+		}
+
+		// ---- 1. on the ground 30 units from the vehicle, alone in the encounter area: it wanders, takes to the air (the control), and in time lands
+		SurfaceAt( start, out var startHeight );
+
+		flyer.transform.position = new Vector3( start.x, startHeight + flyer.m_groundOffset, start.z );
+
+		SetField( flyer, "m_flying", false );
+
+		var tookOff = false;
+		var landed = false;
+		var highest = 0.0f;
+		var landedAt = 0.0f;
+		var tookOffAt = 0.0f;
+		var began = Time.realtimeSinceStartup;
+		var end = began + 20.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !landed )
+		{
+			yield return null;
+
+			var above = HeightAboveSurface( flyer );
+
+			highest = Mathf.Max( highest, above );
+
+			if ( IsFlying( flyer ) && ( above > 4.0f ) )
+			{
+				if ( !tookOff )
+				{
+					tookOffAt = Time.realtimeSinceStartup - began;
+				}
+
+				tookOff = true;
+			}
+			else if ( tookOff && !IsFlying( flyer ) && ( Mathf.Abs( above ) < 0.5f ) )
+			{
+				landed = true;
+				landedAt = Time.realtimeSinceStartup - began;
+			}
+		}
+
+		var wanderedFor = Time.realtimeSinceStartup - began;
+
+		// ---- 2. in the air above dry ground, stunned: it comes down
+		PutInTheAir( flyer, start );
+
+		flyer.m_stuns = 1;
+		flyer.HitWithStunner();
+
+		var stunnedStatus = flyer.m_status.ToString();
+		var stunnedFlying = IsFlying( flyer );
+		var stunnedAbove = HeightAboveSurface( flyer );
+
+		flyer.m_status = TerrainLifeform.Status.Alive;
+		flyer.m_stuns = species.m_stunPoints;
+
+		// ---- 3. made dangerous, in the air 8 units from the vehicle: it attacks the vehicle, and comes down to do it
+		var attackFound = FindPlace( vehicle, 8.0f, true, out var attackPlace );
+
+		flyer.m_aggression = 66;
+		flyer.m_noticedPlayer = true;
+		flyer.m_hits = 1;
+		species.m_intelligence = 1;
+
+		PutInTheAir( flyer, attackPlace );
+		SetField( flyer, "m_behaviourTimer", 0.0f );
+
+		var attackBehaviours = "";
+		var attackLanded = false;
+
+		end = Time.realtimeSinceStartup + 3.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !attackLanded )
+		{
+			HealTheCrew();
+
+			yield return null;
+
+			var behaviour = MateBehaviour( flyer );
+
+			if ( !attackBehaviours.Contains( behaviour ) )
+			{
+				attackBehaviours += behaviour + " ";
+			}
+
+			attackLanded = !IsFlying( flyer ) && ( Mathf.Abs( HeightAboveSurface( flyer ) ) < 0.5f );
+		}
+
+		// ---- 4. the same in the air 2 units from the vehicle, over the square the vehicle is on: it attacks from the air (the control)
+		var besidePlace = vehicle + ( attackPlace - vehicle ).normalized * 2.0f;
+		var besideDry = SurfaceAt( besidePlace, out _ );
+
+		PutInTheAir( flyer, besidePlace );
+		SetField( flyer, "m_behaviourTimer", 0.0f );
+
+		var besideBehaviours = "";
+		var besideStayedUp = true;
+
+		end = Time.realtimeSinceStartup + 2.0f;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			HealTheCrew();
+
+			yield return null;
+
+			var behaviour = MateBehaviour( flyer );
+
+			if ( !besideBehaviours.Contains( behaviour ) )
+			{
+				besideBehaviours += behaviour + " ";
+			}
+
+			besideStayedUp &= IsFlying( flyer ) && ( HeightAboveSurface( flyer ) > 4.0f );
+		}
+
+		HealTheCrew();
+
+		// ---- 5. the flyer of middling aggression again, in the air over dry ground, and a large carnivore on the ground 40 units from it: once the flyer lands,
+		// the hunter comes at it
+		flyer.m_aggression = 50;
+		flyer.m_noticedPlayer = false;
+		flyer.m_hits = 100;
+		species.m_intelligence = 50;
+
+		var hunterSpecies = MakeTestAnimal( GD_Species.Niche.Carnivore, 6 );
+
+		hunterSpecies.m_canFly = false;
+
+		hunter.m_species = hunterSpecies;
+		hunter.m_aggression = 50;
+		hunter.m_hits = 100;
+
+		var hunterFound = FindPlace( start, 40.0f, true, out var hunterPlace );
+
+		SurfaceAt( hunterPlace, out var hunterHeight );
+
+		hunter.transform.position = new Vector3( hunterPlace.x, hunterHeight + hunter.m_groundOffset, hunterPlace.z );
+
+		SetField( hunter, "m_flying", false );
+		SetField( hunter, "m_moving", false );
+
+		PutInTheAir( flyer, start );
+
+		var huntBehaviours = "";
+		var approachedAfterFlying = false;
+		var preyLandings = 0;
+		var preyWasFlying = true;
+
+		began = Time.realtimeSinceStartup;
+		end = began + 20.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !approachedAfterFlying )
+		{
+			yield return null;
+
+			var flying = IsFlying( flyer );
+
+			if ( preyWasFlying && !flying )
+			{
+				preyLandings++;
+			}
+
+			preyWasFlying = flying;
+
+			var behaviour = MateBehaviour( hunter );
+
+			if ( !huntBehaviours.Contains( behaviour ) )
+			{
+				huntBehaviours += behaviour + " ";
+			}
+
+			approachedAfterFlying = ( behaviour == "ApproachingMate" ) && ( ( FieldOrNull( hunter, "m_mate" ) as TerrainLifeform ) == flyer );
+		}
+
+		var huntedFor = Time.realtimeSinceStartup - began;
+
+		// ---- 6. in the air over a liquid, killed: it comes down onto the liquid's surface
+		hunter.transform.position = vehicle + Vector3.right * 600.0f;
+
+		var liquidFound = false;
+		var liquidPlace = vehicle;
+
+		for ( var distance = 20.0f; ( distance <= 600.0f ) && !liquidFound; distance += 20.0f )
+		{
+			liquidFound = FindPlace( vehicle, distance, false, out liquidPlace );
+		}
+
+		PutInTheAir( flyer, liquidPlace );
+
+		for ( var shot = 0; ( shot < 20 ) && ( flyer.m_status != TerrainLifeform.Status.Dead ); shot++ )
+		{
+			flyer.HitWithLaser();
+		}
+
+		SurfaceAt( flyer.transform.position, out var liquidHeight );
+
+		var deadStatus = flyer.m_status.ToString();
+		var deadFlying = IsFlying( flyer );
+		var deadBottom = DrawnBounds( flyer.gameObject ).min.y - liquidHeight;
+
+		Log( "flyers: wandered " + wanderedFor + " s, took off " + tookOff + " at " + tookOffAt + " s (highest " + highest + "), landed " + landed + " at " + landedAt + " s || stunned: " + stunnedStatus + ", flying " + stunnedFlying + ", " + stunnedAbove + " above || attacking 8 away (found " + attackFound + "): [" + attackBehaviours + "] landed " + attackLanded + " || 2 away (dry " + besideDry + "): [" + besideBehaviours + "] stayed up " + besideStayedUp + " || hunter (found " + hunterFound + "): [" + huntBehaviours + "] approached " + approachedAfterFlying + " after " + huntedFor + " s, prey landed " + preyLandings + " times || dead over liquid (found " + liquidFound + " at " + liquidPlace + "): " + deadStatus + ", flying " + deadFlying + ", bottom " + deadBottom + " above the surface" );
+
+		Check( "flyers: a flyer that wanders takes to the air (control)", tookOff, tookOff + ", highest " + highest );
+		Check( "flyers: a flyer in the air that wanders lands in time, on the ground", landed, landed + " after " + wanderedFor + " s" );
+		Check( "flyers: a flyer in the air that is stunned comes down to the ground", ( stunnedStatus == "Stunned" ) && !stunnedFlying && ( Mathf.Abs( stunnedAbove ) < 0.5f ), stunnedStatus + ", flying " + stunnedFlying + ", " + stunnedAbove + " above" );
+		Check( "flyers: a flyer that attacks the vehicle comes down to do it", attackFound && attackBehaviours.Contains( "AttackingPlayer" ) && attackLanded, attackFound + " | " + attackBehaviours + "| landed " + attackLanded );
+		Check( "flyers: over the square the vehicle is on it attacks from the air (control)", besideDry && besideBehaviours.Contains( "AttackingPlayer" ) && besideStayedUp, besideDry + " | " + besideBehaviours + "| stayed up " + besideStayedUp );
+		Check( "flyers: once a flyer has been in the air and lands, a hunter comes at it", hunterFound && approachedAfterFlying && ( preyLandings > 0 ), hunterFound + " | " + huntBehaviours + "| landed " + preyLandings + " times" );
+		Check( "flyers: a flyer killed over a liquid comes down onto its surface", liquidFound && ( deadStatus == "Dead" ) && !deadFlying && ( Mathf.Abs( deadBottom ) < 1.0f ), liquidFound + ", " + deadStatus + ", flying " + deadFlying + ", bottom " + deadBottom );
+
+		Finish( "scenario=flyers landed=" + landed + " attackLanded=" + attackLanded + " hunted=" + approachedAfterFlying, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
