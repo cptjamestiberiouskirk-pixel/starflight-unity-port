@@ -829,6 +829,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioUphill();
 				break;
 
+			case "flatdevice":
+				yield return ScenarioFlatDevice();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -19480,6 +19484,90 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "uphill: the terrain vehicle goes less far up a slope than down it", ( downhill[ 0 ] > 1.0f ) && ( uphill[ 0 ] < downhill[ 0 ] * 0.85f ), uphill[ 0 ] + " / " + downhill[ 0 ] );
 
 		Finish( "scenario=uphill rise=" + bestRise + " up=" + uphill[ 0 ] + " down=" + downhill[ 0 ], 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 4: the Flat Device
+
+	// a lifeform attacks this many times: returns how many of the attacks hurt the captain (the crew kept from dying)
+	static int AttacksThatHurt( TerrainLifeform lifeform, int count, PD_Personnel.PD_PersonnelFile captain )
+	{
+		var attack = typeof( TerrainLifeform ).GetMethod( "AttackPlayer", c_any );
+		var hurt = 0;
+
+		for ( var i = 0; i < count; i++ )
+		{
+			captain.m_vitality = 100000.0f;
+
+			attack.Invoke( lifeform, null );
+
+			if ( captain.m_vitality < 100000.0f )
+			{
+				hurt++;
+			}
+		}
+
+		captain.m_vitality = 100.0f;
+
+		return hurt;
+	}
+
+	IEnumerator ScenarioFlatDevice()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		// a crew of one, so that every attack is on the captain
+		var ada = AddPerson( "Ada", 100.0f, 100 );
+
+		for ( var role = PD_CrewAssignment.Role.First; role < PD_CrewAssignment.Role.Count; role++ )
+		{
+			playerData.m_crewAssignment.Assign( role, ada.m_fileId );
+		}
+
+		// planet 92 of the Arth system
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var all = LifeformsOnTheGround();
+
+		if ( all.Count == 0 )
+		{
+			Finish( "scenario=flatdevice abort: no lifeform", 2 );
+			yield break;
+		}
+
+		// a lifeform that nearly always hits: its chance is the average of its aggression and intelligence
+		var lifeform = all[ 0 ].GetComponent<TerrainLifeform>();
+
+		lifeform.m_aggression = 96;
+		lifeform.m_species.m_intelligence = 96;
+
+		// ---- 1. without the Flat Device
+		var flatDevice = DataController.m_instance.m_gameData.FindArtifactId( "Flat Device" );
+
+		if ( playerData.m_playerShip.HasArtifact( "Flat Device" ) )
+		{
+			playerData.m_playerShip.RemoveArtifact( flatDevice );
+		}
+
+		var hurtWithout = AttacksThatHurt( lifeform, 200, ada );
+
+		// ---- 2. with the Flat Device in the ship's hold
+		playerData.m_playerShip.AddArtifact( flatDevice );
+
+		controller.m_messages.Clear();
+
+		var hurtWith = AttacksThatHurt( lifeform, 200, ada );
+		var messages = MessageList();
+
+		playerData.m_playerShip.RemoveArtifact( flatDevice );
+
+		Log( "flatdevice: of 200 attacks (a chance of 96%) " + hurtWithout + " hurt without the Flat Device, " + hurtWith + " with it | " + ( messages.Length > 300 ? messages.Substring( 0, 300 ) : messages ) );
+
+		Check( "flatdevice: without the Flat Device nearly every attack hurts (control)", hurtWithout >= 170, hurtWithout + " of 200" );
+		Check( "flatdevice: with the Flat Device about half of the attacks hurt, and the shield turns the others away", ( hurtWith >= 80 ) && ( hurtWith <= 140 ) && messages.Contains( "the shield turns it away" ), hurtWith + " of 200" );
+
+		Finish( "scenario=flatdevice without=" + hurtWithout + " with=" + hurtWith, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

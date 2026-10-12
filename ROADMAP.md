@@ -142,7 +142,7 @@ Only the effects that matter for winning have to come before Phase 5. The others
 | Crystal Cone | finds the Crystal Planet's nexus from orbit: PR 118 (the messages report it on entering orbit and on Land; how it is shown is the port's choice) | Uhlek space | INFERRED yes |
 | Ring Device | shows nearby fluxes (alpha.txt: fluxes are hidden without it and navigation skill) | Mars, 90N 0 | no; ruled 2026-10-10: fluxes are hidden without it. PR 132 |
 | Whining Orb | translates Spemin: PR 126 | Starport, 6000 MU | no |
-| Flat Device | shields the terrain vehicle from lifeforms | Starport, 30,000 MU | no, needs Phase 6 |
+| Flat Device | shields the terrain vehicle from lifeforms: a lifeform hits half as often with the device in the ship or the terrain vehicle (the half is the port's choice) | Starport, 30,000 MU | no |
 | Shimmering Ball | automatic cloak in combat; ruled 2026-10-10: the aliens cannot fire at the ship until it fires. PR 130 (3 s uncloaked after each shot) | 68,66 planet 1 | no |
 | Rod Device | stronger laser shield: PR 127 (half of every alien laser hit; the amount is the port's choice) | New Scotland (site: D5) | no |
 | Tesseract | doubles engine efficiency: PR 124 (half the engines' fuel in hyperspace) | 18,50 planet 5 | no |

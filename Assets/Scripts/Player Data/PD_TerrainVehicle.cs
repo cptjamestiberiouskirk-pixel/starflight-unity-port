@@ -119,6 +119,14 @@ public class PD_TerrainVehicle
 		RecalculateVolumeUsed();
 	}
 
+	// true if this artifact is in the terrain vehicle's hold
+	public bool HasArtifact( string artifactName )
+	{
+		var artifactId = DataController.m_instance.m_gameData.FindArtifactId( artifactName );
+
+		return ( artifactId >= 0 ) && ( m_artifactStorage != null ) && ( m_artifactStorage.Find( artifactId ) != null );
+	}
+
 	public void RemoveArtifact( int artifactId )
 	{
 		// ensure storage exists

@@ -613,6 +613,18 @@ public class TerrainLifeform : MonoBehaviour
 	// "ATTACK-PLAYER : Determine whether or not alien hits or misses. Distribute any damage, and print out result-phrase." - one to three attacks (70%, 25%,
 	// 5%), each on a crew member at random, a hit if a number from 1 to 100 is under the average of its aggression and intelligence, for damage of up to
 	// (aggression + 2 x hit points) / 3 / the crew member's durability
+	// true if the terrain vehicle is shielded by the Flat Device, in its hold or the ship's (the Starport's analysis: "This device will project a shield around
+	// your terrain vehicle which makes it difficult for dangerous lifeforms to attack you"; the 1986 kernel's ?FLAT, "TRUE if TV has flat device")
+	static bool TerrainVehicleIsShielded()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		return playerData.m_playerShip.HasArtifact( "Flat Device" ) || ( ( playerData.m_terrainVehicle != null ) && playerData.m_terrainVehicle.HasArtifact( "Flat Device" ) );
+	}
+
+	// how much harder the Flat Device makes it for a lifeform to hit: its chance is halved (the port's; the sources say only "difficult")
+	const int c_flatDeviceHitDivisor = 2;
+
 	void AttackPlayer()
 	{
 		m_lastAttackTime = Time.time;
@@ -649,6 +661,8 @@ public class TerrainLifeform : MonoBehaviour
 
 		messages.AddText( "<color=red>Captain, we're being attacked!</color>" );
 
+		var shielded = TerrainVehicleIsShielded();
+
 		SoundController.m_instance.PlaySound( SoundController.Sound.Error );
 
 		for ( var i = 0; i < attacks; i++ )
@@ -656,9 +670,20 @@ public class TerrainLifeform : MonoBehaviour
 			var victim = crew[ Random.Range( 0, crew.Count ) ];
 			var phrase = "The " + m_species.GetBodyPlanText().ToLower() + " lifeform attacks " + victim.m_name;
 
-			if ( Random.Range( 1, 101 ) >= ( m_aggression + m_species.m_intelligence ) / 2 )
+			var hitChance = ( m_aggression + m_species.m_intelligence ) / 2;
+			var hitRoll = Random.Range( 1, 101 );
+
+			if ( hitRoll >= hitChance )
 			{
 				messages.AddText( "<color=white>" + phrase + " and misses.</color>" );
+
+				continue;
+			}
+
+			// the Flat Device's shield turns away half of the attacks that would hit
+			if ( shielded && ( hitRoll >= hitChance / c_flatDeviceHitDivisor ) )
+			{
+				messages.AddText( "<color=white>" + phrase + ", but the shield turns it away.</color>" );
 
 				continue;
 			}
