@@ -137,6 +137,7 @@ The project features a **deterministic visualization system** that renders plane
 - The Crystal Pearl warps a critically wounded ship out of an encounter
 - The Dodecahedron draws alien ships from twice as far
 - The Shimmering Ball cloaks the ship in combat until it fires
+- The Flat Device shields the terrain vehicle: lifeforms hit its crew half as often
 - Continuum fluxes can be seen only with the Ring Device aboard
 - The price of Endurium rises with the notices of 20-02 and 15-05, and the Starport buys it back for what it sells it for
 - Nebulae keep the shields down
