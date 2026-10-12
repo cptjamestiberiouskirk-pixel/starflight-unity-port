@@ -13458,7 +13458,21 @@ public class ClaudeProbe : MonoBehaviour
 	// the size of the meshes under model, measured along the axes of container (the ship's own frame: +Z is its nose)
 	static Vector3 SizeInFrameOf( Transform container, GameObject model )
 	{
-		var toContainer = container.worldToLocalMatrix;
+		return SizeInFrameOf( container.worldToLocalMatrix, model );
+	}
+
+	// the size of a ship model template at rest, posed as its clone is in its container (Encounter.Start puts the container at the identity before it clones
+	// the template with the template's own local rotation and scale): what an animated model is made of, wherever its parts have moved to in the encounter
+	static Vector3 RestSizeOf( GameObject template )
+	{
+		var pose = Matrix4x4.TRS( Vector3.zero, template.transform.localRotation, template.transform.localScale );
+
+		return SizeInFrameOf( pose * template.transform.worldToLocalMatrix, template );
+	}
+
+	// the size of the meshes under model, measured along the axes of the frame that toContainer takes world space to
+	static Vector3 SizeInFrameOf( Matrix4x4 toContainer, GameObject model )
+	{
 		var bounds = new Bounds();
 		var first = true;
 
@@ -13676,36 +13690,35 @@ public class ClaudeProbe : MonoBehaviour
 				}
 			}
 
-			// the debris: destroy the first ship and wait for its explosion to call back (1.5 s)
+			// the debris: destroy the first ship (the debris replaces it at once, in CombatController.ApplyDamageToAlien, before the explosion has played)
 			if ( hasModel && ( debrisTemplates != null ) && ( vesselId < debrisTemplates.Length ) && ( debrisTemplates[ vesselId ] != null ) )
 			{
 				Kill( 0 );
 
-				// catch the debris on the frame it appears and measure it in the ship's frame before it has tumbled
-				var until = Time.realtimeSinceStartup + 3.0f;
-				DebrisTumble tumble = null;
-
-				while ( ( tumble == null ) && ( Time.realtimeSinceStartup < until ) )
-				{
-					yield return null;
-
-					tumble = model.GetComponentInChildren<DebrisTumble>( false );
-				}
+				// measure the debris in the ship's frame before a frame has passed: its DebrisTumble turns it by up to 17 degrees a second from its first update, and one
+				// slow headless frame (up to Time.maximumDeltaTime, a third of a second) turned it far enough to fail the shape check below
+				var tumble = model.GetComponentInChildren<DebrisTumble>( false );
 
 				var debrisSize = ( tumble != null ) ? SizeInFrameOf( model.transform, tumble.gameObject ) : Vector3.zero;
 				var debrisLongest = Mathf.Max( debrisSize.x, debrisSize.y, debrisSize.z );
 				var ratio = ( longest > 0.0f ) ? ( debrisLongest / longest ) : 0.0f;
-				var sameShape = true;
 
-				for ( var axis = 0; axis < 3; axis++ )
+				// the debris is turned like the ship if its proportions along the ship's axes are those of the ship, each within a tenth of the longest side, measured
+				// against the ship at rest: the Mysterion (vessel 20) is a cloud of orbs that Mysterion.Update moves with the game time, so its shape when it is
+				// destroyed depends on how long the encounter's first frames took (90.6 x 80.0 x 90.6 in one run, 87.1 x 80.0 x 87.1 in another)
+				var restSize = RestSizeOf( templates[ vesselId ] );
+				var restLongest = Mathf.Max( restSize.x, restSize.y, restSize.z );
+				var sameShape = ( debrisLongest > 0.0f ) && ( restLongest > 0.0f );
+
+				for ( var axis = 0; sameShape && ( axis < 3 ); axis++ )
 				{
-					sameShape &= Mathf.Abs( debrisSize[ axis ] - size[ axis ] ) <= longest * 0.1f;
+					sameShape &= Mathf.Abs( debrisSize[ axis ] / debrisLongest - restSize[ axis ] / restLongest ) <= 0.1f;
 				}
 
 				sizes += "(debris " + ratio.ToString( "F2" ) + ( sameShape ? "" : " turned" ) + ")";
 
 				Check( "vessel " + vesselId + " leaves debris of its own size", ( tumble != null ) && ( Mathf.Abs( ratio - 1.0f ) <= 0.1f ), "debris=" + debrisSize.ToString( "F1" ) + " ratio=" + ratio.ToString( "F2" ) );
-				Check( "vessel " + vesselId + " leaves debris turned like the ship", ( tumble != null ) && sameShape, "debris=" + debrisSize.ToString( "F1" ) + " ship=" + size.ToString( "F1" ) );
+				Check( "vessel " + vesselId + " leaves debris turned like the ship", ( tumble != null ) && sameShape, "debris=" + debrisSize.ToString( "F1" ) + " ship at rest=" + restSize.ToString( "F1" ) + " ship=" + size.ToString( "F1" ) );
 			}
 
 			ClearMissiles();
@@ -20397,6 +20410,25 @@ public class ClaudeProbe : MonoBehaviour
 		var preyBehaviours = "";
 		var hunterBehaviours = "";
 
+		// the prey decides only once the hunter is coming at it: every lifeform decides on the same frame, in an order Unity does not fix, and the hunter may
+		// unpair at random as it pairs; a prey that decided first saw nothing coming, wandered into the air, and a flyer is never approached again (it never
+		// lands), so about one run in ten failed
+		SetField( prey, "m_flying", false );
+		SetField( prey, "m_moving", false );
+
+		end = Time.realtimeSinceStartup + 3.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !( ( MateBehaviour( grazer ) == "ApproachingMate" ) && ( ( FieldOrNull( grazer, "m_mate" ) as TerrainLifeform ) == prey ) ) )
+		{
+			SetField( prey, "m_behaviourTimer", 0.5f );
+
+			yield return null;
+		}
+
+		hunterBehaviours = MateBehaviour( grazer ) + " ";
+
+		SetField( prey, "m_behaviourTimer", 0.0f );
+
 		end = Time.realtimeSinceStartup + 3.0f;
 
 		while ( Time.realtimeSinceStartup < end )
@@ -21657,6 +21689,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		System.IO.Directory.CreateDirectory( folder );
 
+		// the pictures of an earlier run go, so that the folder holds one run's pictures only (their numbers change when a screen is added)
+		foreach ( var oldPicture in System.IO.Directory.GetFiles( folder, "*.png" ) )
+		{
+			System.IO.File.Delete( oldPicture );
+		}
+
 		return folder;
 	}
 
@@ -21720,11 +21758,20 @@ public class ClaudeProbe : MonoBehaviour
 
 		take( "orbit" );
 
-		displays.ChangeDisplay( displays.m_sensorsDisplay );
+		// a real scan of the planet (a science officer of full skill, who gives every line of the analysis), then its analysis
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer ).m_science = 250;
 
-		yield return Frames( 30 );
+		new SensorsButton().Execute();
+
+		yield return new WaitForSecondsRealtime( displays.m_sensorsDisplay.m_minDuration + 1.5f );
 
 		take( "orbit_sensors" );
+
+		new AnalysisButton().Execute();
+
+		yield return Frames( 10 );
+
+		take( "orbit_analysis" );
 
 		// ---- the landing map
 		displays.ChangeDisplay( displays.m_terrainMapDisplay );
@@ -21740,24 +21787,62 @@ public class ClaudeProbe : MonoBehaviour
 
 		take( "terrain_vehicle" );
 
-		// ---- hyperspace
-		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 125.0f, 0.0f, 100.0f ) );
+		// ---- hyperspace, away from any star (125,100 is Arth's own place, where the view was its sun)
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 118.0f, 0.0f, 96.0f ) );
 		controller.SwitchLocation( PD_General.Location.Hyperspace );
 
 		yield return Frames( 60 );
 
 		take( "hyperspace" );
 
-		// ---- an encounter met in hyperspace (Spemin)
-		EnterEncounter( FindEncounter( 1, 6, 3, 0 ) );
+		// ---- an encounter of Spemin scouts in Arth's system, once the ships have come close
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
 
-		yield return Frames( 60 );
+		yield return Frames( 10 );
+
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		ForceVessel( speminId, 2 );
+		EnterEncounter( speminId );
+
+		yield return new WaitForSecondsRealtime( 4.0f );
 
 		take( "encounter" );
 
+		// the sensor reading of the first Spemin scout (selection 0 is our own ship), as the Sensors button takes it, and the analysis of it
+		displays.ChangeDisplay( displays.m_sensorsDisplay );
+		controller.m_encounter.StartScanning( 1 );
+
+		// (the scan of a ship is a cinematic that ends with the reading: wait for the reading itself)
+		var scanEnd = Time.realtimeSinceStartup + 30.0f;
+
+		yield return Frames( 5 );
+
+		while ( !displays.m_sensorsDisplay.m_hasSensorData && ( Time.realtimeSinceStartup < scanEnd ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 30 );
+
+		take( "encounter_sensors" );
+
+		new AnalysisButton().Execute();
+
+		yield return Frames( 10 );
+
+		take( "encounter_analysis" );
+
+		// the comm link with them
+		controller.m_encounter.Connect();
+
+		yield return Frames( 60 );
+
+		take( "encounter_comm" );
+
 		Log( "screenpictures: " + pictures.Count + " pictures in " + folder + ": " + string.Join( ", ", pictures ) );
 
-		Check( "screenpictures: a picture of every screen visited", pictures.Count == 8, pictures.Count.ToString() );
+		Check( "screenpictures: a picture of every screen visited", pictures.Count == 12, pictures.Count.ToString() );
 
 		Finish( "scenario=screenpictures pictures=" + pictures.Count, 0 );
 	}

@@ -46,6 +46,10 @@ public static class UIKitDockingBayTool
 		SetColours( "Docking Bay Siren Dome", theme.m_accentSecondary, theme.m_accentSecondary * c_sirenGlow, report );
 		SetColours( "Docking Bay Siren Base", theme.m_borderDefault, Color.black, report );
 
+		// the launch and the landing light the sirens up in the original's orange: their keys take the kit's amber
+		RetargetSirenKeys( "Docking Bay Launch", theme.m_accentSecondary, report );
+		RetargetSirenKeys( "Docking Bay Landing", theme.m_accentSecondary, report );
+
 		// the doors
 		if ( MakeDoorTextures( theme, report ) )
 		{
@@ -76,6 +80,63 @@ public static class UIKitDockingBayTool
 		AssetDatabase.SaveAssets();
 
 		return report.ToString();
+	}
+
+	// gives the sirens' emissive colour keys in an animation this colour: at each key the red channel tells how lit the siren is (the original's orange is
+	// full red, so 0 is off and 1 is lit), and the green and blue keys become the colour's green and blue that far lit (the red and the alpha stay)
+	static void RetargetSirenKeys( string clipName, Color colour, System.Text.StringBuilder report )
+	{
+		var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>( c_folder + clipName + ".anim" );
+
+		if ( clip == null )
+		{
+			report.AppendLine( clipName + ": not found" );
+			return;
+		}
+
+		Undo.RecordObject( clip, "UI kit" );
+
+		var retargeted = 0;
+
+		foreach ( var binding in AnimationUtility.GetCurveBindings( clip ) )
+		{
+			var green = binding.propertyName == "material.SF_EmissiveColor.g";
+			var blue = binding.propertyName == "material.SF_EmissiveColor.b";
+
+			if ( !green && !blue )
+			{
+				continue;
+			}
+
+			var redBinding = binding;
+
+			redBinding.propertyName = "material.SF_EmissiveColor.r";
+
+			var red = AnimationUtility.GetEditorCurve( clip, redBinding );
+			var curve = AnimationUtility.GetEditorCurve( clip, binding );
+
+			if ( ( red == null ) || ( curve == null ) )
+			{
+				continue;
+			}
+
+			var keys = curve.keys;
+
+			for ( var i = 0; i < keys.Length; i++ )
+			{
+				keys[ i ].value = ( green ? colour.g : colour.b ) * Mathf.Clamp01( red.Evaluate( keys[ i ].time ) );
+			}
+
+			curve.keys = keys;
+
+			AnimationUtility.SetEditorCurve( clip, binding, curve );
+
+			retargeted++;
+		}
+
+		EditorUtility.SetDirty( clip );
+
+		report.AppendLine( clipName + ": " + retargeted + " siren colour curves in the kit's amber" );
 	}
 
 	// sets a material's albedo (and the standard colour, which the editor shows) and its emissive colour
