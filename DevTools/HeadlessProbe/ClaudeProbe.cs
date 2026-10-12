@@ -13917,6 +13917,25 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
+		// the three supplemental evaluations (shown as they stand in Operations) in the shipped game's words (OP-OV in the decompiled original, where STRINFO
+		// prints "CONSEQUENLY", "LIABLE FOR ANY COSTS" and "ON BEHALF SAID CREW"), with STRINFO's blank line after the SUBJECT line
+		var supplemental = "";
+
+		foreach ( var record in storyTexts )
+		{
+			var key = FieldOrNull( record, "m_key" ) as string;
+
+			if ( ( key == "MissionComplete" ) || ( key == "TerrainVehicleLost" ) || ( key == "TowingCharges" ) )
+			{
+				supplemental += ( FieldOrNull( record, "m_text" ) as string ?? "" ) + "\n|\n";
+			}
+		}
+
+		var supplementalRight = supplemental.Contains( "CONSEQUENTLY, YOU HAVE BEEN FINED" ) && supplemental.Contains( "LIABLE FOR ALL COSTS" ) && supplemental.Contains( "ON BEHALF OF SAID CREW" )
+			&& supplemental.Contains( "SUBJECT:  COMPLETION OF MISSION\n\n" ) && supplemental.Contains( "SUBJECT:  LOSS OF TERRAIN VEHICLE\n\n" ) && supplemental.Contains( "SUBJECT:  TOWING CHARGES\n\n" );
+
+		Check( "recovereddata: the supplemental evaluations read CONSEQUENTLY, LIABLE FOR ALL COSTS and ON BEHALF OF SAID CREW as in the shipped game, with a blank line after each SUBJECT", supplementalRight, supplemental.Replace( '\n', '/' ) );
+
 		Log( "recovereddata: story texts missing or broken: " + ( ( missingKeys == "" ) ? "none" : missingKeys.Trim() ) + " | the flare text: " + flareText.Replace( '\n', '/' ) );
 
 		Check( "recovereddata: the ten story texts are there, with their line breaks", ( missingKeys == "" ) && flareText.Contains( "INCINERATED" ) && flareText.Contains( "\n" ), ( missingKeys == "" ) ? flareText.Replace( '\n', '/' ) : missingKeys.Trim() );
@@ -13949,6 +13968,25 @@ public class ClaudeProbe : MonoBehaviour
 		var sizes = gameData.m_planetList.Length + "/" + gameData.m_artifactList.Length + "/" + gameData.m_commList.Length;
 
 		Check( "recovereddata: the original game data is unchanged (control)", sizes == "811/51/558", sizes );
+
+		// ---- the game data's notices and Starport analyses were typed from STRINFO, and six of their words are STRINFO's slips: they read as the shipped game
+		// has them (its notice records in the decompiled original's instance.txt, its analyses in data.h; the owner's ruling of 2026-10-12)
+		var noticeText = "";
+
+		foreach ( var notice in gameData.m_noticeList )
+		{
+			noticeText += notice.m_message + "\n";
+		}
+
+		var hypercubeAnalysis = gameData.m_artifactList[ gameData.FindArtifactId( "Hypercube" ) ].m_analysisText;
+		var rodDeviceAnalysis = gameData.m_artifactList[ gameData.FindArtifactId( "Rod Device" ) ].m_analysisText;
+
+		var shippedWords = noticeText.Contains( "penalized for recommendations of planets" ) && noticeText.Contains( "lost several ships in its vicinity." ) && noticeText.Contains( "Extensive experience as communications officer on board the ISS Intrepid" )
+			&& noticeText.Contains( "indicate that minimal or no life" ) && !noticeText.Contains( "minimial" ) && hypercubeAnalysis.Contains( "feeling of ataraxia." ) && rodDeviceAnalysis.Contains( "enhanced laser shield" );
+
+		Log( "recovereddata: the Hypercube's analysis: " + hypercubeAnalysis + " | the Rod Device's: " + rodDeviceAnalysis );
+
+		Check( "recovereddata: the notices and the Starport's analyses have the shipped game's words (penalized for, its vicinity, as communications officer, minimal, ataraxia, laser shield)", shippedWords, hypercubeAnalysis + " | " + rodDeviceAnalysis );
 
 		Finish( "scenario=recovereddata counts=" + counts + " unresolved=" + ( ( unresolved == "" ) ? "none" : unresolved.Trim().Replace( ' ', ',' ) ) + " planets=" + planets.Replace( ' ', ',' ) + " gameData=" + sizes, 0 );
 	}
