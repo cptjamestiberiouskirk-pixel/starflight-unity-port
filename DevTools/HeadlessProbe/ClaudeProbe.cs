@@ -885,6 +885,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioTVDisplay();
 				break;
 
+			case "coordinatebar":
+				yield return ScenarioCoordinateBar();
+				break;
+
 			case "statusdisplay":
 				yield return ScenarioStatusDisplay();
 				break;
@@ -21628,6 +21632,46 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "tvdisplay: the bearing to the ship is spelled out, as the original's NORTH", System.Array.IndexOf( words, bearing ) >= 0, ship );
 
 		Finish( "scenario=tvdisplay date=" + date + " ship=" + ship, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the coordinates above the main view after the terrain vehicle
+
+	IEnumerator ScenarioCoordinateBar()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// on planet 92 of Arth, in the terrain vehicle
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+		yield return Frames( 10 );
+
+		var onTheSurface = controller.m_viewport.m_label.text;
+
+		// back into orbit, as the terrain vehicle's return does when it is lost (the ship does not move on the way)
+		controller.m_disembarked.ReturnToOrbit();
+
+		yield return Frames( 10 );
+
+		var inOrbit = controller.m_viewport.m_label.text;
+		var locationInOrbit = playerData.m_general.m_location;
+
+		// and out of orbit into the star system
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 10 );
+
+		var inTheSystem = controller.m_viewport.m_label.text;
+
+		Log( "coordinatebar: on the surface '" + onTheSurface + "', in orbit (" + locationInOrbit + ") '" + inOrbit + "', in the star system '" + inTheSystem + "'" );
+
+		Check( "coordinatebar: on the surface the bar has the terrain vehicle's place (control)", onTheSurface.Contains( " x " ), onTheSurface );
+		Check( "coordinatebar: back in orbit the bar has the ship's coordinates again, as the original's 125 100", ( locationInOrbit == PD_General.Location.InOrbit ) && System.Text.RegularExpressions.Regex.IsMatch( inOrbit, @"^\d+ +\d+$" ), locationInOrbit + ": " + inOrbit );
+		Check( "coordinatebar: in the star system the bar has the ship's coordinates", System.Text.RegularExpressions.Regex.IsMatch( inTheSystem, @"^\d+ +\d+$" ), inTheSystem );
+
+		Finish( "scenario=coordinatebar", 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 7: the Status display in the original's words
