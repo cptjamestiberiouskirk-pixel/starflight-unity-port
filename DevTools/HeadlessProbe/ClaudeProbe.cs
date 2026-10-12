@@ -873,6 +873,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioScreenPictures();
 				break;
 
+			case "systemviewpictures":
+				yield return ScenarioSystemViewPictures();
+				break;
+
 			case "starport-screenpictures":
 				yield return ScenarioStarportScreenPictures();
 				break;
@@ -21382,6 +21386,160 @@ public class ClaudeProbe : MonoBehaviour
 	}
 
 	// ---------------------------------------------------------------- phase 7: pictures of every screen, for the comparison with the original's (probe.ps1 -Graphics)
+
+	// the 3D star system view: in Arth's system (class G) and star 156 (class A, a gas giant in orbit 4) the sunlight shines from the middle of the star, in the
+	// plane of the orbits, toward the ship (so the planets in view are lit on their star's side) and has the star's colour; with -Graphics, pictures of the
+	// ship beside the sun, beside each planet and of an overview from high above the sun go into Logs/screen-pictures/system-view/ (or -probePictures)
+	IEnumerator ScenarioSystemViewPictures()
+	{
+		var controller = SpaceflightController.m_instance;
+		var gameData = DataController.m_instance.m_gameData;
+		var folder = ScreenPictureFolder( "system-view" );
+		var pictures = new List<string>();
+
+		EnsureCrew();
+
+		// no encounter begins while the pictures are taken
+		controller.m_encounterRange = 0.0f;
+
+		var ship = controller.m_playerShip.gameObject;
+
+		// the light the planets are lit by: the directional light of the star system that lights their layer (the scene's sunlight before the change), and the
+		// one the ship is lit by
+		var planetLayer = controller.m_starSystem.m_planetController[ 0 ].m_planetModel.layer;
+		var shipRenderer = ship.GetComponentInChildren<MeshRenderer>();
+		var shipLayer = ( shipRenderer != null ) ? shipRenderer.gameObject.layer : ship.layer;
+		Light sunlight = null;
+		Light shipLight = null;
+
+		foreach ( var light in controller.m_starSystem.GetComponentsInChildren<Light>( true ) )
+		{
+			if ( light.type != LightType.Directional )
+			{
+				continue;
+			}
+
+			if ( ( light.cullingMask & ( 1 << planetLayer ) ) != 0 )
+			{
+				sunlight = light;
+			}
+
+			if ( ( light.cullingMask & ( 1 << shipLayer ) ) != 0 )
+			{
+				shipLight = light;
+			}
+		}
+
+		Log( "systemviewpictures: the planets (layer " + planetLayer + ") are lit by " + ( ( sunlight != null ) ? sunlight.name : "nothing" ) + ", the ship (layer " + shipLayer + ") by " + ( ( shipLight != null ) ? shipLight.name : "nothing" ) );
+
+		var shipLitFromAbove = true;
+
+		System.Action<string> take = name =>
+		{
+			if ( folder != "" )
+			{
+				RenderScreenPicture( System.IO.Path.Combine( folder, name + ".png" ) );
+				pictures.Add( name );
+			}
+		};
+
+		foreach ( var starId in new[] { gameData.m_misc.m_arthStarId, 156 } )
+		{
+			EnterStarSystem( starId );
+
+			var start = Time.realtimeSinceStartup;
+
+			while ( controller.m_starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 60.0f ) )
+			{
+				yield return null;
+			}
+
+			// the shine fades in
+			yield return new WaitForSecondsRealtime( 3.0f );
+
+			var starClass = gameData.m_starList[ starId ].m_class;
+			var prefix = "star" + starId + "_" + starClass;
+
+			// beside the sun
+			MoveShipTo( new Vector3( 0.0f, 0.0f, -250.0f ) );
+
+			yield return Frames( 10 );
+
+			take( prefix + "_sun" );
+
+			// beside each planet, south of it: the sunlight's direction is measured at each
+			var worstAngle = 0.0f;
+			var planetsSeen = 0;
+
+			foreach ( var planetController in controller.m_starSystem.m_planetController )
+			{
+				if ( ( planetController.m_planet == null ) || !planetController.gameObject.activeInHierarchy )
+				{
+					continue;
+				}
+
+				var planet = planetController.m_planet;
+				var position = planetController.transform.position;
+
+				MoveShipTo( position + new Vector3( 0.0f, 0.0f, -( planet.GetScale().y * 1.5f + 120.0f ) ) );
+
+				yield return Frames( 10 );
+
+				if ( sunlight != null )
+				{
+					// from the middle of the star (in the plane of the orbits) to the ship
+					var fromStar = ship.transform.position - controller.m_starSystem.transform.position;
+					var angle = Vector3.Angle( sunlight.transform.forward, fromStar );
+
+					worstAngle = Mathf.Max( worstAngle, angle );
+
+				}
+
+				// the ship is still lit from high above, as before (at least 15 degrees down: the scene's sunlight is aimed at the ship from 2048 above the star)
+				if ( ( shipLight == null ) || ( Vector3.Angle( shipLight.transform.forward, Vector3.down ) > 75.0f ) )
+				{
+					shipLitFromAbove = false;
+				}
+
+				planetsSeen++;
+
+				take( prefix + "_orbit" + planet.m_orbitPosition + "_" + gameData.m_surfaceList[ planet.m_surfaceId ].m_name.Replace( " ", "" ) );
+			}
+
+			var expectedColor = SystemDisplay.GetStarColor( starClass );
+			var colorMatches = ( sunlight != null ) && ( Mathf.Abs( sunlight.color.r - expectedColor.r ) < 0.01f ) && ( Mathf.Abs( sunlight.color.g - expectedColor.g ) < 0.01f ) && ( Mathf.Abs( sunlight.color.b - expectedColor.b ) < 0.01f );
+
+			Log( "systemviewpictures: star " + starId + " (" + starClass + "): " + planetsSeen + " planets, the sunlight's direction is at most " + worstAngle.ToString( "F1" ) + " degrees from the star's, its colour " + ( ( sunlight != null ) ? sunlight.color.ToString() : "none" ) + " (the star's " + expectedColor + ")" );
+
+			Check( "systemviewpictures: star " + starId + ": beside every planet the sunlight comes from the star itself, in the plane of the orbits (within 2 degrees)", ( sunlight != null ) && ( planetsSeen > 0 ) && ( worstAngle <= 2.0f ), "sunlight " + ( sunlight != null ) + ", " + planetsSeen + " planets, worst " + worstAngle.ToString( "F1" ) + " degrees" );
+
+			Check( "systemviewpictures: star " + starId + ": the sunlight has the colour of a class " + starClass + " star", colorMatches, ( ( sunlight != null ) ? sunlight.color.ToString() : "no sunlight" ) + " vs " + expectedColor );
+
+			Check( "systemviewpictures: star " + starId + ": the ship is still lit from high above, so that it can be seen from the camera (control)", shipLitFromAbove, "light " + ( ( shipLight != null ) ? shipLight.name : "none" ) );
+
+			// high above the sun
+			MoveShipTo( Vector3.zero );
+
+			controller.m_playerCamera.SetCameraFollow( ship, Vector3.up * 9000.0f );
+
+			yield return Frames( 10 );
+
+			take( prefix + "_overview" );
+
+			controller.m_playerCamera.SetCameraFollow( ship, Vector3.up * 1024.0f );
+		}
+
+		if ( folder == "" )
+		{
+			Log( "systemviewpictures: no graphics device (-nographics), so no pictures; run probe.ps1 with -Graphics for them" );
+		}
+		else
+		{
+			Log( "systemviewpictures: " + pictures.Count + " pictures in " + folder + ": " + string.Join( ", ", pictures ) );
+		}
+
+		Finish( "scenario=systemviewpictures pictures=" + pictures.Count + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
 
 	// renders every camera in its order of depth into one picture, as the screen shows them: the views, the console and its displays, the panels (cameras
 	// that draw into a texture of their own are left out: the screens that show those textures draw them)

@@ -27,6 +27,7 @@ The project has been refactored to a clean, **root-directory architecture** to e
 - **Encounters in Orbit**: Home fleets, drones and a derelict wait in orbit around their planets and meet the ship when it goes into orbit there. The ship drops into the encounter and comes back at the level of the star system, as in the original.
 - **Ship Systems Over Time**: Shields keep their charge and recharge slowly, and the engineer's repairs and the doctor's treatment take time, faster with higher skill.
 - **Living Suns**: The sun of each star system churns, its corona flickers, and small flares rise from its rim and fall back, in the colour of real stars of its class.
+- **Planets Lit by Their Star**: In the 3D star system view each planet is lit from its own star, in the star's colour, with a day side and a night side, and its atmosphere glows on the sunlit edge
 - **Ship Destruction**: Complete death sequences with explosion effects, debris spawning, and salvage opportunities.
 - **Game Over System**: Player ship destruction triggers the game over screen. Returning to the title screen goes back to the last save.
 - **Terrain Scanning**: Enhanced exploration with 3D world-space labels, mineral detection, and Star Trek-style transporter effects.
