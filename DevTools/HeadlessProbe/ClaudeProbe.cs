@@ -21941,7 +21941,8 @@ public class ClaudeProbe : MonoBehaviour
 
 	// the 3D star system view: in Arth's system (class G) and star 156 (class A, a gas giant in orbit 4) the sunlight shines from the middle of the star, in the
 	// plane of the orbits, toward the ship (so the planets in view are lit on their star's side) and has the star's colour; with -Graphics, pictures of the
-	// ship beside the sun, beside each planet and of an overview from high above the sun go into Logs/screen-pictures/system-view/ (or -probePictures)
+	// ship beside the sun, beside each planet and of an overview from high above the sun go into Logs/screen-pictures/system-view/ (or -probePictures); the sky
+	// has a Milky Way under the territory's nebula (and stars of several colours, #232), and the main view shows no Regen Starfield debug button (#240)
 	IEnumerator ScenarioSystemViewPictures()
 	{
 		var controller = SpaceflightController.m_instance;
@@ -21990,6 +21991,13 @@ public class ClaudeProbe : MonoBehaviour
 		{
 			if ( folder != "" )
 			{
+				// the sky turned back to where it starts (it turns as the ship moves, and the ship is put in place at once here, which turns it a long way)
+				if ( StarflightSkybox.m_instance != null )
+				{
+					StarflightSkybox.m_instance.m_currentRotation = Quaternion.identity;
+					StarflightSkybox.m_instance.m_material.SetMatrix( "SF_ModelMatrix", Matrix4x4.identity );
+				}
+
 				RenderScreenPicture( System.IO.Path.Combine( folder, name + ".png" ) );
 				pictures.Add( name );
 			}
@@ -22080,6 +22088,51 @@ public class ClaudeProbe : MonoBehaviour
 
 			controller.m_playerCamera.SetCameraFollow( ship, Vector3.up * 1024.0f );
 		}
+
+		// ---- the sky: a Milky Way under the territory's nebula, stars of several colours, and no debug button on the main view
+		var sky = RenderSettings.skybox;
+		var milkyWay = ( ( sky != null ) && sky.HasProperty( "_MilkyWay" ) ) ? sky.GetTexture( "_MilkyWay" ) : null;
+		var milkyWayStrength = ( ( sky != null ) && sky.HasProperty( "_MilkyWayStrength" ) ) ? sky.GetFloat( "_MilkyWayStrength" ) : 0.0f;
+
+		Check( "systemviewpictures: the sky of the star system view has a Milky Way", ( milkyWay != null ) && ( milkyWayStrength > 0.0f ), "texture " + ( ( milkyWay != null ) ? milkyWay.name : "none" ) + ", strength " + milkyWayStrength );
+
+		var fewestColours = int.MaxValue;
+		var layers = 0;
+
+		foreach ( var starfield in UnityEngine.Object.FindObjectsByType<InfiniteStarfield>( FindObjectsInactive.Include, FindObjectsSortMode.None ) )
+		{
+			foreach ( var particleSystem in starfield.GetComponentsInChildren<ParticleSystem>( true ) )
+			{
+				var particles = new ParticleSystem.Particle[ particleSystem.particleCount ];
+				var count = particleSystem.GetParticles( particles );
+				var colours = new HashSet<Color32>();
+
+				for ( var k = 0; k < count; k++ )
+				{
+					colours.Add( particles[ k ].startColor );
+				}
+
+				if ( count > 0 )
+				{
+					fewestColours = Mathf.Min( fewestColours, colours.Count );
+					layers++;
+				}
+			}
+		}
+
+		Check( "systemviewpictures: every layer of the starfield has stars of several colours, at least 4 (control: #232)", ( layers > 0 ) && ( fewestColours >= 4 ), layers + " layers, the fewest colours in a layer " + ( ( layers > 0 ) ? fewestColours.ToString() : "none" ) );
+
+		var debugButtonsShown = 0;
+
+		foreach ( var gameObject in Resources.FindObjectsOfTypeAll<GameObject>() )
+		{
+			if ( gameObject.scene.IsValid() && ( gameObject.name == "Starfield Regen Button" ) && gameObject.activeInHierarchy )
+			{
+				debugButtonsShown++;
+			}
+		}
+
+		Check( "systemviewpictures: the main view shows no Regen Starfield debug button (control: #240)", debugButtonsShown == 0, debugButtonsShown + " shown" );
 
 		if ( folder == "" )
 		{

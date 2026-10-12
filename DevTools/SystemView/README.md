@@ -4,9 +4,8 @@ The main view of the star system location (`StarSystem`) shows the ship from a c
 
 The parts:
 - **Planets lit by their star** (done): each planet is lit from its own star, in the star's colour, with a day side and a night side, and its atmosphere glows on the sunlit edge. The light of the star is a directional light that `StarSystem` makes in `Awake` ("Starlight"). It lights only the star system's layer (the planets and their atmospheres), shines from the middle of the star in the plane of the orbits toward the ship, and takes the colour of real stars of the star's class (`SystemDisplay.GetStarColor`, the same as the system map and the sun's shine). The planets in view are always near the ship (they are thousands of units apart), so one light serves them all. The scene's "Sunlight" still lights the ship from high above the star (its look at constraint aims it at the ship from 2048 above the star), as before, so that the ship can be seen from the camera; it no longer lights the star system's layer. The atmosphere shader takes the sun's direction from the main directional light, so it follows the starlight without a change.
-- **A new sky**: a faint Milky Way band, faint nebula haze and stars of several colours in place of the plain dot field.
+- **A new sky** (done): a faint Milky Way crosses the sky under the territory's nebula, which stays as the cue to whose space the ship is in (blue for human space, green for the Elowan, red for the Uhlek, and so on). It is a cubemap (`Assets/Game Objects/Skyboxes/Milky Way/milky_way.png`, imported from its latitude and longitude layout) that the skybox shader adds by the direction of each pixel, so it turns with the sky as the ship flies, as the nebula does. Its strength is the skybox controller's `m_milkyWayStrength`: 0.035 in the Spaceflight scene, none in the Starport, which uses the same skybox material. The stars of several colours, sizes and brightnesses were already there (#232), and so was the main view without the "Regen Starfield" debug button (#240 switched it off in the scene; a developer can switch it on in the Inspector).
 - **Orbit paths**: a faint path along each planet's orbit, brighter just behind the planet, and a small blue glow at the ship's engines.
-- **No debug button**: the "Regen Starfield" button is taken off the main view.
 
 Not chosen: look C, "Cinematic" (bloom on bright edges, a soft flare from the star's direction, a richer sky).
 
@@ -18,6 +17,11 @@ Not chosen: look C, "Cinematic" (bloom on bright edges, a soft flare from the st
 | `previews/system-view-mockups.png` | The sheet the owner chose from: A the game before, B Realistic, C Cinematic, beside the gas giant (orbit 4), a liquid planet (orbit 5) and a molten planet (orbit 1) of star 156 |
 | `previews/liquid-planet-realistic.png`, `liquid-planet-cinematic.png` | B and C beside the liquid planet at full size |
 | `previews/starlight-before-after.png` | The planets lit by their star in the engine: before (top) and after (bottom), in star 156 and Arth's system |
+| `build_sky_art.py` | Blender 5.2 script (with numpy) that makes the Milky Way: a 4096 x 2048 latitude and longitude picture worked out on directions with 3D noise (no seam, nothing pinched at the poles), the band through straight down at 28 degrees from the screen's up, with star clouds, dust lanes and a warm bulge; with a second path it also writes what the camera sees straight down |
+| `SkyWiring.cs`, `wire.ps1` | The Unity side, run headless: the cubemap import, the skybox material (the Milky Way with no strength of its own), and the Spaceflight scene's strength |
+| `previews/milky-way-art.png` | The Milky Way picture, and what the camera sees of it straight down at full strength |
+| `previews/sky.png` | The new sky in the engine: beside Arth's sun and frozen planet, and beside two planets of star 156 (the sky turned back to where it starts) |
+| `previews/sky-other-views.png` | Hyperspace, an encounter, orbit and the Starport with the new sky (the Starport shows none of it) |
 
 ## Pictures from the engine
 
@@ -28,6 +32,18 @@ The probe scenario `systemviewpictures` checks the light of the star and, with a
 ```
 
 The pictures go into `Logs/screen-pictures/system-view/`.
+
+## Building the sky
+
+From the project root (a worktree; the Unity project must not be open in an Editor for the second step):
+
+```bash
+blender --background --factory-startup --python DevTools/SystemView/build_sky_art.py
+```
+
+```powershell
+& "DevTools\SystemView\wire.ps1"
+```
 
 ## The mock-ups
 
