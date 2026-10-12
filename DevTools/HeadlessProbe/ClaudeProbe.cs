@@ -933,6 +933,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioDisembarkLines();
 				break;
 
+			case "encounterend":
+				yield return ScenarioEncounterEnd();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -8245,7 +8249,8 @@ public class ClaudeProbe : MonoBehaviour
 	{
 		var count = 0;
 
-		foreach ( var textMesh in FindObjectsByType<TextMesh>( FindObjectsSortMode.None ) )
+		// (the labels are TextMesh Pro text in the UI kit's style)
+		foreach ( var textMesh in FindObjectsByType<TMPro.TextMeshPro>( FindObjectsSortMode.None ) )
 		{
 			count += ( textMesh.gameObject.name == "Label" ) ? 1 : 0;
 		}
@@ -10647,6 +10652,11 @@ public class ClaudeProbe : MonoBehaviour
 			Finish( "scenario=perframe abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
 			yield break;
 		}
+
+		// (no weather: a storm hides the bearing behind LOST!, and then the display does not change when the vehicle is moved - seen in a full run)
+		PlanetWeather.End();
+
+		yield return Frames( 5 );
 
 		var vehicleDisplay = controller.m_displayController.m_terrainVehicleDisplay;
 
@@ -22979,6 +22989,59 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "disembarklines: disembarking says the original's lines in its order, with Hull check complete", ( playerData.m_general.m_location == PD_General.Location.Disembarked ) && said.StartsWith( expected ), said );
 
 		Finish( "scenario=disembarklines", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the end of a comm link and of an encounter in the original's words
+
+	IEnumerator ScenarioEncounterEnd()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// ---- Spemin scouts in Arth's system: the comm link, then its end
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		EnterEncounter( FindEncounter( 1, 6, 3, 0 ) );
+
+		yield return Frames( 10 );
+
+		controller.m_encounter.Connect();
+
+		yield return Frames( 5 );
+
+		controller.m_messages.Clear();
+
+		controller.m_encounter.Disconnect();
+
+		yield return Frames( 2 );
+
+		var linkEnded = MessageList();
+
+		// ---- out of the encounter (the way Encounter.Update takes the ship out, 4096 or more from its middle)
+		controller.m_messages.Clear();
+
+		playerData.m_general.m_coordinates = new Vector3( 5000.0f, 0.0f, 0.0f );
+		controller.m_playerShip.transform.position = playerData.m_general.m_coordinates;
+
+		yield return WaitForLocation( PD_General.Location.StarSystem, 10.0f );
+		yield return Frames( 5 );
+
+		var left = MessageList();
+		var locationAfter = playerData.m_general.m_location;
+
+		Log( "encounterend: the comm link ends: " + linkEnded + " || out of the encounter (" + locationAfter + "): " + left );
+
+		Check( "encounterend: the end of the comm link says the original's COMMUNICATIONS HAVE BEEN TERMINATED", linkEnded.Contains( "Communications have been terminated." ), linkEnded );
+		Check( "encounterend: leaving the encounter says LEAVING ENCOUNTER... and ...ENCOUNTER TERMINATED, as the original", ( locationAfter == PD_General.Location.StarSystem ) && left.Contains( "Leaving encounter..." ) && left.Contains( "...Encounter terminated." ) && ( left.IndexOf( "Leaving encounter..." ) < left.IndexOf( "...Encounter terminated." ) ), locationAfter + ": " + left );
+
+		Finish( "scenario=encounterend", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
