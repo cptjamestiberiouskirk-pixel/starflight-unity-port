@@ -925,6 +925,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAncientSites();
 				break;
 
+			case "noreading":
+				yield return ScenarioNoReading();
+				break;
+
 			case "disembarklines":
 				yield return ScenarioDisembarkLines();
 				break;
@@ -22894,6 +22898,32 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "ancientsites: planet 2 of 154,62 has two ancient ruins at 42S x 13W with 3.1 and 5.9 cubic meters of Endurium", thrynnRuins == "31,59", thrynnRuins );
 
 		Finish( "scenario=ancientsites", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: Analysis with no reading, in the original's words
+
+	IEnumerator ScenarioNoReading()
+	{
+		var sensors = SpaceflightController.m_instance.m_displayController.m_sensorsDisplay;
+
+		EnsureCrew();
+
+		yield return Frames( 5 );
+
+		// no sensor reading, then Analysis
+		sensors.m_hasSensorData = false;
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		new AnalysisButton().Execute();
+
+		var said = MessageList();
+
+		Log( "noreading: Analysis with no reading says: " + said );
+
+		Check( "noreading: Analysis with no reading says the original's I NEED A CURRENT SENSOR READING.", said.Contains( "I need a current sensor reading." ), said );
+
+		Finish( "scenario=noreading", 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 7: the disembark's lines in the original's words and order
