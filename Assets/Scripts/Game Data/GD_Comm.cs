@@ -43,6 +43,42 @@ public class GD_Comm
 	public bool m_surrender;
 	public string m_text;
 
+	// the shipped game's postures of the speaker that the line is said in, as bits (GD_CommPosture, from the recovered data - 0 for a line the shipped game does
+	// not have, which is said in its m_stance only)
+	[NonSerialized] public int m_postureMask;
+
+	// the bit of a posture in a posture mask (COMM-OV: 1 obsequious, 2 friendly, 4 neutral, 8 hostile)
+	public static int GetPostureBit( Stance stance )
+	{
+		switch ( stance )
+		{
+			case Stance.Obsequious:
+				return 1;
+
+			case Stance.Friendly:
+				return 2;
+
+			case Stance.Neutral:
+				return 4;
+
+			case Stance.Hostile:
+				return 8;
+		}
+
+		return 0;
+	}
+
+	// true if the line is said in this posture of the speaker's: by the shipped game's posture mask where it has one, else by the game data's stance
+	public bool IsSaidIn( Stance stance )
+	{
+		if ( m_postureMask != 0 )
+		{
+			return ( m_postureMask & GetPostureBit( stance ) ) != 0;
+		}
+
+		return m_stance == stance;
+	}
+
 	public GD_Comm( string text )
 	{
 		m_text = text;
