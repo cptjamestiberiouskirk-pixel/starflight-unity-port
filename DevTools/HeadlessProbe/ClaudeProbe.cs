@@ -13251,7 +13251,21 @@ public class ClaudeProbe : MonoBehaviour
 	// the size of the meshes under model, measured along the axes of container (the ship's own frame: +Z is its nose)
 	static Vector3 SizeInFrameOf( Transform container, GameObject model )
 	{
-		var toContainer = container.worldToLocalMatrix;
+		return SizeInFrameOf( container.worldToLocalMatrix, model );
+	}
+
+	// the size of a ship model template at rest, posed as its clone is in its container (Encounter.Start puts the container at the identity before it clones
+	// the template with the template's own local rotation and scale): what an animated model is made of, wherever its parts have moved to in the encounter
+	static Vector3 RestSizeOf( GameObject template )
+	{
+		var pose = Matrix4x4.TRS( Vector3.zero, template.transform.localRotation, template.transform.localScale );
+
+		return SizeInFrameOf( pose * template.transform.worldToLocalMatrix, template );
+	}
+
+	// the size of the meshes under model, measured along the axes of the frame that toContainer takes world space to
+	static Vector3 SizeInFrameOf( Matrix4x4 toContainer, GameObject model )
+	{
 		var bounds = new Bounds();
 		var first = true;
 
@@ -13469,36 +13483,35 @@ public class ClaudeProbe : MonoBehaviour
 				}
 			}
 
-			// the debris: destroy the first ship and wait for its explosion to call back (1.5 s)
+			// the debris: destroy the first ship (the debris replaces it at once, in CombatController.ApplyDamageToAlien, before the explosion has played)
 			if ( hasModel && ( debrisTemplates != null ) && ( vesselId < debrisTemplates.Length ) && ( debrisTemplates[ vesselId ] != null ) )
 			{
 				Kill( 0 );
 
-				// catch the debris on the frame it appears and measure it in the ship's frame before it has tumbled
-				var until = Time.realtimeSinceStartup + 3.0f;
-				DebrisTumble tumble = null;
-
-				while ( ( tumble == null ) && ( Time.realtimeSinceStartup < until ) )
-				{
-					yield return null;
-
-					tumble = model.GetComponentInChildren<DebrisTumble>( false );
-				}
+				// measure the debris in the ship's frame before a frame has passed: its DebrisTumble turns it by up to 17 degrees a second from its first update, and one
+				// slow headless frame (up to Time.maximumDeltaTime, a third of a second) turned it far enough to fail the shape check below
+				var tumble = model.GetComponentInChildren<DebrisTumble>( false );
 
 				var debrisSize = ( tumble != null ) ? SizeInFrameOf( model.transform, tumble.gameObject ) : Vector3.zero;
 				var debrisLongest = Mathf.Max( debrisSize.x, debrisSize.y, debrisSize.z );
 				var ratio = ( longest > 0.0f ) ? ( debrisLongest / longest ) : 0.0f;
-				var sameShape = true;
 
-				for ( var axis = 0; axis < 3; axis++ )
+				// the debris is turned like the ship if its proportions along the ship's axes are those of the ship, each within a tenth of the longest side, measured
+				// against the ship at rest: the Mysterion (vessel 20) is a cloud of orbs that Mysterion.Update moves with the game time, so its shape when it is
+				// destroyed depends on how long the encounter's first frames took (90.6 x 80.0 x 90.6 in one run, 87.1 x 80.0 x 87.1 in another)
+				var restSize = RestSizeOf( templates[ vesselId ] );
+				var restLongest = Mathf.Max( restSize.x, restSize.y, restSize.z );
+				var sameShape = ( debrisLongest > 0.0f ) && ( restLongest > 0.0f );
+
+				for ( var axis = 0; sameShape && ( axis < 3 ); axis++ )
 				{
-					sameShape &= Mathf.Abs( debrisSize[ axis ] - size[ axis ] ) <= longest * 0.1f;
+					sameShape &= Mathf.Abs( debrisSize[ axis ] / debrisLongest - restSize[ axis ] / restLongest ) <= 0.1f;
 				}
 
 				sizes += "(debris " + ratio.ToString( "F2" ) + ( sameShape ? "" : " turned" ) + ")";
 
 				Check( "vessel " + vesselId + " leaves debris of its own size", ( tumble != null ) && ( Mathf.Abs( ratio - 1.0f ) <= 0.1f ), "debris=" + debrisSize.ToString( "F1" ) + " ratio=" + ratio.ToString( "F2" ) );
-				Check( "vessel " + vesselId + " leaves debris turned like the ship", ( tumble != null ) && sameShape, "debris=" + debrisSize.ToString( "F1" ) + " ship=" + size.ToString( "F1" ) );
+				Check( "vessel " + vesselId + " leaves debris turned like the ship", ( tumble != null ) && sameShape, "debris=" + debrisSize.ToString( "F1" ) + " ship at rest=" + restSize.ToString( "F1" ) + " ship=" + size.ToString( "F1" ) );
 			}
 
 			ClearMissiles();
