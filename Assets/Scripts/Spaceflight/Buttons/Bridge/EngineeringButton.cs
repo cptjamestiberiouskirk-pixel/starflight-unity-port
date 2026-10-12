@@ -18,7 +18,7 @@ public class EngineeringButton : ShipButton
 		PD_Personnel.PD_PersonnelFile personnelFile = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Engineer );
 
 		// set the name of the officer
-		SpaceflightController.m_instance.m_buttonController.ChangeOfficerText( "Officer " + personnelFile.m_name );
+		SpaceflightController.m_instance.m_buttonController.ChangeOfficerText( "Officer " + personnelFile.m_name, UIKitTheme.OfficerIcon.Engineer );
 
 		return true;
 	}
