@@ -61,6 +61,7 @@ public class GameData
 	[NonSerialized] public GD_ColonyEvaluation[] m_colonyEvaluationList = new GD_ColonyEvaluation[ 0 ];
 	[NonSerialized] public GD_StoryText[] m_storyTextList = new GD_StoryText[ 0 ];
 	[NonSerialized] public GD_RuinFormation[] m_ruinFormationList = new GD_RuinFormation[ 0 ];
+	[NonSerialized] public GD_AncientRuinSite[] m_ancientRuinSiteList = new GD_AncientRuinSite[ 0 ];
 
 	public void Initialize()
 	{
@@ -134,6 +135,16 @@ public class GameData
 			if ( colonyEvaluation.m_planetId < 0 )
 			{
 				UnityEngine.Debug.LogError( "Recovered colony evaluation " + colonyEvaluation.m_id + " names a planet the game data does not have" );
+			}
+		}
+
+		foreach ( var ancientRuinSite in m_ancientRuinSiteList )
+		{
+			ancientRuinSite.m_planetId = FindPlanetFromSun( ancientRuinSite.m_starX, ancientRuinSite.m_starY, ancientRuinSite.m_planetFromSun );
+
+			if ( ancientRuinSite.m_planetId < 0 )
+			{
+				UnityEngine.Debug.LogError( "Recovered ancient ruin site " + ancientRuinSite.m_id + " names a planet the game data does not have" );
 			}
 		}
 
@@ -287,6 +298,11 @@ public class GameData
 		if ( recoveredData.m_ruinFormationList != null )
 		{
 			m_ruinFormationList = recoveredData.m_ruinFormationList;
+		}
+
+		if ( recoveredData.m_ancientRuinSiteList != null )
+		{
+			m_ancientRuinSiteList = recoveredData.m_ancientRuinSiteList;
 		}
 	}
 

@@ -537,6 +537,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAtmospherePictures();
 				break;
 
+			case "starfieldpictures":
+				yield return ScenarioStarfieldPictures();
+				break;
+
 			case "perframe":
 				yield return ScenarioPerFrame();
 				break;
@@ -651,6 +655,10 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "blackegg":
 				yield return ScenarioBlackEgg();
+				break;
+
+			case "tvtakesegg":
+				yield return ScenarioTvTakesEgg();
 				break;
 
 			case "crystalcone":
@@ -903,6 +911,22 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "examinetreat":
 				yield return ScenarioExamineTreat();
+				break;
+
+			case "landinglines":
+				yield return ScenarioLandingLines();
+				break;
+
+			case "alienshields":
+				yield return ScenarioAlienShields();
+				break;
+
+			case "ancientsites":
+				yield return ScenarioAncientSites();
+				break;
+
+			case "disembarklines":
+				yield return ScenarioDisembarkLines();
 				break;
 
 			default:
@@ -4059,10 +4083,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "M23 the landing finishes and gives the controls back", ( locationAfterLanding == PD_General.Location.Planetside ) && ( consoleAfterLanding == "CommandA selected 0 running nothing" ) && ( consoleAfterLandingStick == "CommandA selected 1 running nothing" ), locationAfterLanding + " after " + landingTime.ToString( "F1" ) + " s, " + consoleAfterLanding + ", after the stick: " + consoleAfterLandingStick );
 
-		// the message box during the landing: every step once, in the order it happens
+		// the message box during the landing: every step once, in the order it happens (the original's lines, ORBIT-OV DESCEND)
 		var plainMessages = System.Text.RegularExpressions.Regex.Replace( messagesAfterLanding, "<[^>]+>", "" );
 
-		Check( "M23 the landing reports each step once and in order", plainMessages == "Computing descent profile... / Autopilot engaged. Descending... / Topography net locked on. / Retro rockets firing... / Safe landing, captain.", plainMessages );
+		Check( "M23 the landing reports each step once and in order", plainMessages == "Computing descent profile... / Autopilot engaged. Descending... / Topography net locked on. / Safe landing, captain.", plainMessages );
 
 		Finish( "scenario=m23 afterDescend=[" + consoleAfterDescend + "] afterStick=[" + consoleAfterStick + "] afterFire=[" + consoleAfterFire + "] landed=" + locationAfterLanding + "@" + landingTime.ToString( "F1" ) + "s afterLanding=[" + consoleAfterLanding + "] afterLandingStick=[" + consoleAfterLandingStick + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
@@ -10312,6 +10336,197 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=atmospherepictures planets=" + chosen.Count + " noRoom=" + noRoom.Count + " hidden=" + hidden.Count + " dim=" + dim.Count + " errors=" + errorsDuring + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
+	// ---------------------------------------------------------------- Low: starfield pictures (the stars' sizes, colours, glints and twinkle, and the game's random numbers they take)
+
+	// render the main camera into a texture and read back the brightness of each pixel of its space view (for a comparison of two moments)
+	static float[] RenderBrightness( Camera camera )
+	{
+		var renderTexture = new RenderTexture( 960, 540, 24, RenderTextureFormat.ARGB32 );
+		var picture = new Texture2D( 960, 540, TextureFormat.RGB24, false );
+
+		camera.targetTexture = renderTexture;
+		camera.Render();
+		camera.targetTexture = null;
+
+		var active = RenderTexture.active;
+
+		RenderTexture.active = renderTexture;
+		picture.ReadPixels( new Rect( 0, 0, 960, 540 ), 0, 0 );
+		picture.Apply();
+		RenderTexture.active = active;
+
+		var pixels = picture.GetPixels();
+		var brightness = new float[ pixels.Length ];
+
+		for ( var i = 0; i < pixels.Length; i++ )
+		{
+			brightness[ i ] = Mathf.Max( pixels[ i ].r, Mathf.Max( pixels[ i ].g, pixels[ i ].b ) );
+		}
+
+		UnityEngine.Object.Destroy( picture );
+		renderTexture.Release();
+		UnityEngine.Object.Destroy( renderTexture );
+
+		return brightness;
+	}
+
+	IEnumerator ScenarioStarfieldPictures()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+		var camera = Camera.main;
+
+		// out in dark hyperspace, where there is nothing but the stars, with no encounter able to begin
+		controller.m_encounterRange = 0.0f;
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 4.0f, 0.0f, 4.0f ) );
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 30 );
+
+		var starfield = UnityEngine.Object.FindFirstObjectByType<InfiniteStarfield>();
+
+		if ( starfield == null )
+		{
+			Finish( "scenario=starfieldpictures abort: no starfield", 2 );
+			yield break;
+		}
+
+		var errorsBefore = s_errorCount;
+
+		// ---- 1. control: the starfield takes four of the game's random numbers for each star, as it always has (the planets and the encounters draw from the same numbers)
+		UnityEngine.Random.InitState( 4321 );
+
+		starfield.InitStarField();
+
+		var stateAfterTheStarfield = JsonUtility.ToJson( UnityEngine.Random.state );
+
+		yield return Frames( 2 );
+
+		var particleSystems = GetField( starfield, "m_particleSystems" ) as ParticleSystem[];
+		var starCount = 0;
+
+		foreach ( var layer in GetField( starfield, "m_particles" ) as ParticleSystem.Particle[][] )
+		{
+			starCount += layer.Length;
+		}
+
+		UnityEngine.Random.InitState( 4321 );
+
+		for ( var i = 0; i < starCount * 4; i++ )
+		{
+			var draw = UnityEngine.Random.value;
+		}
+
+		var stateAfterFourEach = JsonUtility.ToJson( UnityEngine.Random.state );
+
+		Check( "starfieldpictures: the starfield takes four of the game's random numbers for each star (control)", stateAfterTheStarfield == stateAfterFourEach, starCount + " stars, " + ( ( stateAfterTheStarfield == stateAfterFourEach ) ? "the same state as after " + ( starCount * 4 ) + " draws" : "a different state" ) );
+
+		// ---- 2. the stars of a layer differ in size and colour, a few have a glint, and the shader gets their random numbers for the twinkle
+		var flatLayers = new List<string>();
+		var glinting = 0;
+		var twinkleStreams = 0;
+
+		for ( var l = 0; l < particleSystems.Length; l++ )
+		{
+			var particles = new ParticleSystem.Particle[ particleSystems[ l ].particleCount ];
+
+			particleSystems[ l ].GetParticles( particles );
+
+			var smallest = float.MaxValue;
+			var largest = 0.0f;
+			var colours = new HashSet<Color32>();
+
+			foreach ( var particle in particles )
+			{
+				smallest = Mathf.Min( smallest, particle.startSize );
+				largest = Mathf.Max( largest, particle.startSize );
+				colours.Add( particle.startColor );
+
+				if ( particle.startColor.a > 0 && particle.startColor.a < 255 )
+				{
+					glinting++;
+				}
+			}
+
+			if ( ( particles.Length == 0 ) || ( largest < smallest * 2.0f ) || ( colours.Count < 4 ) )
+			{
+				flatLayers.Add( "layer " + l + " (" + particles.Length + " stars, sizes " + smallest.ToString( "F0" ) + " to " + largest.ToString( "F0" ) + ", " + colours.Count + " colours)" );
+			}
+
+			var streams = new List<ParticleSystemVertexStream>();
+
+			particleSystems[ l ].GetComponent<ParticleSystemRenderer>().GetActiveVertexStreams( streams );
+
+			if ( streams.Contains( ParticleSystemVertexStream.StableRandomXY ) )
+			{
+				twinkleStreams++;
+			}
+		}
+
+		var glintShare = ( starCount > 0 ) ? glinting / ( float ) starCount : 0.0f;
+
+		Log( "starfieldpictures: " + particleSystems.Length + " layers, " + starCount + " stars; layers whose stars are all alike: " + ( ( flatLayers.Count == 0 ) ? "none" : string.Join( ", ", flatLayers ) ) + "; glinting " + glinting + " (" + ( glintShare * 100.0f ).ToString( "F1" ) + "%); layers with the twinkle's random numbers " + twinkleStreams );
+
+		Check( "starfieldpictures: the stars of each layer differ in size and colour", ( particleSystems.Length > 0 ) && ( flatLayers.Count == 0 ), ( flatLayers.Count == 0 ) ? "all " + particleSystems.Length + " layers" : string.Join( ", ", flatLayers ) );
+		Check( "starfieldpictures: a few bright stars have a glint", ( glintShare > 0.01f ) && ( glintShare < 0.1f ), ( glintShare * 100.0f ).ToString( "F1" ) + "% of the stars" );
+		Check( "starfieldpictures: the star shader gets each star's random numbers for its twinkle", ( particleSystems.Length > 0 ) && ( twinkleStreams == particleSystems.Length ), twinkleStreams + " of " + particleSystems.Length + " layers" );
+
+		// ---- 3. pictures, and the twinkle seen: the same view a third of a second apart
+		var twinkled = -1;
+		var starPixels = 0;
+
+		if ( hasGraphics )
+		{
+			var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "starfield-pictures" ) );
+
+			System.IO.Directory.CreateDirectory( folder );
+
+			Time.captureDeltaTime = 1.0f / 30.0f;
+
+			RenderCameraPicture( camera, System.IO.Path.Combine( folder, "hyperspace.png" ) );
+			RenderZoomedPicture( camera, System.IO.Path.Combine( folder, "hyperspace_zoomed.png" ), 10.0f );
+
+			var first = RenderBrightness( camera );
+
+			var start = Time.frameCount;
+
+			while ( Time.frameCount - start < 10 )
+			{
+				yield return null;
+			}
+
+			var second = RenderBrightness( camera );
+
+			Time.captureDeltaTime = 0.0f;
+
+			twinkled = 0;
+
+			for ( var i = 0; i < first.Length; i++ )
+			{
+				if ( Mathf.Max( first[ i ], second[ i ] ) > 0.15f )
+				{
+					starPixels++;
+
+					if ( Mathf.Abs( first[ i ] - second[ i ] ) > 0.06f )
+					{
+						twinkled++;
+					}
+				}
+			}
+
+			Log( "starfieldpictures: of " + starPixels + " star pixels, " + twinkled + " changed brightness in a third of a second (the camera did not move); pictures in " + folder );
+
+			Check( "starfieldpictures: stars twinkle", ( starPixels > 0 ) && ( twinkled > starPixels / 20 ), twinkled + " of " + starPixels + " star pixels changed" );
+		}
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "starfieldpictures: no error is logged while the starfield is made and drawn", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=starfieldpictures stars=" + starCount + " flatLayers=" + flatLayers.Count + " glint=" + ( glintShare * 100.0f ).ToString( "F1" ) + "% twinkleStreams=" + twinkleStreams + "/" + particleSystems.Length + " twinkled=" + twinkled + "/" + starPixels + " errors=" + errorsDuring + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
 	// ---------------------------------------------------------------- Low: what the displays cost every frame (the status display, the terrain vehicle display)
 
 	// something for the control measurement to hold on to
@@ -13247,7 +13462,21 @@ public class ClaudeProbe : MonoBehaviour
 	// the size of the meshes under model, measured along the axes of container (the ship's own frame: +Z is its nose)
 	static Vector3 SizeInFrameOf( Transform container, GameObject model )
 	{
-		var toContainer = container.worldToLocalMatrix;
+		return SizeInFrameOf( container.worldToLocalMatrix, model );
+	}
+
+	// the size of a ship model template at rest, posed as its clone is in its container (Encounter.Start puts the container at the identity before it clones
+	// the template with the template's own local rotation and scale): what an animated model is made of, wherever its parts have moved to in the encounter
+	static Vector3 RestSizeOf( GameObject template )
+	{
+		var pose = Matrix4x4.TRS( Vector3.zero, template.transform.localRotation, template.transform.localScale );
+
+		return SizeInFrameOf( pose * template.transform.worldToLocalMatrix, template );
+	}
+
+	// the size of the meshes under model, measured along the axes of the frame that toContainer takes world space to
+	static Vector3 SizeInFrameOf( Matrix4x4 toContainer, GameObject model )
+	{
 		var bounds = new Bounds();
 		var first = true;
 
@@ -13465,36 +13694,35 @@ public class ClaudeProbe : MonoBehaviour
 				}
 			}
 
-			// the debris: destroy the first ship and wait for its explosion to call back (1.5 s)
+			// the debris: destroy the first ship (the debris replaces it at once, in CombatController.ApplyDamageToAlien, before the explosion has played)
 			if ( hasModel && ( debrisTemplates != null ) && ( vesselId < debrisTemplates.Length ) && ( debrisTemplates[ vesselId ] != null ) )
 			{
 				Kill( 0 );
 
-				// catch the debris on the frame it appears and measure it in the ship's frame before it has tumbled
-				var until = Time.realtimeSinceStartup + 3.0f;
-				DebrisTumble tumble = null;
-
-				while ( ( tumble == null ) && ( Time.realtimeSinceStartup < until ) )
-				{
-					yield return null;
-
-					tumble = model.GetComponentInChildren<DebrisTumble>( false );
-				}
+				// measure the debris in the ship's frame before a frame has passed: its DebrisTumble turns it by up to 17 degrees a second from its first update, and one
+				// slow headless frame (up to Time.maximumDeltaTime, a third of a second) turned it far enough to fail the shape check below
+				var tumble = model.GetComponentInChildren<DebrisTumble>( false );
 
 				var debrisSize = ( tumble != null ) ? SizeInFrameOf( model.transform, tumble.gameObject ) : Vector3.zero;
 				var debrisLongest = Mathf.Max( debrisSize.x, debrisSize.y, debrisSize.z );
 				var ratio = ( longest > 0.0f ) ? ( debrisLongest / longest ) : 0.0f;
-				var sameShape = true;
 
-				for ( var axis = 0; axis < 3; axis++ )
+				// the debris is turned like the ship if its proportions along the ship's axes are those of the ship, each within a tenth of the longest side, measured
+				// against the ship at rest: the Mysterion (vessel 20) is a cloud of orbs that Mysterion.Update moves with the game time, so its shape when it is
+				// destroyed depends on how long the encounter's first frames took (90.6 x 80.0 x 90.6 in one run, 87.1 x 80.0 x 87.1 in another)
+				var restSize = RestSizeOf( templates[ vesselId ] );
+				var restLongest = Mathf.Max( restSize.x, restSize.y, restSize.z );
+				var sameShape = ( debrisLongest > 0.0f ) && ( restLongest > 0.0f );
+
+				for ( var axis = 0; sameShape && ( axis < 3 ); axis++ )
 				{
-					sameShape &= Mathf.Abs( debrisSize[ axis ] - size[ axis ] ) <= longest * 0.1f;
+					sameShape &= Mathf.Abs( debrisSize[ axis ] / debrisLongest - restSize[ axis ] / restLongest ) <= 0.1f;
 				}
 
 				sizes += "(debris " + ratio.ToString( "F2" ) + ( sameShape ? "" : " turned" ) + ")";
 
 				Check( "vessel " + vesselId + " leaves debris of its own size", ( tumble != null ) && ( Mathf.Abs( ratio - 1.0f ) <= 0.1f ), "debris=" + debrisSize.ToString( "F1" ) + " ratio=" + ratio.ToString( "F2" ) );
-				Check( "vessel " + vesselId + " leaves debris turned like the ship", ( tumble != null ) && sameShape, "debris=" + debrisSize.ToString( "F1" ) + " ship=" + size.ToString( "F1" ) );
+				Check( "vessel " + vesselId + " leaves debris turned like the ship", ( tumble != null ) && sameShape, "debris=" + debrisSize.ToString( "F1" ) + " ship at rest=" + restSize.ToString( "F1" ) + " ship=" + size.ToString( "F1" ) );
 			}
 
 			ClearMissiles();
@@ -13678,6 +13906,30 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "recovereddata: story texts missing or broken: " + ( ( missingKeys == "" ) ? "none" : missingKeys.Trim() ) + " | the flare text: " + flareText.Replace( '\n', '/' ) );
 
 		Check( "recovereddata: the ten story texts are there, with their line breaks", ( missingKeys == "" ) && flareText.Contains( "INCINERATED" ) && flareText.Contains( "\n" ), ( missingKeys == "" ) ? flareText.Replace( '\n', '/' ) : missingKeys.Trim() );
+
+		// ---- the planet messages are recorded as they stand (TVCargoButton), so none may keep a field of STRINFO's editor in brackets: the Mardan 4 sign
+		// reads NO. 17, as the shipped game's message record has it (the decompiled original's instance.txt), where STRINFO prints NO. [NUMBER]
+		var bracketed = "";
+		var mardanSign = "";
+
+		foreach ( var record in messages )
+		{
+			var text = FieldOrNull( record, "m_text" ) as string ?? "";
+
+			if ( text.Contains( "[" ) || text.Contains( "]" ) )
+			{
+				bracketed += FieldOrNull( record, "m_id" ) + " ";
+			}
+
+			if ( Equals( FieldOrNull( record, "m_id" ), 29 ) )
+			{
+				mardanSign = text;
+			}
+		}
+
+		Log( "recovereddata: planet messages with a bracketed field: " + ( ( bracketed == "" ) ? "none" : bracketed.Trim() ) + " | message 29: " + mardanSign );
+
+		Check( "recovereddata: no planet message shows a bracketed field, and the Mardan 4 sign of message 29 reads NO. 17 as in the shipped game", ( bracketed == "" ) && ( mardanSign == "SIGN - MARDAN 4 MINING STATION NO. 17" ), ( bracketed == "" ) ? mardanSign : bracketed.Trim() );
 
 		// ---- the game data file itself is unchanged (control): 811 planets, 51 artifacts, its 556 comms and the 2 recovered drone lines
 		var sizes = gameData.m_planetList.Length + "/" + gameData.m_artifactList.Length + "/" + gameData.m_commList.Length;
@@ -15259,6 +15511,119 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=blackegg dropped=" + eggsOnPlanet90 + " planet90=" + planet90Destroyed + " crystalAway=" + crystalAfterAway + " crystalNexus=" + crystalDestroyed + " stillGone=" + stillGone, 0 );
 	}
 
+	// the terrain vehicle takes the Black Egg and the Flat Device out of the ship's hold every time it goes out (the original's disembark, TV-OV WEE39), so that the egg
+	// can be dropped and armed from the terrain vehicle's cargo; another artifact stays in the ship, and what is left in the terrain vehicle comes back on board
+	IEnumerator ScenarioTvTakesEgg()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var blackEggId = gameData.FindArtifactId( "Black Egg" );
+		var flatDeviceId = gameData.FindArtifactId( "Flat Device" );
+		var whiningOrbId = gameData.FindArtifactId( "Whining Orb" );
+		var planet90StarId = gameData.m_planetList[ 90 ].m_starId;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		if ( ( blackEggId < 0 ) || ( flatDeviceId < 0 ) || ( whiningOrbId < 0 ) )
+		{
+			Finish( "scenario=tvtakesegg abort: an artifact is missing from the game data (" + blackEggId + ", " + flatDeviceId + ", " + whiningOrbId + ")", 2 );
+			yield break;
+		}
+
+		// ---- 1. the three artifacts in the ship's hold, down on planet 90 and out through the real Disembark button
+		ship.AddArtifact( blackEggId );
+		ship.AddArtifact( flatDeviceId );
+		ship.AddArtifact( whiningOrbId );
+
+		yield return GoIntoOrbit( planet90StarId, 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=tvtakesegg abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var vehicle = playerData.m_terrainVehicle;
+		var eggInVehicle = vehicle.HasArtifact( "Black Egg" );
+		var flatInVehicle = vehicle.HasArtifact( "Flat Device" );
+		var eggInShip = ship.HasArtifact( "Black Egg" );
+		var flatInShip = ship.HasArtifact( "Flat Device" );
+
+		Log( "tvtakesegg: after the disembark: vehicle egg " + eggInVehicle + " flat " + flatInVehicle + ", ship egg " + eggInShip + " flat " + flatInShip + " orb " + ship.HasArtifact( "Whining Orb" ) );
+
+		Check( "tvtakesegg: the terrain vehicle has taken the Black Egg and the Flat Device out of the ship's hold", eggInVehicle && flatInVehicle && !eggInShip && !flatInShip, "vehicle egg " + eggInVehicle + " flat " + flatInVehicle + ", ship egg " + eggInShip + " flat " + flatInShip );
+
+		Check( "tvtakesegg: the Whining Orb stays in the ship's hold (control)", ship.HasArtifact( "Whining Orb" ) && !vehicle.HasArtifact( "Whining Orb" ), "ship " + ship.HasArtifact( "Whining Orb" ) + ", vehicle " + vehicle.HasArtifact( "Whining Orb" ) );
+
+		// ---- 2. the terrain vehicle's cargo list has the egg, and dropping it arms it
+		var terrainVehicle = controller.m_terrainVehicle;
+
+		foreach ( var deposit in controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true ) )
+		{
+			if ( Vector3.Distance( deposit.transform.position, terrainVehicle.transform.position ) < 50.0f )
+			{
+				deposit.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		var items = TVCargoButton.BuildCargoItems();
+		var eggIndex = items.FindIndex( item => item.m_artifactId == blackEggId );
+		var dropText = "";
+		var eggsOnPlanet90 = 0;
+
+		if ( eggIndex >= 0 )
+		{
+			controller.m_messages.Clear();
+
+			TVCargoButton.OpenCargoList();
+
+			for ( var i = 0; i < eggIndex; i++ )
+			{
+				TVCargoButton.MarkNextItem();
+			}
+
+			TVCargoButton.DropMarkedItem();
+
+			yield return Frames( 2 );
+
+			dropText = MessageList();
+
+			foreach ( var droppedCargo in playerData.m_planetSurfaces.m_droppedCargoList )
+			{
+				if ( ( droppedCargo.m_planetId == 90 ) && ( droppedCargo.m_artifactId == blackEggId ) )
+				{
+					eggsOnPlanet90++;
+				}
+			}
+		}
+
+		Log( "tvtakesegg: the egg is item " + eggIndex + " of " + items.Count + " in the cargo list; " + eggsOnPlanet90 + " Black Egg on planet 90 | " + dropText.Substring( 0, Mathf.Min( 200, dropText.Length ) ) );
+
+		Check( "tvtakesegg: the terrain vehicle's cargo list drops the Black Egg it took from the ship, and it is armed", ( eggIndex >= 0 ) && ( eggsOnPlanet90 == 1 ) && dropText.Contains( "armed" ), "item " + eggIndex + ", " + eggsOnPlanet90 + " | " + dropText );
+
+		// ---- 3. back in the ship: the Flat Device comes back on board, the terrain vehicle's hold is empty
+		TVCargoButton.BackToTerrainVehicle();
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+
+		var vehicleArtifacts = ( vehicle.m_artifactStorage != null ) && ( vehicle.m_artifactStorage.m_artifactList != null ) ? vehicle.m_artifactStorage.m_artifactList.Count : 0;
+
+		Check( "tvtakesegg: back in the ship, the Flat Device is in the ship's hold again and nothing is left in the terrain vehicle", ship.HasArtifact( "Flat Device" ) && !ship.HasArtifact( "Black Egg" ) && ( vehicleArtifacts == 0 ), "ship flat " + ship.HasArtifact( "Flat Device" ) + " egg " + ship.HasArtifact( "Black Egg" ) + ", vehicle artifacts " + vehicleArtifacts );
+
+		Finish( "scenario=tvtakesegg eggIndex=" + eggIndex + " dropped=" + eggsOnPlanet90 + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
 	// ---------------------------------------------------------------- phase 4: the Crystal Cone
 
 	// goes into orbit around a planet from its star system, clears the messages and waits a while in orbit - returns the messages
@@ -18296,6 +18661,32 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return TradeWithTheThrynn( thrynnId, 100, 0, new string[ 0 ], new AnswerYesButton(), tooLittle );
 
+		// ---- 6. the Bladed Toy alone (1 at their prices): the offer's words as the shipped game fills them in, "a Bladed Toy." and one "unit"
+		var oneUnit = new List<string>();
+
+		yield return TradeWithTheThrynn( thrynnId, 50, 0, new[] { "Bladed Toy" }, new AnswerNoButton(), oneUnit );
+
+		// ---- 7. the Tesseract in a hold with 10 cubic meters of room once it is out: they offer the 10 that fit, not their 29, and pay what they offered
+		SetEndurium( 0 );
+
+		foreach ( var artifact in DataController.m_instance.m_gameData.m_artifactList )
+		{
+			for ( var i = 0; ( i < 10 ) && ( ship.m_artifactStorage != null ) && ( ship.m_artifactStorage.Find( artifact.m_id ) != null ); i++ )
+			{
+				ship.m_artifactStorage.Remove( artifact.m_id );
+			}
+		}
+
+		ship.RecalculateVolumeUsed();
+
+		// 100 tenths of room left once the Tesseract is out of the hold (the Endurium leaves room for it and 10 cubic meters more)
+		var fillingEndurium = ship.m_volume - ship.m_volumeUsed - 100;
+		var fullHold = new List<string>();
+
+		yield return TradeWithTheThrynn( thrynnId, fillingEndurium, 0, new[] { "Tesseract" }, new AnswerYesButton(), fullHold );
+
+		var paidIntoFullHold = int.Parse( fullHold[ 2 ] ) - fillingEndurium;
+
 		controller.m_encounterRange = encounterRange;
 
 		Log( "thrynntrades: encounter " + thrynnId + " || sold: " + string.Join( " | ", sold ) + " || kept: " + string.Join( " | ", kept ) + " || plutonium: " + string.Join( " | ", plutonium ) + " || black box: " + string.Join( " | ", bought ) + " || too little: " + string.Join( " | ", tooLittle ) );
@@ -18307,6 +18698,13 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "thrynntrades: they offer a cubic meter of Endurium for each of plutonium", plutonium[ 0 ].Contains( " 12 " ) && ( plutonium[ 2 ] == "170" ) && ( plutonium[ 3 ] == "0" ), string.Join( " | ", plutonium ) );
 		Check( "thrynntrades: with nothing they want aboard they sell the Black Box for 30", bought[ 0 ].Contains( CommText( 301 ) ) && ( bought[ 2 ] == "100" ) && ( bought[ 5 ] == "black box" ), string.Join( " | ", bought ) );
 		Check( "thrynntrades: a yes without 30 cubic meters gets \"you do not have enough\"", tooLittle[ 1 ].Contains( CommText( 302 ) ) && ( tooLittle[ 2 ] == "100" ) && ( tooLittle[ 5 ] == "no black box" ), string.Join( " | ", tooLittle ) );
+
+		// the offer's words as the shipped game fills in its template (COMMSPEC-OV): the name with a full stop, "unitss" for more than one and "unit" for one,
+		// never the template's "unitxx"
+		Log( "thrynntrades: one unit: " + string.Join( " | ", oneUnit ) + " || a full hold (" + fillingEndurium + " of Endurium, paid " + paidIntoFullHold + "): " + string.Join( " | ", fullHold ) );
+
+		Check( "thrynntrades: the artifact offer reads \"a Tesseract. Thiss artifact\" and \"29 cubic Arth unitss\", and \"a Bladed Toy.\" for \"1 cubic Arth unit\"", sold[ 0 ].Contains( "a Tesseract. Thiss artifact" ) && sold[ 0 ].Contains( " 29 cubic Arth unitss " ) && oneUnit[ 0 ].Contains( "a Bladed Toy. Thiss artifact" ) && oneUnit[ 0 ].Contains( " 1 cubic Arth unit of " ) && !( sold[ 0 ] + oneUnit[ 0 ] ).Contains( "unitxx" ), sold[ 0 ] + " || " + oneUnit[ 0 ] );
+		Check( "thrynntrades: with room for 10 cubic meters they offer 10 for the Tesseract, and a yes pays the 10 they offered", fullHold[ 0 ].Contains( " 10 cubic Arth unitss " ) && ( paidIntoFullHold == 100 ) && ( fullHold[ 4 ] == "gone" ), fullHold[ 0 ] + " | paid " + paidIntoFullHold );
 
 		Finish( "scenario=thrynntrades sold=" + sold[ 2 ] + " plutonium=" + plutonium[ 2 ] + " blackbox=" + bought[ 5 ], 0 );
 	}
@@ -20049,6 +20447,25 @@ public class ClaudeProbe : MonoBehaviour
 		var preyBehaviours = "";
 		var hunterBehaviours = "";
 
+		// the prey decides only once the hunter is coming at it: every lifeform decides on the same frame, in an order Unity does not fix, and the hunter may
+		// unpair at random as it pairs; a prey that decided first saw nothing coming, wandered into the air, and a flyer is never approached again (it never
+		// lands), so about one run in ten failed
+		SetField( prey, "m_flying", false );
+		SetField( prey, "m_moving", false );
+
+		end = Time.realtimeSinceStartup + 3.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !( ( MateBehaviour( grazer ) == "ApproachingMate" ) && ( ( FieldOrNull( grazer, "m_mate" ) as TerrainLifeform ) == prey ) ) )
+		{
+			SetField( prey, "m_behaviourTimer", 0.5f );
+
+			yield return null;
+		}
+
+		hunterBehaviours = MateBehaviour( grazer ) + " ";
+
+		SetField( prey, "m_behaviourTimer", 0.0f );
+
 		end = Time.realtimeSinceStartup + 3.0f;
 
 		while ( Time.realtimeSinceStartup < end )
@@ -21309,6 +21726,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		System.IO.Directory.CreateDirectory( folder );
 
+		// the pictures of an earlier run go, so that the folder holds one run's pictures only (their numbers change when a screen is added)
+		foreach ( var oldPicture in System.IO.Directory.GetFiles( folder, "*.png" ) )
+		{
+			System.IO.File.Delete( oldPicture );
+		}
+
 		return folder;
 	}
 
@@ -21372,11 +21795,20 @@ public class ClaudeProbe : MonoBehaviour
 
 		take( "orbit" );
 
-		displays.ChangeDisplay( displays.m_sensorsDisplay );
+		// a real scan of the planet (a science officer of full skill, who gives every line of the analysis), then its analysis
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer ).m_science = 250;
 
-		yield return Frames( 30 );
+		new SensorsButton().Execute();
+
+		yield return new WaitForSecondsRealtime( displays.m_sensorsDisplay.m_minDuration + 1.5f );
 
 		take( "orbit_sensors" );
+
+		new AnalysisButton().Execute();
+
+		yield return Frames( 10 );
+
+		take( "orbit_analysis" );
 
 		// ---- the landing map
 		displays.ChangeDisplay( displays.m_terrainMapDisplay );
@@ -21392,24 +21824,62 @@ public class ClaudeProbe : MonoBehaviour
 
 		take( "terrain_vehicle" );
 
-		// ---- hyperspace
-		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 125.0f, 0.0f, 100.0f ) );
+		// ---- hyperspace, away from any star (125,100 is Arth's own place, where the view was its sun)
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 118.0f, 0.0f, 96.0f ) );
 		controller.SwitchLocation( PD_General.Location.Hyperspace );
 
 		yield return Frames( 60 );
 
 		take( "hyperspace" );
 
-		// ---- an encounter met in hyperspace (Spemin)
-		EnterEncounter( FindEncounter( 1, 6, 3, 0 ) );
+		// ---- an encounter of Spemin scouts in Arth's system, once the ships have come close
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
 
-		yield return Frames( 60 );
+		yield return Frames( 10 );
+
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		ForceVessel( speminId, 2 );
+		EnterEncounter( speminId );
+
+		yield return new WaitForSecondsRealtime( 4.0f );
 
 		take( "encounter" );
 
+		// the sensor reading of the first Spemin scout (selection 0 is our own ship), as the Sensors button takes it, and the analysis of it
+		displays.ChangeDisplay( displays.m_sensorsDisplay );
+		controller.m_encounter.StartScanning( 1 );
+
+		// (the scan of a ship is a cinematic that ends with the reading: wait for the reading itself)
+		var scanEnd = Time.realtimeSinceStartup + 30.0f;
+
+		yield return Frames( 5 );
+
+		while ( !displays.m_sensorsDisplay.m_hasSensorData && ( Time.realtimeSinceStartup < scanEnd ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 30 );
+
+		take( "encounter_sensors" );
+
+		new AnalysisButton().Execute();
+
+		yield return Frames( 10 );
+
+		take( "encounter_analysis" );
+
+		// the comm link with them
+		controller.m_encounter.Connect();
+
+		yield return Frames( 60 );
+
+		take( "encounter_comm" );
+
 		Log( "screenpictures: " + pictures.Count + " pictures in " + folder + ": " + string.Join( ", ", pictures ) );
 
-		Check( "screenpictures: a picture of every screen visited", pictures.Count == 8, pictures.Count.ToString() );
+		Check( "screenpictures: a picture of every screen visited", pictures.Count == 12, pictures.Count.ToString() );
 
 		Finish( "scenario=screenpictures pictures=" + pictures.Count, 0 );
 	}
@@ -22196,6 +22666,289 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "examinetreat: Yes stops it and asks who instead, and a crew member who is whole or dead is not treated", ceasing.Contains( "I am ceasing treatment on " + navigator.m_name + "." ) && ceasing.Contains( "Who should I treat?" ) && treatCaptain.Contains( captain.m_name + " doesn't need medical treatment." ) && !underWayAfterCaptain && treatEngineer.Contains( engineer.m_name + " is beyond help." ), ceasing + " | " + treatCaptain + " | " + treatEngineer );
 
 		Finish( "scenario=examinetreat", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the landing's lines in the original's order
+
+	IEnumerator ScenarioLandingLines()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var buttonController = SpaceflightController.m_instance.m_buttonController;
+
+		EnsureCrew();
+
+		// planet 94 is a small rock planet in the arth system
+		yield return EnterOrbit( 94 );
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		// Land, then Descend
+		PressButton( ButtonController.ButtonSet.CommandB, 0 );
+
+		yield return Frames( 5 );
+
+		PressButton( ButtonController.ButtonSet.Land, 1 );
+
+		// every line said during the landing, in the order it first came up, with where the ship was then
+		var lines = new List<string>();
+		var end = Time.realtimeSinceStartup + 60.0f;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			foreach ( var message in playerData.m_general.m_messageList )
+			{
+				var line = System.Text.RegularExpressions.Regex.Replace( message, "<[^>]*>", "" );
+
+				if ( !lines.Exists( l => l.StartsWith( line + " @" ) ) )
+				{
+					lines.Add( line + " @" + playerData.m_general.m_location );
+				}
+			}
+
+			if ( ( playerData.m_general.m_location == PD_General.Location.Planetside ) && ( buttonController.GetCurrentButtonSet() == ButtonController.ButtonSet.CommandA ) )
+			{
+				break;
+			}
+
+			yield return null;
+		}
+
+		var said = string.Join( " | ", lines );
+		var autopilot = lines.FindIndex( l => l.StartsWith( "Autopilot engaged. Descending..." ) );
+		var topography = lines.FindIndex( l => l.StartsWith( "Topography net locked on." ) );
+		var safeLanding = lines.FindIndex( l => l.StartsWith( "Safe landing, captain." ) );
+
+		Log( "landinglines: " + said );
+
+		Check( "landinglines: the landing says the original's lines and no others (no Retro rockets firing)", !said.Contains( "Retro rockets" ) && ( autopilot >= 0 ) && ( topography >= 0 ) && ( safeLanding >= 0 ), said );
+		Check( "landinglines: Topography net locked on comes after Autopilot engaged, once the terrain is there, as the original's", ( topography > autopilot ) && ( safeLanding > topography ) && ( topography >= 0 ) && lines[ topography ].EndsWith( "@Planetside" ), said );
+
+		Finish( "scenario=landinglines", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the captain is told when the aliens raise or lower their shields, or arm or disarm
+
+	IEnumerator ScenarioAlienShields()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// a mechan encounter: its scouts have shields and missiles, and the mechans have no mood, so their stance is their posture
+		var mechanId = -1;
+
+		for ( var i = 0; i < gameData.m_encounterList.Length; i++ )
+		{
+			if ( gameData.m_encounterList[ i ].m_race == GameData.Race.Mechan )
+			{
+				mechanId = i;
+
+				break;
+			}
+		}
+
+		EnterStarSystem( gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		EnterEncounter( mechanId );
+
+		yield return Frames( 10 );
+
+		var pdEncounter = controller.m_encounter.m_pdEncounter;
+		var atTheStart = MessageList();
+
+		// ---- neutral to hostile: they arm (their shields were already up)
+		controller.m_messages.Clear();
+
+		pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+
+		yield return Frames( 5 );
+
+		var toHostile = MessageList();
+
+		// ---- hostile to friendly: they lower their shields and disarm
+		controller.m_messages.Clear();
+
+		pdEncounter.m_alienStance = GD_Comm.Stance.Friendly;
+
+		yield return Frames( 5 );
+
+		var toFriendly = MessageList();
+
+		// ---- friendly to neutral: they raise their shields
+		controller.m_messages.Clear();
+
+		pdEncounter.m_alienStance = GD_Comm.Stance.Neutral;
+
+		yield return Frames( 5 );
+
+		var toNeutral = MessageList();
+
+		Log( "alienshields: at the start: " + atTheStart );
+		Log( "alienshields: to hostile (" + pdEncounter.m_alienStance + " now): " + toHostile + " || to friendly: " + toFriendly + " || to neutral: " + toNeutral );
+
+		Check( "alienshields: the state the encounter begins with is taken without a word", !atTheStart.Contains( "they've" ), atTheStart );
+		Check( "alienshields: turning hostile, they arm their weapons and nothing is said of the shields they already had up", toHostile.Contains( "Captain, they've armed their weapons." ) && !toHostile.Contains( "shields" ), toHostile );
+		Check( "alienshields: turning friendly, they lower their shields and disarm, as the original says", toFriendly.Contains( "Captain, they've lowered their shields." ) && toFriendly.Contains( "Captain, they've disarmed their weapons." ), toFriendly );
+		Check( "alienshields: turning neutral again, they raise their shields", toNeutral.Contains( "Captain, they've raised their shields." ) && !toNeutral.Contains( "weapons" ), toNeutral );
+
+		Finish( "scenario=alienshields", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the ancient ruins STRINFO's editors place, with their Endurium
+
+	// lands the terrain vehicle at a place on a planet of any star system
+	static IEnumerator LandOnPlanetAt( int starId, int planetId, Vector3 place, bool[] done )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		// (the port's "latitude" is the east-west coordinate - see Tools.LatLongToWorldCoordinates)
+		Tools.WorldToLatLongCoordinates( place, out var x, out var z );
+
+		playerData.m_general.m_selectedLatitude = x;
+		playerData.m_general.m_selectedLongitude = z;
+
+		yield return GoIntoOrbit( starId, planetId );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+	}
+
+	// the Endurium of the ruins within the given distance of a place, nearest first, in tenths of a cubic meter ("-" for a ruin that holds none)
+	static string EnduriumInRuinsNear( Vector3 place, float distance )
+	{
+		var found = new List<KeyValuePair<float, string>>();
+
+		foreach ( var ruin in RuinsOnTheGround() )
+		{
+			var delta = ruin.transform.position - place;
+
+			delta.y = 0.0f;
+
+			if ( delta.magnitude > distance )
+			{
+				continue;
+			}
+
+			var terrainRuin = ruin as TerrainRuin;
+			var endurium = 0;
+
+			if ( terrainRuin != null )
+			{
+				foreach ( var item in terrainRuin.m_randomItems )
+				{
+					endurium += item.m_enduriumVolume;
+				}
+			}
+
+			found.Add( new KeyValuePair<float, string>( delta.magnitude, ( endurium > 0 ) ? endurium.ToString() : "-" ) );
+		}
+
+		found.Sort( ( a, b ) => a.Key.CompareTo( b.Key ) );
+
+		return string.Join( ",", found.ConvertAll( f => f.Value ) );
+	}
+
+	IEnumerator ScenarioAncientSites()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// ---- 1. the Mechans' ice planet: planet 5 of 145,107, a ruin with 3.1 cubic meters at 36N x 90E
+		var mechanStar = StarAt( 145, 107 );
+		var mechanPlanet = gameData.FindPlanetFromSun( 145, 107, 5 );
+		var mechanSite = Tools.LatLongToWorldCoordinates( 90.0f, 36.0f );
+
+		yield return LandOnPlanetAt( mechanStar, mechanPlanet, mechanSite, done );
+
+		var mechanRuins = done[ 0 ] ? EnduriumInRuinsNear( mechanSite, 100.0f ) : "(never got into the terrain vehicle)";
+
+		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+
+		// ---- 2. deep in Elowan space: planet 2 of 154,62, two ruins with 3.1 and 5.9 cubic meters at 42S x 13W
+		var thrynnStar = StarAt( 154, 62 );
+		var thrynnPlanet = gameData.FindPlanetFromSun( 154, 62, 2 );
+		var thrynnSite = Tools.LatLongToWorldCoordinates( -13.0f, -42.0f );
+
+		yield return LandOnPlanetAt( thrynnStar, thrynnPlanet, thrynnSite, done );
+
+		var thrynnRuins = done[ 0 ] ? EnduriumInRuinsNear( thrynnSite, 100.0f ) : "(never got into the terrain vehicle)";
+
+		Log( "ancientsites: planet " + mechanPlanet + " of star " + mechanStar + ", ruins near 36N x 90E (Endurium in tenths): [" + mechanRuins + "] | planet " + thrynnPlanet + " of star " + thrynnStar + ", ruins near 42S x 13W: [" + thrynnRuins + "]" );
+
+		Check( "ancientsites: the Mechans' ice planet has an ancient ruin at 36N x 90E with 3.1 cubic meters of Endurium and nothing else near it", mechanRuins == "31", mechanRuins );
+		Check( "ancientsites: planet 2 of 154,62 has two ancient ruins at 42S x 13W with 3.1 and 5.9 cubic meters of Endurium", thrynnRuins == "31,59", thrynnRuins );
+
+		Finish( "scenario=ancientsites", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the disembark's lines in the original's words and order
+
+	IEnumerator ScenarioDisembarkLines()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// on the ground of planet 94 of Arth, in the ship
+		yield return GoIntoOrbit( 25, 94 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		controller.m_messages.Clear();
+
+		// Disembark (the second button of the command set on a planet), every line in the order it first came up, until the terrain vehicle is out
+		PressButton( ButtonController.ButtonSet.CommandA, 1 );
+
+		var lines = new List<string>();
+		var end = Time.realtimeSinceStartup + 15.0f;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			foreach ( var message in playerData.m_general.m_messageList )
+			{
+				var line = System.Text.RegularExpressions.Regex.Replace( message, "<[^>]*>", "" );
+
+				if ( !lines.Contains( line ) )
+				{
+					lines.Add( line );
+				}
+			}
+
+			if ( playerData.m_general.m_location == PD_General.Location.Disembarked )
+			{
+				break;
+			}
+
+			yield return null;
+		}
+
+		var said = string.Join( " | ", lines );
+		var expected = "Standby...scanning planet. | Auto sampling devices activated. | Initiating hull integrity check. | Hull check complete. | Activating terrain vehicle.";
+
+		Log( "disembarklines: (" + playerData.m_general.m_location + ") " + said );
+
+		Check( "disembarklines: disembarking says the original's lines in its order, with Hull check complete", ( playerData.m_general.m_location == PD_General.Location.Disembarked ) && said.StartsWith( expected ), said );
+
+		Finish( "scenario=disembarklines", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

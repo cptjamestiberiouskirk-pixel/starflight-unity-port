@@ -23,6 +23,10 @@ public class TerrainRuins : TerrainGridPopulator
 	// how many places to try for a ruin at a random place on the planet
 	const int c_maxTries = 50;
 
+	// the ruins of an ancient ruin site (STRINFO 2.1.4, 2.5.4) take the places after a planet's random ruins (at most 2) in the keys of the items they hold
+	const int c_firstSiteRuinIndex = 5;
+	const int c_maxSiteRuins = 5;
+
 	// place the ruins of this planet
 	public void Initialize( PlanetGenerator planetGenerator, float elevationScale, int randomSeed )
 	{
@@ -188,6 +192,36 @@ public class TerrainRuins : TerrainGridPopulator
 			}
 		}
 
+		// the ancient ruins whose place and Endurium STRINFO's editors give (2.1.4, 2.5.4) - also with no random numbers, and each holds its Endurium as a random
+		// ancient ruin holds its own (taken once, by the key of its item)
+		foreach ( var ancientRuinSite in gameData.m_ancientRuinSiteList )
+		{
+			if ( ( ancientRuinSite.m_planetId != planet.m_id ) || ( ancientRuinSite.m_enduriumVolumes == null ) )
+			{
+				continue;
+			}
+
+			// the first ruin at the site's place, the others in a row to the east of it
+			var center = Tools.LatLongToWorldCoordinates( ancientRuinSite.m_longitude, ancientRuinSite.m_latitude );
+			var count = Mathf.Min( ancientRuinSite.m_enduriumVolumes.Length, c_maxSiteRuins );
+
+			for ( var i = 0; i < count; i++ )
+			{
+				Tools.WorldToMapCoordinates( center + Vector3.right * ( i * ancientRuinSite.m_spacing ), out var mapX, out var mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
+
+				var template = m_ruinTemplates[ ( ancientRuinSite.m_id * 5 + i ) % m_ruinTemplates.Length ];
+
+				var ruinObject = PlaceObjectAt( template, mapX, mapY, elevationScale, ( i * 90 + ancientRuinSite.m_id * 45 ) % 360 );
+
+				ruinObject.name = "Ancient ruin " + ( i + 1 ) + " of site " + ancientRuinSite.m_id;
+
+				var ruin = ruinObject.AddComponent<TerrainRuin>();
+
+				ruin.m_isAncient = true;
+				ruin.m_randomItems.Add( new TerrainRuin.RandomItem { m_key = TerrainRuin.GetRandomItemKey( planet.m_id, c_firstSiteRuinIndex + i, ancientRuinSite.m_id % 10 ), m_enduriumVolume = ancientRuinSite.m_enduriumVolumes[ i ] } );
+			}
+		}
+
 		// the random ruins (their random numbers come after everything else, so nothing above moves)
 		PlaceRandomRuins( planetGenerator, elevationScale, planet );
 
@@ -287,6 +321,15 @@ public class TerrainRuins : TerrainGridPopulator
 		foreach ( var artifactSite in gameData.m_artifactSiteList )
 		{
 			if ( artifactSite.m_planetId == planet.m_id )
+			{
+				return 0;
+			}
+		}
+
+		// nor the planets of the ancient ruin sites ("nothing else of note is there", STRINFO 2.1.4 and 2.5.4)
+		foreach ( var ancientRuinSite in gameData.m_ancientRuinSiteList )
+		{
+			if ( ancientRuinSite.m_planetId == planet.m_id )
 			{
 				return 0;
 			}
@@ -446,7 +489,8 @@ public class TerrainRuins : TerrainGridPopulator
 		return places;
 	}
 
-	// the places of a planet's ancient ruins, in degrees as the landing map gives them: its random ancient ruins and the formations of ancient ruins (STRINFO 4.1)
+	// the places of a planet's ancient ruins, in degrees as the landing map gives them: its random ancient ruins, the formations of ancient ruins (STRINFO 4.1)
+	// and the ancient ruin sites (STRINFO 2.1.4, 2.5.4)
 	public static System.Collections.Generic.List<Vector2> GetAncientRuinPlaces( PlanetGenerator planetGenerator, float elevationScale, GD_Planet planet )
 	{
 		var gameData = DataController.m_instance.m_gameData;
@@ -465,6 +509,15 @@ public class TerrainRuins : TerrainGridPopulator
 			{
 				// (a site's longitude is the map's east-west, as the formations above are placed)
 				places.Add( new Vector2( artifactSite.m_longitude, artifactSite.m_latitude ) );
+			}
+		}
+
+		// the ancient ruin sites (STRINFO 2.1.4, 2.5.4)
+		foreach ( var ancientRuinSite in gameData.m_ancientRuinSiteList )
+		{
+			if ( ancientRuinSite.m_planetId == planet.m_id )
+			{
+				places.Add( new Vector2( ancientRuinSite.m_longitude, ancientRuinSite.m_latitude ) );
 			}
 		}
 

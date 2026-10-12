@@ -1,5 +1,5 @@
 {
-  "m_about": "What the original game had and Starflight Game Data.json does not, recovered from Research/Data/STRINFO.DOC. Texts are as STRINFO prints them (in capitals, with its brackets for values the game fills in). A planet is given as STRINFO gives it: the star by its coordinates and the planet by its number counted from the sun (m_planetFromSun; this holds in 15 of the 16 STRINFO entries that also print an orbit number, the 16th is Koann). Latitude is positive to the north, longitude positive to the east; m_placement says whether a message is at its coordinates (Site), at random places on the planet (Random) or at several places (Several). m_note records corrections and conflicts, m_source the section of STRINFO. Comm ids start at 1000 so that they never meet the ids of the game data.",
+  "m_about": "What the original game had and Starflight Game Data.json does not, recovered from Research/Data/STRINFO.DOC. Texts are as STRINFO prints them (in capitals, with its brackets for values the game fills in). A planet is given as STRINFO gives it: the star by its coordinates and the planet by its number counted from the sun (m_planetFromSun; this holds in 17 of the 18 STRINFO entries that also print an orbit number, the 18th is Koann). Latitude is positive to the north, longitude positive to the east; m_placement says whether a message is at its coordinates (Site), at random places on the planet (Random) or at several places (Several). m_note records corrections and conflicts, m_source the section of STRINFO. Comm ids start at 1000 so that they never meet the ids of the game data.",
   "m_commList": [
     {
       "m_id": 1000,
@@ -409,9 +409,9 @@
       "m_placement": "Several",
       "m_latitude": 0,
       "m_longitude": 0,
-      "m_text": "SIGN - MARDAN 4 MINING STATION NO. [NUMBER]",
-      "m_note": "STRINFO: \"several locations\" on this planet; [NUMBER] stands for the station number.",
-      "m_source": "STRINFO 3.1"
+      "m_text": "SIGN - MARDAN 4 MINING STATION NO. 17",
+      "m_note": "STRINFO: \"several locations\" on this planet, and NO. [NUMBER]: its editor's field for the station number. The number 17 is the shipped game's own: its message records have this sign twice, NO. 82 (message 28) and NO. 17 (the decompiled original, s-macke/starflight-reverse, starflt1-out/data/instance.txt).",
+      "m_source": "STRINFO 3.1; the shipped game's message record"
     },
     {
       "m_id": 30,
@@ -551,7 +551,7 @@
       "m_planetFromSun": 3,
       "m_latitude": 52,
       "m_longitude": 16,
-      "m_text": "Phlegmak ruins (the microfilm message on Arth).",
+      "m_text": "Phlegmak ruins (the microfilm message on planet 3 of Arth's system).",
       "m_note": "",
       "m_source": "STRINFO 4.1"
     },
@@ -1353,6 +1353,34 @@
       "m_text": "THE CRYSTAL PEARL IS FOUND WITHIN A RECENT RUIN IN THE SOUTHWEST OF A CLUSTER OF 15 ANCIENT RUINS KNOWN AS 'THE CITY OF THE ANCIENTS'.",
       "m_note": "STRINFO gives the count and that the Pearl's ruin is in the southwest, not the layout: the port puts the 15 ruins in rows of 4, 40 units apart, north and east of the Pearl's ruin, which takes the southwest corner of the block.",
       "m_source": "STRINFO 4.1"
+    }
+  ],
+  "m_ancientRuinSiteList": [
+    {
+      "m_id": 0,
+      "m_starX": 145,
+      "m_starY": 107,
+      "m_planetFromSun": 5,
+      "m_latitude": 36,
+      "m_longitude": 90,
+      "m_enduriumVolumes": [ 31 ],
+      "m_spacing": 40.0,
+      "m_text": "THERE IS AN ANCIENT RUIN AT THIS LOCATION ON PLANET 5 OF SYSTEM 145, 107, WHICH CONTAINS 3.1 CUBIC METERS OF ENDURIUM.  NOTHING ELSE OF NOTE IS THERE.",
+      "m_note": "The Mechans' line it answers: WE HAVE DISCOVERED SOME RUINS AT 36N x 90E ON THE ICE PLANET IN OUR SYSTEM.",
+      "m_source": "STRINFO 2.1.4"
+    },
+    {
+      "m_id": 1,
+      "m_starX": 154,
+      "m_starY": 62,
+      "m_planetFromSun": 2,
+      "m_latitude": -42,
+      "m_longitude": -13,
+      "m_enduriumVolumes": [ 31, 59 ],
+      "m_spacing": 40.0,
+      "m_text": "THERE ARE INDEED TWO ANCIENT RUINS AT THIS LOCATION, WITHIN A VAST OCEAN, CONTAINING 3.1 CUBIC METERS AND 5.9 CUBIC METERS OF ENDURIUM, RESPECTIVELY.  THERE IS NOTHING ELSE OF NOTE THERE.",
+      "m_note": "The Thrynn's line it answers: A FAIRLY LARGE ANCIENT RUIN AT 42S x 13W ON PLANET 2 OF SYSTEM 154, 62. STRINFO puts both ruins at the one place; the port puts the second 40 units east of the first.",
+      "m_source": "STRINFO 2.5.4"
     }
   ]
 }

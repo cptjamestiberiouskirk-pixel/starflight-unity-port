@@ -119,8 +119,9 @@ public static class UIKitSceneTool
 			new Entry( c_viewport + "Ships Log/GameObject/GameObject/Entries Mask/Selection Xform/Up Arrow Image", UIText.None, 0, UISprite.None, UIColor.AccentPrimary ),
 			new Entry( c_viewport + "Ships Log/GameObject/GameObject/Entries Mask/Selection Xform/Down Arrow Image", UIText.None, 0, UISprite.None, UIColor.AccentPrimary ),
 
-			// the launch countdown keeps its colour
-			new Entry( c_viewport + "Countdown", UIText.DisplayXL, 240, UISprite.None, UIColor.Keep ),
+			// the launch countdown in the kit's amber, as the docking bay's sirens (it was the original's yellow; its animation changes only its size and opacity,
+			// and it starts invisible, as it was, until its animation shows it)
+			new Entry( c_viewport + "Countdown", UIText.DisplayXL, 240, UISprite.None, UIColor.TextWarning, 0.0f ),
 
 			// the popup ("Commencing System Penetration")
 			new Entry( "Popup/Panel", UIText.None, 0, UISprite.Panel, UIColor.BackgroundPanel ),
@@ -350,6 +351,22 @@ public static class UIKitSceneTool
 		{
 			report.AppendLine( "selection highlight not set (no button controller or no label panel at " + c_buttons + "B)" );
 		}
+
+		// the docking bay sirens' lights shine in the kit's amber, as their domes do (the launch and landing animations change only their intensity)
+		var amberLights = 0;
+
+		foreach ( var light in Object.FindObjectsByType<Light>( FindObjectsInactive.Include, FindObjectsSortMode.None ) )
+		{
+			if ( light.name.StartsWith( "Amber Light" ) )
+			{
+				Undo.RecordObject( light, "UI kit" );
+				light.color = theme.m_accentSecondary;
+				EditorUtility.SetDirty( light );
+				amberLights++;
+			}
+		}
+
+		report.AppendLine( amberLights + " siren lights in the kit's amber" );
 
 		EditorSceneManager.MarkSceneDirty( canvas.gameObject.scene );
 
