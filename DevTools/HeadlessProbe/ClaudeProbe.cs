@@ -901,6 +901,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSystemTravel();
 				break;
 
+			case "landinglines":
+				yield return ScenarioLandingLines();
+				break;
+
 			case "alienshields":
 				yield return ScenarioAlienShields();
 				break;
@@ -4059,10 +4063,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "M23 the landing finishes and gives the controls back", ( locationAfterLanding == PD_General.Location.Planetside ) && ( consoleAfterLanding == "CommandA selected 0 running nothing" ) && ( consoleAfterLandingStick == "CommandA selected 1 running nothing" ), locationAfterLanding + " after " + landingTime.ToString( "F1" ) + " s, " + consoleAfterLanding + ", after the stick: " + consoleAfterLandingStick );
 
-		// the message box during the landing: every step once, in the order it happens
+		// the message box during the landing: every step once, in the order it happens (the original's lines, ORBIT-OV DESCEND)
 		var plainMessages = System.Text.RegularExpressions.Regex.Replace( messagesAfterLanding, "<[^>]+>", "" );
 
-		Check( "M23 the landing reports each step once and in order", plainMessages == "Computing descent profile... / Autopilot engaged. Descending... / Topography net locked on. / Retro rockets firing... / Safe landing, captain.", plainMessages );
+		Check( "M23 the landing reports each step once and in order", plainMessages == "Computing descent profile... / Autopilot engaged. Descending... / Topography net locked on. / Safe landing, captain.", plainMessages );
 
 		Finish( "scenario=m23 afterDescend=[" + consoleAfterDescend + "] afterStick=[" + consoleAfterStick + "] afterFire=[" + consoleAfterFire + "] landed=" + locationAfterLanding + "@" + landingTime.ToString( "F1" ) + "s afterLanding=[" + consoleAfterLanding + "] afterLandingStick=[" + consoleAfterLandingStick + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
@@ -22014,6 +22018,64 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "systemtravel: docking at the Starport says Closing docking bay doors, as the original", ( locationDocked == PD_General.Location.DockingBay ) && docked.Contains( "Closing docking bay doors" ), locationDocked + ": " + docked );
 
 		Finish( "scenario=systemtravel", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the landing's lines in the original's order
+
+	IEnumerator ScenarioLandingLines()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var buttonController = SpaceflightController.m_instance.m_buttonController;
+
+		EnsureCrew();
+
+		// planet 94 is a small rock planet in the arth system
+		yield return EnterOrbit( 94 );
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		// Land, then Descend
+		PressButton( ButtonController.ButtonSet.CommandB, 0 );
+
+		yield return Frames( 5 );
+
+		PressButton( ButtonController.ButtonSet.Land, 1 );
+
+		// every line said during the landing, in the order it first came up, with where the ship was then
+		var lines = new List<string>();
+		var end = Time.realtimeSinceStartup + 60.0f;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			foreach ( var message in playerData.m_general.m_messageList )
+			{
+				var line = System.Text.RegularExpressions.Regex.Replace( message, "<[^>]*>", "" );
+
+				if ( !lines.Exists( l => l.StartsWith( line + " @" ) ) )
+				{
+					lines.Add( line + " @" + playerData.m_general.m_location );
+				}
+			}
+
+			if ( ( playerData.m_general.m_location == PD_General.Location.Planetside ) && ( buttonController.GetCurrentButtonSet() == ButtonController.ButtonSet.CommandA ) )
+			{
+				break;
+			}
+
+			yield return null;
+		}
+
+		var said = string.Join( " | ", lines );
+		var autopilot = lines.FindIndex( l => l.StartsWith( "Autopilot engaged. Descending..." ) );
+		var topography = lines.FindIndex( l => l.StartsWith( "Topography net locked on." ) );
+		var safeLanding = lines.FindIndex( l => l.StartsWith( "Safe landing, captain." ) );
+
+		Log( "landinglines: " + said );
+
+		Check( "landinglines: the landing says the original's lines and no others (no Retro rockets firing)", !said.Contains( "Retro rockets" ) && ( autopilot >= 0 ) && ( topography >= 0 ) && ( safeLanding >= 0 ), said );
+		Check( "landinglines: Topography net locked on comes after Autopilot engaged, once the terrain is there, as the original's", ( topography > autopilot ) && ( safeLanding > topography ) && ( topography >= 0 ) && lines[ topography ].EndsWith( "@Planetside" ), said );
+
+		Finish( "scenario=landinglines", 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 7: the captain is told when the aliens raise or lower their shields, or arm or disarm

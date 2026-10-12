@@ -30,28 +30,14 @@ public class DescendButton : ShipButton
 		// stop the music
 		MusicController.m_instance.ChangeToTrack( MusicController.Track.None );
 
-		// reset timer and step
-		m_timer = 0.0f;
-		m_step = 0;
-
 		return true;
 	}
 
 	public override bool Update()
 	{
-		m_timer += Time.deltaTime;
-
-		// the landing animation reports the start of the descent and the landing itself (see PlayerCamera.StartingDescent and PlayerHasLanded) - this is the one message in between
-		if ( m_timer >= 6.0f && m_step == 0 )
-		{
-			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Topography net locked on.</color>" );
-			m_step++;
-		}
+		// the landing animation says the rest of the original's lines (PlayerCamera.StartingDescent, TopographyNetLockedOn and PlayerHasLanded)
 
 		// don't let the default ship button update run - the controls stay locked until the landing animation changes the buttons (see PlayerCamera.PlayerHasLanded)
 		return true;
 	}
-
-	float m_timer;
-	int m_step;
 }
