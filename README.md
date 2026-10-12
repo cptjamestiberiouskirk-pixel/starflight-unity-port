@@ -162,6 +162,7 @@ The project features a **deterministic visualization system** that renders plane
 - Encounters that guard planets from orbit, fought over the planet's own surface; a Veloxi drone grants permission to orbit to a crew that answers its numbers the Veloxi way
 - The Spemin, Thrynn and Veloxi home fleets warn a ship off their homeworlds, more sternly each time, and attack after the last warning
 - The Spemin, Thrynn and Veloxi give up after losing half of their ships: they stop fighting and surrender
+- The crew tells the captain when the aliens raise or lower their shields and arm or disarm their weapons, and Analysis gives their shields' class and whether they are up
 - The Elowan give 15 cubic meters of Endurium to a crew whose need for energy is dire, and see through one that has 20 or more
 - The Veloxi demand a tribute of Endurium, and the Crystal Orb or the Ellipsoid when the ship carries one, and attack a crew that refuses
 - The Thrynn buy artifacts at their own prices and plutonium for Endurium, and sell the Black Box for 30 Endurium
