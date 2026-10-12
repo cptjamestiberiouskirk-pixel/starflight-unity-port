@@ -808,6 +808,7 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_mechan9NoHumansWarningDone = false;
 			m_pdEncounter.m_attackedByPlayer = false;
 			m_pdEncounter.m_homeworldWarningCount = 0;
+			m_pdEncounter.m_homeworldWarningCounts = new int[ 3 ];
 			m_pdEncounter.m_homeworldWarningsGiven = false;
 			m_pdEncounter.m_aliensAreCowardly = false;
 			m_pdEncounter.m_specialQuestionAsked = false;
@@ -2915,10 +2916,11 @@ public class Encounter : MonoBehaviour
 		return Random.Range( 3, 9 );
 	}
 
-	// true once aliens with a personality have said all their phrases
+	// true once aliens with a personality have said all their phrases - never a home fleet, whose talk ends with its last warning (it attacks then; a Veloxi fleet
+	// hailed first has its refusal and four hails to give)
 	bool IsTiredOfTalking()
 	{
-		return ( AlienPersonality.Find( m_gdEncounter.m_race ) != null ) && ( m_pdEncounter.m_alienPhrasesLeft <= 0 );
+		return ( AlienPersonality.Find( m_gdEncounter.m_race ) != null ) && ( m_pdEncounter.m_alienPhrasesLeft <= 0 ) && !IsHomeFleet();
 	}
 
 	// true if the aliens transmit rather than talk: the Minstrels' song, the Nomad probe's planetary data, the Noah 9 derelict's recorded message and the Mysterions'
@@ -3122,11 +3124,17 @@ public class Encounter : MonoBehaviour
 		};
 	}
 
-	// true if this encounter is a race's home fleet: it is met in orbit, and the game data has homeworld lines for its race (the Spemin, the Thrynn and the Veloxi,
-	// whose lines STRINFO 2.7, 2.5 and 2.2 give "while in orbit of" their homeworlds - the encounters 139, 165 and 233)
+	// true if this encounter is a race's home fleet: it is met in orbit around the race's homeworld, and the game data has homeworld lines for its race (the Spemin,
+	// the Thrynn and the Veloxi, whose lines STRINFO 2.7, 2.5 and 2.2 give "while in orbit of" their homeworlds, and the Gazurtoid, whose two the shipped game says
+	// only there - the encounters 139, 165, 233 and 65; the Gazurtoid that guard the Shimmering Ball's planet are not one)
 	bool IsHomeFleet()
 	{
 		if ( ( m_pdEncounter == null ) || ( m_gdEncounter == null ) || ( m_pdEncounter.GetLocation() != PD_General.Location.InOrbit ) )
+		{
+			return false;
+		}
+
+		if ( !DataController.m_instance.m_gameData.IsHomeworldOf( m_gdEncounter.m_race, DataController.m_instance.m_playerData.m_general.m_currentPlanetId ) )
 		{
 			return false;
 		}
@@ -3143,9 +3151,11 @@ public class Encounter : MonoBehaviour
 	}
 
 	// the next warning of a home fleet: a hail or a statement from its homeworld hails, the answer to the player's hail from its homeworld responses, and the answer
-	// to a question from its homeworld refusals ("Us are not answer the questions") - each list in the order of the game data, and every warning one step further
-	// along than the one before, whichever list it comes from - the last line of a list is the last warning, and the fleet attacks after it ("You must pay the
-	// consequences") - null if the game data has no homeworld line for the subject
+	// to a question from its homeworld refusals ("Us are not answer the questions") - each list in the order of the game data and each one step further along than
+	// the last line said from it, as the shipped game says the least used line of a subject, the first of them on a tie (COMM-OV, FIND-PHRASE); its homeworld
+	// lists go from the warnings to the threat its fleet attacks after ("You must pay the consequences", "Banzaii"), so the last line of a list is the last
+	// warning, and the fleet attacks after it - a subject the fleet has no homeworld line on is answered from its refusals, as the shipped game says a subject 5
+	// line instead (PHRASE-SEARCH: the Veloxi answer a hail with "Us are not answer the questions") - null if it has neither
 	GD_Comm FindHomeworldWarning( GD_Comm.Subject subject )
 	{
 		GD_Comm.Subject homeworldSubject;
@@ -3167,15 +3177,14 @@ public class Encounter : MonoBehaviour
 			return null;
 		}
 
-		// the homeworld lines of the race for this subject (the comm list is in the order of the ids)
-		var warnings = new List<GD_Comm>();
+		// the homeworld lines of the race for this subject (the comm list is in the order of the ids), or else its refusals
+		var warnings = FindHomeworldLines( homeworldSubject );
 
-		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
+		if ( warnings.Count == 0 )
 		{
-			if ( comm.m_homeworld && ( comm.m_race == m_gdEncounter.m_race ) && ( comm.m_subject == homeworldSubject ) )
-			{
-				warnings.Add( comm );
-			}
+			homeworldSubject = GD_Comm.Subject.NoMoreInformation;
+
+			warnings = FindHomeworldLines( homeworldSubject );
 		}
 
 		if ( warnings.Count == 0 )
@@ -3183,9 +3192,17 @@ public class Encounter : MonoBehaviour
 			return null;
 		}
 
-		// one step further than the last warning (the last line once they have all been given)
-		var index = Mathf.Clamp( m_pdEncounter.m_homeworldWarningCount, 0, warnings.Count - 1 );
+		// one step further than the last line of this list (its last line once they have all been given) - save files from before the counts per list have none
+		var listIndex = ( homeworldSubject == GD_Comm.Subject.GreetingHail ) ? 0 : ( ( homeworldSubject == GD_Comm.Subject.GreetingResponse ) ? 1 : 2 );
 
+		if ( ( m_pdEncounter.m_homeworldWarningCounts == null ) || ( m_pdEncounter.m_homeworldWarningCounts.Length != 3 ) )
+		{
+			m_pdEncounter.m_homeworldWarningCounts = new int[ 3 ];
+		}
+
+		var index = Mathf.Clamp( m_pdEncounter.m_homeworldWarningCounts[ listIndex ], 0, warnings.Count - 1 );
+
+		m_pdEncounter.m_homeworldWarningCounts[ listIndex ]++;
 		m_pdEncounter.m_homeworldWarningCount++;
 
 		if ( index == warnings.Count - 1 )
@@ -3194,6 +3211,22 @@ public class Encounter : MonoBehaviour
 		}
 
 		return warnings[ index ];
+	}
+
+	// the race's homeworld lines on this subject, in the order of the game data
+	List<GD_Comm> FindHomeworldLines( GD_Comm.Subject subject )
+	{
+		var lines = new List<GD_Comm>();
+
+		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
+		{
+			if ( comm.m_homeworld && ( comm.m_race == m_gdEncounter.m_race ) && ( comm.m_subject == subject ) )
+			{
+				lines.Add( comm );
+			}
+		}
+
+		return lines;
 	}
 
 	// true if the race has a line on this subject in this posture (not a homeworld line, nor a surrender line unless the aliens are cowardly)

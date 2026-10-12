@@ -20,6 +20,14 @@ public class RepairButton : ShipButton
 
 		SpaceflightController.m_instance.m_messages.Clear();
 
+		// the original's Repair begins with the DAMAGE display (ENGINEER in the decompiled original: (/REPAIR) calls (/DAMAGE) first)
+		var displayController = SpaceflightController.m_instance.m_displayController;
+
+		if ( displayController.m_damageDisplay != null )
+		{
+			displayController.ChangeDisplay( displayController.m_damageDisplay );
+		}
+
 		// check if we have an engineer assigned
 		if ( !playerData.m_crewAssignment.IsAssigned( PD_CrewAssignment.Role.Engineer ) )
 		{
