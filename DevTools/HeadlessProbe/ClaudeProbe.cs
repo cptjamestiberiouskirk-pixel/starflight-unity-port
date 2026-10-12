@@ -8272,6 +8272,49 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "comms: a press on Statement does not answer a question that came after it", ( consoleAtTheQuestion == "AnswerQuestion selected 0 running nothing" ) && ( consoleAfterThePress == "AnswerQuestion selected 0 running nothing" ) && !sentAfterThePress.Contains( "Transmitting" ), "console " + consoleAfterThePress + ", sent: [" + sentAfterThePress + "]" );
 		Check( "comms: a press with nothing in its way is carried out", sentByAPlainPress.Contains( "Transmitting" ) && !sentByAPlainPress.Contains( "ERROR" ), "sent: [" + sentByAPlainPress + "]" );
 
+		// ---- the shipped game's choice of line (FIND-PHRASE in COMM-OV): the line used least in the game, the first in the order of the data on a tie - so a race's
+		// statements come in the order of the game data, start again after the last, and carry on where they stopped at the next meeting (the use counts are
+		// saved); the port's choice before was random, with no repeat within a meeting. Six statements from a Thrynn patrol met in flight, then three more at a
+		// second meeting, straight from the encounter's FindComm
+		var findComm = typeof( Encounter ).GetMethod( "FindComm", BindingFlags.NonPublic | BindingFlags.Instance );
+		var statementIds = new List<int>();
+
+		for ( var meeting = 0; meeting < 2; meeting++ )
+		{
+			EnterEncounter( 157 );
+			yield return Frames( 10 );
+
+			for ( var i = 0; i < ( ( meeting == 0 ) ? 6 : 3 ); i++ )
+			{
+				var comm = ( findComm == null ) ? null : findComm.Invoke( controller.m_encounter, new object[] { GD_Comm.Subject.Statement, false } ) as GD_Comm;
+
+				statementIds.Add( ( comm == null ) ? -1 : comm.m_id );
+			}
+
+			ClearMissiles();
+			LeaveEncounter();
+			yield return Frames( 10 );
+		}
+
+		// in order: each one after the one before, or the first of them again once the last has been said
+		var smallestId = int.MaxValue;
+
+		foreach ( var id in statementIds )
+		{
+			smallestId = Mathf.Min( smallestId, id );
+		}
+
+		var inOrder = ( smallestId > 0 ) && ( statementIds[ 0 ] == smallestId );
+
+		for ( var i = 1; inOrder && ( i < statementIds.Count ); i++ )
+		{
+			inOrder = ( statementIds[ i ] > statementIds[ i - 1 ] ) || ( statementIds[ i ] == smallestId );
+		}
+
+		Log( "comms: a Thrynn patrol's statements in two meetings (6, then 3): " + string.Join( ", ", statementIds ) );
+
+		Check( "comms: a race's lines come least used first, in the order of the game data, and carry on at the next meeting", inOrder && ( statementIds.Count == 9 ), string.Join( ", ", statementIds ) );
+
 		Finish( "scenario=comms tokens=" + withToken + " twoSpacesThrew=" + threw + " garbledWords=" + garbledWords + "/" + plainWords + " mechan9=" + unlockedInPeace + "/" + unlockedAfterFiring + " press=[" + consoleAfterThePress + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
@@ -16328,6 +16371,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "arthflare: after the flare a distress signal gets no response", distressText.Contains( "NO RESPONSE" ), distressText );
 
+		// the answer's layout, as STRINFO 2.14 prints it: a blank line between "THERE'S NO RESPONSE!" and "CANCELLED" (the messages show each new line as "/")
+		Check( "arthflare: the no response has a blank line before CANCELLED", distressText.Contains( "THERE'S NO RESPONSE!//CANCELLED" ), distressText );
+
 		// ---- 3. in Arth's star system: no Starport model, and in orbital range of Arth no docking
 		EnterStarSystem( arthStarId );
 
@@ -16391,6 +16437,9 @@ public class ClaudeProbe : MonoBehaviour
 		var deathText = MessageList();
 
 		Log( "arthflare: in Arth's system on the day: the ship destroyed " + incinerated + " | " + deathText );
+
+		// the flare's layout, as the shipped game prints it (HYPERMSG-OV in the decompiled original: two new lines before "GAME OVER") and STRINFO 2.14 shows it
+		Check( "arthflare: the flare's text has a blank line before GAME OVER", deathText.Contains( "AND CREW WERE INCINERATED.//GAME OVER" ), deathText );
 
 		Check( "arthflare: a ship in Arth's star system when its sun flares is incinerated, and the game is over", incinerated && deathText.Contains( "INCINERATED" ) && deathText.Contains( "125, 100" ) && deathText.Contains( "01-01-4621" ), incinerated + " | " + deathText );
 
@@ -19591,8 +19640,10 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 4. the derelict's beacon in the shipped game's order (FIND-PHRASE in COMM-OV: the line used least, the first on a tie): in three meetings, its first
-		// two lines are the officer's "we're picking up a distress beacon signal" and then the SOS (a random pick would give that order in all three one time in 8)
+		// ---- 4. the derelict's beacon in the shipped game's order (FIND-PHRASE in COMM-OV: the line used least in the game, the first on a tie): its first line of
+		// the game (part 3 above, every count at 0) is the officer's "we're picking up a distress beacon signal", and from then on the report and the SOS take
+		// turns across the meetings, the use counts carrying over (a random pick would keep that up one time in 32)
+		var firstOfTheGame = ( noah.Count > 0 ) && SaysLine( noah[ 0 ], CommText( 555 ) );
 		var beaconOrders = new List<string>();
 
 		for ( var meeting = 0; meeting < 3; meeting++ )
@@ -19614,7 +19665,16 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "transmissions: the first two lines of the Noah 9 derelict in three meetings: " + string.Join( " | ", beaconOrders ) );
 
-		Check( "transmissions: in each of three meetings the Noah 9 derelict's first line is the officer's \"we're picking up a distress beacon signal\" and its second the SOS", string.Join( " ", beaconOrders ) == "beacon,SOS beacon,SOS beacon,SOS", string.Join( " | ", beaconOrders ) );
+		// the six lines of the three meetings, one after the other: each the other line than the one before
+		var beaconLines = string.Join( ",", beaconOrders ).Split( ',' );
+		var takingTurns = ( beaconLines.Length == 6 ) && !System.Array.Exists( beaconLines, line => line == "other" );
+
+		for ( var i = 1; takingTurns && ( i < beaconLines.Length ); i++ )
+		{
+			takingTurns = beaconLines[ i ] != beaconLines[ i - 1 ];
+		}
+
+		Check( "transmissions: the Noah 9 derelict's first line of the game is the officer's \"we're picking up a distress beacon signal\", and then it and the SOS take turns across three meetings", firstOfTheGame && takingTurns, firstOfTheGame + " | " + string.Join( " | ", beaconOrders ) );
 
 		controller.m_encounterRange = encounterRange;
 
