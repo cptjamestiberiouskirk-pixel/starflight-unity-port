@@ -2032,7 +2032,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "unknown object scan (no picture) leaves the window empty", !PictureShown( sensors ), SensorPicture( sensors ) );
 		Check( "unknown object scan keeps its scan type", sensors.m_scanType == SensorsDisplay.ScanType.Unknown, "scanType=" + sensors.m_scanType );
 
-		// an empty window is black inside a magenta border, as the original shows an unidentified object
+		// an empty window is black inside its border (magenta in the original, the UI kit's sensor window colour now), as the original shows an unidentified object
 		var window = sensors.m_backgroundImage.transform.parent;
 		var emptyTransform = window.Find( "Empty" );
 		var panelTransform = window.Find( "Panel" );
@@ -2048,13 +2048,13 @@ public class ClaudeProbe : MonoBehaviour
 			emptyText += " active=" + emptyImage.gameObject.activeInHierarchy + " colour=" + emptyImage.color + " size=" + emptySize + " panel=" + panelSize + " order=" + panelTransform.GetSiblingIndex() + "<" + emptyTransform.GetSiblingIndex() + "<" + sensors.m_backgroundImage.transform.GetSiblingIndex();
 		}
 
-		Check( "unknown object scan shows a black window inside a magenta border", ( emptyImage != null ) && ( panelImage != null ) && emptyImage.gameObject.activeInHierarchy && ( emptyImage.color == Color.black ) && ( Mathf.Abs( panelImage.rectTransform.rect.width - emptyImage.rectTransform.rect.width - 32.0f ) < 0.5f ) && ( Mathf.Abs( panelImage.rectTransform.rect.height - emptyImage.rectTransform.rect.height - 32.0f ) < 0.5f ), emptyText );
+		Check( "unknown object scan shows a black window inside its border", ( emptyImage != null ) && ( panelImage != null ) && emptyImage.gameObject.activeInHierarchy && ( emptyImage.color == Color.black ) && ( Mathf.Abs( panelImage.rectTransform.rect.width - emptyImage.rectTransform.rect.width - 32.0f ) < 0.5f ) && ( Mathf.Abs( panelImage.rectTransform.rect.height - emptyImage.rectTransform.rect.height - 32.0f ) < 0.5f ), emptyText );
 		Check( "the black inside is drawn over the panel and under the pictures", ( emptyTransform != null ) && ( panelTransform != null ) && ( panelTransform.GetSiblingIndex() < emptyTransform.GetSiblingIndex() ) && ( emptyTransform.GetSiblingIndex() < sensors.m_backgroundImage.transform.GetSiblingIndex() ), emptyText );
 
 		// the original shows no readout for an unidentified object
 		Check( "unknown object scan shows no readout", !sensors.m_massText.gameObject.activeInHierarchy && !sensors.m_bioMinText.gameObject.activeInHierarchy, "mass=" + sensors.m_massText.gameObject.activeInHierarchy + " bio=" + sensors.m_bioMinText.gameObject.activeInHierarchy );
 
-		// a scan with a picture, and a display that has just been shown, keep the magenta window
+		// a scan with a picture, and a display that has just been shown, keep the coloured window
 		sensors.StartScanning( SensorsDisplay.ScanType.SpeminScout, 1, 400, 100, 100 );
 		yield return Frames( 2 );
 

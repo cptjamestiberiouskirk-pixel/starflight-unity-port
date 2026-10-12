@@ -464,6 +464,13 @@ public class SensorsDisplay : ShipDisplay
 			emptyObject.name = "Empty";
 			emptyObject.transform.SetSiblingIndex( m_panelImage.transform.GetSiblingIndex() + 1 );
 
+			// the copy must not keep the panel's UI kit style, which would give it the window's colour again each time it is shown
+			if ( emptyObject.TryGetComponent<UIKitStyle>( out var style ) )
+			{
+				style.enabled = false;
+				Destroy( style );
+			}
+
 			m_emptyImage = emptyObject.GetComponent<Image>();
 			m_emptyImage.color = Color.black;
 			m_emptyImage.raycastTarget = false;
