@@ -1,16 +1,24 @@
 
 using UnityEngine;
+using TMPro;
 
 // This component creates a floating label above terrain objects when scanned.
-// It uses Unity's legacy TextMesh for simple 3D world-space text.
+// It is TextMesh Pro world-space text in the UI kit's label style (Rajdhani, capitals, spaced), with a dark outline so that it reads on any ground.
 public class TerrainObjectLabel : MonoBehaviour
 {
 	// the label text object
 	GameObject m_labelObject;
-	TextMesh m_textMesh;
+	TextMeshPro m_textMesh;
+
+	// the label's own copy of its font material (for the outline), destroyed with it
+	Material m_material;
 
 	// how high above the object to place the label
 	const float c_labelHeight = 8.0f;
+
+	// the size of the label's text in world units (a little larger than the legacy label's 72 point Arial at a character size of 0.2, as the kit's capitals are narrower), and the width of its outline
+	const float c_fontSize = 20.0f;
+	const float c_outlineWidth = 0.3f;
 
 	// how long the label stays visible (in seconds)
 	const float c_labelDuration = 30.0f;
@@ -69,37 +77,31 @@ public class TerrainObjectLabel : MonoBehaviour
 		// this avoids issues with object scale/rotation affecting label position
 		m_labelObject.transform.position = transform.position + new Vector3( 0, c_labelHeight, 0 );
 
-		// add legacy TextMesh component (simpler, no font asset needed)
-		m_textMesh = m_labelObject.AddComponent<TextMesh>();
-		m_textMesh.fontSize = 72;
-		m_textMesh.characterSize = 0.2f;
-		m_textMesh.anchor = TextAnchor.MiddleCenter;
-		m_textMesh.alignment = TextAlignment.Center;
-		m_textMesh.fontStyle = FontStyle.Bold;
+		// the text, in the UI kit's small label style (its font, capitals and spacing; the size is the label's own, in world units)
+		m_textMesh = m_labelObject.AddComponent<TextMeshPro>();
 
-		// try to use Arial font which is built into Unity
-		m_textMesh.font = Resources.GetBuiltinResource<Font>( "LegacyRuntime.ttf" );
+		var theme = UIKitTheme.Get();
 
-		// if that fails, try Arial
-		if ( m_textMesh.font == null )
+		if ( theme != null )
 		{
-			m_textMesh.font = Resources.GetBuiltinResource<Font>( "Arial.ttf" );
+			theme.m_labelS.Apply( m_textMesh );
 		}
+
+		m_textMesh.fontSize = c_fontSize;
+		m_textMesh.alignment = TextAlignmentOptions.Center;
+		m_textMesh.textWrappingMode = TextWrappingModes.NoWrap;
+		m_textMesh.rectTransform.sizeDelta = new Vector2( 40.0f, 8.0f );
+
+		// a dark outline (on the label's own copy of the font material, which it destroys)
+		m_material = m_textMesh.fontMaterial;
+		m_textMesh.outlineWidth = c_outlineWidth;
+		m_textMesh.outlineColor = ( theme != null ) ? (Color32) theme.m_backgroundApp : new Color32( 0, 0, 0, 255 );
 
 		// configure the mesh renderer
 		var renderer = m_labelObject.GetComponent<MeshRenderer>();
+
 		if ( renderer != null )
 		{
-			// use the font's material if available, otherwise create one
-			if ( m_textMesh.font != null && m_textMesh.font.material != null )
-			{
-				renderer.material = m_textMesh.font.material;
-			}
-			else
-			{
-				renderer.material = new Material( Shader.Find( "GUI/Text Shader" ) );
-			}
-
 			renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 			renderer.receiveShadows = false;
 		}
@@ -151,6 +153,12 @@ public class TerrainObjectLabel : MonoBehaviour
 		if ( m_labelObject != null )
 		{
 			Destroy( m_labelObject );
+		}
+
+		// and its copy of the font material
+		if ( m_material != null )
+		{
+			Destroy( m_material );
 		}
 	}
 }
