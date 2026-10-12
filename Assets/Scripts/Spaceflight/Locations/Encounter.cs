@@ -800,8 +800,8 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_alreadyScanned = false;
 			m_pdEncounter.m_scanTimer = 0.0f;
 			m_pdEncounter.m_conversationTimer = 0.0f;
-			m_pdEncounter.m_alienStance = GD_Comm.Stance.Neutral;
-			Debug.Log( $"[Encounter.Show] Set stance to Neutral (line ~473)" );
+			// the races the shipped game starts friendly are friendly, the others neutral
+			m_pdEncounter.m_alienStance = AlienPersonality.StartsFriendly( m_gdEncounter.m_race ) ? GD_Comm.Stance.Friendly : GD_Comm.Stance.Neutral;
 			m_pdEncounter.m_playerStance = GD_Comm.Stance.Neutral;
 			m_pdEncounter.m_questionLikelihood = 50;
 			m_pdEncounter.m_numCorrectAnswers = 0;
@@ -2589,10 +2589,12 @@ public class Encounter : MonoBehaviour
 	{
 		if ( !m_pdEncounter.m_moodSet )
 		{
-			m_pdEncounter.m_mood = personality.m_startingMood;
+			// the race's mood, and more against a ship that meets them with its shields up or its weapons armed
+			m_pdEncounter.m_mood = personality.m_startingMood + AlienPersonality.GetMeetingMood( DataController.m_instance.m_playerData.m_playerShip );
 			m_pdEncounter.m_moodSet = true;
 
-			// the Elowan and the Thrynn hold the crew's friendship with their rival race against it: they start in their hostile band (the owner's ruling of 2026-10-11)
+			// the Elowan and the Thrynn hold the crew's friendship with their rival race against it: they start in their hostile band (the owner's ruling of 2026-10-11),
+			// which for the Elowan is fight or flight, as the original says the rival lines only to aliens past their neutral posture (COMMSPEC-OV: A-POSTU > 1)
 			if ( IsFriendOfRival() )
 			{
 				m_pdEncounter.m_mood = Mathf.Max( m_pdEncounter.m_mood, personality.m_hostileFrom );

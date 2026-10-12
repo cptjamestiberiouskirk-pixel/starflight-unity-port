@@ -1,8 +1,8 @@
-// how a race behaves in conversation, after the conversation module of the 1984 design notes (Research/Notes/compart.txt, sections 4 to 7): the alien's
-// "emotional disposition level" - its mood, from 0 (most calm) to 100 (most agitated), which the original's kernel keeps as EDL - is divided into postures by three
-// thresholds, each of the player's postures moves it by an effect of its own, and the race's aggression weighs its strength against the player's - the notes give
-// the model and none of the numbers, so the numbers here are the port's, read from each race's character in STRINFO (the owner's ruling of 2026-10-11 for roadmap
-// item 2.1)
+// how a race behaves in conversation, after the conversation module of the shipped game (COMM-OV) and of the 1984 design notes (Research/Notes/compart.txt,
+// sections 4 to 7): the alien's "emotional disposition level" - its mood, from 0 (most calm) to 100 (most agitated), which the original keeps as EDL - is divided
+// into postures by three thresholds, and each of the player's postures moves it by an effect of its own - the numbers are the shipped game's, from each race's
+// record in the original's STARB.COM (its ORIGINATOR: BASE-EDL, AET, BET, CET, OPE, FPE, HPE; DevTools/OriginalRecords), by the owner's ruling of 2026-10-12;
+// the race's aggression, which weighs its strength against the player's, is still the port's (the shipped game's rule of strength is a step of its own)
 public class AlienPersonality
 {
 	// below this mood the aliens are friendly, below the next diplomatic, below the last hostile or obsequious (by their strength against the player's), and from
@@ -22,37 +22,60 @@ public class AlienPersonality
 	// the aggression level (the notes weigh the alien's strength by aggression / 5)
 	public float m_aggression;
 
-	// the Elowan "bear thee no ill will", ask "commit neither violence nor trespass against us", and are "wise in thy peaceful dealings" with a friendly crew: slow
-	// to anger, calmed by friendship, and little aggression
+	// the Elowan: their hostile band is empty (BET = CET = 60), so they go from talking straight to fight or flight; friendship calms them, hostility angers them
+	// (EDL 44, AET 25, BET 60, CET 60, OPE 0, FPE -10, HPE 20) - the aggression is the port's, little
 	static readonly AlienPersonality s_elowan = new AlienPersonality
 	{
-		m_friendlyBelow = 40.0f, m_hostileFrom = 75.0f, m_fightFrom = 95.0f, m_startingMood = 45.0f,
-		m_friendlyEffect = -10.0f, m_hostileEffect = 15.0f, m_obsequiousEffect = 5.0f, m_aggression = 2.0f
+		m_friendlyBelow = 25.0f, m_hostileFrom = 60.0f, m_fightFrom = 60.0f, m_startingMood = 44.0f,
+		m_friendlyEffect = -10.0f, m_hostileEffect = 20.0f, m_obsequiousEffect = 0.0f, m_aggression = 2.0f
 	};
 
-	// the Thrynn are "practical, realistic people" who "cannot stand races who cower and debase themselves": calmed a little by friendship, angered by hostility
-	// and more by grovelling
+	// the Thrynn: calmed a little by friendship, angered by hostility and a little by grovelling (EDL 44, AET 30, BET 60, CET 80, OPE 5, FPE -8, HPE 20)
 	static readonly AlienPersonality s_thrynn = new AlienPersonality
 	{
-		m_friendlyBelow = 30.0f, m_hostileFrom = 65.0f, m_fightFrom = 90.0f, m_startingMood = 45.0f,
-		m_friendlyEffect = -8.0f, m_hostileEffect = 12.0f, m_obsequiousEffect = 15.0f, m_aggression = 5.0f
+		m_friendlyBelow = 30.0f, m_hostileFrom = 60.0f, m_fightFrom = 80.0f, m_startingMood = 44.0f,
+		m_friendlyEffect = -8.0f, m_hostileEffect = 20.0f, m_obsequiousEffect = 5.0f, m_aggression = 5.0f
 	};
 
-	// the Spemin bully ("you will obey us or you will cease to exist") and grovel to the strong ("so, you wish to praise us. This is acceptable"): they start
-	// between hostile and obsequious, praise calms them, and little aggression (they "act cowardly")
+	// the Spemin: never friendly (AET 0), they start neutral and turn hostile from 20, which a ship that meets them with its shields up and its weapons armed
+	// already brings; praise calms them, hostility angers them a lot (EDL 10, AET 0, BET 20, CET 80, OPE -8, FPE 0, HPE 30)
 	static readonly AlienPersonality s_spemin = new AlienPersonality
 	{
-		m_friendlyBelow = 15.0f, m_hostileFrom = 40.0f, m_fightFrom = 90.0f, m_startingMood = 55.0f,
-		m_friendlyEffect = 0.0f, m_hostileEffect = 10.0f, m_obsequiousEffect = -10.0f, m_aggression = 3.0f
+		m_friendlyBelow = 0.0f, m_hostileFrom = 20.0f, m_fightFrom = 80.0f, m_startingMood = 10.0f,
+		m_friendlyEffect = 0.0f, m_hostileEffect = 30.0f, m_obsequiousEffect = -8.0f, m_aggression = 3.0f
 	};
 
-	// the Veloxi are "arrogant" and want worship ("you are coming to worship of illustrious queen of Veloxi?"): calmed by grovelling, angered by hostility, and
-	// fairly aggressive
+	// the Veloxi: calmed by grovelling, angered by hostility (EDL 44, AET 20, BET 60, CET 80, OPE -8, FPE 0, HPE 20)
 	static readonly AlienPersonality s_velox = new AlienPersonality
 	{
-		m_friendlyBelow = 25.0f, m_hostileFrom = 60.0f, m_fightFrom = 90.0f, m_startingMood = 45.0f,
-		m_friendlyEffect = -5.0f, m_hostileEffect = 15.0f, m_obsequiousEffect = -10.0f, m_aggression = 6.0f
+		m_friendlyBelow = 20.0f, m_hostileFrom = 60.0f, m_fightFrom = 80.0f, m_startingMood = 44.0f,
+		m_friendlyEffect = 0.0f, m_hostileEffect = 20.0f, m_obsequiousEffect = -8.0f, m_aggression = 6.0f
 	};
+
+	// the races whose shipped starting posture is friendly: their mood (BASE-EDL) is below every threshold (the Mysterions 1 under 99, the Nomad probes 1 under
+	// 100, the Veloxi drones 1 under 98, the Minstrels 0 under 99, the Enterprise 48 under 99, the Noah 9 derelict 50 under 101) - the others start neutral, as
+	// they did (the Mechans are neutral in the shipped game too; the Gazurtoids' hostile posture is talk, which needs a mood of their own; the Uhlek fight)
+	public static bool StartsFriendly( GameData.Race race )
+	{
+		switch ( race )
+		{
+			case GameData.Race.Mysterion:
+			case GameData.Race.NomadProbe:
+			case GameData.Race.VeloxProbe:
+			case GameData.Race.Minstrel:
+			case GameData.Race.TheEnterprise:
+			case GameData.Race.NoahDerelict:
+				return true;
+		}
+
+		return false;
+	}
+
+	// what the player's ship adds to the aliens' mood when they meet: 5 with its shields up and 10 with its weapons armed (COMM-OV, INIT_ACOMM)
+	public static float GetMeetingMood( PD_PlayerShip ship )
+	{
+		return ( ship.m_shieldsAreUp ? 5.0f : 0.0f ) + ( ship.m_weaponsAreArmed ? 10.0f : 0.0f );
+	}
 
 	// the personality of a race - null for a race whose stance is set by rules of its own (the Mechans, the drones, the Uhlek) or that has lines in one stance only
 	public static AlienPersonality Find( GameData.Race race )
