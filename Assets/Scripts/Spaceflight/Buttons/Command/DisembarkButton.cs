@@ -117,7 +117,8 @@ public class DisembarkButton : ShipButton
 				// display message
 				SpaceflightController.m_instance.m_messages.Clear();
 
-				SpaceflightController.m_instance.m_messages.AddText( "<color=white>Stand by, scanning planet...</color>" );
+				// the original's words (SHIPBUTTONS: "STANDBY...SCANNING PLANET.")
+				SpaceflightController.m_instance.m_messages.AddText( "<color=white>Standby...scanning planet.</color>" );
 
 				// refuel the terrain vehicle
 				playerData.m_terrainVehicle.Refuel();
@@ -142,9 +143,10 @@ public class DisembarkButton : ShipButton
 		{
 			m_messageTimer += Time.deltaTime;
 
-			if ( m_messageTimer >= 0.65f )
+			// (the four lines come within the map's fade of 2 seconds)
+			if ( m_messageTimer >= 0.4f )
 			{
-				m_messageTimer -= 0.65f;
+				m_messageTimer -= 0.4f;
 
 				switch ( m_messageState )
 				{
@@ -157,6 +159,11 @@ public class DisembarkButton : ShipButton
 						break;
 
 					case 2:
+						// the hull check ends before the terrain vehicle goes out, as the original's (HP-OV, C+OPARMS: "HULL CHECK COMPLETE")
+						SpaceflightController.m_instance.m_messages.AddText( "<color=white>Hull check complete.</color>" );
+						break;
+
+					case 3:
 						SpaceflightController.m_instance.m_messages.AddText( "<color=white>Activating terrain vehicle.</color>" );
 						break;
 
