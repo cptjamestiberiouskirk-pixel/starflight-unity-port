@@ -371,6 +371,10 @@ public static class UIKitSceneTool
 		// the target bracket in the viewport (the Figma file's Encounter and Combat mockups)
 		report.AppendLine( MakeTargetBracket( canvas ) );
 
+		// the stars' coordinates in hyperspace, and the frame on the viewport (the Hyperspace mockup)
+		report.AppendLine( MakeStarLabels( canvas ) );
+		report.AppendLine( MakeViewportFrame( canvas ) );
+
 		EditorSceneManager.MarkSceneDirty( canvas.gameObject.scene );
 
 		return report.ToString();
@@ -469,6 +473,145 @@ public static class UIKitSceneTool
 		EditorUtility.SetDirty( targetBracket );
 
 		return "target bracket made";
+	}
+
+	// the size of a star's coordinates in hyperspace, the frame's corner arms, its margin from the viewport's edges, and the size of the location's name
+	const float c_starLabelSize = 14.0f;
+	const float c_frameArm = 20.0f;
+	const float c_frameMargin = 6.0f;
+	const float c_frameLabelSize = 14.0f;
+
+	// makes (or remakes) the stars' coordinates in hyperspace: a StarLabels that covers the viewport (masked to it, under the target bracket and the fade)
+	// and the hidden label its pool is cloned from
+	static string MakeStarLabels( Transform canvas )
+	{
+		var viewport = canvas.Find( c_viewport.TrimEnd( '/' ) );
+
+		if ( viewport == null )
+		{
+			return "star labels not made (no viewport at " + c_viewport + ")";
+		}
+
+		var old = viewport.Find( "UI Kit Star Labels" );
+
+		if ( old != null )
+		{
+			Undo.DestroyObjectImmediate( old.gameObject );
+		}
+
+		var rootObject = new GameObject( "UI Kit Star Labels", typeof( RectTransform ), typeof( RectMask2D ), typeof( StarLabels ) );
+
+		Undo.RegisterCreatedObjectUndo( rootObject, "UI kit" );
+
+		var rootRect = (RectTransform) rootObject.transform;
+
+		rootRect.SetParent( viewport, false );
+		rootRect.anchorMin = Vector2.zero;
+		rootRect.anchorMax = Vector2.one;
+		rootRect.offsetMin = Vector2.zero;
+		rootRect.offsetMax = Vector2.zero;
+
+		// under the target bracket (and so under the fade)
+		var target = viewport.Find( "UI Kit Target" );
+		var fade = viewport.Find( "Fade" );
+
+		if ( target != null )
+		{
+			rootRect.SetSiblingIndex( target.GetSiblingIndex() );
+		}
+		else if ( fade != null )
+		{
+			rootRect.SetSiblingIndex( fade.GetSiblingIndex() );
+		}
+
+		// the label the pool is cloned from: placed by its left edge, beside the star
+		var label = new GameObject( "Star Label", typeof( RectTransform ), typeof( CanvasRenderer ), typeof( TMPro.TextMeshProUGUI ) );
+		var labelRect = (RectTransform) label.transform;
+		var labelText = label.GetComponent<TMPro.TextMeshProUGUI>();
+
+		labelRect.SetParent( rootRect, false );
+		labelRect.anchorMin = new Vector2( 0.5f, 0.5f );
+		labelRect.anchorMax = new Vector2( 0.5f, 0.5f );
+		labelRect.pivot = new Vector2( 0.0f, 0.5f );
+		labelRect.sizeDelta = new Vector2( 200.0f, 24.0f );
+		labelText.alignment = TMPro.TextAlignmentOptions.Left;
+		labelText.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+		labelText.raycastTarget = false;
+		labelText.text = "123 · 101";
+
+		Style( labelText, UIText.LabelS, c_starLabelSize, UISprite.None, UIColor.TextSecondary );
+
+		var starLabels = rootObject.GetComponent<StarLabels>();
+
+		starLabels.m_template = labelText;
+
+		EditorUtility.SetDirty( starLabels );
+
+		return "star labels made";
+	}
+
+	// makes (or remakes) the viewport's frame: a ViewportFrame a little inside the viewport's edges, with a corner mark (two bars) at each corner and the
+	// location's name in the top left; drawn over everything else in the viewport
+	static string MakeViewportFrame( Transform canvas )
+	{
+		var viewport = canvas.Find( c_viewport.TrimEnd( '/' ) );
+
+		if ( viewport == null )
+		{
+			return "viewport frame not made (no viewport at " + c_viewport + ")";
+		}
+
+		var old = viewport.Find( "UI Kit Frame" );
+
+		if ( old != null )
+		{
+			Undo.DestroyObjectImmediate( old.gameObject );
+		}
+
+		var rootObject = new GameObject( "UI Kit Frame", typeof( RectTransform ), typeof( ViewportFrame ) );
+
+		Undo.RegisterCreatedObjectUndo( rootObject, "UI kit" );
+
+		var rootRect = (RectTransform) rootObject.transform;
+
+		rootRect.SetParent( viewport, false );
+		rootRect.anchorMin = Vector2.zero;
+		rootRect.anchorMax = Vector2.one;
+		rootRect.offsetMin = new Vector2( c_frameMargin, c_frameMargin );
+		rootRect.offsetMax = new Vector2( -c_frameMargin, -c_frameMargin );
+		rootRect.SetAsLastSibling();
+
+		foreach ( var corner in new[] { new Vector2( 0, 1 ), new Vector2( 1, 1 ), new Vector2( 0, 0 ), new Vector2( 1, 0 ) } )
+		{
+			Style( MakeBar( rootRect, corner, new Vector2( c_frameArm, c_bracketThickness ) ), UIText.None, 0, UISprite.None, UIColor.AccentPrimary );
+			Style( MakeBar( rootRect, corner, new Vector2( c_bracketThickness, c_frameArm ) ), UIText.None, 0, UISprite.None, UIColor.AccentPrimary );
+		}
+
+		// the location's name, inside the top left corner
+		var label = new GameObject( "Location", typeof( RectTransform ), typeof( CanvasRenderer ), typeof( TMPro.TextMeshProUGUI ) );
+		var labelRect = (RectTransform) label.transform;
+		var labelText = label.GetComponent<TMPro.TextMeshProUGUI>();
+
+		labelRect.SetParent( rootRect, false );
+		labelRect.anchorMin = new Vector2( 0.0f, 1.0f );
+		labelRect.anchorMax = new Vector2( 0.0f, 1.0f );
+		labelRect.pivot = new Vector2( 0.0f, 1.0f );
+		labelRect.anchoredPosition = new Vector2( c_frameArm + 8.0f, -6.0f );
+		labelRect.sizeDelta = new Vector2( 400.0f, 24.0f );
+		labelText.alignment = TMPro.TextAlignmentOptions.TopLeft;
+		labelText.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+		labelText.raycastTarget = false;
+		labelText.text = "Hyperspace";
+
+		Style( labelText, UIText.LabelS, c_frameLabelSize, UISprite.None, UIColor.TextAccent );
+
+		var frame = rootObject.GetComponent<ViewportFrame>();
+
+		frame.m_label = labelText;
+
+		EditorUtility.SetDirty( frame );
+
+		return "viewport frame made";
 	}
 
 	// one bar of a target bracket corner: anchored at the corner, reaching into the bracket
