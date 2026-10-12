@@ -653,6 +653,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioBlackEgg();
 				break;
 
+			case "tvtakesegg":
+				yield return ScenarioTvTakesEgg();
+				break;
+
 			case "crystalcone":
 				yield return ScenarioCrystalCone();
 				break;
@@ -15209,6 +15213,119 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=blackegg dropped=" + eggsOnPlanet90 + " planet90=" + planet90Destroyed + " crystalAway=" + crystalAfterAway + " crystalNexus=" + crystalDestroyed + " stillGone=" + stillGone, 0 );
 	}
 
+	// the terrain vehicle takes the Black Egg and the Flat Device out of the ship's hold every time it goes out (the original's disembark, TV-OV WEE39), so that the egg
+	// can be dropped and armed from the terrain vehicle's cargo; another artifact stays in the ship, and what is left in the terrain vehicle comes back on board
+	IEnumerator ScenarioTvTakesEgg()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var blackEggId = gameData.FindArtifactId( "Black Egg" );
+		var flatDeviceId = gameData.FindArtifactId( "Flat Device" );
+		var whiningOrbId = gameData.FindArtifactId( "Whining Orb" );
+		var planet90StarId = gameData.m_planetList[ 90 ].m_starId;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		if ( ( blackEggId < 0 ) || ( flatDeviceId < 0 ) || ( whiningOrbId < 0 ) )
+		{
+			Finish( "scenario=tvtakesegg abort: an artifact is missing from the game data (" + blackEggId + ", " + flatDeviceId + ", " + whiningOrbId + ")", 2 );
+			yield break;
+		}
+
+		// ---- 1. the three artifacts in the ship's hold, down on planet 90 and out through the real Disembark button
+		ship.AddArtifact( blackEggId );
+		ship.AddArtifact( flatDeviceId );
+		ship.AddArtifact( whiningOrbId );
+
+		yield return GoIntoOrbit( planet90StarId, 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=tvtakesegg abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var vehicle = playerData.m_terrainVehicle;
+		var eggInVehicle = vehicle.HasArtifact( "Black Egg" );
+		var flatInVehicle = vehicle.HasArtifact( "Flat Device" );
+		var eggInShip = ship.HasArtifact( "Black Egg" );
+		var flatInShip = ship.HasArtifact( "Flat Device" );
+
+		Log( "tvtakesegg: after the disembark: vehicle egg " + eggInVehicle + " flat " + flatInVehicle + ", ship egg " + eggInShip + " flat " + flatInShip + " orb " + ship.HasArtifact( "Whining Orb" ) );
+
+		Check( "tvtakesegg: the terrain vehicle has taken the Black Egg and the Flat Device out of the ship's hold", eggInVehicle && flatInVehicle && !eggInShip && !flatInShip, "vehicle egg " + eggInVehicle + " flat " + flatInVehicle + ", ship egg " + eggInShip + " flat " + flatInShip );
+
+		Check( "tvtakesegg: the Whining Orb stays in the ship's hold (control)", ship.HasArtifact( "Whining Orb" ) && !vehicle.HasArtifact( "Whining Orb" ), "ship " + ship.HasArtifact( "Whining Orb" ) + ", vehicle " + vehicle.HasArtifact( "Whining Orb" ) );
+
+		// ---- 2. the terrain vehicle's cargo list has the egg, and dropping it arms it
+		var terrainVehicle = controller.m_terrainVehicle;
+
+		foreach ( var deposit in controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true ) )
+		{
+			if ( Vector3.Distance( deposit.transform.position, terrainVehicle.transform.position ) < 50.0f )
+			{
+				deposit.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		var items = TVCargoButton.BuildCargoItems();
+		var eggIndex = items.FindIndex( item => item.m_artifactId == blackEggId );
+		var dropText = "";
+		var eggsOnPlanet90 = 0;
+
+		if ( eggIndex >= 0 )
+		{
+			controller.m_messages.Clear();
+
+			TVCargoButton.OpenCargoList();
+
+			for ( var i = 0; i < eggIndex; i++ )
+			{
+				TVCargoButton.MarkNextItem();
+			}
+
+			TVCargoButton.DropMarkedItem();
+
+			yield return Frames( 2 );
+
+			dropText = MessageList();
+
+			foreach ( var droppedCargo in playerData.m_planetSurfaces.m_droppedCargoList )
+			{
+				if ( ( droppedCargo.m_planetId == 90 ) && ( droppedCargo.m_artifactId == blackEggId ) )
+				{
+					eggsOnPlanet90++;
+				}
+			}
+		}
+
+		Log( "tvtakesegg: the egg is item " + eggIndex + " of " + items.Count + " in the cargo list; " + eggsOnPlanet90 + " Black Egg on planet 90 | " + dropText.Substring( 0, Mathf.Min( 200, dropText.Length ) ) );
+
+		Check( "tvtakesegg: the terrain vehicle's cargo list drops the Black Egg it took from the ship, and it is armed", ( eggIndex >= 0 ) && ( eggsOnPlanet90 == 1 ) && dropText.Contains( "armed" ), "item " + eggIndex + ", " + eggsOnPlanet90 + " | " + dropText );
+
+		// ---- 3. back in the ship: the Flat Device comes back on board, the terrain vehicle's hold is empty
+		TVCargoButton.BackToTerrainVehicle();
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+
+		var vehicleArtifacts = ( vehicle.m_artifactStorage != null ) && ( vehicle.m_artifactStorage.m_artifactList != null ) ? vehicle.m_artifactStorage.m_artifactList.Count : 0;
+
+		Check( "tvtakesegg: back in the ship, the Flat Device is in the ship's hold again and nothing is left in the terrain vehicle", ship.HasArtifact( "Flat Device" ) && !ship.HasArtifact( "Black Egg" ) && ( vehicleArtifacts == 0 ), "ship flat " + ship.HasArtifact( "Flat Device" ) + " egg " + ship.HasArtifact( "Black Egg" ) + ", vehicle artifacts " + vehicleArtifacts );
+
+		Finish( "scenario=tvtakesegg eggIndex=" + eggIndex + " dropped=" + eggsOnPlanet90 + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
 	// ---------------------------------------------------------------- phase 4: the Crystal Cone
 
 	// goes into orbit around a planet from its star system, clears the messages and waits a while in orbit - returns the messages

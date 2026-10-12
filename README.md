@@ -130,7 +130,7 @@ The project features a **deterministic visualization system** that renders plane
 - The original's special artifacts in the ruins of their sites, picked up by the terrain vehicle, with the Most Magnificent Hexagon and the City of the Ancients around two of them
 - The terrain vehicle drops cargo from its hold and picks it up again, with a cargo display while the cargo list is open
 - The Crystal Planet's field damages a ship in orbit that does not carry the Crystal Orb
-- The Black Egg: dropped by the terrain vehicle it is armed, and back in orbit it counts down and destroys the planet (the Crystal Planet only at its control nexus)
+- The Black Egg: the terrain vehicle takes it out of the ship's hold when it goes out (as it takes the Flat Device), dropped by the terrain vehicle it is armed, and back in orbit it counts down and destroys the planet (the Crystal Planet only at its control nexus)
 - The Crystal Cone locates the Crystal Planet's control nexus from orbit
 - The Tesseract halves the fuel the engines use in hyperspace
 - The Whining Orb translates the Spemin
