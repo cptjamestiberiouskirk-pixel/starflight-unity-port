@@ -1,5 +1,5 @@
 {
-  "m_about": "What the original game had and Starflight Game Data.json does not, recovered from Research/Data/STRINFO.DOC. Texts are as STRINFO prints them (in capitals, with its brackets for values the game fills in). A planet is given as STRINFO gives it: the star by its coordinates and the planet by its number counted from the sun (m_planetFromSun; this holds in 15 of the 16 STRINFO entries that also print an orbit number, the 16th is Koann). Latitude is positive to the north, longitude positive to the east; m_placement says whether a message is at its coordinates (Site), at random places on the planet (Random) or at several places (Several). m_note records corrections and conflicts, m_source the section of STRINFO. Comm ids start at 1000 so that they never meet the ids of the game data.",
+  "m_about": "What the original game had and Starflight Game Data.json does not, recovered from Research/Data/STRINFO.DOC. Texts are as STRINFO prints them (in capitals, with its brackets for values the game fills in). A planet is given as STRINFO gives it: the star by its coordinates and the planet by its number counted from the sun (m_planetFromSun; this holds in 17 of the 18 STRINFO entries that also print an orbit number, the 18th is Koann). Latitude is positive to the north, longitude positive to the east; m_placement says whether a message is at its coordinates (Site), at random places on the planet (Random) or at several places (Several). m_note records corrections and conflicts, m_source the section of STRINFO. Comm ids start at 1000 so that they never meet the ids of the game data.",
   "m_commList": [
     {
       "m_id": 1000,
@@ -551,7 +551,7 @@
       "m_planetFromSun": 3,
       "m_latitude": 52,
       "m_longitude": 16,
-      "m_text": "Phlegmak ruins (the microfilm message on Arth).",
+      "m_text": "Phlegmak ruins (the microfilm message on planet 3 of Arth's system).",
       "m_note": "",
       "m_source": "STRINFO 4.1"
     },

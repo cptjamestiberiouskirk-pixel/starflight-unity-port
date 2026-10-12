@@ -73,7 +73,7 @@ Still open:
   - The real effects of the Black Box, the Hypercube and the Ellipsoid. Resolved 2026-10-11 (Claude's recommendation, by the owner's leave): none beyond their documented roles. STRINFO 4.1 gives no effect, and their analyses read as curios ("It slices, it dices", "decorative", "a 4-dimensional puzzle"); the Black Box is the Thrynn's sale (PR 156) and the Ellipsoid a Veloxi demand (PR 155).
   - The flare deadline: resolved 2026-10-09. The data does not disagree with itself: the year, month and day fields of every star still to flare are its flare day in the original's calendar of 10 months of 30 days (234 of 234), so Arth's day 300 is 01-01-4621. The original looks for a flare as a day ends, so Arth's comes as 30-10-4620, the last day of the year, ends: the Elowan's "final week of your Ten-month". See item 0.7.
 
-Reading STRINFO: its "PLANET N OF SYSTEM X, Y" is the N-th planet from the sun, not the orbit number. This holds in 15 of the 16 entries that also print an orbit number; the 16th is Koann, see D5. To find the JSON's `m_orbitPosition`, sort the star's planets by orbit.
+Reading STRINFO: its "PLANET N OF SYSTEM X, Y" is the N-th planet from the sun, not the orbit number. This holds in 17 of the 18 entries that also print an orbit number; the 18th is Koann, see D5. To find the JSON's `m_orbitPosition`, sort the star's planets by orbit.
 
 ## Phase 0: Foundations
 
