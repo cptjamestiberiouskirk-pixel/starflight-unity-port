@@ -17851,7 +17851,29 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "colonies: Log Planet asks whether to recommend the planet for colonization, and Yes recommends it while No does not", askedForHeaven && ( pendingCount == 3 ), askedForHeaven + ", " + pendingCount );
 		Check( "colonies: back at the Starport an optimal planet of Interstel's list earns its bonus", ledger.Contains( "Colony bonus 50000+" ) && evaluationText.Contains( "OPTIMAL PLANET" ) && evaluationText.Contains( "BONUS OF 50000" ), ledger );
 		Check( "colonies: the first unsuitable planet is a warning of 100 MU, with its reasons", ledger.Contains( "Colony fine 100-" ) && evaluationText.Contains( "FINED 100 MU'S.  THIS IS ONLY A WARNING" ) && ( reasonsA.Length > 0 ) && evaluationText.Contains( reasonsA.Split( ',' )[ 0 ].Trim() ), ledger + " | " + reasonsA );
-		Check( "colonies: a later unsuitable planet is fined heavily, 5000 MU for each reason, with no warning", ledger.Contains( "Colony fine " + ( 5000 * reasonCountB ) + "-" ) && ( change == 50000 - 100 - 5000 * reasonCountB ) && ( pendingAfter == 0 ), ledger + " | " + change + " | pending " + pendingAfter );
+		// the shipped game's fine (CAPTAIN overlay WF348 and WF292 in the decompiled original): 10,000 MU for each unsuitable planet recommended before, whatever the
+		// planet's reasons (the second planet has reasonCountB of them), and the warning with the first only
+		Check( "colonies: a later unsuitable planet is fined heavily, 10,000 MU for the one unsuitable planet before it (not by its reasons), with no warning", ledger.Contains( "Colony fine 10000-" ) && ( change == 50000 - 100 - 10000 ) && evaluationText.Contains( "FINED 10000 MU'S." ) && !evaluationText.Contains( "FINED 10000 MU'S.  THIS IS ONLY A WARNING" ) && ( pendingAfter == 0 ), ledger + " | " + change + " | reasons " + reasonCountB + " | pending " + pendingAfter );
+
+		// ---- 5. the fine goes up 10,000 MU with each unsuitable planet before, to 80,000 MU from the ninth on: evaluated straight away, with 2, 8 and 12 unsuitable
+		// planets recommended before
+		var finesByCount = "";
+
+		foreach ( var unsuitableBefore in new[] { 2, 8, 12 } )
+		{
+			playerData.m_general.m_unsuitableRecommendationCount = unsuitableBefore;
+			playerData.m_general.AddColonyRecommendation( unsuitableA );
+
+			var ledgerCount = bank.m_transactionList.Count;
+
+			playerData.EvaluateColonyRecommendations();
+
+			finesByCount += unsuitableBefore + ":" + ( ( bank.m_transactionList.Count > ledgerCount ) ? bank.m_transactionList[ bank.m_transactionList.Count - 1 ].m_amount : "none" ) + " ";
+		}
+
+		Log( "colonies: the fines after 2, 8 and 12 unsuitable planets: " + finesByCount );
+
+		Check( "colonies: the fine is 10,000 MU for each unsuitable planet before, up to 80,000 MU (20000 after 2, 80000 after 8 and after 12)", finesByCount.Trim() == "2:20000- 8:80000- 12:80000-", finesByCount.Trim() );
 
 		// ---- 4. the original's evaluation screen (OP-OV): each evaluation under its recommendation's number, date, system, orbit and the name the player gave it
 		var heavenOrbit = gameData.m_planetList[ heaven ].m_orbitPosition;

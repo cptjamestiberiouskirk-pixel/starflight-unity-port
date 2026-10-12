@@ -175,10 +175,12 @@ public class PlayerData
 		return true;
 	}
 
-	// what an unsuitable recommendation costs: the first is a warning of 100 MU ("this is only a warning, your next fine will be heavy"), and later fines "vary with
-	// how unsuitable the planet is" (STRINFO 1.2) - 5000 MU for each reason is the port's choice
+	// what an unsuitable recommendation costs, as the shipped game works it out (CAPTAIN overlay WF348 and WF292, OP-OV WED0C, in the decompiled original): 10,000 MU
+	// for each unsuitable planet recommended before this one, at most 8 of them, and never less than 100 MU - so the first is a warning of 100 MU ("this is only a
+	// warning, your next fine will be heavy", shown with that one only), then 10,000, 20,000 and on to 80,000 (STRINFO 1.2 only says they "vary")
 	public const int c_firstUnsuitableFine = 100;
-	public const int c_unsuitableFinePerReason = 5000;
+	public const int c_unsuitableFineStep = 10000;
+	public const int c_unsuitableFineSteps = 8;
 
 	// call this when the ship is back at the Starport: Interstel evaluates the planets recommended for colonization since the last visit - a planet of its list
 	// earns its bonus, any other is unsuitable and fined (STRINFO 1.2) - returns how many it evaluated
@@ -234,8 +236,9 @@ public class PlayerData
 
 			// no - unsuitable, and fined
 			var reasons = gameData.m_planetList[ planetId ].GetUnsuitableReasons();
-			var firstTime = ( m_general.m_unsuitableRecommendationCount == 0 );
-			var fine = firstTime ? c_firstUnsuitableFine : ( c_unsuitableFinePerReason * System.Math.Max( 1, reasons.Count ) );
+			var unsuitableBefore = System.Math.Max( 0, m_general.m_unsuitableRecommendationCount );
+			var firstTime = ( unsuitableBefore == 0 );
+			var fine = System.Math.Max( c_firstUnsuitableFine, c_unsuitableFineStep * System.Math.Min( unsuitableBefore, c_unsuitableFineSteps ) );
 
 			m_general.m_unsuitableRecommendationCount++;
 
