@@ -473,6 +473,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCargo();
 				break;
 
+			case "pushback":
+				yield return ScenarioPushBack();
+				break;
+
 			case "savedata":
 				yield return ScenarioSaveData();
 				break;
@@ -527,6 +531,10 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "debrispictures":
 				yield return ScenarioDebrisPictures();
+				break;
+
+			case "atmospherepictures":
+				yield return ScenarioAtmospherePictures();
 				break;
 
 			case "perframe":
@@ -847,6 +855,14 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "redcylinder":
 				yield return ScenarioRedCylinder();
+				break;
+
+			case "orbitplanet":
+				yield return ScenarioOrbitPlanet();
+				break;
+
+			case "storms":
+				yield return ScenarioStorms();
 				break;
 
 			default:
@@ -3781,6 +3797,23 @@ public class ClaudeProbe : MonoBehaviour
 		buttonController.ActivateButton();
 	}
 
+	// where a scenario puts a deposit beside the terrain vehicle: in reach of the Cargo button (a pickup reaches 10, TerrainElement) and clear of the vehicle,
+	// since every deposit pushes a vehicle it touches (TerrainVehicleCollider): the vehicle jumps back and forth every other frame, and now and then it keeps the
+	// push and moves away, which took a deposit 2 in front of it out of reach in some runs of the cargo scenario. The vehicle is a capsule that reaches 4.9 ahead
+	// of its middle and 2.2 to its sides, and a deposit is a sphere of up to 3.8 (Lead on planet 90) whose middle is up to 0.5 from where it stands, so nothing
+	// in front of the vehicle is both in reach and clear of it: the deposit goes 8 to its right
+	static Vector3 BesideTheVehicle( TerrainVehicle terrainVehicle )
+	{
+		var toTheRight = Vector3.Cross( Vector3.up, DataController.m_instance.m_playerData.m_general.m_currentDirection );
+
+		if ( toTheRight.sqrMagnitude < 0.0001f )
+		{
+			toTheRight = Vector3.right;
+		}
+
+		return terrainVehicle.transform.position + toTheRight.normalized * 8.0f;
+	}
+
 	// how much of an element the terrain vehicle is carrying
 	static int TerrainVehicleCargo( int elementId )
 	{
@@ -3849,7 +3882,7 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		deposit.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		deposit.transform.position = BesideTheVehicle( terrainVehicle );
 
 		var elementId = deposit.m_elementId;
 		var volume = deposit.m_volume;
@@ -6509,6 +6542,537 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- Low: cargo volumes in cubic meters, a deposit that does not fit, the size of a scanned vessel
 
+	// ---------------------------------------------------------------- the push-back of what the terrain vehicle touches
+
+	// what the physics steps leave in the terrain vehicle's push-back vector (TerrainVehicle.AddPushBack, called by TerrainVehicleCollider from OnCollisionStay)
+	static bool s_samplingPushBack;
+	static float s_largestPushBack;
+	static int s_stepsWithPushBack;
+	static float s_largestSpeedAfterPush;
+
+	// reads the push-back vector after every physics step, before the next Update resets it
+	IEnumerator SamplePushBack( TerrainVehicle terrainVehicle )
+	{
+		var general = DataController.m_instance.m_playerData.m_general;
+
+		while ( s_samplingPushBack )
+		{
+			yield return new WaitForFixedUpdate();
+
+			// (read by name: a fix may do without the vector)
+			var pushField = FieldOrNull( terrainVehicle, "m_pushBackVector" );
+			var push = ( pushField is Vector3 pushVector ) ? pushVector : Vector3.zero;
+
+			if ( push.magnitude > 0.0001f )
+			{
+				s_stepsWithPushBack++;
+			}
+
+			s_largestPushBack = Mathf.Max( s_largestPushBack, push.magnitude );
+			s_largestSpeedAfterPush = Mathf.Max( s_largestSpeedAfterPush, general.m_currentSpeed );
+		}
+	}
+
+	// the terrain vehicle stands still for this long, and the drawn vehicle (its transform after Update) is compared with where it is saved: [0] the largest gap
+	// between them, [1] the frames with a gap, [2] how far the saved place moved, [3] the largest move of the drawn vehicle from one frame to the next, [4] the
+	// frames, [5] how far the saved place moved in the second half, [6] the largest push-back after a physics step, [7] the physics steps with a push-back,
+	// [8] the largest speed after a physics step, [9] the farthest the drawn vehicle got from where it stood
+	IEnumerator WatchStandingVehicle( TerrainVehicle terrainVehicle, float seconds, float[] result )
+	{
+		var general = DataController.m_instance.m_playerData.m_general;
+		var start = general.m_coordinates;
+		var lastDrawn = terrainVehicle.transform.localPosition;
+		var halfway = start;
+		var time = 0.0f;
+
+		for ( var i = 0; i < result.Length; i++ )
+		{
+			result[ i ] = 0.0f;
+		}
+
+		s_largestPushBack = 0.0f;
+		s_stepsWithPushBack = 0;
+		s_largestSpeedAfterPush = 0.0f;
+		s_samplingPushBack = true;
+
+		StartCoroutine( SamplePushBack( terrainVehicle ) );
+
+		while ( time < seconds )
+		{
+			yield return null;
+
+			time += Time.deltaTime;
+
+			var drawn = terrainVehicle.transform.localPosition;
+			var saved = general.m_coordinates;
+			var gap = Vector2.Distance( new Vector2( drawn.x, drawn.z ), new Vector2( saved.x, saved.z ) );
+
+			result[ 0 ] = Mathf.Max( result[ 0 ], gap );
+			result[ 1 ] += ( gap > 0.01f ) ? 1.0f : 0.0f;
+			result[ 3 ] = Mathf.Max( result[ 3 ], Vector2.Distance( new Vector2( drawn.x, drawn.z ), new Vector2( lastDrawn.x, lastDrawn.z ) ) );
+			result[ 9 ] = Mathf.Max( result[ 9 ], Vector2.Distance( new Vector2( drawn.x, drawn.z ), new Vector2( start.x, start.z ) ) );
+			result[ 4 ] += 1.0f;
+
+			if ( ( time >= seconds * 0.5f ) && ( halfway == start ) )
+			{
+				halfway = saved;
+			}
+
+			lastDrawn = drawn;
+		}
+
+		s_samplingPushBack = false;
+
+		var end = general.m_coordinates;
+
+		result[ 2 ] = Vector2.Distance( new Vector2( start.x, start.z ), new Vector2( end.x, end.z ) );
+		result[ 5 ] = Vector2.Distance( new Vector2( halfway.x, halfway.z ), new Vector2( end.x, end.z ) );
+		result[ 6 ] = s_largestPushBack;
+		result[ 7 ] = s_stepsWithPushBack;
+		result[ 8 ] = s_largestSpeedAfterPush;
+
+		yield return new WaitForFixedUpdate();
+	}
+
+	static string DescribeStanding( float[] result )
+	{
+		return "gap between drawn and saved up to " + result[ 0 ].ToString( "F3" ) + " in " + result[ 1 ] + " of " + result[ 4 ] + " frames, saved place moved " + result[ 2 ].ToString( "F3" ) + " (" + result[ 5 ].ToString( "F3" ) + " in the second half), largest drawn move in a frame " + result[ 3 ].ToString( "F3" ) + ", push-back up to " + result[ 6 ].ToString( "F3" ) + " in " + result[ 7 ] + " physics steps, speed up to " + result[ 8 ].ToString( "F3" ) + ", drawn up to " + result[ 9 ].ToString( "F3" ) + " from where it stood";
+	}
+
+	// the terrain vehicle back where it stood, stopped, and drawn there
+	static IEnumerator StandTheVehicleAt( TerrainVehicle terrainVehicle, Vector3 coordinates )
+	{
+		var general = DataController.m_instance.m_playerData.m_general;
+
+		terrainVehicle.TurnOffEngines();
+
+		general.m_coordinates = coordinates;
+		general.m_currentSpeed = 0.0f;
+
+		yield return new WaitForFixedUpdate();
+		yield return Frames( 3 );
+
+		general.m_coordinates = coordinates;
+		general.m_currentSpeed = 0.0f;
+
+		yield return Frames( 1 );
+	}
+
+	// the distance ahead of the vehicle's middle at which a deposit's sphere stops overlapping the vehicle's capsule (Physics.ComputePenetration, no move needed)
+	// the elevation of the ground at this place of the planet, the way the terrain vehicle reads it (TerrainVehicle.ApplyElevation, before the scale)
+	static float GroundElevation( PlanetGenerator planetGenerator, Vector3 worldCoordinates )
+	{
+		var x = worldCoordinates.x * 0.25f + planetGenerator.m_textureMapWidth * 0.5f - 0.5f;
+		var y = worldCoordinates.z * 0.25f + planetGenerator.m_textureMapHeight * 0.5f - 0.5f;
+
+		return planetGenerator.GetBicubicSmoothedElevation( x, y );
+	}
+
+	static float s_highestGroundFound;
+
+	// the nearest place, in rings of 16 units, where the terrain vehicle and everything 16 around it stand above the water (the vehicle floats and bobs below it)
+	static bool FindDryGround( TerrainVehicle terrainVehicle, Vector3 near, out Vector3 dry )
+	{
+		dry = near;
+
+		var planetGenerator = FieldOrNull( terrainVehicle, "m_planetGenerator" ) as PlanetGenerator;
+
+		if ( planetGenerator == null )
+		{
+			return false;
+		}
+
+		var water = planetGenerator.m_waterElevation + 0.002f;
+
+		s_highestGroundFound = -1.0f;
+
+		for ( var ring = 0; ring < 60; ring++ )
+		{
+			for ( var i = 0; i < 16; i++ )
+			{
+				var angle = i * 22.5f * Mathf.Deg2Rad;
+				var place = near + new Vector3( Mathf.Sin( angle ), 0.0f, Mathf.Cos( angle ) ) * ring * 16.0f;
+
+				s_highestGroundFound = Mathf.Max( s_highestGroundFound, GroundElevation( planetGenerator, place ) );
+
+				if ( ( GroundElevation( planetGenerator, place ) >= water ) && ( GroundElevation( planetGenerator, place + Vector3.forward * 16.0f ) >= water ) && ( GroundElevation( planetGenerator, place + Vector3.back * 16.0f ) >= water ) && ( GroundElevation( planetGenerator, place + Vector3.left * 16.0f ) >= water ) && ( GroundElevation( planetGenerator, place + Vector3.right * 16.0f ) >= water ) )
+				{
+					dry = place;
+
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	static float DistanceWhereItTouches( Collider vehicleCollider, TerrainElement deposit, Vector3 from, Vector3 forward )
+	{
+		var sphere = deposit.GetComponentInChildren<SphereCollider>();
+		var offset = sphere.transform.position - deposit.transform.position;
+		var near = 0.0f;
+		var far = 40.0f;
+
+		for ( var i = 0; i < 40; i++ )
+		{
+			var middle = ( near + far ) * 0.5f;
+			var overlaps = Physics.ComputePenetration( vehicleCollider, vehicleCollider.transform.position, vehicleCollider.transform.rotation, sphere, from + forward * middle + offset, sphere.transform.rotation, out _, out _ );
+
+			if ( overlaps )
+			{
+				near = middle;
+			}
+			else
+			{
+				far = middle;
+			}
+		}
+
+		return far;
+	}
+
+	// every object that pushes the terrain vehicle, moved 1000 to the east if it is within 80 of this place (on the ground, any height)
+	static TerrainVehicleCollider[] ClearAroundTheVehicle( Vector3 place )
+	{
+		var pushers = FindObjectsByType<TerrainVehicleCollider>( FindObjectsInactive.Exclude, FindObjectsSortMode.None );
+
+		foreach ( var pusher in pushers )
+		{
+			var flat = new Vector3( pusher.transform.position.x - place.x, 0.0f, pusher.transform.position.z - place.z );
+
+			if ( flat.magnitude < 80.0f )
+			{
+				pusher.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		return pushers;
+	}
+
+	// the deposit whose sphere is the largest
+	static TerrainElement LargestDeposit( TerrainElement[] deposits, out float largestRadius )
+	{
+		var largest = deposits[ 0 ];
+
+		largestRadius = 0.0f;
+
+		foreach ( var deposit in deposits )
+		{
+			var sphere = deposit.GetComponentInChildren<SphereCollider>();
+
+			if ( ( sphere != null ) && ( sphere.radius * sphere.transform.lossyScale.x > largestRadius ) )
+			{
+				largest = deposit;
+				largestRadius = sphere.radius * sphere.transform.lossyScale.x;
+			}
+		}
+
+		return largest;
+	}
+
+	IEnumerator ScenarioPushBack()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var general = playerData.m_general;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// planet 94 of the Arth system, a small rock planet (no life, no trees: only deposits touch the vehicle here); planet 90, where the scenarios usually
+		// land, is sea around the landing place, where the vehicle floats and its model bobs with the time, which case 9 looks at
+		yield return LandInTheArthSystemAt( 94, Vector3.zero, done );
+
+		if ( general.m_location != PD_General.Location.Disembarked )
+		{
+			Finish( "scenario=pushback abort: never got into the terrain vehicle (" + general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var terrainVehicle = controller.m_terrainVehicle;
+		var vehicleCollider = terrainVehicle.GetComponentInChildren<CapsuleCollider>();
+		var deposits = controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true );
+
+		if ( ( vehicleCollider == null ) || ( deposits.Length < 2 ) )
+		{
+			Finish( "scenario=pushback abort: no vehicle collider (" + ( vehicleCollider != null ) + ") or fewer than two deposits (" + deposits.Length + ")", 2 );
+			yield break;
+		}
+
+		// a game of 60 frames a second, the same in every run: the physics runs at 50 steps a second, so most frames have one and some have none
+		Time.captureDeltaTime = 1.0f / 60.0f;
+
+		// dry ground, where the vehicle holds still and a deposit put down just clear of it stays clear
+		var landedAt = general.m_coordinates;
+
+		if ( !FindDryGround( terrainVehicle, landedAt, out var start ) )
+		{
+			Time.captureDeltaTime = 0.0f;
+
+			var planetGeneratorForLog = FieldOrNull( terrainVehicle, "m_planetGenerator" ) as PlanetGenerator;
+
+			Finish( "scenario=pushback abort: no dry ground near " + landedAt + " (water " + ( ( planetGeneratorForLog != null ) ? planetGeneratorForLog.m_waterElevation : -1.0f ) + ", highest ground found " + s_highestGroundFound + ")", 2 );
+			yield break;
+		}
+
+		var forward = new Vector3( general.m_currentDirection.x, 0.0f, general.m_currentDirection.z );
+
+		forward = ( forward.sqrMagnitude < 0.0001f ) ? Vector3.forward : forward.normalized;
+
+		var right = Vector3.Cross( Vector3.up, forward );
+
+		// everything that pushes out of the way
+		var pushers = ClearAroundTheVehicle( start );
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+
+		Log( "pushback: dry ground at " + start.ToString( "F1" ) + " (landed at " + landedAt.ToString( "F1" ) + "), the vehicle bobs there by " + FieldOrNull( terrainVehicle, "m_waterEffectAmount" ) );
+
+		// the largest deposit, and another one
+		var largest = LargestDeposit( deposits, out var largestRadius );
+
+		var other = ( largest == deposits[ 0 ] ) ? deposits[ 1 ] : deposits[ 0 ];
+		var body = largest.GetComponent<Rigidbody>();
+		var largestSphere = largest.GetComponentInChildren<SphereCollider>();
+
+		Log( "pushback: vehicle at " + start.ToString( "F2" ) + " facing " + forward.ToString( "F2" ) + ", its capsule on " + vehicleCollider.name + " (radius " + vehicleCollider.radius + ", height " + vehicleCollider.height + ", contact offset " + vehicleCollider.contactOffset + ", bounds " + vehicleCollider.bounds.extents.ToString( "F2" ) + "), rigidbody on the vehicle: " + ( ( terrainVehicle.GetComponentInChildren<Rigidbody>() != null ) ? "kinematic " + terrainVehicle.GetComponentInChildren<Rigidbody>().isKinematic + " on " + terrainVehicle.GetComponentInChildren<Rigidbody>().name : "none" ) + ", " + pushers.Length + " objects push" );
+		Log( "pushback: the largest deposit is " + largest.GetElementName() + " (world radius " + largestRadius.ToString( "F2" ) + ", centre " + largestSphere.center + ", contact offset " + largestSphere.contactOffset + "), rigidbody " + ( body != null ) + ( ( body != null ) ? " kinematic " + body.isKinematic + " gravity " + body.useGravity + " constraints " + body.constraints : "" ) + "; the other is " + other.GetElementName() );
+
+		// ---- 1. the control: nothing near the vehicle
+		var nothing = new float[ 10 ];
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+		yield return WatchStandingVehicle( terrainVehicle, 3.0f, nothing );
+
+		Log( "pushback: nothing near: " + DescribeStanding( nothing ) );
+
+		// where the largest deposit stops overlapping the vehicle straight ahead
+		yield return StandTheVehicleAt( terrainVehicle, start );
+
+		var from = terrainVehicle.transform.position;
+		var edge = DistanceWhereItTouches( vehicleCollider, largest, from, forward );
+		var touchGap = ( vehicleCollider.contactOffset + largestSphere.contactOffset ) * 0.5f;
+
+		Log( "pushback: the " + largest.GetElementName() + " deposit stops overlapping the vehicle " + edge.ToString( "F3" ) + " ahead of it (the pickup reaches 10, TerrainElement.c_pickupDistance)" );
+
+		// ---- 2. the control: the deposit a unit clear of the vehicle
+		var clear = new float[ 10 ];
+
+		largest.transform.position = from + forward * ( edge + 1.0f );
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+		yield return WatchStandingVehicle( terrainVehicle, 3.0f, clear );
+
+		Log( "pushback: " + largest.GetElementName() + " a unit clear: " + DescribeStanding( clear ) );
+
+		// ---- 3. the deposit touching the vehicle, inside the contact offset but not overlapping
+		var touching = new float[ 10 ];
+
+		largest.transform.position = from + forward * ( edge + touchGap );
+
+		var depositBefore = largest.transform.position;
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+		yield return WatchStandingVehicle( terrainVehicle, 3.0f, touching );
+
+		Log( "pushback: " + largest.GetElementName() + " touching (" + touchGap.ToString( "F3" ) + " clear): " + DescribeStanding( touching ) + "; the deposit moved " + Vector3.Distance( depositBefore, largest.transform.position ).ToString( "F3" ) );
+
+		// ---- 4. the deposit a unit into the vehicle
+		var overlapping = new float[ 10 ];
+
+		largest.transform.position = from + forward * ( edge - 1.0f );
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+		yield return WatchStandingVehicle( terrainVehicle, 3.0f, overlapping );
+
+		Log( "pushback: " + largest.GetElementName() + " a unit into the vehicle: " + DescribeStanding( overlapping ) );
+
+		// ---- 5. two deposits 2 in front of the vehicle's middle, where the scenarios used to put a deposit to pick up
+		var two = new float[ 10 ];
+
+		largest.transform.position = from + forward * 2.0f;
+		other.transform.position = from + forward * 2.0f + right * 1.0f;
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+		yield return WatchStandingVehicle( terrainVehicle, 3.0f, two );
+
+		Log( "pushback: " + largest.GetElementName() + " and " + other.GetElementName() + " 2 in front: " + DescribeStanding( two ) );
+
+		// ---- 6. the same at 10 frames a second, as on a slow computer: five physics steps a frame, each adding to the push before Update uses it
+		var twoSlow = new float[ 10 ];
+
+		Time.captureDeltaTime = 0.1f;
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+		yield return WatchStandingVehicle( terrainVehicle, 3.0f, twoSlow );
+
+		Log( "pushback: " + largest.GetElementName() + " and " + other.GetElementName() + " 2 in front at 10 frames a second: " + DescribeStanding( twoSlow ) );
+
+		// ---- 7. the same with one long frame in the middle (Time.maximumDeltaTime, a third of a second by default): sixteen physics steps in one frame
+		var twoHitch = new float[ 10 ];
+
+		Time.captureDeltaTime = 1.0f / 60.0f;
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+
+		var hitchFrom = terrainVehicle.transform.localPosition;
+		var hitchStart = general.m_coordinates;
+
+		s_largestPushBack = 0.0f;
+		s_stepsWithPushBack = 0;
+		s_samplingPushBack = true;
+
+		StartCoroutine( SamplePushBack( terrainVehicle ) );
+
+		yield return Frames( 10 );
+
+		Time.captureDeltaTime = Time.maximumDeltaTime;
+
+		yield return null;
+
+		var hitchDrawn = terrainVehicle.transform.localPosition;
+		var hitchJump = Vector2.Distance( new Vector2( hitchDrawn.x, hitchDrawn.z ), new Vector2( hitchFrom.x, hitchFrom.z ) );
+		var hitchSaved = Vector2.Distance( new Vector2( general.m_coordinates.x, general.m_coordinates.z ), new Vector2( hitchStart.x, hitchStart.z ) );
+
+		Time.captureDeltaTime = 1.0f / 60.0f;
+
+		yield return Frames( 10 );
+
+		s_samplingPushBack = false;
+
+		twoHitch[ 3 ] = hitchJump;
+		twoHitch[ 2 ] = hitchSaved;
+
+		Log( "pushback: " + largest.GetElementName() + " and " + other.GetElementName() + " 2 in front, one frame of " + Time.maximumDeltaTime.ToString( "F3" ) + " s: the drawn vehicle moved " + hitchJump.ToString( "F3" ) + " in that frame from where it stood, the saved place " + hitchSaved.ToString( "F3" ) + " (largest push-back after a physics step " + s_largestPushBack.ToString( "F3" ) + ")" );
+
+		// ---- 8. driving into the Lead deposit from 12 units clear of it, at 60 frames a second: the port's vehicle stops at a deposit (keep that, or not: the owner's call)
+		other.transform.position += Vector3.right * 1000.0f;
+		largest.transform.position = from + forward * ( edge + 12.0f );
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+
+		var deepest = -100.0f;
+		var driveTime = 0.0f;
+
+		// the real Move button, and the up arrow of a keyboard held down (the stick to the north, which is where the vehicle faces)
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
+
+		yield return Frames( 30 );
+
+		HoldKeys( Key.UpArrow );
+
+		while ( driveTime < 6.0f )
+		{
+			yield return null;
+
+			driveTime += Time.deltaTime;
+
+			if ( driveTime >= 4.0f )
+			{
+				HoldKeys();
+			}
+
+			var ahead = Vector3.Dot( largest.transform.position - terrainVehicle.transform.position, forward );
+
+			deepest = Mathf.Max( deepest, edge - ahead );
+		}
+
+		HoldKeys();
+
+		terrainVehicle.TurnOffEngines();
+
+		var drivenTo = Vector2.Distance( new Vector2( general.m_coordinates.x, general.m_coordinates.z ), new Vector2( start.x, start.z ) );
+
+		var driven = new float[ 10 ];
+
+		yield return WatchStandingVehicle( terrainVehicle, 2.0f, driven );
+
+		var restAhead = Vector3.Dot( largest.transform.position - general.m_coordinates, forward );
+
+		Log( "pushback: driving 4 s into " + largest.GetElementName() + " from 12 clear: the vehicle went " + drivenTo.ToString( "F3" ) + ", at most " + deepest.ToString( "F3" ) + " into it, resting with its middle " + restAhead.ToString( "F3" ) + " ahead (it touches at " + edge.ToString( "F3" ) + "), then standing: " + DescribeStanding( driven ) );
+
+		// ---- 9. floating at the landing place, Lead put down just clear of the vehicle's nose: the model bobs (up to 5 degrees of pitch and 15 of yaw,
+		// m_waterBobAmount) and can tilt into the deposit, which pushes the vehicle away and never pulls it back, so it may drift a little, but no farther
+		// than the bob reaches
+		var floating = new float[ 10 ];
+
+		largest.transform.position += Vector3.right * 1000.0f;
+		other.transform.position += Vector3.right * 1000.0f;
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+
+		Time.captureDeltaTime = 0.0f;
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandInTheArthSystemAt( 90, Vector3.zero, done );
+
+		Time.captureDeltaTime = 1.0f / 60.0f;
+
+		var waterSpot = general.m_coordinates;
+		var deposits90 = controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true );
+		var floatingLog = "never got into the terrain vehicle on planet 90";
+		var waterEdge = 0.0f;
+
+		if ( ( general.m_location == PD_General.Location.Disembarked ) && ( deposits90.Length > 0 ) )
+		{
+			ClearAroundTheVehicle( waterSpot );
+
+			var deposit90 = LargestDeposit( deposits90, out _ );
+			var sphere90 = deposit90.GetComponentInChildren<SphereCollider>();
+
+			yield return StandTheVehicleAt( terrainVehicle, waterSpot );
+
+			var waterFrom = terrainVehicle.transform.position;
+
+			waterEdge = DistanceWhereItTouches( vehicleCollider, deposit90, waterFrom, forward );
+
+			deposit90.transform.position = waterFrom + forward * ( waterEdge + ( vehicleCollider.contactOffset + sphere90.contactOffset ) * 0.5f );
+
+			yield return StandTheVehicleAt( terrainVehicle, waterSpot );
+			yield return WatchStandingVehicle( terrainVehicle, 6.0f, floating );
+
+			floatingLog = "floating at " + waterSpot.ToString( "F1" ) + " on planet 90 (bob " + FieldOrNull( terrainVehicle, "m_waterEffectAmount" ) + ") with " + deposit90.GetElementName() + " just clear of its nose (" + waterEdge.ToString( "F2" ) + " ahead) for 6 s: " + DescribeStanding( floating );
+
+			deposit90.transform.position += Vector3.right * 1000.0f;
+
+			yield return StandTheVehicleAt( terrainVehicle, waterSpot );
+		}
+		else
+		{
+			floating[ 0 ] = 100.0f;
+			floating[ 2 ] = 100.0f;
+		}
+
+		Log( "pushback: " + floatingLog );
+
+		Time.captureDeltaTime = 0.0f;
+
+		Check( "pushback: nothing near, the vehicle stands still and is drawn where it is (control)", ( nothing[ 2 ] < 0.01f ) && ( nothing[ 0 ] < 0.01f ), DescribeStanding( nothing ) );
+		Check( "pushback: a deposit a unit clear does not touch the vehicle (control)", ( clear[ 2 ] < 0.01f ) && ( clear[ 0 ] < 0.01f ) && ( clear[ 7 ] == 0.0f ), DescribeStanding( clear ) );
+		Check( "pushback: a deposit that touches a standing vehicle does not move it", touching[ 2 ] < 0.01f, DescribeStanding( touching ) );
+		Check( "pushback: a deposit that touches a standing vehicle does not shake it (drawn where it is saved)", touching[ 0 ] < 0.01f, DescribeStanding( touching ) );
+		Check( "pushback: with a deposit in it, the vehicle is drawn where it is saved", overlapping[ 0 ] < 0.01f, DescribeStanding( overlapping ) );
+		Check( "pushback: with a deposit in it, the vehicle comes to rest (still in the second half)", overlapping[ 5 ] < 0.01f, DescribeStanding( overlapping ) );
+		Check( "pushback: with a deposit a unit into it, the drawn vehicle goes no farther than it takes to clear it, and a half more", overlapping[ 9 ] < 1.5f, DescribeStanding( overlapping ) );
+		// how far the vehicle has to go back to clear the Lead deposit 2 ahead of its middle, and a unit more for the Gold one beside it and the frame timing
+		var clearOfTwo = edge - 2.0f + 1.0f;
+
+		Check( "pushback: with two deposits in it, the vehicle is drawn where it is saved", two[ 0 ] < 0.01f, DescribeStanding( two ) );
+		Check( "pushback: with two deposits in it, the drawn vehicle goes no farther than it takes to clear them (" + clearOfTwo.ToString( "F2" ) + ")", two[ 9 ] < clearOfTwo, DescribeStanding( two ) );
+		Check( "pushback: at 10 frames a second, the vehicle is drawn where it is saved", twoSlow[ 0 ] < 0.01f, DescribeStanding( twoSlow ) );
+		Check( "pushback: at 10 frames a second, the drawn vehicle goes no farther than it takes to clear the deposits", twoSlow[ 9 ] < clearOfTwo, DescribeStanding( twoSlow ) );
+		Check( "pushback: a long frame does not throw the drawn vehicle farther than it takes to clear the deposits", twoHitch[ 3 ] < clearOfTwo, "moved " + twoHitch[ 3 ].ToString( "F3" ) + ", saved place " + twoHitch[ 2 ].ToString( "F3" ) );
+		Check( "pushback: driving into a deposit stops the vehicle at it (control: it does not drive through)", ( drivenTo > 5.0f ) && ( deepest < 2.0f ) && ( restAhead > 0.0f ), "went " + drivenTo.ToString( "F3" ) + ", at most " + deepest.ToString( "F3" ) + " into it, resting " + restAhead.ToString( "F3" ) + " ahead of it" );
+		Check( "pushback: after driving into a deposit, the stopped vehicle is drawn where it is saved", driven[ 0 ] < 0.01f, DescribeStanding( driven ) );
+		Check( "pushback: floating beside a deposit, the bobbing vehicle is drawn where it is saved", floating[ 0 ] < 0.01f, DescribeStanding( floating ) );
+		Check( "pushback: floating beside a deposit, the bob drifts the vehicle less than half a unit in 6 s", floating[ 2 ] < 0.5f, DescribeStanding( floating ) );
+
+		Finish( "scenario=pushback edge=" + edge.ToString( "F2" ) + " touching=" + touching[ 2 ].ToString( "F2" ) + "/" + touching[ 0 ].ToString( "F2" ) + " overlapping=" + overlapping[ 2 ].ToString( "F2" ) + "/" + overlapping[ 0 ].ToString( "F2" ) + " two=" + two[ 2 ].ToString( "F2" ) + "/" + two[ 3 ].ToString( "F2" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
 	IEnumerator ScenarioCargo()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -6589,6 +7153,9 @@ public class ClaudeProbe : MonoBehaviour
 			yield break;
 		}
 
+		// where the terrain vehicle stands: nothing in the scenario moves it
+		var vehicleStart = playerData.m_general.m_coordinates;
+
 		// everything out of reach, then one deposit of 3 tenths next to the vehicle
 		foreach ( var other in deposits )
 		{
@@ -6601,7 +7168,7 @@ public class ClaudeProbe : MonoBehaviour
 		var first = deposits[ 0 ];
 
 		first.m_volume = 3;
-		first.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		first.transform.position = BesideTheVehicle( terrainVehicle );
 
 		new TVCargoButton().Execute();
 
@@ -6629,7 +7196,7 @@ public class ClaudeProbe : MonoBehaviour
 		playerData.m_terrainVehicle.AddElement( second.m_elementId, playerData.m_terrainVehicle.GetRemainingVolume() - 1 );
 
 		second.m_volume = 4;
-		second.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		second.transform.position = BesideTheVehicle( terrainVehicle );
 
 		var cargoBefore = TerrainVehicleCargo( second.m_elementId );
 
@@ -6654,6 +7221,11 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "cargo: a deposit that does not fit is left with what the hold could not take", ( cargoAfterPartial - cargoBefore == 1 ) && secondIsStillThere && ( secondVolume == 3 ) && partialMessage.Contains( "0.3 cubic meters are left" ), "took " + ( cargoAfterPartial - cargoBefore ) + ", still there " + secondIsStillThere + " with " + secondVolume + " tenths | " + partialMessage );
 		Check( "cargo: nothing is taken from it with a full hold", ( cargoAfterFull == cargoAfterPartial ) && fullMessage.Contains( "full" ), "took " + ( cargoAfterFull - cargoAfterPartial ) + " | " + fullMessage );
+
+		// the checks above need the deposits in reach, and the vehicle stands still: if it has moved, something pushed it (the deposits it touches did, see BesideTheVehicle)
+		var vehicleMoved = Vector2.Distance( new Vector2( vehicleStart.x, vehicleStart.z ), new Vector2( playerData.m_general.m_coordinates.x, playerData.m_general.m_coordinates.z ) );
+
+		Check( "cargo: the terrain vehicle stands where it was put down", vehicleMoved < 0.01f, "moved " + vehicleMoved.ToString( "F3" ) + " from " + vehicleStart.ToString( "F2" ) + " to " + playerData.m_general.m_coordinates.ToString( "F2" ) );
 
 		Finish( "scenario=cargo shipList=[" + volumeColumn + "] size=" + expectedSmall + "/" + expectedLarge + " pickup=" + cargoAfterFirst + " partial=" + ( cargoAfterPartial - cargoBefore ) + "/" + secondIsStillThere + "/" + secondVolume + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
@@ -6734,8 +7306,11 @@ public class ClaudeProbe : MonoBehaviour
 		var saveGamePanel = PanelController.m_instance.m_saveGamePanel;
 		var otherSlot = dataController.m_playerDataList[ 1 ];
 		var otherLocationBefore = otherSlot.m_general.m_location;
+		var otherStardateBefore = otherSlot.m_general.m_currentStardateYMD;
 
+		// a stardate whose day and month differ, so the order of the parts shows
 		otherSlot.m_general.m_location = PD_General.Location.Disembarked;
+		otherSlot.m_general.m_currentStardateYMD = "4620-03-15";
 
 		Call( saveGamePanel, "UpdateDescriptions" );
 
@@ -6743,6 +7318,7 @@ public class ClaudeProbe : MonoBehaviour
 		var description = descriptionTexts[ 1 ].text;
 
 		otherSlot.m_general.m_location = otherLocationBefore;
+		otherSlot.m_general.m_currentStardateYMD = otherStardateBefore;
 
 		Call( saveGamePanel, "UpdateDescriptions" );
 
@@ -6753,6 +7329,15 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "save and data: the save panel's line for a game in the terrain vehicle: " + locationLine + " (" + opened + " colour tags opened, " + closed + " closed)" );
 
 		Check( "save and data: the save panel names the location of a game in the terrain vehicle", ( opened == closed ) && locationLine.Contains( "Terrain Vehicle</color>" ), locationLine + " | opened " + opened + ", closed " + closed );
+
+		// the date line shows the stardate as the game shows it, day-month-year, not in the stored year-month-day form
+		// (the colour tag around it is the UI kit's, so any colour is accepted)
+		var dateLine = description.Split( '\n' )[ 0 ];
+		var dateShown = System.Text.RegularExpressions.Regex.IsMatch( dateLine, "^Date: <color=[^>]+>15-03-4620</color>" );
+
+		Log( "save and data: the save panel's date line for a game saved on 4620-03-15: " + dateLine );
+
+		Check( "save and data: the save panel shows the stardate day-month-year", dateShown, dateLine );
 
 		// ---- 3. the terrain vehicle of a new game
 		var fresh = new PlayerData();
@@ -7753,7 +8338,7 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		near.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		near.transform.position = BesideTheVehicle( terrainVehicle );
 		far.transform.position = terrainVehicle.transform.position + Vector3.forward * 20.0f;
 
 		var nearName = near.GetElementName();
@@ -7777,7 +8362,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var labelsInTheVehicle = LabelsShowing();
 
-		Log( "terrain: scan with " + nearName + " 2 away and " + farName + " 20 away: " + scanBefore );
+		Log( "terrain: scan with " + nearName + " 8 away and " + farName + " 20 away: " + scanBefore );
 		Log( "terrain: pickup: " + pickupMessage + " | scan right after it: " + scanDuring );
 
 		var countedBefore = scanBefore.Contains( expectedBefore );
@@ -9480,6 +10065,203 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=debrispictures alienBlank=" + alienBlank.Count + " playerBlank=" + playerBlank.Count + " errors=" + errorsDuring + " pictures=" + ( hasGraphics ? 7 : 0 ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
+	// ---------------------------------------------------------------- Low: atmosphere pictures (what a planet's atmosphere is drawn with, in the star system and in orbit, and pictures of it with -Graphics)
+
+	// what an atmosphere object is drawn with
+	static string DescribeAtmosphere( GameObject atmosphere )
+	{
+		if ( atmosphere == null )
+		{
+			return "no atmosphere object";
+		}
+
+		var renderer = atmosphere.GetComponent<MeshRenderer>();
+		var material = ( renderer != null ) ? renderer.sharedMaterial : null;
+
+		if ( material == null )
+		{
+			return "no material";
+		}
+
+		var text = "active " + atmosphere.activeInHierarchy + ", " + material.name + " (" + material.shader.name + "), queue " + material.renderQueue + ", scale " + atmosphere.transform.lossyScale.x.ToString( "F1" );
+
+		foreach ( var name in new string[] { "SF_AlbedoColor", "SF_EmissiveColor" } )
+		{
+			if ( material.HasProperty( name ) )
+			{
+				text += ", " + name + " " + material.GetColor( name ).ToString( "F2" );
+			}
+		}
+
+		foreach ( var name in new string[] { "SF_BlendSrc", "SF_BlendDst", "SF_CullMode", "SF_ZWriteOn", "SF_Density", "SF_NormalMapStrength" } )
+		{
+			if ( material.HasProperty( name ) )
+			{
+				text += ", " + name + " " + material.GetFloat( name ).ToString( "F2" );
+			}
+		}
+
+		if ( material.HasProperty( "SF_AlbedoMap" ) && ( material.GetTexture( "SF_AlbedoMap" ) != null ) )
+		{
+			text += ", albedo map " + material.GetTexture( "SF_AlbedoMap" ).name;
+		}
+
+		return text;
+	}
+
+	// how an atmosphere sits on its planet: the halo room (the quad's half size over the planet's radius), the quad's height over the planet's top (in planet radii), and the brightest channel of its colour
+	static void MeasureAtmosphere( GameObject atmosphere, GameObject planetModel, out float room, out float lift, out float brightest )
+	{
+		room = 0.0f;
+		lift = -1.0f;
+		brightest = 0.0f;
+
+		if ( ( atmosphere == null ) || ( planetModel == null ) )
+		{
+			return;
+		}
+
+		var planetMesh = planetModel.GetComponentInChildren<MeshFilter>();
+		var planetRenderer = planetModel.GetComponentInChildren<Renderer>();
+		var quadMesh = atmosphere.GetComponent<MeshFilter>();
+		var quadRenderer = atmosphere.GetComponent<MeshRenderer>();
+
+		if ( ( planetMesh == null ) || ( planetRenderer == null ) || ( quadMesh == null ) || ( quadRenderer == null ) )
+		{
+			return;
+		}
+
+		var planetRadius = planetMesh.sharedMesh.bounds.extents.x * planetMesh.transform.lossyScale.x;
+		var quadExtents = quadMesh.sharedMesh.bounds.extents;
+		var quadHalfSize = Mathf.Max( quadExtents.x, Mathf.Max( quadExtents.y, quadExtents.z ) ) * atmosphere.transform.lossyScale.x;
+
+		room = quadHalfSize / planetRadius;
+		lift = ( atmosphere.transform.position.y - ( planetRenderer.bounds.center.y + planetRadius ) ) / planetRadius;
+
+		var material = quadRenderer.sharedMaterial;
+
+		if ( ( material != null ) && material.HasProperty( "SF_AlbedoColor" ) )
+		{
+			var color = material.GetColor( "SF_AlbedoColor" );
+
+			brightest = Mathf.Max( color.r, Mathf.Max( color.g, color.b ) );
+		}
+	}
+
+	IEnumerator ScenarioAtmospherePictures()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+
+		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "atmosphere-pictures" ) );
+		var camera = Camera.main;
+
+		if ( hasGraphics )
+		{
+			System.IO.Directory.CreateDirectory( folder );
+		}
+
+		// the planets of the star system with an atmosphere, the first of each colour
+		var star = gameData.m_starList[ playerData.m_general.m_currentStarId ];
+		var chosen = new List<GD_Planet>();
+		var colours = new List<Color>();
+
+		foreach ( var planet in star.GetPlanetList() )
+		{
+			if ( ( planet != null ) && planet.HasAtmosphere() && !colours.Contains( planet.GetAtmosphereColor() ) )
+			{
+				chosen.Add( planet );
+				colours.Add( planet.GetAtmosphereColor() );
+			}
+		}
+
+		Log( "atmospherepictures: " + chosen.Count + " planets with an atmosphere of their own colour in star " + star.m_id );
+
+		var errorsBefore = s_errorCount;
+		var noRoom = new List<string>();
+		var hidden = new List<string>();
+		var dim = new List<string>();
+
+		System.Action<string, GameObject, GameObject> measure = ( where, atmosphere, planetModel ) =>
+		{
+			float room, lift, brightest;
+
+			MeasureAtmosphere( atmosphere, planetModel, out room, out lift, out brightest );
+
+			Log( "atmospherepictures: " + where + ": the quad is " + room.ToString( "F3" ) + " planet radii across from the middle, " + lift.ToString( "F3" ) + " planet radii above the planet's top, colour at most " + brightest.ToString( "F2" ) );
+
+			// the halo reaches 12% of the radius beyond the planet's edge: the quad has to be bigger than that
+			if ( room < 1.12f )
+			{
+				noRoom.Add( where + " " + room.ToString( "F2" ) );
+			}
+
+			// below the planet's top, the planet hides the haze over it
+			if ( lift < 0.0f )
+			{
+				hidden.Add( where + " " + lift.ToString( "F2" ) );
+			}
+
+			// a dark colour adds next to nothing to what is behind it
+			if ( brightest < 0.5f )
+			{
+				dim.Add( where + " " + brightest.ToString( "F2" ) );
+			}
+		};
+
+		// ---- 1. in the star system: each planet from a camera of its own over it
+		foreach ( var planet in chosen )
+		{
+			var planetController = controller.m_starSystem.GetPlanetController( planet.m_id );
+
+			Log( "atmospherepictures: planet " + planet.m_id + " (atmosphere colour " + planet.GetAtmosphereColor().ToString( "F2" ) + ", density " + planet.GetAtmosphereDensity().ToString( "F2" ) + ") in the star system: " + DescribeAtmosphere( ( planetController != null ) ? planetController.m_planetAtmosphere : null ) );
+
+			if ( planetController != null )
+			{
+				measure( "planet " + planet.m_id + " in the star system", planetController.m_planetAtmosphere, planetController.m_planetModel );
+			}
+
+			if ( hasGraphics && ( planetController != null ) )
+			{
+				var size = planetController.m_planetModel.transform.lossyScale.x;
+
+				RenderFromAbove( planetController.transform.position, size * 4.0f, System.IO.Path.Combine( folder, "system_planet" + planet.m_id + ".png" ) );
+			}
+		}
+
+		// ---- 2. in orbit around each of them
+		foreach ( var planet in chosen )
+		{
+			yield return EnterOrbit( planet.m_id );
+
+			yield return Frames( 30 );
+
+			Log( "atmospherepictures: planet " + planet.m_id + " in orbit: " + DescribeAtmosphere( controller.m_inOrbit.m_planetAtmosphere ) );
+
+			measure( "planet " + planet.m_id + " in orbit", controller.m_inOrbit.m_planetAtmosphere, controller.m_inOrbit.m_planetModel.gameObject );
+
+			if ( hasGraphics )
+			{
+				RenderCameraPicture( camera, System.IO.Path.Combine( folder, "orbit_planet" + planet.m_id + ".png" ) );
+			}
+
+			controller.SwitchLocation( PD_General.Location.StarSystem );
+
+			yield return Frames( 10 );
+		}
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "atmospherepictures: an atmosphere leaves room for a halo beyond the planet's edge", ( chosen.Count > 0 ) && ( noRoom.Count == 0 ), ( noRoom.Count == 0 ) ? "all " + ( chosen.Count * 2 ) : string.Join( ", ", noRoom ) );
+		Check( "atmospherepictures: an atmosphere is in front of its planet, so the haze over the planet is not hidden in it", ( chosen.Count > 0 ) && ( hidden.Count == 0 ), ( hidden.Count == 0 ) ? "all " + ( chosen.Count * 2 ) : string.Join( ", ", hidden ) );
+		Check( "atmospherepictures: an atmosphere of a dark colour is drawn bright enough to show", ( chosen.Count > 0 ) && ( dim.Count == 0 ), ( dim.Count == 0 ) ? "all " + ( chosen.Count * 2 ) : string.Join( ", ", dim ) );
+		Check( "atmospherepictures: no error is logged while the atmospheres are set up", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=atmospherepictures planets=" + chosen.Count + " noRoom=" + noRoom.Count + " hidden=" + hidden.Count + " dim=" + dim.Count + " errors=" + errorsDuring + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
 	// ---------------------------------------------------------------- Low: what the displays cost every frame (the status display, the terrain vehicle display)
 
 	// something for the control measurement to hold on to
@@ -9810,7 +10592,7 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		deposits[ 0 ].transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		deposits[ 0 ].transform.position = BesideTheVehicle( terrainVehicle );
 
 		return true;
 	}
@@ -10745,7 +11527,7 @@ public class ClaudeProbe : MonoBehaviour
 		var first = deposits[ 0 ];
 		var firstVolume = first.m_volume;
 
-		first.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		first.transform.position = BesideTheVehicle( terrainVehicle );
 
 		new TVCargoButton().Execute();
 
@@ -10763,7 +11545,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		for ( var i = 1; ( i < deposits.Length ) && ( i < 700 ) && ( playerData.m_terrainVehicle.GetRemainingVolume() > 0 ); i++ )
 		{
-			deposits[ i ].transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+			deposits[ i ].transform.position = BesideTheVehicle( terrainVehicle );
 
 			new TVCargoButton().Execute();
 
@@ -10778,7 +11560,7 @@ public class ClaudeProbe : MonoBehaviour
 		var holdUsed = holdSize - playerData.m_terrainVehicle.GetRemainingVolume();
 
 		// one more press with the hold full and a fresh deposit in reach
-		deposits[ deposits.Length - 1 ].transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		deposits[ deposits.Length - 1 ].transform.position = BesideTheVehicle( terrainVehicle );
 
 		new TVCargoButton().Execute();
 
@@ -13253,7 +14035,7 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		// ---- 1. all of the first deposit, through the real Cargo button
-		whole.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		whole.transform.position = BesideTheVehicle( terrainVehicle );
 
 		new TVCargoButton().Execute();
 
@@ -13266,7 +14048,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		playerData.m_terrainVehicle.AddElement( part.m_elementId, room - 10 );
 
-		part.transform.position = terrainVehicle.transform.position + Vector3.forward * 2.0f;
+		part.transform.position = BesideTheVehicle( terrainVehicle );
 
 		new TVCargoButton().Execute();
 
@@ -16943,12 +17725,42 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 2: the Spemin, the Thrynn and the Veloxi after their losses
 
+	// the placeholders that Encounter.AddComm fills in before a line is said: the player's ship (&), the player's captain (*), the aliens' captain (%) and ship (+)
+	static readonly char[] c_linePlaceholders = { '&', '*', '%', '+' };
+
+	// true if the text holds this line of the game data as it is said - the pieces between its placeholders, in order, with anything in between
+	static bool SaysLine( string text, string line )
+	{
+		var pieces = line.Split( c_linePlaceholders );
+		var position = 0;
+
+		foreach ( var piece in pieces )
+		{
+			// (two placeholders in a row, or one at an end, leave an empty piece)
+			if ( piece.Length == 0 )
+			{
+				continue;
+			}
+
+			var found = text.IndexOf( piece, position, System.StringComparison.Ordinal );
+
+			if ( found < 0 )
+			{
+				return false;
+			}
+
+			position = found + piece.Length;
+		}
+
+		return true;
+	}
+
 	// true if the text holds one of these comms of the game data
 	static bool SaysOneOf( string text, params int[] commIds )
 	{
 		foreach ( var commId in commIds )
 		{
-			if ( text.Contains( CommText( commId ) ) )
+			if ( SaysLine( text, CommText( commId ) ) )
 			{
 				return true;
 			}
@@ -17471,7 +18283,7 @@ public class ClaudeProbe : MonoBehaviour
 	{
 		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
 		{
-			if ( ( comm.m_race == race ) && ( comm.m_subject == subject ) && ( comm.m_stance == stance ) && text.Contains( comm.m_text ) )
+			if ( ( comm.m_race == race ) && ( comm.m_subject == subject ) && ( comm.m_stance == stance ) && SaysLine( text, comm.m_text ) )
 			{
 				return true;
 			}
@@ -17679,7 +18491,7 @@ public class ClaudeProbe : MonoBehaviour
 	{
 		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
 		{
-			if ( ( comm.m_race == race ) && ( comm.m_subject == subject ) && text.Contains( comm.m_text ) )
+			if ( ( comm.m_race == race ) && ( comm.m_subject == subject ) && SaysLine( text, comm.m_text ) )
 			{
 				return true;
 			}
@@ -20161,6 +20973,231 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "redcylinder: the Red Cylinder flashes on the landing map near an ancient ruin, not far from it, and only aboard", ( atTheRuin is bool ) && (bool) atTheRuin && !(bool) farAway && !(bool) withoutIt && messages.Contains( "The Red Cylinder is flashing" ), withoutIt + ", " + farAway + ", " + atTheRuin + " | " + messages );
 
 		Finish( "scenario=redcylinder placed=" + placed.Count + " worked=" + worked.Count, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the planet under an encounter that began in orbit
+
+	// the planet drawn under the encounter (null if there is none)
+	static Transform PlanetBackdrop()
+	{
+		return SpaceflightController.m_instance.m_encounter.transform.Find( "Planet Backdrop" );
+	}
+
+	IEnumerator ScenarioOrbitPlanet()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var starSystem = controller.m_starSystem;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// ---- 1. a Spemin encounter met in hyperspace (the control: no planet)
+		EnterEncounter( FindEncounter( 1, 6, 3, 0 ) );
+
+		yield return Frames( 5 );
+
+		var backdropInHyperspace = PlanetBackdrop();
+		var shownInHyperspace = ( backdropInHyperspace != null ) && backdropInHyperspace.gameObject.activeInHierarchy;
+
+		yield return FlyOutOfEncounter();
+
+		// ---- 2. the derelict that waits in orbit 3 of star 30 (encounter 316): into orbit around its planet, and the encounter begins
+		const int c_encounterId = 316;
+		const int c_starId = 30;
+
+		var guardedPlanetId = -1;
+
+		foreach ( var planet in gameData.m_planetList )
+		{
+			if ( ( planet.m_starId == c_starId ) && ( planet.m_orbitPosition == gameData.m_encounterList[ c_encounterId ].m_orbitPosition ) )
+			{
+				guardedPlanetId = planet.m_id;
+			}
+		}
+
+		EnterStarSystem( c_starId );
+
+		var start = Time.realtimeSinceStartup;
+
+		while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 40.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+		yield return EnterOrbit( guardedPlanetId );
+		yield return Frames( 5 );
+
+		var inEncounter = playerData.m_general.m_location == PD_General.Location.Encounter;
+		var backdrop = PlanetBackdrop();
+		var shown = ( backdrop != null ) && backdrop.gameObject.activeInHierarchy;
+		var below = shown && ( backdrop.position.y + backdrop.localScale.y < playerData.m_general.m_coordinates.y - 100.0f );
+		var planetController = starSystem.GetPlanetController( guardedPlanetId );
+		var samePlanet = shown && ( planetController != null ) && ( backdrop.GetComponent<MeshRenderer>().sharedMaterial == planetController.GetMaterial() );
+
+		// ---- 3. with a graphics device, a picture of it (probe.ps1 -Graphics)
+		var picture = "none (no graphics device)";
+
+		if ( inEncounter && ( SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null ) )
+		{
+			var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "orbit-encounter-pictures" ) );
+
+			System.IO.Directory.CreateDirectory( folder );
+
+			var pictureCameraObject = new GameObject( "Orbit Encounter Picture Camera" );
+			var pictureCamera = pictureCameraObject.AddComponent<Camera>();
+
+			pictureCamera.CopyFrom( Camera.main );
+			pictureCamera.rect = new Rect( 0.0f, 0.0f, 1.0f, 1.0f );
+
+			picture = System.IO.Path.Combine( folder, "orbit_encounter.png" );
+
+			RenderCameraPicture( pictureCamera, picture );
+
+			Destroy( pictureCameraObject );
+		}
+
+		Log( "orbitplanet: hyperspace encounter: planet shown " + shownInHyperspace + " || encounter in orbit: in it " + inEncounter + ", planet shown " + shown + ", below the ships " + below + ", the planet's own surface " + samePlanet + ( shown ? " (radius " + backdrop.localScale.x + ", at " + backdrop.position + ", ship at " + playerData.m_general.m_coordinates + ")" : "" ) + " | picture " + picture );
+
+		Check( "orbitplanet: an encounter met in hyperspace has no planet under it (control)", !shownInHyperspace, shownInHyperspace.ToString() );
+		Check( "orbitplanet: an encounter that began in orbit is drawn over its planet's own surface, below the ships", inEncounter && shown && below && samePlanet, inEncounter + ", " + shown + ", " + below + ", " + samePlanet );
+
+		Finish( "scenario=orbitplanet shown=" + shown, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 6: storms on the surface
+
+	// calls a static method of PlanetWeather (null on the code before it)
+	static object Weather( string method )
+	{
+		var type = typeof( ShipButton ).Assembly.GetType( "PlanetWeather" );
+		var info = ( type == null ) ? null : type.GetMethod( method );
+
+		return ( info == null ) ? null : info.Invoke( null, null );
+	}
+
+	// the crew on board, all at full vitality
+	static List<PD_Personnel.PD_PersonnelFile> HealCrew()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var crew = new List<PD_Personnel.PD_PersonnelFile>();
+
+		for ( var role = PD_CrewAssignment.Role.First; role < PD_CrewAssignment.Role.Count; role++ )
+		{
+			if ( playerData.m_crewAssignment.IsAssigned( role ) )
+			{
+				var file = playerData.m_crewAssignment.GetPersonnelFile( role );
+
+				if ( ( file != null ) && !crew.Contains( file ) )
+				{
+					file.m_vitality = 100.0f;
+					file.m_isDead = false;
+
+					crew.Add( file );
+				}
+			}
+		}
+
+		return crew;
+	}
+
+	// passes this many game hours of weather, the crew healed before each: returns the storm hours, the heavy snow hours, the storm hours that injured, and the
+	// other hours that injured
+	static int[] PassWeatherHours( int hours )
+	{
+		var counts = new int[ 4 ];
+
+		for ( var i = 0; i < hours; i++ )
+		{
+			var crew = HealCrew();
+
+			Weather( "PassHour" );
+
+			var sky = Weather( "GetSky" );
+			var storm = Weather( "IsStorm" ) is bool && (bool) Weather( "IsStorm" );
+			var injured = crew.Exists( file => file.m_vitality < 100.0f );
+
+			if ( storm )
+			{
+				counts[ 0 ]++;
+			}
+
+			if ( ( sky != null ) && ( sky.ToString() == "SnowingHeavily" ) )
+			{
+				counts[ 1 ]++;
+			}
+
+			if ( injured )
+			{
+				counts[ storm ? 2 : 3 ]++;
+			}
+		}
+
+		HealCrew();
+
+		return counts;
+	}
+
+	IEnumerator ScenarioStorms()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// ---- 1. planet 91 of Arth, Very Violent and frozen: storms half of the hours, heavy snow some, injuries only in storms
+		yield return LandInTheArthSystemAt( 91, Vector3.zero, done );
+
+		yield return Frames( 5 );
+
+		var firstSky = MessageList();
+		var violent = PassWeatherHours( 300 );
+
+		// ---- 2. in a storm: half the efficiency, and the bearing to the ship lost
+		var tries = 0;
+
+		while ( !( ( Weather( "IsStorm" ) is bool ) && (bool) Weather( "IsStorm" ) ) && ( tries++ < 100 ) )
+		{
+			HealCrew();
+			Weather( "PassHour" );
+		}
+
+		HealCrew();
+
+		yield return Frames( 3 );
+
+		var stormEfficiency = Weather( "GetEfficiency" );
+		var displayInStorm = controller.m_displayController.m_terrainVehicleDisplay.m_statusValues.text;
+		var fuelEfficiencyInStorm = controller.m_terrainVehicle.GetFuelEfficiency();
+
+		// ---- 3. back in the ship nothing happens
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+
+		var inShip = PassWeatherHours( 50 );
+
+		// ---- 4. planet 90 of Arth, weather None: storms now and then
+		yield return LandInTheArthSystemAt( 90, Vector3.zero, done );
+
+		yield return Frames( 5 );
+
+		var calm = PassWeatherHours( 300 );
+
+		Log( "storms: first sky " + firstSky + " || planet 91 (Very Violent), 300 hours: storms " + violent[ 0 ] + ", heavy snow " + violent[ 1 ] + ", storm hours that injured " + violent[ 2 ] + ", other hours that injured " + violent[ 3 ] + " | in a storm: efficiency " + stormEfficiency + ", fuel efficiency " + fuelEfficiencyInStorm + ", display " + displayInStorm.Replace( "\n", "/" ) + " || in the ship, 50 hours: storms " + inShip[ 0 ] + ", injuries " + ( inShip[ 2 ] + inShip[ 3 ] ) + " || planet 90 (None), 300 hours: storms " + calm[ 0 ] + ", injured " + calm[ 2 ] + "/" + calm[ 3 ] );
+
+		Check( "storms: on a Very Violent planet storms come in about half of the hours, with heavy snow besides", ( violent[ 0 ] >= 120 ) && ( violent[ 0 ] <= 180 ) && ( violent[ 1 ] >= 30 ), violent[ 0 ] + " storms, " + violent[ 1 ] + " heavy snow of 300 hours" );
+		Check( "storms: a storm injures the crew in about half of its hours, and nothing else does", ( violent[ 0 ] > 0 ) && ( violent[ 2 ] >= violent[ 0 ] * 3 / 10 ) && ( violent[ 2 ] <= violent[ 0 ] * 7 / 10 ) && ( violent[ 3 ] == 0 ), violent[ 2 ] + " of " + violent[ 0 ] + " storm hours, " + violent[ 3 ] + " others" );
+		Check( "storms: in a storm the terrain vehicle has half its efficiency and the bearing to the ship is lost", ( stormEfficiency is float ) && Mathf.Approximately( (float) stormEfficiency, 0.5f ) && displayInStorm.Contains( "LOST!" ), stormEfficiency + " | " + displayInStorm.Replace( "\n", "/" ) );
+		Check( "storms: in the ship there is no weather and no injury", ( inShip[ 0 ] == 0 ) && ( inShip[ 2 ] + inShip[ 3 ] == 0 ), inShip[ 0 ] + " storms, " + ( inShip[ 2 ] + inShip[ 3 ] ) + " injuries" );
+		Check( "storms: on a planet whose weather is None storms are rare but come", ( calm[ 0 ] >= 15 ) && ( calm[ 0 ] <= 60 ), calm[ 0 ] + " storms of 300 hours" );
+
+		Finish( "scenario=storms violent=" + violent[ 0 ] + " calm=" + calm[ 0 ], 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

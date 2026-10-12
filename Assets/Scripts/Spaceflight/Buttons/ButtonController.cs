@@ -51,6 +51,16 @@ public class ButtonController : MonoBehaviour
 	public TextMeshProUGUI[] m_buttonLabelList;
 	public TextMeshProUGUI m_currentOfficer;
 
+	// the icon beside the current officer's name (the scene's logo stands for the ship; the officers and the terrain vehicle have the UI kit's icons)
+	public Image m_officerIcon;
+
+	// the logo the icon shows on the bridge
+	Sprite m_shipIcon;
+
+	// the highlight behind the selected button's label and the bar on its left edge (the UI kit's selected and running states; without them only the bullets show the selection)
+	public Image m_selectionHighlight;
+	public Image m_selectionBar;
+
 	// buttons
 	private ShipButton[] m_buttonList;
 	private ShipButton m_currentButton;
@@ -78,6 +88,12 @@ public class ButtonController : MonoBehaviour
 
 		// reset the ignore controller timer
 		m_ignoreControllerTimer = 0.0f;
+
+		// remember the ship's logo, which the officer icon shows on the bridge
+		if ( m_officerIcon != null )
+		{
+			m_shipIcon = m_officerIcon.sprite;
+		}
 
 		// common bridge button
 		var bridgeButton = new ChangeMenuButton( "Bridge", ButtonSet.Bridge );
@@ -231,8 +247,8 @@ public class ButtonController : MonoBehaviour
 				// remember which button this press is for
 				m_buttonBeingActivated = m_buttonList[ m_selectedButtonIndex ];
 
-				// update the button sprite for the currently selected button
-				m_buttonImageList[ m_selectedButtonIndex ].sprite = m_buttonActiveSprite;
+				// show the currently selected button as running
+				ShowButtonStates( true );
 
 				// play the activate sound
 				SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
@@ -240,10 +256,21 @@ public class ButtonController : MonoBehaviour
 		}
 	}
 
-	// call this to change the current officer text
-	public void ChangeOfficerText( string newOfficer )
+	// call this to change the current officer: the name and the icon beside it
+	public void ChangeOfficerText( string newOfficer, UIKitTheme.OfficerIcon officerIcon )
 	{
 		m_currentOfficer.text = newOfficer;
+
+		if ( m_officerIcon == null )
+		{
+			return;
+		}
+
+		// the officer's icon from the UI kit (the ship, or a theme without the icon, shows the ship's logo)
+		var theme = UIKitTheme.Get();
+		var sprite = ( theme != null ) ? theme.GetOfficerIcon( officerIcon ) : null;
+
+		m_officerIcon.sprite = ( sprite != null ) ? sprite : m_shipIcon;
 	}
 
 	// set the bridge buttons
@@ -259,7 +286,7 @@ public class ButtonController : MonoBehaviour
 		ChangeButtonSet( ButtonSet.Bridge );
 
 		// change the current officer label to the name of the ship
-		ChangeOfficerText( "ISS " + playerData.m_playerShip.m_name );
+		ChangeOfficerText( "ISS " + playerData.m_playerShip.m_name, UIKitTheme.OfficerIcon.Ship );
 
 		// update the message
 		switch ( playerData.m_general.m_location )
@@ -304,7 +331,7 @@ public class ButtonController : MonoBehaviour
 		var personnelFile = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Navigator );
 
 		// set the name of the officer
-		SpaceflightController.m_instance.m_buttonController.ChangeOfficerText( "Officer " + personnelFile.m_name );
+		SpaceflightController.m_instance.m_buttonController.ChangeOfficerText( "Officer " + personnelFile.m_name, UIKitTheme.OfficerIcon.Navigator );
 	}
 
 	// update the buttons and change the current button index
@@ -343,13 +370,70 @@ public class ButtonController : MonoBehaviour
 		UpdateButtonSprites();
 	}
 
-	// go through each button image and set it to the on or off or active button sprite depending on what is currently selected
+	// go through each button and show it as selected or not (none of them running)
 	public void UpdateButtonSprites()
+	{
+		ShowButtonStates( false );
+	}
+
+	// shows which button is selected and whether it is running: the bullets (off, on, active), the labels' colours and the highlight behind the selected label
+	// (the UI kit's console button states: a raised row with a cyan bar for the selected button, a cyan row with dark text for the running one)
+	void ShowButtonStates( bool selectedIsRunning )
 	{
 		for ( var i = 0; i < c_numButtons; i++ )
 		{
-			m_buttonImageList[ i ].sprite = ( m_selectedButtonIndex == i ) ? m_buttonOnSprite : m_buttonOffSprite;
+			var selected = ( m_selectedButtonIndex == i );
+
+			m_buttonImageList[ i ].sprite = selected ? ( selectedIsRunning ? m_buttonActiveSprite : m_buttonOnSprite ) : m_buttonOffSprite;
 		}
+
+		var theme = UIKitTheme.Get();
+
+		// a scene without the highlight (or without the theme) shows the selection with the bullets alone
+		if ( ( m_selectionHighlight == null ) || ( theme == null ) )
+		{
+			return;
+		}
+
+		for ( var i = 0; i < c_numButtons; i++ )
+		{
+			var selected = ( m_selectedButtonIndex == i );
+
+			m_buttonLabelList[ i ].color = selected ? ( selectedIsRunning ? theme.m_textOnAccent : theme.m_textPrimary ) : theme.m_textSecondary;
+		}
+
+		// no highlight on an empty row (the selected index is always on a button, but the buttons may not have been set yet)
+		var hasButton = ( m_selectedButtonIndex >= 0 ) && ( m_selectedButtonIndex < c_numButtons ) && ( m_buttonList != null ) && ( m_buttonList[ m_selectedButtonIndex ] != null );
+
+		m_selectionHighlight.enabled = hasButton;
+
+		if ( m_selectionBar != null )
+		{
+			m_selectionBar.enabled = hasButton && !selectedIsRunning;
+			m_selectionBar.color = theme.m_accentPrimary;
+		}
+
+		if ( !hasButton )
+		{
+			return;
+		}
+
+		m_selectionHighlight.color = selectedIsRunning ? theme.m_accentPrimary : theme.m_backgroundHover;
+
+		// the highlight goes behind the selected label: its centre and its height, in the highlight's parent (it spans the parent's width)
+		var label = m_buttonLabelList[ m_selectedButtonIndex ].rectTransform;
+		var highlight = m_selectionHighlight.rectTransform;
+		var area = highlight.parent as RectTransform;
+
+		if ( area == null )
+		{
+			return;
+		}
+
+		var centre = area.InverseTransformPoint( label.TransformPoint( label.rect.center ) );
+
+		highlight.anchoredPosition = new Vector2( highlight.anchoredPosition.x, centre.y - area.rect.center.y );
+		highlight.sizeDelta = new Vector2( highlight.sizeDelta.x, label.rect.height );
 	}
 
 	// call this to stop calling update on the current button
@@ -365,9 +449,8 @@ public class ButtonController : MonoBehaviour
 		
 		m_selectedButtonIndex = buttonIndex;
 
-		UpdateButtonSprites();
-
-		m_buttonImageList[ m_selectedButtonIndex ].sprite = m_buttonActiveSprite;
+		// show it as running
+		ShowButtonStates( true );
 	}
 
 	// call this to activate the selected button

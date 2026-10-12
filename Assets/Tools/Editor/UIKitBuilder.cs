@@ -101,6 +101,15 @@ public static class UIKitBuilder
 		theme.m_bulletOnSprite = MakeBullet( "UI Kit - Bullet On.png", theme.m_accentPrimary, 1.0f, report );
 		theme.m_bulletActiveSprite = MakeBullet( "UI Kit - Bullet Active.png", theme.m_accentPrimary, 2.0f, report );
 
+		// the officer icons (the Figma file's Icon components, exported at 4x and made white: the console tints them)
+		theme.m_officerCaptainSprite = ImportSprite( "UI Kit - Officer Captain.png", Vector4.zero, report );
+		theme.m_officerScienceSprite = ImportSprite( "UI Kit - Officer Science.png", Vector4.zero, report );
+		theme.m_officerNavigatorSprite = ImportSprite( "UI Kit - Officer Navigator.png", Vector4.zero, report );
+		theme.m_officerEngineerSprite = ImportSprite( "UI Kit - Officer Engineer.png", Vector4.zero, report );
+		theme.m_officerCommunicationsSprite = ImportSprite( "UI Kit - Officer Communications.png", Vector4.zero, report );
+		theme.m_officerDoctorSprite = ImportSprite( "UI Kit - Officer Doctor.png", Vector4.zero, report );
+		theme.m_officerTerrainVehicleSprite = ImportSprite( "UI Kit - Officer Terrain Vehicle.png", Vector4.zero, report );
+
 		EditorUtility.SetDirty( theme );
 		AssetDatabase.SaveAssets();
 

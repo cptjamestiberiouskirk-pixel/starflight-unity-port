@@ -97,6 +97,37 @@ public class UIKitTheme : ScriptableObject
 	public Sprite m_bulletOnSprite;
 	public Sprite m_bulletActiveSprite;
 
+	[Header( "Officer icons (white line art, tinted by the image colour)" )]
+	public Sprite m_officerCaptainSprite;
+	public Sprite m_officerScienceSprite;
+	public Sprite m_officerNavigatorSprite;
+	public Sprite m_officerEngineerSprite;
+	public Sprite m_officerCommunicationsSprite;
+	public Sprite m_officerDoctorSprite;
+	public Sprite m_officerTerrainVehicleSprite;
+
+	// who has the console: the ship itself (on the bridge), one of the six officers, or the terrain vehicle
+	public enum OfficerIcon
+	{
+		Ship, Captain, Science, Navigator, Engineer, Communications, Doctor, TerrainVehicle
+	}
+
+	// returns the icon of whoever has the console (null for the ship, which keeps the logo it has in the scene)
+	public Sprite GetOfficerIcon( OfficerIcon officer )
+	{
+		switch ( officer )
+		{
+			case OfficerIcon.Captain: return m_officerCaptainSprite;
+			case OfficerIcon.Science: return m_officerScienceSprite;
+			case OfficerIcon.Navigator: return m_officerNavigatorSprite;
+			case OfficerIcon.Engineer: return m_officerEngineerSprite;
+			case OfficerIcon.Communications: return m_officerCommunicationsSprite;
+			case OfficerIcon.Doctor: return m_officerDoctorSprite;
+			case OfficerIcon.TerrainVehicle: return m_officerTerrainVehicleSprite;
+			default: return null;
+		}
+	}
+
 	// the kit's colour roles, by name (Keep leaves a colour as it is)
 	public enum ColorRole
 	{
