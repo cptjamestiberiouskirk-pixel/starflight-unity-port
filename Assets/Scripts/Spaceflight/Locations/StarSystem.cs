@@ -24,6 +24,9 @@ public class StarSystem : MonoBehaviour
 	// true once the ship has been told in orbital range of Arth that the Starport does not answer (after the flare of Arth's sun)
 	bool m_reportedNoStarport;
 
+	// true while the ship is within orbital range of a planet (leaving it is reported, as the original's "OUTSIDE ORBITAL RANGE")
+	bool m_inOrbitalRange;
+
 	// unity awake
 	void Awake()
 	{
@@ -85,6 +88,9 @@ public class StarSystem : MonoBehaviour
 			// are we close enough to orbit the planet?
 			if ( distanceToPlanet <= orbitPlanetController.m_planetModel.transform.localScale.y )
 			{
+				// the ship is within orbital range
+				m_inOrbitalRange = true;
+
 				// after Arth's sun has flared there is no Starport to dock at any more (and the ship cannot go into orbit around Arth then)
 				if ( IsDestroyedStarport( orbitPlanetController.m_planet.m_id ) )
 				{
@@ -102,9 +108,18 @@ public class StarSystem : MonoBehaviour
 					// yes - remember this planet
 					m_planetToOrbitId = orbitPlanetController.m_planet.m_id;
 
-					// let the player know
+					// let the player know, in the original's words (STARB.COM: "STANDING BY TO DOCK WITH STARPORT" at Arth, else "STANDING BY TO ORBIT" and
+					// "PRESS SPACEBAR TO ORBIT" - the port's key for it is Enter)
 					SpaceflightController.m_instance.m_messages.Clear();
-					SpaceflightController.m_instance.m_messages.AddText( "<color=white>Ship is within orbital range.</color>" );
+
+					if ( orbitPlanetController.m_planet.m_id == DataController.m_instance.m_gameData.m_misc.m_arthPlanetId )
+					{
+						SpaceflightController.m_instance.m_messages.AddText( "<color=white>Standing by to dock with Starport.</color>" );
+					}
+					else
+					{
+						SpaceflightController.m_instance.m_messages.AddText( "<color=white>Standing by to orbit.\nPress Enter to orbit.</color>" );
+					}
 
 					// say so if this is a planet whose maps could not be generated (that is why it is a plain grey ball)
 					if ( orbitPlanetController.CouldNotBeMapped() )
@@ -118,7 +133,16 @@ public class StarSystem : MonoBehaviour
 				// out of orbital range: the Starport's silence is reported again next time
 				m_reportedNoStarport = false;
 
-				if ( m_planetToOrbitId != -1 )
+				if ( m_inOrbitalRange )
+				{
+					// the ship has just left orbital range: forget the planet, and say so as the original does
+					m_inOrbitalRange = false;
+
+					m_planetToOrbitId = -1;
+
+					SpaceflightController.m_instance.m_messages.AddText( "<color=white>Outside orbital range.</color>" );
+				}
+				else if ( m_planetToOrbitId != -1 )
 				{
 					// forget this planet
 					m_planetToOrbitId = -1;
