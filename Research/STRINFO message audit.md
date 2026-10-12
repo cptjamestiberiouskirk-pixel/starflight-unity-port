@@ -110,7 +110,7 @@ Not listed one by one: 43 lines differ only in spacing or punctuation (for examp
 
 | GD id | Code | What the player sees | STRINFO (line) | Shipped game (`COMMSPEC-OV.c`) | Category |
 |---|---|---|---|---|---|
-| 300 (GD line 32806) | `Encounter.cs:1705` to `1708` | "...for 145 cubic Arth unitxx of energy crysstalsss": the template's "unitxx" is printed as it stands | "[AMOUNT] CUBIC ARTH UNIT(S)" (1112) | "FOR XXXX CUBIC ARTH UNITXX": XX is a field the game fills (INFERRED: "S " or blanks) | missing field: a bug |
+| 300 (GD line 32806) | `Encounter.cs:1705` to `1708` | "...for 145 cubic Arth unitxx of energy crysstalsss": the template's "unitxx" is printed as it stands | "[AMOUNT] CUBIC ARTH UNIT(S)" (1112) | "FOR XXXX CUBIC ARTH UNITXX": XX is a field the game fills (INFERRED: "S " or blanks) | missing field: a bug. Fixed in PR 243 |
 | 300 | same | "your sship a Crystal Orb thiss artifact": no full stop after the name | "A(N) [ARTIFACT].  THIS ARTIFACT" (1112) | "SSHIP AX XXXX... THISS": no full stop either | alike with the shipped game; STRINFO adds the stop |
 | 300 | same | "an A Mulligan" for the artifact named "A Mulligan" (vowel rule) | "A(N) [ARTIFACT]" | "AX" field (INFERRED: the same rule) | edge case of the port's |
 | 299 (GD line 32796) | `Encounter.cs:1718` | "Let uss ssay 1 unitss" for one cubic meter | "[AMOUNT] UNITS" (1115) | "XXX UNITSS" | alike |
@@ -160,8 +160,8 @@ The six texts are in RD `m_storyTextList` (from STRINFO 1.2) and shown by `Playe
 
 | Text | Where | Port (after the code's replacements) | STRINFO (line) | Shipped game (`OP-OV.c`) | Category |
 |---|---|---|---|---|---|
-| TerrainVehicleLost | RD line 1281 | "CONSEQUENLY, YOU HAVE BEEN FINED 10,000 MU." | "CONSEQUENLY" (353) | "CONSEQUENTLY" | STRINFO's typo, copied into RD |
-| TowingCharges | RD line 1287 | "LIABLE FOR ANY COSTS INCURRED ... ON BEHALF SAID CREW." | same (359) | "LIABLE FOR ALL COSTS INCURRED ... ON BEHALF OF SAID CREW." | different wording and a missing word in STRINFO |
+| TerrainVehicleLost | RD line 1281 | "CONSEQUENLY, YOU HAVE BEEN FINED 10,000 MU." | "CONSEQUENLY" (353) | "CONSEQUENTLY" | STRINFO's typo, copied into RD. Fixed in PR 246 |
+| TowingCharges | RD line 1287 | "LIABLE FOR ANY COSTS INCURRED ... ON BEHALF SAID CREW." | same (359) | "LIABLE FOR ALL COSTS INCURRED ... ON BEHALF OF SAID CREW." | different wording and a missing word in STRINFO. Fixed in PR 246 |
 | EvaluationUnsuitable | `PlayerData.cs:254` | "DUE TO ITS CONDITIONS, THIS PLANET PROVED UNSUITABLE ..." when no reason applies | "[REASON: EXTREME HEAT, ...]" (339) | the reasons only ("EXTREME HEAT," "EXTREME COLD," "CRUSHING GRAVITY," "VIOLENT STORMS," "LACK OF WATER," "LACK OF OXYGEN,") | port's own text where STRINFO has one |
 | Every evaluation | `OperationsPanel.cs` | the text alone; several evaluations at one docking give identical lines with nothing to tell them apart | STRINFO prints the texts only | "RECOMMENDATION: n", "SYSTEM: x,y", "ORBIT: n", "EVALUATION:" above each, "PRESS SPACEBAR FOR NEXT EVALUATION", "END OF EVALUATIONS" | missing lines (STRINFO silent; the shipped game has them) |
 | The three supplemental evaluations | RD, `OperationsPanel.cs` | "SUBJECT: ..." and the body on consecutive lines | a blank line after the SUBJECT line (343 to 359) | | layout |
@@ -192,7 +192,7 @@ The 38 messages of RD `m_planetMessageList` were recovered from STRINFO and agre
 |---|---|---|---|---|
 | 0 (RD line 35) | 3.1 (1577) | "AND THE RECENT INFESTATION" | "AND A RECENT INFESTATION" | different wording (STRINFO's) |
 | 22 (RD line 321) | 3.1 (1644) | "SURFACE TEMP. IT IS AT 150 DEGREES" | "SURFACE TEMP. IS AT 150 DEGREES" | word added in STRINFO |
-| 29 (RD line 412) | 3.1 (1661) | "SIGN - MARDAN 4 MINING STATION NO. [NUMBER]", shown as it stands: the player sees the literal "[NUMBER]" (`TVCargoButton.cs:187`; nothing replaces it, CONFIRMED by grep) | "[NUMBER]" is the editor's field | "SIGN - MARDAN 4 MINING STATION NO. 17" (`instance.txt` line 1736; the site sign 28 is NO. 82 in both) | missing field: a bug |
+| 29 (RD line 412) | 3.1 (1661) | "SIGN - MARDAN 4 MINING STATION NO. [NUMBER]", shown as it stands: the player sees the literal "[NUMBER]" (`TVCargoButton.cs:187`; nothing replaces it, CONFIRMED by grep) | "[NUMBER]" is the editor's field | "SIGN - MARDAN 4 MINING STATION NO. 17" (`instance.txt` line 1736; the site sign 28 is NO. 82 in both) | missing field: a bug. Fixed in PR 239 |
 | 29 | 3.1 (1660) | one ruin at a place picked from the seed (`TerrainRuins.cs:86`) | "SEVERAL LOCATIONS" | | missing places (the port's ruling of 2026-10-09: one ruin) |
 | 33 (RD line 464) | 3.1 (1673) | "DECIPERABLE" | same | "DECIPHERABLE" | STRINFO's typo, copied into RD |
 | 34 (RD line 477) | 3.1 (1676) | "AMIDST FILES OF ALIEN BOOKS" | same | "AMIDST PILES OF ALIEN BOOKS" | STRINFO's typo, copied into RD |
@@ -203,9 +203,9 @@ The shipped dump has junk in place of messages 2, 11, 18, 21, 31 and parts of 36
 
 | Text | Where | Port | STRINFO (line) | Shipped game | Category |
 |---|---|---|---|---|---|
-| Noah 9's beacon | GD 555, `Encounter.cs:3504` | "Receiving:" then "Captain *, we're picking up a distress beacon signal", as if the derelict sent it | "[UPON ORBITING ..., THE COMMUNICATIONS OFFICER REPORTS:]" (1504) | | different framing: the officer's report is shown as a transmission |
-| Noah 9's beacon, hailed first | GD 553, `Encounter.cs` (DefaultEncounterUpdate) | "Captain, we're picking up a distress beacon signal" | "CAPTAIN [CAPTAIN'S NAME], ..." (1505) | | missing field (the name) |
-| Noah 9, order | `Encounter.cs` FindComm | the report and "SOS... SOS" come at random, 10 to 30 s apart | the report, then SOS (1505, 1507) | | order (INFERRED from the code; not run) |
+| Noah 9's beacon | GD 555, `Encounter.cs:3504` | "Receiving:" then "Captain *, we're picking up a distress beacon signal", as if the derelict sent it | "[UPON ORBITING ..., THE COMMUNICATIONS OFFICER REPORTS:]" (1504) | the derelict's own phrase: the shipped game keeps it, and the one without the name, among the Noah 9 originator's phrases with "SOS....SOS" (`instance.txt` lines 1694, 1699, 1696) | alike with the shipped game's data; STRINFO's framing is its editor's (INFERRED: how the original's screen labels it is not known) |
+| Noah 9's beacon, hailed first | GD 553, `Encounter.cs` (DefaultEncounterUpdate) | "Captain, we're picking up a distress beacon signal" | "CAPTAIN [CAPTAIN'S NAME], ..." (1505) | "CAPTAIN, WE'RE PICKING UP A DISTRESS BEACON SIGNAL" (`instance.txt` line 1694) | alike with the shipped game |
+| Noah 9, order | `Encounter.cs` FindComm | the report and "SOS... SOS" come at random, 10 to 30 s apart | the report, then SOS (1505, 1507) | the two are phrases of one subject (`instance.txt` lines 1694, 1696) | order not known (INFERRED from the code; not run) |
 | Crystal Planet destroyed | RD, `BlackEgg.cs:231` | "INCOMING HIGH PRIORITY MESSAGE" then the text, no picture | a picture between the two (1518, "EMBED") | | missing picture (HYPOTHESIZED: the medal) |
 | Crystal Planet destroyed | RD | "RETURN TO TO STARPORT", "END TRANSMISSION)" | same (1522, 1523) | | STRINFO's own slips, copied; the shipped text is not in the files fetched |
 | Flare death | RD, `StellarFlares.cs:93` | "... AND CREW WERE INCINERATED." then "GAME OVER" on the next line | a blank line before GAME OVER (1566 to 1568) | two new lines before "GAME OVER" (`HYPERMSG-OV.c`) | layout |
@@ -241,8 +241,8 @@ The port's own texts where STRINFO is silent are many (the docking screen's line
 
 Under D1 the shipped game's text and STRINFO are both sources of the original's behaviour. Where they differ, the shipped game is the original itself, so the recommendation below takes its text; where the change would touch `Starflight Game Data.json`, it waits for the owner.
 
-1. **Ruin messages** (RD only): message 29's "[NUMBER]" becomes "17", as in the shipped game (a bug: the player sees the bracket). Optionally, messages 0, 22, 33 and 34 in the shipped game's words. Probe check: the `ruins` scenario can read the recorded text.
-2. **Evaluations** (RD and `PlayerData.cs`, `OperationsPanel.cs`): "CONSEQUENTLY", the towing text's "ALL COSTS ... ON BEHALF OF SAID CREW", the blank line after SUBJECT, and the original's "RECOMMENDATION: / SYSTEM: / ORBIT: / EVALUATION:" heading above each evaluation. Probe check: a recommendation filed and evaluated on docking.
-3. **Story and reports** (RD, `StellarFlares.cs`, `DistressYesButton.cs`, `Encounter.cs`): the blank line before GAME OVER and after THERE'S NO RESPONSE!; the Noah 9 beacon as the officer's report with the captain's name, before the SOS.
-4. **Comms in code**: whatever section 1.4 shows of the filled placeholders.
+1. **Ruin messages** (RD only): message 29's "[NUMBER]" becomes "17", as in the shipped game (a bug: the player saw the bracket). Done: PR 239. Optionally, messages 0, 22, 33 and 34 in the shipped game's words.
+2. **Evaluations** (RD): "CONSEQUENTLY", the towing text's "ALL COSTS ... ON BEHALF OF SAID CREW", the blank line after SUBJECT. Done: PR 246. Left for the Operations screen work: the original's heading above each colony evaluation ("RECOMMENDATION:", "DATE:", "SYSTEM:", "ORBIT:", "NAME:", "EVALUATION:", `OP-OV.c`), which needs the date and a name the player gives a logged planet; the port records neither.
+3. **Story and reports** (RD): the blank line before GAME OVER and after THERE'S NO RESPONSE! (layout only). The Noah 9 beacon needs no change: the port follows the shipped game's data (section 6).
+4. **Comms in code**: the Thrynn artifact offer ("unitxx", the name's full stop, the amount cut down to the room in the hold). Done: PR 243. Open, behaviour rather than words: the Veloxi homeworld fleet never says GD 473, and the Thrynn home fleet ends on GD 394 (section 1.4).
 5. **Owner's call, the game data**: the four notice words of section 2, "laser" and "ataraxia" in the analyses (section 4), the Humming Gizzy's price and the Shimmering Ball's volume. No comm line of the game data needs a change.
