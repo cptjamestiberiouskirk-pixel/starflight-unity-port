@@ -208,9 +208,9 @@ The shipped dump has junk in place of messages 2, 11, 18, 21, 31 and parts of 36
 | Noah 9, order | `Encounter.cs` FindComm | the report and "SOS... SOS" come at random, 10 to 30 s apart | the report, then SOS (1505, 1507) | the two are phrases of one subject (`instance.txt` lines 1694, 1696), and the shipped game says the one used least, the first on a tie (FIND-PHRASE in `COMM-OV.c`): the report, then the SOS, then in turns | different order; fixed 2026-10-12 (`fix/noah9-beacon-order`) |
 | Crystal Planet destroyed | RD, `BlackEgg.cs:231` | "INCOMING HIGH PRIORITY MESSAGE" then the text, no picture | a picture between the two (1518, "EMBED") | | missing picture (HYPOTHESIZED: the medal) |
 | Crystal Planet destroyed | RD | "RETURN TO TO STARPORT", "END TRANSMISSION)" | same (1522, 1523) | | STRINFO's own slips, copied; the shipped text is not in the files fetched |
-| Flare death | RD, `StellarFlares.cs:93` | "... AND CREW WERE INCINERATED." then "GAME OVER" on the next line | a blank line before GAME OVER (1566 to 1568) | two new lines before "GAME OVER" (`HYPERMSG-OV.c`) | layout |
+| Flare death | RD, `StellarFlares.cs:93` | "... AND CREW WERE INCINERATED." then "GAME OVER" on the next line | a blank line before GAME OVER (1566 to 1568) | two new lines before "GAME OVER" (`HYPERMSG-OV.c`) | layout; fixed 2026-10-12 (`fix/story-blank-lines`) |
 | Flare death, the date | `StellarFlares.cs:93` | DD-MM-YYYY | "[DD-MM-YY]" (1564) | a 10-character date, DD-MM-YYYY (`HYPERMSG-OV.c`, `DATE$>ADR` typed with length 10) | alike: STRINFO's field name only |
-| Distress after the flare | RD, `DistressYesButton.cs:34` | "THERE'S NO RESPONSE!" then "CANCELLED" on the next line | a blank line between (1571, 1573) | "THERE'S NO RESPONSE!" (`COMM-OV.c`) | layout |
+| Distress after the flare | RD, `DistressYesButton.cs:34` | "THERE'S NO RESPONSE!" then "CANCELLED" on the next line | a blank line between (1571, 1573) | "THERE'S NO RESPONSE!" (`COMM-OV.c`) | layout; fixed 2026-10-12 (`fix/story-blank-lines`) |
 | Distress after the flare, in an encounter | `DistressYesButton.cs:24` | "Transmission is being jammed." | "THERE'S NO RESPONSE!" (1571), no exception given | | which check comes first is not known (HYPOTHESIZED) |
 | Elan and the Uhlek | RD, `BlackEgg.cs:180, 184` | as STRINFO | 5.1 (1846, 2051) | | alike |
 
