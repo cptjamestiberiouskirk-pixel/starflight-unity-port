@@ -202,6 +202,9 @@ public class PlayerData
 
 			evaluated++;
 
+			// the heading the original's evaluation screen puts above each evaluation
+			var heading = GetColonyEvaluationHeading( planetId );
+
 			// is it a planet of Interstel's list?
 			GD_ColonyEvaluation colonyEvaluation = null;
 
@@ -223,7 +226,7 @@ public class PlayerData
 
 				if ( text != null )
 				{
-					m_general.AddSupplementalEvaluation( text.m_text.Replace( "[REWARD]", colonyEvaluation.m_bonus.ToString() ) );
+					m_general.AddSupplementalEvaluation( heading + text.m_text.Replace( "[REWARD]", colonyEvaluation.m_bonus.ToString() ) );
 				}
 
 				continue;
@@ -264,13 +267,54 @@ public class PlayerData
 					evaluation = evaluation.Replace( "  THIS IS ONLY A WARNING, YOUR NEXT FINE WILL BE HEAVY.", "" );
 				}
 
-				m_general.AddSupplementalEvaluation( evaluation );
+				m_general.AddSupplementalEvaluation( heading + evaluation );
 			}
 		}
 
 		m_general.m_colonyRecommendationList.Clear();
 
+		if ( m_general.m_colonyRecommendationRecordList != null )
+		{
+			m_general.m_colonyRecommendationRecordList.Clear();
+		}
+
 		return evaluated;
+	}
+
+	// the lines above an evaluation on the original's evaluation screen (OP-OV in the decompiled original): "RECOMMENDATION: ", "DATE: ", "SYSTEM: ", "ORBIT: ",
+	// "NAME: " and "EVALUATION:" - a recommendation made before the records were saved has no number, date or name, and gets only the planet's lines
+	string GetColonyEvaluationHeading( int planetId )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var planet = gameData.m_planetList[ planetId ];
+		var record = m_general.FindColonyRecommendation( planetId );
+		var heading = "";
+
+		if ( record != null )
+		{
+			heading += "RECOMMENDATION: " + record.m_number + "\n";
+
+			if ( !string.IsNullOrEmpty( record.m_stardateYMD ) )
+			{
+				heading += "DATE: " + PD_General.GetDisplayStardate( record.m_stardateYMD ) + "\n";
+			}
+		}
+
+		if ( ( planet.m_starId >= 0 ) && ( planet.m_starId < gameData.m_starList.Length ) )
+		{
+			var star = gameData.m_starList[ planet.m_starId ];
+
+			heading += "SYSTEM: " + star.m_xCoordinate + "," + star.m_yCoordinate + "\n";
+		}
+
+		heading += "ORBIT: " + planet.m_orbitPosition + "\n";
+
+		if ( record != null )
+		{
+			heading += "NAME: " + ( record.m_name ?? "" ).ToUpperInvariant() + "\n";
+		}
+
+		return heading + "EVALUATION:\n";
 	}
 
 	// the fine for being towed back to the Starport after a distress call: "fines vary directly with the distance from Arth and range from 15000 to 80000 MU"

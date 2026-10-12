@@ -14,6 +14,7 @@ public class ButtonController : MonoBehaviour
 		CommunicationsB,
 		Engineering,
 		Medical,
+		StopTreatment,
 		NavigationA,
 		NavigationB,
 		NavigationC,
@@ -109,13 +110,14 @@ public class ButtonController : MonoBehaviour
 		m_buttonSets[ (int) ButtonSet.CommunicationsB ] = new ShipButton[] { new RespondButton(), new DistressButton(), bridgeButton };
 		m_buttonSets[ (int) ButtonSet.Engineering ] = new ShipButton[] { new DamageButton(), new RepairButton(), bridgeButton };
 		m_buttonSets[ (int) ButtonSet.Medical ] = new ShipButton[] { new ExamineButton(), new TreatButton(), bridgeButton };
+		m_buttonSets[ (int) ButtonSet.StopTreatment ] = new ShipButton[] { new StopTreatmentNoButton(), new StopTreatmentYesButton() };
 		m_buttonSets[ (int) ButtonSet.NavigationA ] = new ShipButton[] { new ManeuverButton(), new StarmapButton(), new RaiseShieldsButton(), new ArmWeaponButton(), new CombatButton(), bridgeButton };
 		m_buttonSets[ (int) ButtonSet.NavigationB ] = new ShipButton[] { new ManeuverButton(), new StarmapButton(), new DropShieldsButton(), new ArmWeaponButton(), new CombatButton(), bridgeButton };
 		m_buttonSets[ (int) ButtonSet.NavigationC ] = new ShipButton[] { new ManeuverButton(), new StarmapButton(), new RaiseShieldsButton(), new DisarmWeaponButton(), new CombatButton(), bridgeButton };
 		m_buttonSets[ (int) ButtonSet.NavigationD ] = new ShipButton[] { new ManeuverButton(), new StarmapButton(), new DropShieldsButton(), new DisarmWeaponButton(), new CombatButton(), bridgeButton };
 		m_buttonSets[ (int) ButtonSet.Science ] = new ShipButton[] { new SensorsButton(), new AnalysisButton(), new StatusButton(), bridgeButton };
 		m_buttonSets[ (int) ButtonSet.Land ] = new ShipButton[] { new SelectSiteButton(), new DescendButton(), new AbortButton() };
-		m_buttonSets[ (int) ButtonSet.Launch ] = new ShipButton[] { new LaunchYesButton(), new LaunchNoButton() };
+		m_buttonSets[ (int) ButtonSet.Launch ] = new ShipButton[] { new LaunchNoButton(), new LaunchYesButton() };
 		m_buttonSets[ (int) ButtonSet.Hail ] = new ShipButton[] { new FriendlyButton(), new HostileButton(), new ObsequiousButton() };
 		m_buttonSets[ (int) ButtonSet.Respond ] = new ShipButton[] { new FriendlyButton(), new HostileButton(), new ObsequiousButton() };
 		m_buttonSets[ (int) ButtonSet.Comm ] = new ShipButton[] { new StatementButton(), new QuestionButton(), new PostureButton(), new TerminateButton() };

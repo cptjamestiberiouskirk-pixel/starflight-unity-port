@@ -1,6 +1,12 @@
 ﻿
 public class TreatButton : ShipButton
 {
+	// the choice of the crew member to treat
+	readonly CrewChooser m_crewChooser = new CrewChooser();
+
+	// a line said before the question when the button is run again after a treatment was stopped (StopTreatmentYesButton)
+	public static string s_preface;
+
 	public override string GetLabel()
 	{
 		return "Treat";
@@ -11,66 +17,89 @@ public class TreatButton : ShipButton
 		// get to the player data
 		var playerData = DataController.m_instance.m_playerData;
 
+		var preface = s_preface;
+
+		s_preface = null;
+
 		SpaceflightController.m_instance.m_messages.Clear();
 
 		// check if we have a doctor assigned
 		if ( !playerData.m_crewAssignment.IsAssigned( PD_CrewAssignment.Role.Doctor ) )
 		{
-			SpaceflightController.m_instance.m_messages.AddText( "<color=red>No doctor assigned!</color>" );
-			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
-			SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
-			return false;
+			return Refuse( "<color=red>No doctor assigned!</color>" );
 		}
-
-		// get the doctor's medical skill
-		var doctor = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Doctor );
 
 		// check if doctor is alive
+		var doctor = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Doctor );
+
 		if ( doctor.m_vitality <= 0 )
 		{
-			SpaceflightController.m_instance.m_messages.AddText( "<color=red>The doctor is incapacitated!</color>" );
-			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
-			SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+			return Refuse( "<color=red>The doctor is incapacitated!</color>" );
+		}
+
+		// the doctor treats one patient at a time: with someone under treatment the original asks first (DOCTOR, (/TREAT): "SHOULD I STOP TREATING ... TO TREAT
+		// SOMEONE ELSE? [N Y]") - No and Yes on the console
+		var patient = playerData.m_crewAssignment.GetPatient();
+
+		if ( ( patient != null ) && ( patient.m_vitality > 0 ) && ( patient.m_vitality < 100 ) )
+		{
+			SpaceflightController.m_instance.m_messages.AddText( "<color=yellow>Should I stop treating " + patient.m_name + " to treat someone else?</color>" );
+
+			SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.StopTreatment );
+
 			return false;
 		}
 
-		// the doctor treats one patient at a time - is someone still being treated?
-		var patient = playerData.m_crewAssignment.GetPatient();
-
-		var alreadyUnderWay = ( patient != null ) && ( patient.m_vitality > 0 ) && ( patient.m_vitality < 100 );
-
-		if ( !alreadyUnderWay )
+		// the doctor asks who to treat
+		if ( m_crewChooser.Begin( "treat", preface ) )
 		{
-			// no - treat the living crew member on board who is hurt the most (people who were left at starport are not on the ship)
-			patient = playerData.m_crewAssignment.FindMostInjuredCrewMember();
-
-			if ( patient != null )
-			{
-				playerData.m_crewAssignment.StartTreatment( patient );
-			}
+			return true;
 		}
 
-		if ( patient != null )
-		{
-			// treatment takes time - the patient recovers a little at a time (the better the doctor the faster it goes)
-			var treatmentRate = playerData.m_crewAssignment.GetTreatmentRate();
+		return Refuse( "<color=white>No crew assigned.</color>" );
+	}
 
-			var timeRemaining = ( treatmentRate > 0.0f ) ? ( ( 100.0f - patient.m_vitality ) / treatmentRate ) : 0.0f;
+	public override bool Update()
+	{
+		var crewMember = m_crewChooser.Update();
 
-			SpaceflightController.m_instance.m_messages.AddText(
-				( alreadyUnderWay ? "<color=#00FF00>Still treating " : "<color=#00FF00>Beginning treatment of " ) + patient.m_name + ", Captain.</color>\n" +
-				"Vitality: <color=white>" + UnityEngine.Mathf.CeilToInt( patient.m_vitality ) + "%</color>\n" +
-				"Estimated time: <color=white>" + FormatDuration( timeRemaining ) + "</color>"
-			);
-			SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
-		}
-		else
+		if ( crewMember != null )
 		{
-			SpaceflightController.m_instance.m_messages.AddText( "<color=white>All crew members are healthy.</color>" );
-			SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+			SpaceflightController.m_instance.m_messages.Clear();
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>" + Treat( crewMember ) + "</color>" );
+
+			SpaceflightController.m_instance.m_buttonController.DeactivateButton();
 		}
 
+		// the stick and the fire button are the chooser's until it is done
+		return true;
+	}
+
+	// the doctor's answer for the crew member chosen, in the original's words (DOCTOR, WF26F) - the treatment itself takes its time (PD_CrewAssignment.UpdateTreatment)
+	static string Treat( PD_Personnel.PD_PersonnelFile crewMember )
+	{
+		if ( crewMember.m_isDead || ( crewMember.m_vitality <= 0 ) )
+		{
+			return crewMember.m_name + " is beyond help.";
+		}
+
+		if ( crewMember.m_vitality >= 100 )
+		{
+			return crewMember.m_name + " doesn't need medical treatment.";
+		}
+
+		DataController.m_instance.m_playerData.m_crewAssignment.StartTreatment( crewMember );
+
+		return "I am starting treatment on " + crewMember.m_name + ".";
+	}
+
+	static bool Refuse( string text )
+	{
+		SpaceflightController.m_instance.m_messages.AddText( text );
+
+		SoundController.m_instance.PlaySound( SoundController.Sound.Error );
 		SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
 		return false;
 	}
 }
