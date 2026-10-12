@@ -463,6 +463,10 @@ public class Encounter : MonoBehaviour
 
 				break;
 		}
+
+		// say so, as the original does ("LEAVING ENCOUNTER..." and "...ENCOUNTER TERMINATED", made in STARB.COM as "LEAVING STARPORT..." and "...STARPORT CLEAR" are)
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Leaving encounter...</color>" );
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>...Encounter terminated.</color>" );
 	}
 
 	// check if all enemy ships in the encounter are destroyed
@@ -3679,6 +3683,9 @@ public class Encounter : MonoBehaviour
 		// we are not connected any more
 		m_pdEncounter.m_connected = false;
 		m_pdEncounter.m_disconnected = true;
+
+		// the end of every comm link, in the original's words (COMM-OV: "COMMUNICATIONS HAVE BEEN TERMINATED")
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Communications have been terminated.</color>" );
 
 		// no one wants to connect any more
 		m_pdEncounter.m_playerWantsToConnect = false;
