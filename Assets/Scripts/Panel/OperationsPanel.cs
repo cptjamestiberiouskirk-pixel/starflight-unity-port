@@ -35,9 +35,13 @@ public class OperationsPanel : Panel
 	float m_currentOffset;
 	bool m_endOfMessageReached;
 
-	// the text of the evaluation screen, and what it said in the scene (the colony recommendations are not in the port yet)
+	// the text of the evaluation screen, and what it says in the scene (that no colony world recommendations have been filed)
 	TextMeshProUGUI m_evaluationText;
 	string m_evaluationSceneText;
+
+	// the evaluation screen's pages, one evaluation to a page as in the original, and the page shown
+	readonly System.Collections.Generic.List<string> m_evaluationPages = new System.Collections.Generic.List<string>();
+	int m_evaluationPage;
 
 	// the starport controller
 	public AstronautController m_astronautController;
@@ -171,24 +175,33 @@ public class OperationsPanel : Panel
 		m_noticesGameObject.SetActive( false );
 		m_evaluationGameObject.SetActive( true );
 
-		// show the main buttons
-		m_noticesButton.gameObject.SetActive( true );
-		m_evaluationButton.gameObject.SetActive( true );
-		m_exitButton.gameObject.SetActive( true );
+		// the main buttons give way to the notices screen's More (the next page) and Quit, as the original's evaluation screen has "[ QUIT ]"
+		m_noticesButton.gameObject.SetActive( false );
+		m_evaluationButton.gameObject.SetActive( false );
+		m_exitButton.gameObject.SetActive( false );
 
-		// hide the notices buttons
 		m_moreButton.gameObject.SetActive( false );
 		m_previousButton.gameObject.SetActive( false );
 		m_nextButton.gameObject.SetActive( false );
-		m_quitButton.gameObject.SetActive( false );
+		m_quitButton.gameObject.SetActive( true );
 
-		// after the win the evaluation is Interstel's supplemental evaluation on the completion of the mission (STRINFO 1.2)
-		ShowWinEvaluation();
+		m_quitButton.Select();
+
+		MakeEvaluationPages();
+
+		m_evaluationPage = 0;
+
+		ShowEvaluationPage();
 	}
 
-	// shows the supplemental evaluation on the completion of the mission once the game has been won
-	void ShowWinEvaluation()
+	// the evaluation screen's pages, as the original's (OP-OV in the decompiled original): first Interstel's supplemental evaluations, each once (the towing
+	// charges, the lost terrain vehicle, and the completion of the mission after the win, STRINFO 1.2), then the evaluations of the planets recommended for
+	// colonization, every time, the last of them followed by "END OF EVALUATIONS" - or, with none filed, the scene's "You have not filed any colony world
+	// recommendations"
+	void MakeEvaluationPages()
 	{
+		m_evaluationPages.Clear();
+
 		if ( m_evaluationText == null )
 		{
 			var evaluationTransform = m_evaluationGameObject.transform.Find( "Display/Error Text Mask/Error Text" );
@@ -208,26 +221,68 @@ public class OperationsPanel : Panel
 			m_evaluationSceneText = m_evaluationText.text;
 		}
 
-		// Interstel's supplemental evaluations, oldest first, and the one on the completion of the mission after the win
 		var general = DataController.m_instance.m_playerData.m_general;
-		var evaluations = "";
 
+		// (this also moves the colony evaluations of a save file from before their list out of the supplemental ones)
+		var colonyEvaluations = general.GetColonyEvaluationList();
+
+		// the supplemental evaluations, shown now and then no more
 		if ( general.m_supplementalEvaluationList != null )
 		{
-			foreach ( var evaluation in general.m_supplementalEvaluationList )
-			{
-				evaluations += ( ( evaluations.Length > 0 ) ? "\n\n" : "" ) + evaluation;
-			}
+			m_evaluationPages.AddRange( general.m_supplementalEvaluationList );
+
+			general.m_supplementalEvaluationList.Clear();
 		}
 
-		var storyText = general.m_gameWon ? DataController.m_instance.m_gameData.FindStoryText( "MissionComplete" ) : null;
-
-		if ( storyText != null )
+		if ( general.m_gameWon && !general.m_missionCompleteShown )
 		{
-			evaluations += ( ( evaluations.Length > 0 ) ? "\n\n" : "" ) + storyText.m_text;
+			var storyText = DataController.m_instance.m_gameData.FindStoryText( "MissionComplete" );
+
+			if ( storyText != null )
+			{
+				m_evaluationPages.Add( storyText.m_text );
+			}
+
+			general.m_missionCompleteShown = true;
 		}
 
-		m_evaluationText.text = ( evaluations.Length > 0 ) ? evaluations : m_evaluationSceneText;
+		// the colony evaluations, every time
+		if ( colonyEvaluations.Count > 0 )
+		{
+			m_evaluationPages.AddRange( colonyEvaluations );
+
+			m_evaluationPages[ m_evaluationPages.Count - 1 ] += "\n\n\nEND OF EVALUATIONS";
+		}
+		else
+		{
+			m_evaluationPages.Add( m_evaluationSceneText );
+		}
+	}
+
+	// shows the current page of the evaluation screen - More is there while there is another page to see
+	void ShowEvaluationPage()
+	{
+		if ( ( m_evaluationText == null ) || ( m_evaluationPages.Count == 0 ) )
+		{
+			return;
+		}
+
+		m_evaluationPage = Mathf.Clamp( m_evaluationPage, 0, m_evaluationPages.Count - 1 );
+
+		m_evaluationText.text = m_evaluationPages[ m_evaluationPage ];
+
+		var morePages = ( m_evaluationPage < m_evaluationPages.Count - 1 );
+
+		m_moreButton.gameObject.SetActive( morePages );
+
+		if ( morePages )
+		{
+			m_moreButton.Select();
+		}
+		else
+		{
+			m_quitButton.Select();
+		}
 	}
 
 	// this is called if we clicked on the notices button
@@ -267,6 +322,18 @@ public class OperationsPanel : Panel
 	public void MoreClicked()
 	{
 		InputController.m_instance.Debounce();
+
+		// on the evaluation screen, the next evaluation (the original's "PRESS SPACEBAR FOR NEXT EVALUATION")
+		if ( m_evaluationGameObject.activeSelf )
+		{
+			m_evaluationPage++;
+
+			ShowEvaluationPage();
+
+			SoundController.m_instance.PlaySound( SoundController.Sound.Update );
+
+			return;
+		}
 
 		// show the next line of the notice
 		ShowNextLine();
