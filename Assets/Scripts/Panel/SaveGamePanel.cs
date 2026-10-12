@@ -376,8 +376,8 @@ public class SaveGamePanel : Panel
 			description += "   Missle Launcher: <color=\"blue\">" + playerData.m_playerShip.GetMissileLauncher().m_name + "</color>";
 			description += "   Laser Cannon: <color=\"blue\">" + playerData.m_playerShip.GetLaserCannon().m_name + "</color>";
 
-			// replace the description text for this save game slot
-			m_slotDescriptionText[ i ].text = description;
+			// replace the description text for this save game slot (its values in the UI kit's colours)
+			m_slotDescriptionText[ i ].text = UIKitTheme.KitColors( description );
 		}
 	}
 

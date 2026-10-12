@@ -205,6 +205,85 @@ public class UIKitTheme : ScriptableObject
 		return s_instance;
 	}
 
+	// the colour tags the game's messages are written with, and the kit's colour role each of them shows as (each keeps its meaning: green stays green)
+	static readonly (string tag, ColorRole role)[] c_messageColours =
+	{
+		( "white", ColorRole.TextPrimary ),
+		( "green", ColorRole.StatusFuel ),
+		( "#0a0", ColorRole.StatusFuel ),
+		( "#00aa00", ColorRole.StatusFuel ),
+		( "#0aa", ColorRole.TextAccent ),
+		( "cyan", ColorRole.TextAccent ),
+		( "lightblue", ColorRole.TextAccent ),
+		( "blue", ColorRole.AccentPrimary ),
+		( "red", ColorRole.TextAlert ),
+		( "yellow", ColorRole.TextWarning ),
+		( "#ffff00", ColorRole.TextWarning ),
+		( "orange", ColorRole.TextWarning ),
+		( "grey", ColorRole.TextSecondary ),
+	};
+
+	// the tags as they are written (<color=green> and <color="green">) and what they become, made the first time
+	static (string from, string to)[] s_messageColourTags;
+
+	// returns the text with the colours of its colour tags turned into the kit's (the message box shows its messages through this, so the game's code keeps its tags)
+	public static string KitColors( string text )
+	{
+		var theme = Get();
+
+		if ( string.IsNullOrEmpty( text ) || ( theme == null ) || ( text.IndexOf( "<color=", System.StringComparison.OrdinalIgnoreCase ) < 0 ) )
+		{
+			return text;
+		}
+
+		if ( s_messageColourTags == null )
+		{
+			var tags = new System.Collections.Generic.List<(string, string)>();
+
+			foreach ( var ( tag, role ) in c_messageColours )
+			{
+				var to = "<color=#" + ColorUtility.ToHtmlStringRGB( theme.GetColor( role ) ) + ">";
+
+				tags.Add( ( "<color=" + tag + ">", to ) );
+				tags.Add( ( "<color=\"" + tag + "\">", to ) );
+			}
+
+			s_messageColourTags = tags.ToArray();
+		}
+
+		foreach ( var ( from, to ) in s_messageColourTags )
+		{
+			text = ReplaceIgnoringCase( text, from, to );
+		}
+
+		return text;
+	}
+
+	// replaces every occurrence of a string, whatever its case
+	static string ReplaceIgnoringCase( string text, string from, string to )
+	{
+		var index = text.IndexOf( from, System.StringComparison.OrdinalIgnoreCase );
+
+		if ( index < 0 )
+		{
+			return text;
+		}
+
+		var result = new System.Text.StringBuilder( text.Length + 16 );
+		var start = 0;
+
+		for ( var i = 0; ( index >= 0 ) && ( i < 1000 ); i++ )
+		{
+			result.Append( text, start, index - start ).Append( to );
+			start = index + from.Length;
+			index = text.IndexOf( from, start, System.StringComparison.OrdinalIgnoreCase );
+		}
+
+		result.Append( text, start, text.Length - start );
+
+		return result.ToString();
+	}
+
 	// a colour from its 0xRRGGBB value (the kit's colours are written as in Figma, in sRGB)
 	public static Color Hex( int rgb )
 	{

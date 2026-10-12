@@ -20500,6 +20500,7 @@ GameObject:
   - component: {fileID: 604745513}
   - component: {fileID: 604745515}
   - component: {fileID: 604745514}
+  - component: {fileID: 604745516}
   m_Layer: 5
   m_Name: Map Frame
   m_TagString: Untagged
@@ -20539,7 +20540,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_Color: {r: 0.14117648, g: 0.21176471, b: 0.3529412, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -20564,6 +20565,24 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 604745512}
   m_CullTransparentMesh: 0
+--- !u!114 &604745516
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 604745512}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82d18d4a99d076e4382c83397dbac3d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIKitStyle
+  m_textStyle: 0
+  m_fontSize: 0
+  m_lineHeight: 0
+  m_sprite: 0
+  m_color: 6
+  m_alpha: 1
 --- !u!1 &609209866
 GameObject:
   m_ObjectHideFlags: 0
@@ -28564,6 +28583,7 @@ GameObject:
   - component: {fileID: 775901336}
   - component: {fileID: 775901338}
   - component: {fileID: 775901337}
+  - component: {fileID: 775901339}
   m_Layer: 5
   m_Name: Outline
   m_TagString: Untagged
@@ -28603,7 +28623,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 2100000, guid: 54eb28d6112a6da41a06fea91c4adc73, type: 2}
-  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_Color: {r: 0.019607844, g: 0.02745098, b: 0.050980393, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -28628,6 +28648,24 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 775901335}
   m_CullTransparentMesh: 0
+--- !u!114 &775901339
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 775901335}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82d18d4a99d076e4382c83397dbac3d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIKitStyle
+  m_textStyle: 0
+  m_fontSize: 0
+  m_lineHeight: 0
+  m_sprite: 0
+  m_color: 1
+  m_alpha: 1
 --- !u!1 &777692516 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 100060, guid: e26148b8b7a13b64d93bc449d062d5a3,
@@ -29809,6 +29847,7 @@ GameObject:
   - component: {fileID: 851218159}
   - component: {fileID: 851218162}
   - component: {fileID: 851218161}
+  - component: {fileID: 851218163}
   m_Layer: 5
   m_Name: Terrain Map
   m_TagString: Untagged
@@ -29878,7 +29917,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.15, g: 0.15, b: 0.15, a: 1}
+  m_Color: {r: 0.039215688, g: 0.05882353, b: 0.10980392, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -29903,6 +29942,24 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 851218157}
   m_CullTransparentMesh: 0
+--- !u!114 &851218163
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 851218157}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82d18d4a99d076e4382c83397dbac3d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIKitStyle
+  m_textStyle: 0
+  m_fontSize: 0
+  m_lineHeight: 0
+  m_sprite: 0
+  m_color: 2
+  m_alpha: 1
 --- !u!1 &852372686 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 100008, guid: 09c6ce45639a32740a6283cbc46d2a7a,
@@ -48999,6 +49056,7 @@ GameObject:
   - component: {fileID: 1185046864}
   - component: {fileID: 1185046866}
   - component: {fileID: 1185046865}
+  - component: {fileID: 1185046867}
   m_Layer: 5
   m_Name: Legend Frame
   m_TagString: Untagged
@@ -49038,7 +49096,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_Color: {r: 0.14117648, g: 0.21176471, b: 0.3529412, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -49063,6 +49121,24 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1185046863}
   m_CullTransparentMesh: 0
+--- !u!114 &1185046867
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1185046863}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82d18d4a99d076e4382c83397dbac3d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIKitStyle
+  m_textStyle: 0
+  m_fontSize: 0
+  m_lineHeight: 0
+  m_sprite: 0
+  m_color: 6
+  m_alpha: 1
 --- !u!1001 &1191358933
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -63809,6 +63885,7 @@ GameObject:
   - component: {fileID: 1487210859}
   - component: {fileID: 1487210861}
   - component: {fileID: 1487210860}
+  - component: {fileID: 1487210862}
   m_Layer: 5
   m_Name: Outline
   m_TagString: Untagged
@@ -63848,7 +63925,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 2100000, guid: 54eb28d6112a6da41a06fea91c4adc73, type: 2}
-  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_Color: {r: 0.019607844, g: 0.02745098, b: 0.050980393, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -63873,6 +63950,24 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1487210858}
   m_CullTransparentMesh: 0
+--- !u!114 &1487210862
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1487210858}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82d18d4a99d076e4382c83397dbac3d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIKitStyle
+  m_textStyle: 0
+  m_fontSize: 0
+  m_lineHeight: 0
+  m_sprite: 0
+  m_color: 1
+  m_alpha: 1
 --- !u!1 &1489698559
 GameObject:
   m_ObjectHideFlags: 0
@@ -68804,6 +68899,7 @@ GameObject:
   - component: {fileID: 1548171757}
   - component: {fileID: 1548171759}
   - component: {fileID: 1548171758}
+  - component: {fileID: 1548171760}
   m_Layer: 5
   m_Name: Up Arrow Image
   m_TagString: Untagged
@@ -68843,7 +68939,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  m_Color: {r: 0.23921569, g: 0.9019608, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -68868,6 +68964,24 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1548171756}
   m_CullTransparentMesh: 0
+--- !u!114 &1548171760
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1548171756}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82d18d4a99d076e4382c83397dbac3d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIKitStyle
+  m_textStyle: 0
+  m_fontSize: 0
+  m_lineHeight: 0
+  m_sprite: 0
+  m_color: 16
+  m_alpha: 1
 --- !u!1 &1562909884
 GameObject:
   m_ObjectHideFlags: 0
@@ -68913,6 +69027,7 @@ GameObject:
   - component: {fileID: 1570964002}
   - component: {fileID: 1570964004}
   - component: {fileID: 1570964003}
+  - component: {fileID: 1570964005}
   m_Layer: 5
   m_Name: Center
   m_TagString: Untagged
@@ -68952,7 +69067,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 2100000, guid: 18984ef32da327449803bf50d10563b0, type: 2}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.23921569, g: 0.9019608, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -68977,6 +69092,24 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1570964001}
   m_CullTransparentMesh: 0
+--- !u!114 &1570964005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1570964001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82d18d4a99d076e4382c83397dbac3d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIKitStyle
+  m_textStyle: 0
+  m_fontSize: 0
+  m_lineHeight: 0
+  m_sprite: 0
+  m_color: 16
+  m_alpha: 1
 --- !u!1 &1573453323
 GameObject:
   m_ObjectHideFlags: 0
@@ -69019,6 +69152,7 @@ GameObject:
   - component: {fileID: 1577772617}
   - component: {fileID: 1577772619}
   - component: {fileID: 1577772618}
+  - component: {fileID: 1577772620}
   m_Layer: 5
   m_Name: Center
   m_TagString: Untagged
@@ -69058,7 +69192,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 2100000, guid: 18984ef32da327449803bf50d10563b0, type: 2}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.23921569, g: 0.9019608, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -69083,6 +69217,24 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1577772616}
   m_CullTransparentMesh: 0
+--- !u!114 &1577772620
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1577772616}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82d18d4a99d076e4382c83397dbac3d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIKitStyle
+  m_textStyle: 0
+  m_fontSize: 0
+  m_lineHeight: 0
+  m_sprite: 0
+  m_color: 16
+  m_alpha: 1
 --- !u!1 &1580923892
 GameObject:
   m_ObjectHideFlags: 0
@@ -91799,6 +91951,7 @@ GameObject:
   - component: {fileID: 2013697334}
   - component: {fileID: 2013697336}
   - component: {fileID: 2013697335}
+  - component: {fileID: 2013697337}
   m_Layer: 5
   m_Name: Down Arrow Image
   m_TagString: Untagged
@@ -91838,7 +91991,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  m_Color: {r: 0.23921569, g: 0.9019608, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -91863,6 +92016,24 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2013697333}
   m_CullTransparentMesh: 0
+--- !u!114 &2013697337
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2013697333}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82d18d4a99d076e4382c83397dbac3d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIKitStyle
+  m_textStyle: 0
+  m_fontSize: 0
+  m_lineHeight: 0
+  m_sprite: 0
+  m_color: 16
+  m_alpha: 1
 --- !u!1 &2014036045
 GameObject:
   m_ObjectHideFlags: 0
