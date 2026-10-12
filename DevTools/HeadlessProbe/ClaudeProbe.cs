@@ -445,6 +445,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSystemMap();
 				break;
 
+			case "maplife":
+				yield return ScenarioMapLife();
+				break;
+
 			case "nomaps":
 				yield return ScenarioNoMaps();
 				break;
@@ -5179,6 +5183,210 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "M16 leaving the spaceflight scene leaves no planet map behind and logs no error", ( planetSizedAfterLeaving - otherPlanetSized == 0 ) && ( s_errorsLogged == 0 ) && ( leavingExceptions == 0 ), ( planetSizedAfterLeaving - otherPlanetSized ) + " planet maps left, errors " + s_errorsLogged + ", exceptions " + leavingExceptions );
 
 		Finish( "scenario=m16 visits=[" + visits + "] mostLeftOver=" + mostLeftOver + " memory=" + ( bytesAtStart >> 20 ) + "MB->" + ( bytesAtEnd >> 20 ) + "MB filesLoaded=" + mostFilesLoaded + " elevationMapOutlived=" + elevationTextureOutlivedItsSystem + " landed=" + landed + " afterLeaving=" + ( planetSizedAfterLeaving - otherPlanetSized ) + "maps/" + s_errorsLogged + "errors checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the animations of the system map
+
+	// the animations of the system map (SystemDisplay): the wake a moving ship leaves on the map and that fades once it stops, the engine
+	// glow at the back of the ship marker that pulses, the sensor ping that grows from the ship, all frozen while the game is paused and
+	// hidden in orbit (it reaches the objects through the scene, so that it also runs on the map without them)
+	IEnumerator ScenarioMapLife()
+	{
+		var controller = SpaceflightController.m_instance;
+		var playerData = DataController.m_instance.m_playerData;
+		var systemDisplay = controller.m_displayController.m_systemDisplay;
+		var root = systemDisplay.transform;
+
+		EnterStarSystem( 25 );
+
+		yield return WaitForPlanetMaps( 60.0f );
+
+		var wakeRoot = root.Find( "Wake" );
+		var engineGlowTransform = root.Find( "Engine Glow" );
+		var engineGlow = ( engineGlowTransform != null ) ? engineGlowTransform.GetComponent<UnityEngine.UI.Image>() : null;
+		var pingTransform = root.Find( "Ping" );
+		var ping = ( pingTransform != null ) ? pingTransform.GetComponent<UnityEngine.UI.Image>() : null;
+
+		// ---- 1. the ship flies east across the map (60 world units a frame, about 1.9 map units) and leaves a wake behind it
+		var start = new Vector3( -2400.0f, 0.0f, 1200.0f );
+
+		playerData.m_general.m_currentDirection = Vector3.right;
+		playerData.m_general.m_currentSpeed = playerData.m_general.m_currentMaximumSpeed;
+
+		for ( var i = 0; i < 40; i++ )
+		{
+			MoveShipTo( start + Vector3.right * 60.0f * i );
+
+			yield return null;
+		}
+
+		var shipOnMap = new Vector2( systemDisplay.m_player.transform.localPosition.x, systemDisplay.m_player.transform.localPosition.y );
+		var segments = 0;
+		var behindTheShip = 0;
+
+		if ( wakeRoot != null )
+		{
+			foreach ( var segment in wakeRoot.GetComponentsInChildren<UnityEngine.UI.Image>( true ) )
+			{
+				if ( !segment.enabled || !segment.gameObject.activeInHierarchy )
+				{
+					continue;
+				}
+
+				segments++;
+
+				// on the ship's path (the line y = the ship's), and west of the ship
+				var position = segment.rectTransform.localPosition;
+
+				if ( ( Mathf.Abs( position.y - shipOnMap.y ) < 0.5f ) && ( position.x < shipOnMap.x + 0.5f ) && ( position.x > shipOnMap.x - 30.0f ) )
+				{
+					behindTheShip++;
+				}
+			}
+		}
+
+		Check( "maplife: a moving ship leaves a wake on the map, along its path behind it", ( segments >= 5 ) && ( behindTheShip == segments ), segments + " segments, " + behindTheShip + " behind the ship" );
+
+		// ---- 2. the engine glow is at the back of the chevron (west of the ship, which heads east) and pulses
+		var glowBehind = false;
+		var lowest = 1.0f;
+		var highest = 0.0f;
+
+		if ( engineGlow != null )
+		{
+			var glowPosition = engineGlow.rectTransform.localPosition;
+
+			glowBehind = engineGlow.enabled && ( Mathf.Abs( glowPosition.x - ( shipOnMap.x - 5.0f ) ) < 0.1f ) && ( Mathf.Abs( glowPosition.y - shipOnMap.y ) < 0.1f );
+
+			for ( var i = 0; i < 40; i++ )
+			{
+				MoveShipTo( start + Vector3.right * 60.0f * 39 );
+
+				yield return null;
+
+				lowest = Mathf.Min( lowest, engineGlow.canvasRenderer.GetAlpha() );
+				highest = Mathf.Max( highest, engineGlow.canvasRenderer.GetAlpha() );
+			}
+		}
+
+		Check( "maplife: the engine glow is at the back of the ship marker and pulses", glowBehind && ( highest - lowest > 0.05f ), "behind " + glowBehind + ", alpha " + lowest.ToString( "F2" ) + " to " + highest.ToString( "F2" ) );
+
+		// ---- 3. the ship stops: the wake fades away
+		var stopTime = Time.time;
+
+		while ( Time.time - stopTime < 2.5f )
+		{
+			MoveShipTo( start + Vector3.right * 60.0f * 39 );
+
+			yield return null;
+		}
+
+		var segmentsAfterStopping = 0;
+
+		if ( wakeRoot != null )
+		{
+			foreach ( var segment in wakeRoot.GetComponentsInChildren<UnityEngine.UI.Image>( true ) )
+			{
+				if ( segment.enabled )
+				{
+					segmentsAfterStopping++;
+				}
+			}
+		}
+
+		Check( "maplife: the wake fades away once the ship has stopped", ( wakeRoot != null ) && ( segmentsAfterStopping == 0 ), segmentsAfterStopping + " segments left" );
+
+		// ---- 4. a sensor ping goes out from the ship within 4.5 s and grows
+		var pingSeen = false;
+		var pingGrew = false;
+		var pingCentred = false;
+		var lastSize = 0.0f;
+		var pingStart = Time.time;
+
+		while ( ( ping != null ) && ( Time.time - pingStart < 4.5f ) && !pingGrew )
+		{
+			yield return null;
+
+			if ( ping.enabled )
+			{
+				var size = ping.rectTransform.rect.width;
+
+				if ( !pingSeen )
+				{
+					var pingPosition = ping.rectTransform.localPosition;
+
+					pingCentred = ( Mathf.Abs( pingPosition.x - shipOnMap.x ) < 0.5f ) && ( Mathf.Abs( pingPosition.y - shipOnMap.y ) < 0.5f );
+				}
+				else if ( size > lastSize + 1.0f )
+				{
+					pingGrew = true;
+				}
+
+				pingSeen = true;
+				lastSize = size;
+			}
+		}
+
+		Check( "maplife: a sensor ping goes out from the ship and grows", pingSeen && pingGrew && pingCentred, "seen " + pingSeen + ", grew " + pingGrew + ", from the ship " + pingCentred );
+
+		// ---- 5. paused: the ping stops growing and the engine glow stops pulsing
+		var pingSizeBefore = ( ping != null ) ? ping.rectTransform.rect.width : -1.0f;
+		var glowAlphaBefore = ( engineGlow != null ) ? engineGlow.canvasRenderer.GetAlpha() : -1.0f;
+
+		controller.m_gameIsPaused = true;
+
+		yield return Frames( 20 );
+
+		var pingSizePaused = ( ping != null ) ? ping.rectTransform.rect.width : -1.0f;
+		var glowAlphaPaused = ( engineGlow != null ) ? engineGlow.canvasRenderer.GetAlpha() : -1.0f;
+
+		controller.m_gameIsPaused = false;
+
+		Check( "maplife: the animations stop while the game is paused", ( ping != null ) && ( engineGlow != null ) && ( pingSizePaused == pingSizeBefore ) && ( glowAlphaPaused == glowAlphaBefore ), "ping " + pingSizeBefore + " -> " + pingSizePaused + ", glow " + glowAlphaBefore + " -> " + glowAlphaPaused );
+
+		// ---- 6. a frame of the map takes no memory from the heap
+		var controlBytes = AllocatedByTheControl();
+		var mapBytes = Allocated( systemDisplay.Update, c_meterCalls ) / c_meterCalls;
+
+		Check( "maplife: a frame of the animated system map takes no memory", ( controlBytes >= 256 ) && ( mapBytes == 0 ), mapBytes + " bytes per frame, the control measures " + controlBytes + " bytes per call" );
+
+		// ---- 7. in orbit there is no ship marker, so none of its animations either (the location is set for a few frames only)
+		var locationBefore = playerData.m_general.m_location;
+
+		playerData.m_general.m_location = PD_General.Location.InOrbit;
+
+		yield return Frames( 3 );
+
+		var glowInOrbit = ( engineGlow != null ) && engineGlow.enabled;
+		var pingInOrbit = ( ping != null ) && ping.enabled;
+		var wakeInOrbit = 0;
+
+		if ( wakeRoot != null )
+		{
+			foreach ( var segment in wakeRoot.GetComponentsInChildren<UnityEngine.UI.Image>( true ) )
+			{
+				if ( segment.enabled )
+				{
+					wakeInOrbit++;
+				}
+			}
+		}
+
+		playerData.m_general.m_location = locationBefore;
+
+		Check( "maplife: in orbit there is no engine glow, wake or ping", ( engineGlow != null ) && ( ping != null ) && !glowInOrbit && !pingInOrbit && ( wakeInOrbit == 0 ), "glow " + glowInOrbit + ", ping " + pingInOrbit + ", wake " + wakeInOrbit );
+
+		Finish( "scenario=maplife wake=" + segments + "/" + behindTheShip + " glow=" + lowest.ToString( "F2" ) + "-" + highest.ToString( "F2" ) + " ping=" + pingSeen + "/" + pingGrew + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// puts the ship at a position of the star system, as flying there does
+	static void MoveShipTo( Vector3 coordinates )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		playerData.m_general.m_coordinates = coordinates;
+		playerData.m_general.m_lastStarSystemCoordinates = coordinates;
+		SpaceflightController.m_instance.m_playerShip.transform.position = coordinates;
 	}
 
 	// ---------------------------------------------------------------- the system map

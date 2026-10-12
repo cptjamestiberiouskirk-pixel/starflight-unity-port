@@ -5,7 +5,8 @@
 //   -executeMethod SystemMapWiring.Run
 // and removes it again. It sets up the import of the two textures, makes the four materials, and in the scene: puts the
 // star field (a RawImage) and the ecosphere band behind the map, gives each orbit a ring image in place of its ring mesh,
-// gives the star, the planets and the ship marker their materials and sprite, and points SystemDisplay at the new objects.
+// gives the star, the planets and the ship marker their materials and sprite, puts the ship's sensor ping, wake and engine
+// glow under the ship marker, and points SystemDisplay at the new objects.
 // It then deletes the assets only the old map used (the ring mesh and its materials). Running it again gives the same scene.
 
 using System;
@@ -21,6 +22,11 @@ public static class SystemMapWiring
 
 	const string c_starFieldPath = c_folder + "/System Map Star Field.png";
 	const string c_shipPath = c_folder + "/System Map Ship.png";
+	const string c_glowPath = c_folder + "/System Map Glow.png";
+	const string c_wakePath = c_folder + "/System Map Wake.png";
+
+	// how many segments the ship's wake has
+	const int c_wakeSegments = 12;
 
 	// the ship sprite is 20 x 60 map units at 4 texels per unit, with the middle of the chevron 10 units above its bottom
 	const float c_shipWidth = 20.0f;
@@ -120,7 +126,32 @@ public static class SystemMapWiring
 		ship.SetTextureSettings( settings );
 		ship.SaveAndReimport();
 
+		// the engine glow and the segments of the wake are plain sprites, tinted in the game
+		SetUpPlainSprite( c_glowPath );
+		SetUpPlainSprite( c_wakePath );
+
 		Log( "textures set up" );
+	}
+
+	// a white sprite, tinted in the game
+	static void SetUpPlainSprite( string path )
+	{
+		var importer = (TextureImporter) AssetImporter.GetAtPath( path );
+
+		if ( importer == null )
+		{
+			throw new Exception( "no texture at " + path + " (run build_system_map_art.py first)" );
+		}
+
+		importer.textureType = TextureImporterType.Sprite;
+		importer.spriteImportMode = SpriteImportMode.Single;
+		importer.sRGBTexture = true;
+		importer.alphaIsTransparency = true;
+		importer.wrapMode = TextureWrapMode.Clamp;
+		importer.filterMode = FilterMode.Bilinear;
+		importer.mipmapEnabled = true;
+		importer.textureCompression = TextureImporterCompression.Uncompressed;
+		importer.SaveAndReimport();
 	}
 
 	static Material MakeMaterial( string name, string shaderName )
@@ -261,6 +292,67 @@ public static class SystemMapWiring
 		player.rectTransform.sizeDelta = new Vector2( c_shipWidth, c_shipHeight );
 		player.rectTransform.pivot = new Vector2( 0.5f, c_shipPivotY );
 
+		// the sensor ping: a ring drawn by the orbit shader (SystemDisplay takes the trail off it)
+		var ping = FindOrMake( root, "Ping" ).GetComponent<Image>();
+
+		if ( ping == null )
+		{
+			ping = FindOrMake( root, "Ping" ).AddComponent<Image>();
+		}
+
+		ping.sprite = null;
+		ping.material = orbitMaterial;
+		ping.raycastTarget = false;
+		ping.color = Color.white;
+		Center( ping.rectTransform, 100.0f );
+
+		// the wake: segments that SystemDisplay stretches between the ship's last positions
+		var wakeRoot = FindOrMake( root, "Wake" );
+
+		Center( (RectTransform) wakeRoot.transform, 0.0f );
+
+		var wakeSprite = AssetDatabase.LoadAssetAtPath<Sprite>( c_wakePath );
+		var wake = new Image[ c_wakeSegments ];
+
+		for ( var i = 0; i < c_wakeSegments; i++ )
+		{
+			var segment = FindOrMake( wakeRoot.transform, "Segment " + ( i + 1 ) ).GetComponent<Image>();
+
+			if ( segment == null )
+			{
+				segment = FindOrMake( wakeRoot.transform, "Segment " + ( i + 1 ) ).AddComponent<Image>();
+			}
+
+			segment.sprite = wakeSprite;
+			segment.material = null;
+			segment.raycastTarget = false;
+			segment.color = Color.white;
+			Center( segment.rectTransform, 0.0f );
+			segment.rectTransform.sizeDelta = new Vector2( 4.0f, 2.4f );
+
+			wake[ i ] = segment;
+		}
+
+		// the engine glow, at the back of the chevron
+		var engineGlow = FindOrMake( root, "Engine Glow" ).GetComponent<Image>();
+
+		if ( engineGlow == null )
+		{
+			engineGlow = FindOrMake( root, "Engine Glow" ).AddComponent<Image>();
+		}
+
+		engineGlow.sprite = AssetDatabase.LoadAssetAtPath<Sprite>( c_glowPath );
+		engineGlow.material = null;
+		engineGlow.raycastTarget = false;
+		engineGlow.color = Color.white;
+		Center( engineGlow.rectTransform, 10.0f );
+
+		// drawn in this order, under the ship marker
+		ping.transform.SetAsLastSibling();
+		wakeRoot.transform.SetAsLastSibling();
+		engineGlow.transform.SetAsLastSibling();
+		player.transform.SetAsLastSibling();
+
 		// point the display at the new objects
 		var serializedDisplay = new SerializedObject( systemDisplay );
 
@@ -275,6 +367,18 @@ public static class SystemMapWiring
 
 		serializedDisplay.FindProperty( "m_ecosphere" ).objectReferenceValue = ecosphere;
 		serializedDisplay.FindProperty( "m_background" ).objectReferenceValue = background;
+		serializedDisplay.FindProperty( "m_engineGlow" ).objectReferenceValue = engineGlow;
+		serializedDisplay.FindProperty( "m_ping" ).objectReferenceValue = ping;
+
+		var wakeList = serializedDisplay.FindProperty( "m_wakeList" );
+
+		wakeList.arraySize = wake.Length;
+
+		for ( var i = 0; i < wake.Length; i++ )
+		{
+			wakeList.GetArrayElementAtIndex( i ).objectReferenceValue = wake[ i ];
+		}
+
 		serializedDisplay.ApplyModifiedPropertiesWithoutUndo();
 
 		EditorSceneManager.MarkSceneDirty( scene );
@@ -284,7 +388,7 @@ public static class SystemMapWiring
 			throw new Exception( "could not save " + c_scenePath );
 		}
 
-		Log( "scene wired: " + rings.Length + " rings, star field, ecosphere, star, " + systemDisplay.m_planetList.Length + " planets, ship marker" );
+		Log( "scene wired: " + rings.Length + " rings, star field, ecosphere, star, " + systemDisplay.m_planetList.Length + " planets, ship marker, sensor ping, " + wake.Length + " wake segments, engine glow" );
 	}
 
 	// the child of that name, or a new one on the UI layer

@@ -1,6 +1,8 @@
 # Builds the textures of the console's system map with Blender 5.2 (its Python and numpy, no scene):
 #   System Map Star Field.png  the background, a star field with a faint nebula, 1024 x 1024, tiles seamlessly
 #   System Map Ship.png        the ship marker, a chevron with a glow and a dotted heading line ahead of it
+#   System Map Glow.png        a soft round glow, white (the engine glow behind the ship marker, tinted in the game)
+#   System Map Wake.png        a soft band, white (one segment of the ship's wake, tinted and faded in the game)
 #
 #   blender --background --factory-startup --python DevTools/SystemMap/build_system_map_art.py -- <output folder>
 #
@@ -118,6 +120,26 @@ def ship_marker(units_wide=20, units_high=60, texels_per_unit=4, chevron_center=
     return rgba
 
 
+def glow(size=64):
+    # white, with a gaussian alpha that is gone before the edge
+    ys, xs = np.mgrid[0:size, 0:size].astype(np.float32)
+    r = np.sqrt((xs + 0.5 - size / 2.0) ** 2 + (ys + 0.5 - size / 2.0) ** 2) / (size / 2.0)
+    rgba = np.ones((size, size, 4), np.float32)
+    rgba[..., 3] = np.exp(-(r / 0.42) ** 2) * np.clip((1.0 - r) / 0.1, 0, 1)
+    return rgba
+
+
+def wake(length=64, width=16):
+    # white, soft across its width and even along its length (the segments are stretched between the ship's positions)
+    ys = np.mgrid[0:width, 0:length][0].astype(np.float32)
+    across = (ys + 0.5 - width / 2.0) / (width / 2.0)
+    rgba = np.ones((width, length, 4), np.float32)
+    rgba[..., 3] = np.exp(-(across / 0.45) ** 2) * np.clip((1.0 - np.abs(across)) / 0.15, 0, 1)
+    return rgba
+
+
 save_rgba(star_field(), os.path.join(OUT, "System Map Star Field.png"))
 save_rgba(ship_marker(), os.path.join(OUT, "System Map Ship.png"))
+save_rgba(glow(), os.path.join(OUT, "System Map Glow.png"))
+save_rgba(wake(), os.path.join(OUT, "System Map Wake.png"))
 print("SYSTEMMAP done")

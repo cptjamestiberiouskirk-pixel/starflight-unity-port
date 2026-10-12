@@ -1,4 +1,4 @@
-// an orbit on the system map: a thin anti-aliased ring that is brighter in a trail behind its planet
+// an orbit on the system map: a thin anti-aliased ring that is brighter in a trail behind its planet, with a gentle shimmer along the trail
 // (the image turns with its orbit and the planet is at the top of it, so the trail is fixed in the image: it runs clockwise from the top;
 // the ring is worked out in gamma space, as it looks on the screen, and drawn premultiplied in the colour space of the project)
 Shader "Custom/UI/System Map Orbit"
@@ -145,6 +145,9 @@ Shader "Custom/UI/System Map Orbit"
 					float angle = atan2( -position.x, position.y );
 					float behind = ( angle > 0.0 ) ? ( UNITY_TWO_PI - angle ) : -angle;
 					float trail = exp( -behind / max( _TrailLength, 0.001 ) );
+
+					// a gentle shimmer that runs along the trail toward its planet
+					trail *= 0.8 + 0.2 * sin( behind * 9.0 + _Time.y * 2.0 );
 
 					half4 color;
 
