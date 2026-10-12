@@ -6734,8 +6734,11 @@ public class ClaudeProbe : MonoBehaviour
 		var saveGamePanel = PanelController.m_instance.m_saveGamePanel;
 		var otherSlot = dataController.m_playerDataList[ 1 ];
 		var otherLocationBefore = otherSlot.m_general.m_location;
+		var otherStardateBefore = otherSlot.m_general.m_currentStardateYMD;
 
+		// a stardate whose day and month differ, so the order of the parts shows
 		otherSlot.m_general.m_location = PD_General.Location.Disembarked;
+		otherSlot.m_general.m_currentStardateYMD = "4620-03-15";
 
 		Call( saveGamePanel, "UpdateDescriptions" );
 
@@ -6743,6 +6746,7 @@ public class ClaudeProbe : MonoBehaviour
 		var description = descriptionTexts[ 1 ].text;
 
 		otherSlot.m_general.m_location = otherLocationBefore;
+		otherSlot.m_general.m_currentStardateYMD = otherStardateBefore;
 
 		Call( saveGamePanel, "UpdateDescriptions" );
 
@@ -6753,6 +6757,15 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "save and data: the save panel's line for a game in the terrain vehicle: " + locationLine + " (" + opened + " colour tags opened, " + closed + " closed)" );
 
 		Check( "save and data: the save panel names the location of a game in the terrain vehicle", ( opened == closed ) && locationLine.Contains( "Terrain Vehicle</color>" ), locationLine + " | opened " + opened + ", closed " + closed );
+
+		// the date line shows the stardate as the game shows it, day-month-year, not in the stored year-month-day form
+		// (the colour tag around it is the UI kit's, so any colour is accepted)
+		var dateLine = description.Split( '\n' )[ 0 ];
+		var dateShown = System.Text.RegularExpressions.Regex.IsMatch( dateLine, "^Date: <color=[^>]+>15-03-4620</color>" );
+
+		Log( "save and data: the save panel's date line for a game saved on 4620-03-15: " + dateLine );
+
+		Check( "save and data: the save panel shows the stardate day-month-year", dateShown, dateLine );
 
 		// ---- 3. the terrain vehicle of a new game
 		var fresh = new PlayerData();
