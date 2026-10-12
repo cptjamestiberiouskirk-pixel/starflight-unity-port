@@ -112,7 +112,7 @@ public class TerrainLifeforms : TerrainGridPopulator
 	}
 
 	// the height of the ground at this place, and whether it is dry ground a lifeform can walk on (planet.txt: lifeforms on the ground never move onto "liquid" or
-	// "lava") - false off the planet's maps
+	// "lava") - false off the planet's maps - over a liquid the height is that of its surface, where the terrain grid draws it
 	public bool GetGround( Vector3 worldPosition, out float height )
 	{
 		var planetGenerator = GetPlanetGenerator();
@@ -128,9 +128,17 @@ public class TerrainLifeforms : TerrainGridPopulator
 
 		var elevation = planetGenerator.GetBilinearSmoothedElevation( mapX, mapY );
 
-		height = elevation * m_elevationScale;
+		height = Mathf.Max( elevation, planetGenerator.m_waterElevation ) * m_elevationScale;
 
 		return elevation >= planetGenerator.m_waterElevation;
+	}
+
+	// the height of what is under this place, the ground or the surface of a liquid - false off the planet's maps
+	public bool GetSurface( Vector3 worldPosition, out float height )
+	{
+		GetGround( worldPosition, out height );
+
+		return GetPlanetGenerator() != null;
 	}
 
 	// the models of the body plans (Resources/Lifeforms, made with Blender by DevTools/LifeformModels), loaded once
