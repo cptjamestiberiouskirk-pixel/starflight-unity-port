@@ -849,6 +849,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioRedCylinder();
 				break;
 
+			case "pushback":
+				yield return ScenarioPushBack();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -20161,6 +20165,401 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "redcylinder: the Red Cylinder flashes on the landing map near an ancient ruin, not far from it, and only aboard", ( atTheRuin is bool ) && (bool) atTheRuin && !(bool) farAway && !(bool) withoutIt && messages.Contains( "The Red Cylinder is flashing" ), withoutIt + ", " + farAway + ", " + atTheRuin + " | " + messages );
 
 		Finish( "scenario=redcylinder placed=" + placed.Count + " worked=" + worked.Count, 0 );
+	}
+
+	// ---------------------------------------------------------------- the push-back of what the terrain vehicle touches
+
+	// what the physics steps leave in the terrain vehicle's push-back vector (TerrainVehicle.AddPushBack, called by TerrainVehicleCollider from OnCollisionStay)
+	static bool s_samplingPushBack;
+	static float s_largestPushBack;
+	static int s_stepsWithPushBack;
+	static float s_largestSpeedAfterPush;
+
+	// reads the push-back vector after every physics step, before the next Update resets it
+	IEnumerator SamplePushBack( TerrainVehicle terrainVehicle )
+	{
+		var general = DataController.m_instance.m_playerData.m_general;
+
+		while ( s_samplingPushBack )
+		{
+			yield return new WaitForFixedUpdate();
+
+			// (read by name: a fix may do without the vector)
+			var pushField = FieldOrNull( terrainVehicle, "m_pushBackVector" );
+			var push = ( pushField is Vector3 pushVector ) ? pushVector : Vector3.zero;
+
+			if ( push.magnitude > 0.0001f )
+			{
+				s_stepsWithPushBack++;
+			}
+
+			s_largestPushBack = Mathf.Max( s_largestPushBack, push.magnitude );
+			s_largestSpeedAfterPush = Mathf.Max( s_largestSpeedAfterPush, general.m_currentSpeed );
+		}
+	}
+
+	// the terrain vehicle stands still for this long, and the drawn vehicle (its transform after Update) is compared with where it is saved: [0] the largest gap
+	// between them, [1] the frames with a gap, [2] how far the saved place moved, [3] the largest move of the drawn vehicle from one frame to the next, [4] the
+	// frames, [5] how far the saved place moved in the second half, [6] the largest push-back after a physics step, [7] the physics steps with a push-back,
+	// [8] the largest speed after a physics step, [9] the farthest the drawn vehicle got from where it stood
+	IEnumerator WatchStandingVehicle( TerrainVehicle terrainVehicle, float seconds, float[] result )
+	{
+		var general = DataController.m_instance.m_playerData.m_general;
+		var start = general.m_coordinates;
+		var lastDrawn = terrainVehicle.transform.localPosition;
+		var halfway = start;
+		var time = 0.0f;
+
+		for ( var i = 0; i < result.Length; i++ )
+		{
+			result[ i ] = 0.0f;
+		}
+
+		s_largestPushBack = 0.0f;
+		s_stepsWithPushBack = 0;
+		s_largestSpeedAfterPush = 0.0f;
+		s_samplingPushBack = true;
+
+		StartCoroutine( SamplePushBack( terrainVehicle ) );
+
+		while ( time < seconds )
+		{
+			yield return null;
+
+			time += Time.deltaTime;
+
+			var drawn = terrainVehicle.transform.localPosition;
+			var saved = general.m_coordinates;
+			var gap = Vector2.Distance( new Vector2( drawn.x, drawn.z ), new Vector2( saved.x, saved.z ) );
+
+			result[ 0 ] = Mathf.Max( result[ 0 ], gap );
+			result[ 1 ] += ( gap > 0.01f ) ? 1.0f : 0.0f;
+			result[ 3 ] = Mathf.Max( result[ 3 ], Vector2.Distance( new Vector2( drawn.x, drawn.z ), new Vector2( lastDrawn.x, lastDrawn.z ) ) );
+			result[ 9 ] = Mathf.Max( result[ 9 ], Vector2.Distance( new Vector2( drawn.x, drawn.z ), new Vector2( start.x, start.z ) ) );
+			result[ 4 ] += 1.0f;
+
+			if ( ( time >= seconds * 0.5f ) && ( halfway == start ) )
+			{
+				halfway = saved;
+			}
+
+			lastDrawn = drawn;
+		}
+
+		s_samplingPushBack = false;
+
+		var end = general.m_coordinates;
+
+		result[ 2 ] = Vector2.Distance( new Vector2( start.x, start.z ), new Vector2( end.x, end.z ) );
+		result[ 5 ] = Vector2.Distance( new Vector2( halfway.x, halfway.z ), new Vector2( end.x, end.z ) );
+		result[ 6 ] = s_largestPushBack;
+		result[ 7 ] = s_stepsWithPushBack;
+		result[ 8 ] = s_largestSpeedAfterPush;
+
+		yield return new WaitForFixedUpdate();
+	}
+
+	static string DescribeStanding( float[] result )
+	{
+		return "gap between drawn and saved up to " + result[ 0 ].ToString( "F3" ) + " in " + result[ 1 ] + " of " + result[ 4 ] + " frames, saved place moved " + result[ 2 ].ToString( "F3" ) + " (" + result[ 5 ].ToString( "F3" ) + " in the second half), largest drawn move in a frame " + result[ 3 ].ToString( "F3" ) + ", push-back up to " + result[ 6 ].ToString( "F3" ) + " in " + result[ 7 ] + " physics steps, speed up to " + result[ 8 ].ToString( "F3" ) + ", drawn up to " + result[ 9 ].ToString( "F3" ) + " from where it stood";
+	}
+
+	// the terrain vehicle back where it stood, stopped, and drawn there
+	static IEnumerator StandTheVehicleAt( TerrainVehicle terrainVehicle, Vector3 coordinates )
+	{
+		var general = DataController.m_instance.m_playerData.m_general;
+
+		terrainVehicle.TurnOffEngines();
+
+		general.m_coordinates = coordinates;
+		general.m_currentSpeed = 0.0f;
+
+		yield return new WaitForFixedUpdate();
+		yield return Frames( 3 );
+
+		general.m_coordinates = coordinates;
+		general.m_currentSpeed = 0.0f;
+
+		yield return Frames( 1 );
+	}
+
+	// the distance ahead of the vehicle's middle at which a deposit's sphere stops overlapping the vehicle's capsule (Physics.ComputePenetration, no move needed)
+	static float DistanceWhereItTouches( Collider vehicleCollider, TerrainElement deposit, Vector3 from, Vector3 forward )
+	{
+		var sphere = deposit.GetComponentInChildren<SphereCollider>();
+		var offset = sphere.transform.position - deposit.transform.position;
+		var near = 0.0f;
+		var far = 40.0f;
+
+		for ( var i = 0; i < 40; i++ )
+		{
+			var middle = ( near + far ) * 0.5f;
+			var overlaps = Physics.ComputePenetration( vehicleCollider, vehicleCollider.transform.position, vehicleCollider.transform.rotation, sphere, from + forward * middle + offset, sphere.transform.rotation, out _, out _ );
+
+			if ( overlaps )
+			{
+				near = middle;
+			}
+			else
+			{
+				far = middle;
+			}
+		}
+
+		return far;
+	}
+
+	IEnumerator ScenarioPushBack()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var general = playerData.m_general;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// planet 90 of the Arth system (no life, no trees: only deposits touch the vehicle here)
+		yield return LandInTheArthSystemAt( 90, Vector3.zero, done );
+
+		if ( general.m_location != PD_General.Location.Disembarked )
+		{
+			Finish( "scenario=pushback abort: never got into the terrain vehicle (" + general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var terrainVehicle = controller.m_terrainVehicle;
+		var vehicleCollider = terrainVehicle.GetComponentInChildren<CapsuleCollider>();
+		var deposits = controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true );
+
+		if ( ( vehicleCollider == null ) || ( deposits.Length < 2 ) )
+		{
+			Finish( "scenario=pushback abort: no vehicle collider (" + ( vehicleCollider != null ) + ") or fewer than two deposits (" + deposits.Length + ")", 2 );
+			yield break;
+		}
+
+		// a game of 60 frames a second, the same in every run: the physics runs at 50 steps a second, so most frames have one and some have none
+		Time.captureDeltaTime = 1.0f / 60.0f;
+
+		var start = general.m_coordinates;
+		var forward = new Vector3( general.m_currentDirection.x, 0.0f, general.m_currentDirection.z );
+
+		forward = ( forward.sqrMagnitude < 0.0001f ) ? Vector3.forward : forward.normalized;
+
+		var right = Vector3.Cross( Vector3.up, forward );
+
+		// everything that pushes out of the way
+		var pushers = FindObjectsByType<TerrainVehicleCollider>( FindObjectsInactive.Exclude, FindObjectsSortMode.None );
+
+		foreach ( var pusher in pushers )
+		{
+			if ( Vector3.Distance( pusher.transform.position, terrainVehicle.transform.position ) < 80.0f )
+			{
+				pusher.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		// the largest deposit (Lead on planet 90), and another one
+		var largest = deposits[ 0 ];
+		var largestRadius = 0.0f;
+
+		foreach ( var deposit in deposits )
+		{
+			var sphere = deposit.GetComponentInChildren<SphereCollider>();
+
+			if ( ( sphere != null ) && ( sphere.radius * sphere.transform.lossyScale.x > largestRadius ) )
+			{
+				largest = deposit;
+				largestRadius = sphere.radius * sphere.transform.lossyScale.x;
+			}
+		}
+
+		var other = ( largest == deposits[ 0 ] ) ? deposits[ 1 ] : deposits[ 0 ];
+		var body = largest.GetComponent<Rigidbody>();
+		var largestSphere = largest.GetComponentInChildren<SphereCollider>();
+
+		Log( "pushback: vehicle at " + start.ToString( "F2" ) + " facing " + forward.ToString( "F2" ) + ", its capsule on " + vehicleCollider.name + " (radius " + vehicleCollider.radius + ", height " + vehicleCollider.height + ", contact offset " + vehicleCollider.contactOffset + ", bounds " + vehicleCollider.bounds.extents.ToString( "F2" ) + "), rigidbody on the vehicle: " + ( ( terrainVehicle.GetComponentInChildren<Rigidbody>() != null ) ? "kinematic " + terrainVehicle.GetComponentInChildren<Rigidbody>().isKinematic + " on " + terrainVehicle.GetComponentInChildren<Rigidbody>().name : "none" ) + ", " + pushers.Length + " objects push" );
+		Log( "pushback: the largest deposit is " + largest.GetElementName() + " (world radius " + largestRadius.ToString( "F2" ) + ", centre " + largestSphere.center + ", contact offset " + largestSphere.contactOffset + "), rigidbody " + ( body != null ) + ( ( body != null ) ? " kinematic " + body.isKinematic + " gravity " + body.useGravity + " constraints " + body.constraints : "" ) + "; the other is " + other.GetElementName() );
+
+		// ---- 1. the control: nothing near the vehicle
+		var nothing = new float[ 10 ];
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+		yield return WatchStandingVehicle( terrainVehicle, 3.0f, nothing );
+
+		Log( "pushback: nothing near: " + DescribeStanding( nothing ) );
+
+		// where the largest deposit stops overlapping the vehicle straight ahead
+		yield return StandTheVehicleAt( terrainVehicle, start );
+
+		var from = terrainVehicle.transform.position;
+		var edge = DistanceWhereItTouches( vehicleCollider, largest, from, forward );
+		var touchGap = ( vehicleCollider.contactOffset + largestSphere.contactOffset ) * 0.5f;
+
+		Log( "pushback: the " + largest.GetElementName() + " deposit stops overlapping the vehicle " + edge.ToString( "F3" ) + " ahead of it (the pickup reaches 10, TerrainElement.c_pickupDistance)" );
+
+		// ---- 2. the control: the deposit a unit clear of the vehicle
+		var clear = new float[ 10 ];
+
+		largest.transform.position = from + forward * ( edge + 1.0f );
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+		yield return WatchStandingVehicle( terrainVehicle, 3.0f, clear );
+
+		Log( "pushback: " + largest.GetElementName() + " a unit clear: " + DescribeStanding( clear ) );
+
+		// ---- 3. the deposit touching the vehicle, inside the contact offset but not overlapping
+		var touching = new float[ 10 ];
+
+		largest.transform.position = from + forward * ( edge + touchGap );
+
+		var depositBefore = largest.transform.position;
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+		yield return WatchStandingVehicle( terrainVehicle, 3.0f, touching );
+
+		Log( "pushback: " + largest.GetElementName() + " touching (" + touchGap.ToString( "F3" ) + " clear): " + DescribeStanding( touching ) + "; the deposit moved " + Vector3.Distance( depositBefore, largest.transform.position ).ToString( "F3" ) );
+
+		// ---- 4. the deposit a unit into the vehicle
+		var overlapping = new float[ 10 ];
+
+		largest.transform.position = from + forward * ( edge - 1.0f );
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+		yield return WatchStandingVehicle( terrainVehicle, 3.0f, overlapping );
+
+		Log( "pushback: " + largest.GetElementName() + " a unit into the vehicle: " + DescribeStanding( overlapping ) );
+
+		// ---- 5. two deposits 2 in front of the vehicle's middle, where the scenarios used to put a deposit to pick up
+		var two = new float[ 10 ];
+
+		largest.transform.position = from + forward * 2.0f;
+		other.transform.position = from + forward * 2.0f + right * 1.0f;
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+		yield return WatchStandingVehicle( terrainVehicle, 3.0f, two );
+
+		Log( "pushback: " + largest.GetElementName() + " and " + other.GetElementName() + " 2 in front: " + DescribeStanding( two ) );
+
+		// ---- 6. the same at 10 frames a second, as on a slow computer: five physics steps a frame, each adding to the push before Update uses it
+		var twoSlow = new float[ 10 ];
+
+		Time.captureDeltaTime = 0.1f;
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+		yield return WatchStandingVehicle( terrainVehicle, 3.0f, twoSlow );
+
+		Log( "pushback: " + largest.GetElementName() + " and " + other.GetElementName() + " 2 in front at 10 frames a second: " + DescribeStanding( twoSlow ) );
+
+		// ---- 7. the same with one long frame in the middle (Time.maximumDeltaTime, a third of a second by default): sixteen physics steps in one frame
+		var twoHitch = new float[ 10 ];
+
+		Time.captureDeltaTime = 1.0f / 60.0f;
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+
+		var hitchFrom = terrainVehicle.transform.localPosition;
+		var hitchStart = general.m_coordinates;
+
+		s_largestPushBack = 0.0f;
+		s_stepsWithPushBack = 0;
+		s_samplingPushBack = true;
+
+		StartCoroutine( SamplePushBack( terrainVehicle ) );
+
+		yield return Frames( 10 );
+
+		Time.captureDeltaTime = Time.maximumDeltaTime;
+
+		yield return null;
+
+		var hitchDrawn = terrainVehicle.transform.localPosition;
+		var hitchJump = Vector2.Distance( new Vector2( hitchDrawn.x, hitchDrawn.z ), new Vector2( hitchFrom.x, hitchFrom.z ) );
+		var hitchSaved = Vector2.Distance( new Vector2( general.m_coordinates.x, general.m_coordinates.z ), new Vector2( hitchStart.x, hitchStart.z ) );
+
+		Time.captureDeltaTime = 1.0f / 60.0f;
+
+		yield return Frames( 10 );
+
+		s_samplingPushBack = false;
+
+		twoHitch[ 3 ] = hitchJump;
+		twoHitch[ 2 ] = hitchSaved;
+
+		Log( "pushback: " + largest.GetElementName() + " and " + other.GetElementName() + " 2 in front, one frame of " + Time.maximumDeltaTime.ToString( "F3" ) + " s: the drawn vehicle moved " + hitchJump.ToString( "F3" ) + " in that frame from where it stood, the saved place " + hitchSaved.ToString( "F3" ) + " (largest push-back after a physics step " + s_largestPushBack.ToString( "F3" ) + ")" );
+
+		// ---- 8. driving into the Lead deposit from 12 units clear of it, at 60 frames a second: the port's vehicle stops at a deposit (keep that, or not: the owner's call)
+		other.transform.position += Vector3.right * 1000.0f;
+		largest.transform.position = from + forward * ( edge + 12.0f );
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+
+		var deepest = -100.0f;
+		var driveTime = 0.0f;
+
+		// the real Move button, and the up arrow of a keyboard held down (the stick to the north, which is where the vehicle faces)
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
+
+		yield return Frames( 30 );
+
+		HoldKeys( Key.UpArrow );
+
+		while ( driveTime < 6.0f )
+		{
+			yield return null;
+
+			driveTime += Time.deltaTime;
+
+			if ( driveTime >= 4.0f )
+			{
+				HoldKeys();
+			}
+
+			var ahead = Vector3.Dot( largest.transform.position - terrainVehicle.transform.position, forward );
+
+			deepest = Mathf.Max( deepest, edge - ahead );
+		}
+
+		HoldKeys();
+
+		terrainVehicle.TurnOffEngines();
+
+		var drivenTo = Vector2.Distance( new Vector2( general.m_coordinates.x, general.m_coordinates.z ), new Vector2( start.x, start.z ) );
+
+		var driven = new float[ 10 ];
+
+		yield return WatchStandingVehicle( terrainVehicle, 2.0f, driven );
+
+		var restAhead = Vector3.Dot( largest.transform.position - general.m_coordinates, forward );
+
+		Log( "pushback: driving 4 s into " + largest.GetElementName() + " from 12 clear: the vehicle went " + drivenTo.ToString( "F3" ) + ", at most " + deepest.ToString( "F3" ) + " into it, resting with its middle " + restAhead.ToString( "F3" ) + " ahead (it touches at " + edge.ToString( "F3" ) + "), then standing: " + DescribeStanding( driven ) );
+
+		// everything back out of the way, and the vehicle back where it stood
+		largest.transform.position += Vector3.right * 1000.0f;
+		other.transform.position += Vector3.right * 1000.0f;
+
+		yield return StandTheVehicleAt( terrainVehicle, start );
+
+		Time.captureDeltaTime = 0.0f;
+
+		Check( "pushback: nothing near, the vehicle stands still and is drawn where it is (control)", ( nothing[ 2 ] < 0.01f ) && ( nothing[ 0 ] < 0.01f ), DescribeStanding( nothing ) );
+		Check( "pushback: a deposit a unit clear does not touch the vehicle (control)", ( clear[ 2 ] < 0.01f ) && ( clear[ 0 ] < 0.01f ) && ( clear[ 7 ] == 0.0f ), DescribeStanding( clear ) );
+		Check( "pushback: a deposit that touches a standing vehicle does not move it", touching[ 2 ] < 0.01f, DescribeStanding( touching ) );
+		Check( "pushback: a deposit that touches a standing vehicle does not shake it (drawn where it is saved)", touching[ 0 ] < 0.01f, DescribeStanding( touching ) );
+		Check( "pushback: with a deposit in it, the vehicle is drawn where it is saved", overlapping[ 0 ] < 0.01f, DescribeStanding( overlapping ) );
+		Check( "pushback: with a deposit in it, the vehicle comes to rest (still in the second half)", overlapping[ 5 ] < 0.01f, DescribeStanding( overlapping ) );
+		Check( "pushback: with a deposit a unit into it, the drawn vehicle goes no farther than it takes to clear it, and a half more", overlapping[ 9 ] < 1.5f, DescribeStanding( overlapping ) );
+		// how far the vehicle has to go back to clear the Lead deposit 2 ahead of its middle, and a unit more for the Gold one beside it and the frame timing
+		var clearOfTwo = edge - 2.0f + 1.0f;
+
+		Check( "pushback: with two deposits in it, the vehicle is drawn where it is saved", two[ 0 ] < 0.01f, DescribeStanding( two ) );
+		Check( "pushback: with two deposits in it, the drawn vehicle goes no farther than it takes to clear them (" + clearOfTwo.ToString( "F2" ) + ")", two[ 9 ] < clearOfTwo, DescribeStanding( two ) );
+		Check( "pushback: at 10 frames a second, the vehicle is drawn where it is saved", twoSlow[ 0 ] < 0.01f, DescribeStanding( twoSlow ) );
+		Check( "pushback: at 10 frames a second, the drawn vehicle goes no farther than it takes to clear the deposits", twoSlow[ 9 ] < clearOfTwo, DescribeStanding( twoSlow ) );
+		Check( "pushback: a long frame does not throw the drawn vehicle farther than it takes to clear the deposits", twoHitch[ 3 ] < clearOfTwo, "moved " + twoHitch[ 3 ].ToString( "F3" ) + ", saved place " + twoHitch[ 2 ].ToString( "F3" ) );
+		Check( "pushback: driving into a deposit stops the vehicle at it (control: it does not drive through)", ( drivenTo > 5.0f ) && ( deepest < 2.0f ) && ( restAhead > 0.0f ), "went " + drivenTo.ToString( "F3" ) + ", at most " + deepest.ToString( "F3" ) + " into it, resting " + restAhead.ToString( "F3" ) + " ahead of it" );
+		Check( "pushback: after driving into a deposit, the stopped vehicle is drawn where it is saved", driven[ 0 ] < 0.01f, DescribeStanding( driven ) );
+
+		Finish( "scenario=pushback edge=" + edge.ToString( "F2" ) + " touching=" + touching[ 2 ].ToString( "F2" ) + "/" + touching[ 0 ].ToString( "F2" ) + " overlapping=" + overlapping[ 2 ].ToString( "F2" ) + "/" + overlapping[ 0 ].ToString( "F2" ) + " two=" + two[ 2 ].ToString( "F2" ) + "/" + two[ 3 ].ToString( "F2" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
