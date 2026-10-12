@@ -961,6 +961,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioShippedMoods();
 				break;
 
+			case "floaters":
+				yield return ScenarioFloaters();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -24565,6 +24569,120 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "shippedmoods: the Mysterions start friendly and their shields are lowered, as the original's Analysis", ( mysterionStance == GD_Comm.Stance.Friendly ) && mysterionAnalysis.Contains( "equivalent lowered" ), mysterionStance + ": " + mysterionAnalysis );
 
 		Finish( "scenario=shippedmoods", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 6: lifeforms that float (lf-behav.txt FLOAT)
+
+	IEnumerator ScenarioFloaters()
+	{
+		var controller = SpaceflightController.m_instance;
+		var gameData = DataController.m_instance.m_gameData;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// ---- 1. the species of every planet: floating plants drift (a movement rate), and some animals float too
+		var floatingPlants = 0;
+		var driftingPlants = 0;
+		var floatingAnimals = 0;
+		var flyingFloaters = 0;
+
+		foreach ( var planet in gameData.m_planetList )
+		{
+			foreach ( var each in GD_Species.ForPlanet( planet ) )
+			{
+				var floats = each.m_canFloat;
+
+				if ( each.m_niche == GD_Species.Niche.Producer )
+				{
+					floatingPlants += floats ? 1 : 0;
+					driftingPlants += ( floats && ( each.m_movementRate > 0 ) ) ? 1 : 0;
+				}
+				else
+				{
+					floatingAnimals += floats ? 1 : 0;
+					flyingFloaters += ( floats && each.m_canFly ) ? 1 : 0;
+				}
+			}
+		}
+
+		// ---- 2. on planet 92 of the Arth system, a floating plant 30 units from the terrain vehicle, moving: it floats up (?PRODUCER TRUE, no chance needed)
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var all = LifeformsOnTheGround();
+
+		if ( all.Count < 1 )
+		{
+			Finish( "scenario=floaters abort: no lifeform", 2 );
+			yield break;
+		}
+
+		var vehicle = controller.m_terrainVehicle.transform.position;
+		var floater = all[ 0 ].GetComponent<TerrainLifeform>();
+
+		// everything else far outside the encounter area
+		for ( var i = 1; i < all.Count; i++ )
+		{
+			all[ i ].position = vehicle + Vector3.right * 600.0f + Vector3.forward * ( i * 10.0f );
+		}
+
+		var species = MakeTestAnimal( GD_Species.Niche.Producer, 3 );
+
+		species.m_canFly = false;
+		species.m_canFloat = true;
+		species.m_movementRate = 1;
+		species.m_stunEffect = GD_Species.StunEffect.Stunned;
+
+		floater.m_species = species;
+		floater.m_hits = 100;
+		floater.m_status = TerrainLifeform.Status.Alive;
+
+		if ( !FindPlace( vehicle, 30.0f, true, out var place ) )
+		{
+			Finish( "scenario=floaters abort: no dry ground beside the vehicle", 2 );
+			yield break;
+		}
+
+		SurfaceAt( place, out var placeHeight );
+
+		floater.transform.position = new Vector3( place.x, placeHeight + floater.m_groundOffset, place.z );
+
+		SetField( floater, "m_flying", false );
+		// (on the code that has floating)
+		if ( floater.GetType().GetField( "m_floating", c_any ) != null )
+		{
+			SetField( floater, "m_floating", false );
+		}
+		SetField( floater, "m_moving", true );
+
+		Call( floater, "UpdateAirGround" );
+
+		var floating = FieldOrNull( floater, "m_floating" );
+		var isFloating = ( floating != null ) && (bool) floating;
+
+		// ---- 3. while it floats the player cannot deal with it: neither the weapons nor the cargo find it
+		var fireTarget = TVFireButton.FindNearestLifeform( 50.0f );
+		var cargoTarget = controller.m_disembarked.m_terrainGrid.m_terrainLifeforms.FindLifeformBeside( floater.transform.position );
+
+		var fireFindsFloater = fireTarget == floater;
+		var cargoFindsFloater = cargoTarget == floater;
+
+		// ---- 4. stunned, it comes down, and the weapons find it again (the control)
+		floater.m_stuns = 1;
+		floater.HitWithStunner();
+
+		var floatingAfterStun = FieldOrNull( floater, "m_floating" );
+		var downAfterStun = ( floatingAfterStun == null ) || !(bool) floatingAfterStun;
+		var fireFindsLanded = TVFireButton.FindNearestLifeform( 50.0f ) == floater;
+
+		Log( "floaters: species floating plants " + floatingPlants + " (drifting " + driftingPlants + "), floating animals " + floatingAnimals + " (flying too " + flyingFloaters + ") | test plant floating " + ( floating == null ? "missing" : floating.ToString() ) + ", fire finds it " + fireFindsFloater + ", cargo finds it " + cargoFindsFloater + " | stunned: down " + downAfterStun + ", fire finds it " + fireFindsLanded );
+
+		Check( "floaters: floating plants drift and some animals float, none of them a flyer as well", ( floatingPlants > 0 ) && ( driftingPlants == floatingPlants ) && ( floatingAnimals > 0 ) && ( flyingFloaters == 0 ), floatingPlants + " " + driftingPlants + " " + floatingAnimals + " " + flyingFloaters );
+		Check( "floaters: a floating plant that moves floats up, as the notes' FLOAT rule (?PRODUCER TRUE)", isFloating, floating == null ? "missing" : floating.ToString() );
+		Check( "floaters: the player can deal with nothing in the air, as the notes say (neither the weapons nor the cargo find a floater)", isFloating && !fireFindsFloater && !cargoFindsFloater, fireFindsFloater + " " + cargoFindsFloater );
+		Check( "floaters: a stunned floater comes down and the weapons find it again (control)", downAfterStun && fireFindsLanded, downAfterStun + " " + fireFindsLanded );
+
+		Finish( "scenario=floaters", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
