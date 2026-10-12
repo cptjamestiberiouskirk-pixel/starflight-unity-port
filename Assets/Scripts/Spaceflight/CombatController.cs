@@ -780,6 +780,9 @@ public class CombatController : MonoBehaviour
 		// get the player ship
 		var playerShip = SpaceflightController.m_instance.m_playerShip;
 
+		// the ship's materials, for its wreck (the debris model was imported with blank ones)
+		var shipMaterials = ShipWreck.GatherShipMaterials( ( playerShip.m_ship != null ) ? playerShip.m_ship.gameObject : null );
+
 		// hide the player ship model
 		if ( playerShip.m_ship != null )
 		{
@@ -792,6 +795,9 @@ public class CombatController : MonoBehaviour
 		// use the template's local scale directly - adjust in Unity Inspector if needed
 		debrisInstance.transform.localScale = m_playerDebrisTemplate.transform.localScale;
 		debrisInstance.SetActive( true );
+
+		// drawn with the ship's own materials, scorched, with embers that cool
+		ShipWreck.MakeWreck( debrisInstance, shipMaterials );
 
 		Debug.Log( $"SpawnPlayerDebris: Spawned debris at {position} with scale {debrisInstance.transform.localScale}" );
 
