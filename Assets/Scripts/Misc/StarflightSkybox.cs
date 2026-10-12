@@ -41,6 +41,9 @@ public class StarflightSkybox : MonoBehaviour
 	public string m_currentSkyboxA;
 	public string m_currentSkyboxB;
 
+	// how strong the Milky Way is under the nebula (none unless the scene sets it: the Spaceflight scene does, the Starport does not)
+	public float m_milkyWayStrength = 0.0f;
+
 	// the color to tint the skybox by
 	public Color m_colorTintA = Color.white;
 	public Color m_colorTintB = Color.white;
@@ -202,6 +205,9 @@ public class StarflightSkybox : MonoBehaviour
 		// update the material with the new color tints
 		m_material.SetColor( "SF_ColorTintA", m_colorTintA );
 		m_material.SetColor( "SF_ColorTintB", m_colorTintB );
+
+		// update the material with the strength of the Milky Way
+		m_material.SetFloat( "_MilkyWayStrength", m_milkyWayStrength );
 
 		// remember the coordinates for the next update
 		m_lastCoordinates = playerData.m_general.m_coordinates;

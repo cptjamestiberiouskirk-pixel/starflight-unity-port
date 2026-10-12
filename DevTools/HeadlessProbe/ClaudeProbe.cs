@@ -881,6 +881,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioScreenPictures();
 				break;
 
+			case "systemviewpictures":
+				yield return ScenarioSystemViewPictures();
+				break;
+
 			case "starport-screenpictures":
 				yield return ScenarioStarportScreenPictures();
 				break;
@@ -947,6 +951,10 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "shippedlines":
 				yield return ScenarioShippedLines();
+				break;
+
+			case "flyers":
+				yield return ScenarioFlyers();
 				break;
 
 			default:
@@ -17861,7 +17869,29 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "colonies: Log Planet asks whether to recommend the planet for colonization, and Yes recommends it while No does not", askedForHeaven && ( pendingCount == 3 ), askedForHeaven + ", " + pendingCount );
 		Check( "colonies: back at the Starport an optimal planet of Interstel's list earns its bonus", ledger.Contains( "Colony bonus 50000+" ) && evaluationText.Contains( "OPTIMAL PLANET" ) && evaluationText.Contains( "BONUS OF 50000" ), ledger );
 		Check( "colonies: the first unsuitable planet is a warning of 100 MU, with its reasons", ledger.Contains( "Colony fine 100-" ) && evaluationText.Contains( "FINED 100 MU'S.  THIS IS ONLY A WARNING" ) && ( reasonsA.Length > 0 ) && evaluationText.Contains( reasonsA.Split( ',' )[ 0 ].Trim() ), ledger + " | " + reasonsA );
-		Check( "colonies: a later unsuitable planet is fined heavily, 5000 MU for each reason, with no warning", ledger.Contains( "Colony fine " + ( 5000 * reasonCountB ) + "-" ) && ( change == 50000 - 100 - 5000 * reasonCountB ) && ( pendingAfter == 0 ), ledger + " | " + change + " | pending " + pendingAfter );
+		// the shipped game's fine (CAPTAIN overlay WF348 and WF292 in the decompiled original): 10,000 MU for each unsuitable planet recommended before, whatever the
+		// planet's reasons (the second planet has reasonCountB of them), and the warning with the first only
+		Check( "colonies: a later unsuitable planet is fined heavily, 10,000 MU for the one unsuitable planet before it (not by its reasons), with no warning", ledger.Contains( "Colony fine 10000-" ) && ( change == 50000 - 100 - 10000 ) && evaluationText.Contains( "FINED 10000 MU'S." ) && !evaluationText.Contains( "FINED 10000 MU'S.  THIS IS ONLY A WARNING" ) && ( pendingAfter == 0 ), ledger + " | " + change + " | reasons " + reasonCountB + " | pending " + pendingAfter );
+
+		// ---- 5. the fine goes up 10,000 MU with each unsuitable planet before, to 80,000 MU from the ninth on: evaluated straight away, with 2, 8 and 12 unsuitable
+		// planets recommended before
+		var finesByCount = "";
+
+		foreach ( var unsuitableBefore in new[] { 2, 8, 12 } )
+		{
+			playerData.m_general.m_unsuitableRecommendationCount = unsuitableBefore;
+			playerData.m_general.AddColonyRecommendation( unsuitableA );
+
+			var ledgerCount = bank.m_transactionList.Count;
+
+			playerData.EvaluateColonyRecommendations();
+
+			finesByCount += unsuitableBefore + ":" + ( ( bank.m_transactionList.Count > ledgerCount ) ? bank.m_transactionList[ bank.m_transactionList.Count - 1 ].m_amount : "none" ) + " ";
+		}
+
+		Log( "colonies: the fines after 2, 8 and 12 unsuitable planets: " + finesByCount );
+
+		Check( "colonies: the fine is 10,000 MU for each unsuitable planet before, up to 80,000 MU (20000 after 2, 80000 after 8 and after 12)", finesByCount.Trim() == "2:20000- 8:80000- 12:80000-", finesByCount.Trim() );
 
 		// ---- 4. the original's evaluation screen (OP-OV): each evaluation under its recommendation's number, date, system, orbit and the name the player gave it
 		var heavenOrbit = gameData.m_planetList[ heaven ].m_orbitPosition;
@@ -20722,8 +20752,8 @@ public class ClaudeProbe : MonoBehaviour
 		var hunterBehaviours = "";
 
 		// the prey decides only once the hunter is coming at it: every lifeform decides on the same frame, in an order Unity does not fix, and the hunter may
-		// unpair at random as it pairs; a prey that decided first saw nothing coming, wandered into the air, and a flyer is never approached again (it never
-		// lands), so about one run in ten failed
+		// unpair at random as it pairs; a prey that decided first saw nothing coming and wandered into the air, where no hunter approaches it (before flyers
+		// landed it was never approached again), so about one run in ten failed
 		SetField( prey, "m_flying", false );
 		SetField( prey, "m_moving", false );
 
@@ -21948,6 +21978,311 @@ public class ClaudeProbe : MonoBehaviour
 	}
 
 	// ---------------------------------------------------------------- phase 7: pictures of every screen, for the comparison with the original's (probe.ps1 -Graphics)
+
+	// the 3D star system view: in Arth's system (class G) and star 156 (class A, a gas giant in orbit 4) the sunlight shines from the middle of the star, in the
+	// plane of the orbits, toward the ship (so the planets in view are lit on their star's side) and has the star's colour; with -Graphics, pictures of the
+	// ship beside the sun, beside each planet and of an overview from high above the sun go into Logs/screen-pictures/system-view/ (or -probePictures); the sky
+	// has a Milky Way under the territory's nebula (and stars of several colours, #232), and the main view shows no Regen Starfield debug button (#240); every planet has
+	// the path of its orbit, and the ship's engines glow, brighter at full speed
+	IEnumerator ScenarioSystemViewPictures()
+	{
+		var controller = SpaceflightController.m_instance;
+		var gameData = DataController.m_instance.m_gameData;
+		var folder = ScreenPictureFolder( "system-view" );
+		var pictures = new List<string>();
+
+		EnsureCrew();
+
+		// no encounter begins while the pictures are taken
+		controller.m_encounterRange = 0.0f;
+
+		var ship = controller.m_playerShip.gameObject;
+
+		// the light the planets are lit by: the directional light of the star system that lights their layer (the scene's sunlight before the change), and the
+		// one the ship is lit by
+		var planetLayer = controller.m_starSystem.m_planetController[ 0 ].m_planetModel.layer;
+		var shipRenderer = ship.GetComponentInChildren<MeshRenderer>();
+		var shipLayer = ( shipRenderer != null ) ? shipRenderer.gameObject.layer : ship.layer;
+		Light sunlight = null;
+		Light shipLight = null;
+
+		foreach ( var light in controller.m_starSystem.GetComponentsInChildren<Light>( true ) )
+		{
+			if ( light.type != LightType.Directional )
+			{
+				continue;
+			}
+
+			if ( ( light.cullingMask & ( 1 << planetLayer ) ) != 0 )
+			{
+				sunlight = light;
+			}
+
+			if ( ( light.cullingMask & ( 1 << shipLayer ) ) != 0 )
+			{
+				shipLight = light;
+			}
+		}
+
+		Log( "systemviewpictures: the planets (layer " + planetLayer + ") are lit by " + ( ( sunlight != null ) ? sunlight.name : "nothing" ) + ", the ship (layer " + shipLayer + ") by " + ( ( shipLight != null ) ? shipLight.name : "nothing" ) );
+
+		var shipLitFromAbove = true;
+
+		System.Action<string> take = name =>
+		{
+			if ( folder != "" )
+			{
+				// the sky turned back to where it starts (it turns as the ship moves, and the ship is put in place at once here, which turns it a long way)
+				if ( StarflightSkybox.m_instance != null )
+				{
+					StarflightSkybox.m_instance.m_currentRotation = Quaternion.identity;
+					StarflightSkybox.m_instance.m_material.SetMatrix( "SF_ModelMatrix", Matrix4x4.identity );
+				}
+
+				RenderScreenPicture( System.IO.Path.Combine( folder, name + ".png" ) );
+				pictures.Add( name );
+			}
+		};
+
+		foreach ( var starId in new[] { gameData.m_misc.m_arthStarId, 156 } )
+		{
+			EnterStarSystem( starId );
+
+			var start = Time.realtimeSinceStartup;
+
+			while ( controller.m_starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 60.0f ) )
+			{
+				yield return null;
+			}
+
+			// the shine fades in
+			yield return new WaitForSecondsRealtime( 3.0f );
+
+			var starClass = gameData.m_starList[ starId ].m_class;
+			var prefix = "star" + starId + "_" + starClass;
+
+			// beside the sun
+			MoveShipTo( new Vector3( 0.0f, 0.0f, -250.0f ) );
+
+			yield return Frames( 10 );
+
+			take( prefix + "_sun" );
+
+			// beside each planet, south of it: the sunlight's direction is measured at each
+			var worstAngle = 0.0f;
+			var planetsSeen = 0;
+
+			foreach ( var planetController in controller.m_starSystem.m_planetController )
+			{
+				if ( ( planetController.m_planet == null ) || !planetController.gameObject.activeInHierarchy )
+				{
+					continue;
+				}
+
+				var planet = planetController.m_planet;
+				var position = planetController.transform.position;
+
+				MoveShipTo( position + new Vector3( 0.0f, 0.0f, -( planet.GetScale().y * 1.5f + 120.0f ) ) );
+
+				yield return Frames( 10 );
+
+				if ( sunlight != null )
+				{
+					// from the middle of the star (in the plane of the orbits) to the ship
+					var fromStar = ship.transform.position - controller.m_starSystem.transform.position;
+					var angle = Vector3.Angle( sunlight.transform.forward, fromStar );
+
+					worstAngle = Mathf.Max( worstAngle, angle );
+
+				}
+
+				// the ship is still lit from high above, as before (at least 15 degrees down: the scene's sunlight is aimed at the ship from 2048 above the star)
+				if ( ( shipLight == null ) || ( Vector3.Angle( shipLight.transform.forward, Vector3.down ) > 75.0f ) )
+				{
+					shipLitFromAbove = false;
+				}
+
+				planetsSeen++;
+
+				take( prefix + "_orbit" + planet.m_orbitPosition + "_" + gameData.m_surfaceList[ planet.m_surfaceId ].m_name.Replace( " ", "" ) );
+			}
+
+			var expectedColor = SystemDisplay.GetStarColor( starClass );
+			var colorMatches = ( sunlight != null ) && ( Mathf.Abs( sunlight.color.r - expectedColor.r ) < 0.01f ) && ( Mathf.Abs( sunlight.color.g - expectedColor.g ) < 0.01f ) && ( Mathf.Abs( sunlight.color.b - expectedColor.b ) < 0.01f );
+
+			Log( "systemviewpictures: star " + starId + " (" + starClass + "): " + planetsSeen + " planets, the sunlight's direction is at most " + worstAngle.ToString( "F1" ) + " degrees from the star's, its colour " + ( ( sunlight != null ) ? sunlight.color.ToString() : "none" ) + " (the star's " + expectedColor + ")" );
+
+			Check( "systemviewpictures: star " + starId + ": beside every planet the sunlight comes from the star itself, in the plane of the orbits (within 2 degrees)", ( sunlight != null ) && ( planetsSeen > 0 ) && ( worstAngle <= 2.0f ), "sunlight " + ( sunlight != null ) + ", " + planetsSeen + " planets, worst " + worstAngle.ToString( "F1" ) + " degrees" );
+
+			Check( "systemviewpictures: star " + starId + ": the sunlight has the colour of a class " + starClass + " star", colorMatches, ( ( sunlight != null ) ? sunlight.color.ToString() : "no sunlight" ) + " vs " + expectedColor );
+
+			Check( "systemviewpictures: star " + starId + ": the ship is still lit from high above, so that it can be seen from the camera (control)", shipLitFromAbove, "light " + ( ( shipLight != null ) ? shipLight.name : "none" ) );
+
+			// the path of each planet's orbit: a ring round the star at the height of the planet's middle, of the planet's distance from the star, marked
+			// with the planet's place on it (where its trail starts)
+			var pathsRight = 0;
+			var pathsSeen = 0;
+			var worstPath = "";
+
+			foreach ( var planetController in controller.m_starSystem.m_planetController )
+			{
+				if ( ( planetController.m_planet == null ) || !planetController.gameObject.activeInHierarchy )
+				{
+					continue;
+				}
+
+				pathsSeen++;
+
+				var path = planetController.transform.Find( "Orbit Path" );
+				var pathRenderer = ( path != null ) ? path.GetComponent<MeshRenderer>() : null;
+				var pathMesh = ( path != null ) ? path.GetComponent<MeshFilter>() : null;
+
+				if ( ( pathRenderer == null ) || ( pathMesh == null ) || ( pathMesh.sharedMesh == null ) || !pathRenderer.enabled )
+				{
+					worstPath = "orbit " + planetController.m_planet.m_orbitPosition + " has none";
+					continue;
+				}
+
+				var planetPosition = planetController.transform.position;
+				var radius = new Vector2( planetPosition.x, planetPosition.z ).magnitude;
+				var extent = pathMesh.sharedMesh.bounds.extents.x;
+				var centre = path.position;
+				var properties = new MaterialPropertyBlock();
+
+				pathRenderer.GetPropertyBlock( properties );
+
+				var markedAngle = properties.GetFloat( "_PlanetAngle" );
+				var planetAngle = Mathf.Repeat( Mathf.Atan2( -planetPosition.x, planetPosition.z ), Mathf.PI * 2.0f );
+				var heightRight = Mathf.Abs( centre.y - planetController.m_planetModel.transform.position.y ) < 0.5f;
+				var centreRight = new Vector2( centre.x - controller.m_starSystem.transform.position.x, centre.z - controller.m_starSystem.transform.position.z ).magnitude < 0.5f;
+				var radiusRight = Mathf.Abs( extent - radius ) < radius * 0.01f + 2.0f;
+				var angleRight = Mathf.Abs( Mathf.DeltaAngle( markedAngle * Mathf.Rad2Deg, planetAngle * Mathf.Rad2Deg ) ) < 0.5f;
+
+				if ( heightRight && centreRight && radiusRight && angleRight )
+				{
+					pathsRight++;
+				}
+				else
+				{
+					worstPath = "orbit " + planetController.m_planet.m_orbitPosition + ": height " + heightRight + ", centre " + centreRight + ", radius " + extent.ToString( "F0" ) + "/" + radius.ToString( "F0" ) + ", angle " + markedAngle.ToString( "F2" ) + "/" + planetAngle.ToString( "F2" );
+				}
+			}
+
+			Check( "systemviewpictures: star " + starId + ": every planet has the path of its orbit round the star, at its height, marked with its place", ( pathsSeen > 0 ) && ( pathsRight == pathsSeen ), pathsRight + " of " + pathsSeen + " right" + ( ( worstPath != "" ) ? ( ", " + worstPath ) : "" ) );
+
+			// high above the sun
+			MoveShipTo( Vector3.zero );
+
+			controller.m_playerCamera.SetCameraFollow( ship, Vector3.up * 9000.0f );
+
+			yield return Frames( 10 );
+
+			take( prefix + "_overview" );
+
+			controller.m_playerCamera.SetCameraFollow( ship, Vector3.up * 1024.0f );
+		}
+
+		// ---- the engines glow, faintly at rest and brighter at full speed
+		var engineGlowTransform = FindChildRecursively( ship.transform, "Engine Glow" );
+		var engineGlow = ( engineGlowTransform != null ) ? engineGlowTransform.GetComponent<MeshRenderer>() : null;
+		var glowAtRest = -1.0f;
+		var glowAtFullSpeed = -1.0f;
+
+		if ( engineGlow != null )
+		{
+			var general = DataController.m_instance.m_playerData.m_general;
+			var glowProperties = new MaterialPropertyBlock();
+
+			general.m_currentSpeed = 0.0f;
+
+			yield return Frames( 3 );
+
+			engineGlow.GetPropertyBlock( glowProperties );
+			glowAtRest = glowProperties.GetFloat( "_Strength" );
+
+			general.m_currentMaximumSpeed = Mathf.Max( general.m_currentMaximumSpeed, 1.0f );
+			general.m_currentSpeed = general.m_currentMaximumSpeed;
+
+			yield return null;
+
+			engineGlow.GetPropertyBlock( glowProperties );
+			glowAtFullSpeed = glowProperties.GetFloat( "_Strength" );
+
+			general.m_currentSpeed = 0.0f;
+		}
+
+		Check( "systemviewpictures: the ship's engines glow, and more brightly at full speed than at rest", ( engineGlow != null ) && engineGlow.enabled && ( glowAtRest > 0.0f ) && ( glowAtFullSpeed > glowAtRest * 2.0f ), ( ( engineGlow != null ) ? ( "at rest " + glowAtRest.ToString( "F2" ) + ", at full speed " + glowAtFullSpeed.ToString( "F2" ) ) : "no engine glow" ) );
+
+		// ---- the sky: a Milky Way under the territory's nebula, stars of several colours, and no debug button on the main view
+		var sky = RenderSettings.skybox;
+		var milkyWay = ( ( sky != null ) && sky.HasProperty( "_MilkyWay" ) ) ? sky.GetTexture( "_MilkyWay" ) : null;
+		var milkyWayStrength = ( ( sky != null ) && sky.HasProperty( "_MilkyWayStrength" ) ) ? sky.GetFloat( "_MilkyWayStrength" ) : 0.0f;
+
+		Check( "systemviewpictures: the sky of the star system view has a Milky Way", ( milkyWay != null ) && ( milkyWayStrength > 0.0f ), "texture " + ( ( milkyWay != null ) ? milkyWay.name : "none" ) + ", strength " + milkyWayStrength );
+
+		var fewestColours = int.MaxValue;
+		var layers = 0;
+
+		foreach ( var starfield in UnityEngine.Object.FindObjectsByType<InfiniteStarfield>( FindObjectsInactive.Include, FindObjectsSortMode.None ) )
+		{
+			foreach ( var particleSystem in starfield.GetComponentsInChildren<ParticleSystem>( true ) )
+			{
+				var particles = new ParticleSystem.Particle[ particleSystem.particleCount ];
+				var count = particleSystem.GetParticles( particles );
+				var colours = new HashSet<Color32>();
+
+				for ( var k = 0; k < count; k++ )
+				{
+					colours.Add( particles[ k ].startColor );
+				}
+
+				if ( count > 0 )
+				{
+					fewestColours = Mathf.Min( fewestColours, colours.Count );
+					layers++;
+				}
+			}
+		}
+
+		Check( "systemviewpictures: every layer of the starfield has stars of several colours, at least 4 (control: #232)", ( layers > 0 ) && ( fewestColours >= 4 ), layers + " layers, the fewest colours in a layer " + ( ( layers > 0 ) ? fewestColours.ToString() : "none" ) );
+
+		var debugButtonsShown = 0;
+
+		foreach ( var gameObject in Resources.FindObjectsOfTypeAll<GameObject>() )
+		{
+			if ( gameObject.scene.IsValid() && ( gameObject.name == "Starfield Regen Button" ) && gameObject.activeInHierarchy )
+			{
+				debugButtonsShown++;
+			}
+		}
+
+		Check( "systemviewpictures: the main view shows no Regen Starfield debug button (control: #240)", debugButtonsShown == 0, debugButtonsShown + " shown" );
+
+		if ( folder == "" )
+		{
+			Log( "systemviewpictures: no graphics device (-nographics), so no pictures; run probe.ps1 with -Graphics for them" );
+		}
+		else
+		{
+			Log( "systemviewpictures: " + pictures.Count + " pictures in " + folder + ": " + string.Join( ", ", pictures ) );
+		}
+
+		Finish( "scenario=systemviewpictures pictures=" + pictures.Count + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the first child of this name at any depth below a transform (or null)
+	static Transform FindChildRecursively( Transform parent, string name )
+	{
+		foreach ( var child in parent.GetComponentsInChildren<Transform>( true ) )
+		{
+			if ( child.name == name )
+			{
+				return child;
+			}
+		}
+
+		return null;
+	}
 
 	// renders every camera in its order of depth into one picture, as the screen shows them: the views, the console and its displays, the panels (cameras
 	// that draw into a texture of their own are left out: the screens that show those textures draw them)
@@ -23459,6 +23794,350 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "shippedlines: friendly Elowan greet with a friendly line (control)", ( elowanLine >= 71 ) && ( elowanLine <= 73 ), elowanLine.ToString() );
 
 		Finish( "scenario=shippedlines", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 6: the flyers' ground-air transitions
+
+	// the height of what is under a place on the planet, the ground or the surface of a liquid (the terrain grid draws a liquid at its level), worked out here and
+	// not by the game - true on dry ground
+	static bool SurfaceAt( Vector3 place, out float height )
+	{
+		var controller = SpaceflightController.m_instance;
+		var planetGenerator = FieldOrNull( controller.m_terrainVehicle, "m_planetGenerator" ) as PlanetGenerator;
+
+		height = 0.0f;
+
+		if ( planetGenerator == null )
+		{
+			return false;
+		}
+
+		Tools.WorldToMapCoordinates( place, out var mapX, out var mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
+
+		var elevation = planetGenerator.GetBilinearSmoothedElevation( mapX, mapY );
+
+		height = Mathf.Max( elevation, planetGenerator.m_waterElevation ) * controller.m_disembarked.m_terrainGrid.m_elevationScale;
+
+		return elevation >= planetGenerator.m_waterElevation;
+	}
+
+	// a place this far from a centre that is dry (or wet), in the first of 32 directions that has one - false if none has
+	static bool FindPlace( Vector3 centre, float distance, bool dry, out Vector3 place )
+	{
+		for ( var i = 0; i < 32; i++ )
+		{
+			var angle = i * 11.25f * Mathf.Deg2Rad;
+
+			place = centre + new Vector3( Mathf.Sin( angle ), 0.0f, Mathf.Cos( angle ) ) * distance;
+
+			if ( SurfaceAt( place, out _ ) == dry )
+			{
+				return true;
+			}
+		}
+
+		place = centre;
+
+		return false;
+	}
+
+	// whether a lifeform is in the air (false on the code before lifeforms)
+	static bool IsFlying( TerrainLifeform lifeform )
+	{
+		var value = FieldOrNull( lifeform, "m_flying" );
+
+		return ( value is bool ) && (bool) value;
+	}
+
+	// how far a lifeform's pivot is above where it stands on what is under it
+	static float HeightAboveSurface( TerrainLifeform lifeform )
+	{
+		SurfaceAt( lifeform.transform.position, out var height );
+
+		return lifeform.transform.position.y - height - lifeform.m_groundOffset;
+	}
+
+	// puts a lifeform at a place, in the air, not moving
+	static void PutInTheAir( TerrainLifeform lifeform, Vector3 place )
+	{
+		SurfaceAt( place, out var height );
+
+		lifeform.transform.position = new Vector3( place.x, height + lifeform.m_groundOffset + 8.0f, place.z );
+
+		SetField( lifeform, "m_flying", true );
+		SetField( lifeform, "m_moving", false );
+	}
+
+	// gives every crew member full vitality
+	static void HealTheCrew()
+	{
+		foreach ( var file in DataController.m_instance.m_playerData.m_personnel.m_personnelList )
+		{
+			file.m_vitality = 100.0f;
+		}
+	}
+
+	IEnumerator ScenarioFlyers()
+	{
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// planet 92 of the Arth system, landed beside its first lifeform
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var firstPlace = ( LifeformsOnTheGround().Count > 0 ) ? LifeformsOnTheGround()[ 0 ].position : Vector3.zero;
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
+
+		var all = LifeformsOnTheGround();
+
+		if ( all.Count < 2 )
+		{
+			Finish( "scenario=flyers abort: " + all.Count + " lifeforms", 2 );
+			yield break;
+		}
+
+		var vehicle = controller.m_terrainVehicle.transform.position;
+		var flyer = all[ 0 ].GetComponent<TerrainLifeform>();
+		var hunter = all[ 1 ].GetComponent<TerrainLifeform>();
+
+		// everything far outside the encounter area
+		for ( var i = 0; i < all.Count; i++ )
+		{
+			all[ i ].position = vehicle + Vector3.right * 600.0f + Vector3.forward * ( i * 10.0f );
+		}
+
+		// the flyer: a slow herbivore of middling aggression (it neither comes at the vehicle nor flees it) that the stunner stuns
+		var species = MakeTestAnimal( GD_Species.Niche.Herbivore, 4 );
+
+		species.m_movementRate = 1;
+		species.m_stunEffect = GD_Species.StunEffect.Stunned;
+
+		flyer.m_species = species;
+		flyer.m_aggression = 50;
+		flyer.m_hits = 100;
+
+		if ( !FindPlace( vehicle, 30.0f, true, out var start ) )
+		{
+			Finish( "scenario=flyers abort: no dry ground 30 units from the vehicle", 2 );
+			yield break;
+		}
+
+		// ---- 1. on the ground 30 units from the vehicle, alone in the encounter area: it wanders, takes to the air (the control), and in time lands
+		SurfaceAt( start, out var startHeight );
+
+		flyer.transform.position = new Vector3( start.x, startHeight + flyer.m_groundOffset, start.z );
+
+		SetField( flyer, "m_flying", false );
+
+		var tookOff = false;
+		var landed = false;
+		var highest = 0.0f;
+		var landedAt = 0.0f;
+		var tookOffAt = 0.0f;
+		var began = Time.realtimeSinceStartup;
+		var end = began + 20.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !landed )
+		{
+			yield return null;
+
+			var above = HeightAboveSurface( flyer );
+
+			highest = Mathf.Max( highest, above );
+
+			if ( IsFlying( flyer ) && ( above > 4.0f ) )
+			{
+				if ( !tookOff )
+				{
+					tookOffAt = Time.realtimeSinceStartup - began;
+				}
+
+				tookOff = true;
+			}
+			else if ( tookOff && !IsFlying( flyer ) && ( Mathf.Abs( above ) < 0.5f ) )
+			{
+				landed = true;
+				landedAt = Time.realtimeSinceStartup - began;
+			}
+		}
+
+		var wanderedFor = Time.realtimeSinceStartup - began;
+
+		// ---- 2. in the air above dry ground, stunned: it comes down
+		PutInTheAir( flyer, start );
+
+		flyer.m_stuns = 1;
+		flyer.HitWithStunner();
+
+		var stunnedStatus = flyer.m_status.ToString();
+		var stunnedFlying = IsFlying( flyer );
+		var stunnedAbove = HeightAboveSurface( flyer );
+
+		flyer.m_status = TerrainLifeform.Status.Alive;
+		flyer.m_stuns = species.m_stunPoints;
+
+		// ---- 3. made dangerous, in the air 8 units from the vehicle: it attacks the vehicle, and comes down to do it
+		var attackFound = FindPlace( vehicle, 8.0f, true, out var attackPlace );
+
+		flyer.m_aggression = 66;
+		flyer.m_noticedPlayer = true;
+		flyer.m_hits = 1;
+		species.m_intelligence = 1;
+
+		PutInTheAir( flyer, attackPlace );
+		SetField( flyer, "m_behaviourTimer", 0.0f );
+
+		var attackBehaviours = "";
+		var attackLanded = false;
+
+		end = Time.realtimeSinceStartup + 3.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !attackLanded )
+		{
+			HealTheCrew();
+
+			yield return null;
+
+			var behaviour = MateBehaviour( flyer );
+
+			if ( !attackBehaviours.Contains( behaviour ) )
+			{
+				attackBehaviours += behaviour + " ";
+			}
+
+			attackLanded = !IsFlying( flyer ) && ( Mathf.Abs( HeightAboveSurface( flyer ) ) < 0.5f );
+		}
+
+		// ---- 4. the same in the air 2 units from the vehicle, over the square the vehicle is on: it attacks from the air (the control)
+		var besidePlace = vehicle + ( attackPlace - vehicle ).normalized * 2.0f;
+		var besideDry = SurfaceAt( besidePlace, out _ );
+
+		PutInTheAir( flyer, besidePlace );
+		SetField( flyer, "m_behaviourTimer", 0.0f );
+
+		var besideBehaviours = "";
+		var besideStayedUp = true;
+
+		end = Time.realtimeSinceStartup + 2.0f;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			HealTheCrew();
+
+			yield return null;
+
+			var behaviour = MateBehaviour( flyer );
+
+			if ( !besideBehaviours.Contains( behaviour ) )
+			{
+				besideBehaviours += behaviour + " ";
+			}
+
+			besideStayedUp &= IsFlying( flyer ) && ( HeightAboveSurface( flyer ) > 4.0f );
+		}
+
+		HealTheCrew();
+
+		// ---- 5. the flyer of middling aggression again, in the air over dry ground, and a large carnivore on the ground 40 units from it: once the flyer lands,
+		// the hunter comes at it
+		flyer.m_aggression = 50;
+		flyer.m_noticedPlayer = false;
+		flyer.m_hits = 100;
+		species.m_intelligence = 50;
+
+		var hunterSpecies = MakeTestAnimal( GD_Species.Niche.Carnivore, 6 );
+
+		hunterSpecies.m_canFly = false;
+
+		hunter.m_species = hunterSpecies;
+		hunter.m_aggression = 50;
+		hunter.m_hits = 100;
+
+		var hunterFound = FindPlace( start, 40.0f, true, out var hunterPlace );
+
+		SurfaceAt( hunterPlace, out var hunterHeight );
+
+		hunter.transform.position = new Vector3( hunterPlace.x, hunterHeight + hunter.m_groundOffset, hunterPlace.z );
+
+		SetField( hunter, "m_flying", false );
+		SetField( hunter, "m_moving", false );
+
+		PutInTheAir( flyer, start );
+
+		var huntBehaviours = "";
+		var approachedAfterFlying = false;
+		var preyLandings = 0;
+		var preyWasFlying = true;
+
+		began = Time.realtimeSinceStartup;
+		end = began + 20.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !approachedAfterFlying )
+		{
+			yield return null;
+
+			var flying = IsFlying( flyer );
+
+			if ( preyWasFlying && !flying )
+			{
+				preyLandings++;
+			}
+
+			preyWasFlying = flying;
+
+			var behaviour = MateBehaviour( hunter );
+
+			if ( !huntBehaviours.Contains( behaviour ) )
+			{
+				huntBehaviours += behaviour + " ";
+			}
+
+			approachedAfterFlying = ( behaviour == "ApproachingMate" ) && ( ( FieldOrNull( hunter, "m_mate" ) as TerrainLifeform ) == flyer );
+		}
+
+		var huntedFor = Time.realtimeSinceStartup - began;
+
+		// ---- 6. in the air over a liquid, killed: it comes down onto the liquid's surface
+		hunter.transform.position = vehicle + Vector3.right * 600.0f;
+
+		var liquidFound = false;
+		var liquidPlace = vehicle;
+
+		for ( var distance = 20.0f; ( distance <= 600.0f ) && !liquidFound; distance += 20.0f )
+		{
+			liquidFound = FindPlace( vehicle, distance, false, out liquidPlace );
+		}
+
+		PutInTheAir( flyer, liquidPlace );
+
+		for ( var shot = 0; ( shot < 20 ) && ( flyer.m_status != TerrainLifeform.Status.Dead ); shot++ )
+		{
+			flyer.HitWithLaser();
+		}
+
+		SurfaceAt( flyer.transform.position, out var liquidHeight );
+
+		var deadStatus = flyer.m_status.ToString();
+		var deadFlying = IsFlying( flyer );
+		var deadBottom = DrawnBounds( flyer.gameObject ).min.y - liquidHeight;
+
+		Log( "flyers: wandered " + wanderedFor + " s, took off " + tookOff + " at " + tookOffAt + " s (highest " + highest + "), landed " + landed + " at " + landedAt + " s || stunned: " + stunnedStatus + ", flying " + stunnedFlying + ", " + stunnedAbove + " above || attacking 8 away (found " + attackFound + "): [" + attackBehaviours + "] landed " + attackLanded + " || 2 away (dry " + besideDry + "): [" + besideBehaviours + "] stayed up " + besideStayedUp + " || hunter (found " + hunterFound + "): [" + huntBehaviours + "] approached " + approachedAfterFlying + " after " + huntedFor + " s, prey landed " + preyLandings + " times || dead over liquid (found " + liquidFound + " at " + liquidPlace + "): " + deadStatus + ", flying " + deadFlying + ", bottom " + deadBottom + " above the surface" );
+
+		Check( "flyers: a flyer that wanders takes to the air (control)", tookOff, tookOff + ", highest " + highest );
+		Check( "flyers: a flyer in the air that wanders lands in time, on the ground", landed, landed + " after " + wanderedFor + " s" );
+		Check( "flyers: a flyer in the air that is stunned comes down to the ground", ( stunnedStatus == "Stunned" ) && !stunnedFlying && ( Mathf.Abs( stunnedAbove ) < 0.5f ), stunnedStatus + ", flying " + stunnedFlying + ", " + stunnedAbove + " above" );
+		Check( "flyers: a flyer that attacks the vehicle comes down to do it", attackFound && attackBehaviours.Contains( "AttackingPlayer" ) && attackLanded, attackFound + " | " + attackBehaviours + "| landed " + attackLanded );
+		Check( "flyers: over the square the vehicle is on it attacks from the air (control)", besideDry && besideBehaviours.Contains( "AttackingPlayer" ) && besideStayedUp, besideDry + " | " + besideBehaviours + "| stayed up " + besideStayedUp );
+		Check( "flyers: once a flyer has been in the air and lands, a hunter comes at it", hunterFound && approachedAfterFlying && ( preyLandings > 0 ), hunterFound + " | " + huntBehaviours + "| landed " + preyLandings + " times" );
+		Check( "flyers: a flyer killed over a liquid comes down onto its surface", liquidFound && ( deadStatus == "Dead" ) && !deadFlying && ( Mathf.Abs( deadBottom ) < 1.0f ), liquidFound + ", " + deadStatus + ", flying " + deadFlying + ", bottom " + deadBottom );
+
+		Finish( "scenario=flyers landed=" + landed + " attackLanded=" + attackLanded + " hunted=" + approachedAfterFlying, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

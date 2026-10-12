@@ -21,6 +21,10 @@ Shader "Starflight/Skybox"
 
 		SF_ColorTintA( "Color Tint A", Color ) = ( 1, 1, 1, 1 )
 		//SF_ColorTintB( "Color Tint B", Color ) = ( 1, 1, 1, 1 )
+
+		// the Milky Way, a faint band round the whole sky under the territory's nebula (StarflightSkybox sets its strength: none in the Starport)
+		[NoScaleOffset] _MilkyWay( "Milky Way", Cube ) = "black" {}
+		_MilkyWayStrength( "Milky Way Strength", Range( 0, 1 ) ) = 0
 	}
 
 	SubShader
@@ -46,6 +50,9 @@ Shader "Starflight/Skybox"
 		float4 SF_ColorTintA;
 		float4 SF_ColorTintB;
 
+		samplerCUBE _MilkyWay;
+		float _MilkyWayStrength;
+
 		struct vertex_data
 		{
 			float4 position: POSITION;
@@ -57,6 +64,7 @@ Shader "Starflight/Skybox"
 		{
 			float4 position: SV_POSITION;
 			float2 texcoord: TEXCOORD0;
+			float3 direction: TEXCOORD1;
 			UNITY_VERTEX_OUTPUT_STEREO
 		};
 
@@ -75,6 +83,9 @@ Shader "Starflight/Skybox"
 			o.position = mul( projectionMatrix, viewPosition );
 			o.texcoord = vd.texcoord;
 
+			// the direction of the sky at this vertex, turned with the skybox
+			o.direction = worldPosition;
+
 			return o;
 		}
 
@@ -84,6 +95,9 @@ Shader "Starflight/Skybox"
 			float3 texB = tex2D( smpB, i.texcoord ) * GammaToLinearSpace( SF_ColorTintB );
 
 			float3 tex = lerp( texA, texB, SF_BlendFactor );
+
+			// the Milky Way under the nebula
+			tex += texCUBE( _MilkyWay, normalize( i.direction ) ).rgb * _MilkyWayStrength;
 
 			return float4( tex, 1 );
 		}

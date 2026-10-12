@@ -59,6 +59,13 @@ public class TerrainLifeform : MonoBehaviour
 	const float c_speedPerMovementRate = 4.0f;
 	const float c_flyingHeight = 8.0f;
 
+	// the notes' ground-air transitions (lf-words.txt): "?WANTS-TO-FLY : Some randomly determined chance with a fairly high %", "?WANTS-TO-LAND : Some randomly
+	// determined chance with a low to moderate %" - the chances at each step of the behaviour are the port's, ruled by the owner - and "?OK-TO-LAND : Fasle if
+	// the square the alien is on is liquid, lava, or occupied by another alien or the player", the square taken as half of one around it
+	const float c_wantsToFlyChance = 0.75f;
+	const float c_wantsToLandChance = 0.2f;
+	const float c_squareTaken = 4.5f;
+
 	// "BEHAVIOR : Has 5 states - Fleeing Mate, Approaching Mate, Attacking Mate, Wandering, and Other" (lf-words.txt)
 	public enum Behaviour
 	{
@@ -107,7 +114,8 @@ public class TerrainLifeform : MonoBehaviour
 	public int m_aggression;
 	public bool m_noticedPlayer;
 
-	// what it is doing: the direction it moves in, if it is moving, and when it next decides
+	// what it is doing: the direction it moves in, if it is moving, if it is in the air (the notes' ON-GROUND the other way round: "Set to false when the alien
+	// floats or flys and is set to true again when it lands"), and when it next decides
 	Vector3 m_moveDirection;
 	bool m_moving;
 	bool m_flying;
@@ -235,6 +243,12 @@ public class TerrainLifeform : MonoBehaviour
 			m_hits = 0;
 			m_status = Status.Dead;
 
+			// a dead flyer comes down ("LAND <-- ?ALIVE FALSE ?ON-GROUND FALSE ?OK-TO-LAND TRUE", and over a liquid onto its surface, the owner's ruling)
+			if ( m_flying )
+			{
+				Land();
+			}
+
 			// a dead lifeform lies on its side on the ground, darkened
 			transform.rotation = Quaternion.Euler( 0.0f, transform.eulerAngles.y, 90.0f );
 
@@ -249,6 +263,12 @@ public class TerrainLifeform : MonoBehaviour
 		{
 			m_status = Status.Stunned;
 			m_stunRecovery = 0.0f;
+
+			// so does a stunned one ("LAND <-- ?STUNNED TRUE ?ON-GROUND FALSE ?OK-TO-LAND TRUE", the same over a liquid)
+			if ( m_flying )
+			{
+				Land();
+			}
 
 			Tint( 0.6f );
 		}
@@ -277,7 +297,11 @@ public class TerrainLifeform : MonoBehaviour
 		{
 			m_behaviourTimer = c_behaviourInterval;
 
-			Behave();
+			// the notes' loop for a lifeform in the encounter area: its behaviour, then the ground-air transitions
+			if ( Behave() )
+			{
+				UpdateAirGround();
+			}
 		}
 
 		if ( m_moving )
@@ -286,14 +310,15 @@ public class TerrainLifeform : MonoBehaviour
 		}
 	}
 
-	// one step of the notes' expert system: the reaction to the weapons, then the response to the player, then wandering
-	void Behave()
+	// one step of the notes' expert system: the reaction to the weapons, then the response to the player, then wandering - returns false outside the encounter
+	// area, where it does nothing
+	bool Behave()
 	{
 		var vehicle = SpaceflightController.m_instance.m_terrainVehicle;
 
 		if ( vehicle == null )
 		{
-			return;
+			return false;
 		}
 
 		var toVehicle = vehicle.transform.position - transform.position;
@@ -308,7 +333,7 @@ public class TerrainLifeform : MonoBehaviour
 		// outside the encounter area it does nothing
 		if ( distance > c_encounterArea )
 		{
-			return;
+			return false;
 		}
 
 		// the weapons: "REDUCE-AGGR-LEVEL <-- ?PLAYER-FIRING-LASER TRUE ?ALIEN-CLOSE-ENOUGH TRUE ?ALIEN-SMART-ENOUGH TRUE ?ULTRA-AGGR FALSE ?RANDOM-SCARED TRUE",
@@ -344,7 +369,7 @@ public class TerrainLifeform : MonoBehaviour
 
 			AttackPlayer();
 
-			return;
+			return true;
 		}
 
 		// "APPROACH-PLAYER <-- ?MOBILE TRUE ... ?NOTICE-PLAYER TRUE ?DANGEROUS TRUE ?NEXT-TO-PLAYER FALSE"
@@ -354,7 +379,7 @@ public class TerrainLifeform : MonoBehaviour
 			m_moving = true;
 			m_behaviour = Behaviour.ApproachingPlayer;
 
-			return;
+			return true;
 		}
 
 		// "FLEE-PLAYER <-- ?MOBILE TRUE ?NOTICE-PLAYER TRUE ... ?WIMPY TRUE"
@@ -364,13 +389,13 @@ public class TerrainLifeform : MonoBehaviour
 			m_moving = true;
 			m_behaviour = Behaviour.FleeingPlayer;
 
-			return;
+			return true;
 		}
 
 		// the response to another lifeform: its mate
 		if ( RespondToMate( vehicle.transform.position, mobile ) )
 		{
-			return;
+			return true;
 		}
 
 		// "WANDER <-- ?ALIVE TRUE ?STUNNED FALSE ?MOBILE TRUE": in its species' direction, with "some random variation"
@@ -380,6 +405,8 @@ public class TerrainLifeform : MonoBehaviour
 			m_moving = true;
 			m_behaviour = Behaviour.Wandering;
 		}
+
+		return true;
 	}
 
 	// true if this lifeform is in the encounter area around the terrain vehicle
@@ -576,8 +603,85 @@ public class TerrainLifeform : MonoBehaviour
 		}
 	}
 
-	// moves on: a lifeform on the ground keeps to dry ground (another direction where the way is wet), and a flyer goes over anything, taking to the air when it
-	// moves ("FLY <-- ?MOVING TRUE ?ON-GROUND TRUE ?CAN-FLY TRUE ?WANTS-TO-FLY TRUE") and landing when it stops
+	// the notes' ground-air transitions (lf-behav.txt), after each step of the behaviour: a flyer that moves takes to the air, and one in the air comes down where
+	// it may when it wanders and wants to, or when it attacks its mate or the terrain vehicle (a dead or stunned one comes down at once, see UpdateStatus)
+	void UpdateAirGround()
+	{
+		if ( !m_flying )
+		{
+			// "FLY <-- ?MOVING TRUE ?ON-GROUND TRUE ?CAN-FLY TRUE ?WANTS-TO-FLY TRUE"
+			if ( m_moving && m_species.m_canFly && ( Random.value < c_wantsToFlyChance ) )
+			{
+				m_flying = true;
+			}
+
+			return;
+		}
+
+		// "LAND <-- ?ON-GROUND FALSE ?WANDERING TRUE ?WANTS-TO-LAND TRUE ?OK-TO-LAND TRUE", "LAND <-- ?ON-GROUND FALSE ?ATTACKING TRUE ?OK-TO-LAND TRUE"
+		var attacking = ( m_behaviour == Behaviour.AttackingMate ) || ( m_behaviour == Behaviour.AttackingPlayer );
+		var wantsToLand = ( m_behaviour == Behaviour.Wandering ) && ( Random.value < c_wantsToLandChance );
+
+		if ( ( attacking || wantsToLand ) && IsOkToLand() )
+		{
+			Land();
+		}
+	}
+
+	// "?OK-TO-LAND : Fasle if the square the alien is on is liquid, lava, or occupied by another alien or the player." - another lifeform on the ground, alive or
+	// not, or the terrain vehicle
+	bool IsOkToLand()
+	{
+		if ( ( m_populator == null ) || !m_populator.GetGround( transform.position, out _ ) )
+		{
+			return false;
+		}
+
+		var vehicle = SpaceflightController.m_instance.m_terrainVehicle;
+
+		if ( ( vehicle != null ) && IsInSquareOf( vehicle.transform.position ) )
+		{
+			return false;
+		}
+
+		foreach ( var other in m_populator.m_lifeformList )
+		{
+			if ( ( other != null ) && ( other != this ) && !other.m_flying && IsInSquareOf( other.transform.position ) )
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	// true if this place is in the square this lifeform is on
+	bool IsInSquareOf( Vector3 position )
+	{
+		var delta = position - transform.position;
+
+		delta.y = 0.0f;
+
+		return delta.magnitude < c_squareTaken;
+	}
+
+	// "LAND : Sets current movment mode to ground." - it comes down where it is, onto the ground or the surface of a liquid
+	void Land()
+	{
+		m_flying = false;
+
+		if ( ( m_populator != null ) && m_populator.GetSurface( transform.position, out var height ) )
+		{
+			var position = transform.position;
+
+			position.y = height + m_groundOffset;
+
+			transform.position = position;
+		}
+	}
+
+	// moves on: a lifeform on the ground keeps to dry ground (another direction where the way is wet, "Aliens in the air do not need to make any of these
+	// checks"), and a flyer in the air goes over anything
 	void Move( float deltaTime )
 	{
 		var populator = m_populator;
@@ -589,15 +693,13 @@ public class TerrainLifeform : MonoBehaviour
 
 		var next = transform.position + m_moveDirection * m_species.m_movementRate * c_speedPerMovementRate * deltaTime;
 
-		if ( !populator.GetGround( next, out var height ) && !m_species.m_canFly )
+		if ( !populator.GetGround( next, out var height ) && !m_flying )
 		{
 			// the way is wet: turn
 			m_moveDirection = Quaternion.Euler( 0.0f, 90.0f, 0.0f ) * m_moveDirection;
 
 			return;
 		}
-
-		m_flying = m_species.m_canFly;
 
 		next.y = height + m_groundOffset + ( m_flying ? c_flyingHeight : 0.0f );
 
@@ -778,7 +880,7 @@ public class TerrainLifeform : MonoBehaviour
 		}
 	}
 
-	// puts it back on the ground after it has turned over: the bottom of what is drawn of it on the ground under it
+	// puts it back on the ground after it has turned over: the bottom of what is drawn of it on what is under it
 	void Settle()
 	{
 		if ( ( m_populator == null ) || ( m_renderers == null ) || ( m_renderers.Length == 0 ) )
@@ -786,7 +888,8 @@ public class TerrainLifeform : MonoBehaviour
 			return;
 		}
 
-		if ( !m_populator.GetGround( transform.position, out var height ) )
+		// (on the ground, or the surface of a liquid)
+		if ( !m_populator.GetSurface( transform.position, out var height ) )
 		{
 			return;
 		}

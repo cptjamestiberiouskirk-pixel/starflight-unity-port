@@ -372,7 +372,8 @@ public static class UIKitSceneTool
 		report.AppendLine( MakeTargetBracket( canvas ) );
 
 		// the stars' coordinates in hyperspace, and the frame on the viewport (the Hyperspace mockup)
-		report.AppendLine( MakeStarLabels( canvas ) );
+		report.AppendLine( MakeLabelLayer<StarLabels>( canvas, "UI Kit Star Labels", "123 · 101" ) );
+		report.AppendLine( MakeLabelLayer<PlanetLabels>( canvas, "UI Kit Planet Labels", "III · Liquid" ) );
 		report.AppendLine( MakeViewportFrame( canvas ) );
 
 		EditorSceneManager.MarkSceneDirty( canvas.gameObject.scene );
@@ -481,25 +482,25 @@ public static class UIKitSceneTool
 	const float c_frameMargin = 6.0f;
 	const float c_frameLabelSize = 14.0f;
 
-	// makes (or remakes) the stars' coordinates in hyperspace: a StarLabels that covers the viewport (masked to it, under the target bracket and the fade)
-	// and the hidden label its pool is cloned from
-	static string MakeStarLabels( Transform canvas )
+	// makes (or remakes) a layer of labels in the viewport (the stars' coordinates in hyperspace, the planets' orbits in a star system): a component that covers
+	// the viewport (masked to it, under the target bracket and the fade) and the hidden label it clones its labels from
+	static string MakeLabelLayer<T>( Transform canvas, string name, string sample ) where T : MonoBehaviour
 	{
 		var viewport = canvas.Find( c_viewport.TrimEnd( '/' ) );
 
 		if ( viewport == null )
 		{
-			return "star labels not made (no viewport at " + c_viewport + ")";
+			return name + " not made (no viewport at " + c_viewport + ")";
 		}
 
-		var old = viewport.Find( "UI Kit Star Labels" );
+		var old = viewport.Find( name );
 
 		if ( old != null )
 		{
 			Undo.DestroyObjectImmediate( old.gameObject );
 		}
 
-		var rootObject = new GameObject( "UI Kit Star Labels", typeof( RectTransform ), typeof( RectMask2D ), typeof( StarLabels ) );
+		var rootObject = new GameObject( name, typeof( RectTransform ), typeof( RectMask2D ), typeof( T ) );
 
 		Undo.RegisterCreatedObjectUndo( rootObject, "UI kit" );
 
@@ -525,7 +526,7 @@ public static class UIKitSceneTool
 		}
 
 		// the label the pool is cloned from: placed by its left edge, beside the star
-		var label = new GameObject( "Star Label", typeof( RectTransform ), typeof( CanvasRenderer ), typeof( TMPro.TextMeshProUGUI ) );
+		var label = new GameObject( "Label", typeof( RectTransform ), typeof( CanvasRenderer ), typeof( TMPro.TextMeshProUGUI ) );
 		var labelRect = (RectTransform) label.transform;
 		var labelText = label.GetComponent<TMPro.TextMeshProUGUI>();
 
@@ -537,17 +538,22 @@ public static class UIKitSceneTool
 		labelText.alignment = TMPro.TextAlignmentOptions.Left;
 		labelText.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
 		labelText.raycastTarget = false;
-		labelText.text = "123 · 101";
+		labelText.text = sample;
 
 		Style( labelText, UIText.LabelS, c_starLabelSize, UISprite.None, UIColor.TextSecondary );
 
-		var starLabels = rootObject.GetComponent<StarLabels>();
+		// the component's template (both kinds of label layer have one)
+		var layer = rootObject.GetComponent<T>();
+		var field = typeof( T ).GetField( "m_template" );
 
-		starLabels.m_template = labelText;
+		if ( field != null )
+		{
+			field.SetValue( layer, labelText );
+		}
 
-		EditorUtility.SetDirty( starLabels );
+		EditorUtility.SetDirty( layer );
 
-		return "star labels made";
+		return name + " made";
 	}
 
 	// makes (or remakes) the viewport's frame: a ViewportFrame a little inside the viewport's edges, with a corner mark (two bars) at each corner and the
