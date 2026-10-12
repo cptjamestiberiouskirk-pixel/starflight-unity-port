@@ -104,6 +104,9 @@ public class Encounter : MonoBehaviour
 		// measure the destroyed ship before it is removed, so that its debris can be given the same size
 		var shipSize = GetLongestSide( alienShipModel.transform, alienShipModel );
 
+		// and keep its materials, for its wreck (the debris models were imported with blank ones)
+		var shipMaterials = ShipWreck.GatherShipMaterials( alienShipModel );
+
 		// clear any existing children (the destroyed ship model)
 		Tools.DestroyChildrenOf( alienShipModel );
 
@@ -144,6 +147,9 @@ public class Encounter : MonoBehaviour
 		}
 
 		debrisInstance.SetActive( true );
+
+		// drawn with the ship's own materials, scorched, with embers that cool
+		ShipWreck.MakeWreck( debrisInstance, shipMaterials );
 		
 		Debug.Log( $"SpawnDebrisForShip: Spawned debris for vesselId {vesselId} at {position} with scale {debrisInstance.transform.localScale}" );
 

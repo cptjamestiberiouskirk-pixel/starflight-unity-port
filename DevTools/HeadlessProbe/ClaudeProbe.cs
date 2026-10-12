@@ -521,6 +521,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioTransporterPictures();
 				break;
 
+			case "debrispictures":
+				yield return ScenarioDebrisPictures();
+				break;
+
 			case "perframe":
 				yield return ScenarioPerFrame();
 				break;
@@ -9027,6 +9031,223 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "transporterpictures: " + pictures + " pictures" + ( hasGraphics ? " in " + folder : " (no graphics device; run probe.ps1 with -Graphics for them)" ) );
 
 		Finish( "scenario=transporterpictures parts=" + parts + " drawnWrong=" + drawnWrong.Count + " objectQueue=" + objectQueue + " gone=" + ( pickedUp == null ) + " errors=" + errorsDuring + " pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: debris pictures (what the wreck of an alien ship and of the player ship are drawn with, and pictures of them with -Graphics)
+
+	// what the renderers under an object are drawn with: name, shader, texture, colour
+	static string DescribeRenderers( GameObject root )
+	{
+		var parts = new List<string>();
+
+		if ( root == null )
+		{
+			return "nothing";
+		}
+
+		foreach ( var renderer in root.GetComponentsInChildren<Renderer>( true ) )
+		{
+			var material = renderer.sharedMaterial;
+
+			parts.Add( renderer.name + ( renderer.enabled && renderer.gameObject.activeInHierarchy ? "" : " (off)" ) + ": " + ( ( material == null ) ? "no material" : material.shader.name + ( ( material.mainTexture != null ) ? " textured " + material.mainTexture.name : " untextured" ) + ( material.HasProperty( "_Color" ) ? " colour " + material.color.ToString( "F2" ) : "" ) + ( material.HasProperty( "_EmissionColor" ) ? " emission " + material.GetColor( "_EmissionColor" ).ToString( "F2" ) : "" ) ) + " bounds " + renderer.bounds.size.ToString( "F1" ) );
+		}
+
+		return parts.Count + " renderers: " + string.Join( "; ", parts );
+	}
+
+	// render a picture of a point from a camera of its own, at the game camera's angle and the given distance (the whole frame)
+	static void RenderFromAbove( Vector3 target, float distance, string path )
+	{
+		var main = Camera.main;
+		var cameraObject = new GameObject( "Probe Camera" );
+		var camera = cameraObject.AddComponent<Camera>();
+
+		camera.CopyFrom( main );
+		camera.rect = new Rect( 0.0f, 0.0f, 1.0f, 1.0f );
+		camera.enabled = false;
+		camera.transform.rotation = main.transform.rotation;
+		camera.transform.position = target - main.transform.forward * distance;
+
+		RenderCameraPicture( camera, path );
+
+		UnityEngine.Object.Destroy( cameraObject );
+	}
+
+	// the renderers of a wreck that are still drawn with the blank white material the debris models were imported with
+	static List<string> BlankRenderers( GameObject root )
+	{
+		var blank = new List<string>();
+
+		if ( root == null )
+		{
+			return blank;
+		}
+
+		foreach ( var renderer in root.GetComponentsInChildren<Renderer>( true ) )
+		{
+			foreach ( var material in renderer.sharedMaterials )
+			{
+				if ( ( material == null ) || ( ( material.shader.name == "Standard" ) && ( material.mainTexture == null ) ) )
+				{
+					blank.Add( renderer.name );
+					break;
+				}
+			}
+		}
+
+		return blank;
+	}
+
+	IEnumerator ScenarioDebrisPictures()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var combat = CombatController.m_instance;
+		var controller = SpaceflightController.m_instance;
+		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+
+		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "debris-pictures" ) );
+		var camera = Camera.main;
+
+		if ( hasGraphics )
+		{
+			System.IO.Directory.CreateDirectory( folder );
+		}
+
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// ---- 1. an alien ship destroyed in an encounter: its wreck takes its place
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		// spemin scouts
+		ForceVessel( speminId, 2 );
+
+		EnterEncounter( speminId );
+
+		yield return Frames( 10 );
+
+		var target = FirstLivingAlien();
+
+		if ( target < 0 )
+		{
+			Finish( "scenario=debrispictures abort: no alien ship in the encounter", 2 );
+			yield break;
+		}
+
+		var alienShips = controller.m_encounter.m_pdEncounter.GetAlienShipList();
+		var targetShip = alienShips[ target ];
+
+		// every other alien ship far away, the target still in front of the player ship (up the screen)
+		var screenUp = camera.transform.up;
+		var upTheScreen = new Vector3( screenUp.x, 0.0f, screenUp.z ).normalized;
+		var wreckPosition = playerData.m_general.m_coordinates + upTheScreen * 70.0f;
+
+		for ( var i = 0; i < 30; i++ )
+		{
+			foreach ( var alienShip in alienShips )
+			{
+				if ( alienShip.m_addedToEncounter && !alienShip.m_isDead )
+				{
+					alienShip.m_coordinates = ( alienShip == targetShip ) ? wreckPosition : playerData.m_general.m_coordinates + Vector3.right * 3000.0f;
+					alienShip.m_targetCoordinates = alienShip.m_coordinates;
+				}
+			}
+
+			yield return null;
+		}
+
+		var shipModel = Call( controller.m_encounter, "GetAlienShipModel", target ) as GameObject;
+
+		Log( "debrispictures: the spemin scout before: " + DescribeRenderers( shipModel ) );
+
+		if ( hasGraphics )
+		{
+			RenderFromAbove( wreckPosition, 260.0f, System.IO.Path.Combine( folder, "alien_ship.png" ) );
+		}
+
+		// destroyed the way the player's weapons destroy it
+		var errorsBefore = s_errorCount;
+
+		Call( combat, "ApplyDamageToAlien", target, 100000 );
+
+		// the explosion is over after 2.2 s
+		yield return new WaitForSecondsRealtime( 2.6f );
+
+		var wreck = Call( controller.m_encounter, "GetAlienShipModel", target ) as GameObject;
+		var alienBlank = BlankRenderers( wreck );
+
+		Log( "debrispictures: the spemin scout's wreck: " + DescribeRenderers( wreck ) );
+
+		if ( hasGraphics )
+		{
+			RenderFromAbove( wreckPosition, 260.0f, System.IO.Path.Combine( folder, "alien_wreck_hot.png" ) );
+		}
+
+		yield return new WaitForSecondsRealtime( 4.5f );
+
+		if ( hasGraphics )
+		{
+			RenderFromAbove( wreckPosition, 260.0f, System.IO.Path.Combine( folder, "alien_wreck_cold.png" ) );
+		}
+
+		Check( "debrispictures: an alien ship's wreck is drawn with the ship's own materials, not blank white ones", ( wreck != null ) && ( alienBlank.Count == 0 ), ( wreck == null ) ? "no wreck" : ( alienBlank.Count == 0 ) ? "all its renderers" : alienBlank.Count + " blank: " + string.Join( ", ", alienBlank ) );
+
+		// ---- 2. the player ship destroyed in hyperspace, the way F10 does it: its wreck is left where it was
+		LeaveEncounter();
+
+		yield return Frames( 5 );
+
+		controller.m_encounterRange = 0.0f;
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 4.0f, 0.0f, 4.0f ) );
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 30 );
+
+		var shipPosition = playerData.m_general.m_coordinates;
+
+		if ( hasGraphics )
+		{
+			RenderFromAbove( shipPosition, 220.0f, System.IO.Path.Combine( folder, "player_ship.png" ) );
+		}
+
+		playerData.m_playerShip.m_shieldPoints = 0;
+		playerData.m_playerShip.m_armorPoints = 0;
+		combat.ApplyDamageToPlayer( 1, Vector3.forward );
+
+		yield return new WaitForSecondsRealtime( 2.6f );
+
+		GameObject playerWreck = null;
+
+		foreach ( var tumble in UnityEngine.Object.FindObjectsByType<DebrisTumble>( FindObjectsSortMode.None ) )
+		{
+			if ( ( tumble.transform.parent == null ) && ( Vector3.Distance( tumble.transform.position, playerData.m_general.m_coordinates ) < 200.0f ) )
+			{
+				playerWreck = tumble.gameObject;
+			}
+		}
+
+		var playerBlank = BlankRenderers( playerWreck );
+
+		Log( "debrispictures: the player ship's wreck: " + DescribeRenderers( playerWreck ) + ( ( playerWreck != null ) ? " at scale " + playerWreck.transform.localScale.ToString( "F3" ) : "" ) );
+
+		if ( hasGraphics )
+		{
+			RenderFromAbove( shipPosition, 220.0f, System.IO.Path.Combine( folder, "player_wreck_hot.png" ) );
+			RenderCameraPicture( camera, System.IO.Path.Combine( folder, "player_wreck_game_view.png" ) );
+		}
+
+		yield return new WaitForSecondsRealtime( 4.5f );
+
+		if ( hasGraphics )
+		{
+			RenderFromAbove( shipPosition, 220.0f, System.IO.Path.Combine( folder, "player_wreck_cold.png" ) );
+		}
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "debrispictures: the player ship's wreck is drawn with the ship's own materials, not blank white ones", ( playerWreck != null ) && ( playerBlank.Count == 0 ), ( playerWreck == null ) ? "no wreck" : ( playerBlank.Count == 0 ) ? "all its renderers" : playerBlank.Count + " blank: " + string.Join( ", ", playerBlank ) );
+		Check( "debrispictures: no error is logged while the wrecks are made and cool", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=debrispictures alienBlank=" + alienBlank.Count + " playerBlank=" + playerBlank.Count + " errors=" + errorsDuring + " pictures=" + ( hasGraphics ? 7 : 0 ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- Low: what the displays cost every frame (the status display, the terrain vehicle display)
