@@ -10644,6 +10644,11 @@ public class ClaudeProbe : MonoBehaviour
 			yield break;
 		}
 
+		// (no weather: a storm hides the bearing behind LOST!, and then the display does not change when the vehicle is moved - seen in a full run)
+		PlanetWeather.End();
+
+		yield return Frames( 5 );
+
 		var vehicleDisplay = controller.m_displayController.m_terrainVehicleDisplay;
 
 		var vehicleText = vehicleDisplay.m_statusValues.text;
