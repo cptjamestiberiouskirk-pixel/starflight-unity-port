@@ -25,6 +25,7 @@ The display is 512 x 512 map units (1 unit is 1 pixel at 1920 x 1080).
 | `SystemMapWiring.cs`, `wire.ps1` | The Unity side, run headless: the import of the two textures, the four materials, and the map's objects in `Spaceflight.unity` |
 | `previews/system-map.png` | The map in the game before and after, rendered by the engine: Arth's system (class G) old and new, then star 156 (class A) old and new |
 | `previews/sun.png` | The sun of the star system view before and after, rendered by the engine, in the same order |
+| `previews/system-map-animations.mp4`, `.png` | Four seconds of the map in the engine, 20 frames a second, as the ship flies round Arth's sun (the first ping goes out where the ship came in), and four frames of it |
 
 ## Building
 
