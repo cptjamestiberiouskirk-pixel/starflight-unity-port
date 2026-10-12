@@ -109,7 +109,7 @@ public class ScanButton : ShipButton
 							mineralDeposits[ elementName ] = 1;
 
 						// add floating label to this element
-						ShowLabelOnObject( child.gameObject, elementName, Color.green );
+						ShowLabelOnObject( child.gameObject, elementName, LabelColour( UIKitTheme.ColorRole.StatusFuel, Color.green ) );
 					}
 				}
 			}
@@ -127,7 +127,7 @@ public class ScanButton : ShipButton
 					rockCount++;
 
 					// add floating label to this rock
-					ShowLabelOnObject( child.gameObject, "Rock", Color.gray );
+					ShowLabelOnObject( child.gameObject, "Rock", LabelColour( UIKitTheme.ColorRole.TextSecondary, Color.gray ) );
 				}
 			}
 		}
@@ -144,7 +144,7 @@ public class ScanButton : ShipButton
 					vegetationCount++;
 
 					// add floating label to this vegetation
-					ShowLabelOnObject( child.gameObject, "Vegetation", new Color( 0.4f, 0.7f, 0.4f ) );
+					ShowLabelOnObject( child.gameObject, "Vegetation", LabelColour( UIKitTheme.ColorRole.StatusFuel, new Color( 0.4f, 0.7f, 0.4f ) ) );
 				}
 			}
 		}
@@ -161,7 +161,7 @@ public class ScanButton : ShipButton
 				{
 					droppedCount++;
 
-					ShowLabelOnObject( child.gameObject, "Dropped cargo", Color.yellow );
+					ShowLabelOnObject( child.gameObject, "Dropped cargo", LabelColour( UIKitTheme.ColorRole.TextWarning, Color.yellow ) );
 
 					continue;
 				}
@@ -207,7 +207,7 @@ public class ScanButton : ShipButton
 					}
 
 					// add floating label to this ruin
-					ShowLabelOnObject( child.gameObject, label, Color.white );
+					ShowLabelOnObject( child.gameObject, label, LabelColour( UIKitTheme.ColorRole.TextPrimary, Color.white ) );
 				}
 			}
 		}
@@ -231,7 +231,7 @@ public class ScanButton : ShipButton
 
 				lifeformCount++;
 
-				ShowLabelOnObject( child.gameObject, "Lifeform", Color.magenta );
+				ShowLabelOnObject( child.gameObject, "Lifeform", LabelColour( UIKitTheme.ColorRole.TextAlert, Color.magenta ) );
 
 				if ( distance < nearestDistance )
 				{
@@ -295,6 +295,15 @@ public class ScanButton : ShipButton
 		}
 
 		return report.TrimEnd( '\n' );
+	}
+
+	// the colour of a label: the UI kit's colour role (the elements and vegetation in its green, rocks in its secondary text colour, dropped cargo in its amber,
+	// ruins and artifacts in its primary text colour, lifeforms in its alert colour), or the original colour without the theme
+	static Color LabelColour( UIKitTheme.ColorRole role, Color original )
+	{
+		var theme = UIKitTheme.Get();
+
+		return ( theme != null ) ? theme.GetColor( role ) : original;
 	}
 
 	// show a floating label on an object
