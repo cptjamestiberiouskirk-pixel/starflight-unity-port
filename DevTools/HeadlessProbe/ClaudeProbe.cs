@@ -541,6 +541,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarfieldPictures();
 				break;
 
+			case "skyboxpictures":
+				yield return ScenarioSkyboxPictures();
+				break;
+
 			case "perframe":
 				yield return ScenarioPerFrame();
 				break;
@@ -10532,6 +10536,157 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=starfieldpictures stars=" + starCount + " flatLayers=" + flatLayers.Count + " glint=" + ( glintShare * 100.0f ).ToString( "F1" ) + "% twinkleStreams=" + twinkleStreams + "/" + particleSystems.Length + " twinkled=" + twinkled + "/" + starPixels + " errors=" + errorsDuring + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
+	// ---------------------------------------------------------------- Low: skybox pictures (the skybox's rotation stays a rotation, and the sky of each territory is not black, with -Graphics)
+
+	// render the skybox alone (a camera of its own that clears with it and draws no objects), looking in a direction, and return how bright the picture is on average (0 to 255, the brightest channel of each pixel)
+	static float RenderSkyboxOnly( Vector3 direction, string path )
+	{
+		var main = Camera.main;
+		var cameraObject = new GameObject( "Probe Skybox Camera" );
+		var camera = cameraObject.AddComponent<Camera>();
+
+		camera.CopyFrom( main );
+		camera.rect = new Rect( 0.0f, 0.0f, 1.0f, 1.0f );
+		camera.enabled = false;
+		camera.clearFlags = CameraClearFlags.Skybox;
+		camera.cullingMask = 0;
+		camera.fieldOfView = 90.0f;
+		camera.transform.position = main.transform.position;
+		camera.transform.rotation = Quaternion.LookRotation( direction, ( Mathf.Abs( direction.y ) > 0.99f ) ? Vector3.forward : Vector3.up );
+
+		var renderTexture = new RenderTexture( 1920, 1080, 24, RenderTextureFormat.ARGB32 );
+		var picture = new Texture2D( 1920, 1080, TextureFormat.RGB24, false );
+
+		camera.targetTexture = renderTexture;
+		camera.Render();
+		camera.targetTexture = null;
+
+		var active = RenderTexture.active;
+
+		RenderTexture.active = renderTexture;
+		picture.ReadPixels( new Rect( 0, 0, 1920, 1080 ), 0, 0 );
+		picture.Apply();
+		RenderTexture.active = active;
+
+		System.IO.File.WriteAllBytes( path, picture.EncodeToPNG() );
+
+		var pixels = picture.GetPixels32();
+		var sum = 0.0;
+		var count = 0;
+
+		for ( var i = 0; i < pixels.Length; i += 7 )
+		{
+			sum += Mathf.Max( pixels[ i ].r, Mathf.Max( pixels[ i ].g, pixels[ i ].b ) );
+			count++;
+		}
+
+		UnityEngine.Object.Destroy( picture );
+		renderTexture.Release();
+		UnityEngine.Object.Destroy( renderTexture );
+		UnityEngine.Object.Destroy( cameraObject );
+
+		return ( count > 0 ) ? (float) ( sum / count ) : 0.0f;
+	}
+
+	// whether a quaternion is a rotation: finite, and of unit length
+	static bool IsRotation( Quaternion rotation )
+	{
+		if ( !float.IsFinite( rotation.x ) || !float.IsFinite( rotation.y ) || !float.IsFinite( rotation.z ) || !float.IsFinite( rotation.w ) )
+		{
+			return false;
+		}
+
+		var length = Mathf.Sqrt( rotation.x * rotation.x + rotation.y * rotation.y + rotation.z * rotation.z + rotation.w * rotation.w );
+
+		return Mathf.Abs( length - 1.0f ) < 0.001f;
+	}
+
+	IEnumerator ScenarioSkyboxPictures()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+		var camera = Camera.main;
+		var skybox = StarflightSkybox.m_instance;
+
+		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "skybox-pictures" ) );
+
+		if ( hasGraphics )
+		{
+			System.IO.Directory.CreateDirectory( folder );
+		}
+
+		// the scene's first frames include one that takes no time (seen headless): the speed of the ship divided by it made the rotation not a number
+		yield return Frames( 5 );
+
+		Check( "start-rotation", IsRotation( skybox.m_currentRotation ), "the skybox's rotation after the scene starts is " + skybox.m_currentRotation.ToString( "F3" ) );
+
+		// a ship with no maximum speed (engines broken beyond use) that is standing still: its speed over its maximum speed is zero over zero
+		skybox.m_currentRotation = Quaternion.identity;
+
+		var maximumSpeed = playerData.m_general.m_currentMaximumSpeed;
+
+		playerData.m_general.m_currentMaximumSpeed = 0.0f;
+
+		yield return Frames( 3 );
+
+		var maximumSpeedSeen = playerData.m_general.m_currentMaximumSpeed;
+		var rotationSeen = skybox.m_currentRotation;
+
+		playerData.m_general.m_currentMaximumSpeed = maximumSpeed;
+
+		Check( "no-maximum-speed", IsRotation( rotationSeen ), "with a maximum speed of " + maximumSpeedSeen + " the skybox's rotation is " + rotationSeen.ToString( "F3" ) );
+
+		controller.m_encounterRange = 0.0f;
+
+		// human space at Arth's star (game coordinates (4, 4) are in a territory of the Uhlek), then the middle of the first territory of each race
+		var places = new List<KeyValuePair<string, Vector3>>();
+		var arth = gameData.m_starList[ gameData.m_misc.m_arthStarId ];
+
+		places.Add( new KeyValuePair<string, Vector3>( "human", Tools.GameToWorldCoordinates( new Vector3( arth.m_xCoordinate, 0.0f, arth.m_yCoordinate ) ) ) );
+
+		var named = new HashSet<string>();
+
+		foreach ( var territory in gameData.m_territoryList )
+		{
+			if ( named.Add( territory.m_name ) )
+			{
+				places.Add( new KeyValuePair<string, Vector3>( territory.m_name, Tools.GameToWorldCoordinates( new Vector3( territory.m_xCoordinate, 0.0f, territory.m_yCoordinate ) ) ) );
+			}
+		}
+
+		foreach ( var place in places )
+		{
+			playerData.m_general.m_lastHyperspaceCoordinates = place.Value;
+			controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+			yield return Frames( 20 );
+
+			Log( "skyboxpictures: " + place.Key + ": skybox A " + skybox.m_currentSkyboxA + ", B " + skybox.m_currentSkyboxB + ", blend " + skybox.m_currentBlendFactor.ToString( "F2" ) + ", rotation " + skybox.m_currentRotation.ToString( "F3" ) );
+
+			Check( place.Key + "-rotation", IsRotation( skybox.m_currentRotation ), "the skybox's rotation is " + skybox.m_currentRotation.ToString( "F3" ) );
+
+			if ( hasGraphics )
+			{
+				RenderCameraPicture( camera, System.IO.Path.Combine( folder, place.Key + "_game.png" ) );
+
+				var down = RenderSkyboxOnly( Vector3.down, System.IO.Path.Combine( folder, place.Key + "_sky_down.png" ) );
+				var horizon = RenderSkyboxOnly( Vector3.forward, System.IO.Path.Combine( folder, place.Key + "_sky_horizon.png" ) );
+				var corner = RenderSkyboxOnly( new Vector3( 1.0f, -1.0f, 1.0f ).normalized, System.IO.Path.Combine( folder, place.Key + "_sky_corner.png" ) );
+
+				// every sky texture is dark, but none is black: the darkest set (the Elowan's) averages above 4 of 255
+				Check( place.Key + "-sky", ( down + horizon + corner ) / 3.0f > 1.0f, "the sky's average brightness is " + down.ToString( "F1" ) + " looking down, " + horizon.ToString( "F1" ) + " at the horizon, " + corner.ToString( "F1" ) + " at a corner" );
+			}
+
+			controller.SwitchLocation( PD_General.Location.StarSystem );
+
+			yield return Frames( 5 );
+		}
+
+		Finish( "scenario=skyboxpictures places=" + places.Count + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
 	// ---------------------------------------------------------------- Low: what the displays cost every frame (the status display, the terrain vehicle display)
 
 	// something for the control measurement to hold on to
@@ -13964,6 +14119,25 @@ public class ClaudeProbe : MonoBehaviour
 		var sizes = gameData.m_planetList.Length + "/" + gameData.m_artifactList.Length + "/" + gameData.m_commList.Length;
 
 		Check( "recovereddata: the original game data is unchanged (control)", sizes == "811/51/558", sizes );
+
+		// ---- the game data's notices and Starport analyses were typed from STRINFO, and six of their words are STRINFO's slips: they read as the shipped game
+		// has them (its notice records in the decompiled original's instance.txt, its analyses in data.h; the owner's ruling of 2026-10-12)
+		var noticeText = "";
+
+		foreach ( var notice in gameData.m_noticeList )
+		{
+			noticeText += notice.m_message + "\n";
+		}
+
+		var hypercubeAnalysis = gameData.m_artifactList[ gameData.FindArtifactId( "Hypercube" ) ].m_analysisText;
+		var rodDeviceAnalysis = gameData.m_artifactList[ gameData.FindArtifactId( "Rod Device" ) ].m_analysisText;
+
+		var shippedWords = noticeText.Contains( "penalized for recommendations of planets" ) && noticeText.Contains( "lost several ships in its vicinity." ) && noticeText.Contains( "Extensive experience as communications officer on board the ISS Intrepid" )
+			&& noticeText.Contains( "indicate that minimal or no life" ) && !noticeText.Contains( "minimial" ) && hypercubeAnalysis.Contains( "feeling of ataraxia." ) && rodDeviceAnalysis.Contains( "enhanced laser shield" );
+
+		Log( "recovereddata: the Hypercube's analysis: " + hypercubeAnalysis + " | the Rod Device's: " + rodDeviceAnalysis );
+
+		Check( "recovereddata: the notices and the Starport's analyses have the shipped game's words (penalized for, its vicinity, as communications officer, minimal, ataraxia, laser shield)", shippedWords, hypercubeAnalysis + " | " + rodDeviceAnalysis );
 
 		Finish( "scenario=recovereddata counts=" + counts + " unresolved=" + ( ( unresolved == "" ) ? "none" : unresolved.Trim().Replace( ' ', ',' ) ) + " planets=" + planets.Replace( ' ', ',' ) + " gameData=" + sizes, 0 );
 	}

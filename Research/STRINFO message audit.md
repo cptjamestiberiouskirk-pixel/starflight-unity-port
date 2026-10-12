@@ -141,7 +141,7 @@ The warning screen (2.13.1) and the police's four lines (2.13.2, lines 1549 to 1
 
 ## 2. Starport notices (1.1)
 
-The game data's 20 notices agree with STRINFO word for word (the one exception is "15TH" for STRINFO's "15 TH"). The shipped game differs from both in four places (CONFIRMED, `instance.txt` lines 1988 to 2058). These are changes to the game data, so they are the owner's call:
+The game data's 20 notices agree with STRINFO word for word (the one exception is "15TH" for STRINFO's "15 TH"). The shipped game differs from both in four places (CONFIRMED, `instance.txt` lines 1988 to 2058). These are changes to the game data, so they were the owner's call. Ruled 2026-10-12: the shipped game's words; done in the game data PR of that day (`fix/gamedata-shipped-words`):
 
 | GD notice (date) | GD line | Game data and STRINFO | Shipped game | Category |
 |---|---|---|---|---|
@@ -175,14 +175,14 @@ The analyses are in GD `m_artifactList` (`m_analysisText`), shown by `TradeDepot
 
 | Artifact | GD line | Game data | STRINFO (line) | Shipped game (`data.h`) | Category |
 |---|---|---|---|---|---|
-| Rod Device (36) | 889 | "an enhanced laer shield" | "LASER SHIELD" (494) | "LASER SHIELD" | typo in the game data |
-| Hypercube (22) | 735 | "atarxia" | "ATARXIA" (470) | "ATARAXIA" | STRINFO's typo, copied into the game data |
+| Rod Device (36) | 889 | "an enhanced laer shield" | "LASER SHIELD" (494) | "LASER SHIELD" | typo in the game data; fixed 2026-10-12 (the owner's ruling) |
+| Hypercube (22) | 735 | "atarxia" | "ATARXIA" (470) | "ATARAXIA" | STRINFO's typo, copied into the game data; fixed 2026-10-12 (the owner's ruling) |
 | Whining Orb (50) | 1043 | "what it does ... communications" | same (512) | "WHAT IS DOES ... COMMUNICATION." | the shipped game's typo ("IS"), STRINFO's wording ("COMMUNICATIONS") |
 | Every analysis | `TradeDepotPanel.cs:462` | the text alone | "STARPORT ANALYSIS:" above each (416 and on) | | missing line (STRINFO's heading; INFERRED that it is the screen's and not the editor's) |
 | Ellipsoid (15) | 658 | name "Ellipsoid" | "ELLIPSOID (FOCUSING STONE)" (455) | | STRINFO's note, most likely (INFERRED); no change |
 | Terrain Vehicle Debris (44) | 977 | 200.0 m3, 0 MU, no analysis text of its own in GD | not in STRINFO | "THE REMAINS OF AN OLDER, INFERIOR MODEL TERRAIN VEHICLE, DOUBTLESSLY LEFT HERE BY SOME PRIOR EXPLORATION PARTY TOO FOOLISH TO RETURN TO THEIR SHIP BEFORE EXHAUSTING THEIR ENERGY." | STRINFO silent; the shipped analysis is missing (INFERRED that GD 44 is that item) |
 
-Prices and volumes (CONFIRMED against the `.DOC`'s tables; game data values, so the owner's call): Humming Gizzy (21) is 500 MU in the game data and 550 in STRINFO; the Shimmering Ball (38) is 0.3 m3 in the game data and 0.1 in STRINFO; Adrynna's Gold (1) has 0.1 m3 and 2500 MU in the game data where STRINFO prints "?". Every other artifact, every Thrynn price and all 21 mineral prices agree, and Endurium's 1000, 1500 and 2000 follow the notices (`GD_Element.cs`).
+Prices and volumes (CONFIRMED against the `.DOC`'s tables): Humming Gizzy (21) is 500 MU in the game data and 550 in STRINFO; the Shimmering Ball (38) is 0.3 m3 in the game data and 0.1 in STRINFO. The original's own data (`Research/Data/Starflight 1 Data.xls`, its Artifacts sheet from the game's files) has the game data's values: HUMMING GIZZY 0.2 m3 at 500 MU (1000 to buy), SHIMMERING BALL 0.3 m3. So STRINFO is the one that differs, and the game data stays as it is (the owner's ruling of 2026-10-12: the original's text and values); Adrynna's Gold (1) has 0.1 m3 and 2500 MU in the game data where STRINFO prints "?". Every other artifact, every Thrynn price and all 21 mineral prices agree, and Endurium's 1000, 1500 and 2000 follow the notices (`GD_Element.cs`).
 
 ## 5. Ruin messages (3.1)
 
