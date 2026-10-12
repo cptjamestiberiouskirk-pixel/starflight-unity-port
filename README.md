@@ -33,7 +33,7 @@ The project has been refactored to a clean, **root-directory architecture** to e
 - **Original Economy in Builds**: A new game in a build starts with the original 12,000 MU (the Editor keeps 1,000,000 for testing), and the bank and the notices show stardates as the original did (`26-03-4620`).
 - **Debris Scanning**: Scan destroyed vessel wreckage for salvage analysis.
 - **Modern UI Kit**: the ship console and the Starport rooms use the remake's sci-fi UI kit (designed in Figma): Orbitron, Rajdhani and Share Tech Mono, navy panels, cyan and amber accents and a steel blue sensor window. Its colours, text styles and sprites live in one theme (`Resources/UI Kit Theme`), and each element takes its look from a role (`UIKitStyle`).
-- **Realistic System Map**: The console's System Map shows each planet with its own surface, lit from its star and sized by its mass, a glowing star in the colour of real stars of its class (the sun of the star system view has the same colour), orbit trails, the star's ecosphere, a star field, and the ship's heading (built by `DevTools/SystemMap`, see its [README](DevTools/SystemMap/README.md)).
+- **Realistic System Map**: The console's System Map shows each planet with its own surface, lit from its star and sized by its mass, a glowing star in the colour of real stars of its class (the sun of the star system view has the same colour), orbit trails, the star's ecosphere, a star field, and the ship's heading, with its engine glow, wake and sensor ping (built by `DevTools/SystemMap`, see its [README](DevTools/SystemMap/README.md)).
 
 ---
 
