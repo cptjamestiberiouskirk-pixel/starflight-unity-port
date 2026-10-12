@@ -8241,7 +8241,8 @@ public class ClaudeProbe : MonoBehaviour
 	{
 		var count = 0;
 
-		foreach ( var textMesh in FindObjectsByType<TextMesh>( FindObjectsSortMode.None ) )
+		// (the labels are TextMesh Pro text in the UI kit's style)
+		foreach ( var textMesh in FindObjectsByType<TMPro.TextMeshPro>( FindObjectsSortMode.None ) )
 		{
 			count += ( textMesh.gameObject.name == "Label" ) ? 1 : 0;
 		}
