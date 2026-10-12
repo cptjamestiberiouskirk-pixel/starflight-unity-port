@@ -77,8 +77,8 @@ public class TerrainVehicle : MonoBehaviour
 	// how deep in water are we
 	float m_waterEffectAmount;
 
-	// push back vector for collision with stuff on the terrain
-	Vector3 m_pushBackVector;
+	// the most one contact pushes the terrain vehicle in a physics step, so that a deep overlap is left over a few frames rather than in one jump (the port's)
+	const float c_largestPushBack = 0.5f;
 
 	// for gizmo drawing
 	Vector3[] m_debugVectors;
@@ -135,8 +135,8 @@ public class TerrainVehicle : MonoBehaviour
 			// uphill is slow
 			m_slopeEfficiency = GetSlopeEfficiency( playerData.m_general.m_coordinates, playerData.m_general.m_currentDirection );
 
-			// calculate the new position of the player
-			var newPosition = transform.localPosition + (Vector3) playerData.m_general.m_currentDirection * m_wheelEfficiency * m_slopeEfficiency * playerData.m_general.m_currentSpeed * Time.deltaTime;
+			// calculate the new position of the player (from where it is saved, which holds every push-back)
+			var newPosition = playerData.m_general.m_coordinates + (Vector3) playerData.m_general.m_currentDirection * m_wheelEfficiency * m_slopeEfficiency * playerData.m_general.m_currentSpeed * Time.deltaTime;
 
 			// wrap player around the planet
 			var planetWidth = 2048.0f * 4.0f;
@@ -200,9 +200,6 @@ public class TerrainVehicle : MonoBehaviour
 
 		// update the tv game object position
 		transform.localPosition = tvPosition;
-
-		// apply the push back vector
-		transform.localPosition += m_pushBackVector;
 
 		// reset the steering joints
 		foreach ( var steeringJoint in m_steeringJoints )
@@ -299,9 +296,6 @@ public class TerrainVehicle : MonoBehaviour
 
 			steeringJoint.transform.localPosition = wheelPosition;
 		}
-
-		// reset the push back vector
-		m_pushBackVector = Vector3.zero;
 	}
 
 	public void Initialize()
@@ -325,13 +319,36 @@ public class TerrainVehicle : MonoBehaviour
 		return m_fuelEfficiency;
 	}
 
+	// an object on the terrain overlaps the terrain vehicle by this much (a negative separation): push the vehicle out of it and slow it down
 	public void AddPushBack( Vector3 pushBackNormal, float pushBackAmount )
 	{
+		// a contact inside the contact offset (a positive separation) only touches the vehicle: it neither pushes it nor speeds it up
+		if ( pushBackAmount >= 0.0f )
+		{
+			return;
+		}
+
+		// nothing moves the vehicle while the game is paused (the physics steps go on)
+		if ( ( SpaceflightController.m_instance == null ) || SpaceflightController.m_instance.m_gameIsPaused )
+		{
+			return;
+		}
+
 		// get to the player data
 		var playerData = DataController.m_instance.m_playerData;
 
-		// add to the push back vector this collision
-		m_pushBackVector += pushBackNormal * pushBackAmount;
+		// along the ground only (the height comes from the terrain), and no more than a part of the overlap in one step
+		var pushBack = pushBackNormal * pushBackAmount;
+
+		pushBack.y = 0.0f;
+		pushBack = Vector3.ClampMagnitude( pushBack, c_largestPushBack );
+
+		// into the saved place, so that it lasts and the vehicle is drawn where it is, and into the transform, so that the next physics step finds the vehicle
+		// moved and does not push it again for the same overlap (several steps can run before the next Update)
+		playerData.m_general.m_coordinates += pushBack;
+		playerData.m_general.m_lastDisembarkedCoordinates = playerData.m_general.m_coordinates;
+
+		transform.localPosition += pushBack;
 
 		// reduce the current speed of the terrain vehicle
 		playerData.m_general.m_currentSpeed = Mathf.Max( 0.0f, playerData.m_general.m_currentSpeed + pushBackAmount * 10.0f );
