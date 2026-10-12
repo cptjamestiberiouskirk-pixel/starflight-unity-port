@@ -26,6 +26,7 @@ The project has been refactored to a clean, **root-directory architecture** to e
 - **Combat System**: Laser cannons, missile launchers, shield absorption, armor damage, and AI combat behaviors with victory/defeat detection. Alien ships have armor and shield points, any race turns hostile when fired on (the Uhlek attack on sight), aliens hold their fire while a comm link is up, and every shot uses a little Endurium.
 - **Encounters in Orbit**: Home fleets, drones and a derelict wait in orbit around their planets and meet the ship when it goes into orbit there. The ship drops into the encounter and comes back at the level of the star system, as in the original.
 - **Ship Systems Over Time**: Shields keep their charge and recharge slowly, and the engineer's repairs and the doctor's treatment take time, faster with higher skill.
+- **Living Suns**: The sun of each star system churns, its corona flickers, and small flares rise from its rim and fall back, in the colour of real stars of its class.
 - **Ship Destruction**: Complete death sequences with explosion effects, debris spawning, and salvage opportunities.
 - **Game Over System**: Player ship destruction triggers the game over screen. Returning to the title screen goes back to the last save.
 - **Terrain Scanning**: Enhanced exploration with 3D world-space labels, mineral detection, and Star Trek-style transporter effects.
@@ -138,6 +139,7 @@ The project features a **deterministic visualization system** that renders plane
 - The Dodecahedron draws alien ships from twice as far
 - The Shimmering Ball cloaks the ship in combat until it fires
 - The Flat Device shields the terrain vehicle: lifeforms hit its crew half as often
+- The Red Cylinder flashes on the landing map near the planet's ancient ruins
 - Continuum fluxes can be seen only with the Ring Device aboard
 - The price of Endurium rises with the notices of 20-02 and 15-05, and the Starport buys it back for what it sells it for
 - Nebulae keep the shields down
@@ -172,9 +174,12 @@ The project features a **deterministic visualization system** that renders plane
 - Save/load system with JSON persistence
 
 ### 🔧 In Progress
-- Salvage collection from debris fields
+- Storms on planet surfaces, being observed in the original game first
+- The fidelity pass: every screen against the original's, and the planet drawn in encounters that begin in orbit (roadmap Phase 7)
 
-### 📊 Completion: ~95%
+### 📊 Completion: 55 of the 59 items of the roadmap to parity
+
+[ROADMAP.md](ROADMAP.md) lists what the port still lacks against the original game: storms, the owner's play test of the early visual changes, and two items of the fidelity pass. No one has yet played the port through to the win by hand.
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 

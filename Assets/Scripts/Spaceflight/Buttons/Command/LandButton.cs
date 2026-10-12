@@ -52,6 +52,9 @@ public class LandButton : ShipButton
 				// over the Crystal Planet the Crystal Cone reports where its control nexus is, for picking the landing site
 				CrystalCone.ReportNexus();
 
+				// and the Red Cylinder looks afresh for ancient ruins near the crosshair
+				RedCylinder.Reset();
+
 				return true;
 
 			default:

@@ -19,6 +19,12 @@ public class TerrainGrid : MonoBehaviour
 	// the lifeforms of the planet (made when the planet is populated, next to the ruins, so the scene needs no object for it)
 	public TerrainLifeforms m_terrainLifeforms;
 
+	// the seed of a planet's ruins (TerrainRuins.GetRandomRuinPlaces works their places out with it from orbit, so it has to be the one the surface uses)
+	public static int GetRuinSeed( GD_Planet planet )
+	{
+		return planet.m_id + 4;
+	}
+
 	Mesh m_mesh;
 	MeshFilter m_meshFilter;
 	MeshRenderer m_meshRenderer;
@@ -147,7 +153,7 @@ public class TerrainGrid : MonoBehaviour
 		// populate the ruins
 		if ( m_terrainRuins != null )
 		{
-			m_terrainRuins.Initialize( m_planetGenerator, m_elevationScale, planet.m_id + 4 );
+			m_terrainRuins.Initialize( m_planetGenerator, m_elevationScale, GetRuinSeed( planet ) );
 
 			// a ruin stands on its own (taking the rocks and trees next to it away moves nothing else)
 			m_terrainRuins.ClearAroundRuins( new TerrainGridPopulator[] { m_terrainRocks, m_terrainTrees } );

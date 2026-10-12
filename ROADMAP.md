@@ -23,31 +23,31 @@ This is the plan of record. Pick work from it, and when a PR for an item merges,
 | Area | Status | Main gaps |
 |---|---|---|
 | Starport: Personnel, Crew Assignment, Bank, Docking Bay | DONE | |
-| Starport: Trade Depot | PARTIAL | no lifeform sales; Endurium price never changes |
-| Starport: Ship Configuration | PARTIAL | Repair is a STUB (`ShipConfigurationPanel.cs:692`) |
-| Starport: Operations | PARTIAL | Evaluation is fixed scene text; no colony recommendations |
+| Starport: Trade Depot | DONE | Endurium price changes (PR 134), specimens sold (PR 177) |
+| Starport: Ship Configuration | DONE | Repair at a cost (PR 137) |
+| Starport: Operations | DONE | colony evaluations, the win evaluation, fines (PRs 120, 142) |
 | Flight, hyperspace, fluxes, fuel | DONE | |
-| Nebulae | PARTIAL | drawn, no effect (`PlayerShip.cs:218` TODO) |
-| Stellar flares | PARTIAL | checked once on entering a system; Arth's flare does nothing |
-| Starmap | PARTIAL | no fuel estimate |
-| Game clock | PARTIAL | runs only in the star system and hyperspace (`SpaceflightController.cs:181`) |
-| Ship console: Captain | PARTIAL | Log Planet is stored and never used; Messages log always empty |
-| Ship console: Science | PARTIAL | science skill has no effect; salvage not implemented |
-| Ship console: Engineer, Doctor | PARTIAL | repair needs no minerals; the Doctor never has a patient |
-| Ship console: Communications | PARTIAL | Distress is a STUB |
-| Combat | DONE | alien vessel armor, shields and speed are not taken from the data |
-| Comm system | PARTIAL | posture never changes the aliens' mood; homeworld and surrender lines are never shown |
-| Alien trade, tribute, surrender | MISSING | |
-| Terrain vehicle: drive, map, mine, return | DONE | |
-| Terrain vehicle: Look, Scan | PARTIAL | no lifeforms to report |
-| Ruins, artifacts, planet messages | MISSING | code exists but is not wired into any scene |
-| Weather and terrain hazards | MISSING | dust storm is cosmetic |
-| Lifeforms (stun, capture, sell, attack) | MISSING | |
-| Crew injury and death | MISSING | nothing lowers vitality |
-| Artifact effects (15 special artifacts) | MISSING | effects exist as analysis text only |
-| Main story and endgame | MISSING | no Crystal Planet, no win, no flare deadline |
+| Nebulae | DONE | the shields stay down inside one (PR 136) |
+| Stellar flares | DONE | every star on its day, Arth's flare (PRs 121, 122) |
+| Starmap | DONE | fuel estimate (PR 141) |
+| Game clock | DONE | runs in every Spaceflight location but the docking bay (PR 83) |
+| Ship console: Captain | DONE | colony recommendations, the Messages log (PRs 102, 142) |
+| Ship console: Science | DONE | science skill (PR 161), salvage (PR 162), star stability (PR 160) |
+| Ship console: Engineer, Doctor | DONE | repairs with minerals, damage per system (PRs 145 to 147); the Doctor treats lifeform injuries |
+| Ship console: Communications | DONE | Distress (PR 138) |
+| Combat | DONE | vessel armor, shields and speed from the data (PR 140) |
+| Comm system | DONE | moods, rivals, translation, homeworld warnings, surrender, transmissions (PRs 150 to 159) |
+| Alien trade, tribute, surrender | DONE | PRs 152, 154 to 156 |
+| Terrain vehicle: drive, map, mine, return | DONE | uphill is slow (PR 187) |
+| Terrain vehicle: Look, Scan | DONE | lifeforms, minerals, ruins (PRs 167, 181) |
+| Ruins, artifacts, planet messages | DONE | Phase 3; random ruins (PR 164) |
+| Weather and terrain hazards | PARTIAL | lava (PR 165) and slopes (PR 187); storms are being observed in the original first |
+| Lifeforms (stun, capture, sell, attack) | DONE | Phase 6, with Blender models (PRs 167 to 185) |
+| Crew injury and death | DONE | PR 170 |
+| Artifact effects (15 special artifacts) | DONE | the Black Box, Hypercube and Ellipsoid have none beyond their roles (D5) |
+| Main story and endgame | DONE | Phase 5 |
 
-The README's "Completion: ~95%" is far too high for the game as a whole. It is closer to an accurate figure for the engine and the Starport.
+Counting the items of Phases 0 to 7 below (59), 55 are done. The four left are the owner's play test (0.6), storms (6.6), and two of Phase 7: comparing every screen with the original's and drawing the planet in encounters that begin in orbit. No one has yet played the port through to the win by hand.
 
 ## Decisions
 
@@ -147,9 +147,9 @@ Only the effects that matter for winning have to come before Phase 5. The others
 | Rod Device | stronger laser shield: PR 127 (half of every alien laser hit; the amount is the port's choice) | New Scotland (site: D5) | no |
 | Tesseract | doubles engine efficiency: PR 124 (half the engines' fuel in hyperspace) | 18,50 planet 5 | no |
 | Crystal Pearl | warps a badly damaged ship away: PR 128 (out of an encounter below a tenth of the armor; the tenth is the port's choice) | City of the Ancients | no |
-| Red Cylinder | finds ancient ruins from orbit | Koann (planet: D5) | no |
+| Red Cylinder | finds ancient ruins from orbit: flashes on the landing map near an ancient ruin (the shipped game's "THE RED CYLINDER IS FLASHING" is in its landing map code; how near is the port's) | Koann (planet: D5) | no |
 | Dodecahedron | attracts every ship nearby: PR 129 (twice the alien radar distance; the factor is the port's choice) | 118,146 planet 4 | no |
-| Black Box, Hypercube, Ellipsoid | unclear (D5) | Thrynn trade, Earth, 81,98 | Ask |
+| Black Box, Hypercube, Ellipsoid | none beyond their documented roles (D5, resolved 2026-10-11) | Thrynn trade, Earth, 81,98 | no |
 
 ## Phase 5: Main story and endgame
 
@@ -179,7 +179,7 @@ Depends on D3. This is the largest piece and is not on the path to winning, whic
 ## Phase 7: Fidelity pass
 
 - Compare every screen with `Research/Screenshots/` and every message with STRINFO.
-- Correct the README's completion figure.
+- Correct the README's completion figure. Done: it counts the roadmap's items (55 of 59), with what is left.
 - Draw the planet in encounters that begin in orbit (ruling 5, later step).
 - Alien captain and ship names (`%` and `+` in 15 greetings): made of the race's syllables (the garble words), as STRINFO's own names are (Fi-noc-tzi, To-chu-pu, Yrh-ey); done 2026-10-11 on Claude's recommendation.
 - Crew learn by using their skills: DRAFT only. Left out on Claude's recommendation (2026-10-11): the shipped game trains crew at the Starport (the Personnel office, which uses the race's learning rate).

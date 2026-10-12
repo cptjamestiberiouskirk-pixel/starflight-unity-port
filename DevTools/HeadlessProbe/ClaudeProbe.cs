@@ -601,6 +601,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioFlareData();
 				break;
 
+			case "sunlife":
+				yield return ScenarioSunLife();
+				break;
+
 			case "calendar":
 				yield return ScenarioCalendar();
 				break;
@@ -835,6 +839,10 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "flatdevice":
 				yield return ScenarioFlatDevice();
+				break;
+
+			case "redcylinder":
+				yield return ScenarioRedCylinder();
 				break;
 
 			default:
@@ -12640,6 +12648,68 @@ public class ClaudeProbe : MonoBehaviour
 		return ( material == null ) ? float.NaN : material.GetVector( "_Size" ).x;
 	}
 
+	// the living surface of the star system's sun (Shine): a small flare rises from the rim within a few seconds and falls back, the size
+	// of the shine (the game's flares) stays what StarSystem set, the sun takes no numbers from the game's Random, and a frame of it takes
+	// no memory
+	IEnumerator ScenarioSunLife()
+	{
+		var controller = SpaceflightController.m_instance;
+
+		EnterStarSystem( 25 );
+
+		yield return WaitForPlanetMaps( 60.0f );
+
+		var shine = controller.m_starSystem.m_shine;
+		var material = shine.GetComponent<MeshRenderer>().material;
+		var sizeBefore = material.GetVector( "_Size" );
+
+		// ---- 1. within 6 s of real time a flare rises (its strength goes above 0.3) and falls back to nothing
+		var hasFlare = material.HasProperty( "_Flare" );
+		var strongest = 0.0f;
+		var fellBack = false;
+		var highestRise = 0.0f;
+		var start = Time.realtimeSinceStartup;
+
+		while ( hasFlare && ( Time.realtimeSinceStartup - start < 6.0f ) && !fellBack )
+		{
+			yield return null;
+
+			var flare = material.GetVector( "_Flare" );
+
+			strongest = Mathf.Max( strongest, flare.w );
+			highestRise = Mathf.Max( highestRise, flare.y );
+
+			if ( ( strongest > 0.3f ) && ( flare.w < 0.01f ) )
+			{
+				fellBack = true;
+			}
+		}
+
+		Check( "sunlife: a small flare rises from the sun's rim and falls back", hasFlare && ( strongest > 0.3f ) && fellBack && ( highestRise > 0.0f ), "property " + hasFlare + ", strongest " + strongest.ToString( "F2" ) + ", rose " + highestRise.ToString( "F1" ) + " units, fell back " + fellBack );
+
+		// ---- 2. the size of the shine is still what StarSystem set (the flares of the game are not touched)
+		var sizeAfter = material.GetVector( "_Size" );
+
+		Check( "sunlife: the size of the sun's shine is untouched by its small flares (control)", sizeAfter == sizeBefore, sizeBefore + " -> " + sizeAfter );
+
+		// ---- 3. the sun takes no numbers from the game's Random, and a frame of it takes no memory
+		var update = (System.Action) System.Delegate.CreateDelegate( typeof( System.Action ), shine, "Update" );
+		var randomBefore = UnityEngine.Random.state;
+
+		for ( var i = 0; i < 20000; i++ )
+		{
+			update();
+		}
+
+		var randomUntouched = UnityEngine.Random.state.Equals( randomBefore );
+		var controlBytes = AllocatedByTheControl();
+		var sunBytes = Allocated( update, c_meterCalls ) / c_meterCalls;
+
+		Check( "sunlife: the sun takes nothing from the game's Random and no memory in a frame (control)", randomUntouched && ( controlBytes >= 256 ) && ( sunBytes == 0 ), "Random untouched " + randomUntouched + ", " + sunBytes + " bytes per frame, the control measures " + controlBytes );
+
+		Finish( "scenario=sunlife strongest=" + strongest.ToString( "F2" ) + " rise=" + highestRise.ToString( "F1" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
 	IEnumerator ScenarioFlareData()
 	{
 		var gameData = DataController.m_instance.m_gameData;
@@ -19789,6 +19859,90 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "flatdevice: with the Flat Device about half of the attacks hurt, and the shield turns the others away", ( hurtWith >= 80 ) && ( hurtWith <= 140 ) && messages.Contains( "the shield turns it away" ), hurtWith + " of 200" );
 
 		Finish( "scenario=flatdevice without=" + hurtWithout + " with=" + hurtWith, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 4: the Red Cylinder
+
+	// the Red Cylinder looks at this place of the landing map (null on the code before it)
+	static object RedCylinderLook( float eastWest, float northSouth )
+	{
+		var type = typeof( ShipButton ).Assembly.GetType( "RedCylinder" );
+		var look = ( type == null ) ? null : type.GetMethod( "Look" );
+
+		return ( look == null ) ? null : look.Invoke( null, new object[] { eastWest, northSouth } );
+	}
+
+	IEnumerator ScenarioRedCylinder()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// planet 94 of the Arth system has an ancient random ruin
+		yield return LandInTheArthSystemAt( 94, Vector3.zero, done );
+
+		yield return Frames( 5 );
+
+		// ---- 1. where the surface placed the random ruins
+		var placed = new List<string>();
+		var placedPlaces = new List<Vector2>();
+		var terrainRuins = controller.m_disembarked.m_terrainGrid.m_terrainRuins;
+
+		foreach ( Transform child in terrainRuins.transform )
+		{
+			if ( child.name.StartsWith( "Ancient ruin" ) || child.name.StartsWith( "Old Empire ruin" ) )
+			{
+				Tools.WorldToLatLongCoordinates( child.position, out var eastWest, out var northSouth );
+
+				placed.Add( ( child.name.StartsWith( "Ancient" ) ? "ancient" : "old" ) + " " + eastWest.ToString( "F1" ) + "/" + northSouth.ToString( "F1" ) );
+				placedPlaces.Add( new Vector2( eastWest, northSouth ) );
+			}
+		}
+
+		// ---- 2. where they are worked out from the planet's maps, as the Red Cylinder does from orbit
+		var planet = gameData.m_planetList[ 94 ];
+		var planetGenerator = controller.m_starSystem.GetPlanetController( 94 ).GetPlanetGenerator();
+		var getPlaces = typeof( TerrainRuins ).GetMethod( "GetRandomRuinPlaces" );
+		var worked = new List<string>();
+
+		if ( getPlaces != null )
+		{
+			var places = getPlaces.Invoke( null, new object[] { planetGenerator, controller.m_disembarked.m_terrainGrid.m_elevationScale, planet } ) as IList;
+
+			foreach ( var place in places )
+			{
+				var where = (Vector2) place.GetType().GetProperty( "Key" ).GetValue( place );
+				var ancient = (bool) place.GetType().GetProperty( "Value" ).GetValue( place );
+
+				worked.Add( ( ancient ? "ancient" : "old" ) + " " + where.x.ToString( "F1" ) + "/" + where.y.ToString( "F1" ) );
+			}
+		}
+
+		// ---- 3. the Red Cylinder flashes at the ancient ruin, not far from it, and not without the Red Cylinder (the control)
+		var ruin = ( placedPlaces.Count > 0 ) ? placedPlaces[ 0 ] : Vector2.zero;
+		var redCylinder = gameData.FindArtifactId( "Red Cylinder" );
+
+		controller.m_messages.Clear();
+
+		var withoutIt = RedCylinderLook( ruin.x, ruin.y );
+
+		playerData.m_playerShip.AddArtifact( redCylinder );
+
+		var farAway = RedCylinderLook( ruin.x + 90.0f, -ruin.y );
+		var atTheRuin = RedCylinderLook( ruin.x + 3.0f, ruin.y - 2.0f );
+		var messages = MessageList();
+
+		playerData.m_playerShip.RemoveArtifact( redCylinder );
+
+		Log( "redcylinder: placed [" + string.Join( ", ", placed ) + "] worked out [" + string.Join( ", ", worked ) + "] | without it " + withoutIt + ", far away " + farAway + ", at the ruin " + atTheRuin + " | " + messages );
+
+		Check( "redcylinder: the random ruins are worked out from orbit where the surface places them", ( placed.Count > 0 ) && ( string.Join( ", ", placed ) == string.Join( ", ", worked ) ), string.Join( ", ", placed ) + " | " + string.Join( ", ", worked ) );
+		Check( "redcylinder: the Red Cylinder flashes on the landing map near an ancient ruin, not far from it, and only aboard", ( atTheRuin is bool ) && (bool) atTheRuin && !(bool) farAway && !(bool) withoutIt && messages.Contains( "The Red Cylinder is flashing" ), withoutIt + ", " + farAway + ", " + atTheRuin + " | " + messages );
+
+		Finish( "scenario=redcylinder placed=" + placed.Count + " worked=" + worked.Count, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
