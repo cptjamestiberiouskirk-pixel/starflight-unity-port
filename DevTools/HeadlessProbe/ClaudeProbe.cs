@@ -27,6 +27,10 @@ public class ClaudeProbe : MonoBehaviour
 	const string c_tag = "[ClaudeProbe] ";
 
 	static int s_exceptionCount;
+
+	// errors logged with Debug.LogError or by Unity itself (not exceptions), and the last of them
+	static int s_errorCount;
+	static string s_lastError;
 	static readonly Dictionary<string, int> s_exceptions = new Dictionary<string, int>();
 	static bool s_saveSystemSwapped;
 	static bool s_spaceflightReady;
@@ -141,6 +145,14 @@ public class ClaudeProbe : MonoBehaviour
 
 	static void OnLog( string condition, string stackTrace, LogType type )
 	{
+		if ( type == LogType.Error )
+		{
+			s_errorCount++;
+			s_lastError = condition;
+
+			return;
+		}
+
 		if ( type != LogType.Exception )
 		{
 			return;
@@ -8656,6 +8668,8 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		// ---- pick it up: the transporter effect takes a second and a half, then the object is gone
+		var errorsBefore = s_errorCount;
+
 		new TVCargoButton().Execute();
 
 		var start = Time.frameCount;
@@ -8714,6 +8728,7 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		var goneAfter = Time.frameCount - start;
+		var errorsDuring = s_errorCount - errorsBefore;
 
 
 		Log( "transporterpictures: a deposit " + size.ToString( "F2" ) + " across picked up: " + parts + " effect parts, drawn with the lit or opaque shaders: " + ( ( drawnWrong.Count == 0 ) ? "none" : string.Join( ", ", drawnWrong ) ) + "; the object's materials in queue " + objectQueue + " while it plays; the object gone " + ( pickedUp == null ) + " after " + goneAfter + " frames" );
@@ -8721,6 +8736,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "transporterpictures: the transporter effect is drawn transparent, not with the Standard or untextured particle shaders", ( parts > 0 ) && ( drawnWrong.Count == 0 ), ( drawnWrong.Count == 0 ) ? "all " + parts + " parts" : string.Join( ", ", drawnWrong ) );
 		Check( "transporterpictures: the object keeps its own rendering while it is beamed up (no depth writes switched off)", ( objectQueue > 0 ) && ( objectQueue < 3000 ), "queue " + objectQueue );
 		Check( "transporterpictures: the object is gone once the effect is over (control)", pickedUp == null, "gone " + ( pickedUp == null ) );
+		Check( "transporterpictures: no error is logged while the effect plays", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		// ---- 2. control: the effect does not draw from the game's random numbers
 		var probeObject = GameObject.CreatePrimitive( PrimitiveType.Cube );
@@ -8739,7 +8755,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "transporterpictures: " + pictures + " pictures" + ( hasGraphics ? " in " + folder : " (no graphics device; run probe.ps1 with -Graphics for them)" ) );
 
-		Finish( "scenario=transporterpictures parts=" + parts + " drawnWrong=" + drawnWrong.Count + " objectQueue=" + objectQueue + " gone=" + ( pickedUp == null ) + " pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+		Finish( "scenario=transporterpictures parts=" + parts + " drawnWrong=" + drawnWrong.Count + " objectQueue=" + objectQueue + " gone=" + ( pickedUp == null ) + " errors=" + errorsDuring + " pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- Low: what the displays cost every frame (the status display, the terrain vehicle display)
@@ -9116,7 +9132,7 @@ public class ClaudeProbe : MonoBehaviour
 			yield break;
 		}
 
-		// ---- 1. the materials of a deposit that is picked up: its transporter effect makes its own copies of them
+		// ---- 1. the materials of a deposit that is picked up: its transporter effect used to make its own copies of them (and had to destroy them); it uses the shared effect materials now and copies none
 		yield return Frames( 5 );
 
 		var materialsBefore = MaterialCount();
@@ -9134,7 +9150,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "leaks: materials in memory: " + materialsBefore + " before the pickup, " + materialsDuring + " during the transporter effect, " + materialsAfter + " after the deposit is gone" );
 
-		Check( "leaks: the materials of a transporter effect go with it", ( materialsDuring > materialsBefore ) && ( materialsAfter <= materialsBefore ), materialsBefore + " before, " + materialsDuring + " during, " + materialsAfter + " after" );
+		Check( "leaks: a transporter effect leaves no materials behind", materialsAfter <= materialsBefore, materialsBefore + " before, " + materialsDuring + " during, " + materialsAfter + " after" );
 
 		// ---- 2. leaving the spaceflight scene. The save panel is opened and closed first, as a player who saves does (the panel lives in the persistent scene)
 		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.Planetside );

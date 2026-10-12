@@ -124,12 +124,12 @@ public class TransporterEffect : MonoBehaviour
 		shape.shapeType = ParticleSystemShapeType.Box;
 		shape.scale = new Vector3( Mathf.Max( bounds.size.x, c_minimumSize ), Mathf.Max( bounds.size.y, c_minimumSize ), Mathf.Max( bounds.size.z, c_minimumSize ) ) * 1.1f;
 
-		// rising
+		// rising (all three axes in the same mode, two constants: Unity logs "Particle Velocity curves must all be in the same mode" every frame otherwise, and does not use them)
 		var velocityOverLifetime = m_particleSystem.velocityOverLifetime;
 		velocityOverLifetime.enabled = true;
-		velocityOverLifetime.x = new ParticleSystem.MinMaxCurve( 0.0f );
+		velocityOverLifetime.x = new ParticleSystem.MinMaxCurve( 0.0f, 0.0f );
 		velocityOverLifetime.y = new ParticleSystem.MinMaxCurve( m_size * 0.6f, m_size * 1.4f );
-		velocityOverLifetime.z = new ParticleSystem.MinMaxCurve( 0.0f );
+		velocityOverLifetime.z = new ParticleSystem.MinMaxCurve( 0.0f, 0.0f );
 
 		// twinkling: each sparkle flares up, dims and flares again before it goes out
 		var sizeOverLifetime = m_particleSystem.sizeOverLifetime;
