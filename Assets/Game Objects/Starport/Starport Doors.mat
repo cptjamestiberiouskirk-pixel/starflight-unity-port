@@ -2,14 +2,20 @@
 %TAG !u! tag:unity3d.com,2011:
 --- !u!21 &2100000
 Material:
-  serializedVersion: 6
+  serializedVersion: 8
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Starport Doors
   m_Shader: {fileID: 4800000, guid: f67073489be24934c9032d00068b6661, type: 3}
-  m_ShaderKeywords: FORWARDSHADOWS_ON SF_FORWARDSHADOWS_ON
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords:
+  - FORWARDSHADOWS_ON
+  - SF_FORWARDSHADOWS_ON
+  - SF_ZWRITEON_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -17,6 +23,7 @@ Material:
   stringTagMap: {}
   disabledShaderPasses:
   - BlendPrePass
+  m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -53,6 +60,10 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - SF_OcclusionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - SF_ReflectionMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
@@ -132,6 +143,7 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    m_Ints: []
     m_Floats:
     - AlbedoOcclusionOn: 0
     - Alpha: 1
@@ -153,11 +165,13 @@ Material:
     - SF_DetailNormalMapStrength: 1
     - SF_EmissiveProjectionOn: 0
     - SF_ForwardShadowsOn: 1
+    - SF_FractalDetailsOn: 0
     - SF_NormalMapStrength: 1
     - SF_OcclusionPower: 1
     - SF_OrthonormalizeOn: 0
     - SF_RenderQueueOffset: 0
     - SF_Smoothness: 0
+    - SF_ZTest: 4
     - SF_ZWriteOn: 1
     - ShadowCasterOn: 1
     - Smoothness: 0
@@ -188,19 +202,23 @@ Material:
     - LightOverrideColor: {r: 1, g: 1, b: 1, a: 1}
     - LightOverrideDirection: {r: 0, g: 0, b: 1, a: 0}
     - NormalMapScaleOffset: {r: 1, g: 1, b: 0, a: 0}
-    - SF_AlbedoColor: {r: 0.6666667, g: 0, b: 0, a: 1}
+    - SF_AlbedoColor: {r: 0, g: 0.47843137, b: 0.6, a: 1}
     - SF_BaseScaleOffset: {r: 1, g: 1, b: 0, a: 0}
     - SF_DetailScaleOffset: {r: 1, g: 1, b: 0, a: 0}
-    - SF_EmissiveColor: {r: 0, g: 0, b: 0, a: 1}
+    - SF_EmissiveColor: {r: 0.07176471, g: 0.27058825, b: 0.3, a: 0.3}
+    - SF_EmissiveTint: {r: 1, g: 1, b: 1, a: 1}
     - SF_NormalMapScaleOffset: {r: 1, g: 1, b: 0, a: 0}
+    - SF_ReflectionColor: {r: 1, g: 1, b: 1, a: 1}
     - SF_SpecularColor: {r: 0, g: 0, b: 0, a: 1}
     - SpecularColor: {r: 0, g: 0, b: 0, a: 1}
     - UILightColor: {r: 1, g: 1, b: 1, a: 1}
     - UILightDirection: {r: 0, g: 0, b: 1, a: 0}
     - WaterScale: {r: 1, g: 1, b: 1, a: 1}
     - _AlbedoColor: {r: 0.6666667, g: 0, b: 0, a: 1}
-    - _Color: {r: 0.6666667, g: 0, b: 0, a: 1}
+    - _Color: {r: 0, g: 0.47843137, b: 0.6, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 0}
     - _EmissiveColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecularColor: {r: 0, g: 0, b: 0, a: 1}
     - _WaterScale: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
