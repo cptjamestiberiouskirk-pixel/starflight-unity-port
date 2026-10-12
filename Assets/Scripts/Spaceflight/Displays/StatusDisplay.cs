@@ -57,6 +57,53 @@ public class StatusDisplay : ShipDisplay
 	bool m_shownWeaponsAreArmed;
 
 	// unity update
+	// the damage in the original's words (STARB.COM, the status display's damage table): what is left of the hull as a percent of its most, NONE at all of it,
+	// MINIMAL from 95, SLIGHT from 80, MODERATE from 50, HEAVY from 20 and CRITICAL below
+	public static string GetDamageText( int armorPoints, int maximumArmorPoints )
+	{
+		var integrity = ( maximumArmorPoints > 0 ) ? Mathf.FloorToInt( 100.0f * armorPoints / maximumArmorPoints ) : 100;
+
+		if ( integrity >= 100 )
+		{
+			return "None";
+		}
+
+		if ( integrity >= 95 )
+		{
+			return "<color=yellow>Minimal</color>";
+		}
+
+		if ( integrity >= 80 )
+		{
+			return "<color=yellow>Slight</color>";
+		}
+
+		if ( integrity >= 50 )
+		{
+			return "<color=red>Moderate</color>";
+		}
+
+		return ( integrity >= 20 ) ? "<color=red>Heavy</color>" : "<color=red>Critical</color>";
+	}
+
+	// the energy (the Endurium in the hold, in cubic meters) with four figures and no unit, as the original's "20.00", "48.20", "123.8"
+	public static string GetEnergyText( float energyAmount )
+	{
+		var culture = System.Globalization.CultureInfo.InvariantCulture;
+
+		if ( energyAmount < 10.0f )
+		{
+			return energyAmount.ToString( "F3", culture );
+		}
+
+		if ( energyAmount < 100.0f )
+		{
+			return energyAmount.ToString( "F2", culture );
+		}
+
+		return ( energyAmount < 1000.0f ) ? energyAmount.ToString( "F1", culture ) : energyAmount.ToString( "F0", culture );
+	}
+
 	public override void Update()
 	{
 		// get to the player data
@@ -91,21 +138,14 @@ public class StatusDisplay : ShipDisplay
 			// update the date
 			string text = playerData.m_general.m_currentStardateDHMY + "\n";
 
-			// update the damage text
-			if ( playerData.m_playerShip.m_armorPoints < maximumArmorPoints )
-			{
-				float damagePercent = ( 1.0f - (float) playerData.m_playerShip.m_armorPoints / (float) maximumArmorPoints ) * 100.0f;
-				text += "<color=red>" + damagePercent.ToString( "N0" ) + "% Hull Damage</color>\n";
-			}
-			else
-			{
-				text += "None\n";
-			}
+			// update the damage text, in the original's words for what is left of the hull
+			text += GetDamageText( playerData.m_playerShip.m_armorPoints, maximumArmorPoints ) + "\n";
 
 			// update the cargo usage
 			float cargoUsage = (float) playerData.m_playerShip.m_volumeUsed / (float) playerData.m_playerShip.m_volume * 100.0f;
 			string cargoColor = ( cargoUsage > 90.0f ) ? "red" : ( ( cargoUsage > 75.0f ) ? "yellow" : "white" );
-			text += "<color=" + cargoColor + ">" + cargoUsage.ToString( "N1" ) + "% Full</color>\n";
+			// (in whole percent, as the original's "40 %")
+			text += "<color=" + cargoColor + ">" + Mathf.RoundToInt( cargoUsage ) + " %</color>\n";
 
 			// update the amount of energy remaining
 			if ( elementReference == null )
@@ -116,14 +156,14 @@ public class StatusDisplay : ShipDisplay
 			{
 				float energyAmount = (float) elementReference.m_volume / 10.0f;
 				string energyColor = ( energyAmount < 5.0f ) ? "red" : ( ( energyAmount < 15.0f ) ? "yellow" : "white" );
-				text += "<color=" + energyColor + ">" + energyAmount.ToString( "N1" ) + "M<sup>3</sup></color>\n";
+				text += "<color=" + energyColor + ">" + GetEnergyText( energyAmount ) + "</color>\n";
 			}
 
 			// do we have shields?
 			if ( playerData.m_playerShip.m_shieldingClass == 0 )
 			{
-				// no
-				text += "None\n";
+				// no - the original says DOWN (and "SHIP IS NOT EQUIPPED WITH SHIELDS" when they are raised)
+				text += "Down\n";
 			}
 			else
 			{
@@ -134,8 +174,8 @@ public class StatusDisplay : ShipDisplay
 			// do we have weapons?
 			if ( !hasWeapons )
 			{
-				// no
-				text += "None\n";
+				// no - the original says UNARMED (and "SHIP IS NOT EQUIPPED WITH WEAPONS" when they are armed)
+				text += "Unarmed\n";
 			}
 			else
 			{
