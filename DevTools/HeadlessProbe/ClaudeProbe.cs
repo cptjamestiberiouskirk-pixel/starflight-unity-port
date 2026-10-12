@@ -18519,7 +18519,9 @@ public class ClaudeProbe : MonoBehaviour
 		var thrynnBegun = ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == 165 );
 		var thrynnSaid = new List<string>();
 
-		yield return LetAliensSpeak( 3, thrynnSaid );
+		// their homeworld hails are the three the shipped game says only there ("within the limits", "additional warning", "pay the consequences"), not 394, which it
+		// says in space
+		yield return LetAliensSpeak( 2, thrynnSaid );
 
 		var hostileBeforeLast = thrynnBegun && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile );
 
@@ -18528,7 +18530,7 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 3 );
 
 		var thrynnHostile = thrynnBegun && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile ) && encounter.m_pdEncounter.m_disconnected;
-		var thrynnWarnings = new[] { 386, 387, 388, 394 };
+		var thrynnWarnings = new[] { 386, 387, 388 };
 		var thrynnInOrder = thrynnSaid.Count == thrynnWarnings.Length;
 
 		for ( var i = 0; thrynnInOrder && ( i < thrynnWarnings.Length ); i++ )
@@ -18540,7 +18542,9 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 2. the Veloxi home fleet (encounter 233, orbit 3 of 150,148): the ship hails first, and their one homeworld response is the last warning
+		// ---- 2. the Veloxi home fleet (encounter 233, orbit 3 of 150,148): the ship hails first, and the Veloxi, who have no homeworld response in the shipped game,
+		// answer with the first of their refusals ("Us are not answer the questions", never said before: every warning used to move one counter along); then their
+		// own hails in order, holding fire until the last ("Banzaii")
 		var veloxStar = StarAt( 150, 148 );
 
 		yield return GoIntoOrbit( veloxStar, PlanetInOrbit( veloxStar, 3 ) );
@@ -18555,14 +18559,60 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return LetAliensSpeak( 1, veloxSaid );
 
+		var veloxHostileAfterResponse = veloxBegun && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile );
+
+		yield return LetAliensSpeak( 4, veloxSaid );
+
 		yield return Frames( 3 );
 
-		var veloxResponse = ( veloxSaid.Count > 0 ) && veloxSaid[ 0 ].Contains( CommText( 483 ) );
+		var veloxResponse = ( veloxSaid.Count > 0 ) && SaysLine( veloxSaid[ 0 ], CommText( 473 ) );
+		var veloxHails = ( veloxSaid.Count == 5 ) && SaysLine( veloxSaid[ 1 ], CommText( 487 ) ) && SaysLine( veloxSaid[ 2 ], CommText( 488 ) ) && SaysLine( veloxSaid[ 3 ], CommText( 489 ) ) && SaysLine( veloxSaid[ 4 ], CommText( 490 ) );
 		var veloxHostile = veloxBegun && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile ) && !encounter.m_pdEncounter.m_connected;
 
 		ClearMissiles();
 		LeaveEncounter();
 		yield return Frames( 10 );
+
+		// ---- 2b. the Gazurtoid: the shipped game says their "holy land, the planet of the Gazurtoid" lines (94, 95) only at their homeworld, planet 4 of 86,55, where
+		// their fleet waits in orbit (encounter 65) - its hail is that line, and the last warning; the Gazurtoid guarding the Shimmering Ball's planet (encounter 33,
+		// orbit 1 of 68,66) are no home fleet, and none of their three hails is a homeworld line
+		var gazurtoidHome = StarAt( 86, 55 );
+
+		yield return GoIntoOrbit( gazurtoidHome, PlanetInOrbit( gazurtoidHome, 4 ) );
+
+		var gazurtoidHomeBegun = ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == 65 );
+		var gazurtoidHomeSaid = new List<string>();
+
+		yield return LetAliensSpeak( 1, gazurtoidHomeSaid );
+
+		yield return Frames( 3 );
+
+		var gazurtoidHomeLine = ( gazurtoidHomeSaid.Count > 0 ) && SaysLine( gazurtoidHomeSaid[ 0 ], CommText( 95 ) );
+		var gazurtoidHomeLast = gazurtoidHomeBegun && encounter.m_pdEncounter.m_homeworldWarningsGiven;
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		var shimmeringStar = StarAt( 68, 66 );
+
+		yield return GoIntoOrbit( shimmeringStar, PlanetInOrbit( shimmeringStar, 1 ) );
+
+		var gazurtoidAwayBegun = ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == 33 );
+		var gazurtoidAwaySaid = new List<string>();
+
+		yield return LetAliensSpeak( 3, gazurtoidAwaySaid );
+
+		var gazurtoidAwayHomeLine = gazurtoidAwaySaid.Exists( line => SaysLine( line, CommText( 94 ) ) || SaysLine( line, CommText( 95 ) ) );
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		Log( "homeworlds: gazurtoid fleet at home begun " + gazurtoidHomeBegun + ", said " + string.Join( " | ", gazurtoidHomeSaid ) + ", last warning " + gazurtoidHomeLast + " || gazurtoid at 68,66 begun " + gazurtoidAwayBegun + ", said " + string.Join( " | ", gazurtoidAwaySaid ) );
+
+		Check( "homeworlds: the Gazurtoid fleet at their homeworld hails with \"the holy land, the planet of the Gazurtoid\", its last warning", gazurtoidHomeBegun && gazurtoidHomeLine && gazurtoidHomeLast, gazurtoidHomeLine + ", " + gazurtoidHomeLast + " | " + string.Join( " | ", gazurtoidHomeSaid ) );
+		Check( "homeworlds: the Gazurtoid guarding the Shimmering Ball's planet are no home fleet and never say a homeworld line", gazurtoidAwayBegun && ( gazurtoidAwaySaid.Count == 3 ) && !gazurtoidAwayHomeLine, string.Join( " | ", gazurtoidAwaySaid ) );
 
 		// ---- 3. the control: a Thrynn patrol in their home system (encounter 157, met in flight) hails as any Thrynn ship does
 		EnterEncounter( 157 );
@@ -18592,7 +18642,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "homeworlds: the Thrynn home fleet gives its homeworld warnings one after the other while the ship does not answer", thrynnBegun && thrynnInOrder, string.Join( " | ", thrynnSaid ) );
 		Check( "homeworlds: the Thrynn hold their fire until the last warning, then end the comm link and attack", thrynnBegun && !hostileBeforeLast && thrynnHostile, hostileBeforeLast + " -> " + thrynnHostile );
-		Check( "homeworlds: the Veloxi home fleet answers a hail with its homeworld response and attacks", veloxBegun && veloxResponse && veloxHostile, veloxResponse + ", " + veloxHostile + " | " + string.Join( " | ", veloxSaid ) );
+		Check( "homeworlds: the Veloxi home fleet answers a hail with the first of its refusals, \"Us are not answer the questions\", and holds its fire", veloxBegun && veloxResponse && !veloxHostileAfterResponse, veloxResponse + ", hostile " + veloxHostileAfterResponse + " | " + string.Join( " | ", veloxSaid ) );
+		Check( "homeworlds: then the Veloxi give their four homeworld hails in order and attack after the last", veloxBegun && veloxHails && veloxHostile, veloxHails + ", " + veloxHostile + " | " + string.Join( " | ", veloxSaid ) );
 		Check( "homeworlds: a Thrynn patrol met in flight speaks no homeworld line and does not attack (control)", ( patrolLine.Contains( "Receiving" ) ) && !patrolWarned && !patrolHostile, patrolLine );
 
 		Finish( "scenario=homeworlds thrynn=" + thrynnSaid.Count + " velox=" + veloxSaid.Count, 0 );
