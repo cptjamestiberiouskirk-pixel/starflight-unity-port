@@ -853,6 +853,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioRedCylinder();
 				break;
 
+			case "storms":
+				yield return ScenarioStorms();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -20739,6 +20743,137 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "redcylinder: the Red Cylinder flashes on the landing map near an ancient ruin, not far from it, and only aboard", ( atTheRuin is bool ) && (bool) atTheRuin && !(bool) farAway && !(bool) withoutIt && messages.Contains( "The Red Cylinder is flashing" ), withoutIt + ", " + farAway + ", " + atTheRuin + " | " + messages );
 
 		Finish( "scenario=redcylinder placed=" + placed.Count + " worked=" + worked.Count, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 6: storms on the surface
+
+	// calls a static method of PlanetWeather (null on the code before it)
+	static object Weather( string method )
+	{
+		var type = typeof( ShipButton ).Assembly.GetType( "PlanetWeather" );
+		var info = ( type == null ) ? null : type.GetMethod( method );
+
+		return ( info == null ) ? null : info.Invoke( null, null );
+	}
+
+	// the crew on board, all at full vitality
+	static List<PD_Personnel.PD_PersonnelFile> HealCrew()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var crew = new List<PD_Personnel.PD_PersonnelFile>();
+
+		for ( var role = PD_CrewAssignment.Role.First; role < PD_CrewAssignment.Role.Count; role++ )
+		{
+			if ( playerData.m_crewAssignment.IsAssigned( role ) )
+			{
+				var file = playerData.m_crewAssignment.GetPersonnelFile( role );
+
+				if ( ( file != null ) && !crew.Contains( file ) )
+				{
+					file.m_vitality = 100.0f;
+					file.m_isDead = false;
+
+					crew.Add( file );
+				}
+			}
+		}
+
+		return crew;
+	}
+
+	// passes this many game hours of weather, the crew healed before each: returns the storm hours, the heavy snow hours, the storm hours that injured, and the
+	// other hours that injured
+	static int[] PassWeatherHours( int hours )
+	{
+		var counts = new int[ 4 ];
+
+		for ( var i = 0; i < hours; i++ )
+		{
+			var crew = HealCrew();
+
+			Weather( "PassHour" );
+
+			var sky = Weather( "GetSky" );
+			var storm = Weather( "IsStorm" ) is bool && (bool) Weather( "IsStorm" );
+			var injured = crew.Exists( file => file.m_vitality < 100.0f );
+
+			if ( storm )
+			{
+				counts[ 0 ]++;
+			}
+
+			if ( ( sky != null ) && ( sky.ToString() == "SnowingHeavily" ) )
+			{
+				counts[ 1 ]++;
+			}
+
+			if ( injured )
+			{
+				counts[ storm ? 2 : 3 ]++;
+			}
+		}
+
+		HealCrew();
+
+		return counts;
+	}
+
+	IEnumerator ScenarioStorms()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// ---- 1. planet 91 of Arth, Very Violent and frozen: storms half of the hours, heavy snow some, injuries only in storms
+		yield return LandInTheArthSystemAt( 91, Vector3.zero, done );
+
+		yield return Frames( 5 );
+
+		var firstSky = MessageList();
+		var violent = PassWeatherHours( 300 );
+
+		// ---- 2. in a storm: half the efficiency, and the bearing to the ship lost
+		var tries = 0;
+
+		while ( !( ( Weather( "IsStorm" ) is bool ) && (bool) Weather( "IsStorm" ) ) && ( tries++ < 100 ) )
+		{
+			HealCrew();
+			Weather( "PassHour" );
+		}
+
+		HealCrew();
+
+		yield return Frames( 3 );
+
+		var stormEfficiency = Weather( "GetEfficiency" );
+		var displayInStorm = controller.m_displayController.m_terrainVehicleDisplay.m_statusValues.text;
+		var fuelEfficiencyInStorm = controller.m_terrainVehicle.GetFuelEfficiency();
+
+		// ---- 3. back in the ship nothing happens
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+
+		var inShip = PassWeatherHours( 50 );
+
+		// ---- 4. planet 90 of Arth, weather None: storms now and then
+		yield return LandInTheArthSystemAt( 90, Vector3.zero, done );
+
+		yield return Frames( 5 );
+
+		var calm = PassWeatherHours( 300 );
+
+		Log( "storms: first sky " + firstSky + " || planet 91 (Very Violent), 300 hours: storms " + violent[ 0 ] + ", heavy snow " + violent[ 1 ] + ", storm hours that injured " + violent[ 2 ] + ", other hours that injured " + violent[ 3 ] + " | in a storm: efficiency " + stormEfficiency + ", fuel efficiency " + fuelEfficiencyInStorm + ", display " + displayInStorm.Replace( "\n", "/" ) + " || in the ship, 50 hours: storms " + inShip[ 0 ] + ", injuries " + ( inShip[ 2 ] + inShip[ 3 ] ) + " || planet 90 (None), 300 hours: storms " + calm[ 0 ] + ", injured " + calm[ 2 ] + "/" + calm[ 3 ] );
+
+		Check( "storms: on a Very Violent planet storms come in about half of the hours, with heavy snow besides", ( violent[ 0 ] >= 120 ) && ( violent[ 0 ] <= 180 ) && ( violent[ 1 ] >= 30 ), violent[ 0 ] + " storms, " + violent[ 1 ] + " heavy snow of 300 hours" );
+		Check( "storms: a storm injures the crew in about half of its hours, and nothing else does", ( violent[ 0 ] > 0 ) && ( violent[ 2 ] >= violent[ 0 ] * 3 / 10 ) && ( violent[ 2 ] <= violent[ 0 ] * 7 / 10 ) && ( violent[ 3 ] == 0 ), violent[ 2 ] + " of " + violent[ 0 ] + " storm hours, " + violent[ 3 ] + " others" );
+		Check( "storms: in a storm the terrain vehicle has half its efficiency and the bearing to the ship is lost", ( stormEfficiency is float ) && Mathf.Approximately( (float) stormEfficiency, 0.5f ) && displayInStorm.Contains( "LOST!" ), stormEfficiency + " | " + displayInStorm.Replace( "\n", "/" ) );
+		Check( "storms: in the ship there is no weather and no injury", ( inShip[ 0 ] == 0 ) && ( inShip[ 2 ] + inShip[ 3 ] == 0 ), inShip[ 0 ] + " storms, " + ( inShip[ 2 ] + inShip[ 3 ] ) + " injuries" );
+		Check( "storms: on a planet whose weather is None storms are rare but come", ( calm[ 0 ] >= 15 ) && ( calm[ 0 ] <= 60 ), calm[ 0 ] + " storms of 300 hours" );
+
+		Finish( "scenario=storms violent=" + violent[ 0 ] + " calm=" + calm[ 0 ], 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
