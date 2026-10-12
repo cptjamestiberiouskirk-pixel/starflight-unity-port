@@ -17491,12 +17491,42 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 2: the Spemin, the Thrynn and the Veloxi after their losses
 
+	// the placeholders that Encounter.AddComm fills in before a line is said: the player's ship (&), the player's captain (*), the aliens' captain (%) and ship (+)
+	static readonly char[] c_linePlaceholders = { '&', '*', '%', '+' };
+
+	// true if the text holds this line of the game data as it is said - the pieces between its placeholders, in order, with anything in between
+	static bool SaysLine( string text, string line )
+	{
+		var pieces = line.Split( c_linePlaceholders );
+		var position = 0;
+
+		foreach ( var piece in pieces )
+		{
+			// (two placeholders in a row, or one at an end, leave an empty piece)
+			if ( piece.Length == 0 )
+			{
+				continue;
+			}
+
+			var found = text.IndexOf( piece, position, System.StringComparison.Ordinal );
+
+			if ( found < 0 )
+			{
+				return false;
+			}
+
+			position = found + piece.Length;
+		}
+
+		return true;
+	}
+
 	// true if the text holds one of these comms of the game data
 	static bool SaysOneOf( string text, params int[] commIds )
 	{
 		foreach ( var commId in commIds )
 		{
-			if ( text.Contains( CommText( commId ) ) )
+			if ( SaysLine( text, CommText( commId ) ) )
 			{
 				return true;
 			}
@@ -18019,7 +18049,7 @@ public class ClaudeProbe : MonoBehaviour
 	{
 		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
 		{
-			if ( ( comm.m_race == race ) && ( comm.m_subject == subject ) && ( comm.m_stance == stance ) && text.Contains( comm.m_text ) )
+			if ( ( comm.m_race == race ) && ( comm.m_subject == subject ) && ( comm.m_stance == stance ) && SaysLine( text, comm.m_text ) )
 			{
 				return true;
 			}
@@ -18227,7 +18257,7 @@ public class ClaudeProbe : MonoBehaviour
 	{
 		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
 		{
-			if ( ( comm.m_race == race ) && ( comm.m_subject == subject ) && text.Contains( comm.m_text ) )
+			if ( ( comm.m_race == race ) && ( comm.m_subject == subject ) && SaysLine( text, comm.m_text ) )
 			{
 				return true;
 			}
