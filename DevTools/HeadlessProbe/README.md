@@ -37,7 +37,7 @@ What the probe does:
 
 - Opens `Spaceflight.unity` (or `Starport.unity` for scenarios whose name starts with `starport`) and enters play mode.
 - **Never touches the real saves.** Between `DataController.Awake` and `Start` it replaces the private `_saveSystem` with an in-memory one, and it refuses to continue unless `DataController` asked that one about every slot. All five slots are therefore new games.
-- Puts the player in hyperspace, from where the game drops into the Arth star system by itself. `EnsureCrew()` fills every crew role, as a launched ship always has.
+- Puts the player in hyperspace, from where the game drops into the Arth star system by itself. `EnsureCrew()` fills every crew role, as a launched ship always has. It is not called for every scenario (some make a crew of their own), so a scenario that enters an encounter calls it first: what the aliens say names the captain, and with no captain assigned a hail throws in `Encounter.AddComm`.
 - Waits until the planets of that star system have been generated before it starts the scenario. The game is paused while they are being generated, so a scenario that started earlier would lose about two seconds of every real-time wait.
 - Counts exceptions (with their first stack frame), and un-pauses the Editor every tick, because the console's Error Pause preference pauses play mode on the first logged error even in batch mode.
 

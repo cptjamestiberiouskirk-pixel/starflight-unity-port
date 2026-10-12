@@ -1094,6 +1094,9 @@ public class ClaudeProbe : MonoBehaviour
 		var playerData = DataController.m_instance.m_playerData;
 		var gameData = DataController.m_instance.m_gameData;
 
+		// a crew in every role, as a launched ship always has (what the aliens say names the captain, and with no captain a hail threw)
+		EnsureCrew();
+
 		// star system encounters are the ones that come in waves (6 ships, 3 at a time)
 		var encounterId = FindEncounter( 1, 6, 3, 0 );
 
@@ -1147,6 +1150,9 @@ public class ClaudeProbe : MonoBehaviour
 	{
 		var playerData = DataController.m_instance.m_playerData;
 		var combatController = CombatController.m_instance;
+
+		// a crew in every role, as a launched ship always has (what the aliens say names the captain, and with no captain a hail threw)
+		EnsureCrew();
 
 		var firstId = FindEncounter( 1, 6, 3, 0 );
 		var secondId = FindEncounter( 1, 6, 3, 1 );
@@ -10019,6 +10025,9 @@ public class ClaudeProbe : MonoBehaviour
 		var controller = SpaceflightController.m_instance;
 		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
 
+		// a crew in every role, as a launched ship always has (what the aliens say names the captain, and with no captain a hail threw)
+		EnsureCrew();
+
 		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "debris-pictures" ) );
 		var camera = Camera.main;
 
@@ -13788,6 +13797,9 @@ public class ClaudeProbe : MonoBehaviour
 		var encounter = SpaceflightController.m_instance.m_encounter;
 		var templates = encounter.m_alienShipModelTemplate;
 		var debrisTemplates = encounter.m_alienShipDebrisTemplate;
+
+		// a crew in every role, as a launched ship always has (what the aliens say names the captain, and with no captain a hail threw)
+		EnsureCrew();
 
 		Check( "a model slot for every vessel", templates.Length == gameData.m_vesselList.Length, "slots=" + templates.Length + " vessels=" + gameData.m_vesselList.Length );
 		Check( "a debris slot for every vessel", ( debrisTemplates != null ) && ( debrisTemplates.Length == gameData.m_vesselList.Length ), "slots=" + ( ( debrisTemplates == null ) ? -1 : debrisTemplates.Length ) );
