@@ -13903,6 +13903,30 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "recovereddata: the ten story texts are there, with their line breaks", ( missingKeys == "" ) && flareText.Contains( "INCINERATED" ) && flareText.Contains( "\n" ), ( missingKeys == "" ) ? flareText.Replace( '\n', '/' ) : missingKeys.Trim() );
 
+		// ---- the planet messages are recorded as they stand (TVCargoButton), so none may keep a field of STRINFO's editor in brackets: the Mardan 4 sign
+		// reads NO. 17, as the shipped game's message record has it (the decompiled original's instance.txt), where STRINFO prints NO. [NUMBER]
+		var bracketed = "";
+		var mardanSign = "";
+
+		foreach ( var record in messages )
+		{
+			var text = FieldOrNull( record, "m_text" ) as string ?? "";
+
+			if ( text.Contains( "[" ) || text.Contains( "]" ) )
+			{
+				bracketed += FieldOrNull( record, "m_id" ) + " ";
+			}
+
+			if ( Equals( FieldOrNull( record, "m_id" ), 29 ) )
+			{
+				mardanSign = text;
+			}
+		}
+
+		Log( "recovereddata: planet messages with a bracketed field: " + ( ( bracketed == "" ) ? "none" : bracketed.Trim() ) + " | message 29: " + mardanSign );
+
+		Check( "recovereddata: no planet message shows a bracketed field, and the Mardan 4 sign of message 29 reads NO. 17 as in the shipped game", ( bracketed == "" ) && ( mardanSign == "SIGN - MARDAN 4 MINING STATION NO. 17" ), ( bracketed == "" ) ? mardanSign : bracketed.Trim() );
+
 		// ---- the game data file itself is unchanged (control): 811 planets, 51 artifacts, its 556 comms and the 2 recovered drone lines
 		var sizes = gameData.m_planetList.Length + "/" + gameData.m_artifactList.Length + "/" + gameData.m_commList.Length;
 
