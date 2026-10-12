@@ -10,7 +10,8 @@ public class LaunchButton : ShipButton
 	{
 		SpaceflightController.m_instance.m_messages.Clear();
 
-		SpaceflightController.m_instance.m_messages.AddText( "<color=yellow>Confirm launch?</color>" );
+		// the original's words (CAPTAIN: "READY TO LAUNCH / CONFIRM: [N Y]")
+		SpaceflightController.m_instance.m_messages.AddText( "<color=yellow>Ready to launch. Confirm?</color>" );
 
 		SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Launch );
 

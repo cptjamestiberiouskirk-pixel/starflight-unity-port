@@ -141,7 +141,7 @@ The warning screen (2.13.1) and the police's four lines (2.13.2, lines 1549 to 1
 
 ## 2. Starport notices (1.1)
 
-The game data's 20 notices agree with STRINFO word for word (the one exception is "15TH" for STRINFO's "15 TH"). The shipped game differs from both in four places (CONFIRMED, `instance.txt` lines 1988 to 2058). These are changes to the game data, so they are the owner's call:
+The game data's 20 notices agree with STRINFO word for word (the one exception is "15TH" for STRINFO's "15 TH"). The shipped game differs from both in four places (CONFIRMED, `instance.txt` lines 1988 to 2058). These are changes to the game data, so they were the owner's call. Ruled 2026-10-12: the shipped game's words; done in the game data PR of that day (`fix/gamedata-shipped-words`):
 
 | GD notice (date) | GD line | Game data and STRINFO | Shipped game | Category |
 |---|---|---|---|---|
@@ -163,7 +163,7 @@ The six texts are in RD `m_storyTextList` (from STRINFO 1.2) and shown by `Playe
 | TerrainVehicleLost | RD line 1281 | "CONSEQUENLY, YOU HAVE BEEN FINED 10,000 MU." | "CONSEQUENLY" (353) | "CONSEQUENTLY" | STRINFO's typo, copied into RD. Fixed in PR 246 |
 | TowingCharges | RD line 1287 | "LIABLE FOR ANY COSTS INCURRED ... ON BEHALF SAID CREW." | same (359) | "LIABLE FOR ALL COSTS INCURRED ... ON BEHALF OF SAID CREW." | different wording and a missing word in STRINFO. Fixed in PR 246 |
 | EvaluationUnsuitable | `PlayerData.cs:254` | "DUE TO ITS CONDITIONS, THIS PLANET PROVED UNSUITABLE ..." when no reason applies | "[REASON: EXTREME HEAT, ...]" (339) | the reasons only ("EXTREME HEAT," "EXTREME COLD," "CRUSHING GRAVITY," "VIOLENT STORMS," "LACK OF WATER," "LACK OF OXYGEN,") | port's own text where STRINFO has one |
-| Every evaluation | `OperationsPanel.cs` | the text alone; several evaluations at one docking give identical lines with nothing to tell them apart | STRINFO prints the texts only | "RECOMMENDATION: n", "SYSTEM: x,y", "ORBIT: n", "EVALUATION:" above each, "PRESS SPACEBAR FOR NEXT EVALUATION", "END OF EVALUATIONS" | missing lines (STRINFO silent; the shipped game has them) |
+| Every evaluation | `OperationsPanel.cs` | the text alone; several evaluations at one docking give identical lines with nothing to tell them apart | STRINFO prints the texts only | "RECOMMENDATION: n", "SYSTEM: x,y", "ORBIT: n", "EVALUATION:" above each, "PRESS SPACEBAR FOR NEXT EVALUATION", "END OF EVALUATIONS" | missing lines (STRINFO silent; the shipped game has them) Done 2026-10-12 (the owner's request): each evaluation under RECOMMENDATION, DATE, SYSTEM, ORBIT, NAME and EVALUATION, the name typed after the yes ("NAME THIS PLANET: ", `CAPTAIN.c`); the paging ("PRESS SPACEBAR FOR NEXT EVALUATION") is left to the Operations screen work |
 | The three supplemental evaluations | RD, `OperationsPanel.cs` | "SUBJECT: ..." and the body on consecutive lines | a blank line after the SUBJECT line (343 to 359) | | layout |
 | No recommendations filed | `Starport.unity` | "You have not filed any colony world recommendations" | STRINFO silent | "YOU HAVE NOT FILED ANY" / "COLONY WORLD RECOMMENDATIONS" | alike |
 
@@ -175,14 +175,14 @@ The analyses are in GD `m_artifactList` (`m_analysisText`), shown by `TradeDepot
 
 | Artifact | GD line | Game data | STRINFO (line) | Shipped game (`data.h`) | Category |
 |---|---|---|---|---|---|
-| Rod Device (36) | 889 | "an enhanced laer shield" | "LASER SHIELD" (494) | "LASER SHIELD" | typo in the game data |
-| Hypercube (22) | 735 | "atarxia" | "ATARXIA" (470) | "ATARAXIA" | STRINFO's typo, copied into the game data |
+| Rod Device (36) | 889 | "an enhanced laer shield" | "LASER SHIELD" (494) | "LASER SHIELD" | typo in the game data; fixed 2026-10-12 (the owner's ruling) |
+| Hypercube (22) | 735 | "atarxia" | "ATARXIA" (470) | "ATARAXIA" | STRINFO's typo, copied into the game data; fixed 2026-10-12 (the owner's ruling) |
 | Whining Orb (50) | 1043 | "what it does ... communications" | same (512) | "WHAT IS DOES ... COMMUNICATION." | the shipped game's typo ("IS"), STRINFO's wording ("COMMUNICATIONS") |
 | Every analysis | `TradeDepotPanel.cs:462` | the text alone | "STARPORT ANALYSIS:" above each (416 and on) | | missing line (STRINFO's heading; INFERRED that it is the screen's and not the editor's) |
 | Ellipsoid (15) | 658 | name "Ellipsoid" | "ELLIPSOID (FOCUSING STONE)" (455) | | STRINFO's note, most likely (INFERRED); no change |
 | Terrain Vehicle Debris (44) | 977 | 200.0 m3, 0 MU, no analysis text of its own in GD | not in STRINFO | "THE REMAINS OF AN OLDER, INFERIOR MODEL TERRAIN VEHICLE, DOUBTLESSLY LEFT HERE BY SOME PRIOR EXPLORATION PARTY TOO FOOLISH TO RETURN TO THEIR SHIP BEFORE EXHAUSTING THEIR ENERGY." | STRINFO silent; the shipped analysis is missing (INFERRED that GD 44 is that item) |
 
-Prices and volumes (CONFIRMED against the `.DOC`'s tables; game data values, so the owner's call): Humming Gizzy (21) is 500 MU in the game data and 550 in STRINFO; the Shimmering Ball (38) is 0.3 m3 in the game data and 0.1 in STRINFO; Adrynna's Gold (1) has 0.1 m3 and 2500 MU in the game data where STRINFO prints "?". Every other artifact, every Thrynn price and all 21 mineral prices agree, and Endurium's 1000, 1500 and 2000 follow the notices (`GD_Element.cs`).
+Prices and volumes (CONFIRMED against the `.DOC`'s tables): Humming Gizzy (21) is 500 MU in the game data and 550 in STRINFO; the Shimmering Ball (38) is 0.3 m3 in the game data and 0.1 in STRINFO. The original's own data (`Research/Data/Starflight 1 Data.xls`, its Artifacts sheet from the game's files) has the game data's values: HUMMING GIZZY 0.2 m3 at 500 MU (1000 to buy), SHIMMERING BALL 0.3 m3. So STRINFO is the one that differs, and the game data stays as it is (the owner's ruling of 2026-10-12: the original's text and values); Adrynna's Gold (1) has 0.1 m3 and 2500 MU in the game data where STRINFO prints "?". Every other artifact, every Thrynn price and all 21 mineral prices agree, and Endurium's 1000, 1500 and 2000 follow the notices (`GD_Element.cs`).
 
 ## 5. Ruin messages (3.1)
 
@@ -242,7 +242,7 @@ The port's own texts where STRINFO is silent are many (the docking screen's line
 Under D1 the shipped game's text and STRINFO are both sources of the original's behaviour. Where they differ, the shipped game is the original itself, so the recommendation below takes its text; where the change would touch `Starflight Game Data.json`, it waits for the owner.
 
 1. **Ruin messages** (RD only): message 29's "[NUMBER]" becomes "17", as in the shipped game (a bug: the player saw the bracket). Done: PR 239. Optionally, messages 0, 22, 33 and 34 in the shipped game's words.
-2. **Evaluations** (RD): "CONSEQUENTLY", the towing text's "ALL COSTS ... ON BEHALF OF SAID CREW", the blank line after SUBJECT. Done: PR 246. Left for the Operations screen work: the original's heading above each colony evaluation ("RECOMMENDATION:", "DATE:", "SYSTEM:", "ORBIT:", "NAME:", "EVALUATION:", `OP-OV.c`), which needs the date and a name the player gives a logged planet; the port records neither.
+2. **Evaluations** (RD): "CONSEQUENTLY", the towing text's "ALL COSTS ... ON BEHALF OF SAID CREW", the blank line after SUBJECT. Done: PR 246. The original's heading above each colony evaluation ("RECOMMENDATION:", "DATE:", "SYSTEM:", "ORBIT:", "NAME:", "EVALUATION:", `OP-OV.c`), with the name the player types after the yes: done 2026-10-12 (`feat/colony-evaluation-heading`). Seen in the shipped code and not done yet: a planet can be logged only once ("THIS PLANET HAS ALREADY BEEN LOGGED.", which the port's ship's log gives too), and the original's later fines are 10,000 MU for each unsuitable planet recommended before (up to 8), where the port fines 5000 MU a reason.
 3. **Story and reports** (RD): the blank line before GAME OVER and after THERE'S NO RESPONSE! (layout only). The Noah 9 beacon needs no change: the port follows the shipped game's data (section 6).
 4. **Comms in code**: the Thrynn artifact offer ("unitxx", the name's full stop, the amount cut down to the room in the hold). Done: PR 243. Open, behaviour rather than words: the Veloxi homeworld fleet never says GD 473, and the Thrynn home fleet ends on GD 394 (section 1.4).
 5. **Owner's call, the game data**: the four notice words of section 2, "laser" and "ataraxia" in the analyses (section 4), the Humming Gizzy's price and the Shimmering Ball's volume. No comm line of the game data needs a change.

@@ -541,6 +541,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarfieldPictures();
 				break;
 
+			case "skyboxpictures":
+				yield return ScenarioSkyboxPictures();
+				break;
+
 			case "perframe":
 				yield return ScenarioPerFrame();
 				break;
@@ -911,6 +915,14 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "systemtravel":
 				yield return ScenarioSystemTravel();
+				break;
+
+			case "examinetreat":
+				yield return ScenarioExamineTreat();
+				break;
+
+			case "launchconfirm":
+				yield return ScenarioLaunchConfirm();
 				break;
 
 			case "landinglines":
@@ -3618,10 +3630,10 @@ public class ClaudeProbe : MonoBehaviour
 			Check( "M20 repairs never touch a destroyed ship, a ship with no armor, or run without an engineer", ( destroyedArmor == 0 ) && ( bareHullArmor == 250 ) && ( armorWithoutEngineer == 300 ), "destroyed ship " + destroyedArmor + ", bare hull " + bareHullArmor + ", no engineer " + armorWithoutEngineer );
 		}
 
-		// ---- treat
+		// ---- treat (the player chooses who: the one hurt the most)
 		SpaceflightController.m_instance.m_messages.Clear();
 
-		new TreatButton().Execute();
+		TreatThroughTheConsole( worse );
 
 		var treatMessage = MessageList();
 		var rightAfterTreat = "Worse " + worse.m_vitality.ToString( "F0" ) + " Hurt " + hurt.m_vitality.ToString( "F0" ) + " Ashore " + ashore.m_vitality.ToString( "F0" );
@@ -3636,7 +3648,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "M20 treat message: " + treatMessage );
 
 		Check( "M20 the treat button does not heal anyone on the spot", rightAfterTreat == "Worse 20 Hurt 50 Ashore 40", rightAfterTreat );
-		Check( "M20 the doctor treats the crew member who is hurt the most, about 2 points a second at skill 100", ( worseAfter5s >= 29.0f ) && ( worseAfter5s <= 32.0f ) && ( hurtAfter5s == 50.0f ), "after 5 s Worse " + worseAfter5s.ToString( "F1" ) + ", Hurt " + hurtAfter5s.ToString( "F1" ) );
+		Check( "M20 the doctor treats the crew member chosen, about 2 points a second at skill 100", ( worseAfter5s >= 29.0f ) && ( worseAfter5s <= 32.0f ) && ( hurtAfter5s == 50.0f ), "after 5 s Worse " + worseAfter5s.ToString( "F1" ) + ", Hurt " + hurtAfter5s.ToString( "F1" ) );
 		Check( "M20 someone who is not on board is not treated", ashoreAfter5s == 40.0f, "Ashore " + ashoreAfter5s.ToString( "F1" ) + " (was 40)" );
 
 		var treat = "n/a";
@@ -3651,8 +3663,8 @@ public class ClaudeProbe : MonoBehaviour
 			var stillUnderWayWhenDone = (bool) treatmentField.GetValue( crew );
 			var doneMessage = MessageList();
 
-			// the next press picks the next patient
-			new TreatButton().Execute();
+			// the next press treats the next one chosen
+			TreatThroughTheConsole( hurt );
 
 			var nextPatient = (int) patientField.GetValue( crew );
 
@@ -3669,7 +3681,7 @@ public class ClaudeProbe : MonoBehaviour
 
 			worse.m_vitality = 0.0f;
 
-			new TreatButton().Execute();
+			TreatThroughTheConsole( worse );
 
 			var treatingTheDead = (bool) treatmentField.GetValue( crew );
 			var nobodyMessage = MessageList();
@@ -3679,8 +3691,8 @@ public class ClaudeProbe : MonoBehaviour
 			Log( "M20 treat: " + treat + " | message when done: " + doneMessage + " | message with only a dead crew member left: " + nobodyMessage );
 
 			Check( "M20 one patient per command, and the treatment stops at full health", ( worseWhenDone == 100.0f ) && ( hurtWhenWorseIsDone == 50.0f ) && !stillUnderWayWhenDone && doneMessage.Contains( "recovered" ), "Worse " + worseWhenDone.ToString( "F0" ) + ", Hurt " + hurtWhenWorseIsDone.ToString( "F0" ) + ", still under way " + stillUnderWayWhenDone );
-			Check( "M20 the next command treats the next patient, and a better doctor is faster", ( nextPatient == hurt.m_fileId ) && ( hurtAfter10sAtSkill250 == 60.0f ), "next patient file " + nextPatient + " (Hurt is " + hurt.m_fileId + "), 10 s at skill 250 took Hurt from 10 to " + hurtAfter10sAtSkill250.ToString( "F0" ) );
-			Check( "M20 a dead crew member is not treated", !treatingTheDead && nobodyMessage.Contains( "healthy" ), "treatment under way " + treatingTheDead + ", message: " + nobodyMessage );
+			Check( "M20 the next command treats the next one chosen, and a better doctor is faster", ( nextPatient == hurt.m_fileId ) && ( hurtAfter10sAtSkill250 == 60.0f ), "next patient file " + nextPatient + " (Hurt is " + hurt.m_fileId + "), 10 s at skill 250 took Hurt from 10 to " + hurtAfter10sAtSkill250.ToString( "F0" ) );
+			Check( "M20 a dead crew member is not treated", !treatingTheDead && nobodyMessage.Contains( "beyond help" ), "treatment under way " + treatingTheDead + ", message: " + nobodyMessage );
 		}
 
 		Finish( "scenario=m20 repairOnThePress=" + ( armorRightAfter - 300 ) + " repairIn5s=" + ( armorAfter5s - 300 ) + " repair=[" + repair + "] treatOnThePress=[" + rightAfterTreat + "] treatIn5s=Worse" + worseAfter5s.ToString( "F1" ) + "/Hurt" + hurtAfter5s.ToString( "F1" ) + "/Ashore" + ashoreAfter5s.ToString( "F1" ) + " treat=[" + treat + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
@@ -10536,6 +10548,157 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=starfieldpictures stars=" + starCount + " flatLayers=" + flatLayers.Count + " glint=" + ( glintShare * 100.0f ).ToString( "F1" ) + "% twinkleStreams=" + twinkleStreams + "/" + particleSystems.Length + " twinkled=" + twinkled + "/" + starPixels + " errors=" + errorsDuring + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
+	// ---------------------------------------------------------------- Low: skybox pictures (the skybox's rotation stays a rotation, and the sky of each territory is not black, with -Graphics)
+
+	// render the skybox alone (a camera of its own that clears with it and draws no objects), looking in a direction, and return how bright the picture is on average (0 to 255, the brightest channel of each pixel)
+	static float RenderSkyboxOnly( Vector3 direction, string path )
+	{
+		var main = Camera.main;
+		var cameraObject = new GameObject( "Probe Skybox Camera" );
+		var camera = cameraObject.AddComponent<Camera>();
+
+		camera.CopyFrom( main );
+		camera.rect = new Rect( 0.0f, 0.0f, 1.0f, 1.0f );
+		camera.enabled = false;
+		camera.clearFlags = CameraClearFlags.Skybox;
+		camera.cullingMask = 0;
+		camera.fieldOfView = 90.0f;
+		camera.transform.position = main.transform.position;
+		camera.transform.rotation = Quaternion.LookRotation( direction, ( Mathf.Abs( direction.y ) > 0.99f ) ? Vector3.forward : Vector3.up );
+
+		var renderTexture = new RenderTexture( 1920, 1080, 24, RenderTextureFormat.ARGB32 );
+		var picture = new Texture2D( 1920, 1080, TextureFormat.RGB24, false );
+
+		camera.targetTexture = renderTexture;
+		camera.Render();
+		camera.targetTexture = null;
+
+		var active = RenderTexture.active;
+
+		RenderTexture.active = renderTexture;
+		picture.ReadPixels( new Rect( 0, 0, 1920, 1080 ), 0, 0 );
+		picture.Apply();
+		RenderTexture.active = active;
+
+		System.IO.File.WriteAllBytes( path, picture.EncodeToPNG() );
+
+		var pixels = picture.GetPixels32();
+		var sum = 0.0;
+		var count = 0;
+
+		for ( var i = 0; i < pixels.Length; i += 7 )
+		{
+			sum += Mathf.Max( pixels[ i ].r, Mathf.Max( pixels[ i ].g, pixels[ i ].b ) );
+			count++;
+		}
+
+		UnityEngine.Object.Destroy( picture );
+		renderTexture.Release();
+		UnityEngine.Object.Destroy( renderTexture );
+		UnityEngine.Object.Destroy( cameraObject );
+
+		return ( count > 0 ) ? (float) ( sum / count ) : 0.0f;
+	}
+
+	// whether a quaternion is a rotation: finite, and of unit length
+	static bool IsRotation( Quaternion rotation )
+	{
+		if ( !float.IsFinite( rotation.x ) || !float.IsFinite( rotation.y ) || !float.IsFinite( rotation.z ) || !float.IsFinite( rotation.w ) )
+		{
+			return false;
+		}
+
+		var length = Mathf.Sqrt( rotation.x * rotation.x + rotation.y * rotation.y + rotation.z * rotation.z + rotation.w * rotation.w );
+
+		return Mathf.Abs( length - 1.0f ) < 0.001f;
+	}
+
+	IEnumerator ScenarioSkyboxPictures()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+		var camera = Camera.main;
+		var skybox = StarflightSkybox.m_instance;
+
+		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "skybox-pictures" ) );
+
+		if ( hasGraphics )
+		{
+			System.IO.Directory.CreateDirectory( folder );
+		}
+
+		// the scene's first frames include one that takes no time (seen headless): the speed of the ship divided by it made the rotation not a number
+		yield return Frames( 5 );
+
+		Check( "start-rotation", IsRotation( skybox.m_currentRotation ), "the skybox's rotation after the scene starts is " + skybox.m_currentRotation.ToString( "F3" ) );
+
+		// a ship with no maximum speed (engines broken beyond use) that is standing still: its speed over its maximum speed is zero over zero
+		skybox.m_currentRotation = Quaternion.identity;
+
+		var maximumSpeed = playerData.m_general.m_currentMaximumSpeed;
+
+		playerData.m_general.m_currentMaximumSpeed = 0.0f;
+
+		yield return Frames( 3 );
+
+		var maximumSpeedSeen = playerData.m_general.m_currentMaximumSpeed;
+		var rotationSeen = skybox.m_currentRotation;
+
+		playerData.m_general.m_currentMaximumSpeed = maximumSpeed;
+
+		Check( "no-maximum-speed", IsRotation( rotationSeen ), "with a maximum speed of " + maximumSpeedSeen + " the skybox's rotation is " + rotationSeen.ToString( "F3" ) );
+
+		controller.m_encounterRange = 0.0f;
+
+		// human space at Arth's star (game coordinates (4, 4) are in a territory of the Uhlek), then the middle of the first territory of each race
+		var places = new List<KeyValuePair<string, Vector3>>();
+		var arth = gameData.m_starList[ gameData.m_misc.m_arthStarId ];
+
+		places.Add( new KeyValuePair<string, Vector3>( "human", Tools.GameToWorldCoordinates( new Vector3( arth.m_xCoordinate, 0.0f, arth.m_yCoordinate ) ) ) );
+
+		var named = new HashSet<string>();
+
+		foreach ( var territory in gameData.m_territoryList )
+		{
+			if ( named.Add( territory.m_name ) )
+			{
+				places.Add( new KeyValuePair<string, Vector3>( territory.m_name, Tools.GameToWorldCoordinates( new Vector3( territory.m_xCoordinate, 0.0f, territory.m_yCoordinate ) ) ) );
+			}
+		}
+
+		foreach ( var place in places )
+		{
+			playerData.m_general.m_lastHyperspaceCoordinates = place.Value;
+			controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+			yield return Frames( 20 );
+
+			Log( "skyboxpictures: " + place.Key + ": skybox A " + skybox.m_currentSkyboxA + ", B " + skybox.m_currentSkyboxB + ", blend " + skybox.m_currentBlendFactor.ToString( "F2" ) + ", rotation " + skybox.m_currentRotation.ToString( "F3" ) );
+
+			Check( place.Key + "-rotation", IsRotation( skybox.m_currentRotation ), "the skybox's rotation is " + skybox.m_currentRotation.ToString( "F3" ) );
+
+			if ( hasGraphics )
+			{
+				RenderCameraPicture( camera, System.IO.Path.Combine( folder, place.Key + "_game.png" ) );
+
+				var down = RenderSkyboxOnly( Vector3.down, System.IO.Path.Combine( folder, place.Key + "_sky_down.png" ) );
+				var horizon = RenderSkyboxOnly( Vector3.forward, System.IO.Path.Combine( folder, place.Key + "_sky_horizon.png" ) );
+				var corner = RenderSkyboxOnly( new Vector3( 1.0f, -1.0f, 1.0f ).normalized, System.IO.Path.Combine( folder, place.Key + "_sky_corner.png" ) );
+
+				// every sky texture is dark, but none is black: the darkest set (the Elowan's) averages above 4 of 255
+				Check( place.Key + "-sky", ( down + horizon + corner ) / 3.0f > 1.0f, "the sky's average brightness is " + down.ToString( "F1" ) + " looking down, " + horizon.ToString( "F1" ) + " at the horizon, " + corner.ToString( "F1" ) + " at a corner" );
+			}
+
+			controller.SwitchLocation( PD_General.Location.StarSystem );
+
+			yield return Frames( 5 );
+		}
+
+		Finish( "scenario=skyboxpictures places=" + places.Count + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
 	// ---------------------------------------------------------------- Low: what the displays cost every frame (the status display, the terrain vehicle display)
 
 	// something for the control measurement to hold on to
@@ -12329,7 +12492,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 3 );
 
-		PressButton( ButtonController.ButtonSet.Launch, 0 );
+		PressButtonLabelled( ButtonController.ButtonSet.Launch, "Yes" );
 
 		// wait for the ship to be in orbit (or for the encounter, if it does not wait)
 		yield return WaitForLocation( PD_General.Location.InOrbit, 25.0f );
@@ -13968,6 +14131,25 @@ public class ClaudeProbe : MonoBehaviour
 		var sizes = gameData.m_planetList.Length + "/" + gameData.m_artifactList.Length + "/" + gameData.m_commList.Length;
 
 		Check( "recovereddata: the original game data is unchanged (control)", sizes == "811/51/558", sizes );
+
+		// ---- the game data's notices and Starport analyses were typed from STRINFO, and six of their words are STRINFO's slips: they read as the shipped game
+		// has them (its notice records in the decompiled original's instance.txt, its analyses in data.h; the owner's ruling of 2026-10-12)
+		var noticeText = "";
+
+		foreach ( var notice in gameData.m_noticeList )
+		{
+			noticeText += notice.m_message + "\n";
+		}
+
+		var hypercubeAnalysis = gameData.m_artifactList[ gameData.FindArtifactId( "Hypercube" ) ].m_analysisText;
+		var rodDeviceAnalysis = gameData.m_artifactList[ gameData.FindArtifactId( "Rod Device" ) ].m_analysisText;
+
+		var shippedWords = noticeText.Contains( "penalized for recommendations of planets" ) && noticeText.Contains( "lost several ships in its vicinity." ) && noticeText.Contains( "Extensive experience as communications officer on board the ISS Intrepid" )
+			&& noticeText.Contains( "indicate that minimal or no life" ) && !noticeText.Contains( "minimial" ) && hypercubeAnalysis.Contains( "feeling of ataraxia." ) && rodDeviceAnalysis.Contains( "enhanced laser shield" );
+
+		Log( "recovereddata: the Hypercube's analysis: " + hypercubeAnalysis + " | the Rod Device's: " + rodDeviceAnalysis );
+
+		Check( "recovereddata: the notices and the Starport's analyses have the shipped game's words (penalized for, its vicinity, as communications officer, minimal, ataraxia, laser shield)", shippedWords, hypercubeAnalysis + " | " + rodDeviceAnalysis );
 
 		Finish( "scenario=recovereddata counts=" + counts + " unresolved=" + ( ( unresolved == "" ) ? "none" : unresolved.Trim().Replace( ' ', ',' ) ) + " planets=" + planets.Replace( ' ', ',' ) + " gameData=" + sizes, 0 );
 	}
@@ -17507,11 +17689,16 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 1: colony recommendations
 
-	// goes into orbit around a planet, logs it with the real Log Planet button and answers the question - returns whether the question was asked
-	static IEnumerator LogAndRecommend( int planetId, bool recommend, bool[] asked )
+	// goes into orbit around a planet, logs it with the real Log Planet button and answers the question - returns whether the question was asked; after a yes,
+	// if the console asks for the planet's name (the original's "NAME THIS PLANET: "), types this on the probe's keyboard (text events, a backspace as '\b')
+	// and presses Enter - and adds what the console said after the yes and after the Enter
+	static IEnumerator LogAndRecommend( int planetId, bool recommend, bool[] asked, string name = null, List<string> said = null )
 	{
 		var gameData = DataController.m_instance.m_gameData;
 		var controller = SpaceflightController.m_instance;
+
+		// the probe's keyboard is the current one before the yes (a headless run has none, and the yes looks for it)
+		var keyboard = ProbeKeyboard();
 
 		yield return GoIntoOrbit( gameData.m_planetList[ planetId ].m_starId, planetId );
 
@@ -17537,6 +17724,31 @@ public class ClaudeProbe : MonoBehaviour
 			PressButton( (ButtonController.ButtonSet) recommendSet, recommend ? 1 : 0 );
 
 			yield return Frames( 2 );
+
+			var afterAnswer = MessageList();
+
+			if ( said != null )
+			{
+				said.Add( afterAnswer );
+			}
+
+			// only when the console asks for it: on the code before the name an Enter would press one of the command buttons
+			if ( recommend && ( name != null ) && afterAnswer.Contains( "Name this planet" ) )
+			{
+				foreach ( var character in name )
+				{
+					InputSystem.QueueTextEvent( keyboard, character );
+
+					yield return Frames( 2 );
+				}
+
+				yield return Tap( Key.Enter );
+
+				if ( said != null )
+				{
+					said.Add( MessageList() );
+				}
+			}
 		}
 	}
 
@@ -17575,13 +17787,17 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		// ---- 1. Log Planet asks whether to recommend the planet, and Yes recommends it
-		yield return LogAndRecommend( heaven, true, asked );
+		// ---- 1. Log Planet asks whether to recommend the planet, and Yes recommends it; the player names it ("New EdenX" and a backspace, a name longer than the
+		// original's 15 characters, and none at all)
+		var saidForHeaven = new List<string>();
+		var saidForA = new List<string>();
+
+		yield return LogAndRecommend( heaven, true, asked, "New EdenX\b", saidForHeaven );
 
 		var askedForHeaven = asked[ 0 ];
 
-		yield return LogAndRecommend( unsuitableA, true, asked );
-		yield return LogAndRecommend( unsuitableB, true, asked );
+		yield return LogAndRecommend( unsuitableA, true, asked, "ABCDEFGHIJKLMNOPQRS", saidForA );
+		yield return LogAndRecommend( unsuitableB, true, asked, "" );
 
 		// ---- 2. the control: No does not recommend it
 		yield return LogAndRecommend( notRecommended, false, asked );
@@ -17632,6 +17848,17 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "colonies: back at the Starport an optimal planet of Interstel's list earns its bonus", ledger.Contains( "Colony bonus 50000+" ) && evaluationText.Contains( "OPTIMAL PLANET" ) && evaluationText.Contains( "BONUS OF 50000" ), ledger );
 		Check( "colonies: the first unsuitable planet is a warning of 100 MU, with its reasons", ledger.Contains( "Colony fine 100-" ) && evaluationText.Contains( "FINED 100 MU'S.  THIS IS ONLY A WARNING" ) && ( reasonsA.Length > 0 ) && evaluationText.Contains( reasonsA.Split( ',' )[ 0 ].Trim() ), ledger + " | " + reasonsA );
 		Check( "colonies: a later unsuitable planet is fined heavily, 5000 MU for each reason, with no warning", ledger.Contains( "Colony fine " + ( 5000 * reasonCountB ) + "-" ) && ( change == 50000 - 100 - 5000 * reasonCountB ) && ( pendingAfter == 0 ), ledger + " | " + change + " | pending " + pendingAfter );
+
+		// ---- 4. the original's evaluation screen (OP-OV): each evaluation under its recommendation's number, date, system, orbit and the name the player gave it
+		var heavenOrbit = gameData.m_planetList[ heaven ].m_orbitPosition;
+		var orbitA = gameData.m_planetList[ unsuitableA ].m_orbitPosition;
+		var orbitB = gameData.m_planetList[ unsuitableB ].m_orbitPosition;
+
+		Log( "colonies: said after the yes and the Enter for Mardan 4: " + string.Join( " || ", saidForHeaven ).Replace( '\n', '/' ) + " | for " + unsuitableA + ": " + string.Join( " || ", saidForA ).Replace( '\n', '/' ) );
+
+		Check( "colonies: after Yes the console asks \"Name this planet:\", and after the name and Enter says \"Recommendation logged.\"", ( saidForHeaven.Count == 2 ) && saidForHeaven[ 0 ].Contains( "Name this planet: _" ) && saidForHeaven[ 1 ].Contains( "Recommendation logged." ), string.Join( " || ", saidForHeaven ) );
+		Check( "colonies: Mardan 4's evaluation is under RECOMMENDATION: 1, its DATE, SYSTEM: 217,88, its ORBIT and NAME: NEW EDEN (a backspace took the X away)", evaluationText.Contains( "RECOMMENDATION: 1\nDATE: " ) && System.Text.RegularExpressions.Regex.IsMatch( evaluationText, "RECOMMENDATION: 1\nDATE: \\d\\d-\\d\\d-\\d{4}\nSYSTEM: 217,88\nORBIT: " + heavenOrbit + "\nNAME: NEW EDEN\nEVALUATION:\nGOOD WORK!" ), evaluationText.Replace( '\n', '/' ) );
+		Check( "colonies: a name is cut to the original's 15 characters, and a planet left unnamed has an empty NAME line", evaluationText.Contains( "RECOMMENDATION: 2\n" ) && evaluationText.Contains( "SYSTEM: 55,32\nORBIT: " + orbitA + "\nNAME: ABCDEFGHIJKLMNO\nEVALUATION:\nDUE TO" ) && evaluationText.Contains( "RECOMMENDATION: 3\n" ) && evaluationText.Contains( "ORBIT: " + orbitB + "\nNAME: \nEVALUATION:\nDUE TO" ), evaluationText.Replace( '\n', '/' ) );
 
 		Finish( "scenario=colonies asked=" + askedForHeaven + " pending=" + pendingCount + " change=" + change + " pendingAfter=" + pendingAfter, 0 );
 	}
@@ -22822,6 +23049,249 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "systemtravel: docking at the Starport says Closing docking bay doors, as the original", ( locationDocked == PD_General.Location.DockingBay ) && docked.Contains( "Closing docking bay doors" ), locationDocked + ": " + docked );
 
 		Finish( "scenario=systemtravel", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: Examine and Treat ask who, as the original's doctor
+
+	// the button set that asks whether to stop a treatment (null before it existed)
+	static ButtonController.ButtonSet? StopTreatmentButtonSet()
+	{
+		try
+		{
+			return (ButtonController.ButtonSet) Enum.Parse( typeof( ButtonController.ButtonSet ), "StopTreatment" );
+		}
+		catch ( ArgumentException )
+		{
+			return null;
+		}
+	}
+
+	// the doctor's question is showing this crew member's name
+	static bool ChooserShows( PD_Personnel.PD_PersonnelFile crewMember )
+	{
+		return MessageList().Contains( "<color=white>" + crewMember.m_name + "</color>/Choose crewmember" );
+	}
+
+	// goes to the crew member in the doctor's question with the stick and chooses them with the fire button, as the player does - false if the name never came up
+	static bool ChooseCrewMember( PD_Personnel.PD_PersonnelFile crewMember )
+	{
+		var buttonController = SpaceflightController.m_instance.m_buttonController;
+
+		for ( var step = 0; step < 7; step++ )
+		{
+			if ( ChooserShows( crewMember ) )
+			{
+				ConsoleFrameWith( "m_submit" );
+
+				return true;
+			}
+
+			ConsoleFrameWith( "m_east" );
+
+			// (the stick back in the middle, so that the next push is a step of its own)
+			Call( buttonController, "Update" );
+		}
+
+		return false;
+	}
+
+	// Examine as the player does it: the button, then the crew member - returns the doctor's answer
+	static string ExamineThroughTheConsole( PD_Personnel.PD_PersonnelFile crewMember )
+	{
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.Medical, 0 );
+
+		ChooseCrewMember( crewMember );
+
+		return MessageList();
+	}
+
+	// Treat as the player does it: the button, Yes or No if the doctor asks whether to stop a treatment, then the crew member - returns the doctor's answer
+	static string TreatThroughTheConsole( PD_Personnel.PD_PersonnelFile crewMember, bool stopTheTreatment = true )
+	{
+		var buttonController = SpaceflightController.m_instance.m_buttonController;
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.Medical, 1 );
+
+		var stopTreatment = StopTreatmentButtonSet();
+
+		if ( ( stopTreatment != null ) && ( buttonController.GetCurrentButtonSet() == stopTreatment.Value ) )
+		{
+			PressButton( stopTreatment.Value, stopTheTreatment ? 1 : 0 );
+
+			if ( !stopTheTreatment )
+			{
+				return MessageList();
+			}
+		}
+
+		ChooseCrewMember( crewMember );
+
+		return MessageList();
+	}
+
+	IEnumerator ScenarioExamineTreat()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var crewAssignment = playerData.m_crewAssignment;
+
+		EnsureCrew();
+
+		EnterStarSystem( gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		// a crew of separate people (EnsureCrew puts one person in every role): the captain whole, the science officer at 70, the navigator at 15, the engineer
+		// dead, and a doctor of skill 100
+		playerData.m_personnel.m_personnelList.Clear();
+
+		var captain = AddPerson( "Captain", 100.0f, 100 );
+		var scienceOfficer = AddPerson( "Science", 70.0f, 100 );
+		var navigator = AddPerson( "Navigator", 15.0f, 100 );
+		var engineer = AddPerson( "Engineer", 0.0f, 100 );
+		var communicationsOfficer = AddPerson( "Comms", 100.0f, 100 );
+		var doctor = AddPerson( "Doctor", 100.0f, 100 );
+
+		engineer.m_isDead = true;
+
+		crewAssignment.Assign( PD_CrewAssignment.Role.Captain, captain.m_fileId );
+		crewAssignment.Assign( PD_CrewAssignment.Role.ScienceOfficer, scienceOfficer.m_fileId );
+		crewAssignment.Assign( PD_CrewAssignment.Role.Navigator, navigator.m_fileId );
+		crewAssignment.Assign( PD_CrewAssignment.Role.Engineer, engineer.m_fileId );
+		crewAssignment.Assign( PD_CrewAssignment.Role.CommunicationsOfficer, communicationsOfficer.m_fileId );
+		crewAssignment.Assign( PD_CrewAssignment.Role.Doctor, doctor.m_fileId );
+
+		crewAssignment.m_treatmentIsUnderWay = false;
+
+		var durability = gameData.m_crewRaceList[ scienceOfficer.m_crewRaceId ].m_durability;
+
+		// ---- Examine: the question, then the science officer
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.Medical, 0 );
+
+		var examineQuestion = MessageList();
+		var examined = ChooseCrewMember( scienceOfficer ) ? MessageList() : "(the science officer's name never came up) " + MessageList();
+		var examinedDead = ExamineThroughTheConsole( engineer );
+
+		// ---- Treat: the navigator
+		var treatNavigator = TreatThroughTheConsole( navigator );
+		var patientAfterTreat = crewAssignment.GetPatient();
+		var examinedPatient = ExamineThroughTheConsole( navigator );
+
+		// ---- Treat again: the doctor asks whether to stop - No, then Yes and the captain
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.Medical, 1 );
+
+		var stopQuestion = MessageList();
+		var stopTreatmentSet = StopTreatmentButtonSet();
+		var asked = ( stopTreatmentSet != null ) && ( SpaceflightController.m_instance.m_buttonController.GetCurrentButtonSet() == stopTreatmentSet.Value );
+
+		if ( asked )
+		{
+			PressButton( stopTreatmentSet.Value, 0 );
+		}
+
+		var continuing = MessageList();
+		var patientAfterNo = crewAssignment.GetPatient();
+
+		// Yes: the doctor stops, and asks who to treat instead (the line about stopping stands before the question until the choice)
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.Medical, 1 );
+
+		if ( asked )
+		{
+			PressButton( stopTreatmentSet.Value, 1 );
+		}
+
+		var ceasing = MessageList();
+
+		ChooseCrewMember( captain );
+
+		var treatCaptain = MessageList();
+		var underWayAfterCaptain = crewAssignment.m_treatmentIsUnderWay;
+
+		// ---- Treat the dead engineer
+		var treatEngineer = TreatThroughTheConsole( engineer );
+
+		Log( "examinetreat: Examine asks: " + examineQuestion + " | the science officer (durability " + durability + "): " + examined + " | the dead engineer: " + examinedDead );
+		Log( "examinetreat: Treat the navigator: " + treatNavigator + " | patient " + ( ( patientAfterTreat == null ) ? "none" : patientAfterTreat.m_name ) + " | Examine the navigator: " + examinedPatient );
+		Log( "examinetreat: Treat again asks (" + asked + "): " + stopQuestion + " | No: " + continuing + " | Yes: " + ceasing + " | the captain: " + treatCaptain + " (under way " + underWayAfterCaptain + ") | the engineer: " + treatEngineer );
+
+		Check( "examinetreat: Examine asks who, as the original's WHO SHOULD I EXAMINE? / CHOOSE CREWMEMBER", examineQuestion.Contains( "Who should I examine?" ) && examineQuestion.Contains( "Choose crewmember" ), examineQuestion );
+		Check( "examinetreat: the examination of the one chosen is the original's sentence", examined.Contains( scienceOfficer.m_name + " is moderately wounded, and has a vitality of 70 and a durability of " + durability + "." ) && examinedDead.Contains( engineer.m_name + " is dead." ), examined + " | " + examinedDead );
+		Check( "examinetreat: Treat starts the treatment of the one chosen, and Examine then says so", treatNavigator.Contains( "I am starting treatment on " + navigator.m_name + "." ) && ( patientAfterTreat == navigator ) && examinedPatient.Contains( navigator.m_name + " is currently being treated." ), treatNavigator + " | " + examinedPatient );
+		Check( "examinetreat: with a treatment under way Treat asks whether to stop it, and No continues it", stopQuestion.Contains( "Should I stop treating " + navigator.m_name + " to treat someone else?" ) && asked && continuing.Contains( "I am continuing treatment on " + navigator.m_name + "." ) && ( patientAfterNo == navigator ), stopQuestion + " | " + continuing );
+		Check( "examinetreat: Yes stops it and asks who instead, and a crew member who is whole or dead is not treated", ceasing.Contains( "I am ceasing treatment on " + navigator.m_name + "." ) && ceasing.Contains( "Who should I treat?" ) && treatCaptain.Contains( captain.m_name + " doesn't need medical treatment." ) && !underWayAfterCaptain && treatEngineer.Contains( engineer.m_name + " is beyond help." ), ceasing + " | " + treatCaptain + " | " + treatEngineer );
+
+		Finish( "scenario=examinetreat", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the launch's confirmation in the original's words
+
+	// the labels of the buttons of a button set, in their order
+	static string ButtonSetLabels( ButtonController.ButtonSet buttonSet )
+	{
+		var buttonSets = GetField( SpaceflightController.m_instance.m_buttonController, "m_buttonSets" ) as ShipButton[][];
+		var buttons = buttonSets[ (int) buttonSet ];
+		var labels = new List<string>();
+
+		foreach ( var button in buttons )
+		{
+			labels.Add( button.GetLabel() );
+		}
+
+		return string.Join( ",", labels );
+	}
+
+	// press the button of a button set that has the given label (whatever its place)
+	static void PressButtonLabelled( ButtonController.ButtonSet buttonSet, string label )
+	{
+		var labels = ButtonSetLabels( buttonSet ).Split( ',' );
+
+		PressButton( buttonSet, Array.IndexOf( labels, label ) );
+	}
+
+	IEnumerator ScenarioLaunchConfirm()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+
+		EnsureCrew();
+
+		// in the docking bay: Launch, then No
+		controller.SwitchLocation( PD_General.Location.DockingBay );
+
+		yield return Frames( 10 );
+
+		PressButton( ButtonController.ButtonSet.CommandA, 0 );
+
+		yield return Frames( 2 );
+
+		var question = MessageList();
+		var labels = ButtonSetLabels( ButtonController.ButtonSet.Launch );
+
+		PressButtonLabelled( ButtonController.ButtonSet.Launch, "No" );
+
+		yield return Frames( 5 );
+
+		var locationAfterNo = playerData.m_general.m_location;
+		var setAfterNo = buttonController.GetCurrentButtonSet();
+
+		Log( "launchconfirm: Launch asks: " + question + " | buttons " + labels + " | after No: " + locationAfterNo + ", " + setAfterNo );
+
+		Check( "launchconfirm: Launch asks in the original's words, READY TO LAUNCH / CONFIRM", question.Contains( "Ready to launch." ) && question.Contains( "Confirm?" ), question );
+		Check( "launchconfirm: No comes before Yes, as the original's [N Y]", labels == "No,Yes", labels );
+		Check( "launchconfirm: No keeps the ship in the docking bay with the bridge buttons (control)", ( locationAfterNo == PD_General.Location.DockingBay ) && ( setAfterNo == ButtonController.ButtonSet.Bridge ), locationAfterNo + ", " + setAfterNo );
+
+		Finish( "scenario=launchconfirm", 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 7: the landing's lines in the original's order

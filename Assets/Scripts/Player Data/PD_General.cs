@@ -120,6 +120,22 @@ public class PD_General
 	public List<int> m_colonyRecommendationList;
 	public int m_unsuitableRecommendationCount;
 
+	// what the original keeps of a recommendation for its evaluation screen (CAPTAIN overlay, (/LOG-PLAN) in the decompiled original): its number, counted over
+	// the whole game, the stardate it was logged on and the name the player gave the planet ("NAME THIS PLANET: ", up to 15 characters) - one record for each
+	// planet of m_colonyRecommendationList (save files from before the records have none)
+	[Serializable] public class ColonyRecommendation
+	{
+		public int m_planetId;
+		public int m_number;
+		public string m_stardateYMD;
+		public string m_name;
+	}
+
+	public const int c_maximumPlanetNameLength = 15;
+
+	public List<ColonyRecommendation> m_colonyRecommendationRecordList;
+	public int m_colonyRecommendationCount;
+
 	// the day and the hour the two stardate texts were last made for (not saved - they are made again in the first update after a load)
 	[NonSerialized] int m_stardateDay = -1;
 	[NonSerialized] int m_stardateHour = -1;
@@ -257,6 +273,9 @@ public class PD_General
 
 		m_colonyRecommendationList = new List<int>();
 		m_unsuitableRecommendationCount = 0;
+
+		m_colonyRecommendationRecordList = new List<ColonyRecommendation>();
+		m_colonyRecommendationCount = 0;
 	}
 
 	// get the id of the last comm used to answer a question about this subject for this race
@@ -406,6 +425,48 @@ public class PD_General
 		if ( !m_colonyRecommendationList.Contains( planetId ) )
 		{
 			m_colonyRecommendationList.Add( planetId );
+
+			// the record the evaluation screen shows: the next number and today's stardate (the name comes when the player has typed it)
+			if ( m_colonyRecommendationRecordList == null )
+			{
+				m_colonyRecommendationRecordList = new List<ColonyRecommendation>();
+			}
+
+			m_colonyRecommendationCount++;
+
+			m_colonyRecommendationRecordList.Add( new ColonyRecommendation { m_planetId = planetId, m_number = m_colonyRecommendationCount, m_stardateYMD = m_currentStardateYMD, m_name = "" } );
+		}
+	}
+
+	// the record of a pending recommendation of this planet (null if there is none: a save file from before the records)
+	public ColonyRecommendation FindColonyRecommendation( int planetId )
+	{
+		if ( m_colonyRecommendationRecordList == null )
+		{
+			return null;
+		}
+
+		foreach ( var record in m_colonyRecommendationRecordList )
+		{
+			if ( record.m_planetId == planetId )
+			{
+				return record;
+			}
+		}
+
+		return null;
+	}
+
+	// call this when the player has named the planet of a pending recommendation (cut to the original's 15 characters)
+	public void NameColonyRecommendation( int planetId, string name )
+	{
+		var record = FindColonyRecommendation( planetId );
+
+		if ( record != null )
+		{
+			name = ( name ?? "" ).Trim();
+
+			record.m_name = ( name.Length > c_maximumPlanetNameLength ) ? name.Substring( 0, c_maximumPlanetNameLength ) : name;
 		}
 	}
 
