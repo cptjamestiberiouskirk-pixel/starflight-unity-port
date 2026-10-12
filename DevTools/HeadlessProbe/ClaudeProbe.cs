@@ -20284,6 +20284,54 @@ public class ClaudeProbe : MonoBehaviour
 	}
 
 	// the distance ahead of the vehicle's middle at which a deposit's sphere stops overlapping the vehicle's capsule (Physics.ComputePenetration, no move needed)
+	// the elevation of the ground at this place of the planet, the way the terrain vehicle reads it (TerrainVehicle.ApplyElevation, before the scale)
+	static float GroundElevation( PlanetGenerator planetGenerator, Vector3 worldCoordinates )
+	{
+		var x = worldCoordinates.x * 0.25f + planetGenerator.m_textureMapWidth * 0.5f - 0.5f;
+		var y = worldCoordinates.z * 0.25f + planetGenerator.m_textureMapHeight * 0.5f - 0.5f;
+
+		return planetGenerator.GetBicubicSmoothedElevation( x, y );
+	}
+
+	static float s_highestGroundFound;
+
+	// the nearest place, in rings of 16 units, where the terrain vehicle and everything 16 around it stand above the water (the vehicle floats and bobs below it)
+	static bool FindDryGround( TerrainVehicle terrainVehicle, Vector3 near, out Vector3 dry )
+	{
+		dry = near;
+
+		var planetGenerator = FieldOrNull( terrainVehicle, "m_planetGenerator" ) as PlanetGenerator;
+
+		if ( planetGenerator == null )
+		{
+			return false;
+		}
+
+		var water = planetGenerator.m_waterElevation + 0.002f;
+
+		s_highestGroundFound = -1.0f;
+
+		for ( var ring = 0; ring < 60; ring++ )
+		{
+			for ( var i = 0; i < 16; i++ )
+			{
+				var angle = i * 22.5f * Mathf.Deg2Rad;
+				var place = near + new Vector3( Mathf.Sin( angle ), 0.0f, Mathf.Cos( angle ) ) * ring * 16.0f;
+
+				s_highestGroundFound = Mathf.Max( s_highestGroundFound, GroundElevation( planetGenerator, place ) );
+
+				if ( ( GroundElevation( planetGenerator, place ) >= water ) && ( GroundElevation( planetGenerator, place + Vector3.forward * 16.0f ) >= water ) && ( GroundElevation( planetGenerator, place + Vector3.back * 16.0f ) >= water ) && ( GroundElevation( planetGenerator, place + Vector3.left * 16.0f ) >= water ) && ( GroundElevation( planetGenerator, place + Vector3.right * 16.0f ) >= water ) )
+				{
+					dry = place;
+
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
 	static float DistanceWhereItTouches( Collider vehicleCollider, TerrainElement deposit, Vector3 from, Vector3 forward )
 	{
 		var sphere = deposit.GetComponentInChildren<SphereCollider>();
@@ -20309,6 +20357,45 @@ public class ClaudeProbe : MonoBehaviour
 		return far;
 	}
 
+	// every object that pushes the terrain vehicle, moved 1000 to the east if it is within 80 of this place (on the ground, any height)
+	static TerrainVehicleCollider[] ClearAroundTheVehicle( Vector3 place )
+	{
+		var pushers = FindObjectsByType<TerrainVehicleCollider>( FindObjectsInactive.Exclude, FindObjectsSortMode.None );
+
+		foreach ( var pusher in pushers )
+		{
+			var flat = new Vector3( pusher.transform.position.x - place.x, 0.0f, pusher.transform.position.z - place.z );
+
+			if ( flat.magnitude < 80.0f )
+			{
+				pusher.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		return pushers;
+	}
+
+	// the deposit whose sphere is the largest
+	static TerrainElement LargestDeposit( TerrainElement[] deposits, out float largestRadius )
+	{
+		var largest = deposits[ 0 ];
+
+		largestRadius = 0.0f;
+
+		foreach ( var deposit in deposits )
+		{
+			var sphere = deposit.GetComponentInChildren<SphereCollider>();
+
+			if ( ( sphere != null ) && ( sphere.radius * sphere.transform.lossyScale.x > largestRadius ) )
+			{
+				largest = deposit;
+				largestRadius = sphere.radius * sphere.transform.lossyScale.x;
+			}
+		}
+
+		return largest;
+	}
+
 	IEnumerator ScenarioPushBack()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -20318,8 +20405,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
-		// planet 90 of the Arth system (no life, no trees: only deposits touch the vehicle here)
-		yield return LandInTheArthSystemAt( 90, Vector3.zero, done );
+		// planet 94 of the Arth system, a small rock planet (no life, no trees: only deposits touch the vehicle here); planet 90, where the scenarios usually
+		// land, is sea around the landing place, where the vehicle floats and its model bobs with the time, which case 9 looks at
+		yield return LandInTheArthSystemAt( 94, Vector3.zero, done );
 
 		if ( general.m_location != PD_General.Location.Disembarked )
 		{
@@ -20340,7 +20428,19 @@ public class ClaudeProbe : MonoBehaviour
 		// a game of 60 frames a second, the same in every run: the physics runs at 50 steps a second, so most frames have one and some have none
 		Time.captureDeltaTime = 1.0f / 60.0f;
 
-		var start = general.m_coordinates;
+		// dry ground, where the vehicle holds still and a deposit put down just clear of it stays clear
+		var landedAt = general.m_coordinates;
+
+		if ( !FindDryGround( terrainVehicle, landedAt, out var start ) )
+		{
+			Time.captureDeltaTime = 0.0f;
+
+			var planetGeneratorForLog = FieldOrNull( terrainVehicle, "m_planetGenerator" ) as PlanetGenerator;
+
+			Finish( "scenario=pushback abort: no dry ground near " + landedAt + " (water " + ( ( planetGeneratorForLog != null ) ? planetGeneratorForLog.m_waterElevation : -1.0f ) + ", highest ground found " + s_highestGroundFound + ")", 2 );
+			yield break;
+		}
+
 		var forward = new Vector3( general.m_currentDirection.x, 0.0f, general.m_currentDirection.z );
 
 		forward = ( forward.sqrMagnitude < 0.0001f ) ? Vector3.forward : forward.normalized;
@@ -20348,30 +20448,14 @@ public class ClaudeProbe : MonoBehaviour
 		var right = Vector3.Cross( Vector3.up, forward );
 
 		// everything that pushes out of the way
-		var pushers = FindObjectsByType<TerrainVehicleCollider>( FindObjectsInactive.Exclude, FindObjectsSortMode.None );
+		var pushers = ClearAroundTheVehicle( start );
 
-		foreach ( var pusher in pushers )
-		{
-			if ( Vector3.Distance( pusher.transform.position, terrainVehicle.transform.position ) < 80.0f )
-			{
-				pusher.transform.position += Vector3.right * 1000.0f;
-			}
-		}
+		yield return StandTheVehicleAt( terrainVehicle, start );
 
-		// the largest deposit (Lead on planet 90), and another one
-		var largest = deposits[ 0 ];
-		var largestRadius = 0.0f;
+		Log( "pushback: dry ground at " + start.ToString( "F1" ) + " (landed at " + landedAt.ToString( "F1" ) + "), the vehicle bobs there by " + FieldOrNull( terrainVehicle, "m_waterEffectAmount" ) );
 
-		foreach ( var deposit in deposits )
-		{
-			var sphere = deposit.GetComponentInChildren<SphereCollider>();
-
-			if ( ( sphere != null ) && ( sphere.radius * sphere.transform.lossyScale.x > largestRadius ) )
-			{
-				largest = deposit;
-				largestRadius = sphere.radius * sphere.transform.lossyScale.x;
-			}
-		}
+		// the largest deposit, and another one
+		var largest = LargestDeposit( deposits, out var largestRadius );
 
 		var other = ( largest == deposits[ 0 ] ) ? deposits[ 1 ] : deposits[ 0 ];
 		var body = largest.GetComponent<Rigidbody>();
@@ -20533,11 +20617,61 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "pushback: driving 4 s into " + largest.GetElementName() + " from 12 clear: the vehicle went " + drivenTo.ToString( "F3" ) + ", at most " + deepest.ToString( "F3" ) + " into it, resting with its middle " + restAhead.ToString( "F3" ) + " ahead (it touches at " + edge.ToString( "F3" ) + "), then standing: " + DescribeStanding( driven ) );
 
-		// everything back out of the way, and the vehicle back where it stood
+		// ---- 9. floating at the landing place, Lead put down just clear of the vehicle's nose: the model bobs (up to 5 degrees of pitch and 15 of yaw,
+		// m_waterBobAmount) and can tilt into the deposit, which pushes the vehicle away and never pulls it back, so it may drift a little, but no farther
+		// than the bob reaches
+		var floating = new float[ 10 ];
+
 		largest.transform.position += Vector3.right * 1000.0f;
 		other.transform.position += Vector3.right * 1000.0f;
 
 		yield return StandTheVehicleAt( terrainVehicle, start );
+
+		Time.captureDeltaTime = 0.0f;
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandInTheArthSystemAt( 90, Vector3.zero, done );
+
+		Time.captureDeltaTime = 1.0f / 60.0f;
+
+		var waterSpot = general.m_coordinates;
+		var deposits90 = controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true );
+		var floatingLog = "never got into the terrain vehicle on planet 90";
+		var waterEdge = 0.0f;
+
+		if ( ( general.m_location == PD_General.Location.Disembarked ) && ( deposits90.Length > 0 ) )
+		{
+			ClearAroundTheVehicle( waterSpot );
+
+			var deposit90 = LargestDeposit( deposits90, out _ );
+			var sphere90 = deposit90.GetComponentInChildren<SphereCollider>();
+
+			yield return StandTheVehicleAt( terrainVehicle, waterSpot );
+
+			var waterFrom = terrainVehicle.transform.position;
+
+			waterEdge = DistanceWhereItTouches( vehicleCollider, deposit90, waterFrom, forward );
+
+			deposit90.transform.position = waterFrom + forward * ( waterEdge + ( vehicleCollider.contactOffset + sphere90.contactOffset ) * 0.5f );
+
+			yield return StandTheVehicleAt( terrainVehicle, waterSpot );
+			yield return WatchStandingVehicle( terrainVehicle, 6.0f, floating );
+
+			floatingLog = "floating at " + waterSpot.ToString( "F1" ) + " on planet 90 (bob " + FieldOrNull( terrainVehicle, "m_waterEffectAmount" ) + ") with " + deposit90.GetElementName() + " just clear of its nose (" + waterEdge.ToString( "F2" ) + " ahead) for 6 s: " + DescribeStanding( floating );
+
+			deposit90.transform.position += Vector3.right * 1000.0f;
+
+			yield return StandTheVehicleAt( terrainVehicle, waterSpot );
+		}
+		else
+		{
+			floating[ 0 ] = 100.0f;
+			floating[ 2 ] = 100.0f;
+		}
+
+		Log( "pushback: " + floatingLog );
 
 		Time.captureDeltaTime = 0.0f;
 
@@ -20558,6 +20692,8 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "pushback: a long frame does not throw the drawn vehicle farther than it takes to clear the deposits", twoHitch[ 3 ] < clearOfTwo, "moved " + twoHitch[ 3 ].ToString( "F3" ) + ", saved place " + twoHitch[ 2 ].ToString( "F3" ) );
 		Check( "pushback: driving into a deposit stops the vehicle at it (control: it does not drive through)", ( drivenTo > 5.0f ) && ( deepest < 2.0f ) && ( restAhead > 0.0f ), "went " + drivenTo.ToString( "F3" ) + ", at most " + deepest.ToString( "F3" ) + " into it, resting " + restAhead.ToString( "F3" ) + " ahead of it" );
 		Check( "pushback: after driving into a deposit, the stopped vehicle is drawn where it is saved", driven[ 0 ] < 0.01f, DescribeStanding( driven ) );
+		Check( "pushback: floating beside a deposit, the bobbing vehicle is drawn where it is saved", floating[ 0 ] < 0.01f, DescribeStanding( floating ) );
+		Check( "pushback: floating beside a deposit, the bob drifts the vehicle less than half a unit in 6 s", floating[ 2 ] < 0.5f, DescribeStanding( floating ) );
 
 		Finish( "scenario=pushback edge=" + edge.ToString( "F2" ) + " touching=" + touching[ 2 ].ToString( "F2" ) + "/" + touching[ 0 ].ToString( "F2" ) + " overlapping=" + overlapping[ 2 ].ToString( "F2" ) + "/" + overlapping[ 0 ].ToString( "F2" ) + " two=" + two[ 2 ].ToString( "F2" ) + "/" + two[ 3 ].ToString( "F2" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
