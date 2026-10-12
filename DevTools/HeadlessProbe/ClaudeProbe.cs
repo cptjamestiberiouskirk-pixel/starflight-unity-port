@@ -20373,6 +20373,25 @@ public class ClaudeProbe : MonoBehaviour
 		var preyBehaviours = "";
 		var hunterBehaviours = "";
 
+		// the prey decides only once the hunter is coming at it: every lifeform decides on the same frame, in an order Unity does not fix, and the hunter may
+		// unpair at random as it pairs; a prey that decided first saw nothing coming, wandered into the air, and a flyer is never approached again (it never
+		// lands), so about one run in ten failed
+		SetField( prey, "m_flying", false );
+		SetField( prey, "m_moving", false );
+
+		end = Time.realtimeSinceStartup + 3.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !( ( MateBehaviour( grazer ) == "ApproachingMate" ) && ( ( FieldOrNull( grazer, "m_mate" ) as TerrainLifeform ) == prey ) ) )
+		{
+			SetField( prey, "m_behaviourTimer", 0.5f );
+
+			yield return null;
+		}
+
+		hunterBehaviours = MateBehaviour( grazer ) + " ";
+
+		SetField( prey, "m_behaviourTimer", 0.0f );
+
 		end = Time.realtimeSinceStartup + 3.0f;
 
 		while ( Time.realtimeSinceStartup < end )
