@@ -158,7 +158,7 @@ The project features a **deterministic visualization system** that renders plane
 - The game can be won: destroying the Crystal Planet ends the flares, and Interstel pays its 500,000 MU bonus and its supplemental evaluation at the Starport
 - Arth's sun flares on 01-01-4621 unless the game has been won: the Starport is destroyed, and a ship in Arth's system is incinerated
 - 10 alien races with unique encounter behaviors
-- Encounters that guard planets from orbit; a Veloxi drone grants permission to orbit to a crew that answers its numbers the Veloxi way
+- Encounters that guard planets from orbit, fought over the planet's own surface; a Veloxi drone grants permission to orbit to a crew that answers its numbers the Veloxi way
 - The Spemin, Thrynn and Veloxi home fleets warn a ship off their homeworlds, more sternly each time, and attack after the last warning
 - The Spemin, Thrynn and Veloxi give up after losing half of their ships: they stop fighting and surrender
 - The Elowan give 15 cubic meters of Endurium to a crew whose need for energy is dire, and see through one that has 20 or more
@@ -175,11 +175,11 @@ The project features a **deterministic visualization system** that renders plane
 
 ### 🔧 In Progress
 - Storms on planet surfaces, being observed in the original game first
-- The fidelity pass: every screen against the original's, and the planet drawn in encounters that begin in orbit (roadmap Phase 7)
+- The fidelity pass: every screen against the original's (roadmap Phase 7)
 
-### 📊 Completion: 55 of the 59 items of the roadmap to parity
+### 📊 Completion: 56 of the 59 items of the roadmap to parity
 
-[ROADMAP.md](ROADMAP.md) lists what the port still lacks against the original game: storms, the owner's play test of the early visual changes, and two items of the fidelity pass. No one has yet played the port through to the win by hand.
+[ROADMAP.md](ROADMAP.md) lists what the port still lacks against the original game: storms, the owner's play test of the early visual changes, and the fidelity pass's comparison of every screen with the original's. No one has yet played the port through to the win by hand.
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 

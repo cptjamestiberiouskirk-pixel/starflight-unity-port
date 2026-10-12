@@ -47,7 +47,7 @@ This is the plan of record. Pick work from it, and when a PR for an item merges,
 | Artifact effects (15 special artifacts) | DONE | the Black Box, Hypercube and Ellipsoid have none beyond their roles (D5) |
 | Main story and endgame | DONE | Phase 5 |
 
-Counting the items of Phases 0 to 7 below (59), 55 are done. The four left are the owner's play test (0.6), storms (6.6), and two of Phase 7: comparing every screen with the original's and drawing the planet in encounters that begin in orbit. No one has yet played the port through to the win by hand.
+Counting the items of Phases 0 to 7 below (59), 56 are done. The three left are the owner's play test (0.6), storms (6.6), and one of Phase 7: comparing every screen with the original's. No one has yet played the port through to the win by hand.
 
 ## Decisions
 
@@ -179,8 +179,8 @@ Depends on D3. This is the largest piece and is not on the path to winning, whic
 ## Phase 7: Fidelity pass
 
 - Compare every screen with `Research/Screenshots/` and every message with STRINFO.
-- Correct the README's completion figure. Done: it counts the roadmap's items (55 of 59), with what is left.
-- Draw the planet in encounters that begin in orbit (ruling 5, later step).
+- Correct the README's completion figure. Done: it counts the roadmap's items, with what is left.
+- Draw the planet in encounters that begin in orbit (ruling 5, later step). Done: the planet's own surface lies under the encounter, below the ships.
 - Alien captain and ship names (`%` and `+` in 15 greetings): made of the race's syllables (the garble words), as STRINFO's own names are (Fi-noc-tzi, To-chu-pu, Yrh-ey); done 2026-10-11 on Claude's recommendation.
 - Crew learn by using their skills: DRAFT only. Left out on Claude's recommendation (2026-10-11): the shipped game trains crew at the Starport (the Personnel office, which uses the race's learning rate).
 

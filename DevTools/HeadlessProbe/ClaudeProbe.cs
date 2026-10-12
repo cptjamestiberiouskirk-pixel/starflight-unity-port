@@ -857,6 +857,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioRedCylinder();
 				break;
 
+			case "orbitplanet":
+				yield return ScenarioOrbitPlanet();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -20965,6 +20969,100 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "redcylinder: the Red Cylinder flashes on the landing map near an ancient ruin, not far from it, and only aboard", ( atTheRuin is bool ) && (bool) atTheRuin && !(bool) farAway && !(bool) withoutIt && messages.Contains( "The Red Cylinder is flashing" ), withoutIt + ", " + farAway + ", " + atTheRuin + " | " + messages );
 
 		Finish( "scenario=redcylinder placed=" + placed.Count + " worked=" + worked.Count, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the planet under an encounter that began in orbit
+
+	// the planet drawn under the encounter (null if there is none)
+	static Transform PlanetBackdrop()
+	{
+		return SpaceflightController.m_instance.m_encounter.transform.Find( "Planet Backdrop" );
+	}
+
+	IEnumerator ScenarioOrbitPlanet()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var starSystem = controller.m_starSystem;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// ---- 1. a Spemin encounter met in hyperspace (the control: no planet)
+		EnterEncounter( FindEncounter( 1, 6, 3, 0 ) );
+
+		yield return Frames( 5 );
+
+		var backdropInHyperspace = PlanetBackdrop();
+		var shownInHyperspace = ( backdropInHyperspace != null ) && backdropInHyperspace.gameObject.activeInHierarchy;
+
+		yield return FlyOutOfEncounter();
+
+		// ---- 2. the derelict that waits in orbit 3 of star 30 (encounter 316): into orbit around its planet, and the encounter begins
+		const int c_encounterId = 316;
+		const int c_starId = 30;
+
+		var guardedPlanetId = -1;
+
+		foreach ( var planet in gameData.m_planetList )
+		{
+			if ( ( planet.m_starId == c_starId ) && ( planet.m_orbitPosition == gameData.m_encounterList[ c_encounterId ].m_orbitPosition ) )
+			{
+				guardedPlanetId = planet.m_id;
+			}
+		}
+
+		EnterStarSystem( c_starId );
+
+		var start = Time.realtimeSinceStartup;
+
+		while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 40.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+		yield return EnterOrbit( guardedPlanetId );
+		yield return Frames( 5 );
+
+		var inEncounter = playerData.m_general.m_location == PD_General.Location.Encounter;
+		var backdrop = PlanetBackdrop();
+		var shown = ( backdrop != null ) && backdrop.gameObject.activeInHierarchy;
+		var below = shown && ( backdrop.position.y + backdrop.localScale.y < playerData.m_general.m_coordinates.y - 100.0f );
+		var planetController = starSystem.GetPlanetController( guardedPlanetId );
+		var samePlanet = shown && ( planetController != null ) && ( backdrop.GetComponent<MeshRenderer>().sharedMaterial == planetController.GetMaterial() );
+
+		// ---- 3. with a graphics device, a picture of it (probe.ps1 -Graphics)
+		var picture = "none (no graphics device)";
+
+		if ( inEncounter && ( SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null ) )
+		{
+			var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "orbit-encounter-pictures" ) );
+
+			System.IO.Directory.CreateDirectory( folder );
+
+			var pictureCameraObject = new GameObject( "Orbit Encounter Picture Camera" );
+			var pictureCamera = pictureCameraObject.AddComponent<Camera>();
+
+			pictureCamera.CopyFrom( Camera.main );
+			pictureCamera.rect = new Rect( 0.0f, 0.0f, 1.0f, 1.0f );
+
+			picture = System.IO.Path.Combine( folder, "orbit_encounter.png" );
+
+			RenderCameraPicture( pictureCamera, picture );
+
+			Destroy( pictureCameraObject );
+		}
+
+		Log( "orbitplanet: hyperspace encounter: planet shown " + shownInHyperspace + " || encounter in orbit: in it " + inEncounter + ", planet shown " + shown + ", below the ships " + below + ", the planet's own surface " + samePlanet + ( shown ? " (radius " + backdrop.localScale.x + ", at " + backdrop.position + ", ship at " + playerData.m_general.m_coordinates + ")" : "" ) + " | picture " + picture );
+
+		Check( "orbitplanet: an encounter met in hyperspace has no planet under it (control)", !shownInHyperspace, shownInHyperspace.ToString() );
+		Check( "orbitplanet: an encounter that began in orbit is drawn over its planet's own surface, below the ships", inEncounter && shown && below && samePlanet, inEncounter + ", " + shown + ", " + below + ", " + samePlanet );
+
+		Finish( "scenario=orbitplanet shown=" + shown, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
