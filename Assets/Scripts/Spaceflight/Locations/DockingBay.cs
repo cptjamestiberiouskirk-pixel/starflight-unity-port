@@ -135,6 +135,9 @@ public class DockingBay : MonoBehaviour
 		// play the docking bay door open sound
 		SoundController.m_instance.PlaySound( SoundController.Sound.DockingBayDoorClose );
 
+		// the doors close behind the ship: the first thing said on arrival (the original's "CLOSING DOCKING BAY DOORS"), before the ship computer and Interstel's notices
+		SpaceflightController.m_instance.m_messages.InsertText( "<color=white>Closing docking bay doors.</color>" );
+
 		// run the landing camera animation
 		SpaceflightController.m_instance.m_playerCamera.StartAnimation( "Landing (Docking Bay)" );
 	}

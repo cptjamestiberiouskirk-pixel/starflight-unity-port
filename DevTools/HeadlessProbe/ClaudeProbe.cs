@@ -885,6 +885,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStatusDisplay();
 				break;
 
+			case "systemtravel":
+				yield return ScenarioSystemTravel();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -11740,7 +11744,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "unmapped: next to planet 90 in the star system (" + locationAtThePlanet + "): " + rangeMessage );
 		Log( "unmapped: in orbit around planet 90 (" + playerData.m_general.m_location + "): " + orbitMessage + " | the albedo map of the planet model in orbit is " + orbitAlbedoSize );
 
-		Check( "unmapped: within orbital range the player is told that the planet could not be mapped", rangeMessage.Contains( "within orbital range" ) && rangeMessage.Contains( "could not be mapped" ), rangeMessage );
+		Check( "unmapped: within orbital range the player is told that the planet could not be mapped", rangeMessage.Contains( "Standing by to orbit" ) && rangeMessage.Contains( "could not be mapped" ), rangeMessage );
 		Check( "unmapped: in orbit the player is told so too, and the planet model has the plain maps", orbitMessage.Contains( "Orbit established" ) && orbitMessage.Contains( "could not be mapped" ) && ( orbitAlbedoSize == "4x4" ), orbitMessage + " | albedo " + orbitAlbedoSize );
 
 		// a planet with maps gets no such message (control)
@@ -21569,6 +21573,141 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "statusdisplay: damage is the original's word for what is left of the hull", words.Trim() == "100%=None 97%=Minimal 85%=Slight 60%=Moderate 30%=Heavy 10%=Critical", words );
 
 		Finish( "scenario=statusdisplay", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the messages of travel in a star system in the original's words
+
+	// put the ship at a place in the star system it is in
+	static void PlaceShipInTheSystem( Vector3 position )
+	{
+		DataController.m_instance.m_playerData.m_general.m_coordinates = position;
+		DataController.m_instance.m_playerData.m_general.m_currentSpeed = 0.0f;
+
+		SpaceflightController.m_instance.m_playerShip.transform.position = position;
+	}
+
+	IEnumerator ScenarioSystemTravel()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var starSystem = controller.m_starSystem;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// ---- 1. just launched from the Starport, then Maneuver
+		controller.SwitchLocation( PD_General.Location.JustLaunched );
+
+		var end = Time.realtimeSinceStartup + 60.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && starSystem.GeneratingPlanets() )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 10 );
+
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.NavigationA, 0 );
+
+		yield return Frames( 10 );
+
+		var launched = MessageList();
+		var locationAfterManeuver = playerData.m_general.m_location;
+
+		// ---- 2. over Arth, then away from every planet, then over another planet of Arth's system
+		var arth = starSystem.GetPlanetController( gameData.m_misc.m_arthPlanetId );
+		var other = starSystem.GetPlanetController( 94 );
+
+		PlaceShipInTheSystem( arth.transform.localPosition );
+
+		yield return Frames( 5 );
+
+		var overArth = MessageList();
+
+		// the place on a circle around the sun furthest from every planet
+		var away = Vector3.zero;
+		var awayDistance = 0.0f;
+
+		for ( var angle = 0; angle < 360; angle += 5 )
+		{
+			var place = Quaternion.Euler( 0.0f, angle, 0.0f ) * Vector3.forward * 4000.0f;
+			var nearest = float.MaxValue;
+
+			foreach ( var planet in starSystem.m_planetController )
+			{
+				if ( planet.gameObject.activeInHierarchy )
+				{
+					nearest = Mathf.Min( nearest, Vector3.Distance( place, planet.transform.localPosition ) );
+				}
+			}
+
+			if ( nearest > awayDistance )
+			{
+				awayDistance = nearest;
+				away = place;
+			}
+		}
+
+		PlaceShipInTheSystem( away );
+
+		yield return Frames( 5 );
+
+		var awayText = MessageList();
+
+		PlaceShipInTheSystem( other.transform.localPosition );
+
+		yield return Frames( 5 );
+
+		var overPlanet = MessageList();
+
+		// ---- 3. into orbit around it, and out again
+		ConsoleFrameWith( "m_submit" );
+
+		yield return WaitForLocation( PD_General.Location.InOrbit, 15.0f );
+		yield return Frames( 10 );
+
+		var locationInOrbit = playerData.m_general.m_location;
+
+		PressButton( ButtonController.ButtonSet.NavigationA, 0 );
+
+		yield return WaitForLocation( PD_General.Location.StarSystem, 15.0f );
+		yield return Frames( 10 );
+
+		var leftOrbit = MessageList();
+
+		// ---- 4. docking at the Starport
+		PlaceShipInTheSystem( arth.transform.localPosition );
+
+		yield return Frames( 5 );
+
+		ConsoleFrameWith( "m_submit" );
+
+		yield return WaitForLocation( PD_General.Location.DockingBay, 15.0f );
+		yield return Frames( 10 );
+
+		var docked = MessageList();
+		var locationDocked = playerData.m_general.m_location;
+
+		Log( "systemtravel: after Maneuver (" + locationAfterManeuver + "): " + launched );
+		Log( "systemtravel: over Arth: " + overArth );
+		Log( "systemtravel: " + awayDistance.ToString( "F0" ) + " from the nearest planet: " + awayText );
+		Log( "systemtravel: over planet 94: " + overPlanet );
+		Log( "systemtravel: out of orbit (" + locationInOrbit + " before): " + leftOrbit );
+		Log( "systemtravel: docked (" + locationDocked + "): " + docked );
+
+		Check( "systemtravel: Maneuver after the launch says Leaving orbit... and ...Commencing system travel, as the original", ( locationAfterManeuver == PD_General.Location.StarSystem ) && launched.Contains( "Leaving orbit..." ) && launched.Contains( "...Commencing system travel" ), launched );
+		Check( "systemtravel: over Arth the ship is standing by to dock with Starport, as the original", overArth.Contains( "Standing by to dock with Starport" ) && !overArth.Contains( "to orbit" ), overArth );
+		Check( "systemtravel: away from the planets the ship is outside orbital range, as the original", awayText.Contains( "Outside orbital range" ), awayText );
+		Check( "systemtravel: over another planet the ship is standing by to orbit and the key is named, as the original", overPlanet.Contains( "Standing by to orbit" ) && overPlanet.Contains( "Press Enter to orbit" ), overPlanet );
+		Check( "systemtravel: leaving orbit says Leaving orbit... and ...Commencing system travel, as the original", ( locationInOrbit == PD_General.Location.InOrbit ) && leftOrbit.Contains( "Leaving orbit..." ) && leftOrbit.Contains( "...Commencing system travel" ), locationInOrbit + ": " + leftOrbit );
+		Check( "systemtravel: docking at the Starport says Closing docking bay doors, as the original", ( locationDocked == PD_General.Location.DockingBay ) && docked.Contains( "Closing docking bay doors" ), locationDocked + ": " + docked );
+
+		Finish( "scenario=systemtravel", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
