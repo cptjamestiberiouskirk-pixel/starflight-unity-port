@@ -47,7 +47,7 @@ This is the plan of record. Pick work from it, and when a PR for an item merges,
 | Artifact effects (15 special artifacts) | DONE | the Black Box, Hypercube and Ellipsoid have none beyond their roles (D5) |
 | Main story and endgame | DONE | Phase 5 |
 
-Counting the items of Phases 0 to 7 below (59), 56 are done. The three left are the owner's play test (0.6), storms (6.6), and one of Phase 7: comparing every screen with the original's. No one has yet played the port through to the win by hand.
+Counting the items of Phases 0 to 7 below (59), 57 are done. The two left are the owner's play test (0.6) and one of Phase 7: comparing every screen with the original's. No one has yet played the port through to the win by hand.
 
 ## Decisions
 
