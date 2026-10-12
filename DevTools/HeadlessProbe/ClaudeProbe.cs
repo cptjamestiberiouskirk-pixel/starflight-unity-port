@@ -13899,6 +13899,25 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
+		// the three supplemental evaluations (shown as they stand in Operations) in the shipped game's words (OP-OV in the decompiled original, where STRINFO
+		// prints "CONSEQUENLY", "LIABLE FOR ANY COSTS" and "ON BEHALF SAID CREW"), with STRINFO's blank line after the SUBJECT line
+		var supplemental = "";
+
+		foreach ( var record in storyTexts )
+		{
+			var key = FieldOrNull( record, "m_key" ) as string;
+
+			if ( ( key == "MissionComplete" ) || ( key == "TerrainVehicleLost" ) || ( key == "TowingCharges" ) )
+			{
+				supplemental += ( FieldOrNull( record, "m_text" ) as string ?? "" ) + "\n|\n";
+			}
+		}
+
+		var supplementalRight = supplemental.Contains( "CONSEQUENTLY, YOU HAVE BEEN FINED" ) && supplemental.Contains( "LIABLE FOR ALL COSTS" ) && supplemental.Contains( "ON BEHALF OF SAID CREW" )
+			&& supplemental.Contains( "SUBJECT:  COMPLETION OF MISSION\n\n" ) && supplemental.Contains( "SUBJECT:  LOSS OF TERRAIN VEHICLE\n\n" ) && supplemental.Contains( "SUBJECT:  TOWING CHARGES\n\n" );
+
+		Check( "recovereddata: the supplemental evaluations read CONSEQUENTLY, LIABLE FOR ALL COSTS and ON BEHALF OF SAID CREW as in the shipped game, with a blank line after each SUBJECT", supplementalRight, supplemental.Replace( '\n', '/' ) );
+
 		Log( "recovereddata: story texts missing or broken: " + ( ( missingKeys == "" ) ? "none" : missingKeys.Trim() ) + " | the flare text: " + flareText.Replace( '\n', '/' ) );
 
 		Check( "recovereddata: the ten story texts are there, with their line breaks", ( missingKeys == "" ) && flareText.Contains( "INCINERATED" ) && flareText.Contains( "\n" ), ( missingKeys == "" ) ? flareText.Replace( '\n', '/' ) : missingKeys.Trim() );
