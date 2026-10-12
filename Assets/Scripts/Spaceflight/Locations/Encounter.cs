@@ -2956,23 +2956,29 @@ public class Encounter : MonoBehaviour
 			}
 		}
 
-		// a transmission with lines that end the comm link (each of the Nomad probes' planets, every second verse of the Minstrels' song) goes on from the line
-		// after the last one sent, at this meeting or the next, and from the first again after the last: the shipped game says the line used least, and the line
-		// that ends the link ends it (COMM-OV DO-UA)
-		if ( endsCommLink )
+		// a transmission with lines that end the comm link (each of the Nomad probes' planets, every second verse of the Minstrels' song) goes on with the line used
+		// least in the game so far, the first of them on a tie, at this meeting or the next - so it goes on from the line after the last one sent, and from the first
+		// again after the last - and the line that ends the link ends it (COMM-OV FIND-PHRASE and DO-UA; the counts are FindComm's)
+		if ( ( lines.Count > 0 ) && endsCommLink )
 		{
-			var lastCommId = general.GetLastCommId( m_gdEncounter.m_race, GD_Comm.Subject.NoMoreInformation );
-			var nextIndex = lines.FindIndex( line => line.m_id == lastCommId ) + 1;
+			GD_Comm nextLine = null;
+			var leastUses = int.MaxValue;
 
-			if ( nextIndex >= lines.Count )
+			foreach ( var line in lines )
 			{
-				nextIndex = 0;
+				var uses = general.GetCommUseCount( line.m_id );
+
+				if ( uses < leastUses )
+				{
+					nextLine = line;
+					leastUses = uses;
+				}
 			}
 
-			general.SetLastCommId( m_gdEncounter.m_race, GD_Comm.Subject.NoMoreInformation, lines[ nextIndex ].m_id );
-			m_pdEncounter.m_shownCommList.Add( lines[ nextIndex ].m_id );
+			general.AddCommUse( nextLine.m_id );
+			m_pdEncounter.m_shownCommList.Add( nextLine.m_id );
 
-			return lines[ nextIndex ];
+			return nextLine;
 		}
 
 		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
@@ -3349,44 +3355,24 @@ public class Encounter : MonoBehaviour
 			return new GD_Comm( c_noCommFoundText );
 		}
 
-		// have we shown all possible comms for this subject?
-		var alreadyShownThemAll = true;
+		// the shipped game does not pick a line at random: it says the line used least in the game so far, the first of them in the order of the data on a tie
+		// (FIND-PHRASE in COMM-OV, the decompiled original; the counts are kept in its phrase records, PHRASE>CT raises them) - so each race's lines take turns, in
+		// order, across all its meetings and saved games (the Noah 9 derelict's officer report comes before its SOS, as STRINFO 2.11 prints them)
+		GD_Comm selectedComm = null;
+		var leastUses = int.MaxValue;
 
 		foreach ( var comm in possibleComms )
 		{
-			if ( !m_pdEncounter.m_shownCommList.Contains( comm.m_id ) )
+			var uses = playerData.m_general.GetCommUseCount( comm.m_id );
+
+			if ( uses < leastUses )
 			{
-				alreadyShownThemAll = false;
-				break;
+				selectedComm = comm;
+				leastUses = uses;
 			}
 		}
 
-		// if we have shown them all then reset them all
-		if ( alreadyShownThemAll )
-		{
-			foreach ( var comm in possibleComms )
-			{
-				m_pdEncounter.m_shownCommList.Remove( comm.m_id );
-			}
-		}
-
-		// remove all of the ones we've shown before from the list
-		for ( var i = 0; i < possibleComms.Count; i++ )
-		{
-			if ( m_pdEncounter.m_shownCommList.Contains( possibleComms[ i ].m_id ) )
-			{
-				possibleComms.RemoveAt( i );
-
-				i--;
-			}
-		}
-
-		// now pick and return a random one - but the Noah 9 derelict's in the order of the game data: the shipped game says the line of a subject used least, the
-		// first of them on a tie (FIND-PHRASE in COMM-OV, the decompiled original), so the officer's "we're picking up a distress beacon signal" comes before the
-		// SOS, and then they take turns (STRINFO 2.11 prints them in that order)
-		var randomNumber = ( race == GameData.Race.NoahDerelict ) ? 0 : Random.Range( 0, possibleComms.Count );
-
-		var selectedComm = possibleComms[ randomNumber ];
+		playerData.m_general.AddCommUse( selectedComm.m_id );
 
 		m_pdEncounter.m_shownCommList.Add( selectedComm.m_id );
 
