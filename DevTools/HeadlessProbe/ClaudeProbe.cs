@@ -985,6 +985,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioHeaven();
 				break;
 
+			case "gazurtoidmood":
+				yield return ScenarioGazurtoidMood();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -19393,7 +19397,11 @@ public class ClaudeProbe : MonoBehaviour
 
 		var gazurtoidConnected = encounter.m_pdEncounter.m_connected;
 
+		// (their time is up: their connection timer, or since they have a mood their phrases)
 		encounter.m_pdEncounter.m_connectionTimer = 0.0f;
+		SetEncounterField( "m_alienPhrases", 1 );
+		SetEncounterField( "m_alienPhraseLimit", 1 );
+		encounter.m_pdEncounter.m_conversationTimer = 0.0f;
 
 		yield return Frames( 3 );
 
@@ -25165,6 +25173,76 @@ public class ClaudeProbe : MonoBehaviour
 		playerData.m_general.m_mechan9Unlocked = false;
 
 		Finish( "scenario=heaven", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 2: the Gazurtoid's mood by the shipped game's numbers
+
+	IEnumerator ScenarioGazurtoidMood()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+
+		ship.m_armorPoints = 250;
+		ship.m_shieldPoints = 0;
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+
+		var encounterRange = SpaceflightController.m_instance.m_encounterRange;
+
+		SpaceflightController.m_instance.m_encounterRange = 0.0f;
+
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var gazurtoidId = FindEncounterOfRace( GameData.Race.Gazurtoid );
+
+		// ---- 1. met with the shields down and the weapons not armed (26): they talk abuse and hold their fire
+		EnterEncounter( gazurtoidId );
+		yield return Frames( 10 );
+
+		var calmPosture = Call( encounter, "GetAlienTalkStance" ).ToString();
+		var calmStance = encounter.m_pdEncounter.m_alienStance;
+
+		// ---- 2. the player's grovelling hail calms them by their full 20 (the player hails first)
+		var calmMood = EncounterField( "m_mood", -1.0f );
+
+		encounter.Hail( GD_Comm.Stance.Obsequious, false );
+
+		var groveledMood = EncounterField( "m_mood", -1.0f );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 3. met with the shields up and the weapons armed (26 + 15 = 41, from 40 they fight): they attack a weak ship
+		ship.m_shieldsAreUp = true;
+		ship.m_weaponsAreArmed = true;
+
+		EnterEncounter( gazurtoidId );
+		yield return Frames( 10 );
+
+		Call( encounter, "GetAlienTalkStance" );
+
+		yield return Frames( 3 );
+
+		var armedMood = EncounterField( "m_mood", -1.0f );
+		var armedStance = encounter.m_pdEncounter.m_alienStance;
+
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		SpaceflightController.m_instance.m_encounterRange = encounterRange;
+
+		Log( "gazurtoidmood: met calm " + calmMood + " (" + calmPosture + ", stance " + calmStance + "), grovelling hail " + groveledMood + " | met armed with shields up " + armedMood + ", stance " + armedStance );
+
+		Check( "gazurtoidmood: the Gazurtoid met in peace talk abuse and hold their fire, as the original (26, hostile from 0)", ( calmMood == 26.0f ) && ( calmPosture == "Hostile" ) && ( calmStance != GD_Comm.Stance.Hostile ), calmMood + " " + calmPosture + " " + calmStance );
+		Check( "gazurtoidmood: a grovelling hail calms the Gazurtoid by 20, as the original", groveledMood == 6.0f, groveledMood.ToString() );
+		Check( "gazurtoidmood: met with the shields up and the weapons armed the Gazurtoid fight, as the original (41, fight from 40)", ( armedMood == 41.0f ) && ( armedStance == GD_Comm.Stance.Hostile ), armedMood + " " + armedStance );
+
+		Finish( "scenario=gazurtoidmood", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
