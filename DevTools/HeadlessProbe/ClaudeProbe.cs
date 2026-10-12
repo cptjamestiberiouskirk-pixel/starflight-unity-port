@@ -921,6 +921,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAncientSites();
 				break;
 
+			case "noreading":
+				yield return ScenarioNoReading();
+				break;
+
 			case "disembarklines":
 				yield return ScenarioDisembarkLines();
 				break;
@@ -13908,6 +13912,30 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "recovereddata: the ten story texts are there, with their line breaks", ( missingKeys == "" ) && flareText.Contains( "INCINERATED" ) && flareText.Contains( "\n" ), ( missingKeys == "" ) ? flareText.Replace( '\n', '/' ) : missingKeys.Trim() );
 
+		// ---- the planet messages are recorded as they stand (TVCargoButton), so none may keep a field of STRINFO's editor in brackets: the Mardan 4 sign
+		// reads NO. 17, as the shipped game's message record has it (the decompiled original's instance.txt), where STRINFO prints NO. [NUMBER]
+		var bracketed = "";
+		var mardanSign = "";
+
+		foreach ( var record in messages )
+		{
+			var text = FieldOrNull( record, "m_text" ) as string ?? "";
+
+			if ( text.Contains( "[" ) || text.Contains( "]" ) )
+			{
+				bracketed += FieldOrNull( record, "m_id" ) + " ";
+			}
+
+			if ( Equals( FieldOrNull( record, "m_id" ), 29 ) )
+			{
+				mardanSign = text;
+			}
+		}
+
+		Log( "recovereddata: planet messages with a bracketed field: " + ( ( bracketed == "" ) ? "none" : bracketed.Trim() ) + " | message 29: " + mardanSign );
+
+		Check( "recovereddata: no planet message shows a bracketed field, and the Mardan 4 sign of message 29 reads NO. 17 as in the shipped game", ( bracketed == "" ) && ( mardanSign == "SIGN - MARDAN 4 MINING STATION NO. 17" ), ( bracketed == "" ) ? mardanSign : bracketed.Trim() );
+
 		// ---- the game data file itself is unchanged (control): 811 planets, 51 artifacts, its 556 comms and the 2 recovered drone lines
 		var sizes = gameData.m_planetList.Length + "/" + gameData.m_artifactList.Length + "/" + gameData.m_commList.Length;
 
@@ -18638,6 +18666,32 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return TradeWithTheThrynn( thrynnId, 100, 0, new string[ 0 ], new AnswerYesButton(), tooLittle );
 
+		// ---- 6. the Bladed Toy alone (1 at their prices): the offer's words as the shipped game fills them in, "a Bladed Toy." and one "unit"
+		var oneUnit = new List<string>();
+
+		yield return TradeWithTheThrynn( thrynnId, 50, 0, new[] { "Bladed Toy" }, new AnswerNoButton(), oneUnit );
+
+		// ---- 7. the Tesseract in a hold with 10 cubic meters of room once it is out: they offer the 10 that fit, not their 29, and pay what they offered
+		SetEndurium( 0 );
+
+		foreach ( var artifact in DataController.m_instance.m_gameData.m_artifactList )
+		{
+			for ( var i = 0; ( i < 10 ) && ( ship.m_artifactStorage != null ) && ( ship.m_artifactStorage.Find( artifact.m_id ) != null ); i++ )
+			{
+				ship.m_artifactStorage.Remove( artifact.m_id );
+			}
+		}
+
+		ship.RecalculateVolumeUsed();
+
+		// 100 tenths of room left once the Tesseract is out of the hold (the Endurium leaves room for it and 10 cubic meters more)
+		var fillingEndurium = ship.m_volume - ship.m_volumeUsed - 100;
+		var fullHold = new List<string>();
+
+		yield return TradeWithTheThrynn( thrynnId, fillingEndurium, 0, new[] { "Tesseract" }, new AnswerYesButton(), fullHold );
+
+		var paidIntoFullHold = int.Parse( fullHold[ 2 ] ) - fillingEndurium;
+
 		controller.m_encounterRange = encounterRange;
 
 		Log( "thrynntrades: encounter " + thrynnId + " || sold: " + string.Join( " | ", sold ) + " || kept: " + string.Join( " | ", kept ) + " || plutonium: " + string.Join( " | ", plutonium ) + " || black box: " + string.Join( " | ", bought ) + " || too little: " + string.Join( " | ", tooLittle ) );
@@ -18649,6 +18703,13 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "thrynntrades: they offer a cubic meter of Endurium for each of plutonium", plutonium[ 0 ].Contains( " 12 " ) && ( plutonium[ 2 ] == "170" ) && ( plutonium[ 3 ] == "0" ), string.Join( " | ", plutonium ) );
 		Check( "thrynntrades: with nothing they want aboard they sell the Black Box for 30", bought[ 0 ].Contains( CommText( 301 ) ) && ( bought[ 2 ] == "100" ) && ( bought[ 5 ] == "black box" ), string.Join( " | ", bought ) );
 		Check( "thrynntrades: a yes without 30 cubic meters gets \"you do not have enough\"", tooLittle[ 1 ].Contains( CommText( 302 ) ) && ( tooLittle[ 2 ] == "100" ) && ( tooLittle[ 5 ] == "no black box" ), string.Join( " | ", tooLittle ) );
+
+		// the offer's words as the shipped game fills in its template (COMMSPEC-OV): the name with a full stop, "unitss" for more than one and "unit" for one,
+		// never the template's "unitxx"
+		Log( "thrynntrades: one unit: " + string.Join( " | ", oneUnit ) + " || a full hold (" + fillingEndurium + " of Endurium, paid " + paidIntoFullHold + "): " + string.Join( " | ", fullHold ) );
+
+		Check( "thrynntrades: the artifact offer reads \"a Tesseract. Thiss artifact\" and \"29 cubic Arth unitss\", and \"a Bladed Toy.\" for \"1 cubic Arth unit\"", sold[ 0 ].Contains( "a Tesseract. Thiss artifact" ) && sold[ 0 ].Contains( " 29 cubic Arth unitss " ) && oneUnit[ 0 ].Contains( "a Bladed Toy. Thiss artifact" ) && oneUnit[ 0 ].Contains( " 1 cubic Arth unit of " ) && !( sold[ 0 ] + oneUnit[ 0 ] ).Contains( "unitxx" ), sold[ 0 ] + " || " + oneUnit[ 0 ] );
+		Check( "thrynntrades: with room for 10 cubic meters they offer 10 for the Tesseract, and a yes pays the 10 they offered", fullHold[ 0 ].Contains( " 10 cubic Arth unitss " ) && ( paidIntoFullHold == 100 ) && ( fullHold[ 4 ] == "gone" ), fullHold[ 0 ] + " | paid " + paidIntoFullHold );
 
 		Finish( "scenario=thrynntrades sold=" + sold[ 2 ] + " plutonium=" + plutonium[ 2 ] + " blackbox=" + bought[ 5 ], 0 );
 	}
@@ -22656,6 +22717,32 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "ancientsites: planet 2 of 154,62 has two ancient ruins at 42S x 13W with 3.1 and 5.9 cubic meters of Endurium", thrynnRuins == "31,59", thrynnRuins );
 
 		Finish( "scenario=ancientsites", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: Analysis with no reading, in the original's words
+
+	IEnumerator ScenarioNoReading()
+	{
+		var sensors = SpaceflightController.m_instance.m_displayController.m_sensorsDisplay;
+
+		EnsureCrew();
+
+		yield return Frames( 5 );
+
+		// no sensor reading, then Analysis
+		sensors.m_hasSensorData = false;
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		new AnalysisButton().Execute();
+
+		var said = MessageList();
+
+		Log( "noreading: Analysis with no reading says: " + said );
+
+		Check( "noreading: Analysis with no reading says the original's I NEED A CURRENT SENSOR READING.", said.Contains( "I need a current sensor reading." ), said );
+
+		Finish( "scenario=noreading", 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 7: the disembark's lines in the original's words and order
