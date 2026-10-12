@@ -1354,5 +1354,33 @@
       "m_note": "STRINFO gives the count and that the Pearl's ruin is in the southwest, not the layout: the port puts the 15 ruins in rows of 4, 40 units apart, north and east of the Pearl's ruin, which takes the southwest corner of the block.",
       "m_source": "STRINFO 4.1"
     }
+  ],
+  "m_ancientRuinSiteList": [
+    {
+      "m_id": 0,
+      "m_starX": 145,
+      "m_starY": 107,
+      "m_planetFromSun": 5,
+      "m_latitude": 36,
+      "m_longitude": 90,
+      "m_enduriumVolumes": [ 31 ],
+      "m_spacing": 40.0,
+      "m_text": "THERE IS AN ANCIENT RUIN AT THIS LOCATION ON PLANET 5 OF SYSTEM 145, 107, WHICH CONTAINS 3.1 CUBIC METERS OF ENDURIUM.  NOTHING ELSE OF NOTE IS THERE.",
+      "m_note": "The Mechans' line it answers: WE HAVE DISCOVERED SOME RUINS AT 36N x 90E ON THE ICE PLANET IN OUR SYSTEM.",
+      "m_source": "STRINFO 2.1.4"
+    },
+    {
+      "m_id": 1,
+      "m_starX": 154,
+      "m_starY": 62,
+      "m_planetFromSun": 2,
+      "m_latitude": -42,
+      "m_longitude": -13,
+      "m_enduriumVolumes": [ 31, 59 ],
+      "m_spacing": 40.0,
+      "m_text": "THERE ARE INDEED TWO ANCIENT RUINS AT THIS LOCATION, WITHIN A VAST OCEAN, CONTAINING 3.1 CUBIC METERS AND 5.9 CUBIC METERS OF ENDURIUM, RESPECTIVELY.  THERE IS NOTHING ELSE OF NOTE THERE.",
+      "m_note": "The Thrynn's line it answers: A FAIRLY LARGE ANCIENT RUIN AT 42S x 13W ON PLANET 2 OF SYSTEM 154, 62. STRINFO puts both ruins at the one place; the port puts the second 40 units east of the first.",
+      "m_source": "STRINFO 2.5.4"
+    }
   ]
 }

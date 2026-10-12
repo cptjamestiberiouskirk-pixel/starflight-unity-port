@@ -13,4 +13,5 @@ public class RecoveredData
 	public GD_ColonyEvaluation[] m_colonyEvaluationList;
 	public GD_StoryText[] m_storyTextList;
 	public GD_RuinFormation[] m_ruinFormationList;
+	public GD_AncientRuinSite[] m_ancientRuinSiteList;
 }
