@@ -39,9 +39,31 @@ public class Planet : MonoBehaviour
 	// the current rotation
 	float m_currentRotationAngle;
 
+	// the path of the planet's orbit in the star system: a faint ring round the star at the height of the planet's middle, brightest just behind the planet
+	// (made in Awake, filled in when the planet is shown; the planet's sphere hides the part of the ring that passes behind it)
+	MeshRenderer m_orbitPath;
+	Mesh m_orbitPathMesh;
+	Vector3[] m_orbitPathVertices;
+	MaterialPropertyBlock m_orbitPathProperties;
+
+	// one material for every orbit path (each planet sets its own angle and colour)
+	static Material s_orbitPathMaterial;
+
+	// how many pieces the ring is made of, and how wide it is (world units)
+	const int c_orbitPathSegments = 720;
+	const float c_orbitPathWidth = 2.5f;
+
+	// how bright the orbit path is, in the colour of the star
+	const float c_orbitPathStrength = 0.25f;
+
+	static readonly int c_orbitPathColorId = Shader.PropertyToID( "_Color" );
+	static readonly int c_orbitPathAngleId = Shader.PropertyToID( "_PlanetAngle" );
+	static readonly int c_orbitPathStrengthId = Shader.PropertyToID( "_Strength" );
+
 	// unity awake
 	void Awake()
 	{
+		MakeOrbitPath();
 	}
 
 	// unity start
@@ -76,6 +98,12 @@ public class Planet : MonoBehaviour
 		// the maps would stay in memory until unity next clears out its unused assets
 		ReleaseUnshownMaps();
 		ReleaseShownMaps();
+
+		// so would the mesh of the orbit path (the material is one for every planet, and stays)
+		if ( m_orbitPathMesh != null )
+		{
+			Destroy( m_orbitPathMesh );
+		}
 	}
 
 	// destroys the maps of the current planet generator if they never made it onto the material (nothing shows them then)
@@ -176,8 +204,116 @@ public class Planet : MonoBehaviour
 		m_planetModel.transform.localPosition = position;
 		m_planetAtmosphere.transform.localPosition = position * 0.85f;
 
+		// the path of its orbit, through the planet's middle
+		ShowOrbitPath( position.y );
+
 		// set up the clouds and atmosphere
 		SetupClouds( m_planetClouds, m_planetAtmosphere, false, false );
+	}
+
+	// makes the ring of the orbit path: its triangles and its u (once round the orbit) and v (across) are always the same, its vertices are filled in when the
+	// planet is shown
+	void MakeOrbitPath()
+	{
+		var shader = Shader.Find( "Starflight/Orbit Path" );
+
+		if ( shader == null )
+		{
+			return;
+		}
+
+		if ( s_orbitPathMaterial == null )
+		{
+			s_orbitPathMaterial = new Material( shader );
+		}
+
+		var pathObject = new GameObject( "Orbit Path" );
+
+		pathObject.layer = gameObject.layer;
+		pathObject.transform.SetParent( transform, false );
+
+		var vertexCount = ( c_orbitPathSegments + 1 ) * 2;
+
+		m_orbitPathVertices = new Vector3[ vertexCount ];
+
+		var uv = new Vector2[ vertexCount ];
+		var triangles = new int[ c_orbitPathSegments * 6 ];
+
+		for ( var i = 0; i <= c_orbitPathSegments; i++ )
+		{
+			var u = (float) i / c_orbitPathSegments;
+
+			uv[ i * 2 ] = new Vector2( u, 0.0f );
+			uv[ i * 2 + 1 ] = new Vector2( u, 1.0f );
+
+			if ( i < c_orbitPathSegments )
+			{
+				var t = i * 6;
+				var v = i * 2;
+
+				triangles[ t ] = v;
+				triangles[ t + 1 ] = v + 1;
+				triangles[ t + 2 ] = v + 2;
+				triangles[ t + 3 ] = v + 1;
+				triangles[ t + 4 ] = v + 3;
+				triangles[ t + 5 ] = v + 2;
+			}
+		}
+
+		m_orbitPathMesh = new Mesh();
+
+		m_orbitPathMesh.name = "Orbit Path";
+		m_orbitPathMesh.vertices = m_orbitPathVertices;
+		m_orbitPathMesh.uv = uv;
+		m_orbitPathMesh.triangles = triangles;
+
+		pathObject.AddComponent<MeshFilter>().sharedMesh = m_orbitPathMesh;
+
+		m_orbitPath = pathObject.AddComponent<MeshRenderer>();
+
+		m_orbitPath.sharedMaterial = s_orbitPathMaterial;
+		m_orbitPath.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+		m_orbitPath.receiveShadows = false;
+
+		m_orbitPathProperties = new MaterialPropertyBlock();
+	}
+
+	// puts the orbit path round the star, at this height (the planet's middle, below the plane of the star system), in the colour of the star
+	void ShowOrbitPath( float height )
+	{
+		if ( ( m_orbitPath == null ) || ( m_planet == null ) )
+		{
+			return;
+		}
+
+		// the planet is at its place in the orbit: the ring's middle is the star
+		var planetPosition = transform.localPosition;
+		var radius = new Vector2( planetPosition.x, planetPosition.z ).magnitude;
+
+		m_orbitPath.transform.localPosition = new Vector3( -planetPosition.x, height, -planetPosition.z );
+
+		// the angle goes round as GD_Planet.GetPosition's does
+		for ( var i = 0; i <= c_orbitPathSegments; i++ )
+		{
+			var angle = ( (float) i / c_orbitPathSegments ) * Mathf.PI * 2.0f;
+			var direction = new Vector3( -Mathf.Sin( angle ), 0.0f, Mathf.Cos( angle ) );
+
+			m_orbitPathVertices[ i * 2 ] = direction * ( radius - c_orbitPathWidth * 0.5f );
+			m_orbitPathVertices[ i * 2 + 1 ] = direction * ( radius + c_orbitPathWidth * 0.5f );
+		}
+
+		m_orbitPathMesh.vertices = m_orbitPathVertices;
+		m_orbitPathMesh.RecalculateBounds();
+
+		// where the planet is on the ring, and the colour of its star
+		var gameData = DataController.m_instance.m_gameData;
+		var starColor = ( ( m_planet.m_starId >= 0 ) && ( m_planet.m_starId < gameData.m_starList.Length ) ) ? SystemDisplay.GetStarColor( gameData.m_starList[ m_planet.m_starId ].m_class ) : Color.white;
+
+		m_orbitPathProperties.SetColor( c_orbitPathColorId, starColor );
+		m_orbitPathProperties.SetFloat( c_orbitPathAngleId, Mathf.Repeat( Mathf.Atan2( -planetPosition.x, planetPosition.z ), Mathf.PI * 2.0f ) );
+		m_orbitPathProperties.SetFloat( c_orbitPathStrengthId, c_orbitPathStrength );
+
+		m_orbitPath.SetPropertyBlock( m_orbitPathProperties );
 	}
 
 	// call this to get the distance to the player
