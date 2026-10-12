@@ -881,6 +881,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioTVDisplay();
 				break;
 
+			case "statusdisplay":
+				yield return ScenarioStatusDisplay();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -4315,7 +4319,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "M11 bare hull message when done: " + doneMessage );
 		Log( "M11 bare hull repair message with nothing to repair: " + nothingToRepairMessage );
 
-		Check( "M11 a bare hull at 200 of 250 shows 20% damage and a gauge at four fifths", hurtDamageLine.Contains( ">20% Hull Damage<" ) && Mathf.Approximately( hurtArmorGauge, 0.8f ), "status damage line '" + hurtDamageLine + "', armor gauge " + hurtArmorGauge.ToString( "F3" ) );
+		Check( "M11 a bare hull at 200 of 250 shows slight damage (the original's word for four fifths of the hull) and a gauge at four fifths", hurtDamageLine.Contains( ">Slight<" ) && Mathf.Approximately( hurtArmorGauge, 0.8f ), "status damage line '" + hurtDamageLine + "', armor gauge " + hurtArmorGauge.ToString( "F3" ) );
 		Check( "M11 the engineer repairs a bare hull", repairsStarted && ( armorAfter10s == 220 ), "repair started " + repairsStarted + ", armor after 10 s " + armorAfter10s + " (was 200) | " + repairMessage );
 		Check( "M11 the repair of a bare hull stops at its 250 points", ( armorWhenDone == 250 ) && !stillUnderWay && doneMessage.Contains( "completed" ), "armor when done " + armorWhenDone + ", still under way " + stillUnderWay + " | " + doneMessage );
 		Check( "M11 an undamaged bare hull needs no repairs", !startedWithNothingToRepair && nothingToRepairMessage.Contains( "No repairs" ), "started " + startedWithNothingToRepair + " | " + nothingToRepairMessage );
@@ -4339,7 +4343,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "M11 class 2 armor damage report at 300/750: " + class2Report );
 
 		Check( "M11 undamaged class 2 armor shows no damage and a full gauge", ( class2FullDamageLine == "None" ) && Mathf.Approximately( class2FullArmorGauge, 1.0f ), "status damage line '" + class2FullDamageLine + "', armor gauge " + class2FullArmorGauge.ToString( "F3" ) );
-		Check( "M11 class 2 armor at 300 of 750 shows 60% damage and a gauge at two fifths", class2HurtDamageLine.Contains( ">60% Hull Damage<" ) && Mathf.Approximately( class2HurtArmorGauge, 0.4f ), "status damage line '" + class2HurtDamageLine + "', armor gauge " + class2HurtArmorGauge.ToString( "F3" ) );
+		Check( "M11 class 2 armor at 300 of 750 shows heavy damage (the original's word for two fifths of the hull) and a gauge at two fifths", class2HurtDamageLine.Contains( ">Heavy<" ) && Mathf.Approximately( class2HurtArmorGauge, 0.4f ), "status damage line '" + class2HurtDamageLine + "', armor gauge " + class2HurtArmorGauge.ToString( "F3" ) );
 		Check( "M11 the damage report still gives installed armor its own points", class2Report.Contains( "40% (300/750)" ), class2Report );
 
 		// ---- 4. shields: class 1 (500 points) half charged, class 5 (2500 points) fully charged, and none
@@ -10374,7 +10378,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "perframe: status display with half the armor gone: " + damagedText.Replace( '\n', '/' ) );
 
 		Check( "perframe: the status display takes no memory while nothing changes", ( statusBytes == 0 ) && ( statusText == statusTextAfter ) && ( statusText.Length > 20 ), statusBytes + " bytes per frame" );
-		Check( "perframe: the status display still shows what changes", damagedText.Contains( "50% Hull Damage" ) && ( armedText != statusText ) && ( statusTextAtTheEnd == statusText ), "damaged: " + damagedText.Replace( '\n', '/' ) + " | back to: " + statusTextAtTheEnd.Replace( '\n', '/' ) );
+		Check( "perframe: the status display still shows what changes", damagedText.Contains( "Moderate" ) && ( armedText != statusText ) && ( statusTextAtTheEnd == statusText ), "damaged: " + damagedText.Replace( '\n', '/' ) + " | back to: " + statusTextAtTheEnd.Replace( '\n', '/' ) );
 
 		// ---- 2. the terrain vehicle display (planet 90 in the arth system, the way the m10 scenario gets there)
 		yield return EnterOrbit( 90 );
@@ -21498,6 +21502,73 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "tvdisplay: the bearing to the ship is spelled out, as the original's NORTH", System.Array.IndexOf( words, bearing ) >= 0, ship );
 
 		Finish( "scenario=tvdisplay date=" + date + " ship=" + ship, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the Status display in the original's words
+
+	IEnumerator ScenarioStatusDisplay()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var displays = controller.m_displayController;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		// a ship with no shields and no weapons, at 90% of its hull, with 20 cubic meters of Endurium
+		ship.m_shieldingClass = 0;
+		ship.m_missileLauncherClass = 0;
+		ship.m_laserCannonClass = 0;
+		ship.m_armorPoints = Mathf.RoundToInt( ship.GetMaximumArmorPoints() * 0.9f );
+
+		var endurium = ship.m_elementStorage.Find( 5 );
+
+		if ( endurium != null )
+		{
+			ship.RemoveElement( 5, endurium.m_volume );
+		}
+
+		ship.AddElement( 5, 200 );
+
+		displays.ChangeDisplay( displays.m_statusDisplay );
+
+		yield return Frames( 10 );
+
+		var values = displays.m_statusDisplay.m_values.text.Split( '\n' );
+		var shown = string.Join( " / ", values );
+
+		// the rows: date, damage, cargo, energy, shields, weapons
+		var damage = ( values.Length > 1 ) ? values[ 1 ] : "";
+		var cargo = ( values.Length > 2 ) ? values[ 2 ] : "";
+		var energy = ( values.Length > 3 ) ? values[ 3 ] : "";
+		var shields = ( values.Length > 4 ) ? values[ 4 ] : "";
+		var weapons = ( values.Length > 5 ) ? values[ 5 ] : "";
+
+		// ---- the damage words over the hull (the original's table)
+		var words = "";
+
+		foreach ( var percent in new[] { 100, 97, 85, 60, 30, 10 } )
+		{
+			ship.m_armorPoints = Mathf.FloorToInt( ship.GetMaximumArmorPoints() * percent / 100.0f );
+
+			yield return Frames( 3 );
+
+			var rows = displays.m_statusDisplay.m_values.text.Split( '\n' );
+
+			words += percent + "%=" + ( ( rows.Length > 1 ) ? System.Text.RegularExpressions.Regex.Replace( rows[ 1 ], "<[^>]*>", "" ) : "" ) + " ";
+		}
+
+		Log( "statusdisplay: " + shown + " || damage over the hull: " + words );
+
+		Check( "statusdisplay: a ship with no shields reads Down and one with no weapons Unarmed, as the original", ( shields == "Down" ) && ( weapons == "Unarmed" ), shields + " / " + weapons );
+		Check( "statusdisplay: energy has four figures and no unit, and cargo is a whole percent", energy.Contains( ">20.00<" ) && System.Text.RegularExpressions.Regex.IsMatch( cargo, @">\d+ %<" ), energy + " / " + cargo );
+		Check( "statusdisplay: damage is the original's word for what is left of the hull", words.Trim() == "100%=None 97%=Minimal 85%=Slight 60%=Moderate 30%=Heavy 10%=Critical", words );
+
+		Finish( "scenario=statusdisplay", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
