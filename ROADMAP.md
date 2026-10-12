@@ -41,13 +41,13 @@ This is the plan of record. Pick work from it, and when a PR for an item merges,
 | Terrain vehicle: drive, map, mine, return | DONE | uphill is slow (PR 187) |
 | Terrain vehicle: Look, Scan | DONE | lifeforms, minerals, ruins (PRs 167, 181) |
 | Ruins, artifacts, planet messages | DONE | Phase 3; random ruins (PR 164) |
-| Weather and terrain hazards | PARTIAL | lava (PR 165) and slopes (PR 187); storms are being observed in the original first |
+| Weather and terrain hazards | DONE | lava (PR 165), slopes (PR 187), storms (observed in the original) |
 | Lifeforms (stun, capture, sell, attack) | DONE | Phase 6, with Blender models (PRs 167 to 185) |
 | Crew injury and death | DONE | PR 170 |
 | Artifact effects (15 special artifacts) | DONE | the Black Box, Hypercube and Ellipsoid have none beyond their roles (D5) |
 | Main story and endgame | DONE | Phase 5 |
 
-Counting the items of Phases 0 to 7 below (59), 56 are done. The three left are the owner's play test (0.6), storms (6.6), and one of Phase 7: comparing every screen with the original's. No one has yet played the port through to the win by hand.
+Counting the items of Phases 0 to 7 below (59), 57 are done. The two left are the owner's play test (0.6) and one of Phase 7: comparing every screen with the original's. No one has yet played the port through to the win by hand.
 
 ## Decisions
 
@@ -174,7 +174,7 @@ Depends on D3. This is the largest piece and is not on the path to winning, whic
 | 6.3 | Behaviour: approach, attack, flee, predator and prey, flying. Done: the response to the player (approach, attack, flee, wander), the laser's effect on aggression, the mates (hunt, flee, bite, eat), flyers over water | lf-behav.txt |
 | 6.4 | Stunner and laser; capture into stasis; sale at the Trade Depot; payment for recorded data. Done: the stunner and the laser, recording and its payment at the Starport (the manual, page 21: Cargo makes "holographic recordings of lifeforms"; the kernel's BIO-DATA); capture into stasis and the sale of specimens at the Trade Depot (the manual, page 21: Cargo picks up "any item (including lifeforms)"; the kernel's specimen objects) | planet.txt (DRAFT values), the manual page 21, disys.txt (specimens and BIO-DATA objects) |
 | 6.5 | Attacks hurt the crew, scaled by durability; the Doctor treats them; death, the chain of command, DEAD on the personnel file. Done: the lifeforms' attacks by the notes' formula, death at 0 vitality, the chain of command, DEAD on the file, the game lost with the whole crew | lf-words.txt, starship.txt, disys.txt |
-| 6.6 | Weather and terrain hazards: storms, lava destroys the vehicle, uphill is slow. Done: lava (PR 165), uphill (the slope ahead slows the vehicle) | planet.txt, alpha.txt, dir.txt STORM-OV |
+| 6.6 | Weather and terrain hazards: storms, lava destroys the vehicle, uphill is slow. Done: lava (PR 165), uphill (the slope ahead slows the vehicle), storms (watched in the GOG copy: the hourly sky, a storm's half efficiency, lost bearing and injuries) | planet.txt, alpha.txt, dir.txt STORM-OV |
 
 ## Phase 7: Fidelity pass
 

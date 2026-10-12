@@ -104,6 +104,7 @@ public class TerrainVehicleDisplay : ShipDisplay
 	int m_shownPercentFull;
 	int m_shownDistanceInKm;
 	int m_shownDirection;
+	bool m_shownShipLost;
 
 	public override void Update()
 	{
@@ -144,8 +145,11 @@ public class TerrainVehicleDisplay : ShipDisplay
 		// the distance as it is shown
 		var roundedDistanceInKm = Mathf.RoundToInt( distanceInKm );
 
+		// in a storm or heavy snow the bearing to the ship is lost (the original shows "SHIP: LOST!")
+		var shipLost = PlanetWeather.IsShipLost();
+
 		// has anything the text shows changed since we last built it?
-		if ( ( m_shownStardate != playerData.m_general.m_currentStardateDHMY ) || ( m_shownPercentFuelRemaining != percentFuelRemaining ) || ( m_shownFuelEfficiency != fuelEfficiency ) || ( m_shownPercentFull != percentFull ) || ( m_shownDistanceInKm != roundedDistanceInKm ) || ( m_shownDirection != index ) )
+		if ( ( m_shownStardate != playerData.m_general.m_currentStardateDHMY ) || ( m_shownPercentFuelRemaining != percentFuelRemaining ) || ( m_shownFuelEfficiency != fuelEfficiency ) || ( m_shownPercentFull != percentFull ) || ( m_shownDistanceInKm != roundedDistanceInKm ) || ( m_shownDirection != index ) || ( m_shownShipLost != shipLost ) )
 		{
 			// yes - remember what the text is built from this time
 			m_shownStardate = playerData.m_general.m_currentStardateDHMY;
@@ -154,6 +158,7 @@ public class TerrainVehicleDisplay : ShipDisplay
 			m_shownPercentFull = percentFull;
 			m_shownDistanceInKm = roundedDistanceInKm;
 			m_shownDirection = index;
+			m_shownShipLost = shipLost;
 
 			// date and time
 			var text = playerData.m_general.m_currentStardateDHMY + "\n";
@@ -177,7 +182,7 @@ public class TerrainVehicleDisplay : ShipDisplay
 
 			text += percentFull + "% Full\n";
 
-			text += roundedDistanceInKm + " KM. " + c_cardinalDirections[ index ];
+			text += shipLost ? "<color=yellow>LOST!</color>" : ( roundedDistanceInKm + " KM. " + c_cardinalDirections[ index ] );
 
 			// put the text on the display (it used to be put there five times a frame, a piece at a time)
 			m_statusValues.text = text;
