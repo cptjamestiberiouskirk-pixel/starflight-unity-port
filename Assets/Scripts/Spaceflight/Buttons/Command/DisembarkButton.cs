@@ -3,6 +3,11 @@ using UnityEngine;
 
 public class DisembarkButton : ShipButton
 {
+	// the artifacts the terrain vehicle takes out of the ship's hold every time it goes out (the original's disembark, TV-OV WEE39): the Flat Device, whose shield is
+	// around the terrain vehicle, and the Black Egg, which is armed by dropping it from the terrain vehicle's cargo; they come back on board with the rest of its cargo
+	// (Planetside.TransferTerrainVehicleCargo)
+	static readonly string[] c_artifactsTheTerrainVehicleTakes = { "Flat Device", "Black Egg" };
+
 	// if this is true we are transitioning to disembarked
 	bool m_isTransitioning;
 
@@ -117,6 +122,9 @@ public class DisembarkButton : ShipButton
 				// refuel the terrain vehicle
 				playerData.m_terrainVehicle.Refuel();
 
+				// it takes the Black Egg and the Flat Device with it
+				TakeArtifactsIntoTerrainVehicle( playerData );
+
 				// reset the message state and timer
 				m_messageState = 0;
 				m_messageTimer = 0.0f;
@@ -170,5 +178,25 @@ public class DisembarkButton : ShipButton
 
 		// always return true to prevent player from chagning buttons while transitioning to the docking bay
 		return true;
+	}
+
+	// moves one of each of the artifacts the terrain vehicle takes from the ship's hold into the terrain vehicle's (as the original does, without a message and
+	// whatever room is left in the terrain vehicle)
+	static void TakeArtifactsIntoTerrainVehicle( PlayerData playerData )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		foreach ( var artifactName in c_artifactsTheTerrainVehicleTakes )
+		{
+			var artifactId = gameData.FindArtifactId( artifactName );
+
+			// only an artifact the ship has on board
+			if ( ( artifactId >= 0 ) && playerData.m_playerShip.RemoveArtifact( artifactName ) )
+			{
+				playerData.m_terrainVehicle.AddArtifact( artifactId );
+
+				Debug.Log( "The terrain vehicle takes the " + artifactName + " out of the ship's hold." );
+			}
+		}
 	}
 }
