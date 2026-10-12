@@ -182,28 +182,11 @@ public class Viewport : MonoBehaviour
 		{
 			Tools.WorldToLatLongCoordinates( playerData.m_general.m_lastDisembarkedCoordinates, out var x, out var z );
 
-			var latitude = Mathf.RoundToInt( x );
-			var longitude = Mathf.RoundToInt( z );
+			// north-south first, as the original's coordinates above the main view read ("15N x 30W") - x is the east-west place and z the north-south one
+			var eastWest = Mathf.RoundToInt( x );
+			var northSouth = Mathf.RoundToInt( z );
 
-			if ( latitude < 0 )
-			{
-				text = ( -latitude ).ToString() + " W";
-			}
-			else
-			{
-				text = latitude.ToString() + " E";
-			}
-
-			text += "   ";
-
-			if ( longitude < 0 )
-			{
-				text += ( -longitude ).ToString() + " S";
-			}
-			else
-			{
-				text += longitude.ToString() + " N";
-			}
+			text = Mathf.Abs( northSouth ).ToString() + ( ( northSouth < 0 ) ? "S" : "N" ) + " x " + Mathf.Abs( eastWest ).ToString() + ( ( eastWest < 0 ) ? "W" : "E" );
 		}
 		else
 		{

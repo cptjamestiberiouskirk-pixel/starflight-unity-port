@@ -86,6 +86,7 @@ What the probe does:
 | `savepanel` | the Escape key in space, two seconds into a landing, after the landing and while the ship explodes, and whether a game that is over stays paused |
 | `input` | real key presses on a virtual Input System keyboard: each of the 19 keys of the old Input Manager axes gives its input and the stick position (8 other keys give none), two keys of one input, the debounce, the save panel opened with Escape and its selection moved with the arrows and the numpad (not A or D), Return and the numpad Enter on Resume, F9, F10 and Escape at game over (about 35 s) |
 | `starport-input` | the Starport event system's input module, and the arrows and the numpad (not S) moving the selection in the Operations panel, and the crew name field taking the focus without an exception (a legacy `InputField` reads `Input.compositionString`) |
+| `coordinates` | latitude and longitude as the original gives them: the terrain vehicle at 15 north, 30 west reads `15N x 30W` above the main view, and the landing map's LAT reads `15N` and LONG `30W` (about 35 s) |
 | `visual` | a floating object when its timer starts again, when an explosion is switched off, and how far the landing site crosshair moves in a second |
 | `explosionpictures` | every part of an explosion is textured and transparent, no part draws cubes, every part follows the explosion's scale, and making an explosion leaves `Random.state` alone (a control); with `-Graphics` it also renders a half size explosion and the F10 destruction of the ship at fixed game times |
 | `hitpictures` | the hull and shield hits are drawn transparent and not with the `Standard` or untextured particle shaders, a hull hit's particles are gone before it is switched off, both hits land on the side the shot came from, and making them leaves `Random.state` alone (a control); with `-Graphics` it also renders them zoomed in, alone and through `ApplyDamageToPlayer` |
@@ -177,7 +178,7 @@ What the probe does:
 | `lifeformpictures` | with `-Graphics`, renders the game view of planet 92 with the planet's lifeforms, then with all 17 models in a ring around the terrain vehicle, and a close-up of each model, into `Logs/lifeform-pictures/` (or `-probePictures`); without a graphics device it only lands (about 60 s) |
 | `look` | Look on planet 92 with one lifeform at a time beside the vehicle: a living plant (its body plan, not moving, alive), a test animal that wanders (wandering) and the plant made dead (dead) (about 40 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (127 scenarios, about 94 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (128 scenarios, about 95 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
