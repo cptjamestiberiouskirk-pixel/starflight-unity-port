@@ -1920,5 +1920,30 @@
     { "m_commId": 554, "m_postureMask": 15, "m_contextMask": 3, "m_action": -127, "m_deltaNo": 0, "m_deltaYes": 0, "m_source": "STARB.COM PHRASECONTRL" },
     { "m_commId": 555, "m_postureMask": 15, "m_contextMask": 3, "m_action": -127, "m_deltaNo": 0, "m_deltaYes": 0, "m_source": "STARB.COM PHRASECONTRL" },
     { "m_commId": 556, "m_postureMask": 15, "m_contextMask": 3, "m_action": -127, "m_deltaNo": 0, "m_deltaYes": 0, "m_source": "STARB.COM PHRASECONTRL" }
+  ],
+  "m_vesselStrengthList": [
+    { "m_vesselId": 1, "m_strength": 0, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 2, "m_strength": 5, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 3, "m_strength": 10, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 4, "m_strength": 200, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 5, "m_strength": 0, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 6, "m_strength": 5, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 7, "m_strength": 15, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 8, "m_strength": 8, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 9, "m_strength": 15, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 10, "m_strength": 22, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 11, "m_strength": 10, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 12, "m_strength": 20, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 13, "m_strength": 25, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 14, "m_strength": 80, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 15, "m_strength": 120, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 16, "m_strength": 255, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 17, "m_strength": 255, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 18, "m_strength": 255, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 19, "m_strength": 255, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 20, "m_strength": 0, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 21, "m_strength": 255, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 22, "m_strength": 0, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" },
+    { "m_vesselId": 23, "m_strength": 0, "m_source": "Research/Data/Starflight 1 Data.xls, Vessels, Energy (STARB.COM VESSEL byte 5)" }
   ]
 }

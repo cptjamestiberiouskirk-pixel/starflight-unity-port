@@ -15,4 +15,5 @@ public class RecoveredData
 	public GD_RuinFormation[] m_ruinFormationList;
 	public GD_CommPosture[] m_commPostureList;
 	public GD_AncientRuinSite[] m_ancientRuinSiteList;
+	public GD_VesselStrength[] m_vesselStrengthList;
 }

@@ -2602,26 +2602,65 @@ public class Encounter : MonoBehaviour
 		}
 	}
 
-	// the notes' "strength differential": the player's strength less the aliens' weighed by their aggression / 5 - positive, and the aliens grovel where they would
-	// threaten (compart.txt 5) - a strength is the port's: the armor and shield points of the player's ship, and those of the aliens' living ships
-	float GetStrengthDifferential( AlienPersonality personality )
+	// how much stronger than the aliens the player must be for them to grovel instead of threatening, and to take flight instead of fighting (COMM-OV EDL>POSTURE)
+	const int c_grovelOverHostile = 15;
+	const int c_fleeOverFight = 5;
+
+	// the player's strength as the shipped game weighs it (COMM-OV): the classes of the ship's armor, shields, missile launcher and laser cannon, and as much again
+	// for every 500 points by which the captain's five skills together pass 550
+	int GetPlayerStrength()
 	{
-		var ship = DataController.m_instance.m_playerData.m_playerShip;
-		var playerStrength = (float) ( Mathf.Max( 0, ship.m_armorPoints ) + Mathf.Max( 0, ship.m_shieldPoints ) );
-		var alienStrength = 0.0f;
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+
+		var classes = Mathf.Max( 0, ship.m_armorClass ) + Mathf.Max( 0, ship.m_shieldingClass ) + Mathf.Max( 0, ship.m_missileLauncherClass ) + Mathf.Max( 0, ship.m_laserCannonClass );
+
+		var captain = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Captain );
+
+		if ( captain == null )
+		{
+			return classes;
+		}
+
+		var skills = captain.m_science + captain.m_navigation + captain.m_engineering + captain.m_communications + captain.m_medicine;
+
+		return classes + classes * Mathf.Max( 0, skills - 550 ) / 500;
+	}
+
+	// the aliens' strength as the shipped game weighs it (COMM-OV IAPWR): each ship that is there adds its vessel's strength, by the share of its armor and shields
+	// that it has left
+	int GetAlienStrength()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var alienStrength = 0;
 
 		foreach ( var alienShip in m_pdEncounter.GetAlienShipList() )
 		{
-			if ( alienShip.m_addedToEncounter && !alienShip.m_isDead )
+			if ( ( alienShip == null ) || !alienShip.m_addedToEncounter || alienShip.m_isDead || ( alienShip.m_vesselId <= 0 ) || ( alienShip.m_vesselId >= gameData.m_vesselList.Length ) )
 			{
-				alienStrength += Mathf.Max( 0, alienShip.m_armorPoints ) + Mathf.Max( 0, alienShip.m_shieldPoints );
+				continue;
+			}
+
+			var vessel = gameData.m_vesselList[ alienShip.m_vesselId ];
+			var fullPoints = vessel.m_armor + vessel.m_shields;
+
+			if ( fullPoints > 0 )
+			{
+				alienStrength += (int) ( (long) vessel.m_strength * ( Mathf.Max( 0, alienShip.m_armorPoints ) + Mathf.Max( 0, alienShip.m_shieldPoints ) ) / fullPoints );
 			}
 		}
 
-		return playerStrength - alienStrength * personality.m_aggression / 5.0f;
+		return alienStrength;
 	}
 
-	// the posture the aliens' mood gives them below "fight or flight": friendly, diplomatic (neutral), or hostile or obsequious by their strength (compart.txt 4)
+	// the player's strength less the aliens' (COMM-OV EDL>POSTURE)
+	int GetStrengthDifferential()
+	{
+		return GetPlayerStrength() - GetAlienStrength();
+	}
+
+	// the posture the aliens' mood gives them below "fight or flight": friendly, diplomatic (neutral), or hostile - obsequious instead against a player more than 15
+	// stronger (compart.txt 4, COMM-OV EDL>POSTURE)
 	GD_Comm.Stance GetMoodPosture( AlienPersonality personality )
 	{
 		var mood = m_pdEncounter.m_mood;
@@ -2636,7 +2675,7 @@ public class Encounter : MonoBehaviour
 			return GD_Comm.Stance.Neutral;
 		}
 
-		return ( GetStrengthDifferential( personality ) > 0.0f ) ? GD_Comm.Stance.Obsequious : GD_Comm.Stance.Hostile;
+		return ( GetStrengthDifferential() > c_grovelOverHostile ) ? GD_Comm.Stance.Obsequious : GD_Comm.Stance.Hostile;
 	}
 
 	// true if a ship of this encounter that is still there matches (the original's IAPWR looks over the encounter's ships for shields and for weapons)
@@ -2792,7 +2831,7 @@ public class Encounter : MonoBehaviour
 				AddComm( GD_Comm.Subject.Terminate, false );
 			}
 
-			m_pdEncounter.m_alienStance = ( GetStrengthDifferential( personality ) > 0.0f ) ? GD_Comm.Stance.Obsequious : GD_Comm.Stance.Hostile;
+			m_pdEncounter.m_alienStance = ( GetStrengthDifferential() > c_fleeOverFight ) ? GD_Comm.Stance.Obsequious : GD_Comm.Stance.Hostile;
 
 			return;
 		}
