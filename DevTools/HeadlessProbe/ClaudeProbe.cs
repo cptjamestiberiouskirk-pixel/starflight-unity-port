@@ -877,6 +877,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCoordinates();
 				break;
 
+			case "tvdisplay":
+				yield return ScenarioTVDisplay();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -21463,6 +21467,37 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "coordinates: the landing map's LAT is the north-south place and its LONG the east-west one", ( latitude == "15N" ) && ( longitude == "30W" ), latitude + " / " + longitude );
 
 		Finish( "scenario=coordinates bar=" + bar + " lat=" + latitude + " long=" + longitude, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the terrain vehicle's display in the original's words
+
+	IEnumerator ScenarioTVDisplay()
+	{
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// on planet 92 of Arth, in the terrain vehicle
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		// (no weather: a storm would hide the bearing behind LOST!)
+		PlanetWeather.End();
+
+		yield return Frames( 10 );
+
+		var rows = controller.m_displayController.m_terrainVehicleDisplay.m_statusValues.text.Split( '\n' );
+		var date = ( rows.Length > 0 ) ? rows[ 0 ] : "";
+		var ship = ( rows.Length > 0 ) ? System.Text.RegularExpressions.Regex.Replace( rows[ rows.Length - 1 ], "<[^>]*>", "" ) : "";
+		var bearing = ship.Contains( "KM." ) ? ship.Substring( ship.IndexOf( "KM." ) + 3 ).Trim() : "";
+		var words = new[] { "North", "Northeast", "East", "Southeast", "South", "Southwest", "West", "Northwest" };
+
+		Log( "tvdisplay: date '" + date + "', ship '" + ship + "' (bearing '" + bearing + "') | " + string.Join( " / ", rows ) );
+
+		Check( "tvdisplay: the terrain vehicle's date has no hour, as the original's 01-01-4620", System.Text.RegularExpressions.Regex.IsMatch( date, @"^\d\d-\d\d-\d{4}$" ), date );
+		Check( "tvdisplay: the bearing to the ship is spelled out, as the original's NORTH", System.Array.IndexOf( words, bearing ) >= 0, ship );
+
+		Finish( "scenario=tvdisplay date=" + date + " ship=" + ship, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
