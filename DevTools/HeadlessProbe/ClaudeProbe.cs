@@ -17681,11 +17681,16 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 1: colony recommendations
 
-	// goes into orbit around a planet, logs it with the real Log Planet button and answers the question - returns whether the question was asked
-	static IEnumerator LogAndRecommend( int planetId, bool recommend, bool[] asked )
+	// goes into orbit around a planet, logs it with the real Log Planet button and answers the question - returns whether the question was asked; after a yes,
+	// if the console asks for the planet's name (the original's "NAME THIS PLANET: "), types this on the probe's keyboard (text events, a backspace as '\b')
+	// and presses Enter - and adds what the console said after the yes and after the Enter
+	static IEnumerator LogAndRecommend( int planetId, bool recommend, bool[] asked, string name = null, List<string> said = null )
 	{
 		var gameData = DataController.m_instance.m_gameData;
 		var controller = SpaceflightController.m_instance;
+
+		// the probe's keyboard is the current one before the yes (a headless run has none, and the yes looks for it)
+		var keyboard = ProbeKeyboard();
 
 		yield return GoIntoOrbit( gameData.m_planetList[ planetId ].m_starId, planetId );
 
@@ -17711,6 +17716,31 @@ public class ClaudeProbe : MonoBehaviour
 			PressButton( (ButtonController.ButtonSet) recommendSet, recommend ? 1 : 0 );
 
 			yield return Frames( 2 );
+
+			var afterAnswer = MessageList();
+
+			if ( said != null )
+			{
+				said.Add( afterAnswer );
+			}
+
+			// only when the console asks for it: on the code before the name an Enter would press one of the command buttons
+			if ( recommend && ( name != null ) && afterAnswer.Contains( "Name this planet" ) )
+			{
+				foreach ( var character in name )
+				{
+					InputSystem.QueueTextEvent( keyboard, character );
+
+					yield return Frames( 2 );
+				}
+
+				yield return Tap( Key.Enter );
+
+				if ( said != null )
+				{
+					said.Add( MessageList() );
+				}
+			}
 		}
 	}
 
@@ -17749,13 +17779,17 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		// ---- 1. Log Planet asks whether to recommend the planet, and Yes recommends it
-		yield return LogAndRecommend( heaven, true, asked );
+		// ---- 1. Log Planet asks whether to recommend the planet, and Yes recommends it; the player names it ("New EdenX" and a backspace, a name longer than the
+		// original's 15 characters, and none at all)
+		var saidForHeaven = new List<string>();
+		var saidForA = new List<string>();
+
+		yield return LogAndRecommend( heaven, true, asked, "New EdenX\b", saidForHeaven );
 
 		var askedForHeaven = asked[ 0 ];
 
-		yield return LogAndRecommend( unsuitableA, true, asked );
-		yield return LogAndRecommend( unsuitableB, true, asked );
+		yield return LogAndRecommend( unsuitableA, true, asked, "ABCDEFGHIJKLMNOPQRS", saidForA );
+		yield return LogAndRecommend( unsuitableB, true, asked, "" );
 
 		// ---- 2. the control: No does not recommend it
 		yield return LogAndRecommend( notRecommended, false, asked );
@@ -17806,6 +17840,17 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "colonies: back at the Starport an optimal planet of Interstel's list earns its bonus", ledger.Contains( "Colony bonus 50000+" ) && evaluationText.Contains( "OPTIMAL PLANET" ) && evaluationText.Contains( "BONUS OF 50000" ), ledger );
 		Check( "colonies: the first unsuitable planet is a warning of 100 MU, with its reasons", ledger.Contains( "Colony fine 100-" ) && evaluationText.Contains( "FINED 100 MU'S.  THIS IS ONLY A WARNING" ) && ( reasonsA.Length > 0 ) && evaluationText.Contains( reasonsA.Split( ',' )[ 0 ].Trim() ), ledger + " | " + reasonsA );
 		Check( "colonies: a later unsuitable planet is fined heavily, 5000 MU for each reason, with no warning", ledger.Contains( "Colony fine " + ( 5000 * reasonCountB ) + "-" ) && ( change == 50000 - 100 - 5000 * reasonCountB ) && ( pendingAfter == 0 ), ledger + " | " + change + " | pending " + pendingAfter );
+
+		// ---- 4. the original's evaluation screen (OP-OV): each evaluation under its recommendation's number, date, system, orbit and the name the player gave it
+		var heavenOrbit = gameData.m_planetList[ heaven ].m_orbitPosition;
+		var orbitA = gameData.m_planetList[ unsuitableA ].m_orbitPosition;
+		var orbitB = gameData.m_planetList[ unsuitableB ].m_orbitPosition;
+
+		Log( "colonies: said after the yes and the Enter for Mardan 4: " + string.Join( " || ", saidForHeaven ).Replace( '\n', '/' ) + " | for " + unsuitableA + ": " + string.Join( " || ", saidForA ).Replace( '\n', '/' ) );
+
+		Check( "colonies: after Yes the console asks \"Name this planet:\", and after the name and Enter says \"Recommendation logged.\"", ( saidForHeaven.Count == 2 ) && saidForHeaven[ 0 ].Contains( "Name this planet: _" ) && saidForHeaven[ 1 ].Contains( "Recommendation logged." ), string.Join( " || ", saidForHeaven ) );
+		Check( "colonies: Mardan 4's evaluation is under RECOMMENDATION: 1, its DATE, SYSTEM: 217,88, its ORBIT and NAME: NEW EDEN (a backspace took the X away)", evaluationText.Contains( "RECOMMENDATION: 1\nDATE: " ) && System.Text.RegularExpressions.Regex.IsMatch( evaluationText, "RECOMMENDATION: 1\nDATE: \\d\\d-\\d\\d-\\d{4}\nSYSTEM: 217,88\nORBIT: " + heavenOrbit + "\nNAME: NEW EDEN\nEVALUATION:\nGOOD WORK!" ), evaluationText.Replace( '\n', '/' ) );
+		Check( "colonies: a name is cut to the original's 15 characters, and a planet left unnamed has an empty NAME line", evaluationText.Contains( "RECOMMENDATION: 2\n" ) && evaluationText.Contains( "SYSTEM: 55,32\nORBIT: " + orbitA + "\nNAME: ABCDEFGHIJKLMNO\nEVALUATION:\nDUE TO" ) && evaluationText.Contains( "RECOMMENDATION: 3\n" ) && evaluationText.Contains( "ORBIT: " + orbitB + "\nNAME: \nEVALUATION:\nDUE TO" ), evaluationText.Replace( '\n', '/' ) );
 
 		Finish( "scenario=colonies asked=" + askedForHeaven + " pending=" + pendingCount + " change=" + change + " pendingAfter=" + pendingAfter, 0 );
 	}
