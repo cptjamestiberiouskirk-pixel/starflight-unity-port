@@ -195,6 +195,9 @@ public class TerrainMapDisplay : ShipDisplay
 			m_crosshairVelocity = Time.deltaTime * m_crosshairMoveAcceleration;
 		}
 
+		// the Red Cylinder flashes near an ancient ruin
+		RedCylinder.Look( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude );
+
 		m_latitudeText.text = Mathf.FloorToInt( Mathf.Abs( playerData.m_general.m_selectedLatitude ) ).ToString() + ( ( playerData.m_general.m_selectedLatitude < 0.0f ) ? "W" : "E" );
 		m_longitudeText.text = Mathf.RoundToInt( Mathf.Abs( playerData.m_general.m_selectedLongitude ) ).ToString() + ( ( playerData.m_general.m_selectedLongitude < 0.0f ) ? "S" : "N" );
 

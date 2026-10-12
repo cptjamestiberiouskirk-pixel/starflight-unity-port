@@ -841,6 +841,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioFlatDevice();
 				break;
 
+			case "redcylinder":
+				yield return ScenarioRedCylinder();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -19855,6 +19859,90 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "flatdevice: with the Flat Device about half of the attacks hurt, and the shield turns the others away", ( hurtWith >= 80 ) && ( hurtWith <= 140 ) && messages.Contains( "the shield turns it away" ), hurtWith + " of 200" );
 
 		Finish( "scenario=flatdevice without=" + hurtWithout + " with=" + hurtWith, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 4: the Red Cylinder
+
+	// the Red Cylinder looks at this place of the landing map (null on the code before it)
+	static object RedCylinderLook( float eastWest, float northSouth )
+	{
+		var type = typeof( ShipButton ).Assembly.GetType( "RedCylinder" );
+		var look = ( type == null ) ? null : type.GetMethod( "Look" );
+
+		return ( look == null ) ? null : look.Invoke( null, new object[] { eastWest, northSouth } );
+	}
+
+	IEnumerator ScenarioRedCylinder()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// planet 94 of the Arth system has an ancient random ruin
+		yield return LandInTheArthSystemAt( 94, Vector3.zero, done );
+
+		yield return Frames( 5 );
+
+		// ---- 1. where the surface placed the random ruins
+		var placed = new List<string>();
+		var placedPlaces = new List<Vector2>();
+		var terrainRuins = controller.m_disembarked.m_terrainGrid.m_terrainRuins;
+
+		foreach ( Transform child in terrainRuins.transform )
+		{
+			if ( child.name.StartsWith( "Ancient ruin" ) || child.name.StartsWith( "Old Empire ruin" ) )
+			{
+				Tools.WorldToLatLongCoordinates( child.position, out var eastWest, out var northSouth );
+
+				placed.Add( ( child.name.StartsWith( "Ancient" ) ? "ancient" : "old" ) + " " + eastWest.ToString( "F1" ) + "/" + northSouth.ToString( "F1" ) );
+				placedPlaces.Add( new Vector2( eastWest, northSouth ) );
+			}
+		}
+
+		// ---- 2. where they are worked out from the planet's maps, as the Red Cylinder does from orbit
+		var planet = gameData.m_planetList[ 94 ];
+		var planetGenerator = controller.m_starSystem.GetPlanetController( 94 ).GetPlanetGenerator();
+		var getPlaces = typeof( TerrainRuins ).GetMethod( "GetRandomRuinPlaces" );
+		var worked = new List<string>();
+
+		if ( getPlaces != null )
+		{
+			var places = getPlaces.Invoke( null, new object[] { planetGenerator, controller.m_disembarked.m_terrainGrid.m_elevationScale, planet } ) as IList;
+
+			foreach ( var place in places )
+			{
+				var where = (Vector2) place.GetType().GetProperty( "Key" ).GetValue( place );
+				var ancient = (bool) place.GetType().GetProperty( "Value" ).GetValue( place );
+
+				worked.Add( ( ancient ? "ancient" : "old" ) + " " + where.x.ToString( "F1" ) + "/" + where.y.ToString( "F1" ) );
+			}
+		}
+
+		// ---- 3. the Red Cylinder flashes at the ancient ruin, not far from it, and not without the Red Cylinder (the control)
+		var ruin = ( placedPlaces.Count > 0 ) ? placedPlaces[ 0 ] : Vector2.zero;
+		var redCylinder = gameData.FindArtifactId( "Red Cylinder" );
+
+		controller.m_messages.Clear();
+
+		var withoutIt = RedCylinderLook( ruin.x, ruin.y );
+
+		playerData.m_playerShip.AddArtifact( redCylinder );
+
+		var farAway = RedCylinderLook( ruin.x + 90.0f, -ruin.y );
+		var atTheRuin = RedCylinderLook( ruin.x + 3.0f, ruin.y - 2.0f );
+		var messages = MessageList();
+
+		playerData.m_playerShip.RemoveArtifact( redCylinder );
+
+		Log( "redcylinder: placed [" + string.Join( ", ", placed ) + "] worked out [" + string.Join( ", ", worked ) + "] | without it " + withoutIt + ", far away " + farAway + ", at the ruin " + atTheRuin + " | " + messages );
+
+		Check( "redcylinder: the random ruins are worked out from orbit where the surface places them", ( placed.Count > 0 ) && ( string.Join( ", ", placed ) == string.Join( ", ", worked ) ), string.Join( ", ", placed ) + " | " + string.Join( ", ", worked ) );
+		Check( "redcylinder: the Red Cylinder flashes on the landing map near an ancient ruin, not far from it, and only aboard", ( atTheRuin is bool ) && (bool) atTheRuin && !(bool) farAway && !(bool) withoutIt && messages.Contains( "The Red Cylinder is flashing" ), withoutIt + ", " + farAway + ", " + atTheRuin + " | " + messages );
+
+		Finish( "scenario=redcylinder placed=" + placed.Count + " worked=" + worked.Count, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

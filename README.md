@@ -139,6 +139,7 @@ The project features a **deterministic visualization system** that renders plane
 - The Dodecahedron draws alien ships from twice as far
 - The Shimmering Ball cloaks the ship in combat until it fires
 - The Flat Device shields the terrain vehicle: lifeforms hit its crew half as often
+- The Red Cylinder flashes on the landing map near the planet's ancient ruins
 - Continuum fluxes can be seen only with the Ring Device aboard
 - The price of Endurium rises with the notices of 20-02 and 15-05, and the Starport buys it back for what it sells it for
 - Nebulae keep the shields down
