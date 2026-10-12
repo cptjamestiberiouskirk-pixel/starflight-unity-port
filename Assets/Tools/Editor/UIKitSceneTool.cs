@@ -976,6 +976,212 @@ public static class UIKitSceneTool
 		return report.ToString();
 	}
 
+	// ---------------------------------------------------------------- the intro
+
+	const string c_introScenePath = "Assets/Scenes/Intro.unity";
+	const string c_introLogoFolder = "Assets/Game Objects/Intro/";
+
+	// what each element of the intro's pages becomes (the owner's choice of 2026-10-12: all of it in the kit, the logos too; Electronic Arts' logo stays theirs)
+	static Entry[] GetIntroTable()
+	{
+		var entries = new System.Collections.Generic.List<Entry>
+		{
+			// page 2: the Starflight logo in the kit's cyan (it is white), the copyright line on a navy strip
+			new Entry( "Page 2/Starflight Image", UIText.None, 0, UISprite.None, UIColor.AccentPrimary ),
+			new Entry( "Page 2/Panel", UIText.None, 0, UISprite.None, UIColor.BackgroundPanel, 0.85f ),
+			new Entry( "Page 2/Panel/Copyright Text", UIText.LabelM, 36, UISprite.None, UIColor.TextSecondary ),
+			new Entry( "Page 2/Panel/Electronic Arts Text", UIText.LabelM, 36, UISprite.None, UIColor.TextSecondary ),
+
+			// page 3: the remake's credits on a kit panel (the roles in its cyan, the names in its primary text colour, set below)
+			new Entry( "Page 3/Xform/Heading", UIText.HeadingL, 46, UISprite.None, UIColor.TextPrimary ),
+			new Entry( "Page 3/Xform/Panel", UIText.None, 0, UISprite.Panel, UIColor.BackgroundPanel, 0.92f ),
+			new Entry( "Page 3/Xform/Panel/Top Credits", UIText.BodyM, 40, UISprite.None, UIColor.TextAccent ),
+			new Entry( "Page 3/Xform/Panel/GameObject/Left Credits", UIText.BodyM, 40, UISprite.None, UIColor.TextAccent ),
+			new Entry( "Page 3/Xform/Panel/GameObject/Right Credits", UIText.BodyM, 40, UISprite.None, UIColor.TextAccent ),
+			new Entry( "Page 3/Xform/Panel/Bottom Credits", UIText.BodyM, 40, UISprite.None, UIColor.TextAccent ),
+			new Entry( "Page 3/Xform/Footer", UIText.LabelM, 40, UISprite.None, UIColor.TextAccent ),
+
+			// page 5: Interstel's warning on a kit panel with the alert outline (it was a red panel)
+			new Entry( "Page 5/Dialog", UIText.None, 0, UISprite.Panel, UIColor.BackgroundPanel ),
+			new Entry( "Page 5/Dialog/Panel/Heading Text", UIText.HeadingM, 30, UISprite.None, UIColor.TextAlert ),
+			new Entry( "Page 5/Dialog/Panel/Body Text", UIText.BodyM, 38, UISprite.None, UIColor.TextPrimary ),
+		};
+
+		// page 1: the original team's names in the kit's heading style
+		foreach ( var name in new[] { "Row 1 Panel/Rod McConnell", "Row 1 Panel/Greg Johnson", "Row 2 Panel/T. C. Lee", "Row 3 Panel/Alec Kercso", "Row 3 Panel/Bob Gonsalves" } )
+		{
+			entries.Add( new Entry( "Page 1/Credits Panel/" + name, UIText.HeadingL, 50, UISprite.None, UIColor.TextPrimary ) );
+		}
+
+		return entries.ToArray();
+	}
+
+	[MenuItem( "Starflight Remake/UI Kit/Apply to the Intro" )]
+	public static void ApplyIntroFromMenu()
+	{
+		if ( !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo() )
+		{
+			return;
+		}
+
+		EditorSceneManager.OpenScene( c_introScenePath, OpenSceneMode.Single );
+
+		Debug.Log( ApplyToIntro() );
+	}
+
+	// for batch mode: open the Intro scene, apply the kit, save the scene
+	public static void ApplyIntroAndSave()
+	{
+		EditorSceneManager.OpenScene( c_introScenePath, OpenSceneMode.Single );
+
+		Debug.Log( ApplyToIntro() );
+
+		EditorSceneManager.SaveScene( EditorSceneManager.GetActiveScene() );
+	}
+
+	// gives the open Intro scene's pages the kit's look and returns a report
+	public static string ApplyToIntro()
+	{
+		var report = new System.Text.StringBuilder( "UI kit applied to the intro\n" );
+		var theme = UIKitTheme.Get();
+		var canvas = FindCanvas();
+
+		if ( ( theme == null ) || ( canvas == null ) )
+		{
+			return "missing " + ( ( theme == null ) ? "the UI kit theme" : "the UI canvas" );
+		}
+
+		report.AppendLine( ApplyEntries( canvas, GetIntroTable(), report ) + " elements styled" );
+
+		// outlines on the two panels
+		foreach ( var (path, color) in new[] { ( "Page 3/Xform/Panel", UIColor.BorderDefault ), ( "Page 5/Dialog", UIColor.BorderAlert ) } )
+		{
+			var panel = canvas.Find( path );
+
+			if ( panel != null )
+			{
+				AddOutline( panel, color );
+			}
+			else
+			{
+				report.AppendLine( "not found: " + path );
+			}
+		}
+
+		// the credits' names were green (colour tags in the text): the kit's primary text colour
+		var nameTag = "<color=#" + ColorUtility.ToHtmlStringRGB( theme.m_textPrimary ) + ">";
+
+		foreach ( var path in new[] { "Page 3/Xform/Panel/Top Credits", "Page 3/Xform/Panel/GameObject/Left Credits", "Page 3/Xform/Panel/GameObject/Right Credits", "Page 3/Xform/Panel/Bottom Credits" } )
+		{
+			var credits = canvas.Find( path );
+
+			if ( ( credits != null ) && credits.TryGetComponent<TMPro.TMP_Text>( out var text ) && text.text.Contains( "<color=\"green\">" ) )
+			{
+				Undo.RecordObject( text, "UI kit" );
+				text.text = text.text.Replace( "<color=\"green\">", nameTag );
+				EditorUtility.SetDirty( text );
+			}
+		}
+
+		// the Binary Systems logo's red line in the kit's cyan (a copy of each picture, made from the original, which stays)
+		foreach ( var part in new[] { "Left", "Middle", "Right" } )
+		{
+			var image = canvas.Find( "Page 1/Binary Systems/" + part );
+			var sprite = MakeKitLogo( "Intro Binary Systems " + part, theme.m_accentPrimary, report );
+
+			if ( ( image != null ) && image.TryGetComponent<Image>( out var logo ) && ( sprite != null ) )
+			{
+				Undo.RecordObject( logo, "UI kit" );
+				logo.sprite = sprite;
+				EditorUtility.SetDirty( logo );
+			}
+		}
+
+		EditorSceneManager.MarkSceneDirty( canvas.gameObject.scene );
+
+		return report.ToString();
+	}
+
+	// makes the kit's copy of one of the intro's logo pictures: its red pixels in this colour (as bright as they were), everything else as it was; the copy
+	// gets the original's import settings
+	static Sprite MakeKitLogo( string name, Color colour, System.Text.StringBuilder report )
+	{
+		var sourcePath = c_introLogoFolder + name + ".png";
+		var kitPath = c_introLogoFolder + name + " Kit.png";
+
+		if ( !System.IO.File.Exists( sourcePath ) )
+		{
+			report.AppendLine( "missing " + sourcePath );
+			return null;
+		}
+
+		var source = new Texture2D( 2, 2, TextureFormat.RGBA32, false );
+
+		if ( !source.LoadImage( System.IO.File.ReadAllBytes( sourcePath ) ) )
+		{
+			report.AppendLine( "could not read " + sourcePath );
+			return null;
+		}
+
+		var pixels = source.GetPixels32();
+		var changed = 0;
+
+		for ( var i = 0; i < pixels.Length; i++ )
+		{
+			Color c = pixels[ i ];
+
+			// red: well above green and blue
+			var redness = Mathf.Clamp01( ( c.r - Mathf.Max( c.g, c.b ) ) / 0.4f );
+
+			if ( redness <= 0.0f )
+			{
+				continue;
+			}
+
+			// the kit's colour, as bright as the red was (dark red edges stay visible), blended by how red the pixel is
+			var mixed = Color.Lerp( c, new Color( Mathf.Clamp01( colour.r * Mathf.Max( c.r, 0.6f ) ), Mathf.Clamp01( colour.g * Mathf.Max( c.r, 0.6f ) ), Mathf.Clamp01( colour.b * Mathf.Max( c.r, 0.6f ) ), c.a ), redness );
+
+			mixed.a = c.a;
+			pixels[ i ] = mixed;
+			changed++;
+		}
+
+		var copy = new Texture2D( source.width, source.height, TextureFormat.RGBA32, false );
+
+		copy.SetPixels32( pixels );
+		copy.Apply();
+
+		System.IO.File.WriteAllBytes( kitPath, copy.EncodeToPNG() );
+
+		Object.DestroyImmediate( source );
+		Object.DestroyImmediate( copy );
+
+		AssetDatabase.ImportAsset( kitPath, ImportAssetOptions.ForceSynchronousImport );
+
+		var importer = AssetImporter.GetAtPath( kitPath ) as TextureImporter;
+		var original = AssetImporter.GetAtPath( sourcePath ) as TextureImporter;
+
+		if ( ( importer != null ) && ( original != null ) )
+		{
+			importer.textureType = original.textureType;
+			importer.spriteImportMode = original.spriteImportMode;
+			importer.spritePixelsPerUnit = original.spritePixelsPerUnit;
+			importer.spriteBorder = original.spriteBorder;
+			importer.spritePivot = original.spritePivot;
+			importer.alphaIsTransparency = original.alphaIsTransparency;
+			importer.mipmapEnabled = original.mipmapEnabled;
+			importer.wrapMode = original.wrapMode;
+			importer.filterMode = original.filterMode;
+			importer.textureCompression = original.textureCompression;
+			importer.maxTextureSize = original.maxTextureSize;
+			importer.SaveAndReimport();
+		}
+
+		report.AppendLine( name + " Kit: " + changed + " red pixels in the kit's colour" );
+
+		return AssetDatabase.LoadAssetAtPath<Sprite>( kitPath );
+	}
+
 	// ---------------------------------------------------------------- the save game panel
 
 	const string c_persistentScenePath = "Assets/Scenes/Persistent.unity";
