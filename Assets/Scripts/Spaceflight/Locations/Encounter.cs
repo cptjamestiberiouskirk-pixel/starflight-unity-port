@@ -2843,10 +2843,11 @@ public class Encounter : MonoBehaviour
 		return Random.Range( 3, 9 );
 	}
 
-	// true once aliens with a personality have said all their phrases
+	// true once aliens with a personality have said all their phrases - never a home fleet, whose talk ends with its last warning (it attacks then; a Veloxi fleet
+	// hailed first has its refusal and four hails to give)
 	bool IsTiredOfTalking()
 	{
-		return ( AlienPersonality.Find( m_gdEncounter.m_race ) != null ) && ( m_pdEncounter.m_alienPhrasesLeft <= 0 );
+		return ( AlienPersonality.Find( m_gdEncounter.m_race ) != null ) && ( m_pdEncounter.m_alienPhrasesLeft <= 0 ) && !IsHomeFleet();
 	}
 
 	// true if the aliens transmit rather than talk: the Minstrels' song, the Nomad probe's planetary data, the Noah 9 derelict's recorded message and the Mysterions'
