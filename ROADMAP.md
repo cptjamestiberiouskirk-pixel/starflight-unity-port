@@ -180,7 +180,7 @@ Depends on D3. This is the largest piece and is not on the path to winning, whic
 
 - Compare every screen with `Research/Screenshots/` and every message with STRINFO.
 - Correct the README's completion figure. Done: it counts the roadmap's items (55 of 59), with what is left.
-- Draw the planet in encounters that begin in orbit (ruling 5, later step).
+- Draw the planet in encounters that begin in orbit (ruling 5, later step). Done: the planet's own surface lies under the encounter, below the ships.
 - Alien captain and ship names (`%` and `+` in 15 greetings): made of the race's syllables (the garble words), as STRINFO's own names are (Fi-noc-tzi, To-chu-pu, Yrh-ey); done 2026-10-11 on Claude's recommendation.
 - Crew learn by using their skills: DRAFT only. Left out on Claude's recommendation (2026-10-11): the shipped game trains crew at the Starport (the Personnel office, which uses the race's learning rate).
 
