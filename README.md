@@ -25,7 +25,7 @@ The project has been refactored to a clean, **root-directory architecture** to e
 - **Data-Driven Architecture**: Uses JSON-based definitions for game assets and player progress via the `ISaveSystem`.
 - **Combat System**: Laser cannons, missile launchers, shield absorption, armor damage, and AI combat behaviors with victory/defeat detection. Alien ships have armor and shield points, any race turns hostile when fired on (the Uhlek attack on sight), aliens hold their fire while a comm link is up, and every shot uses a little Endurium.
 - **Encounters in Orbit**: Home fleets, drones and a derelict wait in orbit around their planets and meet the ship when it goes into orbit there. The ship drops into the encounter and comes back at the level of the star system, as in the original.
-- **Ship Systems Over Time**: Shields keep their charge and recharge slowly, and the engineer's repairs and the doctor's treatment take time, faster with higher skill.
+- **Ship Systems Over Time**: Shields keep their charge and recharge slowly, and the engineer's repairs and the doctor's treatment take time, faster with higher skill. The doctor asks which crew member to examine or treat, as in the original.
 - **Living Suns**: The sun of each star system churns, its corona flickers, and small flares rise from its rim and fall back, in the colour of real stars of its class.
 - **Ship Destruction**: Complete death sequences with explosion effects, debris spawning, and salvage opportunities.
 - **Game Over System**: Player ship destruction triggers the game over screen. Returning to the title screen goes back to the last save.
@@ -148,7 +148,7 @@ The project features a **deterministic visualization system** that renders plane
 - A distress call, once confirmed, gets the ship towed home, for a fine that grows with the distance from Arth
 - Alien ships have the armor, shields and speed of their vessels in the game data
 - The starmap shows the fuel needed to fly to the cursor
-- Planets can be recommended for colonization, and Interstel pays a bonus or fines the crew at the Starport
+- Planets can be recommended for colonization and named by the player, and Interstel pays a bonus or fines the crew at the Starport, each evaluation under its recommendation's number, date, system, orbit and name
 - The 35 planets with life have lifeforms of their own species, which Scan reads the terrain vehicle's laser and stunner act on; dangerous ones come at the vehicle and attack the crew, and wimpy ones flee; a crew member whose vitality reaches 0 is dead, a dead captain's command passes down the chain of command, and the game is lost when the whole crew has died; lifeforms hunt, flee and eat one another; the terrain vehicle's Cargo records a lifeform's data, which Interstel pays for at the Starport, or captures it into stasis as a specimen the Trade Depot buys; Look describes the nearest lifeform and what it is doing, and the minerals, ruins and dropped cargo next to the vehicle
 - Lava destroys a terrain vehicle that drives into it; the Starport installs a new one for a fine
 - Going uphill is slow: the terrain vehicle slows on a rising slope, and a slow climb takes more fuel for the distance
