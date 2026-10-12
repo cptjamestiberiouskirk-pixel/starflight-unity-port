@@ -21711,7 +21711,8 @@ public class ClaudeProbe : MonoBehaviour
 	// the 3D star system view: in Arth's system (class G) and star 156 (class A, a gas giant in orbit 4) the sunlight shines from the middle of the star, in the
 	// plane of the orbits, toward the ship (so the planets in view are lit on their star's side) and has the star's colour; with -Graphics, pictures of the
 	// ship beside the sun, beside each planet and of an overview from high above the sun go into Logs/screen-pictures/system-view/ (or -probePictures); the sky
-	// has a Milky Way under the territory's nebula (and stars of several colours, #232), and the main view shows no Regen Starfield debug button (#240)
+	// has a Milky Way under the territory's nebula (and stars of several colours, #232), and the main view shows no Regen Starfield debug button (#240); every planet has
+	// the path of its orbit, and the ship's engines glow, brighter at full speed
 	IEnumerator ScenarioSystemViewPictures()
 	{
 		var controller = SpaceflightController.m_instance;
@@ -21846,6 +21847,58 @@ public class ClaudeProbe : MonoBehaviour
 
 			Check( "systemviewpictures: star " + starId + ": the ship is still lit from high above, so that it can be seen from the camera (control)", shipLitFromAbove, "light " + ( ( shipLight != null ) ? shipLight.name : "none" ) );
 
+			// the path of each planet's orbit: a ring round the star at the height of the planet's middle, of the planet's distance from the star, marked
+			// with the planet's place on it (where its trail starts)
+			var pathsRight = 0;
+			var pathsSeen = 0;
+			var worstPath = "";
+
+			foreach ( var planetController in controller.m_starSystem.m_planetController )
+			{
+				if ( ( planetController.m_planet == null ) || !planetController.gameObject.activeInHierarchy )
+				{
+					continue;
+				}
+
+				pathsSeen++;
+
+				var path = planetController.transform.Find( "Orbit Path" );
+				var pathRenderer = ( path != null ) ? path.GetComponent<MeshRenderer>() : null;
+				var pathMesh = ( path != null ) ? path.GetComponent<MeshFilter>() : null;
+
+				if ( ( pathRenderer == null ) || ( pathMesh == null ) || ( pathMesh.sharedMesh == null ) || !pathRenderer.enabled )
+				{
+					worstPath = "orbit " + planetController.m_planet.m_orbitPosition + " has none";
+					continue;
+				}
+
+				var planetPosition = planetController.transform.position;
+				var radius = new Vector2( planetPosition.x, planetPosition.z ).magnitude;
+				var extent = pathMesh.sharedMesh.bounds.extents.x;
+				var centre = path.position;
+				var properties = new MaterialPropertyBlock();
+
+				pathRenderer.GetPropertyBlock( properties );
+
+				var markedAngle = properties.GetFloat( "_PlanetAngle" );
+				var planetAngle = Mathf.Repeat( Mathf.Atan2( -planetPosition.x, planetPosition.z ), Mathf.PI * 2.0f );
+				var heightRight = Mathf.Abs( centre.y - planetController.m_planetModel.transform.position.y ) < 0.5f;
+				var centreRight = new Vector2( centre.x - controller.m_starSystem.transform.position.x, centre.z - controller.m_starSystem.transform.position.z ).magnitude < 0.5f;
+				var radiusRight = Mathf.Abs( extent - radius ) < radius * 0.01f + 2.0f;
+				var angleRight = Mathf.Abs( Mathf.DeltaAngle( markedAngle * Mathf.Rad2Deg, planetAngle * Mathf.Rad2Deg ) ) < 0.5f;
+
+				if ( heightRight && centreRight && radiusRight && angleRight )
+				{
+					pathsRight++;
+				}
+				else
+				{
+					worstPath = "orbit " + planetController.m_planet.m_orbitPosition + ": height " + heightRight + ", centre " + centreRight + ", radius " + extent.ToString( "F0" ) + "/" + radius.ToString( "F0" ) + ", angle " + markedAngle.ToString( "F2" ) + "/" + planetAngle.ToString( "F2" );
+				}
+			}
+
+			Check( "systemviewpictures: star " + starId + ": every planet has the path of its orbit round the star, at its height, marked with its place", ( pathsSeen > 0 ) && ( pathsRight == pathsSeen ), pathsRight + " of " + pathsSeen + " right" + ( ( worstPath != "" ) ? ( ", " + worstPath ) : "" ) );
+
 			// high above the sun
 			MoveShipTo( Vector3.zero );
 
@@ -21857,6 +21910,37 @@ public class ClaudeProbe : MonoBehaviour
 
 			controller.m_playerCamera.SetCameraFollow( ship, Vector3.up * 1024.0f );
 		}
+
+		// ---- the engines glow, faintly at rest and brighter at full speed
+		var engineGlowTransform = FindChildRecursively( ship.transform, "Engine Glow" );
+		var engineGlow = ( engineGlowTransform != null ) ? engineGlowTransform.GetComponent<MeshRenderer>() : null;
+		var glowAtRest = -1.0f;
+		var glowAtFullSpeed = -1.0f;
+
+		if ( engineGlow != null )
+		{
+			var general = DataController.m_instance.m_playerData.m_general;
+			var glowProperties = new MaterialPropertyBlock();
+
+			general.m_currentSpeed = 0.0f;
+
+			yield return Frames( 3 );
+
+			engineGlow.GetPropertyBlock( glowProperties );
+			glowAtRest = glowProperties.GetFloat( "_Strength" );
+
+			general.m_currentMaximumSpeed = Mathf.Max( general.m_currentMaximumSpeed, 1.0f );
+			general.m_currentSpeed = general.m_currentMaximumSpeed;
+
+			yield return null;
+
+			engineGlow.GetPropertyBlock( glowProperties );
+			glowAtFullSpeed = glowProperties.GetFloat( "_Strength" );
+
+			general.m_currentSpeed = 0.0f;
+		}
+
+		Check( "systemviewpictures: the ship's engines glow, and more brightly at full speed than at rest", ( engineGlow != null ) && engineGlow.enabled && ( glowAtRest > 0.0f ) && ( glowAtFullSpeed > glowAtRest * 2.0f ), ( ( engineGlow != null ) ? ( "at rest " + glowAtRest.ToString( "F2" ) + ", at full speed " + glowAtFullSpeed.ToString( "F2" ) ) : "no engine glow" ) );
 
 		// ---- the sky: a Milky Way under the territory's nebula, stars of several colours, and no debug button on the main view
 		var sky = RenderSettings.skybox;
@@ -21913,6 +21997,20 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		Finish( "scenario=systemviewpictures pictures=" + pictures.Count + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the first child of this name at any depth below a transform (or null)
+	static Transform FindChildRecursively( Transform parent, string name )
+	{
+		foreach ( var child in parent.GetComponentsInChildren<Transform>( true ) )
+		{
+			if ( child.name == name )
+			{
+				return child;
+			}
+		}
+
+		return null;
 	}
 
 	// renders every camera in its order of depth into one picture, as the screen shows them: the views, the console and its displays, the panels (cameras

@@ -46,6 +46,27 @@ public class PlayerShip : MonoBehaviour
 	// keep track of whether we allow particles to emit or not
 	bool m_particlesAreEnabled = true;
 
+	// the glow of the engines, at the exhaust: faint while the ship stands still, brighter as it goes faster (made in Awake)
+	MeshRenderer m_engineGlow;
+	Material m_engineGlowMaterial;
+	MaterialPropertyBlock m_engineGlowProperties;
+
+	// the clock of the glow's slight pulse (it stops while the game is paused)
+	float m_engineGlowClock;
+
+	// how big the glow is (world units), and how strong at rest and at full speed
+	const float c_engineGlowSize = 16.0f;
+	const float c_engineGlowAtRest = 0.35f;
+	const float c_engineGlowAtFullSpeed = 1.0f;
+
+	static readonly int c_engineGlowStrengthId = Shader.PropertyToID( "_Strength" );
+
+	// unity awake
+	void Awake()
+	{
+		MakeEngineGlow();
+	}
+
 	// unity start
 	void Start()
 	{
@@ -222,6 +243,83 @@ public class PlayerShip : MonoBehaviour
 	}
 
 	// call this to show the player ship
+	// unity late update (after the ship has moved and turned)
+	void LateUpdate()
+	{
+		UpdateEngineGlow();
+	}
+
+	// unity on destroy
+	void OnDestroy()
+	{
+		// the glow's material is the ship's own: it would stay in memory until unity next clears out its unused assets
+		if ( m_engineGlowMaterial != null )
+		{
+			Destroy( m_engineGlowMaterial );
+		}
+	}
+
+	// makes the glow of the engines: a flat quad at the exhaust with a material of its own
+	void MakeEngineGlow()
+	{
+		var shader = Shader.Find( "Starflight/Engine Glow" );
+
+		if ( ( shader == null ) || ( m_exhaustParticleSystem == null ) )
+		{
+			return;
+		}
+
+		var glowObject = new GameObject( "Engine Glow" );
+
+		glowObject.layer = m_exhaustParticleSystem.gameObject.layer;
+		glowObject.transform.SetParent( m_exhaustParticleSystem.transform, false );
+		glowObject.AddComponent<MeshFilter>().sharedMesh = Resources.GetBuiltinResource<Mesh>( "Quad.fbx" );
+
+		m_engineGlow = glowObject.AddComponent<MeshRenderer>();
+
+		m_engineGlowMaterial = new Material( shader );
+
+		m_engineGlow.sharedMaterial = m_engineGlowMaterial;
+		m_engineGlow.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+		m_engineGlow.receiveShadows = false;
+
+		m_engineGlowProperties = new MaterialPropertyBlock();
+	}
+
+	// the glow lies flat, facing the camera above the ship, as big whatever the scale of the exhaust, and grows brighter with the ship's speed
+	void UpdateEngineGlow()
+	{
+		if ( m_engineGlow == null )
+		{
+			return;
+		}
+
+		m_engineGlow.enabled = m_particlesAreEnabled;
+
+		if ( !m_particlesAreEnabled )
+		{
+			return;
+		}
+
+		var glowTransform = m_engineGlow.transform;
+
+		glowTransform.rotation = Quaternion.Euler( 90.0f, 0.0f, 0.0f );
+		glowTransform.localScale = Vector3.one * ( c_engineGlowSize / Mathf.Max( 0.0001f, glowTransform.parent.lossyScale.x ) );
+
+		if ( ( SpaceflightController.m_instance != null ) && !SpaceflightController.m_instance.m_gameIsPaused )
+		{
+			m_engineGlowClock += Time.deltaTime;
+		}
+
+		var general = DataController.m_instance.m_playerData.m_general;
+		var speed = ( general.m_currentMaximumSpeed > 0.0f ) ? Mathf.Clamp01( general.m_currentSpeed / general.m_currentMaximumSpeed ) : 0.0f;
+		var strength = Mathf.Lerp( c_engineGlowAtRest, c_engineGlowAtFullSpeed, speed ) * ( 1.0f + 0.08f * Mathf.Sin( m_engineGlowClock * 19.0f ) );
+
+		m_engineGlowProperties.SetFloat( c_engineGlowStrengthId, strength );
+
+		m_engineGlow.SetPropertyBlock( m_engineGlowProperties );
+	}
+
 	public void Show()
 	{
 		if ( gameObject.activeInHierarchy )
