@@ -1195,8 +1195,8 @@ public class Encounter : MonoBehaviour
 			// player has unlocked the mechans
 			m_pdEncounter.m_alienStance = GD_Comm.Stance.Friendly;
 
-			// start at 0% question likelihood
-			m_pdEncounter.m_questionLikelihood = 0;
+			// they still ask as many questions as the Mechans do (COMM-OV ?MAKE-STATEMENT)
+			m_pdEncounter.m_questionLikelihood = c_mechanQuestionLikelihood;
 		}
 		else if ( playerData.m_crewAssignment.HasAtLeastOneHumanCrew() )
 		{
@@ -1223,6 +1223,9 @@ public class Encounter : MonoBehaviour
 
 		// mechans have not warned the player yet
 		m_pdEncounter.m_mechan9NoHumansWarningDone = false;
+
+		// and have not let the ship back into orbit
+		m_returnToOrbitTimer = -1.0f;
 	}
 
 	// initialize encounter with mysterion
@@ -1527,61 +1530,60 @@ public class Encounter : MonoBehaviour
 			}
 		}
 
-		// did the mechans ask a question?
-		if ( m_pdEncounter.m_lastQuestionFromAliens != 0 )
+		// the answers to the Mechans' questions move their mood (each right one takes 10, a wrong one adds 10, or 100 for "Are you Group 9?", "Do you serve Layton?"
+		// and "Are you an enemy of Noah?": their answers' changes in the recovered data, ApplyAnswer), and their mood decides their posture (COMM-OV)
+		UpdateMood();
+
+		// friendly Mechans are friendly for good: mechan 9 is unlocked, and the fleet at Heaven lets the ship in (COMM-OV +!EDL) - not Mechans the player has fired on,
+		// whose mood no longer decides
+		if ( !playerData.m_general.m_mechan9Unlocked && m_pdEncounter.m_moodSet && MoodDecides() && ( GetAlienTalkStance() == GD_Comm.Stance.Friendly ) )
 		{
-			// yes - did the player answer?
-			if ( m_pdEncounter.m_lastSubjectFromPlayer != GD_Comm.Subject.None )
+			UnlockMechans();
+		}
+
+		// has the fleet at Heaven let the ship in? back into orbit once the player has had a moment to read it
+		if ( m_returnToOrbitTimer >= 0.0f )
+		{
+			m_returnToOrbitTimer -= Time.deltaTime;
+
+			if ( m_returnToOrbitTimer < 0.0f )
 			{
-				// yes - get the correct answer
-				GD_Comm.Subject correctAnswer = GD_Comm.Subject.Yes;
-
-				switch ( m_pdEncounter.m_lastQuestionFromAliens )
+				if ( m_pdEncounter.m_connected )
 				{
-					case 101:
-					case 102:
-					case 103:
-					case 105:
-						correctAnswer = GD_Comm.Subject.No;
-						break;
+					Disconnect();
 				}
 
-				// did the player answer correctly?
-				if ( m_pdEncounter.m_lastSubjectFromPlayer == correctAnswer )
-				{
-					// yes - add to the number of correct answers
-					m_pdEncounter.m_numCorrectAnswers++;
+				LeaveEncounter();
 
-					// did the player answer enough questions correctly? (mechans that have been fired on stay hostile until the player
-					// leaves, whatever the answers are - without this they still unlocked mechan 9 for every later encounter)
-					if ( ( m_pdEncounter.m_numCorrectAnswers == 5 ) && !m_pdEncounter.m_attackedByPlayer )
-					{
-						// yes - yay! we are are friends!
-						playerData.m_general.m_mechan9Unlocked = true;
-
-						// mechans are friendly now
-						m_pdEncounter.m_alienStance = GD_Comm.Stance.Friendly;
-
-						// no more questions from the mechans
-						m_pdEncounter.m_questionLikelihood = 0;
-					}
-				}
-				else
-				{
-					// no - oh boy mechans hate the player now
-					m_pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
-
-					// no more questions from the mechans
-					m_pdEncounter.m_questionLikelihood = 0;
-
-					// mechans want to terminate comms shortly
-					m_pdEncounter.m_connectionTimer = 15.0f;
-				}
+				return;
 			}
 		}
 
 		// do the default encounter stuff
 		DefaultEncounterUpdate();
+	}
+
+	// the encounter of the Mechan fleet in orbit around Heaven (145,107, orbit 4), the original's *HEAVEN
+	public const int c_heavenEncounterId = 77;
+
+	// the Mechans' mood once they have been friendly (COMM-OV +!EDL sets their BASE-EDL and EDL to 1)
+	const float c_unlockedMechanMood = 1.0f;
+
+	// the Mechans have become friendly: from now on they start friendly (their BASE-EDL 1, the port's m_mechan9Unlocked), the fleet at Heaven no longer stops the ship
+	// (the *HEAVEN encounter made inactive, SpaceflightController.BeginInOrbitEncounter), and a ship in that encounter goes back into orbit (SKIP2NEST)
+	void UnlockMechans()
+	{
+		DataController.m_instance.m_playerData.m_general.m_mechan9Unlocked = true;
+
+		m_pdEncounter.m_mood = c_unlockedMechanMood;
+		m_pdEncounter.m_alienStance = GD_Comm.Stance.Friendly;
+
+		if ( m_pdEncounter.m_encounterId == c_heavenEncounterId )
+		{
+			SpaceflightController.m_instance.GrantOrbitPermission( m_pdEncounter.m_encounterId );
+
+			m_returnToOrbitTimer = c_returnToOrbitDelay;
+		}
 	}
 
 	// update encounter with mysterion
@@ -2620,8 +2622,16 @@ public class Encounter : MonoBehaviour
 	{
 		if ( !m_pdEncounter.m_moodSet )
 		{
-			// the race's mood, and more against a ship that meets them with its shields up or its weapons armed
-			m_pdEncounter.m_mood = personality.m_startingMood + AlienPersonality.GetMeetingMood( DataController.m_instance.m_playerData.m_playerShip );
+			// the race's mood (the Mechans' is 1 once they have been friendly, COMM-OV +!EDL), and more against a ship that meets them with its shields up or its
+			// weapons armed
+			var startingMood = personality.m_startingMood;
+
+			if ( ( m_gdEncounter.m_race == GameData.Race.Mechan ) && DataController.m_instance.m_playerData.m_general.m_mechan9Unlocked )
+			{
+				startingMood = c_unlockedMechanMood;
+			}
+
+			m_pdEncounter.m_mood = startingMood + AlienPersonality.GetMeetingMood( DataController.m_instance.m_playerData.m_playerShip );
 			m_pdEncounter.m_moodSet = true;
 
 			// the Elowan and the Thrynn hold the crew's friendship with their rival race against it: they start in their hostile band (the owner's ruling of 2026-10-11),

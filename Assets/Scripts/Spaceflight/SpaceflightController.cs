@@ -708,6 +708,12 @@ public class SpaceflightController : MonoBehaviour
 				continue;
 			}
 
+			// and the Mechan fleet at Heaven once the Mechans have been friendly (the original makes the *HEAVEN encounter inactive, COMM-OV +!EDL)
+			if ( ( encounter.m_encounterId == Encounter.c_heavenEncounterId ) && playerData.m_general.m_mechan9Unlocked )
+			{
+				continue;
+			}
+
 			// begin this encounter (there is only ever one in the same orbit)
 			BeginEncounter( encounter );
 

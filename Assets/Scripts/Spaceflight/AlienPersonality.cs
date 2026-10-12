@@ -49,6 +49,14 @@ public class AlienPersonality
 		m_friendlyEffect = 0.0f, m_hostileEffect = 20.0f, m_obsequiousEffect = -8.0f
 	};
 
+	// the Mechans: neutral from 10, hostile from 75 and fighting from 99, and the player's postures do not move them (EDL 48, AET 10, BET 75, CET 99, OPE, FPE and HPE
+	// 0) - the answers to their questions do (each right one takes 10), and once they are friendly they are friendly for good (Encounter.UnlockMechans)
+	static readonly AlienPersonality s_mechan = new AlienPersonality
+	{
+		m_friendlyBelow = 10.0f, m_hostileFrom = 75.0f, m_fightFrom = 99.0f, m_startingMood = 48.0f,
+		m_friendlyEffect = 0.0f, m_hostileEffect = 0.0f, m_obsequiousEffect = 0.0f
+	};
+
 	// the races whose shipped starting posture is friendly: their mood (BASE-EDL) is below every threshold (the Mysterions 1 under 99, the Nomad probes 1 under
 	// 100, the Veloxi drones 1 under 98, the Minstrels 0 under 99, the Enterprise 48 under 99, the Noah 9 derelict 50 under 101) - the others start neutral, as
 	// they did (the Mechans are neutral in the shipped game too; the Gazurtoids' hostile posture is talk, which needs a mood of their own; the Uhlek fight)
@@ -90,6 +98,9 @@ public class AlienPersonality
 
 			case GameData.Race.Velox:
 				return s_velox;
+
+			case GameData.Race.Mechan:
+				return s_mechan;
 		}
 
 		return null;
