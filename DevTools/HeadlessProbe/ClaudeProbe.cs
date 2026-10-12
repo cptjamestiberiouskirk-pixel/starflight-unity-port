@@ -16292,6 +16292,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "arthflare: after the flare a distress signal gets no response", distressText.Contains( "NO RESPONSE" ), distressText );
 
+		// the answer's layout, as STRINFO 2.14 prints it: a blank line between "THERE'S NO RESPONSE!" and "CANCELLED" (the messages show each new line as "/")
+		Check( "arthflare: the no response has a blank line before CANCELLED", distressText.Contains( "THERE'S NO RESPONSE!//CANCELLED" ), distressText );
+
 		// ---- 3. in Arth's star system: no Starport model, and in orbital range of Arth no docking
 		EnterStarSystem( arthStarId );
 
@@ -16355,6 +16358,9 @@ public class ClaudeProbe : MonoBehaviour
 		var deathText = MessageList();
 
 		Log( "arthflare: in Arth's system on the day: the ship destroyed " + incinerated + " | " + deathText );
+
+		// the flare's layout, as the shipped game prints it (HYPERMSG-OV in the decompiled original: two new lines before "GAME OVER") and STRINFO 2.14 shows it
+		Check( "arthflare: the flare's text has a blank line before GAME OVER", deathText.Contains( "AND CREW WERE INCINERATED.//GAME OVER" ), deathText );
 
 		Check( "arthflare: a ship in Arth's star system when its sun flares is incinerated, and the game is over", incinerated && deathText.Contains( "INCINERATED" ) && deathText.Contains( "125, 100" ) && deathText.Contains( "01-01-4621" ), incinerated + " | " + deathText );
 

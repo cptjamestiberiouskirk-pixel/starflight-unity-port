@@ -1302,13 +1302,13 @@
     },
     {
       "m_key": "FlareDeath",
-      "m_text": "STAR IN SYSTEM [XX, YY]\nFLARED ON STARDATE\n[DD-MM-YY]\nTHE ISS [VESSEL NAME]\nAND CREW WERE INCINERATED.\nGAME OVER",
+      "m_text": "STAR IN SYSTEM [XX, YY]\nFLARED ON STARDATE\n[DD-MM-YY]\nTHE ISS [VESSEL NAME]\nAND CREW WERE INCINERATED.\n\nGAME OVER",
       "m_note": "[XX, YY] are the coordinates of the star, [DD-MM-YY] the stardate, [VESSEL NAME] the name of the ship.",
       "m_source": "STRINFO 2.14"
     },
     {
       "m_key": "DistressNoResponse",
-      "m_text": "THERE'S NO RESPONSE!\nCANCELLED",
+      "m_text": "THERE'S NO RESPONSE!\n\nCANCELLED",
       "m_note": "A distress signal after the Starport has been destroyed.",
       "m_source": "STRINFO 2.14"
     },
