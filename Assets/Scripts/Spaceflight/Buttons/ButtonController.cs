@@ -37,6 +37,7 @@ public class ButtonController : MonoBehaviour
 		TerrainVehicleWeapon,
 		TerrainVehicleLifeform,
 		TerrainVehicleDeadLifeform,
+		Distress,
 		Count
 	};
 
@@ -128,6 +129,7 @@ public class ButtonController : MonoBehaviour
 		m_buttonSets[ (int) ButtonSet.TerrainVehicleDeadLifeform ] = new ShipButton[] { new TVRecordButton(), new TVIgnoreButton() };
 		m_buttonSets[ (int) ButtonSet.RecommendPlanet ] = new ShipButton[] { new RecommendNoButton(), new RecommendYesButton() };
 		m_buttonSets[ (int) ButtonSet.RepairMineral ] = new ShipButton[] { new RepairNoButton(), new RepairYesButton() };
+		m_buttonSets[ (int) ButtonSet.Distress ] = new ShipButton[] { new DistressNoButton(), new DistressYesButton() };
 		m_buttonSets[ (int) ButtonSet.ShipsLog ] = new ShipButton[] { new StarportNoticesButton(), new AlienCommsButton(), new MessagesButton(), bridgeButton };
 		m_buttonSets[ (int) ButtonSet.AlienComms ] = new ShipButton[] { new ACThemselvesButton(), new ACOtherRacesButton(), new ACOldEmpireButton(), new ACTheAncientsButton(), new ACGeneralInfoButton(), new ChangeMenuButton( "Cancel", ButtonSet.ShipsLog ) };
 		m_buttonSets[ (int) ButtonSet.Combat ] = new ShipButton[] { new TargetButton(), new FireLaserButton(), new FireMissileButton(), new StatusButton(), new NavigationButton() };

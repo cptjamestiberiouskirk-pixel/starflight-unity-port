@@ -885,8 +885,16 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioTVDisplay();
 				break;
 
+			case "coordinatebar":
+				yield return ScenarioCoordinateBar();
+				break;
+
 			case "statusdisplay":
 				yield return ScenarioStatusDisplay();
+				break;
+
+			case "distressconfirm":
+				yield return ScenarioDistressConfirm();
 				break;
 
 			case "systemtravel":
@@ -15613,6 +15621,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		new DistressButton().Execute();
 
+		// (the call is confirmed first, as the original asks: TRANSMIT EMERGENCY DISTRESS CALL / CONFIRM)
+		PressDistressChoice( 1 );
+
 		var distressText = MessageList();
 
 		Check( "arthflare: after the flare a distress signal gets no response", distressText.Contains( "NO RESPONSE" ), distressText );
@@ -16820,6 +16831,9 @@ public class ClaudeProbe : MonoBehaviour
 		controller.m_messages.Clear();
 
 		new DistressButton().Execute();
+
+		// (the call is confirmed first, as the original asks: TRANSMIT EMERGENCY DISTRESS CALL / CONFIRM)
+		PressDistressChoice( 1 );
 
 		yield return Frames( 5 );
 
@@ -21634,6 +21648,46 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=tvdisplay date=" + date + " ship=" + ship, 0 );
 	}
 
+	// ---------------------------------------------------------------- phase 7: the coordinates above the main view after the terrain vehicle
+
+	IEnumerator ScenarioCoordinateBar()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// on planet 92 of Arth, in the terrain vehicle
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+		yield return Frames( 10 );
+
+		var onTheSurface = controller.m_viewport.m_label.text;
+
+		// back into orbit, as the terrain vehicle's return does when it is lost (the ship does not move on the way)
+		controller.m_disembarked.ReturnToOrbit();
+
+		yield return Frames( 10 );
+
+		var inOrbit = controller.m_viewport.m_label.text;
+		var locationInOrbit = playerData.m_general.m_location;
+
+		// and out of orbit into the star system
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 10 );
+
+		var inTheSystem = controller.m_viewport.m_label.text;
+
+		Log( "coordinatebar: on the surface '" + onTheSurface + "', in orbit (" + locationInOrbit + ") '" + inOrbit + "', in the star system '" + inTheSystem + "'" );
+
+		Check( "coordinatebar: on the surface the bar has the terrain vehicle's place (control)", onTheSurface.Contains( " x " ), onTheSurface );
+		Check( "coordinatebar: back in orbit the bar has the ship's coordinates again, as the original's 125 100", ( locationInOrbit == PD_General.Location.InOrbit ) && System.Text.RegularExpressions.Regex.IsMatch( inOrbit, @"^\d+ +\d+$" ), locationInOrbit + ": " + inOrbit );
+		Check( "coordinatebar: in the star system the bar has the ship's coordinates", System.Text.RegularExpressions.Regex.IsMatch( inTheSystem, @"^\d+ +\d+$" ), inTheSystem );
+
+		Finish( "scenario=coordinatebar", 0 );
+	}
+
 	// ---------------------------------------------------------------- phase 7: the Status display in the original's words
 
 	IEnumerator ScenarioStatusDisplay()
@@ -21699,6 +21753,132 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "statusdisplay: damage is the original's word for what is left of the hull", words.Trim() == "100%=None 97%=Minimal 85%=Slight 60%=Moderate 30%=Heavy 10%=Critical", words );
 
 		Finish( "scenario=statusdisplay", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the distress call in the original's words, with its confirmation
+
+	// presses No (0) or Yes (1) of the distress call's confirmation - false if the console is not asking it
+	static bool PressDistressChoice( int buttonIndex )
+	{
+		ButtonController.ButtonSet distressSet;
+
+		try
+		{
+			distressSet = (ButtonController.ButtonSet) Enum.Parse( typeof( ButtonController.ButtonSet ), "Distress" );
+		}
+		catch ( ArgumentException )
+		{
+			return false;
+		}
+
+		if ( SpaceflightController.m_instance.m_buttonController.GetCurrentButtonSet() != distressSet )
+		{
+			return false;
+		}
+
+		PressButton( distressSet, buttonIndex );
+
+		return true;
+	}
+
+	IEnumerator ScenarioDistressConfirm()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// ---- 1. in the docking bay: the question, then Yes
+		controller.SwitchLocation( PD_General.Location.DockingBay );
+
+		yield return Frames( 10 );
+
+		var balanceBefore = playerData.m_bank.m_currentBalance;
+
+		PressButton( ButtonController.ButtonSet.CommunicationsA, 1 );
+
+		yield return Frames( 2 );
+
+		var question = MessageList();
+		var questionSet = buttonController.GetCurrentButtonSet().ToString();
+		var answeredAtHome = PressDistressChoice( 1 );
+
+		yield return Frames( 2 );
+
+		var atHome = MessageList();
+		var locationAtHome = playerData.m_general.m_location;
+		var paidAtHome = balanceBefore - playerData.m_bank.m_currentBalance;
+
+		// ---- 2. in the star system: the question, then No
+		EnterStarSystem( gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		PressButton( ButtonController.ButtonSet.CommunicationsA, 1 );
+
+		yield return Frames( 2 );
+
+		var answeredNo = PressDistressChoice( 0 );
+
+		yield return Frames( 2 );
+
+		var setAfterNo = buttonController.GetCurrentButtonSet();
+		var locationAfterNo = playerData.m_general.m_location;
+		var paidAfterNo = balanceBefore - playerData.m_bank.m_currentBalance;
+
+		// ---- 3. in the star system again: the question, then Yes - towed home
+		PressButton( ButtonController.ButtonSet.CommunicationsA, 1 );
+
+		yield return Frames( 2 );
+
+		var answeredYes = PressDistressChoice( 1 );
+
+		yield return Frames( 10 );
+
+		var towed = MessageList();
+		var locationTowed = playerData.m_general.m_location;
+		var paidTowed = balanceBefore - playerData.m_bank.m_currentBalance;
+
+		// ---- 4. in an encounter: the question, then Yes - jammed
+		EnterStarSystem( gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		EnterEncounter( FindEncounter( 1, 6, 3, 0 ) );
+
+		yield return Frames( 10 );
+
+		var balanceInEncounter = playerData.m_bank.m_currentBalance;
+
+		PressButton( ButtonController.ButtonSet.CommunicationsB, 1 );
+
+		yield return Frames( 2 );
+
+		var answeredInEncounter = PressDistressChoice( 1 );
+
+		yield return Frames( 2 );
+
+		var jammed = MessageList();
+		var locationJammed = playerData.m_general.m_location;
+		var paidJammed = balanceInEncounter - playerData.m_bank.m_currentBalance;
+
+		Log( "distressconfirm: in the docking bay the console asks (" + questionSet + "): " + question + " | Yes (" + answeredAtHome + "): " + atHome + " | " + locationAtHome + ", paid " + paidAtHome );
+		Log( "distressconfirm: in the star system No (" + answeredNo + "): buttons " + setAfterNo + ", " + locationAfterNo + ", paid " + paidAfterNo );
+		Log( "distressconfirm: in the star system Yes (" + answeredYes + "): " + towed + " | " + locationTowed + ", paid " + paidTowed );
+		Log( "distressconfirm: in an encounter Yes (" + answeredInEncounter + "): " + jammed + " | " + locationJammed + ", paid " + paidJammed );
+
+		Check( "distressconfirm: Distress asks to confirm the call, as the original's TRANSMIT EMERGENCY DISTRESS CALL / CONFIRM", question.Contains( "Transmit emergency distress call" ) && ( questionSet == "Distress" ), questionSet + ": " + question );
+		Check( "distressconfirm: confirmed in the docking bay the answer is We're already home!, and nothing is paid", answeredAtHome && atHome.Contains( "We're already home!" ) && ( locationAtHome == PD_General.Location.DockingBay ) && ( paidAtHome == 0 ), answeredAtHome + ": " + atHome + " | paid " + paidAtHome );
+		Check( "distressconfirm: No puts the communications buttons back and nothing happens", answeredNo && ( setAfterNo == ButtonController.ButtonSet.CommunicationsA ) && ( locationAfterNo == PD_General.Location.StarSystem ) && ( paidAfterNo == 0 ), answeredNo + ": " + setAfterNo + ", " + locationAfterNo + ", paid " + paidAfterNo );
+		Check( "distressconfirm: confirmed in space the ship is towed home with the original's words, and the towing is paid", answeredYes && ( locationTowed == PD_General.Location.DockingBay ) && towed.Contains( "Initiating cryogenic stasis" ) && towed.Contains( "Retrieval complete, crew revived" ) && towed.Contains( "Towing charges" ) && ( paidTowed > 0 ), answeredYes + ": " + locationTowed + ", paid " + paidTowed + " | " + towed );
+		Check( "distressconfirm: confirmed in an encounter the transmission is jammed, as the original", answeredInEncounter && jammed.Contains( "Transmission is being jammed" ) && ( locationJammed == PD_General.Location.Encounter ) && ( paidJammed == 0 ), answeredInEncounter + ": " + jammed + " | " + locationJammed + ", paid " + paidJammed );
+
+		Finish( "scenario=distressconfirm", 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 7: the messages of travel in a star system in the original's words

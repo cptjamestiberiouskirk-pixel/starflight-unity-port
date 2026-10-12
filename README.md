@@ -144,7 +144,7 @@ The project features a **deterministic visualization system** that renders plane
 - The price of Endurium rises with the notices of 20-02 and 15-05, and the Starport buys it back for what it sells it for
 - Nebulae keep the shields down
 - The Starport repairs the ship at the price of its armor
-- A distress call gets the ship towed home, for a fine that grows with the distance from Arth
+- A distress call, once confirmed, gets the ship towed home, for a fine that grows with the distance from Arth
 - Alien ships have the armor, shields and speed of their vessels in the game data
 - The starmap shows the fuel needed to fly to the cursor
 - Planets can be recommended for colonization, and Interstel pays a bonus or fines the crew at the Starport
