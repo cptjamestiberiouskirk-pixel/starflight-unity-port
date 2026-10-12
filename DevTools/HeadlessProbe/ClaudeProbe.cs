@@ -19435,6 +19435,31 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
+		// ---- 4. the derelict's beacon in the shipped game's order (FIND-PHRASE in COMM-OV: the line used least, the first on a tie): in three meetings, its first
+		// two lines are the officer's "we're picking up a distress beacon signal" and then the SOS (a random pick would give that order in all three one time in 8)
+		var beaconOrders = new List<string>();
+
+		for ( var meeting = 0; meeting < 3; meeting++ )
+		{
+			yield return GoIntoOrbit( noahStar, PlanetInOrbit( noahStar, 3 ) );
+
+			var lines = new List<string>();
+
+			yield return LetAliensSpeak( 2, lines );
+
+			var first = ( lines.Count > 0 ) && SaysLine( lines[ 0 ], CommText( 555 ) ) ? "beacon" : ( ( lines.Count > 0 ) && SaysLine( lines[ 0 ], CommText( 556 ) ) ? "SOS" : "other" );
+			var second = ( lines.Count > 1 ) && SaysLine( lines[ 1 ], CommText( 556 ) ) ? "SOS" : ( ( lines.Count > 1 ) && SaysLine( lines[ 1 ], CommText( 555 ) ) ? "beacon" : "other" );
+
+			beaconOrders.Add( first + "," + second );
+
+			LeaveEncounter();
+			yield return Frames( 10 );
+		}
+
+		Log( "transmissions: the first two lines of the Noah 9 derelict in three meetings: " + string.Join( " | ", beaconOrders ) );
+
+		Check( "transmissions: in each of three meetings the Noah 9 derelict's first line is the officer's \"we're picking up a distress beacon signal\" and its second the SOS", string.Join( " ", beaconOrders ) == "beacon,SOS beacon,SOS beacon,SOS", string.Join( " | ", beaconOrders ) );
+
 		controller.m_encounterRange = encounterRange;
 
 		Log( "transmissions: minstrel " + string.Join( " | ", minstrel ) + " (connected after " + minstrelConnected + ") || nomad " + string.Join( " | ", nomad ) + " (connected after " + nomadConnected + ") || noah 9 begun " + noahBegun + ": " + string.Join( " | ", noah ) + " (connected after " + noahConnected + ")" );
