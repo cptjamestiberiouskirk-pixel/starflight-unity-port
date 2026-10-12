@@ -151,6 +151,7 @@ The project features a **deterministic visualization system** that renders plane
 - The 35 planets with life have lifeforms of their own species, which Scan reads the terrain vehicle's laser and stunner act on; dangerous ones come at the vehicle and attack the crew, and wimpy ones flee; a crew member whose vitality reaches 0 is dead, a dead captain's command passes down the chain of command, and the game is lost when the whole crew has died; lifeforms hunt, flee and eat one another; the terrain vehicle's Cargo records a lifeform's data, which Interstel pays for at the Starport, or captures it into stasis as a specimen the Trade Depot buys; Look describes the nearest lifeform and what it is doing, and the minerals, ruins and dropped cargo next to the vehicle
 - Lava destroys a terrain vehicle that drives into it; the Starport installs a new one for a fine
 - Going uphill is slow: the terrain vehicle slows on a rising slope, and a slow climb takes more fuel for the distance
+- Storms on the surface, as the original has them: the sky changes every game hour, and a storm halves the terrain vehicle's efficiency, loses the bearing to the ship and injures the crew
 - A quarter of the planets hold random ruins: ancient crystal ruins with Endurium or truly amazing artifacts, and Old Empire ruins with artifacts
 - Destroyed ships leave debris the ship can salvage by flying over it
 - The science officer's skill decides how much of an analysis is known, and a planet's reading is analyzed once
@@ -174,12 +175,11 @@ The project features a **deterministic visualization system** that renders plane
 - Save/load system with JSON persistence
 
 ### 🔧 In Progress
-- Storms on planet surfaces, being observed in the original game first
 - The fidelity pass: every screen against the original's (roadmap Phase 7)
 
-### 📊 Completion: 56 of the 59 items of the roadmap to parity
+### 📊 Completion: 57 of the 59 items of the roadmap to parity
 
-[ROADMAP.md](ROADMAP.md) lists what the port still lacks against the original game: storms, the owner's play test of the early visual changes, and the fidelity pass's comparison of every screen with the original's. No one has yet played the port through to the win by hand.
+[ROADMAP.md](ROADMAP.md) lists what the port still lacks against the original game: the owner's play test of the early visual changes, and the fidelity pass's comparison of every screen with the original's. No one has yet played the port through to the win by hand.
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
