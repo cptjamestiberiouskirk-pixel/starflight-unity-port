@@ -877,6 +877,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCoordinates();
 				break;
 
+			case "alienanalysis":
+				yield return ScenarioAlienAnalysis();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -7128,13 +7132,23 @@ public class ClaudeProbe : MonoBehaviour
 		sensors.m_hasSensorData = hadSensorData;
 		sensors.m_scanType = scanType;
 
-		var expectedSmall = ( (float) gameData.m_vesselList[ 6 ].m_mass / shipMass ).ToString( "F1", System.Globalization.CultureInfo.InvariantCulture );
-		var expectedLarge = ( (float) gameData.m_vesselList[ 1 ].m_mass / shipMass ).ToString( "F1", System.Globalization.CultureInfo.InvariantCulture );
+		// (the original's size: the whole number, or "0." and the decimals to the first that is not zero - worked out here with decimal, apart from the button's code)
+		var smallRatio = (decimal) gameData.m_vesselList[ 6 ].m_mass / shipMass;
+		var largeRatio = (decimal) gameData.m_vesselList[ 1 ].m_mass / shipMass;
+		var smallDecimals = 1;
+
+		while ( ( smallRatio < 1.0m ) && ( decimal.Truncate( smallRatio * (decimal) Math.Pow( 10, smallDecimals ) ) == 0 ) && ( smallDecimals < 10 ) )
+		{
+			smallDecimals++;
+		}
+
+		var expectedSmall = ( smallRatio >= 1.0m ) ? decimal.Truncate( smallRatio ).ToString( System.Globalization.CultureInfo.InvariantCulture ) : ( decimal.Truncate( smallRatio * (decimal) Math.Pow( 10, smallDecimals ) ) / (decimal) Math.Pow( 10, smallDecimals ) ).ToString( "0." + new string( '0', smallDecimals ), System.Globalization.CultureInfo.InvariantCulture );
+		var expectedLarge = decimal.Truncate( largeRatio ).ToString( System.Globalization.CultureInfo.InvariantCulture );
 
 		Log( "cargo: our ship has a mass of " + shipMass + "; analysis of a vessel of mass " + gameData.m_vesselList[ 6 ].m_mass + ": " + smallVessel );
 		Log( "cargo: analysis of a vessel of mass " + gameData.m_vesselList[ 1 ].m_mass + ": " + largeVessel );
 
-		Check( "cargo: the analysis gives the size of a vessel with one decimal", smallVessel.Contains( ">" + expectedSmall + " times the size" ) && largeVessel.Contains( ">" + expectedLarge + " times the size" ), "expected " + expectedSmall + " and " + expectedLarge + " | " + smallVessel + " | " + largeVessel );
+		Check( "cargo: the analysis gives the size of a vessel as the original does", smallVessel.Contains( ">" + expectedSmall + " times the size of our ship." ) && largeVessel.Contains( ">" + expectedLarge + " times the size of our ship." ), "expected " + expectedSmall + " and " + expectedLarge + " | " + smallVessel + " | " + largeVessel );
 
 		// ---- 3. down to planet 90 and into the terrain vehicle
 		yield return EnterOrbit( 90 );
@@ -21463,6 +21477,114 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "coordinates: the landing map's LAT is the north-south place and its LONG the east-west one", ( latitude == "15N" ) && ( longitude == "30W" ), latitude + " / " + longitude );
 
 		Finish( "scenario=coordinates bar=" + bar + " lat=" + latitude + " long=" + longitude, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the analysis of an alien ship in the original's words
+
+	// the science officer's analysis of a sensor reading of the given kind
+	static string AnalyzeScan( SensorsDisplay.ScanType scanType )
+	{
+		var sensors = SpaceflightController.m_instance.m_displayController.m_sensorsDisplay;
+
+		sensors.m_hasSensorData = true;
+		sensors.m_scanType = scanType;
+
+		new AnalysisButton().Execute();
+
+		return MessageList();
+	}
+
+	IEnumerator ScenarioAlienAnalysis()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// (a science officer of full skill, who gives every line of the analysis)
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer ).m_science = 250;
+
+		// a mechan encounter: its scouts have shields of class 2 and missiles, and the mechans have no mood, so their stance is their posture
+		var mechanId = -1;
+
+		for ( var i = 0; i < gameData.m_encounterList.Length; i++ )
+		{
+			if ( gameData.m_encounterList[ i ].m_race == GameData.Race.Mechan )
+			{
+				mechanId = i;
+
+				break;
+			}
+		}
+
+		EnterStarSystem( gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		EnterEncounter( mechanId );
+
+		yield return Frames( 10 );
+
+		var pdEncounter = controller.m_encounter.m_pdEncounter;
+
+		// ---- 1. the shields and weapons in each posture
+		pdEncounter.m_aliensAreCowardly = false;
+		pdEncounter.m_alienStance = GD_Comm.Stance.Neutral;
+
+		var neutral = AnalyzeScan( SensorsDisplay.ScanType.MechanScout );
+
+		pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+
+		var hostile = AnalyzeScan( SensorsDisplay.ScanType.MechanScout );
+
+		pdEncounter.m_alienStance = GD_Comm.Stance.Friendly;
+
+		var friendly = AnalyzeScan( SensorsDisplay.ScanType.MechanScout );
+
+		pdEncounter.m_aliensAreCowardly = true;
+		pdEncounter.m_alienStance = GD_Comm.Stance.Obsequious;
+
+		var surrendering = AnalyzeScan( SensorsDisplay.ScanType.MechanScout );
+
+		pdEncounter.m_aliensAreCowardly = false;
+		pdEncounter.m_alienStance = GD_Comm.Stance.Neutral;
+
+		// ---- 2. a Gazurtoid warship and a Spemin scout
+		var gazurtoid = AnalyzeScan( SensorsDisplay.ScanType.GazurtoidWarship );
+		var spemin = AnalyzeScan( SensorsDisplay.ScanType.SpeminScout );
+
+		// ---- 3. the size line, next to a ship of 500 tons
+		var shipMass = playerData.m_playerShip.m_mass;
+
+		playerData.m_playerShip.m_mass = 500;
+
+		var nomad = AnalyzeScan( SensorsDisplay.ScanType.NomadProbe );
+		var veloxi = AnalyzeScan( SensorsDisplay.ScanType.VeloxiWarship );
+		var enterprise = AnalyzeScan( SensorsDisplay.ScanType.TheEnterprise );
+		var minstrel = AnalyzeScan( SensorsDisplay.ScanType.Minstrel );
+
+		playerData.m_playerShip.m_mass = shipMass;
+
+		Log( "alienanalysis: in encounter " + mechanId + " (" + playerData.m_general.m_location + ")" );
+		Log( "alienanalysis: neutral: " + neutral );
+		Log( "alienanalysis: hostile: " + hostile );
+		Log( "alienanalysis: friendly: " + friendly );
+		Log( "alienanalysis: surrendering: " + surrendering );
+		Log( "alienanalysis: gazurtoid warship: " + gazurtoid + " | spemin scout: " + spemin );
+		Log( "alienanalysis: sizes: " + nomad + " | " + veloxi + " | " + enterprise + " | " + minstrel );
+
+		Check( "alienanalysis: neutral aliens have their shields of class 2 raised and are not armed, as the original", neutral.Contains( "Shields: <color=white>Class 2 equivalent raised<" ) && neutral.Contains( "Weapon Status: <color=white>Not armed<" ), neutral );
+		Check( "alienanalysis: hostile aliens have their shields raised and are armed, as the original", hostile.Contains( "Class 2 equivalent raised<" ) && hostile.Contains( "Weapon Status: <color=white>Armed<" ), hostile );
+		Check( "alienanalysis: friendly aliens have their shields lowered and are not armed, as the original", friendly.Contains( "Class 2 equivalent lowered<" ) && friendly.Contains( "Weapon Status: <color=white>Not armed<" ), friendly );
+		Check( "alienanalysis: surrendering aliens have their shields lowered and are not armed, as the original", surrendering.Contains( "Class 2 equivalent lowered<" ) && surrendering.Contains( "Weapon Status: <color=white>Not armed<" ), surrendering );
+		Check( "alienanalysis: a Gazurtoid ship's shields are unknown and a Spemin scout has none apparent, as the original", gazurtoid.Contains( "Shields: <color=white>Unknown<" ) && spemin.Contains( "Shields: <color=white>None apparent<" ), gazurtoid + " | " + spemin );
+		Check( "alienanalysis: the size is a whole number or the decimals to the first that is not zero, with no label, as the original", nomad.Contains( ">0.04 times the size of our ship.<" ) && veloxi.Contains( ">1 times the size of our ship.<" ) && enterprise.Contains( ">38 times the size of our ship.<" ) && minstrel.Contains( ">0.004 times the size of our ship.<" ) && !( nomad + veloxi + enterprise + minstrel ).Contains( "Size:" ), nomad + " | " + veloxi + " | " + enterprise + " | " + minstrel );
+
+		Finish( "scenario=alienanalysis", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

@@ -2606,6 +2606,78 @@ public class Encounter : MonoBehaviour
 		return ( GetStrengthDifferential( personality ) > 0.0f ) ? GD_Comm.Stance.Obsequious : GD_Comm.Stance.Hostile;
 	}
 
+	// true if a ship of this encounter that is still there matches (the original's IAPWR looks over the encounter's ships for shields and for weapons)
+	bool AnyAlienShipHas( System.Func<GD_Vessel, bool> match )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		var alienShipList = m_pdEncounter.GetAlienShipList();
+
+		if ( alienShipList == null )
+		{
+			return false;
+		}
+
+		foreach ( var alienShip in alienShipList )
+		{
+			if ( ( alienShip == null ) || alienShip.m_isDead || ( alienShip.m_vesselId < 0 ) || ( alienShip.m_vesselId >= gameData.m_vesselList.Length ) )
+			{
+				continue;
+			}
+
+			if ( match( gameData.m_vesselList[ alienShip.m_vesselId ] ) )
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	// true while the aliens surrender: cowardly and obsequious (the original's WEA24 lowers their shields and disarms their weapons then)
+	bool AliensAreSurrendering( GD_Comm.Stance posture )
+	{
+		return m_pdEncounter.m_aliensAreCowardly && ( posture == GD_Comm.Stance.Obsequious );
+	}
+
+	// whether the aliens have raised their shields, as the original's ?A-SHIELDS-UP (COMM-OV, <AUX>): up when a ship of the encounter has shields and their
+	// posture is not friendly, never for the Spemin, and down once they surrender
+	public bool AliensHaveShieldsUp()
+	{
+		if ( ( m_pdEncounter == null ) || ( m_gdEncounter == null ) || ( m_gdEncounter.m_race == GameData.Race.Spemin ) )
+		{
+			return false;
+		}
+
+		var posture = GetAlienTalkStance();
+
+		if ( ( posture == GD_Comm.Stance.Friendly ) || AliensAreSurrendering( posture ) )
+		{
+			return false;
+		}
+
+		return AnyAlienShipHas( vessel => vessel.m_shields > 0 );
+	}
+
+	// whether the aliens have armed their weapons, as the original's ?A-WEAP (COMM-OV, <AUX>): armed when a ship of the encounter has weapons and their
+	// posture is hostile, never while they surrender
+	public bool AliensAreArmed()
+	{
+		if ( ( m_pdEncounter == null ) || ( m_gdEncounter == null ) )
+		{
+			return false;
+		}
+
+		var posture = GetAlienTalkStance();
+
+		if ( ( posture != GD_Comm.Stance.Hostile ) || AliensAreSurrendering( posture ) )
+		{
+			return false;
+		}
+
+		return AnyAlienShipHas( vessel => ( vessel.m_laserClass > 0 ) || ( vessel.m_missileClass > 0 ) || vessel.m_hasPlasmaBolts );
+	}
+
 	// the stance whose lines the aliens say: their mood's posture where the mood decides (a hostile posture is abusive talk, not an attack), else their stance
 	GD_Comm.Stance GetAlienTalkStance()
 	{
