@@ -6,7 +6,7 @@
 // and removes it again. It sets up the import of the two textures, makes the four materials, and in the scene: puts the
 // star field (a RawImage) and the ecosphere band behind the map, gives each orbit a ring image in place of its ring mesh,
 // gives the star, the planets and the ship marker their materials and sprite, puts the ship's sensor ping, wake and engine
-// glow under the ship marker, and points SystemDisplay at the new objects.
+// glow under the ship marker, clips the map to the display, and points SystemDisplay at the new objects.
 // It then deletes the assets only the old map used (the ring mesh and its materials). Running it again gives the same scene.
 
 using System;
@@ -204,6 +204,12 @@ public static class SystemMapWiring
 		}
 
 		var root = systemDisplay.transform;
+
+		// everything on the map stays inside the display (a sensor ping that goes out at the edge of the system would spill over the console)
+		if ( root.GetComponent<RectMask2D>() == null )
+		{
+			root.gameObject.AddComponent<RectMask2D>();
+		}
 
 		// the star field covers the display (inside the edge of the console's screen), behind everything
 		var background = FindOrMake( root, "Star Field" ).GetComponent<RawImage>();

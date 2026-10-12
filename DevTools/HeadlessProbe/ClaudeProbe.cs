@@ -5258,7 +5258,10 @@ public class ClaudeProbe : MonoBehaviour
 
 			glowBehind = engineGlow.enabled && ( Mathf.Abs( glowPosition.x - ( shipOnMap.x - 5.0f ) ) < 0.1f ) && ( Mathf.Abs( glowPosition.y - shipOnMap.y ) < 0.1f );
 
-			for ( var i = 0; i < 40; i++ )
+			// over 1.5 s of real time (headless frames are much shorter than the pulse)
+			var pulseStart = Time.realtimeSinceStartup;
+
+			while ( Time.realtimeSinceStartup - pulseStart < 1.5f )
 			{
 				MoveShipTo( start + Vector3.right * 60.0f * 39 );
 
@@ -5272,9 +5275,9 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "maplife: the engine glow is at the back of the ship marker and pulses", glowBehind && ( highest - lowest > 0.05f ), "behind " + glowBehind + ", alpha " + lowest.ToString( "F2" ) + " to " + highest.ToString( "F2" ) );
 
 		// ---- 3. the ship stops: the wake fades away
-		var stopTime = Time.time;
+		var stopTime = Time.realtimeSinceStartup;
 
-		while ( Time.time - stopTime < 2.5f )
+		while ( Time.realtimeSinceStartup - stopTime < 2.5f )
 		{
 			MoveShipTo( start + Vector3.right * 60.0f * 39 );
 
@@ -5300,10 +5303,12 @@ public class ClaudeProbe : MonoBehaviour
 		var pingSeen = false;
 		var pingGrew = false;
 		var pingCentred = false;
-		var lastSize = 0.0f;
-		var pingStart = Time.time;
+		var firstSize = 0.0f;
+		var firstSeen = 0.0f;
+		var pingStart = Time.realtimeSinceStartup;
 
-		while ( ( ping != null ) && ( Time.time - pingStart < 4.5f ) && !pingGrew )
+		// (it is compared over 0.3 s of real time: headless frames are short)
+		while ( ( ping != null ) && ( Time.realtimeSinceStartup - pingStart < 4.5f ) && !pingGrew )
 		{
 			yield return null;
 
@@ -5316,18 +5321,23 @@ public class ClaudeProbe : MonoBehaviour
 					var pingPosition = ping.rectTransform.localPosition;
 
 					pingCentred = ( Mathf.Abs( pingPosition.x - shipOnMap.x ) < 0.5f ) && ( Mathf.Abs( pingPosition.y - shipOnMap.y ) < 0.5f );
+					pingSeen = true;
+					firstSize = size;
+					firstSeen = Time.realtimeSinceStartup;
 				}
-				else if ( size > lastSize + 1.0f )
+				else if ( ( Time.realtimeSinceStartup - firstSeen > 0.3f ) && ( size > firstSize + 5.0f ) )
 				{
 					pingGrew = true;
 				}
-
-				pingSeen = true;
-				lastSize = size;
 			}
 		}
 
 		Check( "maplife: a sensor ping goes out from the ship and grows", pingSeen && pingGrew && pingCentred, "seen " + pingSeen + ", grew " + pingGrew + ", from the ship " + pingCentred );
+
+		// a ping that goes out at the edge of the system (where the ship comes in) is clipped to the display, not drawn over the console
+		var clipped = root.GetComponent<UnityEngine.UI.RectMask2D>() != null;
+
+		Check( "maplife: the map is clipped to its display", clipped, "RectMask2D " + clipped );
 
 		// ---- 5. paused: the ping stops growing and the engine glow stops pulsing
 		var pingSizeBefore = ( ping != null ) ? ping.rectTransform.rect.width : -1.0f;
@@ -5342,7 +5352,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		controller.m_gameIsPaused = false;
 
-		Check( "maplife: the animations stop while the game is paused", ( ping != null ) && ( engineGlow != null ) && ( pingSizePaused == pingSizeBefore ) && ( glowAlphaPaused == glowAlphaBefore ), "ping " + pingSizeBefore + " -> " + pingSizePaused + ", glow " + glowAlphaBefore + " -> " + glowAlphaPaused );
+		Check( "maplife: the animations stop while the game is paused", ( ping != null ) && ( engineGlow != null ) && ( Mathf.Abs( pingSizePaused - pingSizeBefore ) < 0.001f ) && ( Mathf.Abs( glowAlphaPaused - glowAlphaBefore ) < 0.001f ), "ping " + pingSizeBefore.ToString( "R" ) + " -> " + pingSizePaused.ToString( "R" ) + ", glow " + glowAlphaBefore.ToString( "R" ) + " -> " + glowAlphaPaused.ToString( "R" ) );
 
 		// ---- 6. a frame of the map takes no memory from the heap
 		var controlBytes = AllocatedByTheControl();
