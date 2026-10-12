@@ -533,6 +533,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioDebrisPictures();
 				break;
 
+			case "atmospherepictures":
+				yield return ScenarioAtmospherePictures();
+				break;
+
 			case "perframe":
 				yield return ScenarioPerFrame();
 				break;
@@ -10051,6 +10055,203 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "debrispictures: no error is logged while the wrecks are made and cool", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=debrispictures alienBlank=" + alienBlank.Count + " playerBlank=" + playerBlank.Count + " errors=" + errorsDuring + " pictures=" + ( hasGraphics ? 7 : 0 ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: atmosphere pictures (what a planet's atmosphere is drawn with, in the star system and in orbit, and pictures of it with -Graphics)
+
+	// what an atmosphere object is drawn with
+	static string DescribeAtmosphere( GameObject atmosphere )
+	{
+		if ( atmosphere == null )
+		{
+			return "no atmosphere object";
+		}
+
+		var renderer = atmosphere.GetComponent<MeshRenderer>();
+		var material = ( renderer != null ) ? renderer.sharedMaterial : null;
+
+		if ( material == null )
+		{
+			return "no material";
+		}
+
+		var text = "active " + atmosphere.activeInHierarchy + ", " + material.name + " (" + material.shader.name + "), queue " + material.renderQueue + ", scale " + atmosphere.transform.lossyScale.x.ToString( "F1" );
+
+		foreach ( var name in new string[] { "SF_AlbedoColor", "SF_EmissiveColor" } )
+		{
+			if ( material.HasProperty( name ) )
+			{
+				text += ", " + name + " " + material.GetColor( name ).ToString( "F2" );
+			}
+		}
+
+		foreach ( var name in new string[] { "SF_BlendSrc", "SF_BlendDst", "SF_CullMode", "SF_ZWriteOn", "SF_Density", "SF_NormalMapStrength" } )
+		{
+			if ( material.HasProperty( name ) )
+			{
+				text += ", " + name + " " + material.GetFloat( name ).ToString( "F2" );
+			}
+		}
+
+		if ( material.HasProperty( "SF_AlbedoMap" ) && ( material.GetTexture( "SF_AlbedoMap" ) != null ) )
+		{
+			text += ", albedo map " + material.GetTexture( "SF_AlbedoMap" ).name;
+		}
+
+		return text;
+	}
+
+	// how an atmosphere sits on its planet: the halo room (the quad's half size over the planet's radius), the quad's height over the planet's top (in planet radii), and the brightest channel of its colour
+	static void MeasureAtmosphere( GameObject atmosphere, GameObject planetModel, out float room, out float lift, out float brightest )
+	{
+		room = 0.0f;
+		lift = -1.0f;
+		brightest = 0.0f;
+
+		if ( ( atmosphere == null ) || ( planetModel == null ) )
+		{
+			return;
+		}
+
+		var planetMesh = planetModel.GetComponentInChildren<MeshFilter>();
+		var planetRenderer = planetModel.GetComponentInChildren<Renderer>();
+		var quadMesh = atmosphere.GetComponent<MeshFilter>();
+		var quadRenderer = atmosphere.GetComponent<MeshRenderer>();
+
+		if ( ( planetMesh == null ) || ( planetRenderer == null ) || ( quadMesh == null ) || ( quadRenderer == null ) )
+		{
+			return;
+		}
+
+		var planetRadius = planetMesh.sharedMesh.bounds.extents.x * planetMesh.transform.lossyScale.x;
+		var quadExtents = quadMesh.sharedMesh.bounds.extents;
+		var quadHalfSize = Mathf.Max( quadExtents.x, Mathf.Max( quadExtents.y, quadExtents.z ) ) * atmosphere.transform.lossyScale.x;
+
+		room = quadHalfSize / planetRadius;
+		lift = ( atmosphere.transform.position.y - ( planetRenderer.bounds.center.y + planetRadius ) ) / planetRadius;
+
+		var material = quadRenderer.sharedMaterial;
+
+		if ( ( material != null ) && material.HasProperty( "SF_AlbedoColor" ) )
+		{
+			var color = material.GetColor( "SF_AlbedoColor" );
+
+			brightest = Mathf.Max( color.r, Mathf.Max( color.g, color.b ) );
+		}
+	}
+
+	IEnumerator ScenarioAtmospherePictures()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+
+		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "atmosphere-pictures" ) );
+		var camera = Camera.main;
+
+		if ( hasGraphics )
+		{
+			System.IO.Directory.CreateDirectory( folder );
+		}
+
+		// the planets of the star system with an atmosphere, the first of each colour
+		var star = gameData.m_starList[ playerData.m_general.m_currentStarId ];
+		var chosen = new List<GD_Planet>();
+		var colours = new List<Color>();
+
+		foreach ( var planet in star.GetPlanetList() )
+		{
+			if ( ( planet != null ) && planet.HasAtmosphere() && !colours.Contains( planet.GetAtmosphereColor() ) )
+			{
+				chosen.Add( planet );
+				colours.Add( planet.GetAtmosphereColor() );
+			}
+		}
+
+		Log( "atmospherepictures: " + chosen.Count + " planets with an atmosphere of their own colour in star " + star.m_id );
+
+		var errorsBefore = s_errorCount;
+		var noRoom = new List<string>();
+		var hidden = new List<string>();
+		var dim = new List<string>();
+
+		System.Action<string, GameObject, GameObject> measure = ( where, atmosphere, planetModel ) =>
+		{
+			float room, lift, brightest;
+
+			MeasureAtmosphere( atmosphere, planetModel, out room, out lift, out brightest );
+
+			Log( "atmospherepictures: " + where + ": the quad is " + room.ToString( "F3" ) + " planet radii across from the middle, " + lift.ToString( "F3" ) + " planet radii above the planet's top, colour at most " + brightest.ToString( "F2" ) );
+
+			// the halo reaches 12% of the radius beyond the planet's edge: the quad has to be bigger than that
+			if ( room < 1.12f )
+			{
+				noRoom.Add( where + " " + room.ToString( "F2" ) );
+			}
+
+			// below the planet's top, the planet hides the haze over it
+			if ( lift < 0.0f )
+			{
+				hidden.Add( where + " " + lift.ToString( "F2" ) );
+			}
+
+			// a dark colour adds next to nothing to what is behind it
+			if ( brightest < 0.5f )
+			{
+				dim.Add( where + " " + brightest.ToString( "F2" ) );
+			}
+		};
+
+		// ---- 1. in the star system: each planet from a camera of its own over it
+		foreach ( var planet in chosen )
+		{
+			var planetController = controller.m_starSystem.GetPlanetController( planet.m_id );
+
+			Log( "atmospherepictures: planet " + planet.m_id + " (atmosphere colour " + planet.GetAtmosphereColor().ToString( "F2" ) + ", density " + planet.GetAtmosphereDensity().ToString( "F2" ) + ") in the star system: " + DescribeAtmosphere( ( planetController != null ) ? planetController.m_planetAtmosphere : null ) );
+
+			if ( planetController != null )
+			{
+				measure( "planet " + planet.m_id + " in the star system", planetController.m_planetAtmosphere, planetController.m_planetModel );
+			}
+
+			if ( hasGraphics && ( planetController != null ) )
+			{
+				var size = planetController.m_planetModel.transform.lossyScale.x;
+
+				RenderFromAbove( planetController.transform.position, size * 4.0f, System.IO.Path.Combine( folder, "system_planet" + planet.m_id + ".png" ) );
+			}
+		}
+
+		// ---- 2. in orbit around each of them
+		foreach ( var planet in chosen )
+		{
+			yield return EnterOrbit( planet.m_id );
+
+			yield return Frames( 30 );
+
+			Log( "atmospherepictures: planet " + planet.m_id + " in orbit: " + DescribeAtmosphere( controller.m_inOrbit.m_planetAtmosphere ) );
+
+			measure( "planet " + planet.m_id + " in orbit", controller.m_inOrbit.m_planetAtmosphere, controller.m_inOrbit.m_planetModel.gameObject );
+
+			if ( hasGraphics )
+			{
+				RenderCameraPicture( camera, System.IO.Path.Combine( folder, "orbit_planet" + planet.m_id + ".png" ) );
+			}
+
+			controller.SwitchLocation( PD_General.Location.StarSystem );
+
+			yield return Frames( 10 );
+		}
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "atmospherepictures: an atmosphere leaves room for a halo beyond the planet's edge", ( chosen.Count > 0 ) && ( noRoom.Count == 0 ), ( noRoom.Count == 0 ) ? "all " + ( chosen.Count * 2 ) : string.Join( ", ", noRoom ) );
+		Check( "atmospherepictures: an atmosphere is in front of its planet, so the haze over the planet is not hidden in it", ( chosen.Count > 0 ) && ( hidden.Count == 0 ), ( hidden.Count == 0 ) ? "all " + ( chosen.Count * 2 ) : string.Join( ", ", hidden ) );
+		Check( "atmospherepictures: an atmosphere of a dark colour is drawn bright enough to show", ( chosen.Count > 0 ) && ( dim.Count == 0 ), ( dim.Count == 0 ) ? "all " + ( chosen.Count * 2 ) : string.Join( ", ", dim ) );
+		Check( "atmospherepictures: no error is logged while the atmospheres are set up", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=atmospherepictures planets=" + chosen.Count + " noRoom=" + noRoom.Count + " hidden=" + hidden.Count + " dim=" + dim.Count + " errors=" + errorsDuring + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- Low: what the displays cost every frame (the status display, the terrain vehicle display)
