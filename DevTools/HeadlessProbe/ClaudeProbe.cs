@@ -917,6 +917,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAncientSites();
 				break;
 
+			case "disembarklines":
+				yield return ScenarioDisembarkLines();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -22367,6 +22371,61 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "ancientsites: planet 2 of 154,62 has two ancient ruins at 42S x 13W with 3.1 and 5.9 cubic meters of Endurium", thrynnRuins == "31,59", thrynnRuins );
 
 		Finish( "scenario=ancientsites", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the disembark's lines in the original's words and order
+
+	IEnumerator ScenarioDisembarkLines()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// on the ground of planet 94 of Arth, in the ship
+		yield return GoIntoOrbit( 25, 94 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		controller.m_messages.Clear();
+
+		// Disembark (the second button of the command set on a planet), every line in the order it first came up, until the terrain vehicle is out
+		PressButton( ButtonController.ButtonSet.CommandA, 1 );
+
+		var lines = new List<string>();
+		var end = Time.realtimeSinceStartup + 15.0f;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			foreach ( var message in playerData.m_general.m_messageList )
+			{
+				var line = System.Text.RegularExpressions.Regex.Replace( message, "<[^>]*>", "" );
+
+				if ( !lines.Contains( line ) )
+				{
+					lines.Add( line );
+				}
+			}
+
+			if ( playerData.m_general.m_location == PD_General.Location.Disembarked )
+			{
+				break;
+			}
+
+			yield return null;
+		}
+
+		var said = string.Join( " | ", lines );
+		var expected = "Standby...scanning planet. | Auto sampling devices activated. | Initiating hull integrity check. | Hull check complete. | Activating terrain vehicle.";
+
+		Log( "disembarklines: (" + playerData.m_general.m_location + ") " + said );
+
+		Check( "disembarklines: disembarking says the original's lines in its order, with Hull check complete", ( playerData.m_general.m_location == PD_General.Location.Disembarked ) && said.StartsWith( expected ), said );
+
+		Finish( "scenario=disembarklines", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
