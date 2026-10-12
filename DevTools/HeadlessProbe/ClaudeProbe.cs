@@ -11783,6 +11783,13 @@ public class ClaudeProbe : MonoBehaviour
 
 		BringAliensClose();
 
+		// every hit of steps 1 and 2 also damaged one of the ship's systems at random (a share of the bare hull's 250 points), and now and then the missile launcher
+		// was destroyed, so that neither missile was launched: make the systems whole and the launcher ready before each launch
+		var launcherHealthBefore = ship.GetSystemHealth( PD_PlayerShip.ShipSystem.Missiles );
+
+		ship.RestoreSystems();
+		SetField( combat, "m_playerMissileCooldown", 0.0f );
+
 		var firstLaunched = combat.FirePlayerMissile();
 
 		var waitEnd = Time.realtimeSinceStartup + 3.0f;
@@ -11813,6 +11820,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		BringAliensClose();
 
+		// the spemin have been firing back since the first launch
+		ship.RestoreSystems();
+		SetField( combat, "m_playerMissileCooldown", 0.0f );
+
 		var secondLaunched = combat.FirePlayerMissile();
 		var inTheAir = MissilesInTheAir();
 
@@ -11824,10 +11835,10 @@ public class ClaudeProbe : MonoBehaviour
 		var damageOfATimeOut = armorBefore - target.m_armorPoints;
 		var inTheAirAfter = MissilesInTheAir();
 
-		Log( "missile time out: a player missile that arrives does " + damageOfAHit + " damage (launched " + firstLaunched + "); one that runs out of time (launched " + secondLaunched + ", " + inTheAir + " in the air, " + inTheAirAfter + " after) does " + damageOfATimeOut + " damage, explosions playing before " + explosionsBefore + " and after " + explosionsAfterTimeOut );
+		Log( "missile time out: the missile launcher was at " + launcherHealthBefore + " after steps 1 and 2 (made whole); a player missile that arrives does " + damageOfAHit + " damage (launched " + firstLaunched + "); one that runs out of time (launched " + secondLaunched + ", " + inTheAir + " in the air, " + inTheAirAfter + " after) does " + damageOfATimeOut + " damage, explosions playing before " + explosionsBefore + " and after " + explosionsAfterTimeOut );
 
-		Check( "missile time out: a player missile that arrives still does its damage (control)", firstLaunched && ( damageOfAHit > 0 ), damageOfAHit + " damage" );
-		Check( "missile time out: a player missile that runs out of time explodes where it was and does no damage", secondLaunched && ( inTheAir > 0 ) && ( inTheAirAfter == 0 ) && ( explosionsBefore == 0 ) && ( explosionsAfterTimeOut == 1 ) && ( damageOfATimeOut == 0 ), "explosions " + explosionsBefore + " -> " + explosionsAfterTimeOut + ", damage " + damageOfATimeOut + ", in the air " + inTheAir + " -> " + inTheAirAfter );
+		Check( "missile time out: a player missile that arrives still does its damage (control)", firstLaunched && ( damageOfAHit > 0 ), damageOfAHit + " damage, launched " + firstLaunched );
+		Check( "missile time out: a player missile that runs out of time explodes where it was and does no damage", secondLaunched && ( inTheAir > 0 ) && ( inTheAirAfter == 0 ) && ( explosionsBefore == 0 ) && ( explosionsAfterTimeOut == 1 ) && ( damageOfATimeOut == 0 ), "launched " + secondLaunched + ", explosions " + explosionsBefore + " -> " + explosionsAfterTimeOut + ", damage " + damageOfATimeOut + ", in the air " + inTheAir + " -> " + inTheAirAfter );
 
 		ClearMissiles();
 		LeaveEncounter();
