@@ -212,6 +212,7 @@ What the probe does:
 | `lifeformdata` | recording lifeform data on planet 92: Cargo beside a plant offers it and Record collects its data (a new class, worth 50 and the plant's bonus), the same species again (worth nothing), a test animal beside the vehicle that wanders off (it got away), and the payment at the Starport (about 50 s) |
 | `capture` | capturing a lifeform on planet 92: Cargo beside a living plant offers Capture, Record and Ignore, the capture puts it in stasis in the terrain vehicle's hold (off the surface, worth five times its data), Cargo beside a dead lifeform offers only Record, and back in the ship the specimen goes into the ship's hold (about 50 s) |
 | `starport-notices` | the Operations notices screen as the original's: today's date as the header beside NOTICES, END OF NOTICES after the newest notice and not after an earlier one, and with nothing new NO NEW NOTICES and REPEAT LAST NOTICE? with More and Quit as Yes and No, No back to the menu, Yes the last notice after REPEATING LAST NOTICE (about 20 s) |
+| `starport-noticetyping` | a notice typed out as the original's: a paragraph every 0.3 s without a press, Quit while it is typed ends it with NOTICE ABORTED and the screen stays, the newest notice aborted says NOTICE ABORTED then END OF NOTICES, and a second Quit leaves (about 25 s) |
 | `starport-interest` | the bank's interest: less than 1 M.U. pays nothing and the days count on, 100 M.U. over 250 days earn 10 with an Interest row, a recommendation starts the count again, a save file from before the interest counts from today, and going aboard through the real docking bay pays 6,000 on 100,000 M.U. for 150 days (about 20 s) |
 | `starport-specimens` | a specimen in the ship's hold is listed for sale at the Trade Depot under Specimens, and selling it pays its value and frees its room (about 25 s) |
 | `lifeformmodels` | the lifeform models: every body plan's prefab is in `Resources/Lifeforms` and fits a cube of one unit, the snake lies along +Z (the models face +Z), and on planet 92 every lifeform is its model, its skin in the species colour, standing on the ground (about 40 s) |
@@ -220,7 +221,7 @@ What the probe does:
 | `lookfields` | Look on planet 92 gives the original's fields in its order: Sky, Temperature and Gravity, Atmo, Hydro, Terrain, and no Weather (about 30 s) |
 | `encounterviewscale` | the encounter view at the original's scale: with the Mechans still far off the camera climbs no higher than framing the aliens' fire range needs, a ship brought within that range is in view, the ships are drawn twice as large in the encounter and the player ship has its own size again after it; pictures with `-Graphics` (Logs/screen-pictures/encounter-view) (about 30 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (173 scenarios, about 136 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (174 scenarios, about 137 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
