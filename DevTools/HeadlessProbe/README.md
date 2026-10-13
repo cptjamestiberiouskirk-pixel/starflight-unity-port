@@ -214,8 +214,9 @@ What the probe does:
 | `lifeformmodels` | the lifeform models: every body plan's prefab is in `Resources/Lifeforms` and fits a cube of one unit, the snake lies along +Z (the models face +Z), and on planet 92 every lifeform is its model, its skin in the species colour, standing on the ground (about 40 s) |
 | `lifeformpictures` | with `-Graphics`, renders the game view of planet 92 with the planet's lifeforms, then with all 17 models in a ring around the terrain vehicle, and a close-up of each model, into `Logs/lifeform-pictures/` (or `-probePictures`); without a graphics device it only lands (about 60 s) |
 | `look` | Look on planet 92 with one lifeform at a time beside the vehicle: a living plant (its body plan, not moving, alive), a test animal that wanders (wandering) and the plant made dead (dead) (about 40 s) |
+| `lookfields` | Look on planet 92 gives the original's fields in its order: Sky, Temperature and Gravity, Atmo, Hydro, Terrain, and no Weather (about 30 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (168 scenarios, about 131 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (169 scenarios, about 132 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

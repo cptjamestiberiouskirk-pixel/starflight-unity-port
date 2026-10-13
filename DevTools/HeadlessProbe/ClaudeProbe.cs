@@ -1017,6 +1017,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioShieldMessages();
 				break;
 
+			case "lookfields":
+				yield return ScenarioLookFields();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -26052,6 +26056,42 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "shieldmessages: without fuel the shields can't be raised, in the original's words", !noFuelFlag && noFuel.Contains( "Shields can't be raised." ), noFuelFlag + " | " + noFuel );
 
 		Finish( "scenario=shieldmessages", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: Look gives the planet's fields as the original (MAPS-OV)
+
+	IEnumerator ScenarioLookFields()
+	{
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// planet 92 of the Arth system
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		new LookButton().Execute();
+
+		var shown = MessageList();
+
+		Log( "lookfields: " + shown );
+
+		var order = new[] { "Sky:", "Temperature:", "Gravity:", "Atmo:", "Hydro:", "Terrain:" };
+		var inOrder = true;
+		var last = -1;
+
+		foreach ( var field in order )
+		{
+			var at = shown.IndexOf( field, System.StringComparison.Ordinal );
+
+			inOrder = inOrder && ( at > last );
+			last = at;
+		}
+
+		Check( "lookfields: Look gives the original's fields in its order: Sky, Temperature and Gravity, Atmo, Hydro and Terrain", inOrder && !shown.Contains( "Weather:" ), shown );
+
+		Finish( "scenario=lookfields", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
