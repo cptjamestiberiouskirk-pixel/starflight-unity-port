@@ -259,7 +259,8 @@ public class TerrainLifeforms : TerrainGridPopulator
 
 		foreach ( var lifeform in m_lifeformList )
 		{
-			if ( lifeform == null )
+			// nothing in the air: "Airborne creatures may not be dealt with by the player" (planet.txt)
+			if ( ( lifeform == null ) || lifeform.IsAirborne() )
 			{
 				continue;
 			}

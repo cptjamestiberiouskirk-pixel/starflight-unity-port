@@ -55,14 +55,18 @@ public class TerrainLifeform : MonoBehaviour
 	// "?NOTICE-PLAYER : ... a determination is made with a small random chance that it will become true" - a chance at each step of the behaviour
 	const float c_noticeChance = 0.15f;
 
-	// how fast a lifeform moves for each point of its movement rate, in world units a second, and how high a flyer flies
+	// how fast a lifeform moves for each point of its movement rate, in world units a second, how high a flyer flies and how high a floater floats (the port's)
 	const float c_speedPerMovementRate = 4.0f;
 	const float c_flyingHeight = 8.0f;
+	const float c_floatingHeight = 3.0f;
 
 	// the notes' ground-air transitions (lf-words.txt): "?WANTS-TO-FLY : Some randomly determined chance with a fairly high %", "?WANTS-TO-LAND : Some randomly
 	// determined chance with a low to moderate %" - the chances at each step of the behaviour are the port's, ruled by the owner - and "?OK-TO-LAND : Fasle if
 	// the square the alien is on is liquid, lava, or occupied by another alien or the player", the square taken as half of one around it
 	const float c_wantsToFlyChance = 0.75f;
+
+	// "?WANTS-TO-FLOAT : same" (as ?WANTS-TO-FLY)
+	const float c_wantsToFloatChance = 0.75f;
 	const float c_wantsToLandChance = 0.2f;
 	const float c_squareTaken = 4.5f;
 
@@ -119,7 +123,14 @@ public class TerrainLifeform : MonoBehaviour
 	Vector3 m_moveDirection;
 	bool m_moving;
 	bool m_flying;
+	bool m_floating;
 	float m_behaviourTimer;
+
+	// true if it flies or floats: "Airborne creatures may not be dealt with by the player" (planet.txt), and the notes' ON-GROUND false
+	public bool IsAirborne()
+	{
+		return m_flying || m_floating;
+	}
 
 	// its populator (for the ground it moves on)
 	TerrainLifeforms m_populator;
@@ -243,8 +254,8 @@ public class TerrainLifeform : MonoBehaviour
 			m_hits = 0;
 			m_status = Status.Dead;
 
-			// a dead flyer comes down ("LAND <-- ?ALIVE FALSE ?ON-GROUND FALSE ?OK-TO-LAND TRUE", and over a liquid onto its surface, the owner's ruling)
-			if ( m_flying )
+			// a dead flyer or floater comes down ("LAND <-- ?ALIVE FALSE ?ON-GROUND FALSE ?OK-TO-LAND TRUE", and over a liquid onto its surface, the owner's ruling)
+			if ( IsAirborne() )
 			{
 				Land();
 			}
@@ -265,7 +276,7 @@ public class TerrainLifeform : MonoBehaviour
 			m_stunRecovery = 0.0f;
 
 			// so does a stunned one ("LAND <-- ?STUNNED TRUE ?ON-GROUND FALSE ?OK-TO-LAND TRUE", the same over a liquid)
-			if ( m_flying )
+			if ( IsAirborne() )
 			{
 				Land();
 			}
@@ -513,7 +524,7 @@ public class TerrainLifeform : MonoBehaviour
 		var mateHerbivore = mateNiche == GD_Species.Niche.Herbivore;
 
 		var mateAlive = m_mate.m_status != Status.Dead;
-		var mateOnGround = !m_mate.m_flying;
+		var mateOnGround = !m_mate.IsAirborne();
 		var mateApproaching = m_mate.m_behaviour == Behaviour.ApproachingMate;
 		var mateAttacking = m_mate.m_behaviour == Behaviour.AttackingMate;
 		var bigEnough = m_species.m_size >= m_mate.m_species.m_size - c_sizeAdvantage;
@@ -603,16 +614,23 @@ public class TerrainLifeform : MonoBehaviour
 		}
 	}
 
-	// the notes' ground-air transitions (lf-behav.txt), after each step of the behaviour: a flyer that moves takes to the air, and one in the air comes down where
-	// it may when it wanders and wants to, or when it attacks its mate or the terrain vehicle (a dead or stunned one comes down at once, see UpdateStatus)
+	// the notes' ground-air transitions (lf-behav.txt), after each step of the behaviour: a flyer that moves takes to the air, a floater that moves floats up (a
+	// floating plant always, a floating animal when it wants to), and one in the air comes down where it may when it wanders and wants to, or when it attacks
+	// its mate or the terrain vehicle (a dead or stunned one comes down at once, see UpdateStatus)
 	void UpdateAirGround()
 	{
-		if ( !m_flying )
+		if ( !IsAirborne() )
 		{
 			// "FLY <-- ?MOVING TRUE ?ON-GROUND TRUE ?CAN-FLY TRUE ?WANTS-TO-FLY TRUE"
 			if ( m_moving && m_species.m_canFly && ( Random.value < c_wantsToFlyChance ) )
 			{
 				m_flying = true;
+			}
+			// "FLOAT <-- ?MOVING TRUE ?ON-GROUND TRUE ?CAN-FLOAT TRUE ?PRODUCER TRUE", "FLOAT <-- ?MOVING TRUE ?ON-GROUND TRUE ?CAN-FLOAT TRUE ?PRODUCER FALSE
+			// ?WANTS-TO-FLOAT TRUE"
+			else if ( m_moving && m_species.m_canFloat && ( ( m_species.m_niche == GD_Species.Niche.Producer ) || ( Random.value < c_wantsToFloatChance ) ) )
+			{
+				m_floating = true;
 			}
 
 			return;
@@ -646,7 +664,7 @@ public class TerrainLifeform : MonoBehaviour
 
 		foreach ( var other in m_populator.m_lifeformList )
 		{
-			if ( ( other != null ) && ( other != this ) && !other.m_flying && IsInSquareOf( other.transform.position ) )
+			if ( ( other != null ) && ( other != this ) && !other.IsAirborne() && IsInSquareOf( other.transform.position ) )
 			{
 				return false;
 			}
@@ -669,6 +687,7 @@ public class TerrainLifeform : MonoBehaviour
 	void Land()
 	{
 		m_flying = false;
+		m_floating = false;
 
 		if ( ( m_populator != null ) && m_populator.GetSurface( transform.position, out var height ) )
 		{
@@ -693,7 +712,7 @@ public class TerrainLifeform : MonoBehaviour
 
 		var next = transform.position + m_moveDirection * m_species.m_movementRate * c_speedPerMovementRate * deltaTime;
 
-		if ( !populator.GetGround( next, out var height ) && !m_flying )
+		if ( !populator.GetGround( next, out var height ) && !IsAirborne() )
 		{
 			// the way is wet: turn
 			m_moveDirection = Quaternion.Euler( 0.0f, 90.0f, 0.0f ) * m_moveDirection;
@@ -701,7 +720,7 @@ public class TerrainLifeform : MonoBehaviour
 			return;
 		}
 
-		next.y = height + m_groundOffset + ( m_flying ? c_flyingHeight : 0.0f );
+		next.y = height + m_groundOffset + ( m_flying ? c_flyingHeight : ( m_floating ? c_floatingHeight : 0.0f ) );
 
 		transform.position = next;
 
