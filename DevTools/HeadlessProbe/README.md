@@ -213,6 +213,7 @@ What the probe does:
 | `floaters` | lifeforms that float (lf-behav.txt FLOAT): every planet's species (floating plants drift, some animals float, none flies as well), a floating plant on planet 92 floats up as it moves, the weapons and the cargo pass over it, and stunned it comes down and the weapons find it again (control) (about 35 s) |
 | `commpicture` | the comm link's picture: with an officer of little skill it comes up through interference (coloured rays, low resolution), which has cleared 5 s later and does not come back: the portrait is clean, as in the original, which garbles only the words (about 30 s) |
 | `lightmode` | the UI kit's light mode: the light theme is in use, a text the kit styles, the buttons its tool tinted and the messages take its colours, and the save panel's Light Mode / Dark Mode button switches back to the dark theme (the player's own setting is put back afterwards; pictures with -Graphics). `PROBE_UI_MODE=light` runs any other scenario in the light mode (about 30 s) |
+| `scifibuttons` | the sci-fi buttons: each of the console's six rows has one (shown where the row has a button), the highlight has the same shape, the save panel's buttons have the button and its frame, and the frame takes the light mode's accent colour; logs where each row's text and button are (about 25 s) |
 | `lifeformdata` | recording lifeform data on planet 92: Cargo beside a plant offers it and Record collects its data (a new class, worth 50 and the plant's bonus), the same species again (worth nothing), a test animal beside the vehicle that wanders off (it got away), and the payment at the Starport (about 50 s) |
 | `capture` | capturing a lifeform on planet 92: Cargo beside a living plant offers Capture, Record and Ignore, the capture puts it in stasis in the terrain vehicle's hold (off the surface, worth five times its data), Cargo beside a dead lifeform offers only Record, and back in the ship the specimen goes into the ship's hold (about 50 s) |
 | `starport-notices` | the Operations notices screen as the original's: today's date as the header beside NOTICES, END OF NOTICES after the newest notice and not after an earlier one, and with nothing new NO NEW NOTICES and REPEAT LAST NOTICE? with More and Quit as Yes and No, No back to the menu, Yes the last notice after REPEATING LAST NOTICE (about 20 s) |
@@ -243,7 +244,7 @@ What the probe does:
 | `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 | `combatmessages` | the combat messages are the original's: WEAPONS NOT ARMED, NO TARGET PRESENT, WEAPON NOT AVAILABLE and OUT OF FUEL! when a weapon cannot fire, nothing of the port's own when the player's shot hits, and LASER CLASS n (LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (196 scenarios, about 159 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (197 scenarios, about 160 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

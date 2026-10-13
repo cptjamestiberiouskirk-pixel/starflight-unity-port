@@ -45,8 +45,95 @@ public static class UIKitModeApplier
 	{
 		var dark = UIKitTheme.Load( UIKitTheme.Mode.Dark );
 
+		// the kit's buttons take the sci-fi button's shape (found by their tint, which is still the dark mode's)
+		MakeButtons( scene, dark );
+		MakeButtons( GetDontDestroyOnLoadScene(), dark );
+
 		Apply( scene, dark );
 		Apply( GetDontDestroyOnLoadScene(), dark );
+	}
+
+	// the name of the frame a button is given (and how a button that has its frame is known)
+	public const string c_buttonFrameName = "UI Kit Button Frame";
+
+	// gives every button the kit's tool tinted the sci-fi button's look: its fill with two corners cut off, and a thin frame in the kit's accent colour
+	// (the frame is a child with its own UIKitStyle, so it takes the colours of each mode by itself)
+	static void MakeButtons( Scene scene, UIKitTheme dark )
+	{
+		var theme = UIKitTheme.Get();
+
+		if ( !scene.IsValid() || ( theme == null ) || ( dark == null ) || ( theme.m_buttonSprite == null ) || ( theme.m_buttonFrameSprite == null ) )
+		{
+			return;
+		}
+
+		foreach ( var rootObject in scene.GetRootGameObjects() )
+		{
+			foreach ( var button in rootObject.GetComponentsInChildren<Button>( true ) )
+			{
+				if ( ( button.transition != Selectable.Transition.ColorTint ) || !( button.targetGraphic is Image image ) || ( button.transform.Find( c_buttonFrameName ) != null ) )
+				{
+					continue;
+				}
+
+				// only the kit's buttons (an arrow or an icon keeps its own picture)
+				if ( !s_tintedButtons.Contains( button ) && ( UIKitTheme.FindRole( dark, button.colors.normalColor ) != UIKitTheme.ColorRole.BackgroundRaised ) && ( UIKitTheme.FindRole( theme, button.colors.normalColor ) != UIKitTheme.ColorRole.BackgroundRaised ) )
+				{
+					continue;
+				}
+
+				MakeButton( image );
+			}
+		}
+	}
+
+	// gives one image the sci-fi button's fill, and a frame over it (under the button's label)
+	public static void MakeButton( Image image )
+	{
+		var theme = UIKitTheme.Get();
+
+		if ( ( image == null ) || ( theme == null ) || ( theme.m_buttonSprite == null ) )
+		{
+			return;
+		}
+
+		image.sprite = theme.m_buttonSprite;
+		image.type = Image.Type.Sliced;
+		image.pixelsPerUnitMultiplier = 1.0f;
+
+		// a UIKitStyle on the image would give it its old sprite back when the mode changes
+		if ( image.TryGetComponent<UIKitStyle>( out var imageStyle ) && ( imageStyle.m_sprite != UIKitTheme.SpriteRole.None ) )
+		{
+			imageStyle.m_sprite = UIKitTheme.SpriteRole.Button;
+		}
+
+		if ( image.transform.Find( c_buttonFrameName ) != null )
+		{
+			return;
+		}
+
+		var frameObject = new GameObject( c_buttonFrameName, typeof( RectTransform ), typeof( CanvasRenderer ), typeof( Image ), typeof( LayoutElement ) );
+		var frameTransform = frameObject.GetComponent<RectTransform>();
+
+		frameTransform.SetParent( image.transform, false );
+		frameTransform.SetAsFirstSibling();
+		frameTransform.anchorMin = Vector2.zero;
+		frameTransform.anchorMax = Vector2.one;
+		frameTransform.offsetMin = Vector2.zero;
+		frameTransform.offsetMax = Vector2.zero;
+
+		frameObject.GetComponent<LayoutElement>().ignoreLayout = true;
+
+		var frame = frameObject.GetComponent<Image>();
+
+		frame.raycastTarget = false;
+
+		var frameStyle = frameObject.AddComponent<UIKitStyle>();
+
+		frameStyle.m_sprite = UIKitTheme.SpriteRole.ButtonFrame;
+		frameStyle.m_color = UIKitTheme.ColorRole.BorderAccent;
+		frameStyle.m_alpha = 0.7f;
+		frameStyle.Apply();
 	}
 
 	// the player changed the mode: every loaded scene goes from the old mode's colours to the new

@@ -107,6 +107,10 @@ public class UIKitTheme : ScriptableObject
 	public Sprite m_diamondSprite;
 	public Sprite m_diamondOutlineSprite;
 
+	[Header( "Buttons (white, tinted: the sci-fi button's fill with two corners cut off, and its frame)" )]
+	public Sprite m_buttonSprite;
+	public Sprite m_buttonFrameSprite;
+
 	[Header( "Console button bullets (coloured, made from the colours above by the rebuild)" )]
 	public Sprite m_bulletOffSprite;
 	public Sprite m_bulletOnSprite;
@@ -164,7 +168,7 @@ public class UIKitTheme : ScriptableObject
 	// the kit's sprites, by name
 	public enum SpriteRole
 	{
-		None, Panel, PanelOutline, Glow, Bar, Diamond, DiamondOutline
+		None, Panel, PanelOutline, Glow, Bar, Diamond, DiamondOutline, Button, ButtonFrame
 	}
 
 	// returns the colour of a role (white for Keep, which callers do not apply)
@@ -228,6 +232,8 @@ public class UIKitTheme : ScriptableObject
 			case SpriteRole.Bar: return m_barSprite;
 			case SpriteRole.Diamond: return m_diamondSprite;
 			case SpriteRole.DiamondOutline: return m_diamondOutlineSprite;
+			case SpriteRole.Button: return m_buttonSprite;
+			case SpriteRole.ButtonFrame: return m_buttonFrameSprite;
 			default: return null;
 		}
 	}

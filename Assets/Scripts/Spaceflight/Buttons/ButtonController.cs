@@ -143,6 +143,11 @@ public class ButtonController : MonoBehaviour
 		// reset everything
 		m_activatingButton = false;
 		m_activatingButtonTimer = 0.0f;
+
+		// the rows as the kit's sci-fi buttons
+		MakeRowButtons();
+
+		ShowButtonStates( m_currentButton != null );
 	}
 
 	// unity update
@@ -408,6 +413,203 @@ public class ButtonController : MonoBehaviour
 		UpdateButtonSprites();
 	}
 
+	// the sci-fi buttons behind the console's rows (made at the start, one a row)
+	Image[] m_rowButtons;
+
+	// the space left between two rows' buttons, and how far the text of a row stands in from its button's left edge
+	const float c_rowGap = 4.0f;
+	const float c_rowTextInset = 14.0f;
+
+	// how far the middle of a row's capitals is above the middle of its label's box (measured once a label has text, the labels share one style)
+	float m_textMiddleOffset;
+	bool m_textMiddleMeasured;
+
+	// measures the middle of the capitals against the middle of the box, from a label with text in it (TextMesh Pro leaves room below the line)
+	void MeasureTextMiddle()
+	{
+		if ( m_textMiddleMeasured || ( m_buttonLabelList == null ) )
+		{
+			return;
+		}
+
+		foreach ( var label in m_buttonLabelList )
+		{
+			if ( ( label != null ) && !string.IsNullOrEmpty( label.text ) )
+			{
+				label.ForceMeshUpdate();
+
+				m_textMiddleOffset = label.textBounds.center.y - label.rectTransform.rect.center.y;
+				m_textMiddleMeasured = true;
+
+				return;
+			}
+		}
+	}
+
+	// unity late update: the rows' buttons and the highlight follow the labels, which the console's layout moves when the screen's size changes
+	void LateUpdate()
+	{
+		if ( m_rowButtons == null )
+		{
+			return;
+		}
+
+		MeasureTextMiddle();
+
+		for ( var i = 0; i < m_rowButtons.Length; i++ )
+		{
+			if ( ( m_rowButtons[ i ] == null ) || !m_rowButtons[ i ].gameObject.activeSelf )
+			{
+				continue;
+			}
+
+			PlaceRow( m_rowButtons[ i ].rectTransform, i );
+		}
+
+		if ( ( m_selectionHighlight != null ) && m_selectionHighlight.enabled )
+		{
+			PlaceRow( m_selectionHighlight.rectTransform, m_selectedButtonIndex );
+		}
+	}
+
+	// puts a row's button (or the highlight) in its row's place, anchored in proportions of its parent's height as the console's layout places the labels,
+	// so that it stays with its label at any size of the screen (a picture rendered at another size than the screen's lays the console out again)
+	void PlaceRow( RectTransform rowTransform, int row )
+	{
+		var area = rowTransform.parent as RectTransform;
+
+		if ( ( area == null ) || ( area.rect.height <= 0.0f ) || !GetRowPlace( row, area, out var centreY, out var height ) )
+		{
+			return;
+		}
+
+		var centre = centreY + area.rect.center.y;
+		var bottom = ( centre - height * 0.5f - area.rect.yMin ) / area.rect.height;
+		var top = ( centre + height * 0.5f - area.rect.yMin ) / area.rect.height;
+
+		rowTransform.anchorMin = new Vector2( rowTransform.anchorMin.x, bottom );
+		rowTransform.anchorMax = new Vector2( rowTransform.anchorMax.x, top );
+		rowTransform.offsetMin = new Vector2( rowTransform.offsetMin.x, 0.0f );
+		rowTransform.offsetMax = new Vector2( rowTransform.offsetMax.x, 0.0f );
+	}
+
+	// where a row's button goes in the highlight's parent: centred on the row's text (on the middle of its capitals, not of the label's box, which has room
+	// below the line), and as high as the rows are apart less a gap, so that the text sits inside its button
+	bool GetRowPlace( int row, RectTransform area, out float centreY, out float height )
+	{
+		centreY = 0.0f;
+		height = 0.0f;
+
+		if ( ( area == null ) || ( m_buttonLabelList == null ) || ( row < 0 ) || ( row >= m_buttonLabelList.Length ) || ( m_buttonLabelList[ row ] == null ) )
+		{
+			return false;
+		}
+
+		var label = m_buttonLabelList[ row ];
+		var labelTransform = label.rectTransform;
+
+		// the rows are as far apart as the first two labels
+		var spacing = labelTransform.rect.height;
+
+		if ( ( m_buttonLabelList.Length > 1 ) && ( m_buttonLabelList[ 0 ] != null ) && ( m_buttonLabelList[ 1 ] != null ) )
+		{
+			var first = area.InverseTransformPoint( m_buttonLabelList[ 0 ].rectTransform.TransformPoint( m_buttonLabelList[ 0 ].rectTransform.rect.center ) );
+			var second = area.InverseTransformPoint( m_buttonLabelList[ 1 ].rectTransform.TransformPoint( m_buttonLabelList[ 1 ].rectTransform.rect.center ) );
+
+			spacing = Mathf.Abs( first.y - second.y );
+		}
+
+		height = Mathf.Max( 0.0f, spacing - c_rowGap );
+
+		// the middle of the text as it is drawn: the middle of the label's box, moved up to the middle of its capitals
+		var middle = labelTransform.rect.center + new Vector2( 0.0f, m_textMiddleOffset );
+
+		var centre = area.InverseTransformPoint( labelTransform.TransformPoint( middle ) );
+
+		centreY = centre.y - area.rect.center.y;
+
+		return true;
+	}
+
+	// makes the console's rows look like the kit's sci-fi buttons: a button behind each row, and the selected row's highlight lit in the same shape
+	void MakeRowButtons()
+	{
+		var theme = UIKitTheme.Get();
+
+		if ( ( m_selectionHighlight == null ) || ( theme == null ) || ( theme.m_buttonSprite == null ) || ( m_buttonLabelList == null ) )
+		{
+			return;
+		}
+
+		var highlight = m_selectionHighlight.rectTransform;
+		var area = highlight.parent as RectTransform;
+
+		if ( area == null )
+		{
+			return;
+		}
+
+		// the highlight is the selected row's button, lit (its frame comes with it)
+		UIKitModeApplier.MakeButton( m_selectionHighlight );
+
+		// the frame already marks the selected row, so the bar beside it is not needed
+		if ( m_selectionBar != null )
+		{
+			m_selectionBar.gameObject.SetActive( false );
+		}
+
+		Canvas.ForceUpdateCanvases();
+
+		MeasureTextMiddle();
+
+		m_rowButtons = new Image[ m_buttonLabelList.Length ];
+
+		for ( var i = 0; i < m_buttonLabelList.Length; i++ )
+		{
+			var rowObject = new GameObject( "UI Kit Row Button " + i, typeof( RectTransform ), typeof( CanvasRenderer ), typeof( Image ), typeof( LayoutElement ) );
+			var row = rowObject.GetComponent<RectTransform>();
+
+			row.SetParent( area, false );
+
+			// behind the highlight (and so behind the labels)
+			row.SetSiblingIndex( highlight.GetSiblingIndex() );
+
+			row.anchorMin = highlight.anchorMin;
+			row.anchorMax = highlight.anchorMax;
+			row.pivot = highlight.pivot;
+
+			// the text stands in from the button's left edge
+			m_buttonLabelList[ i ].margin = new Vector4( c_rowTextInset, 0.0f, 0.0f, 0.0f );
+
+			row.sizeDelta = new Vector2( highlight.sizeDelta.x, 0.0f );
+
+			rowObject.GetComponent<LayoutElement>().ignoreLayout = true;
+
+			var image = rowObject.GetComponent<Image>();
+
+			image.raycastTarget = false;
+
+			var style = rowObject.AddComponent<UIKitStyle>();
+
+			style.m_sprite = UIKitTheme.SpriteRole.Button;
+			style.m_color = UIKitTheme.ColorRole.BackgroundRaised;
+			style.Apply();
+
+			UIKitModeApplier.MakeButton( image );
+
+			// an unselected row's frame is fainter than the selected one's
+			var frame = row.Find( UIKitModeApplier.c_buttonFrameName );
+
+			if ( ( frame != null ) && frame.TryGetComponent<UIKitStyle>( out var frameStyle ) )
+			{
+				frameStyle.m_alpha = 0.35f;
+				frameStyle.Apply();
+			}
+
+			m_rowButtons[ i ] = image;
+		}
+	}
+
 	// unity on enable
 	void OnEnable()
 	{
@@ -466,6 +668,23 @@ public class ButtonController : MonoBehaviour
 		// no highlight on an empty row (the selected index is always on a button, but the buttons may not have been set yet)
 		var hasButton = ( m_selectedButtonIndex >= 0 ) && ( m_selectedButtonIndex < c_numButtons ) && ( m_buttonList != null ) && ( m_buttonList[ m_selectedButtonIndex ] != null );
 
+		// a row's button shows only where the row has a button of the console, in its row's place
+		if ( m_rowButtons != null )
+		{
+			for ( var i = 0; i < m_rowButtons.Length; i++ )
+			{
+				if ( m_rowButtons[ i ] == null )
+				{
+					continue;
+				}
+
+				m_rowButtons[ i ].gameObject.SetActive( ( m_buttonList != null ) && ( i < m_buttonList.Length ) && ( m_buttonList[ i ] != null ) );
+
+				MeasureTextMiddle();
+				PlaceRow( m_rowButtons[ i ].rectTransform, i );
+			}
+		}
+
 		m_selectionHighlight.enabled = hasButton;
 
 		if ( m_selectionBar != null )
@@ -495,6 +714,13 @@ public class ButtonController : MonoBehaviour
 
 		highlight.anchoredPosition = new Vector2( highlight.anchoredPosition.x, centre.y - area.rect.center.y );
 		highlight.sizeDelta = new Vector2( highlight.sizeDelta.x, label.rect.height );
+
+		// with the rows as buttons, the highlight is the selected row's button: in the same place
+		if ( m_rowButtons != null )
+		{
+			MeasureTextMiddle();
+			PlaceRow( highlight, m_selectedButtonIndex );
+		}
 	}
 
 	// call this to stop calling update on the current button
