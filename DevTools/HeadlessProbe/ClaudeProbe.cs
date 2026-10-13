@@ -203,6 +203,20 @@ public class ClaudeProbe : MonoBehaviour
 			MemorySaveSystem.s_saveCalls = 0;
 			MemorySaveSystem.s_slots.Clear();
 
+			// a later stage of the playthrough: the saved game of the stage before is in the first slot, where the data controller loads it as it loads every save
+			var carried = PlaythroughCarriedJson();
+
+			if ( carried != null )
+			{
+				MemorySaveSystem.s_slots[ 0 ] = carried;
+
+				Debug.Log( c_tag + "playthrough: stage " + PlaythroughStage() + " starts from the saved game of stage " + ( PlaythroughStage() - 1 ) + " (" + carried.Length + " characters)" );
+			}
+			else if ( PlaythroughStage() > 1 )
+			{
+				Debug.Log( c_tag + "playthrough: stage " + PlaythroughStage() + " found no saved game of stage " + ( PlaythroughStage() - 1 ) + " and starts a new game" );
+			}
+
 			field.SetValue( DataController.m_instance, new MemorySaveSystem() );
 
 			s_saveSystemSwapped = field.GetValue( DataController.m_instance ) is MemorySaveSystem;
@@ -221,7 +235,7 @@ public class ClaudeProbe : MonoBehaviour
 		if ( ( scene.name == TargetScene() ) && ( DataController.m_instance != null ) && s_saveSystemSwapped && ( MemorySaveSystem.s_existsCalls > 0 ) )
 		{
 			// put the player in hyperspace before the spaceflight controller starts
-			if ( ( scene.name == "Spaceflight" ) && !s_spaceflightReady )
+			if ( ( scene.name == "Spaceflight" ) && !s_spaceflightReady && ( PlaythroughStage() == 0 ) )
 			{
 				DataController.m_instance.m_playerData.m_general.m_location = PD_General.Location.Hyperspace;
 			}
@@ -232,7 +246,89 @@ public class ClaudeProbe : MonoBehaviour
 
 	static string TargetScene()
 	{
-		return GetArg( "-probeScenario", "h6" ).StartsWith( "starport" ) ? "Starport" : "Spaceflight";
+		var scenario = GetArg( "-probeScenario", "h6" );
+
+		// a stage of the playthrough starts in the scene of the location its saved game was left in (a new game starts at the Starport), as the game loads a save
+		if ( scenario.StartsWith( "playthrough-" ) )
+		{
+			var carried = PlaythroughCarriedJson();
+
+			if ( carried == null )
+			{
+				return "Starport";
+			}
+
+			var match = System.Text.RegularExpressions.Regex.Match( carried, @"""m_location""\s*:\s*(\d+)" );
+
+			return ( match.Success && ( match.Groups[ 1 ].Value == "0" ) ) ? "Starport" : "Spaceflight";
+		}
+
+		return scenario.StartsWith( "starport" ) ? "Starport" : "Spaceflight";
+	}
+
+	// ---------------------------------------------------------------- the playthrough's saved game, carried from one stage to the next
+
+	// the folder the stages of the playthrough leave their saved games in
+	static string PlaythroughFolder()
+	{
+		return System.IO.Path.Combine( System.IO.Path.GetTempPath(), "starflight-probe", "playthrough" );
+	}
+
+	// the number of this stage of the playthrough (0 if the scenario is not one)
+	static int PlaythroughStage()
+	{
+		var scenario = GetArg( "-probeScenario", "h6" );
+
+		if ( !scenario.StartsWith( "playthrough-" ) )
+		{
+			return 0;
+		}
+
+		int stage;
+
+		return int.TryParse( scenario.Substring( "playthrough-".Length ), out stage ) ? stage : 0;
+	}
+
+	// the saved game the stage before this one left (null for the first stage, or if it left none)
+	static string PlaythroughCarriedJson()
+	{
+		var stage = PlaythroughStage();
+
+		if ( stage <= 1 )
+		{
+			return null;
+		}
+
+		var path = System.IO.Path.Combine( PlaythroughFolder(), "stage-" + ( stage - 1 ) + ".json" );
+
+		return System.IO.File.Exists( path ) ? System.IO.File.ReadAllText( path ) : null;
+	}
+
+	// ends a stage of the playthrough: the game saves itself the way it does on a change of location, and that save is what the next stage loads
+	static bool PlaythroughSave( string summary )
+	{
+		var stage = PlaythroughStage();
+		var dataController = DataController.m_instance;
+
+		System.IO.Directory.CreateDirectory( PlaythroughFolder() );
+
+		dataController.SaveActiveGame();
+
+		string json;
+
+		if ( !MemorySaveSystem.s_slots.TryGetValue( dataController.m_activeSaveGameSlotNumber, out json ) )
+		{
+			Log( "playthrough: the game did not save slot " + dataController.m_activeSaveGameSlotNumber + ", so nothing is carried to the next stage" );
+
+			return false;
+		}
+
+		System.IO.File.WriteAllText( System.IO.Path.Combine( PlaythroughFolder(), "stage-" + stage + ".json" ), json );
+		System.IO.File.AppendAllText( System.IO.Path.Combine( PlaythroughFolder(), "summary.txt" ), DateTime.Now.ToString( "HH:mm:ss" ) + " stage " + stage + " passed=" + s_checksPassed + " failed=" + s_checksFailed + " exceptions=" + s_exceptionCount + " " + summary + Environment.NewLine );
+
+		Log( "playthrough: stage " + stage + " saved (" + json.Length + " characters, location " + dataController.m_playerData.m_general.m_location + ") to " + PlaythroughFolder() );
+
+		return true;
 	}
 
 	static string GetArg( string name, string fallback )
@@ -1141,6 +1237,90 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "scifibuttons":
 				yield return ScenarioSciFiButtons();
+				break;
+
+			case "playthrough-1":
+				yield return ScenarioPlaythrough1();
+				break;
+
+			case "playthrough-2":
+				yield return ScenarioPlaythrough2();
+				break;
+
+			case "playthrough-3":
+				yield return ScenarioPlaythrough3();
+				break;
+
+			case "playthrough-4":
+				yield return ScenarioPlaythrough4();
+				break;
+
+			case "playthrough-5":
+				yield return ScenarioPlaythrough5();
+				break;
+
+			case "playthrough-6":
+				yield return ScenarioPlaythrough6();
+				break;
+
+			case "playthrough-7":
+				yield return ScenarioPlaythrough7();
+				break;
+
+			case "playthrough-8":
+				yield return ScenarioPlaythrough8();
+				break;
+
+			case "playthrough-9":
+				yield return ScenarioPlaythrough9();
+				break;
+
+			case "playthrough-10":
+				yield return ScenarioPlaythrough10();
+				break;
+
+			case "playthrough-11":
+				yield return ScenarioPlaythrough11();
+				break;
+
+			case "playthrough-12":
+				yield return ScenarioPlaythrough12();
+				break;
+
+			case "playthrough-13":
+				yield return ScenarioPlaythrough13();
+				break;
+
+			case "playthrough-14":
+				yield return ScenarioPlaythrough14();
+				break;
+
+			case "playthrough-15":
+				yield return ScenarioPlaythrough15();
+				break;
+
+			case "playthrough-16":
+				yield return ScenarioPlaythrough16();
+				break;
+
+			case "playthrough-17":
+				yield return ScenarioPlaythrough17();
+				break;
+
+			case "playthrough-18":
+				yield return ScenarioPlaythrough18();
+				break;
+
+			case "playthrough-19":
+				yield return ScenarioPlaythrough19();
+				break;
+
+			case "playthrough-20":
+				yield return ScenarioPlaythrough20();
+				break;
+
+			case "playthrough-21":
+				yield return ScenarioPlaythrough21();
 				break;
 
 			default:
@@ -29399,6 +29579,3430 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "scifibuttons: a button's frame takes the light mode's accent colour", ( lightFrameColour == lightAccent ) && ( lightFrameColour != "(none)" ), lightFrameColour + " / " + lightAccent );
 
 		Finish( "scenario=scifibuttons checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the playthrough: a new game played to the win, in stages that carry the saved game on
+
+	// a key of the probe keyboard pressed and let go, a number of times (the panels read the stick and the fire button through the input controller)
+	IEnumerator PtTap( Key key, int times = 1 )
+	{
+		for ( var i = 0; i < times; i++ )
+		{
+			yield return Tap( key );
+		}
+	}
+
+	// the text of a text object without its rich text tags
+	static string PtText( TMPro.TMP_Text text )
+	{
+		return ( text == null ) ? "(none)" : System.Text.RegularExpressions.Regex.Replace( text.text, "<[^>]*>", "" ).Replace( "\r", "" ).Replace( "\n", " / " ).Trim();
+	}
+
+	// the selected UI object's name (the panels move it when they change state)
+	static string PtSelected()
+	{
+		var eventSystem = EventSystem.current;
+
+		return ( ( eventSystem == null ) || ( eventSystem.currentSelectedGameObject == null ) ) ? "nothing" : eventSystem.currentSelectedGameObject.name;
+	}
+
+	// stage 1: a new game at the Starport. Personnel (six crew members created and trained), Crew Assignment, Ship Configuration (cargo pods, engines,
+	// shields, armor, missiles, lasers, the name), the Trade Depot (fuel, the Whining Orb), the Bank, Operations (notices, evaluation), the docking bay
+	IEnumerator ScenarioPlaythrough1()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var bank = playerData.m_bank;
+		var ship = playerData.m_playerShip;
+		var start = Time.realtimeSinceStartup;
+
+		ProbeKeyboard();
+
+		Log( "playthrough-1: a new game: location " + playerData.m_general.m_location + ", stardate " + playerData.m_general.m_currentStardateYMD + ", balance " + bank.m_currentBalance + ", crew " + playerData.m_personnel.m_personnelList.Count + ", engines " + ship.m_enginesClass + ", fuel " + Endurium() + ", ship '" + ship.m_name + "', realtime " + Time.realtimeSinceStartup.ToString( "F1" ) );
+
+		Check( "playthrough-1: a new game starts at the Starport with no crew, class 1 engines, no name and the Editor's balance of 1,000,000 MU", ( playerData.m_general.m_location == PD_General.Location.Starport ) && ( playerData.m_personnel.m_personnelList.Count == 0 ) && ( ship.m_enginesClass == 1 ) && ( ship.m_name == "" ) && ( bank.m_currentBalance == 1000000 ), playerData.m_general.m_location + ", " + playerData.m_personnel.m_personnelList.Count + ", " + ship.m_enginesClass + ", '" + ship.m_name + "', " + bank.m_currentBalance );
+
+		// ---- 1. the docking bay first, as a new player tries: the preflight check refuses
+		var dockingBay = FindPanel<DockingBayPanel>();
+
+		yield return OpenPanel( dockingBay, "docking bay" );
+
+		var refused = PreflightText( dockingBay );
+
+		yield return ClosePanel( dockingBay, "docking bay" );
+
+		Log( "playthrough-1: the docking bay of a new game says: " + refused );
+
+		Check( "playthrough-1: the docking bay refuses a new game and names crew assignment and the name (engines and fuel are there)", refused.Contains( "Crew Assignment" ) && refused.Contains( "christen ship" ) && !refused.Contains( "fuel" ), refused );
+
+		// ---- 2. Personnel: six crew members, each race chosen with the stick, named, and trained
+		var personnel = FindPanel<PersonnelPanel>();
+		var crew = new[] { new KeyValuePair<string, int>( "Kirk", 0 ), new KeyValuePair<string, int>( "Spock", 3 ), new KeyValuePair<string, int>( "Sulu", 0 ), new KeyValuePair<string, int>( "Scotty", 1 ), new KeyValuePair<string, int>( "Uhura", 3 ), new KeyValuePair<string, int>( "McCoy", 0 ) };
+
+		// the skill each one trains (science, navigation, engineering, communications, medicine)
+		var skills = new[] { 1, 0, 1, 2, 3, 4 };
+		var balanceBeforePersonnel = bank.m_currentBalance;
+		var ledgerBefore = bank.m_transactionList.Count;
+
+		yield return OpenPanel( personnel, "personnel" );
+
+		for ( var i = 0; i < crew.Length; i++ )
+		{
+			PanelCall( "CreateClicked", () => personnel.CreateClicked() );
+
+			yield return Frames( 3 );
+
+			// the stick moves east through the races
+			yield return PtTap( Key.RightArrow, crew[ i ].Value );
+
+			var raceShown = PtText( personnel.m_raceNameText );
+
+			PanelCall( "SelectClicked", () => personnel.SelectClicked() );
+
+			yield return Frames( 3 );
+
+			personnel.m_nameInputField.text = crew[ i ].Key;
+
+			PanelCall( "OnEndEdit", () => personnel.OnEndEdit() );
+
+			yield return Frames( 3 );
+
+			var file = playerData.m_personnel.m_personnelList[ playerData.m_personnel.m_personnelList.Count - 1 ];
+
+			Log( "playthrough-1: created " + file.m_name + " race " + file.m_crewRaceId + " (" + raceShown + ") skills " + file.m_science + "/" + file.m_navigation + "/" + file.m_engineering + "/" + file.m_communications + "/" + file.m_medicine + ", selected " + PtSelected() );
+
+			Check( "playthrough-1: " + crew[ i ].Key + " is created with the race chosen with the stick", ( file.m_name == crew[ i ].Key ) && ( file.m_crewRaceId == crew[ i ].Value ), file.m_name + " race " + file.m_crewRaceId + " shown '" + raceShown + "'" );
+
+			// train: Train, the stick down to the skill, the fire button, the stick up for the most sessions, the fire button
+			var skillBefore = file.GetSkill( skills[ i ] );
+			var balanceBeforeTraining = bank.m_currentBalance;
+
+			PanelCall( "TrainClicked", () => personnel.TrainClicked() );
+
+			yield return Frames( 3 );
+			yield return PtTap( Key.DownArrow, skills[ i ] );
+			yield return PtTap( Key.Enter );
+
+			var question = PtText( personnel.m_trainingText );
+
+			yield return PtTap( Key.UpArrow );
+
+			var questionAtMost = PtText( personnel.m_trainingText );
+
+			yield return PtTap( Key.Enter );
+
+			var skillAfter = file.GetSkill( skills[ i ] );
+			var paid = balanceBeforeTraining - bank.m_currentBalance;
+			var race = gameData.m_crewRaceList[ file.m_crewRaceId ];
+
+			Log( "playthrough-1: training " + file.m_name + " skill " + skills[ i ] + ": '" + question + "' then '" + questionAtMost + "', skill " + skillBefore + " -> " + skillAfter + " (max " + race.GetMaximumSkill( skills[ i ] ) + "), paid " + paid + ", selected " + PtSelected() );
+
+			Check( "playthrough-1: training " + file.m_name + " raises the skill to its maximum and costs 300 MU a session", ( skillAfter == race.GetMaximumSkill( skills[ i ] ) ) && ( paid > 0 ) && ( paid % 300 == 0 ) && ( paid / 300 == ( skillAfter - skillBefore + race.m_learningRate - 1 ) / Math.Max( 1, race.m_learningRate ) ), skillBefore + " -> " + skillAfter + ", paid " + paid );
+
+			// back to the file with the cancel button
+			yield return PtTap( Key.Escape );
+		}
+
+		yield return ClosePanel( personnel, "personnel" );
+
+		var personnelCost = balanceBeforePersonnel - bank.m_currentBalance;
+		var personnelLedger = ( bank.m_transactionList.Count > ledgerBefore ) ? bank.m_transactionList[ bank.m_transactionList.Count - 1 ].m_description + " " + bank.m_transactionList[ bank.m_transactionList.Count - 1 ].m_amount : "none";
+
+		Log( "playthrough-1: personnel cost " + personnelCost + ", ledger: " + personnelLedger + ", crew " + playerData.m_personnel.m_personnelList.Count );
+
+		Check( "playthrough-1: six crew members on file, and the ledger books what Personnel cost", ( playerData.m_personnel.m_personnelList.Count == 6 ) && personnelLedger.Contains( personnelCost.ToString() ), playerData.m_personnel.m_personnelList.Count + ", " + personnelLedger );
+
+		// ---- 3. Crew Assignment: role i gets file i, with the stick
+		var crewAssignment = FindPanel<CrewAssignmentPanel>();
+
+		yield return OpenPanel( crewAssignment, "crew assignment" );
+
+		PanelCall( "AssignClicked", () => crewAssignment.AssignClicked() );
+
+		yield return Frames( 3 );
+
+		for ( var role = 0; role < 6; role++ )
+		{
+			yield return PtTap( Key.RightArrow, role );
+
+			if ( role < 5 )
+			{
+				yield return PtTap( Key.DownArrow );
+			}
+		}
+
+		yield return PtTap( Key.Escape );
+
+		var assigned = "";
+		var allRight = true;
+
+		for ( var role = PD_CrewAssignment.Role.First; role < PD_CrewAssignment.Role.Count; role++ )
+		{
+			var file = playerData.m_crewAssignment.IsAssigned( role ) ? playerData.m_crewAssignment.GetPersonnelFile( role ) : null;
+
+			assigned += role + "=" + ( ( file == null ) ? "-" : file.m_name ) + " ";
+			allRight &= ( file != null ) && ( file.m_name == crew[ (int) role ].Key );
+		}
+
+		Log( "playthrough-1: crew assignment: " + assigned + "| assigned list '" + PtText( crewAssignment.m_positionValuesText ) + "'" );
+
+		Check( "playthrough-1: each role has the crew member chosen for it with the stick", allRight, assigned );
+
+		yield return ClosePanel( crewAssignment, "crew assignment" );
+
+		// ---- 4. Ship Configuration: four cargo pods, then a class of each part, then the name
+		var shipConfiguration = FindPanel<ShipConfigurationPanel>();
+		var balanceBeforeShip = bank.m_currentBalance;
+		var price = 0;
+
+		yield return OpenPanel( shipConfiguration, "ship configuration" );
+
+		// the new ship's class 1 engines are sold first (Buy says De-equip first while a part is installed)
+		PanelCall( "SellClicked", () => shipConfiguration.SellClicked() );
+
+		yield return Frames( 3 );
+		yield return PtTap( Key.DownArrow );
+		yield return PtTap( Key.Enter );
+
+		var soldEngines = bank.m_currentBalance - balanceBeforeShip;
+
+		Log( "playthrough-1: sold the class 1 engines for " + soldEngines + ", engines now " + ship.m_enginesClass );
+
+		Check( "playthrough-1: the class 1 engines of the new ship sell for their sell price", ( ship.m_enginesClass == 0 ) && ( soldEngines == gameData.m_enginesList[ 1 ].m_sellPrice ), ship.m_enginesClass + ", " + soldEngines );
+
+		yield return PtTap( Key.Escape );
+
+		price -= soldEngines;
+
+		PanelCall( "BuyClicked", () => shipConfiguration.BuyClicked() );
+
+		yield return Frames( 3 );
+
+		var selectedInBuy = PtSelected();
+
+		yield return PtTap( Key.Enter, 4 );
+
+		var pods = ship.m_numCargoPods;
+
+		// engines 3, shields 3, armor 3, missile launcher 2, laser cannon 3 (classes counted from 1)
+		var classes = new[] { 0, 3, 3, 3, 2, 3 };
+		price += 4 * gameData.m_misc.m_cargoPodBuyPrice;
+
+		for ( var part = 1; part < 6; part++ )
+		{
+			yield return PtTap( Key.DownArrow, part );
+			yield return PtTap( Key.Enter );
+			yield return PtTap( Key.DownArrow, classes[ part ] - 1 );
+			yield return PtTap( Key.Enter );
+
+			var state = GetField( shipConfiguration, "m_currentState" ).ToString();
+
+			if ( state != "BuyPart" )
+			{
+				Log( "playthrough-1: buying part " + part + " left the panel in " + state + ": '" + PtText( shipConfiguration.m_errorMessageText ) + "'" );
+
+				yield return PtTap( Key.Escape );
+			}
+
+			GD_ShipPart[] list = null;
+
+			switch ( part )
+			{
+				case 1: list = gameData.m_enginesList; break;
+				case 2: list = gameData.m_shieldingList; break;
+				case 3: list = gameData.m_armorList; break;
+				case 4: list = gameData.m_missileLauncherList; break;
+				case 5: list = gameData.m_laserCannonList; break;
+			}
+
+			price += list[ classes[ part ] ].m_buyPrice;
+		}
+
+		var installed = ship.m_enginesClass + "/" + ship.m_shieldingClass + "/" + ship.m_armorClass + "/" + ship.m_missileLauncherClass + "/" + ship.m_laserCannonClass;
+
+		yield return PtTap( Key.Escape );
+
+		PanelCall( "NameClicked", () => shipConfiguration.NameClicked() );
+
+		yield return Frames( 3 );
+
+		shipConfiguration.m_nameInputField.text = "Enterprise";
+
+		PanelCall( "OnEndEdit", () => shipConfiguration.OnEndEdit() );
+
+		yield return Frames( 3 );
+
+		var shipCost = balanceBeforeShip - bank.m_currentBalance;
+		var status = PtText( shipConfiguration.m_statusValuesText );
+		var configuration = PtText( shipConfiguration.m_configurationValuesText );
+
+		Log( "playthrough-1: ship configuration: selected in Buy " + selectedInBuy + ", pods " + pods + ", installed " + installed + " (wanted 3/3/3/2/3), name '" + ship.m_name + "', cost " + shipCost + " (prices add up to " + price + "), armor points " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() + ", shields " + ship.m_shieldPoints + "/" + ship.GetMaximumShieldPoints() + ", mass " + ship.m_mass + ", acceleration " + ship.m_acceleration + " | configuration '" + configuration + "' | status '" + status + "'" );
+
+		Check( "playthrough-1: Ship Configuration buys four cargo pods and the classes chosen with the stick", ( pods == 4 ) && ( installed == "3/3/3/2/3" ), pods + " pods, " + installed );
+		Check( "playthrough-1: the ship costs what its parts cost", shipCost == price, shipCost + " vs " + price );
+		Check( "playthrough-1: the ship is named Enterprise", ship.m_name == "Enterprise", ship.m_name );
+		Check( "playthrough-1: the bought armor gives the ship its maximum armor points", ship.m_armorPoints == ship.GetMaximumArmorPoints(), ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() );
+
+		yield return ClosePanel( shipConfiguration, "ship configuration" );
+
+		// ---- 5. the Trade Depot: 30 cubic meters of Endurium and the Whining Orb (translates Spemin)
+		var tradeDepot = FindPanel<TradeDepotPanel>();
+		var fuelBefore = Endurium();
+		var balanceBeforeTrade = bank.m_currentBalance;
+
+		yield return OpenPanel( tradeDepot, "trade depot" );
+
+		PanelCall( "BuyClicked", () => tradeDepot.BuyClicked() );
+
+		yield return Frames( 3 );
+
+		var buyList = PtText( tradeDepot.m_itemListText );
+
+		// Endurium is the sixth element of the list
+		yield return PtTap( Key.DownArrow, 5 );
+		yield return PtTap( Key.Enter );
+
+		tradeDepot.m_amountInputField.text = "30";
+
+		PanelCall( "OnEndEdit", () => tradeDepot.OnEndEdit() );
+
+		yield return Frames( 3 );
+
+		var fuelAfter = Endurium();
+		var fuelPaid = balanceBeforeTrade - bank.m_currentBalance;
+
+		Log( "playthrough-1: trade depot buy list '" + buyList + "'; 30 m3 of Endurium: fuel " + fuelBefore + " -> " + fuelAfter + " tenths, paid " + fuelPaid );
+
+		Check( "playthrough-1: 30 cubic meters of Endurium are 300 tenths more in the hold and cost 30 times its price", ( fuelAfter - fuelBefore == 300 ) && ( fuelPaid == 30 * gameData.m_elementList[ 5 ].GetStarportPrice() ), ( fuelAfter - fuelBefore ) + ", " + fuelPaid );
+
+		// the Whining Orb: down the list to it
+		var items = GetField( tradeDepot, "m_itemList" ) as IList;
+		var orbIndex = -1;
+
+		for ( var i = 0; ( items != null ) && ( i < items.Count ); i++ )
+		{
+			if ( ( (int) GetField( items[ i ], "m_type" ) == 1 ) && ( gameData.m_artifactList[ (int) GetField( items[ i ], "m_id" ) ].m_name == "Whining Orb" ) )
+			{
+				orbIndex = i;
+			}
+		}
+
+		var current = (int) GetField( tradeDepot, "m_currentItemIndex" );
+		var balanceBeforeOrb = bank.m_currentBalance;
+
+		if ( orbIndex > current )
+		{
+			yield return PtTap( Key.DownArrow, orbIndex - current );
+			yield return PtTap( Key.Enter );
+		}
+
+		var orbPaid = balanceBeforeOrb - bank.m_currentBalance;
+
+		Log( "playthrough-1: the Whining Orb is item " + orbIndex + " of the buy list; paid " + orbPaid + ", in the hold " + ship.HasArtifact( "Whining Orb" ) );
+
+		Check( "playthrough-1: the Trade Depot sells the Whining Orb for 6000 MU", ship.HasArtifact( "Whining Orb" ) && ( orbPaid == 6000 ), ship.HasArtifact( "Whining Orb" ) + ", " + orbPaid );
+
+		yield return PtTap( Key.Escape );
+		yield return ClosePanel( tradeDepot, "trade depot" );
+
+		// ---- 6. the Bank: the ledger
+		var bankPanel = FindPanel<BankPanel>();
+
+		yield return OpenPanel( bankPanel, "bank" );
+
+		var ledger = "";
+
+		foreach ( var transaction in bank.m_transactionList )
+		{
+			ledger += transaction.m_stardate + " " + transaction.m_description + " " + transaction.m_amount + "; ";
+		}
+
+		var balanceText = PtText( FieldOrNull( bankPanel, "m_currentBalanceText" ) as TMPro.TMP_Text );
+
+		Log( "playthrough-1: the bank: '" + balanceText + "', ledger " + ledger );
+
+		// the ledger of a new game starts with the original's Game purchase of 200 MU, which the starting balance does not take away
+		var spent = 1000000 - bank.m_currentBalance + 200;
+		var booked = 0;
+
+		foreach ( var transaction in bank.m_transactionList )
+		{
+			var amount = transaction.m_amount.Trim();
+			var value = 0;
+
+			int.TryParse( amount.TrimEnd( '+', '-' ), out value );
+
+			booked += amount.EndsWith( "-" ) ? value : -value;
+		}
+
+		Check( "playthrough-1: the ledger adds up to what was spent", booked == spent, booked + " booked, " + spent + " spent" );
+		Check( "playthrough-1: the bank shows the balance", balanceText.Contains( string.Format( "{0:n0}", bank.m_currentBalance ) ), balanceText );
+
+		yield return ClosePanel( bankPanel, "bank" );
+
+		// ---- 7. Operations: the notices to the end, and the evaluation
+		var operations = FindPanel<OperationsPanel>();
+
+		yield return OpenPanel( operations, "operations" );
+
+		PanelCall( "NoticesClicked", () => operations.NoticesClicked() );
+
+		var typedEnd = Time.realtimeSinceStartup + 12.0f;
+
+		while ( !(bool) GetField( operations, "m_endOfMessageReached" ) && ( Time.realtimeSinceStartup < typedEnd ) )
+		{
+			yield return null;
+		}
+
+		var notice = PtText( operations.m_messageText );
+
+		PanelCall( "QuitClicked", () => operations.QuitClicked() );
+		PanelCall( "EvaluationClicked", () => operations.EvaluationClicked() );
+
+		yield return Frames( 3 );
+
+		var evaluation = "";
+
+		foreach ( var text in operations.m_evaluationGameObject.GetComponentsInChildren<TMPro.TextMeshProUGUI>() )
+		{
+			evaluation += PtText( text ) + " | ";
+		}
+
+		PanelCall( "QuitClicked", () => operations.QuitClicked() );
+
+		yield return ClosePanel( operations, "operations" );
+
+		Log( "playthrough-1: the first notice: '" + Head( notice ) + "' ... '" + Tail( notice ) + "' | evaluation: '" + Head( evaluation ) + "'" );
+
+		Check( "playthrough-1: Operations shows a notice and an evaluation screen", ( notice.Length > 40 ) && ( evaluation.Length > 10 ), notice.Length + ", " + evaluation.Length );
+
+		// ---- 8. the docking bay: the preflight check passes and the crew goes aboard
+		yield return OpenPanel( dockingBay, "docking bay" );
+
+		var transporting = dockingBay.IsTransporting();
+		var preflight = PreflightText( dockingBay );
+
+		Log( "playthrough-1: the docking bay: transporting " + transporting + ", says '" + preflight + "'" );
+
+		Check( "playthrough-1: the preflight check passes and the transporter starts", transporting, preflight );
+
+		yield return PtWaitForScene( "Spaceflight", 20.0f );
+
+		var waited = Time.realtimeSinceStartup;
+
+		while ( ( ( SpaceflightController.m_instance == null ) || SpaceflightController.m_instance.m_starSystem.GeneratingPlanets() ) && ( Time.realtimeSinceStartup - waited < 30.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 30 );
+
+		var location = DataController.m_instance.m_playerData.m_general.m_location;
+		var buttons = Console();
+
+		Log( "playthrough-1: in the Spaceflight scene: location " + location + ", console " + buttons + ", messages " + MessageList() + ", balance " + DataController.m_instance.m_playerData.m_bank.m_currentBalance + " (interest paid on boarding), took " + ( Time.realtimeSinceStartup - start ).ToString( "F0" ) + " s" );
+
+		Check( "playthrough-1: the crew is aboard in the docking bay", location == PD_General.Location.DockingBay, location.ToString() );
+
+		PlaythroughSave( "location=" + location + " balance=" + DataController.m_instance.m_playerData.m_bank.m_currentBalance );
+
+		Finish( "scenario=playthrough-1 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the playthrough's console and flight helpers
+
+	// the labels of the console's buttons as the player sees them
+	static string PtLabels()
+	{
+		var buttonController = SpaceflightController.m_instance.m_buttonController;
+		var list = GetField( buttonController, "m_buttonList" ) as ShipButton[];
+		var labels = new List<string>();
+
+		foreach ( var button in list )
+		{
+			labels.Add( ( button == null ) ? "-" : button.GetLabel() );
+		}
+
+		return buttonController.GetCurrentButtonSet() + "[" + string.Join( ",", labels ) + "]";
+	}
+
+	// the index of the console button with this label (-1 if there is none)
+	static int PtIndexOf( string label )
+	{
+		var list = GetField( SpaceflightController.m_instance.m_buttonController, "m_buttonList" ) as ShipButton[];
+
+		for ( var i = 0; i < list.Length; i++ )
+		{
+			if ( ( list[ i ] != null ) && ( list[ i ].GetLabel() == label ) )
+			{
+				return i;
+			}
+		}
+
+		return -1;
+	}
+
+	// whether a console button is running (its Update has the stick and the fire button)
+	static bool PtButtonRunning()
+	{
+		var current = GetField( SpaceflightController.m_instance.m_buttonController, "m_currentButton" );
+
+		// a button whose Update is the base one gives the stick back to the console (the captain's menu after the launch is such a current button)
+		// (the communications officer's button keeps its menu up to date in its Update, which never keeps the stick: it does not count)
+		return ( current != null ) && ( current.GetType().GetMethod( "Update" ).DeclaringType != typeof( ShipButton ) ) && !( current is CommunicationsButton );
+	}
+
+	static bool s_ptDebug = false;
+
+	// presses the console button with this label as the player does: the stick up or down to it, the fire button, and the 0.35 s until it is activated
+	IEnumerator PtPress( string label, bool[] pressed = null )
+	{
+		var buttonController = SpaceflightController.m_instance.m_buttonController;
+		var index = PtIndexOf( label );
+
+		if ( pressed != null )
+		{
+			pressed[ 0 ] = false;
+		}
+
+		if ( index < 0 )
+		{
+			Log( "playthrough: the console has no " + label + " button: " + PtLabels() );
+
+			yield break;
+		}
+
+		// the console does nothing while the game is paused (a star system's planets are being generated)
+		var pauseEnd = Time.realtimeSinceStartup + 30.0f;
+
+		while ( SpaceflightController.m_instance.m_gameIsPaused && ( Time.realtimeSinceStartup < pauseEnd ) )
+		{
+			yield return null;
+		}
+
+		for ( var guard = 0; guard < 8; guard++ )
+		{
+			var selected = (int) GetField( buttonController, "m_selectedButtonIndex" );
+
+			if ( selected == index )
+			{
+				break;
+			}
+
+			yield return Tap( ( selected < index ) ? Key.DownArrow : Key.UpArrow );
+
+			if ( s_ptDebug )
+			{
+				Log( "playthrough: PtPress " + label + ": selected " + selected + " -> " + GetField( buttonController, "m_selectedButtonIndex" ) + ", activating " + GetField( buttonController, "m_activatingButton" ) + ", paused " + SpaceflightController.m_instance.m_gameIsPaused + ", input south " + InputController.m_instance.m_south + ", " + PtLabels() );
+			}
+		}
+
+		yield return Tap( Key.Enter );
+		yield return new WaitForSecondsRealtime( 0.5f );
+
+		if ( pressed != null )
+		{
+			pressed[ 0 ] = true;
+		}
+	}
+
+	// the keys of the stick that point the ship (or the terrain vehicle) at a place, east being +x and north +z
+	static Key[] PtKeysToward( Vector3 delta )
+	{
+		var keys = new List<Key>();
+		var length = new Vector2( delta.x, delta.z ).magnitude;
+
+		if ( length < 0.001f )
+		{
+			return keys.ToArray();
+		}
+
+		if ( delta.x > 0.38f * length )
+		{
+			keys.Add( Key.RightArrow );
+		}
+		else if ( delta.x < -0.38f * length )
+		{
+			keys.Add( Key.LeftArrow );
+		}
+
+		if ( delta.z > 0.38f * length )
+		{
+			keys.Add( Key.UpArrow );
+		}
+		else if ( delta.z < -0.38f * length )
+		{
+			keys.Add( Key.DownArrow );
+		}
+
+		return keys.ToArray();
+	}
+
+	// flies the ship with Maneuver running toward a place with the stick until the condition holds or the time is up - gives back the distance flown
+	IEnumerator PtFly( Func<Vector3> target, Func<bool> arrived, float seconds, float[] flown )
+	{
+		var ship = SpaceflightController.m_instance.m_playerShip.transform;
+		var end = Time.realtimeSinceStartup + seconds;
+		var last = ship.position;
+
+		flown[ 0 ] = 0.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !arrived() )
+		{
+			HoldKeys( PtKeysToward( target() - ship.position ) );
+
+			yield return null;
+
+			flown[ 0 ] += Vector3.Distance( last, ship.position );
+			last = ship.position;
+		}
+
+		HoldKeys();
+
+		yield return Frames( 3 );
+	}
+
+	// gets the console to the navigation officer's buttons and starts Maneuver
+	IEnumerator PtManeuver()
+	{
+		// Maneuver already running (Enter would end it, and over a planet go into orbit)
+		if ( GetField( SpaceflightController.m_instance.m_buttonController, "m_currentButton" ) is ManeuverButton )
+		{
+			yield break;
+		}
+
+		if ( PtButtonRunning() )
+		{
+			yield return Tap( Key.Enter );
+			yield return Frames( 5 );
+		}
+
+		if ( PtIndexOf( "Maneuver" ) < 0 )
+		{
+			if ( PtIndexOf( "Bridge" ) >= 0 )
+			{
+				yield return PtPress( "Bridge" );
+			}
+
+			yield return PtPress( "Navigation" );
+		}
+
+		yield return PtPress( "Maneuver" );
+	}
+
+	// waits for the planets of the star system to be generated
+	static IEnumerator PtWaitForPlanets( float seconds )
+	{
+		var end = Time.realtimeSinceStartup + seconds;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( SpaceflightController.m_instance != null ) && SpaceflightController.m_instance.m_starSystem.GeneratingPlanets() )
+		{
+			yield return null;
+		}
+	}
+
+	// the messages of the window without their tags
+	static string PtMessages()
+	{
+		return System.Text.RegularExpressions.Regex.Replace( MessageList(), "<[^>]*>", "" );
+	}
+
+	// stage 2: from the docking bay. The save of stage 1 loaded, Launch and Yes, Maneuver, real flight to planet 94 of Arth's system, Enter to orbit, Sensors,
+	// Analysis, Status
+	IEnumerator ScenarioPlaythrough2()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+
+		ProbeKeyboard();
+
+		// ---- 1. what the save of stage 1 carried
+		var crewNames = "";
+
+		for ( var role = PD_CrewAssignment.Role.First; role < PD_CrewAssignment.Role.Count; role++ )
+		{
+			crewNames += ( playerData.m_crewAssignment.IsAssigned( role ) ? playerData.m_crewAssignment.GetPersonnelFile( role ).m_name : "-" ) + " ";
+		}
+
+		Log( "playthrough-2: loaded: location " + playerData.m_general.m_location + ", ship '" + ship.m_name + "' " + ship.m_enginesClass + "/" + ship.m_shieldingClass + "/" + ship.m_armorClass + "/" + ship.m_missileLauncherClass + "/" + ship.m_laserCannonClass + " pods " + ship.m_numCargoPods + ", armor " + ship.m_armorPoints + ", shields " + ship.m_shieldPoints + "/" + ship.GetMaximumShieldPoints() + ", fuel " + Endurium() + ", Whining Orb " + ship.HasArtifact( "Whining Orb" ) + ", balance " + playerData.m_bank.m_currentBalance + ", crew " + crewNames + ", console " + PtLabels() + ", messages " + PtMessages() );
+
+		Check( "playthrough-2: the save of stage 1 carries the ship, its crew, its fuel, the Whining Orb and the balance", ( playerData.m_general.m_location == PD_General.Location.DockingBay ) && ( ship.m_name == "Enterprise" ) && ( ship.m_enginesClass == 3 ) && ( ship.m_numCargoPods == 4 ) && ( Endurium() == 500 ) && ship.HasArtifact( "Whining Orb" ) && crewNames.StartsWith( "Kirk Spock Sulu Scotty Uhura McCoy" ), playerData.m_general.m_location + " '" + ship.m_name + "' " + Endurium() + " " + crewNames );
+		Check( "playthrough-2: the shields leave the docking bay fully charged", ship.m_shieldPoints == ship.GetMaximumShieldPoints(), ship.m_shieldPoints + "/" + ship.GetMaximumShieldPoints() );
+
+		// ---- 2. Command, Launch, Yes
+		yield return PtPress( "Command" );
+		yield return PtPress( "Launch" );
+
+		var asked = PtMessages();
+		var launchSet = PtLabels();
+
+		yield return PtPress( "Yes" );
+
+		var launchStart = Time.realtimeSinceStartup;
+
+		yield return WaitForLocation( PD_General.Location.JustLaunched, 60.0f );
+
+		var launchTook = Time.realtimeSinceStartup - launchStart;
+
+		yield return Frames( 10 );
+
+		Log( "playthrough-2: Launch asked '" + asked + "' with " + launchSet + "; out of the docking bay after " + launchTook.ToString( "F1" ) + " s: " + playerData.m_general.m_location + ", messages '" + PtMessages() + "', console " + PtLabels() );
+
+		Check( "playthrough-2: Launch and Yes take the ship out of the Starport", playerData.m_general.m_location == PD_General.Location.JustLaunched, playerData.m_general.m_location + " after " + launchTook.ToString( "F1" ) + " s" );
+
+		// ---- 3. Maneuver, and real flight to planet 94
+		var generationStart = Time.realtimeSinceStartup;
+
+		yield return PtWaitForPlanets( 30.0f );
+
+		Log( "playthrough-2: the planets of Arth's system took " + ( Time.realtimeSinceStartup - generationStart ).ToString( "F1" ) + " s to generate after the launch (the game is paused meanwhile)" );
+
+		yield return PtManeuver();
+		yield return Frames( 10 );
+
+		var afterManeuver = PtMessages();
+
+		Check( "playthrough-2: Maneuver after the launch starts system travel", ( playerData.m_general.m_location == PD_General.Location.StarSystem ) && afterManeuver.Contains( "Commencing system travel" ), playerData.m_general.m_location + ": " + afterManeuver );
+
+		yield return PtWaitForPlanets( 30.0f );
+
+		var planet94 = controller.m_starSystem.GetPlanetController( 94 );
+		var fuelBeforeFlight = Endurium();
+		var flown = new float[ 1 ];
+		var startPosition = controller.m_playerShip.transform.position;
+
+		Log( "playthrough-2: the ship at " + startPosition + ", planet 94 at " + ( ( planet94 == null ) ? "-" : planet94.transform.position.ToString() ) + ", speed limit " + playerData.m_general.m_currentMaximumSpeed + ", console " + PtLabels() + " running " + PtButtonRunning() );
+
+		if ( planet94 == null )
+		{
+			Finish( "scenario=playthrough-2 abort: planet 94 is not in Arth's system", 2 );
+			yield break;
+		}
+
+		yield return PtFly( () => planet94.transform.position, () => ( controller.m_starSystem.m_planetToOrbitId == 94 ) || ( playerData.m_general.m_location != PD_General.Location.StarSystem ), 20.0f, flown );
+
+		var arrived = controller.m_starSystem.m_planetToOrbitId == 94;
+		var left = Vector3.Distance( controller.m_playerShip.transform.position, planet94.transform.position );
+
+		Log( "playthrough-2: flew " + flown[ 0 ].ToString( "F0" ) + " units toward planet 94 (" + left.ToString( "F0" ) + " left), arrived " + arrived + ", location " + playerData.m_general.m_location + ", fuel " + fuelBeforeFlight + " -> " + Endurium() + ", stardate " + playerData.m_general.m_currentStardateDHMY + ", messages '" + PtMessages() + "'" );
+
+		if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+		{
+			Log( "playthrough-2: an encounter on the way (" + playerData.m_general.m_currentEncounterId + "): left by the ship's way out" );
+		}
+
+		// the shortcut: if the flight did not get there in time, the ship is put beside the planet (only travel time is skipped)
+		if ( !arrived && ( playerData.m_general.m_location == PD_General.Location.StarSystem ) )
+		{
+			Log( "playthrough-2: SHORTCUT the ship is put beside planet 94 to save travel time" );
+
+			PlaceShipInTheSystem( planet94.transform.position + Vector3.back * 30.0f );
+
+			yield return PtFly( () => planet94.transform.position, () => controller.m_starSystem.m_planetToOrbitId == 94, 10.0f, flown );
+		}
+
+		var standingBy = PtMessages();
+
+		Check( "playthrough-2: over planet 94 the ship is standing by to orbit", ( controller.m_starSystem.m_planetToOrbitId == 94 ) && standingBy.Contains( "Standing by to orbit" ), standingBy );
+
+		// Enter, with Maneuver running, goes into orbit
+		yield return Tap( Key.Enter );
+		yield return WaitForLocation( PD_General.Location.InOrbit, 15.0f );
+		yield return Frames( 20 );
+
+		Log( "playthrough-2: after Enter: " + playerData.m_general.m_location + " planet " + playerData.m_general.m_currentPlanetId + ", messages '" + PtMessages() + "', console " + PtLabels() );
+
+		var orbitLines = PtMessages();
+		var initiating = orbitLines.LastIndexOf( "Initiating orbital maneuver..." );
+
+		Check( "playthrough-2: going into orbit says Initiating orbital maneuver... and ...Orbit established. without Outside orbital range. between them (the ship coasts on during the fade)", ( initiating >= 0 ) && !orbitLines.Substring( initiating ).Contains( "Outside orbital range." ), ( initiating >= 0 ) ? orbitLines.Substring( initiating ) : orbitLines );
+
+		Check( "playthrough-2: Enter goes into orbit around planet 94", ( playerData.m_general.m_location == PD_General.Location.InOrbit ) && ( playerData.m_general.m_currentPlanetId == 94 ), playerData.m_general.m_location + " " + playerData.m_general.m_currentPlanetId );
+
+		// ---- 4. Science: Sensors, Analysis, Status
+		if ( PtIndexOf( "Bridge" ) >= 0 )
+		{
+			yield return PtPress( "Bridge" );
+		}
+
+		yield return PtPress( "Science" );
+		yield return PtPress( "Sensors" );
+
+		var sensors = controller.m_displayController.m_sensorsDisplay;
+		var scanEnd = Time.realtimeSinceStartup + 30.0f;
+
+		while ( ( Time.realtimeSinceStartup < scanEnd ) && !sensors.m_hasSensorData )
+		{
+			yield return null;
+		}
+
+		var scanTook = 30.0f - ( scanEnd - Time.realtimeSinceStartup );
+
+		yield return Frames( 10 );
+
+		Log( "playthrough-2: Sensors: data " + sensors.m_hasSensorData + " after " + scanTook.ToString( "F1" ) + " s, console " + PtLabels() + " running " + PtButtonRunning() + ", messages '" + PtMessages() + "'" );
+
+		if ( PtButtonRunning() )
+		{
+			yield return Tap( Key.Enter );
+			yield return Frames( 5 );
+		}
+
+		controller.m_messages.Clear();
+
+		yield return PtPress( "Analysis" );
+		yield return Frames( 5 );
+
+		var analysis = PtMessages();
+
+		Log( "playthrough-2: Analysis: '" + analysis + "'" );
+
+		Check( "playthrough-2: the sensors read planet 94 and the science officer analyses it", sensors.m_hasSensorData && ( analysis.Length > 40 ) && !analysis.Contains( "I need a current sensor reading" ), analysis );
+
+		yield return PtPress( "Status" );
+		yield return Frames( 5 );
+
+		Log( "playthrough-2: Status pressed, console " + PtLabels() + ", display " + controller.m_displayController.GetType().Name + ", exceptions so far " + s_exceptionCount );
+
+		PlaythroughSave( "location=" + playerData.m_general.m_location + " planet=" + playerData.m_general.m_currentPlanetId + " fuel=" + Endurium() );
+
+		Finish( "scenario=playthrough-2 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// gets the console to one of the bridge officers' menus (Command, Science, Navigation, Engineering, Communications, Medical)
+	IEnumerator PtOfficer( string officer )
+	{
+		if ( PtButtonRunning() )
+		{
+			yield return Tap( Key.Enter );
+			yield return Frames( 5 );
+		}
+
+		if ( PtIndexOf( officer ) < 0 )
+		{
+			if ( PtIndexOf( "Bridge" ) >= 0 )
+			{
+				yield return PtPress( "Bridge" );
+			}
+		}
+
+		yield return PtPress( officer );
+	}
+
+	// the deposits on the ground that have not been picked up, nearest first
+	static List<TerrainElement> PtDeposits( Vector3 from )
+	{
+		var list = new List<TerrainElement>();
+		var grid = SpaceflightController.m_instance.m_disembarked.m_terrainGrid;
+
+		if ( ( grid == null ) || ( grid.m_terrainElements == null ) )
+		{
+			return list;
+		}
+
+		foreach ( var deposit in grid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( false ) )
+		{
+			if ( deposit.m_volume > 0 )
+			{
+				list.Add( deposit );
+			}
+		}
+
+		list.Sort( ( a, b ) => Vector3.Distance( a.transform.position, from ).CompareTo( Vector3.Distance( b.transform.position, from ) ) );
+
+		return list;
+	}
+
+	// drives the terrain vehicle with Move running toward a place until it is within reach or the time is up (the Move button must be running)
+	IEnumerator PtDrive( Func<Vector3> target, float reach, float seconds, float[] driven )
+	{
+		var vehicle = SpaceflightController.m_instance.m_terrainVehicle.transform;
+		var end = Time.realtimeSinceStartup + seconds;
+		var last = vehicle.position;
+
+		driven[ 0 ] = 0.0f;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			var delta = target() - vehicle.position;
+
+			delta.y = 0.0f;
+
+			if ( delta.magnitude <= reach )
+			{
+				break;
+			}
+
+			HoldKeys( PtKeysToward( delta ) );
+
+			yield return null;
+
+			driven[ 0 ] += Vector3.Distance( last, vehicle.position );
+			last = vehicle.position;
+
+			if ( DataController.m_instance.m_playerData.m_terrainVehicle.GetPercentFuelRemaining() <= -3 )
+			{
+				Log( "playthrough: the terrain vehicle is out of fuel after " + driven[ 0 ].ToString( "F0" ) + " units of this drive; messages '" + PtMessages() + "'" );
+
+				break;
+			}
+		}
+
+		HoldKeys();
+
+		yield return Frames( 5 );
+	}
+
+	// the terrain vehicle's hold in words
+	static string PtVehicleHold()
+	{
+		var vehicle = DataController.m_instance.m_playerData.m_terrainVehicle;
+		var gameData = DataController.m_instance.m_gameData;
+		var text = "";
+
+		if ( vehicle.m_elementStorage != null )
+		{
+			foreach ( var element in vehicle.m_elementStorage.m_elementList )
+			{
+				text += gameData.m_elementList[ element.m_elementId ].m_name + " " + element.m_volume + ", ";
+			}
+		}
+
+		if ( vehicle.m_artifactStorage != null )
+		{
+			foreach ( var artifact in vehicle.m_artifactStorage.m_artifactList )
+			{
+				text += gameData.m_artifactList[ artifact.m_artifactId ].m_name + ", ";
+			}
+		}
+
+		return ( text == "" ) ? "empty" : text.TrimEnd( ' ', ',' );
+	}
+
+	// the ship's hold in words
+	static string PtShipHold()
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+		var gameData = DataController.m_instance.m_gameData;
+		var text = "";
+
+		foreach ( var element in ship.m_elementStorage.m_elementList )
+		{
+			text += gameData.m_elementList[ element.m_elementId ].m_name + " " + element.m_volume + ", ";
+		}
+
+		if ( ship.m_artifactStorage != null )
+		{
+			foreach ( var artifact in ship.m_artifactStorage.m_artifactList )
+			{
+				text += gameData.m_artifactList[ artifact.m_artifactId ].m_name + ", ";
+			}
+		}
+
+		return ( text == "" ) ? "empty" : text.TrimEnd( ' ', ',' );
+	}
+
+	// the volume of the ship's elements other than Endurium
+	static int PtMinerals()
+	{
+		var volume = 0;
+
+		foreach ( var element in DataController.m_instance.m_playerData.m_playerShip.m_elementStorage.m_elementList )
+		{
+			if ( element.m_elementId != 5 )
+			{
+				volume += element.m_volume;
+			}
+		}
+
+		return volume;
+	}
+
+	// lands at a site: Land, Select Site (the stick moves the crosshair to the site, Enter), Descend, and the 35 s landing
+	IEnumerator PtLand( float east, float north, bool[] landed )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		landed[ 0 ] = false;
+
+		yield return PtOfficer( "Command" );
+		yield return PtPress( "Land" );
+		yield return PtPress( "Select Site" );
+
+		// the stick moves the crosshair until it is on the site (east is the port's latitude field, north its longitude field)
+		var siteEnd = Time.realtimeSinceStartup + 20.0f;
+
+		while ( Time.realtimeSinceStartup < siteEnd )
+		{
+			var delta = new Vector3( east - playerData.m_general.m_selectedLatitude, 0.0f, north - playerData.m_general.m_selectedLongitude );
+
+			if ( ( Mathf.Abs( delta.x ) < 0.6f ) && ( Mathf.Abs( delta.z ) < 0.6f ) )
+			{
+				break;
+			}
+
+			var keys = new List<Key>();
+
+			if ( Mathf.Abs( delta.x ) >= 0.6f )
+			{
+				keys.Add( ( delta.x > 0.0f ) ? Key.RightArrow : Key.LeftArrow );
+			}
+
+			if ( Mathf.Abs( delta.z ) >= 0.6f )
+			{
+				keys.Add( ( delta.z > 0.0f ) ? Key.UpArrow : Key.DownArrow );
+			}
+
+			HoldKeys( keys.ToArray() );
+
+			yield return null;
+		}
+
+		HoldKeys();
+
+		yield return Frames( 3 );
+		yield return Tap( Key.Enter );
+		yield return Frames( 5 );
+
+		Log( "playthrough: the site chosen: latitude field " + playerData.m_general.m_selectedLatitude.ToString( "F1" ) + ", longitude field " + playerData.m_general.m_selectedLongitude.ToString( "F1" ) + ", map LAT '" + SpaceflightController.m_instance.m_displayController.m_terrainMapDisplay.m_latitudeText.text + "' LONG '" + SpaceflightController.m_instance.m_displayController.m_terrainMapDisplay.m_longitudeText.text + "', console " + PtLabels() );
+
+		var start = Time.realtimeSinceStartup;
+
+		yield return PtPress( "Descend" );
+		yield return WaitForLocation( PD_General.Location.Planetside, 60.0f );
+
+		var end = Time.realtimeSinceStartup + 30.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !PtMessages().Contains( "Safe landing" ) )
+		{
+			yield return null;
+		}
+
+		Log( "playthrough: landed after " + ( Time.realtimeSinceStartup - start ).ToString( "F1" ) + " s: " + playerData.m_general.m_location + ", messages '" + PtMessages() + "', console " + PtLabels() );
+
+		landed[ 0 ] = ( playerData.m_general.m_location == PD_General.Location.Planetside ) && PtMessages().Contains( "Safe landing" );
+	}
+
+	// goes out in the terrain vehicle with the Disembark button
+	IEnumerator PtDisembark( bool[] done )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		done[ 0 ] = false;
+
+		yield return PtOfficer( "Command" );
+		yield return PtPress( "Disembark" );
+		yield return WaitForLocation( PD_General.Location.Disembarked, 20.0f );
+		yield return Frames( 30 );
+
+		// the Disembark button runs on a while with its messages, and has the console until it is done
+		var end = Time.realtimeSinceStartup + 6.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( GetField( SpaceflightController.m_instance.m_buttonController, "m_currentButton" ) is DisembarkButton ) )
+		{
+			yield return null;
+		}
+
+		done[ 0 ] = playerData.m_general.m_location == PD_General.Location.Disembarked;
+
+		Log( "playthrough: disembarked " + done[ 0 ] + ": messages '" + PtMessages() + "', console " + PtLabels() + ", vehicle fuel " + playerData.m_terrainVehicle.GetPercentFuelRemaining() + "%, hold " + PtVehicleHold() );
+	}
+
+	// whether the last drive back to the ship needed the workaround for the Move button's distance
+	static bool s_ptMoveDistanceBug;
+
+	// drives back to the ship and goes in with Move and Enter
+	IEnumerator PtBackToTheShip( bool[] done )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var driven = new float[ 1 ];
+
+		done[ 0 ] = false;
+
+		Func<Vector3> shipPlace = () => controller.m_disembarked.ApplyElevation( Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude ), false );
+
+		if ( PtButtonRunning() && ( PtIndexOf( "Move" ) < 0 ) )
+		{
+			yield return Tap( Key.Enter );
+			yield return Frames( 5 );
+		}
+
+		if ( !( GetField( controller.m_buttonController, "m_currentButton" ) is MoveButton ) )
+		{
+			yield return PtPress( "Move" );
+		}
+
+		// within 2 km of the ship (2048 units are 225 km)
+		yield return PtDrive( shipPlace, 12.0f, 25.0f, driven );
+
+		Log( "playthrough: drove " + driven[ 0 ].ToString( "F0" ) + " units back toward the ship, " + Vector3.Distance( controller.m_terrainVehicle.transform.position, shipPlace() ).ToString( "F0" ) + " from it" );
+
+		var current = GetField( controller.m_buttonController, "m_currentButton" );
+		var kmToShip = ( shipPlace() - playerData.m_general.m_lastDisembarkedCoordinates ).magnitude * 225.0f / 2048.0f - 2.0f;
+
+		Log( "playthrough: before Enter: running " + ( ( current == null ) ? "nothing" : current.GetType().Name ) + ", the Move button's distance to the ship " + kmToShip.ToString( "F2" ) + " km (last disembarked coordinates " + playerData.m_general.m_lastDisembarkedCoordinates + ", vehicle " + controller.m_terrainVehicle.transform.position + ", ship " + shipPlace() + "), activating " + GetField( controller.m_buttonController, "m_activatingButton" ) );
+
+		// the game's bug: the Move button measures to the ship in three dimensions, from the vehicle's saved place (which has no height since PR 207) to the
+		// ship on the ground, so on high ground the vehicle is never close enough to go in. The workaround gives the saved place the ship's height, so that the
+		// real Move button and its Enter can be used
+		var flatKm = new Vector3( shipPlace().x - playerData.m_general.m_lastDisembarkedCoordinates.x, 0.0f, shipPlace().z - playerData.m_general.m_lastDisembarkedCoordinates.z ).magnitude * 225.0f / 2048.0f - 2.0f;
+
+		s_ptMoveDistanceBug = ( kmToShip > 0.0f ) && ( flatKm <= 0.0f );
+
+		if ( s_ptMoveDistanceBug )
+		{
+			Log( "playthrough: GAME BUG the vehicle is " + ( flatKm + 2.0f ).ToString( "F2" ) + " km from the ship along the ground but the Move button counts " + ( kmToShip + 2.0f ).ToString( "F2" ) + " km with the height; WORKAROUND the saved place is given the ship's height" );
+
+			var coordinates = playerData.m_general.m_lastDisembarkedCoordinates;
+
+			coordinates.y = shipPlace().y;
+
+			playerData.m_general.m_lastDisembarkedCoordinates = coordinates;
+		}
+
+		yield return Tap( Key.Enter );
+		yield return WaitForLocation( PD_General.Location.Planetside, 10.0f );
+		yield return Frames( 20 );
+
+		done[ 0 ] = playerData.m_general.m_location == PD_General.Location.Planetside;
+
+		Log( "playthrough: back in the ship " + done[ 0 ] + ": messages '" + PtMessages() + "', ship's hold " + PtShipHold() + ", vehicle " + PtVehicleHold() + ", console " + PtLabels() );
+	}
+
+	// stage 3: in orbit around planet 94. Land with Select Site and Descend, Disembark, Scan, drive to deposits and take them with Cargo, drive back, go in
+	IEnumerator ScenarioPlaythrough3()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var done = new bool[ 1 ];
+
+		ProbeKeyboard();
+
+		Log( "playthrough-3: loaded: location " + playerData.m_general.m_location + " planet " + playerData.m_general.m_currentPlanetId + ", console " + PtLabels() + ", messages '" + PtMessages() + "', hold " + PtShipHold() );
+
+		Check( "playthrough-3: the save of stage 2 is loaded in orbit around planet 94", ( playerData.m_general.m_location == PD_General.Location.InOrbit ) && ( playerData.m_general.m_currentPlanetId == 94 ), playerData.m_general.m_location + " " + playerData.m_general.m_currentPlanetId );
+
+		yield return PtWaitForPlanets( 30.0f );
+
+		// ---- 1. land
+		yield return PtLand( 4.3f, -16.0f, done );
+
+		Check( "playthrough-3: Land, Select Site and Descend put the ship down on planet 94 with Safe landing, captain", done[ 0 ], playerData.m_general.m_location + ": " + PtMessages() );
+
+		if ( !done[ 0 ] )
+		{
+			PlaythroughSave( "landing failed" );
+			Finish( "scenario=playthrough-3 abort: no landing", 2 );
+			yield break;
+		}
+
+		// ---- 2. disembark
+		yield return PtDisembark( done );
+
+		Check( "playthrough-3: Disembark puts the crew in the terrain vehicle", done[ 0 ], playerData.m_general.m_location.ToString() );
+
+		if ( !done[ 0 ] )
+		{
+			PlaythroughSave( "disembark failed" );
+			Finish( "scenario=playthrough-3 abort: no disembark", 2 );
+			yield break;
+		}
+
+		// the vehicle comes out with Move running: Enter stops it, then Scan
+		if ( GetField( controller.m_buttonController, "m_currentButton" ) is MoveButton )
+		{
+			yield return Tap( Key.Enter );
+			yield return Frames( 5 );
+		}
+
+		controller.m_messages.Clear();
+
+		yield return PtPress( "Scan" );
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		Log( "playthrough-3: Scan: '" + PtMessages() + "', console " + PtLabels() );
+
+		if ( PtButtonRunning() )
+		{
+			yield return Tap( Key.Enter );
+			yield return Frames( 5 );
+		}
+
+		// ---- 3. drive to the nearest deposits and take them
+		var vehicle = controller.m_terrainVehicle;
+
+		// where the deposits of the planet are: the nearest few, and the place with the most of them within 150 (for choosing the landing site)
+		{
+			var all = PtDeposits( vehicle.transform.position );
+			var nearest = "";
+
+			for ( var i = 0; ( i < 5 ) && ( i < all.Count ); i++ )
+			{
+				float x, z;
+
+				Tools.WorldToLatLongCoordinates( all[ i ].transform.position, out x, out z );
+
+				nearest += all[ i ].GetElementName() + " " + Vector3.Distance( all[ i ].transform.position, vehicle.transform.position ).ToString( "F0" ) + " at " + z.ToString( "F1" ) + "N " + x.ToString( "F1" ) + "E; ";
+			}
+
+			var best = 0;
+			var bestAt = Vector3.zero;
+
+			foreach ( var a in all )
+			{
+				var count = 0;
+
+				foreach ( var b in all )
+				{
+					if ( Vector3.Distance( a.transform.position, b.transform.position ) < 150.0f )
+					{
+						count++;
+					}
+				}
+
+				if ( count > best )
+				{
+					best = count;
+					bestAt = a.transform.position;
+				}
+			}
+
+			float bx, bz;
+
+			Tools.WorldToLatLongCoordinates( bestAt, out bx, out bz );
+
+			Log( "playthrough-3: planet 94 has " + all.Count + " deposits; the vehicle is at " + vehicle.transform.position + "; the nearest: " + nearest + "the most within 150: " + best + " around " + bestAt + " = " + bz.ToString( "F1" ) + "N " + bx.ToString( "F1" ) + "E; vehicle fuel efficiency " + vehicle.GetFuelEfficiency().ToString( "F3" ) + ", weather efficiency " + PlanetWeather.GetEfficiency() );
+		}
+		var driven = new float[ 1 ];
+		var taken = 0;
+		var miningEnd = Time.realtimeSinceStartup + 35.0f;
+		var takenText = new List<string>();
+		var startPlace = vehicle.transform.position;
+
+		while ( ( Time.realtimeSinceStartup < miningEnd ) && ( taken < 4 ) )
+		{
+			var deposits = PtDeposits( vehicle.transform.position );
+
+			if ( deposits.Count == 0 )
+			{
+				break;
+			}
+
+			var deposit = deposits[ 0 ];
+
+			if ( !( GetField( controller.m_buttonController, "m_currentButton" ) is MoveButton ) )
+			{
+				yield return PtPress( "Move" );
+			}
+
+			yield return PtDrive( () => deposit.transform.position, 7.5f, 10.0f, driven );
+
+			// stop, and Cargo
+			yield return Tap( Key.Enter );
+			yield return Frames( 5 );
+
+			var holdBefore = playerData.m_terrainVehicle.GetRemainingVolume();
+			var distance = Vector3.Distance( vehicle.transform.position, deposit.transform.position );
+
+			controller.m_messages.Clear();
+
+			yield return PtPress( "Cargo" );
+			yield return Frames( 5 );
+
+			var said = PtMessages();
+
+			takenText.Add( said );
+
+			Log( "playthrough-3: drove " + driven[ 0 ].ToString( "F0" ) + " to a deposit of " + deposit.GetElementName() + " (" + deposit.m_volume + "), " + distance.ToString( "F1" ) + " away: Cargo says '" + said + "', the hold had " + holdBefore + " left, now " + playerData.m_terrainVehicle.GetRemainingVolume() + ", console " + PtLabels() );
+
+			if ( playerData.m_terrainVehicle.GetRemainingVolume() < holdBefore )
+			{
+				taken++;
+			}
+			else if ( PtIndexOf( "Next" ) >= 0 )
+			{
+				// the cargo list came up: back to the vehicle's buttons
+				yield return PtPress( "Back" );
+			}
+
+			yield return new WaitForSecondsRealtime( 0.5f );
+		}
+
+		var vehicleHold = PtVehicleHold();
+		var vehicleVolume = playerData.m_terrainVehicle.m_volumeUsed;
+
+		Log( "playthrough-3: " + taken + " deposits taken, " + Vector3.Distance( startPlace, vehicle.transform.position ).ToString( "F0" ) + " from where the vehicle started; the terrain vehicle's hold: " + vehicleHold + " (" + vehicleVolume + " tenths), fuel " + playerData.m_terrainVehicle.GetPercentFuelRemaining() + "%" );
+
+		Check( "playthrough-3: the terrain vehicle drives to deposits and Cargo takes them", taken >= 2, taken + " taken: " + string.Join( " || ", takenText ) );
+
+		// ---- 4. back to the ship: the cargo goes into the ship's hold
+		var mineralsBefore = PtMinerals();
+
+		yield return PtBackToTheShip( done );
+
+		var mineralsAfter = PtMinerals();
+
+		Check( "playthrough-3: Move and Enter beside the ship take the vehicle in without help (no workaround for the distance to the ship)", !s_ptMoveDistanceBug, s_ptMoveDistanceBug ? "the Move button counted the ground's height as distance" : "" );
+		Check( "playthrough-3: back in the ship, the terrain vehicle's cargo is in the ship's hold", done[ 0 ] && ( mineralsAfter - mineralsBefore == vehicleVolume ) && ( playerData.m_terrainVehicle.m_volumeUsed == 0 ), done[ 0 ] + ", " + mineralsBefore + " -> " + mineralsAfter + " (vehicle had " + vehicleVolume + ")" );
+
+		PlaythroughSave( "location=" + playerData.m_general.m_location + " minerals=" + PtMinerals() + " hold=" + PtShipHold() );
+
+		Finish( "scenario=playthrough-3 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// launches from a planet's surface: Command, Launch, Yes, and the launch into orbit
+	IEnumerator PtLaunchFromPlanet( bool[] done )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		done[ 0 ] = false;
+
+		yield return PtOfficer( "Command" );
+		yield return PtPress( "Launch" );
+
+		var asked = PtMessages();
+
+		yield return PtPress( "Yes" );
+
+		var start = Time.realtimeSinceStartup;
+
+		yield return WaitForLocation( PD_General.Location.InOrbit, 60.0f );
+
+		var inOrbitAfter = Time.realtimeSinceStartup - start;
+
+		// the launch animation goes on in orbit, and the console is the launch's until it is over
+		var end = Time.realtimeSinceStartup + 30.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && SpaceflightController.m_instance.m_playerCamera.IsLaunchingOrLanding() )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 10 );
+
+		Log( "playthrough: in orbit " + inOrbitAfter.ToString( "F1" ) + " s after Yes, the launch animation over after " + ( Time.realtimeSinceStartup - start ).ToString( "F1" ) + " s" );
+
+		done[ 0 ] = playerData.m_general.m_location == PD_General.Location.InOrbit;
+
+		Log( "playthrough: launch from the surface ('" + asked + "'): " + playerData.m_general.m_location + " after " + ( Time.realtimeSinceStartup - start ).ToString( "F1" ) + " s, messages '" + PtMessages() + "', console " + PtLabels() );
+	}
+
+	// leaves orbit with Maneuver (Leaving orbit..., the fade, ...Commencing system travel)
+	IEnumerator PtLeaveOrbit( bool[] done )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		done[ 0 ] = false;
+
+		yield return PtManeuver();
+		yield return WaitForLocation( PD_General.Location.StarSystem, 10.0f );
+		yield return Frames( 10 );
+
+		done[ 0 ] = playerData.m_general.m_location == PD_General.Location.StarSystem;
+
+		Log( "playthrough: leaving orbit: " + playerData.m_general.m_location + ", messages '" + PtMessages() + "', console " + PtLabels() + " running " + PtButtonRunning() );
+	}
+
+	// flies to a planet of the star system and goes into orbit with Enter (or docks, at Arth) - Maneuver must be running
+	IEnumerator PtFlyToPlanetAndEnter( int planetId, PD_General.Location expected, bool[] done )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var flown = new float[ 1 ];
+
+		done[ 0 ] = false;
+
+		yield return PtWaitForPlanets( 30.0f );
+
+		var planet = controller.m_starSystem.GetPlanetController( planetId );
+
+		if ( planet == null )
+		{
+			Log( "playthrough: planet " + planetId + " is not in the star system" );
+
+			yield break;
+		}
+
+		if ( !PtButtonRunning() )
+		{
+			yield return PtManeuver();
+		}
+
+		yield return PtFly( () => planet.transform.position, () => ( controller.m_starSystem.m_planetToOrbitId == planetId ) || ( playerData.m_general.m_location != PD_General.Location.StarSystem ), 25.0f, flown );
+
+		Log( "playthrough: flew " + flown[ 0 ].ToString( "F0" ) + " units to planet " + planetId + ": over it " + ( controller.m_starSystem.m_planetToOrbitId == planetId ) + ", location " + playerData.m_general.m_location + ", messages '" + PtMessages() + "'" );
+
+		if ( playerData.m_general.m_location != PD_General.Location.StarSystem )
+		{
+			yield break;
+		}
+
+		if ( controller.m_starSystem.m_planetToOrbitId != planetId )
+		{
+			Log( "playthrough: SHORTCUT the ship is put beside planet " + planetId + " to save travel time" );
+
+			PlaceShipInTheSystem( planet.transform.position + Vector3.back * 30.0f );
+
+			yield return PtFly( () => planet.transform.position, () => controller.m_starSystem.m_planetToOrbitId == planetId, 10.0f, flown );
+		}
+
+		yield return Tap( Key.Enter );
+		yield return WaitForLocation( expected, 20.0f );
+		yield return Frames( 20 );
+
+		done[ 0 ] = playerData.m_general.m_location == expected;
+
+		Log( "playthrough: Enter over planet " + planetId + ": " + playerData.m_general.m_location + ", messages '" + PtMessages() + "', console " + PtLabels() );
+	}
+
+	// waits for a scene by the clock (a scene fade takes seconds, and headless frames are short)
+	static IEnumerator PtWaitForScene( string sceneName, float seconds )
+	{
+		var end = Time.realtimeSinceStartup + seconds;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( SceneManager.GetActiveScene().name != sceneName ) )
+		{
+			yield return null;
+		}
+	}
+
+	// stage 4: on the surface of planet 94 with the minerals. Launch, leave orbit, fly to Arth, dock, and go into the Starport
+	IEnumerator ScenarioPlaythrough4()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var done = new bool[ 1 ];
+
+		ProbeKeyboard();
+
+		Log( "playthrough-4: loaded: location " + playerData.m_general.m_location + " planet " + playerData.m_general.m_currentPlanetId + ", hold " + PtShipHold() + ", console " + PtLabels() + ", messages '" + PtMessages() + "'" );
+
+		Check( "playthrough-4: the save of stage 3 is on planet 94 with the minerals in the ship's hold", ( playerData.m_general.m_location == PD_General.Location.Planetside ) && ( PtMinerals() == 130 ), playerData.m_general.m_location + ", " + PtMinerals() );
+
+		yield return PtWaitForPlanets( 30.0f );
+
+		// ---- 1. launch
+		yield return PtLaunchFromPlanet( done );
+
+		Check( "playthrough-4: Launch and Yes from the surface take the ship up into orbit", done[ 0 ], playerData.m_general.m_location.ToString() );
+
+		// ---- 2. leave orbit, fly to Arth, dock
+		yield return PtLeaveOrbit( done );
+
+		Check( "playthrough-4: Maneuver leaves orbit", done[ 0 ], playerData.m_general.m_location.ToString() );
+
+		var fuelBefore = Endurium();
+
+		yield return PtFlyToPlanetAndEnter( gameData.m_misc.m_arthPlanetId, PD_General.Location.DockingBay, done );
+
+		Check( "playthrough-4: flying to Arth and Enter dock the ship at the Starport", done[ 0 ], playerData.m_general.m_location + ": " + PtMessages() );
+
+		Log( "playthrough-4: fuel " + fuelBefore + " -> " + Endurium() + " in the star system" );
+
+		if ( !done[ 0 ] )
+		{
+			PlaythroughSave( "no docking" );
+			Finish( "scenario=playthrough-4 abort: no docking", 2 );
+			yield break;
+		}
+
+		// the docking animation, then Disembark into the Starport
+		var dockEnd = Time.realtimeSinceStartup + 30.0f;
+
+		while ( ( Time.realtimeSinceStartup < dockEnd ) && SpaceflightController.m_instance.m_playerCamera.IsLaunchingOrLanding() )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 10 );
+
+		Log( "playthrough-4: docked: messages '" + PtMessages() + "', console " + PtLabels() );
+
+		yield return PtOfficer( "Command" );
+		yield return PtPress( "Disembark" );
+		yield return PtWaitForScene( "Starport", 20.0f );
+		yield return Frames( 60 );
+
+		Log( "playthrough-4: in the Starport: location " + DataController.m_instance.m_playerData.m_general.m_location + ", scene " + SceneManager.GetActiveScene().name );
+
+		Check( "playthrough-4: Disembark in the docking bay goes into the Starport", ( SceneManager.GetActiveScene().name == "Starport" ) && ( DataController.m_instance.m_playerData.m_general.m_location == PD_General.Location.Starport ), SceneManager.GetActiveScene().name + " " + DataController.m_instance.m_playerData.m_general.m_location );
+
+		PlaythroughSave( "location=" + DataController.m_instance.m_playerData.m_general.m_location + " hold=" + PtShipHold() );
+
+		Finish( "scenario=playthrough-4 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the index in the Trade Depot's list of the item of this type (0 element, 1 artifact) and id, -1 if it is not there
+	static int PtDepotIndex( TradeDepotPanel depot, int type, int id )
+	{
+		var items = GetField( depot, "m_itemList" ) as IList;
+
+		for ( var i = 0; ( items != null ) && ( i < items.Count ); i++ )
+		{
+			if ( ( (int) GetField( items[ i ], "m_type" ) == type ) && ( (int) GetField( items[ i ], "m_id" ) == id ) )
+			{
+				return i;
+			}
+		}
+
+		return -1;
+	}
+
+	// moves the Trade Depot's selection to an item with the stick
+	IEnumerator PtDepotSelect( TradeDepotPanel depot, int index )
+	{
+		for ( var guard = 0; guard < 30; guard++ )
+		{
+			var current = (int) GetField( depot, "m_currentItemIndex" );
+
+			if ( current == index )
+			{
+				break;
+			}
+
+			yield return Tap( ( current < index ) ? Key.DownArrow : Key.UpArrow );
+		}
+	}
+
+	// sells (or buys) an amount of an element at the Trade Depot: the stick to it, Enter, the amount typed - gives back the change in the balance
+	IEnumerator PtDepotTrade( TradeDepotPanel depot, bool buy, int elementId, string amount, int[] change )
+	{
+		var bank = DataController.m_instance.m_playerData.m_bank;
+		var before = bank.m_currentBalance;
+
+		change[ 0 ] = 0;
+
+		if ( buy )
+		{
+			PanelCall( "BuyClicked", () => depot.BuyClicked() );
+		}
+		else
+		{
+			PanelCall( "SellClicked", () => depot.SellClicked() );
+		}
+
+		yield return Frames( 3 );
+
+		var index = PtDepotIndex( depot, 0, elementId );
+
+		if ( index < 0 )
+		{
+			Log( "playthrough: element " + elementId + " is not in the Trade Depot's " + ( buy ? "buy" : "sell" ) + " list" );
+
+			yield return Tap( Key.Escape );
+			yield break;
+		}
+
+		yield return PtDepotSelect( depot, index );
+		yield return Tap( Key.Enter );
+
+		depot.m_amountInputField.text = amount;
+
+		PanelCall( "OnEndEdit", () => depot.OnEndEdit() );
+
+		yield return Frames( 3 );
+
+		var state = GetField( depot, "m_currentState" ).ToString();
+
+		if ( state == "ErrorMessage" )
+		{
+			Log( "playthrough: the Trade Depot says '" + PtText( depot.m_errorMessageText ) + "'" );
+
+			yield return Tap( Key.Enter );
+		}
+
+		yield return Tap( Key.Escape );
+
+		change[ 0 ] = bank.m_currentBalance - before;
+	}
+
+	// stage 5: at the Starport after the mining trip. The Trade Depot sells the minerals at their prices and sells fuel, the Whining Orb is analysed, the
+	// ledger books it, Operations, then the docking bay and aboard
+	IEnumerator ScenarioPlaythrough5()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var bank = playerData.m_bank;
+		var ship = playerData.m_playerShip;
+		var change = new int[ 1 ];
+
+		ProbeKeyboard();
+
+		Log( "playthrough-5: loaded at the Starport: location " + playerData.m_general.m_location + ", hold " + PtShipHold() + ", balance " + bank.m_currentBalance + ", stardate " + playerData.m_general.m_currentStardateYMD + ", armor " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() + ", shields " + ship.m_shieldPoints );
+
+		Check( "playthrough-5: the save of stage 4 loads at the Starport with the minerals", ( playerData.m_general.m_location == PD_General.Location.Starport ) && ( PtMinerals() == 130 ), playerData.m_general.m_location + ", " + PtMinerals() );
+
+		// ---- 1. the Trade Depot: sell every mineral, buy 195 cubic meters of fuel
+		var depot = FindPanel<TradeDepotPanel>();
+		var ledgerBefore = bank.m_transactionList.Count;
+		var depotBalanceBefore = bank.m_currentBalance;
+
+		yield return OpenPanel( depot, "trade depot" );
+
+		PanelCall( "SellClicked", () => depot.SellClicked() );
+
+		yield return Frames( 3 );
+
+		var sellList = PtText( depot.m_itemListText ) + " | values " + PtText( depot.m_unitValueListText ) + " | volumes " + PtText( depot.m_volumeListText );
+
+		yield return Tap( Key.Escape );
+
+		Log( "playthrough-5: the sell list: " + sellList );
+
+		var expected = 0;
+		var got = 0;
+		var sold = "";
+
+		foreach ( var element in new List<PD_ElementReference>( ship.m_elementStorage.m_elementList ) )
+		{
+			if ( element.m_elementId == 5 )
+			{
+				continue;
+			}
+
+			var volume = element.m_volume;
+			var value = gameData.m_elementList[ element.m_elementId ].GetActualValue() * volume / 10;
+
+			yield return PtDepotTrade( depot, false, element.m_elementId, ( volume / 10.0f ).ToString( "F1", System.Globalization.CultureInfo.InvariantCulture ), change );
+
+			expected += value;
+			got += change[ 0 ];
+			sold += gameData.m_elementList[ element.m_elementId ].m_name + " " + volume + " for " + change[ 0 ] + " (" + value + " expected); ";
+		}
+
+		Log( "playthrough-5: sold " + sold + "the hold now " + PtShipHold() );
+
+		Check( "playthrough-5: the Trade Depot pays for the minerals what they are worth, and they leave the hold", ( got == expected ) && ( got > 0 ) && ( PtMinerals() == 0 ), got + " paid, " + expected + " expected, minerals left " + PtMinerals() );
+
+		var fuelBefore = Endurium();
+
+		// enough for the whole journey (about 650 coordinates of hyperspace at 0.32 cubic meters each with class 3 engines)
+		yield return PtDepotTrade( depot, true, 5, "195", change );
+
+		Log( "playthrough-5: bought 195 cubic meters of fuel for " + ( -change[ 0 ] ) + ": " + fuelBefore + " -> " + Endurium() + ", hold " + ship.m_volumeUsed + "/" + ship.m_volume );
+
+		Check( "playthrough-5: 195 cubic meters of fuel go into the hold", Endurium() - fuelBefore == 1950, ( Endurium() - fuelBefore ).ToString() );
+
+		// the analysis of the Whining Orb (500 MU)
+		PanelCall( "AnalyzeClicked", () => depot.AnalyzeClicked() );
+
+		yield return Frames( 3 );
+
+		var orbIndex = PtDepotIndex( depot, 1, gameData.FindArtifactId( "Whining Orb" ) );
+		var beforeAnalysis = bank.m_currentBalance;
+		var analysis = "";
+
+		if ( orbIndex >= 0 )
+		{
+			yield return PtDepotSelect( depot, orbIndex );
+			yield return Tap( Key.Enter );
+			yield return Frames( 3 );
+
+			var confirmState = GetField( depot, "m_currentState" ).ToString();
+
+			PanelCall( "YesClicked", () => depot.YesClicked() );
+
+			yield return Frames( 3 );
+
+			analysis = confirmState + " -> " + GetField( depot, "m_currentState" ) + ": " + PtText( depot.m_analyzeText );
+
+			yield return Tap( Key.Enter );
+		}
+
+		yield return Tap( Key.Escape );
+
+		Log( "playthrough-5: the analysis of the Whining Orb (item " + orbIndex + ") cost " + ( beforeAnalysis - bank.m_currentBalance ) + ": " + Head( analysis ) );
+
+		Check( "playthrough-5: the Trade Depot analyses the Whining Orb for 500 MU", ( beforeAnalysis - bank.m_currentBalance == 500 ) && ( analysis.Length > 40 ), ( beforeAnalysis - bank.m_currentBalance ) + ": " + Head( analysis ) );
+
+		yield return ClosePanel( depot, "trade depot" );
+
+		var depotChange = bank.m_currentBalance - depotBalanceBefore;
+		var lastRow = ( bank.m_transactionList.Count > ledgerBefore ) ? bank.m_transactionList[ bank.m_transactionList.Count - 1 ] : null;
+		var lastText = ( lastRow == null ) ? "none" : lastRow.m_stardate + " " + lastRow.m_description + " " + lastRow.m_amount;
+
+		Log( "playthrough-5: the Trade Depot changed the balance by " + depotChange + "; the ledger's new rows: " + ( bank.m_transactionList.Count - ledgerBefore ) + ", the last '" + lastText + "'" );
+
+		Check( "playthrough-5: the ledger books the Trade Depot's net change", ( lastRow != null ) && lastRow.m_amount.Trim() == ( Math.Abs( depotChange ) + ( ( depotChange >= 0 ) ? "+" : "-" ) ), lastText + " vs " + depotChange );
+
+		// ---- 2. Operations: the notices since the last visit, the evaluation
+		var operations = FindPanel<OperationsPanel>();
+
+		yield return OpenPanel( operations, "operations" );
+
+		PanelCall( "NoticesClicked", () => operations.NoticesClicked() );
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		var notices = PtText( operations.m_messageText );
+		var asking = operations.IsAskingToRepeat();
+
+		PanelCall( "QuitClicked", () => operations.QuitClicked() );
+		PanelCall( "EvaluationClicked", () => operations.EvaluationClicked() );
+
+		yield return Frames( 3 );
+
+		var evaluation = "";
+
+		foreach ( var text in operations.m_evaluationGameObject.GetComponentsInChildren<TMPro.TextMeshProUGUI>() )
+		{
+			evaluation += PtText( text ) + " | ";
+		}
+
+		PanelCall( "QuitClicked", () => operations.QuitClicked() );
+
+		yield return ClosePanel( operations, "operations" );
+
+		Log( "playthrough-5: Operations: notices '" + Head( notices ) + "' (asking to repeat " + asking + "), evaluation '" + evaluation + "'" );
+
+		Check( "playthrough-5: Operations has no new notice on the same day and asks to repeat the last", asking && notices.Contains( "No new notices" ), notices );
+
+		// ---- 3. Ship Configuration: Repair says the ship needs none
+		var shipConfiguration = FindPanel<ShipConfigurationPanel>();
+
+		yield return OpenPanel( shipConfiguration, "ship configuration" );
+
+		PanelCall( "RepairClicked", () => shipConfiguration.RepairClicked() );
+
+		yield return Frames( 3 );
+
+		var repair = PtText( shipConfiguration.m_errorMessageText );
+
+		yield return Tap( Key.Enter );
+		yield return ClosePanel( shipConfiguration, "ship configuration" );
+
+		Log( "playthrough-5: Repair: '" + repair + "'" );
+
+		// ---- 4. aboard again
+		var dockingBay = FindPanel<DockingBayPanel>();
+
+		yield return OpenPanel( dockingBay, "docking bay" );
+
+		Check( "playthrough-5: the preflight check passes again", dockingBay.IsTransporting(), PreflightText( dockingBay ) );
+
+		yield return PtWaitForScene( "Spaceflight", 20.0f );
+
+		var waited = Time.realtimeSinceStartup;
+
+		while ( ( ( SpaceflightController.m_instance == null ) || SpaceflightController.m_instance.m_starSystem.GeneratingPlanets() ) && ( Time.realtimeSinceStartup - waited < 30.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 30 );
+
+		Check( "playthrough-5: the crew is aboard in the docking bay", DataController.m_instance.m_playerData.m_general.m_location == PD_General.Location.DockingBay, DataController.m_instance.m_playerData.m_general.m_location.ToString() );
+
+		PlaythroughSave( "location=" + DataController.m_instance.m_playerData.m_general.m_location + " balance=" + bank.m_currentBalance + " fuel=" + Endurium() );
+
+		Finish( "scenario=playthrough-5 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// what the playthrough has met on the way: encounters and how they ended
+	static readonly List<string> s_ptEncounters = new List<string>();
+
+	// the race and ships of the encounter the ship is in
+	static string PtEncounterText()
+	{
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var playerData = DataController.m_instance.m_playerData;
+		var gdEncounter = DataController.m_instance.m_gameData.m_encounterList[ playerData.m_general.m_currentEncounterId ];
+		var living = 0;
+
+		if ( encounter.m_pdEncounter != null )
+		{
+			foreach ( var ship in encounter.m_pdEncounter.GetAlienShipList() )
+			{
+				if ( !ship.m_isDead && ship.m_addedToEncounter )
+				{
+					living++;
+				}
+			}
+		}
+
+		return "encounter " + playerData.m_general.m_currentEncounterId + " (" + gdEncounter.m_race + ", " + living + " ships here, stance " + ( ( encounter.m_pdEncounter == null ) ? "-" : encounter.m_pdEncounter.m_alienStance.ToString() ) + ")";
+	}
+
+	// flies out of an encounter: the stick away from the middle for a few seconds, then the rest of the way is skipped (the way out is 4096 units)
+	IEnumerator PtFlyOutOfEncounter( float realSeconds )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var flown = new float[ 1 ];
+
+		yield return PtManeuver();
+		yield return PtFly( () => playerData.m_general.m_coordinates.normalized * 10000.0f + ( ( playerData.m_general.m_coordinates.magnitude < 1.0f ) ? Vector3.forward * 10000.0f : Vector3.zero ), () => playerData.m_general.m_location != PD_General.Location.Encounter, realSeconds, flown );
+
+		if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+		{
+			Log( "playthrough: SHORTCUT flew " + flown[ 0 ].ToString( "F0" ) + " of the 4096 units out of the encounter; the rest is skipped" );
+
+			var direction = ( playerData.m_general.m_coordinates.magnitude < 1.0f ) ? Vector3.forward : playerData.m_general.m_coordinates.normalized;
+
+			playerData.m_general.m_coordinates = direction * 4100.0f;
+			SpaceflightController.m_instance.m_playerShip.transform.position = playerData.m_general.m_coordinates;
+
+			yield return Frames( 10 );
+		}
+
+		Log( "playthrough: out of the encounter: " + playerData.m_general.m_location + ", messages '" + PtMessages() + "'" );
+	}
+
+	// fights an encounter: shields up, weapons armed, Combat, Target and the lasers (and missiles) until every ship that came is destroyed or the time is up
+	IEnumerator PtFight( float seconds, int[] result )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var encounter = controller.m_encounter;
+		var ship = playerData.m_playerShip;
+		var shots = 0;
+		var armorBefore = ship.m_armorPoints;
+		var fuelBefore = Endurium();
+		var retargets = 0;
+		var outOfRange = 0;
+		var shotLog = new List<string>();
+
+		result[ 0 ] = 0;
+
+		if ( PtIndexOf( "Target" ) < 0 )
+		{
+			yield return PtOfficer( "Navigation" );
+		}
+
+		if ( !ship.m_shieldsAreUp && ( PtIndexOf( "Raise Shields" ) >= 0 ) )
+		{
+			yield return PtPress( "Raise Shields" );
+		}
+
+		if ( !ship.m_weaponsAreArmed && ( PtIndexOf( "Arm Weapon" ) >= 0 ) )
+		{
+			yield return PtPress( "Arm Weapon" );
+		}
+
+		Log( "playthrough: before the fight: shields up " + ship.m_shieldsAreUp + " (" + ship.m_shieldPoints + "), weapons armed " + ship.m_weaponsAreArmed + ", console " + PtLabels() + ", messages '" + PtMessages() + "'" );
+
+		if ( PtIndexOf( "Target" ) < 0 )
+		{
+			yield return PtPress( "Combat" );
+		}
+
+		var end = Time.realtimeSinceStartup + seconds;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( playerData.m_general.m_location == PD_General.Location.Encounter ) && !CombatController.m_instance.PlayerIsDestroyed() )
+		{
+			// a captain breaks off a fight that is being lost: the shields are gone and the hull is down to half
+			if ( ( ship.m_shieldPoints <= 0 ) && ( ship.m_armorPoints < ship.GetMaximumArmorPoints() / 2 ) )
+			{
+				Log( "playthrough: the fight is broken off: shields " + ship.m_shieldPoints + ", armor " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() );
+
+				break;
+			}
+
+			var target = CombatController.m_instance.GetTargetIndex();
+			var targetShip = ( target < 0 ) ? null : encounter.m_pdEncounter.GetAlienShipList()[ target ];
+
+			if ( ( targetShip == null ) || targetShip.m_isDead )
+			{
+				yield return PtPress( "Target" );
+
+				target = CombatController.m_instance.GetTargetIndex();
+
+				if ( target < 0 )
+				{
+					// nothing to aim at (all destroyed, or none came close yet)
+					if ( (bool) Call( encounter, "AllEnemyShipsDestroyed" ) )
+					{
+						break;
+					}
+
+					yield return new WaitForSecondsRealtime( 0.5f );
+
+					continue;
+				}
+			}
+
+			// a target out of laser range (800): Target picks the next one, as a player does when the game says it is out of range
+			var targetDistance = Vector3.Distance( encounter.m_pdEncounter.GetAlienShipList()[ target ].m_coordinates, playerData.m_general.m_coordinates );
+
+			// nothing in reach of the missiles either (1500): wait for them to come
+			if ( ( targetDistance > 1500.0f ) && ( retargets >= 3 ) )
+			{
+				retargets = 0;
+
+				yield return new WaitForSecondsRealtime( 0.5f );
+
+				continue;
+			}
+
+			if ( ( targetDistance > 800.0f ) && ( retargets < 3 ) )
+			{
+				retargets++;
+				outOfRange++;
+
+				yield return PtPress( "Target" );
+
+				continue;
+			}
+
+			retargets = 0;
+
+			var weapon = ( ( ( shots % 3 ) == 2 ) || ( targetDistance > 800.0f ) ) && ( ship.m_missileLauncherClass > 0 ) ? "Missile" : "Laser";
+
+			yield return PtPress( weapon );
+
+			shotLog.Add( weapon + "@" + targetDistance.ToString( "F0" ) );
+
+			shots++;
+
+			yield return new WaitForSecondsRealtime( 0.3f );
+		}
+
+		var destroyed = 0;
+		var total = 0;
+
+		var points = "";
+
+		foreach ( var alien in encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			if ( alien.m_addedToEncounter )
+			{
+				total++;
+				points += alien.m_armorPoints + "+" + alien.m_shieldPoints + " ";
+			}
+
+			if ( alien.m_isDead )
+			{
+				destroyed++;
+			}
+		}
+
+		Log( "playthrough: the fight's shots (weapon@distance): " + string.Join( " ", shotLog ) + "; targets out of laser range " + outOfRange + " times; the aliens' armor+shields left: " + points );
+
+		result[ 0 ] = destroyed;
+
+
+		Log( "playthrough: the fight: " + shots + " presses of the weapons, " + destroyed + " of " + total + " ships destroyed, all destroyed " + (bool) Call( encounter, "AllEnemyShipsDestroyed" ) + ", armor " + armorBefore + " -> " + ship.m_armorPoints + ", shields " + ship.m_shieldPoints + ", fuel " + fuelBefore + " -> " + Endurium() + ", messages '" + PtMessages() + "'" );
+	}
+
+	// the stick toward a star in hyperspace for some real seconds, then the rest of the way skipped with the fuel the engines would have burnt taken from the hold,
+	// then the stick into the star - handles encounters on the way (a hail for those that talk, a fight for those that attack)
+	IEnumerator PtHyperspaceTo( int starId, float realSeconds, bool[] arrived )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var star = gameData.m_starList[ starId ];
+		var flown = new float[ 1 ];
+
+		arrived[ 0 ] = false;
+
+		for ( var leg = 0; leg < 4; leg++ )
+		{
+			if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+			{
+				yield return PtMeetEncounter();
+			}
+
+			if ( playerData.m_general.m_location != PD_General.Location.Hyperspace )
+			{
+				break;
+			}
+
+			var fuelBefore = Endurium();
+			var startCoordinates = playerData.m_general.m_coordinates;
+
+			yield return PtManeuver();
+			yield return PtFly( () => star.GetWorldCoordinates(), () => playerData.m_general.m_location != PD_General.Location.Hyperspace, realSeconds, flown );
+
+			Log( "playthrough: in hyperspace " + flown[ 0 ].ToString( "F0" ) + " units (" + ( flown[ 0 ] / 256.0f ).ToString( "F2" ) + " coordinates) toward star " + starId + " (" + star.m_xCoordinate + "," + star.m_yCoordinate + ") for " + ( fuelBefore - Endurium() ) + " tenths of fuel; now " + playerData.m_general.m_location + ", stardate " + playerData.m_general.m_currentStardateDHMY );
+
+			if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+			{
+				continue;
+			}
+
+			if ( playerData.m_general.m_location != PD_General.Location.Hyperspace )
+			{
+				break;
+			}
+
+			// the shortcut: the ship is put just outside the star, and the fuel of the way is burnt
+			var toStar = star.GetWorldCoordinates() - playerData.m_general.m_coordinates;
+			var skipped = Mathf.Max( 0.0f, toStar.magnitude - star.GetBreachDistance() - 60.0f );
+			var fuelFactor = playerData.m_playerShip.GetEngineFuelFactor();
+			var fuelPerUnit = playerData.m_playerShip.GetEngines().m_fuelUsedPerCoordinate * fuelFactor / 256.0f;
+
+			// no further than the fuel in the hold takes the ship
+			var reach = ( fuelPerUnit > 0.0f ) ? Endurium() / 10.0f / fuelPerUnit : float.MaxValue;
+
+			if ( reach < skipped )
+			{
+				Log( "playthrough: the fuel in the hold (" + Endurium() + " tenths) reaches " + ( reach / 256.0f ).ToString( "F1" ) + " of the " + ( skipped / 256.0f ).ToString( "F1" ) + " coordinates to star " + starId );
+
+				skipped = Mathf.Max( 0.0f, reach - 1.0f );
+			}
+
+			var fuelOfTheWay = skipped * fuelPerUnit;
+			var fuelBeforeSkip = Endurium();
+
+			for ( var burnt = 0.0f; burnt < fuelOfTheWay; burnt += 0.1f )
+			{
+				playerData.m_playerShip.UseUpFuel( 0.1f );
+			}
+
+			var place = playerData.m_general.m_coordinates + toStar.normalized * skipped;
+
+			playerData.m_general.m_coordinates = place;
+			playerData.m_general.m_lastHyperspaceCoordinates = place;
+			controller.m_playerShip.transform.position = place;
+
+			Log( "playthrough: SHORTCUT " + ( skipped / 256.0f ).ToString( "F1" ) + " coordinates of hyperspace skipped to star " + starId + "; the engines' fuel for them taken: " + fuelOfTheWay.ToString( "F1" ) + " cubic meters, " + fuelBeforeSkip + " -> " + Endurium() + " tenths" );
+
+			yield return Frames( 5 );
+			yield return PtFly( () => star.GetWorldCoordinates(), () => playerData.m_general.m_location != PD_General.Location.Hyperspace, 15.0f, flown );
+
+			if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+			{
+				continue;
+			}
+
+			break;
+		}
+
+		yield return PtWaitForPlanets( 30.0f );
+		yield return Frames( 10 );
+
+		arrived[ 0 ] = ( playerData.m_general.m_location == PD_General.Location.StarSystem ) && ( playerData.m_general.m_currentStarId == starId );
+
+		Log( "playthrough: arrived at star " + starId + ": " + arrived[ 0 ] + " (" + playerData.m_general.m_location + " star " + playerData.m_general.m_currentStarId + "), fuel " + Endurium() + ", messages '" + PtMessages() + "'" );
+	}
+
+	// an encounter met in flight: hail those that talk and talk a while, fight those that attack, then fly out
+	IEnumerator PtMeetEncounter()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var encounter = controller.m_encounter;
+		var result = new int[ 1 ];
+		var met = PtEncounterText();
+
+		yield return new WaitForSecondsRealtime( 2.0f );
+
+		var race = DataController.m_instance.m_gameData.m_encounterList[ playerData.m_general.m_currentEncounterId ].m_race;
+		var hostile = ( encounter.m_pdEncounter != null ) && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile );
+
+		Log( "playthrough: met " + met + ", hostile " + hostile + ", messages '" + PtMessages() + "'" );
+
+		var outcome = "";
+		var weak = playerData.m_playerShip.m_armorPoints < playerData.m_playerShip.GetMaximumArmorPoints() / 2;
+
+		if ( ( hostile || ( race == GameData.Race.Uhlek ) ) && weak )
+		{
+			// a damaged ship does not take on a hostile fleet: straight out again
+			outcome = "fled at once (armor " + playerData.m_playerShip.m_armorPoints + ")";
+		}
+		else if ( hostile || ( race == GameData.Race.Uhlek ) )
+		{
+			yield return PtFight( 30.0f, result );
+
+			outcome = "fought, " + result[ 0 ] + " destroyed";
+		}
+		else
+		{
+			var said = new List<string>();
+
+			yield return PtHail( said );
+
+			outcome = "hailed: " + string.Join( " || ", said );
+		}
+
+		s_ptEncounters.Add( met + ": " + outcome );
+
+		yield return PtFlyOutOfEncounter( 4.0f );
+	}
+
+	// hails the aliens (or responds to their hail) with a friendly posture, says one statement, asks one question, and ends the comm link - gives back what was said
+	IEnumerator PtHail( List<string> said )
+	{
+		var controller = SpaceflightController.m_instance;
+		var encounter = controller.m_encounter;
+
+		yield return PtOfficer( "Communications" );
+
+		var respond = PtIndexOf( "Respond" ) >= 0;
+
+		yield return PtPress( respond ? "Respond" : "Hail" );
+		yield return PtPress( "Friendly" );
+
+		var end = Time.realtimeSinceStartup + 12.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !encounter.IsConnected() )
+		{
+			yield return null;
+		}
+
+		said.Add( ( respond ? "responded" : "hailed" ) + ", connected " + encounter.IsConnected() + ": " + PtMessages() );
+
+		if ( !encounter.IsConnected() )
+		{
+			yield break;
+		}
+
+		// a statement, and a while to hear the answer
+		if ( PtIndexOf( "Statement" ) < 0 )
+		{
+			yield return PtOfficer( "Communications" );
+		}
+
+		controller.m_messages.Clear();
+
+		yield return PtPress( "Statement" );
+
+		var statementSet = PtLabels();
+
+		if ( PtIndexOf( "Themselves" ) >= 0 )
+		{
+			yield return PtPress( "Themselves" );
+		}
+
+		yield return new WaitForSecondsRealtime( 4.0f );
+
+		said.Add( "statement (" + statementSet + "): " + PtMessages() );
+
+		// a question about themselves
+		if ( PtIndexOf( "Question" ) >= 0 )
+		{
+			controller.m_messages.Clear();
+
+			yield return PtPress( "Question" );
+
+			if ( PtIndexOf( "Themselves" ) >= 0 )
+			{
+				yield return PtPress( "Themselves" );
+			}
+
+			yield return new WaitForSecondsRealtime( 5.0f );
+
+			said.Add( "question: " + PtMessages() );
+		}
+
+		if ( encounter.IsConnected() && ( PtIndexOf( "Terminate" ) >= 0 ) )
+		{
+			yield return PtPress( "Terminate" );
+		}
+	}
+
+	// leaves the star system: Maneuver and the stick outward to its edge (8192 units from the sun)
+	IEnumerator PtLeaveSystem( bool[] done )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var flown = new float[ 1 ];
+
+		done[ 0 ] = false;
+
+		yield return PtManeuver();
+
+		var outward = ( playerData.m_general.m_coordinates.magnitude < 1.0f ) ? Vector3.forward : playerData.m_general.m_coordinates.normalized;
+
+		yield return PtFly( () => outward * 20000.0f, () => playerData.m_general.m_location != PD_General.Location.StarSystem, 25.0f, flown );
+
+		if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+		{
+			yield return PtMeetEncounter();
+			yield return PtManeuver();
+			yield return PtFly( () => outward * 20000.0f, () => playerData.m_general.m_location != PD_General.Location.StarSystem, 25.0f, flown );
+		}
+
+		yield return Frames( 10 );
+
+		done[ 0 ] = playerData.m_general.m_location == PD_General.Location.Hyperspace;
+
+		Log( "playthrough: flew " + flown[ 0 ].ToString( "F0" ) + " units to the edge of the star system: " + playerData.m_general.m_location + " at " + playerData.m_general.m_coordinates + ", messages '" + PtMessages() + "'" );
+	}
+
+	// answers the Veloxi drone's numbers through the console: Yes to a multiple of 6, No to any other (STRINFO 2.3)
+	IEnumerator PtAnswerTheDrone( int[] answered )
+	{
+		var controller = SpaceflightController.m_instance;
+		var encounter = controller.m_encounter;
+		var question = new int[ 1 ];
+
+		answered[ 0 ] = 0;
+
+		for ( var i = 0; i < 3; i++ )
+		{
+			yield return WaitForAlienQuestion( 25.0f, question );
+
+			if ( question[ 0 ] == 0 )
+			{
+				Log( "playthrough: the drone asked no number (" + i + " answered), messages '" + PtMessages() + "', console " + PtLabels() );
+
+				yield break;
+			}
+
+			var yes = ( question[ 0 ] % 6 ) == 0;
+
+			// the Yes and No buttons come up with the question
+			var end = Time.realtimeSinceStartup + 3.0f;
+
+			while ( ( Time.realtimeSinceStartup < end ) && ( PtIndexOf( "Yes" ) < 0 ) )
+			{
+				yield return null;
+			}
+
+			Log( "playthrough: the drone's number " + question[ 0 ] + ", messages '" + PtMessages() + "', console " + PtLabels() + ", answering " + ( yes ? "Yes" : "No" ) );
+
+			yield return PtPress( yes ? "Yes" : "No" );
+			yield return Frames( 5 );
+
+			answered[ 0 ]++;
+		}
+	}
+
+	// stage 6: from the docking bay to Sphexi (132,165, star 35) through hyperspace, into orbit around planet 130, where the Veloxi drones ask their numbers
+	IEnumerator ScenarioPlaythrough6()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+		var orbSite = gameData.m_artifactSiteList[ 4 ];
+
+		ProbeKeyboard();
+
+		Log( "playthrough-6: loaded: location " + playerData.m_general.m_location + ", fuel " + Endurium() + ", balance " + playerData.m_bank.m_currentBalance + "; the Crystal Orb's site: " + orbSite.m_artifactName + " on planet " + orbSite.m_planetId + " at " + orbSite.m_latitude + " x " + orbSite.m_longitude );
+
+		// ---- 1. launch and out of Arth's system
+		yield return PtPress( "Command" );
+		yield return PtPress( "Launch" );
+		yield return PtPress( "Yes" );
+		yield return WaitForLocation( PD_General.Location.JustLaunched, 60.0f );
+		yield return PtWaitForPlanets( 30.0f );
+		yield return Frames( 10 );
+
+		yield return PtLeaveSystem( done );
+
+		Check( "playthrough-6: the ship flies out of Arth's system into hyperspace", done[ 0 ], playerData.m_general.m_location.ToString() );
+
+		// ---- 2. hyperspace to Sphexi
+		yield return PtHyperspaceTo( 35, 4.0f, done );
+
+		Check( "playthrough-6: hyperspace travel reaches the star system of Sphexi", done[ 0 ], playerData.m_general.m_location + " star " + playerData.m_general.m_currentStarId );
+
+		if ( !done[ 0 ] )
+		{
+			PlaythroughSave( "no Sphexi" );
+			Finish( "scenario=playthrough-6 abort: Sphexi not reached", 2 );
+			yield break;
+		}
+
+		// ---- 3. into orbit around Sphexi: the drones
+		yield return PtFlyToPlanetAndEnter( orbSite.m_planetId, PD_General.Location.Encounter, done );
+
+		Log( "playthrough-6: going into orbit around Sphexi: " + playerData.m_general.m_location + ( ( playerData.m_general.m_location == PD_General.Location.Encounter ) ? " " + PtEncounterText() : "" ) + ", messages '" + PtMessages() + "'" );
+
+		Check( "playthrough-6: going into orbit around Sphexi begins the drones' encounter (305)", ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == 305 ), playerData.m_general.m_location + " " + playerData.m_general.m_currentEncounterId );
+
+		if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+		{
+			var said = new List<string>();
+			var answered = new int[ 1 ];
+
+			yield return new WaitForSecondsRealtime( 2.0f );
+
+			// the comm link: respond to their hail, or hail
+			yield return PtOfficer( "Communications" );
+
+			var respond = PtIndexOf( "Respond" ) >= 0;
+
+			yield return PtPress( respond ? "Respond" : "Hail" );
+			yield return PtPress( "Friendly" );
+
+			Log( "playthrough-6: " + ( respond ? "responded to" : "hailed" ) + " the drone: connected " + controller.m_encounter.IsConnected() + ", messages '" + PtMessages() + "', console " + PtLabels() );
+
+			yield return PtAnswerTheDrone( answered );
+
+			yield return WaitForLocation( PD_General.Location.InOrbit, 12.0f );
+			yield return Frames( 20 );
+
+			s_ptEncounters.Add( "the drones of Sphexi: " + answered[ 0 ] + " numbers answered, then " + playerData.m_general.m_location );
+
+			Log( "playthrough-6: after " + answered[ 0 ] + " answers: " + playerData.m_general.m_location + " planet " + playerData.m_general.m_currentPlanetId + ", messages '" + PtMessages() + "'" );
+
+			Check( "playthrough-6: three right answers to the drone's numbers let the ship into orbit around Sphexi", ( answered[ 0 ] == 3 ) && ( playerData.m_general.m_location == PD_General.Location.InOrbit ) && ( playerData.m_general.m_currentPlanetId == orbSite.m_planetId ), answered[ 0 ] + " answered, " + playerData.m_general.m_location + " " + playerData.m_general.m_currentPlanetId );
+		}
+
+		Log( "playthrough-6: encounters on the way: " + string.Join( " ## ", s_ptEncounters ) );
+
+		PlaythroughSave( "location=" + playerData.m_general.m_location + " planet=" + playerData.m_general.m_currentPlanetId + " fuel=" + Endurium() );
+
+		Finish( "scenario=playthrough-6 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// on the ground at an artifact's site: go out, drive to the ruin, take the artifact with Cargo, and go back into the ship - gives back whether the artifact
+	// is in the ship's hold
+	IEnumerator PtTakeArtifact( GD_ArtifactSite site, bool[] fetched )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+		var driven = new float[ 1 ];
+
+		fetched[ 0 ] = false;
+
+		yield return PtDisembark( done );
+
+		if ( !done[ 0 ] )
+		{
+			yield break;
+		}
+
+		var sitePlace = Tools.LatLongToWorldCoordinates( site.m_longitude, site.m_latitude );
+		var vehicle = controller.m_terrainVehicle;
+		var fuelBefore = playerData.m_terrainVehicle.GetPercentFuelRemaining();
+		var startPlace = vehicle.transform.position;
+
+		Log( "playthrough: the " + site.m_artifactName + "'s site is " + Vector3.Distance( new Vector3( sitePlace.x, 0.0f, sitePlace.z ), new Vector3( vehicle.transform.position.x, 0.0f, vehicle.transform.position.z ) ).ToString( "F0" ) + " units from the terrain vehicle; ruins on the ground " + RuinsOnTheGround().Count );
+
+		// the vehicle comes out with Move running (as in stage 3's mining), so the stick drives it at once
+		if ( !( GetField( controller.m_buttonController, "m_currentButton" ) is MoveButton ) )
+		{
+			yield return PtPress( "Move" );
+		}
+
+		var moveRunning = GetField( controller.m_buttonController, "m_currentButton" ) is MoveButton;
+
+		// a ruin is in reach from 20 units (TerrainRuin), and its model stands in the way of the vehicle
+		yield return PtDrive( () => sitePlace, 12.0f, 15.0f, driven );
+
+		Log( "playthrough: Move running " + moveRunning + ", drove " + driven[ 0 ].ToString( "F1" ) + " units from " + startPlace + " to " + vehicle.transform.position + " toward the site at " + sitePlace + ", fuel " + fuelBefore + "% -> " + playerData.m_terrainVehicle.GetPercentFuelRemaining() + "%, speed " + playerData.m_general.m_currentSpeed.ToString( "F2" ) + ", paused " + controller.m_gameIsPaused );
+
+		yield return Tap( Key.Enter );
+		yield return Frames( 5 );
+
+		var artifactId = gameData.FindArtifactId( site.m_artifactName );
+
+		for ( var press = 0; ( press < 3 ) && ( ArtifactsHeld( playerData.m_terrainVehicle.m_artifactStorage, artifactId ) == 0 ); press++ )
+		{
+			controller.m_messages.Clear();
+
+			yield return PtPress( "Cargo" );
+			yield return Frames( 5 );
+
+			Log( "playthrough: Cargo at the " + site.m_artifactName + "'s ruin (" + Vector3.Distance( new Vector3( sitePlace.x, 0.0f, sitePlace.z ), new Vector3( vehicle.transform.position.x, 0.0f, vehicle.transform.position.z ) ).ToString( "F1" ) + " away): '" + PtMessages() + "', vehicle " + PtVehicleHold() + ", console " + PtLabels() );
+
+			if ( PtIndexOf( "Next" ) >= 0 )
+			{
+				yield return PtPress( "Back" );
+			}
+		}
+
+		var inVehicle = ArtifactsHeld( playerData.m_terrainVehicle.m_artifactStorage, artifactId ) > 0;
+
+		Check( "playthrough: the Cargo button takes the " + site.m_artifactName + " out of its ruin", inVehicle, PtVehicleHold() );
+
+		yield return PtBackToTheShip( done );
+
+		fetched[ 0 ] = done[ 0 ] && ( ArtifactsHeld( playerData.m_playerShip.m_artifactStorage, artifactId ) > 0 );
+
+		Check( "playthrough: back in the ship, the " + site.m_artifactName + " is in the ship's hold", fetched[ 0 ], PtShipHold() );
+	}
+
+	// the drones of Sphexi begin again (their permission is not saved): answer them again
+	IEnumerator PtDronesAgain( string when )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		if ( ( playerData.m_general.m_location != PD_General.Location.Encounter ) || ( playerData.m_general.m_currentEncounterId != 305 ) )
+		{
+			yield break;
+		}
+
+		Log( "playthrough: " + when + " began " + PtEncounterText() + " again; the drone is answered again" );
+
+		var answered = new int[ 1 ];
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+		yield return PtOfficer( "Communications" );
+		yield return PtPress( ( PtIndexOf( "Respond" ) >= 0 ) ? "Respond" : "Hail" );
+		yield return PtPress( "Friendly" );
+		yield return PtAnswerTheDrone( answered );
+		yield return WaitForLocation( PD_General.Location.InOrbit, 12.0f );
+		yield return Frames( 10 );
+
+		s_ptEncounters.Add( "the drones of Sphexi again (" + when + "): " + answered[ 0 ] + " answered, then " + playerData.m_general.m_location );
+	}
+
+	// stage 7: in orbit around Sphexi (the drones ask again when the game is loaded there). Land at the Crystal Orb's site (46N x 14E)
+	IEnumerator ScenarioPlaythrough7()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var done = new bool[ 1 ];
+		var site = gameData.m_artifactSiteList[ 4 ];
+
+		ProbeKeyboard();
+
+		Log( "playthrough-7: loaded: location " + playerData.m_general.m_location + " planet " + playerData.m_general.m_currentPlanetId + ", messages '" + PtMessages() + "'" );
+
+		Check( "playthrough-7: the save of stage 6 loads around Sphexi (in orbit, or in the drones' encounter, whose permission is not saved)", ( ( playerData.m_general.m_location == PD_General.Location.InOrbit ) || ( playerData.m_general.m_location == PD_General.Location.Encounter ) ) && ( playerData.m_general.m_currentPlanetId == site.m_planetId ), playerData.m_general.m_location + " " + playerData.m_general.m_currentPlanetId );
+
+		yield return PtDronesAgain( "loading the save in orbit" );
+
+		Check( "playthrough-7: in orbit around Sphexi", playerData.m_general.m_location == PD_General.Location.InOrbit, playerData.m_general.m_location.ToString() );
+
+		// the crosshair's latitude field is the site's east-west place, its longitude field the north-south one
+		yield return PtLand( site.m_longitude, site.m_latitude, done );
+
+		Check( "playthrough-7: the ship lands on Sphexi at the Crystal Orb's site", done[ 0 ], playerData.m_general.m_location.ToString() );
+
+		PlaythroughSave( "location=" + playerData.m_general.m_location + " planet=" + playerData.m_general.m_currentPlanetId );
+
+		Finish( "scenario=playthrough-7 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// stage 8: on Sphexi at the Crystal Orb's site. Out, take the Orb, back in, launch into orbit and out of it
+	IEnumerator ScenarioPlaythrough8()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var done = new bool[ 1 ];
+		var site = gameData.m_artifactSiteList[ 4 ];
+
+		ProbeKeyboard();
+
+		Log( "playthrough-8: loaded: location " + playerData.m_general.m_location + " planet " + playerData.m_general.m_currentPlanetId + ", site " + playerData.m_general.m_selectedLongitude + "N " + playerData.m_general.m_selectedLatitude + "E" );
+
+		Check( "playthrough-8: the save of stage 7 is on the surface of Sphexi", ( playerData.m_general.m_location == PD_General.Location.Planetside ) && ( playerData.m_general.m_currentPlanetId == site.m_planetId ), playerData.m_general.m_location + " " + playerData.m_general.m_currentPlanetId );
+
+		yield return PtWaitForPlanets( 30.0f );
+		yield return PtTakeArtifact( site, done );
+
+		yield return PtLaunchFromPlanet( done );
+
+		var launchedInto = playerData.m_general.m_location;
+
+		yield return PtDronesAgain( "the launch into orbit after the game was loaded on Sphexi" );
+
+		done[ 0 ] = playerData.m_general.m_location == PD_General.Location.InOrbit;
+
+		Check( "playthrough-8: the launch from Sphexi ends in orbit without the drones asking again (the permission was given in this visit, before the save was loaded)", launchedInto == PD_General.Location.InOrbit, launchedInto.ToString() );
+
+		Check( "playthrough-8: the ship launches from Sphexi into orbit", done[ 0 ], playerData.m_general.m_location.ToString() );
+
+		yield return PtLeaveOrbit( done );
+
+		PlaythroughSave( "location=" + playerData.m_general.m_location + " hold=" + PtShipHold() );
+
+		Finish( "scenario=playthrough-8 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// in hyperspace: goes to meet an encounter (the travel to it skipped with its fuel taken), and lets it come - gives back whether it began
+	IEnumerator PtSeekEncounter( int encounterId, bool[] met )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var pdEncounter = playerData.FindEncounter( encounterId );
+		var flown = new float[ 1 ];
+
+		met[ 0 ] = false;
+
+		if ( ( pdEncounter == null ) || ( playerData.m_general.m_location != PD_General.Location.Hyperspace ) )
+		{
+			Log( "playthrough: encounter " + encounterId + " cannot be sought (" + playerData.m_general.m_location + ")" );
+
+			yield break;
+		}
+
+		var toEncounter = pdEncounter.m_currentCoordinates - playerData.m_general.m_coordinates;
+
+		toEncounter.y = 0.0f;
+
+		var skipped = Mathf.Max( 0.0f, toEncounter.magnitude - 1500.0f );
+		var fuelOfTheWay = skipped / 256.0f * playerData.m_playerShip.GetEngines().m_fuelUsedPerCoordinate * playerData.m_playerShip.GetEngineFuelFactor();
+
+		for ( var burnt = 0.0f; burnt < fuelOfTheWay; burnt += 0.1f )
+		{
+			playerData.m_playerShip.UseUpFuel( 0.1f );
+		}
+
+		var place = playerData.m_general.m_coordinates + toEncounter.normalized * skipped;
+
+		playerData.m_general.m_coordinates = place;
+		playerData.m_general.m_lastHyperspaceCoordinates = place;
+		controller.m_playerShip.transform.position = place;
+
+		Log( "playthrough: SHORTCUT " + ( skipped / 256.0f ).ToString( "F1" ) + " coordinates of hyperspace skipped toward encounter " + encounterId + " (" + fuelOfTheWay.ToString( "F1" ) + " cubic meters of fuel taken)" );
+
+		yield return PtManeuver();
+		yield return PtFly( () => pdEncounter.m_currentCoordinates, () => playerData.m_general.m_location != PD_General.Location.Hyperspace, 20.0f, flown );
+
+		met[ 0 ] = playerData.m_general.m_location == PD_General.Location.Encounter;
+
+		Log( "playthrough: flew " + flown[ 0 ].ToString( "F0" ) + " toward encounter " + encounterId + ": " + playerData.m_general.m_location + ( met[ 0 ] ? " " + PtEncounterText() : "" ) );
+	}
+
+	// stage 9: in the star system of Sphexi with the Crystal Orb. Out into hyperspace, a meeting with the Velox (hail, statement, question), then on to the star of
+	// a Black Egg (238,189) and into orbit around its planet
+	IEnumerator ScenarioPlaythrough9()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var done = new bool[ 1 ];
+		var eggSite = gameData.m_artifactSiteList[ 2 ];
+		var eggStar = gameData.m_planetList[ eggSite.m_planetId ].m_starId;
+
+		ProbeKeyboard();
+
+		Log( "playthrough-9: loaded: location " + playerData.m_general.m_location + " star " + playerData.m_general.m_currentStarId + ", hold " + PtShipHold() + "; the Black Egg's site: planet " + eggSite.m_planetId + " of star " + eggStar + " at " + eggSite.m_latitude + " x " + eggSite.m_longitude );
+
+		Check( "playthrough-9: the save of stage 8 is in the star system of Sphexi with the Crystal Orb", ( playerData.m_general.m_location == PD_General.Location.StarSystem ) && playerData.m_playerShip.HasArtifact( "Crystal Orb" ), playerData.m_general.m_location + ", " + PtShipHold() );
+
+		yield return PtWaitForPlanets( 30.0f );
+		yield return PtLeaveSystem( done );
+
+		Check( "playthrough-9: out of Sphexi's system into hyperspace", done[ 0 ], playerData.m_general.m_location.ToString() );
+
+		// ---- 1. the Velox of encounter 229 (138,163)
+		var met = new bool[ 1 ];
+
+		yield return PtSeekEncounter( 229, met );
+
+		if ( met[ 0 ] )
+		{
+			var said = new List<string>();
+			var encounter = SpaceflightController.m_instance.m_encounter;
+
+			yield return new WaitForSecondsRealtime( 1.0f );
+			yield return PtHail( said );
+
+			var stance = ( encounter.m_pdEncounter == null ) ? "-" : encounter.m_pdEncounter.m_alienStance.ToString();
+
+			Log( "playthrough-9: the meeting with the Velox: " + string.Join( " || ", said ) + " | stance " + stance );
+
+			s_ptEncounters.Add( "Velox 229: " + string.Join( " || ", said ) );
+
+			var replied = false;
+
+			foreach ( var line in said )
+			{
+				replied |= line.Contains( "Receiving:" );
+			}
+
+			Check( "playthrough-9: the Velox answer a hail and the statement or question", replied, string.Join( " || ", said ) );
+
+			yield return PtFlyOutOfEncounter( 4.0f );
+		}
+
+		Check( "playthrough-9: the Velox encounter 229 is met in hyperspace", met[ 0 ], playerData.m_general.m_location.ToString() );
+
+		// ---- 2. on to the Black Egg's star
+		yield return PtHyperspaceTo( eggStar, 2.0f, done );
+
+		Check( "playthrough-9: hyperspace travel reaches the star of the Black Egg (238,189)", done[ 0 ], playerData.m_general.m_location + " star " + playerData.m_general.m_currentStarId );
+
+		if ( done[ 0 ] )
+		{
+			yield return PtFlyToPlanetAndEnter( eggSite.m_planetId, PD_General.Location.InOrbit, done );
+
+			Check( "playthrough-9: into orbit around the Black Egg's planet", done[ 0 ] && ( playerData.m_general.m_currentPlanetId == eggSite.m_planetId ), playerData.m_general.m_location + " " + playerData.m_general.m_currentPlanetId );
+		}
+
+		Log( "playthrough-9: fuel " + Endurium() + ", stardate " + playerData.m_general.m_currentStardateYMD + ", encounters: " + string.Join( " ## ", s_ptEncounters ) );
+
+		PlaythroughSave( "location=" + playerData.m_general.m_location + " planet=" + playerData.m_general.m_currentPlanetId + " fuel=" + Endurium() );
+
+		Finish( "scenario=playthrough-9 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// stage 10: in orbit around the Black Egg's planet (238,189 planet 3). Land at 52N x 16E, take the egg, and back into the ship
+	IEnumerator ScenarioPlaythrough10()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var done = new bool[ 1 ];
+		var site = gameData.m_artifactSiteList[ 2 ];
+
+		ProbeKeyboard();
+
+		Log( "playthrough-10: loaded: location " + playerData.m_general.m_location + " planet " + playerData.m_general.m_currentPlanetId + ", hold " + PtShipHold() );
+
+		Check( "playthrough-10: the save of stage 9 is in orbit around the Black Egg's planet", ( playerData.m_general.m_location == PD_General.Location.InOrbit ) && ( playerData.m_general.m_currentPlanetId == site.m_planetId ), playerData.m_general.m_location + " " + playerData.m_general.m_currentPlanetId );
+
+		yield return PtWaitForPlanets( 30.0f );
+		yield return PtLand( site.m_longitude, site.m_latitude, done );
+
+		Check( "playthrough-10: the ship lands at the Black Egg's site", done[ 0 ], playerData.m_general.m_location.ToString() );
+
+		if ( done[ 0 ] )
+		{
+			yield return PtTakeArtifact( site, done );
+		}
+
+		PlaythroughSave( "location=" + playerData.m_general.m_location + " hold=" + PtShipHold() );
+
+		Finish( "scenario=playthrough-10 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// stage 11: on the Black Egg's planet with the egg aboard. Launch, the ship's log, Engineering's damage report and the doctor's examination in orbit, out of
+	// orbit and out of the star system into hyperspace
+	IEnumerator ScenarioPlaythrough11()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		ProbeKeyboard();
+
+		Log( "playthrough-11: loaded: location " + playerData.m_general.m_location + " planet " + playerData.m_general.m_currentPlanetId + ", hold " + PtShipHold() );
+
+		Check( "playthrough-11: the save of stage 10 is on the Black Egg's planet with the Orb and the egg aboard", ( playerData.m_general.m_location == PD_General.Location.Planetside ) && playerData.m_playerShip.HasArtifact( "Black Egg" ) && playerData.m_playerShip.HasArtifact( "Crystal Orb" ), playerData.m_general.m_location + ", " + PtShipHold() );
+
+		yield return PtWaitForPlanets( 30.0f );
+		yield return PtLaunchFromPlanet( done );
+
+		Check( "playthrough-11: the ship launches into orbit", done[ 0 ], playerData.m_general.m_location.ToString() );
+
+		// the ship's log: the messages found
+		yield return PtOfficer( "Command" );
+		yield return PtPress( "Ship's Log" );
+
+		var logSet = PtLabels();
+
+		controller.m_messages.Clear();
+
+		yield return PtPress( "Messages" );
+		yield return Frames( 5 );
+
+		var logShown = SpaceflightController.m_instance.m_shipsLog.gameObject.activeInHierarchy;
+
+		// the log's window has the fire button until it is closed
+		if ( logShown )
+		{
+			yield return Tap( Key.Enter );
+			yield return Frames( 5 );
+		}
+
+		Log( "playthrough-11: the ship's log window was shown " + logShown + ", now " + SpaceflightController.m_instance.m_shipsLog.gameObject.activeInHierarchy );
+
+		Log( "playthrough-11: Ship's Log " + logSet + ", Messages: '" + Head( PtMessages() ) + "' (" + playerData.m_shipsLog.m_foundMessages.Count + " found), console " + PtLabels() );
+
+		if ( PtButtonRunning() )
+		{
+			yield return Tap( Key.Enter );
+			yield return Frames( 5 );
+		}
+
+		// Engineering: the damage report; Medical: an examination
+		yield return PtOfficer( "Engineering" );
+
+		controller.m_messages.Clear();
+
+		yield return PtPress( "Damage" );
+		yield return Frames( 5 );
+
+		Log( "playthrough-11: Damage: '" + PtMessages() + "', console " + PtLabels() + ", running " + PtButtonRunning() );
+
+		if ( PtButtonRunning() )
+		{
+			yield return Tap( Key.Enter );
+			yield return Frames( 5 );
+		}
+
+		yield return PtOfficer( "Medical" );
+
+		controller.m_messages.Clear();
+
+		yield return PtPress( "Examine" );
+		yield return Frames( 5 );
+
+		var examineSet = PtLabels();
+
+		if ( PtIndexOf( "Bridge" ) < 0 )
+		{
+			yield return PtPress( PtLabels().Contains( "Kirk" ) ? "Kirk" : ( (ShipButton[]) GetField( controller.m_buttonController, "m_buttonList" ) )[ 0 ].GetLabel() );
+		}
+
+		Log( "playthrough-11: Examine (" + examineSet + "): '" + PtMessages() + "', console " + PtLabels() );
+
+		if ( PtButtonRunning() )
+		{
+			yield return Tap( Key.Enter );
+			yield return Frames( 5 );
+		}
+
+		yield return PtLeaveOrbit( done );
+		yield return PtLeaveSystem( done );
+
+		Check( "playthrough-11: out of the star system into hyperspace", done[ 0 ], playerData.m_general.m_location.ToString() );
+
+		PlaythroughSave( "location=" + playerData.m_general.m_location + " fuel=" + Endurium() );
+
+		Finish( "scenario=playthrough-11 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// stage 12: in hyperspace by the Black Egg's star with the Orb and the egg. The Uhlek of encounter 261 (40,188, on the way west to the Crystal Cone): they
+	// attack on sight and never talk, so the ship fights them, then flies out
+	IEnumerator ScenarioPlaythrough12()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var met = new bool[ 1 ];
+		var result = new int[ 1 ];
+
+		ProbeKeyboard();
+
+		Log( "playthrough-12: loaded: location " + playerData.m_general.m_location + " at " + Tools.WorldToGameCoordinates( playerData.m_general.m_coordinates ) + ", fuel " + Endurium() + ", armor " + ship.m_armorPoints + ", shields " + ship.m_shieldPoints );
+
+		Check( "playthrough-12: the save of stage 11 is in hyperspace", playerData.m_general.m_location == PD_General.Location.Hyperspace, playerData.m_general.m_location.ToString() );
+
+		yield return PtSeekEncounter( 261, met );
+
+		Check( "playthrough-12: the Uhlek encounter 261 is met in hyperspace", met[ 0 ], playerData.m_general.m_location.ToString() );
+
+		if ( met[ 0 ] )
+		{
+			var encounter = SpaceflightController.m_instance.m_encounter;
+			var armorBefore = ship.m_armorPoints;
+			var hailed = new List<string>();
+
+			yield return new WaitForSecondsRealtime( 2.0f );
+
+			// the Uhlek do not answer a hail
+			yield return PtOfficer( "Communications" );
+			yield return PtPress( "Hail" );
+
+			if ( PtIndexOf( "Friendly" ) >= 0 )
+			{
+				yield return PtPress( "Friendly" );
+			}
+
+			yield return new WaitForSecondsRealtime( 3.0f );
+
+			var afterHail = PtMessages();
+
+			Log( "playthrough-12: hailing the Uhlek: connected " + encounter.IsConnected() + ", stance " + encounter.m_pdEncounter.m_alienStance + ", messages '" + afterHail + "'" );
+
+			Check( "playthrough-12: the Uhlek are hostile and do not answer a hail", !encounter.IsConnected() && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile ), encounter.IsConnected() + ", " + encounter.m_pdEncounter.m_alienStance );
+
+			yield return PtFight( 55.0f, result );
+
+			Log( "playthrough-12: after 55 s of the fight: " + PtEncounterText() + ", armor " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() + ", shields " + ship.m_shieldPoints + ", systems " + string.Join( ",", Array.ConvertAll( SystemHealth(), h => h.ToString() ) ) + ", fuel " + Endurium() );
+
+			Check( "playthrough-12: the ship survives the first part of the fight", !CombatController.m_instance.PlayerIsDestroyed() && ( ship.m_armorPoints > 0 ), "armor " + ship.m_armorPoints );
+		}
+
+		// the game is saved in the middle of the fight, and the next stage goes on with it after loading
+		PlaythroughSave( "location=" + playerData.m_general.m_location + " " + ( ( playerData.m_general.m_location == PD_General.Location.Encounter ) ? PtEncounterText() : "" ) + " armor=" + ship.m_armorPoints );
+
+		Finish( "scenario=playthrough-12 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the alien ships of the encounter, their armor and shields (for comparing a save before and after it is loaded)
+	static string PtAlienPoints()
+	{
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var text = "";
+
+		if ( ( encounter == null ) || ( encounter.m_pdEncounter == null ) )
+		{
+			return "none";
+		}
+
+		foreach ( var alien in encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			text += ( alien.m_isDead ? "dead" : ( alien.m_addedToEncounter ? alien.m_armorPoints + "+" + alien.m_shieldPoints : "waiting" ) ) + " ";
+		}
+
+		return text.Trim();
+	}
+
+	// stage 13: the game saved in the fight with the Uhlek is loaded, and the fight goes on until a ship is destroyed, then the ship flies out
+	IEnumerator ScenarioPlaythrough13()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var result = new int[ 1 ];
+
+		ProbeKeyboard();
+
+		yield return Frames( 30 );
+
+		var loadedPoints = PtAlienPoints();
+
+		Log( "playthrough-13: loaded: location " + playerData.m_general.m_location + ( ( playerData.m_general.m_location == PD_General.Location.Encounter ) ? " " + PtEncounterText() : "" ) + ", the aliens' armor+shields " + loadedPoints + ", armor " + ship.m_armorPoints + ", shields " + ship.m_shieldPoints + " (up " + ship.m_shieldsAreUp + "), weapons armed " + ship.m_weaponsAreArmed + ", console " + PtLabels() );
+
+		Check( "playthrough-13: the game saved in the fight loads in the Uhlek encounter with the damage done to them", ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == 261 ) && loadedPoints.Contains( "+" ) && !loadedPoints.StartsWith( "1000+1400 1000+1400 1000+1400" ), playerData.m_general.m_location + " " + loadedPoints );
+
+		if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+		{
+			var armorBefore = ship.m_armorPoints;
+
+			yield return PtFight( 60.0f, result );
+
+			s_ptEncounters.Add( "Uhlek 261 after loading: " + result[ 0 ] + " destroyed, armor " + armorBefore + " -> " + ship.m_armorPoints );
+
+			Check( "playthrough-13: the ship's weapons destroy at least one Uhlek ship, and the ship survives", ( result[ 0 ] >= 1 ) && !CombatController.m_instance.PlayerIsDestroyed() && ( ship.m_armorPoints > 0 ), result[ 0 ] + " destroyed, armor " + ship.m_armorPoints + ", aliens " + PtAlienPoints() );
+
+			if ( !CombatController.m_instance.PlayerIsDestroyed() )
+			{
+				yield return PtFlyOutOfEncounter( 4.0f );
+			}
+
+			Log( "playthrough-13: after the fight: " + playerData.m_general.m_location + ", armor " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() + ", shields " + ship.m_shieldPoints + ", systems " + string.Join( ",", Array.ConvertAll( SystemHealth(), h => h.ToString() ) ) + ", fuel " + Endurium() + ", hold " + PtShipHold() );
+		}
+
+		Check( "playthrough-13: out of the encounter, back in hyperspace", playerData.m_general.m_location == PD_General.Location.Hyperspace, playerData.m_general.m_location.ToString() );
+
+		PlaythroughSave( "location=" + playerData.m_general.m_location + " armor=" + ship.m_armorPoints + " fuel=" + Endurium() );
+
+		Finish( "scenario=playthrough-13 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// stage 14: in hyperspace after the Uhlek. On to the star of the Crystal Cone (20,198) in Uhlek space, with whatever comes on the way, and into orbit
+	// around the Cone's planet
+	IEnumerator ScenarioPlaythrough14()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var done = new bool[ 1 ];
+		var site = gameData.m_artifactSiteList[ 3 ];
+		var coneStar = gameData.m_planetList[ site.m_planetId ].m_starId;
+
+		ProbeKeyboard();
+
+		Log( "playthrough-14: loaded: location " + playerData.m_general.m_location + " at " + Tools.WorldToGameCoordinates( playerData.m_general.m_coordinates ) + ", fuel " + Endurium() + ", armor " + playerData.m_playerShip.m_armorPoints + ", shields " + playerData.m_playerShip.m_shieldPoints + "; the Crystal Cone's site: planet " + site.m_planetId + " of star " + coneStar + " at " + site.m_latitude + " x " + site.m_longitude );
+
+		Check( "playthrough-14: the save of stage 13 is in hyperspace", playerData.m_general.m_location == PD_General.Location.Hyperspace, playerData.m_general.m_location.ToString() );
+
+		// the engineer's repairs after the fight with the Uhlek
+		yield return PtOfficer( "Engineering" );
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		yield return PtPress( "Repair" );
+		yield return Frames( 5 );
+
+		var repairSaid = PtMessages();
+		var repairSet = PtLabels();
+
+		// a repair that asks for a mineral: Yes
+		if ( PtIndexOf( "Yes" ) >= 0 )
+		{
+			yield return PtPress( "Yes" );
+			yield return Frames( 5 );
+		}
+		else if ( PtButtonRunning() )
+		{
+			yield return Tap( Key.Enter );
+			yield return Frames( 5 );
+		}
+
+		var armorAtRepair = playerData.m_playerShip.m_armorPoints;
+
+		Log( "playthrough-14: Repair (" + repairSet + "): '" + repairSaid + "' then '" + PtMessages() + "', repairs under way " + playerData.m_playerShip.m_repairsAreUnderWay + ", armor " + armorAtRepair );
+
+		yield return PtHyperspaceTo( coneStar, 2.0f, done );
+
+		Log( "playthrough-14: armor " + armorAtRepair + " -> " + playerData.m_playerShip.m_armorPoints + " while travelling (repairs under way " + playerData.m_playerShip.m_repairsAreUnderWay + ")" );
+
+		Check( "playthrough-14: hyperspace travel reaches the star of the Crystal Cone", done[ 0 ], playerData.m_general.m_location + " star " + playerData.m_general.m_currentStarId );
+
+		if ( done[ 0 ] )
+		{
+			yield return PtFlyToPlanetAndEnter( site.m_planetId, PD_General.Location.InOrbit, done );
+
+			if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+			{
+				yield return PtMeetEncounter();
+				yield return PtFlyToPlanetAndEnter( site.m_planetId, PD_General.Location.InOrbit, done );
+			}
+
+			Check( "playthrough-14: into orbit around the Crystal Cone's planet", done[ 0 ] && ( playerData.m_general.m_currentPlanetId == site.m_planetId ), playerData.m_general.m_location + " " + playerData.m_general.m_currentPlanetId );
+		}
+
+		Log( "playthrough-14: fuel " + Endurium() + ", armor " + playerData.m_playerShip.m_armorPoints + "/" + playerData.m_playerShip.GetMaximumArmorPoints() + ", shields " + playerData.m_playerShip.m_shieldPoints + ", systems " + string.Join( ",", Array.ConvertAll( SystemHealth(), h => h.ToString() ) ) + ", encounters: " + string.Join( " ## ", s_ptEncounters ) );
+
+		PlaythroughSave( "location=" + playerData.m_general.m_location + " planet=" + playerData.m_general.m_currentPlanetId + " fuel=" + Endurium() + " armor=" + playerData.m_playerShip.m_armorPoints );
+
+		Finish( "scenario=playthrough-14 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// stage 15: in orbit around the Crystal Cone's planet (20,198 planet 1). Land at 29S x 55W, take the Cone, and back into the ship
+	IEnumerator ScenarioPlaythrough15()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var done = new bool[ 1 ];
+		var site = gameData.m_artifactSiteList[ 3 ];
+
+		ProbeKeyboard();
+
+		Log( "playthrough-15: loaded: location " + playerData.m_general.m_location + " planet " + playerData.m_general.m_currentPlanetId + ", hold " + PtShipHold() );
+
+		Check( "playthrough-15: the save of stage 14 is in orbit around the Crystal Cone's planet", ( playerData.m_general.m_location == PD_General.Location.InOrbit ) && ( playerData.m_general.m_currentPlanetId == site.m_planetId ), playerData.m_general.m_location + " " + playerData.m_general.m_currentPlanetId );
+
+		yield return PtWaitForPlanets( 30.0f );
+		yield return PtLand( site.m_longitude, site.m_latitude, done );
+
+		Check( "playthrough-15: the ship lands at the Crystal Cone's site", done[ 0 ], playerData.m_general.m_location.ToString() );
+
+		if ( done[ 0 ] )
+		{
+			yield return PtTakeArtifact( site, done );
+		}
+
+		PlaythroughSave( "location=" + playerData.m_general.m_location + " hold=" + PtShipHold() );
+
+		Finish( "scenario=playthrough-15 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// stage 16: on the Crystal Cone's planet with the Orb, the egg and the Cone. Launch, out of orbit, out of the star system
+	IEnumerator ScenarioPlaythrough16()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var done = new bool[ 1 ];
+
+		ProbeKeyboard();
+
+		Log( "playthrough-16: loaded: location " + playerData.m_general.m_location + " planet " + playerData.m_general.m_currentPlanetId + ", hold " + PtShipHold() + ", armor " + playerData.m_playerShip.m_armorPoints );
+
+		Check( "playthrough-16: the save of stage 15 is on the Cone's planet with the Orb, the egg and the Cone aboard", ( playerData.m_general.m_location == PD_General.Location.Planetside ) && playerData.m_playerShip.HasArtifact( "Crystal Cone" ) && playerData.m_playerShip.HasArtifact( "Black Egg" ) && playerData.m_playerShip.HasArtifact( "Crystal Orb" ), playerData.m_general.m_location + ", " + PtShipHold() );
+
+		yield return PtWaitForPlanets( 30.0f );
+		yield return PtLaunchFromPlanet( done );
+
+		Check( "playthrough-16: the ship launches into orbit", done[ 0 ], playerData.m_general.m_location.ToString() );
+
+		yield return PtLeaveOrbit( done );
+		yield return PtLeaveSystem( done );
+
+		Check( "playthrough-16: out of the star system into hyperspace", done[ 0 ], playerData.m_general.m_location.ToString() );
+
+		Log( "playthrough-16: armor " + playerData.m_playerShip.m_armorPoints + ", shields " + playerData.m_playerShip.m_shieldPoints + ", fuel " + Endurium() + ", stardate " + playerData.m_general.m_currentStardateYMD + ", encounters " + string.Join( " ## ", s_ptEncounters ) );
+
+		PlaythroughSave( "location=" + playerData.m_general.m_location + " fuel=" + Endurium() );
+
+		Finish( "scenario=playthrough-16 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// stage 17: in hyperspace by the Cone's star. On to the Crystal Planet (192,152 planet 1) and into orbit with the Crystal Orb aboard: its field does no harm,
+	// and the Crystal Cone finds the control nexus
+	IEnumerator ScenarioPlaythrough17()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var ship = playerData.m_playerShip;
+		var done = new bool[ 1 ];
+		var crystalPlanet = 33;
+		var crystalStar = gameData.m_planetList[ crystalPlanet ].m_starId;
+
+		ProbeKeyboard();
+
+		Log( "playthrough-17: loaded: location " + playerData.m_general.m_location + ", fuel " + Endurium() + ", armor " + ship.m_armorPoints + ", hold " + PtShipHold() );
+
+		Check( "playthrough-17: the save of stage 16 is in hyperspace with the Orb, the egg and the Cone", ( playerData.m_general.m_location == PD_General.Location.Hyperspace ) && ship.HasArtifact( "Crystal Cone" ), playerData.m_general.m_location + ", " + PtShipHold() );
+
+		yield return PtHyperspaceTo( crystalStar, 2.0f, done );
+
+		Check( "playthrough-17: hyperspace travel reaches the Crystal Planet's star", done[ 0 ], playerData.m_general.m_location + " star " + playerData.m_general.m_currentStarId );
+
+		if ( !done[ 0 ] )
+		{
+			PlaythroughSave( "no crystal star" );
+			Finish( "scenario=playthrough-17 abort: the Crystal Planet's star was not reached", 2 );
+			yield break;
+		}
+
+		yield return PtFlyToPlanetAndEnter( crystalPlanet, PD_General.Location.InOrbit, done );
+
+		if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+		{
+			yield return PtMeetEncounter();
+			yield return PtFlyToPlanetAndEnter( crystalPlanet, PD_General.Location.InOrbit, done );
+		}
+
+		var orbitMessages = PtMessages();
+
+		Check( "playthrough-17: into orbit around the Crystal Planet", done[ 0 ] && ( playerData.m_general.m_currentPlanetId == crystalPlanet ), playerData.m_general.m_location + " " + playerData.m_general.m_currentPlanetId );
+		Check( "playthrough-17: in orbit the Crystal Cone reports the control nexus at 47N x 45E", orbitMessages.Contains( "47" ) && orbitMessages.Contains( "45" ), orbitMessages );
+
+		// a few seconds in orbit with the shields down: the Crystal Orb keeps the field off
+		var armorBefore = ship.m_armorPoints;
+		var shieldsUp = ship.m_shieldsAreUp;
+		var end = Time.realtimeSinceStartup + 4.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( playerData.m_general.m_location == PD_General.Location.InOrbit ) )
+		{
+			yield return null;
+		}
+
+		Log( "playthrough-17: in orbit around the Crystal Planet: armor " + armorBefore + " -> " + ship.m_armorPoints + " in 4 s (shields up " + shieldsUp + "), messages '" + PtMessages() + "'" );
+
+		Check( "playthrough-17: with the Crystal Orb aboard the Crystal Planet's field does no damage", ship.m_armorPoints >= armorBefore, armorBefore + " -> " + ship.m_armorPoints );
+
+		// the science officer: sensors and analysis of the Crystal Planet
+		yield return PtOfficer( "Science" );
+		yield return PtPress( "Sensors" );
+
+		var sensors = SpaceflightController.m_instance.m_displayController.m_sensorsDisplay;
+		var scanEnd = Time.realtimeSinceStartup + 25.0f;
+
+		while ( ( Time.realtimeSinceStartup < scanEnd ) && !sensors.m_hasSensorData )
+		{
+			yield return null;
+		}
+
+		if ( PtButtonRunning() )
+		{
+			yield return Tap( Key.Enter );
+			yield return Frames( 5 );
+		}
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		yield return PtPress( "Analysis" );
+		yield return Frames( 5 );
+
+		Log( "playthrough-17: the analysis of the Crystal Planet: '" + PtMessages() + "'" );
+
+		PlaythroughSave( "location=" + playerData.m_general.m_location + " planet=" + playerData.m_general.m_currentPlanetId + " fuel=" + Endurium() + " armor=" + ship.m_armorPoints );
+
+		Finish( "scenario=playthrough-17 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// stage 18: in orbit around the Crystal Planet. Land at the control nexus (47N x 45E: the Cone reports it on Land too), go out (the terrain vehicle takes the
+	// Black Egg), drive to the nexus by the vehicle's coordinates, drop the egg with the cargo list, and back into the ship
+	IEnumerator ScenarioPlaythrough18()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+		var driven = new float[ 1 ];
+		var eggId = gameData.FindArtifactId( "Black Egg" );
+
+		ProbeKeyboard();
+
+		Log( "playthrough-18: loaded: location " + playerData.m_general.m_location + " planet " + playerData.m_general.m_currentPlanetId + ", hold " + PtShipHold() + ", armor " + playerData.m_playerShip.m_armorPoints );
+
+		Check( "playthrough-18: the save of stage 17 is in orbit around the Crystal Planet", ( playerData.m_general.m_location == PD_General.Location.InOrbit ) && ( playerData.m_general.m_currentPlanetId == 33 ), playerData.m_general.m_location + " " + playerData.m_general.m_currentPlanetId );
+
+		yield return PtWaitForPlanets( 30.0f );
+
+		// Land: the Cone reports the nexus with the landing map
+		controller.m_messages.Clear();
+
+		yield return PtOfficer( "Command" );
+		yield return PtPress( "Land" );
+
+		var landSaid = PtMessages();
+
+		Check( "playthrough-18: Land with the Crystal Cone aboard reports the control nexus", landSaid.Contains( "47N x 45E" ), landSaid );
+
+		// back out of the landing menu with Abort, and land through the usual steps
+		yield return PtPress( "Abort" );
+		yield return PtLand( BlackEgg.c_nexusLongitude, BlackEgg.c_nexusLatitude, done );
+
+		Check( "playthrough-18: the ship lands at the control nexus", done[ 0 ], playerData.m_general.m_location.ToString() );
+
+		if ( !done[ 0 ] )
+		{
+			PlaythroughSave( "no landing at the nexus" );
+			Finish( "scenario=playthrough-18 abort: no landing", 2 );
+			yield break;
+		}
+
+		yield return PtDisembark( done );
+
+		var vehicleHasEgg = ArtifactsHeld( playerData.m_terrainVehicle.m_artifactStorage, eggId ) > 0;
+
+		Check( "playthrough-18: the terrain vehicle takes the Black Egg out of the ship's hold", done[ 0 ] && vehicleHasEgg, PtVehicleHold() );
+
+		// to the nexus by the vehicle's own coordinates
+		var nexus = Tools.LatLongToWorldCoordinates( BlackEgg.c_nexusLongitude, BlackEgg.c_nexusLatitude );
+		var vehicle = controller.m_terrainVehicle;
+
+		if ( !( GetField( controller.m_buttonController, "m_currentButton" ) is MoveButton ) )
+		{
+			yield return PtPress( "Move" );
+		}
+
+		yield return PtDrive( () => nexus, 3.0f, 15.0f, driven );
+		yield return Tap( Key.Enter );
+		yield return Frames( 10 );
+
+		float east, north;
+
+		Tools.WorldToLatLongCoordinates( playerData.m_general.m_lastDisembarkedCoordinates, out east, out north );
+
+		var bar = FieldOrNull( controller.m_viewport, "m_label" ) as TMPro.TMP_Text;
+
+		Log( "playthrough-18: drove " + driven[ 0 ].ToString( "F0" ) + " to the nexus: the vehicle at " + north.ToString( "F2" ) + "N " + east.ToString( "F2" ) + "E, the coordinates above the main view '" + ( ( bar == null ) ? "-" : bar.text ) + "'" );
+
+		// Cargo with nothing beside the vehicle lists its cargo; Drop drops the marked item (the egg is the only one)
+		controller.m_messages.Clear();
+
+		var listSaid = "";
+
+		// the nexus has a ruin with a message: the first Cargo records it, the next lists the cargo
+		for ( var press = 0; ( press < 3 ) && ( PtIndexOf( "Drop" ) < 0 ); press++ )
+		{
+			controller.m_messages.Clear();
+
+			yield return PtPress( "Cargo" );
+			yield return Frames( 5 );
+
+			listSaid += "[" + press + "] " + Head( PtMessages() ) + " ";
+		}
+
+		var listSet = PtLabels();
+		var dropSaid = "";
+
+		if ( PtIndexOf( "Drop" ) >= 0 )
+		{
+			var items = TVCargoButton.BuildCargoItems();
+			var eggIndex = items.FindIndex( item => item.m_artifactId == eggId );
+
+			for ( var i = 0; i < eggIndex; i++ )
+			{
+				yield return PtPress( "Next" );
+			}
+
+			controller.m_messages.Clear();
+
+			yield return PtPress( "Drop" );
+			yield return Frames( 5 );
+
+			dropSaid = PtMessages();
+
+			if ( PtIndexOf( "Back" ) >= 0 )
+			{
+				yield return PtPress( "Back" );
+			}
+		}
+
+		var eggsAtTheNexus = 0;
+
+		foreach ( var droppedCargo in playerData.m_planetSurfaces.m_droppedCargoList )
+		{
+			if ( ( droppedCargo.m_planetId == 33 ) && ( droppedCargo.m_artifactId == eggId ) && BlackEgg.IsAtTheNexus( droppedCargo ) )
+			{
+				eggsAtTheNexus++;
+			}
+		}
+
+		Log( "playthrough-18: Cargo: '" + listSaid + "' (" + listSet + "), Drop: '" + dropSaid + "', eggs at the nexus " + eggsAtTheNexus + ", vehicle " + PtVehicleHold() );
+
+		Check( "playthrough-18: the cargo list drops the Black Egg at the control nexus, and the messages say it is armed", ( eggsAtTheNexus == 1 ) && dropSaid.Contains( "armed" ), eggsAtTheNexus + " | " + dropSaid );
+
+		yield return PtBackToTheShip( done );
+
+		Check( "playthrough-18: back in the ship without the egg", done[ 0 ] && !playerData.m_playerShip.HasArtifact( "Black Egg" ), done[ 0 ] + ", " + PtShipHold() );
+
+		PlaythroughSave( "location=" + playerData.m_general.m_location + " eggsAtTheNexus=" + eggsAtTheNexus );
+
+		Finish( "scenario=playthrough-18 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// stage 19: on the Crystal Planet with the egg armed at the nexus. Launch: back in orbit the egg counts down, BOOM, the Crystal Planet is destroyed and the
+	// game is won (Interstel's message, the bonus waiting for the Starport); then out of the star system
+	IEnumerator ScenarioPlaythrough19()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var general = playerData.m_general;
+		var done = new bool[ 1 ];
+
+		ProbeKeyboard();
+
+		Log( "playthrough-19: loaded: location " + general.m_location + " planet " + general.m_currentPlanetId + ", won " + general.m_gameWon + ", dropped cargo " + playerData.m_planetSurfaces.m_droppedCargoList.Count );
+
+		Check( "playthrough-19: the save of stage 18 is on the Crystal Planet, the game not won yet", ( general.m_location == PD_General.Location.Planetside ) && ( general.m_currentPlanetId == 33 ) && !general.m_gameWon, general.m_location + " " + general.m_currentPlanetId + " won " + general.m_gameWon );
+
+		yield return PtWaitForPlanets( 30.0f );
+
+		// the launch: the egg goes off once the ship is back in orbit
+		var said = new List<string>();
+
+		yield return PtOfficer( "Command" );
+		yield return PtPress( "Launch" );
+		yield return PtPress( "Yes" );
+
+		var end = Time.realtimeSinceStartup + 60.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && !general.m_gameWon )
+		{
+			foreach ( var message in general.m_messageList )
+			{
+				var text = System.Text.RegularExpressions.Regex.Replace( message, "<[^>]*>", "" ).Replace( "\n", " / " );
+
+				if ( !said.Contains( text ) )
+				{
+					said.Add( text );
+				}
+			}
+
+			yield return null;
+		}
+
+		yield return new WaitForSecondsRealtime( 2.0f );
+
+		foreach ( var message in general.m_messageList )
+		{
+			var text = System.Text.RegularExpressions.Regex.Replace( message, "<[^>]*>", "" ).Replace( "\n", " / " );
+
+			if ( !said.Contains( text ) )
+			{
+				said.Add( text );
+			}
+		}
+
+		var all = string.Join( " || ", said );
+		var destroyed = StarSystem.IsPlanetDestroyed( 33 );
+
+		Log( "playthrough-19: after the launch: location " + general.m_location + ", won " + general.m_gameWon + ", bonus pending " + general.m_winBonusPending + ", Crystal Planet destroyed " + destroyed + ", said: " + all );
+
+		Check( "playthrough-19: back in orbit the egg counts down and goes BOOM", all.Contains( "COUNTDOWN TRANSMISSION FROM THE BLACK EGG" ) && all.Contains( "BOOM!" ), Head( all ) );
+		Check( "playthrough-19: the Crystal Planet is destroyed and the game is won, the bonus waiting for the Starport", destroyed && general.m_gameWon && general.m_winBonusPending, destroyed + ", " + general.m_gameWon + ", " + general.m_winBonusPending );
+		Check( "playthrough-19: Interstel's message of the win", all.Contains( "INTERSTEL MEDAL OF SUBLIME ACHIEVEMENT" ), Tail( all ) );
+
+		var settle = Time.realtimeSinceStartup + 6.0f;
+
+		while ( ( Time.realtimeSinceStartup < settle ) && ( general.m_location != PD_General.Location.StarSystem ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 10 );
+
+		Log( "playthrough-19: after the explosion: " + general.m_location + ", console " + PtLabels() + ", running " + PtButtonRunning() + ", messages '" + PtMessages() + "'" );
+
+		Check( "playthrough-19: after the explosion the ship is in the star system", general.m_location == PD_General.Location.StarSystem, general.m_location.ToString() );
+
+		if ( general.m_location == PD_General.Location.StarSystem )
+		{
+			yield return PtLeaveSystem( done );
+		}
+
+		PlaythroughSave( "location=" + general.m_location + " won=" + general.m_gameWon + " fuel=" + Endurium() );
+
+		Finish( "scenario=playthrough-19 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// stage 20: in hyperspace by the Crystal Planet's star after the win. Home to Arth: hyperspace to its star (or, with the hold out of fuel, a distress call and
+	// Interstel's tow), the docking bay, which pays the bonus, and into the Starport
+	IEnumerator ScenarioPlaythrough20()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var general = playerData.m_general;
+		var bank = playerData.m_bank;
+		var done = new bool[ 1 ];
+		var balanceBefore = bank.m_currentBalance;
+		var ledgerBefore = bank.m_transactionList.Count;
+		var towed = false;
+
+		ProbeKeyboard();
+
+		Log( "playthrough-20: loaded: location " + general.m_location + ", won " + general.m_gameWon + ", bonus pending " + general.m_winBonusPending + ", fuel " + Endurium() + ", balance " + balanceBefore + ", stardate " + general.m_currentStardateYMD );
+
+		Check( "playthrough-20: the save of stage 19 keeps the win and the bonus waiting", general.m_gameWon && general.m_winBonusPending, general.m_gameWon + ", " + general.m_winBonusPending );
+
+		yield return PtHyperspaceTo( gameData.m_misc.m_arthStarId, 2.0f, done );
+
+		if ( !done[ 0 ] && ( general.m_location == PD_General.Location.Hyperspace ) )
+		{
+			// out of fuel short of Arth: the distress call
+			Log( "playthrough-20: short of Arth with " + Endurium() + " tenths of fuel at " + Tools.WorldToGameCoordinates( general.m_coordinates ) + ": a distress call" );
+
+			yield return PtOfficer( "Communications" );
+			yield return PtPress( "Distress" );
+
+			var asked = PtMessages();
+
+			yield return PtPress( "Yes" );
+			yield return Frames( 30 );
+
+			towed = general.m_location == PD_General.Location.DockingBay;
+
+			Log( "playthrough-20: Distress asked '" + asked + "'; then " + general.m_location + ", messages '" + PtMessages() + "'" );
+
+			Check( "playthrough-20: the distress call has Interstel tow the ship to the Starport", towed, general.m_location.ToString() );
+		}
+		else if ( done[ 0 ] )
+		{
+			yield return PtFlyToPlanetAndEnter( gameData.m_misc.m_arthPlanetId, PD_General.Location.DockingBay, done );
+
+			Check( "playthrough-20: home at Arth the ship docks at the Starport", done[ 0 ], general.m_location + ": " + PtMessages() );
+
+			var dockEnd = Time.realtimeSinceStartup + 30.0f;
+
+			while ( ( Time.realtimeSinceStartup < dockEnd ) && SpaceflightController.m_instance.m_playerCamera.IsLaunchingOrLanding() )
+			{
+				yield return null;
+			}
+
+			yield return Frames( 10 );
+		}
+
+		var bonus = bank.m_currentBalance - balanceBefore;
+		var newRows = "";
+
+		for ( var i = ledgerBefore; i < bank.m_transactionList.Count; i++ )
+		{
+			newRows += bank.m_transactionList[ i ].m_stardate + " " + bank.m_transactionList[ i ].m_description + " " + bank.m_transactionList[ i ].m_amount + "; ";
+		}
+
+		Log( "playthrough-20: in the docking bay (towed " + towed + "): balance " + balanceBefore + " -> " + bank.m_currentBalance + " (" + bonus + "), bonus pending " + general.m_winBonusPending + ", new ledger rows " + newRows + "messages '" + PtMessages() + "'" );
+
+		Check( "playthrough-20: docking at the Starport after the win pays the 500,000 MU bonus with a ledger entry", ( bonus >= 500000 ) && !general.m_winBonusPending && newRows.Contains( "Bonus 500000+" ), bonus + ", " + newRows );
+
+		// into the Starport
+		if ( general.m_location == PD_General.Location.DockingBay )
+		{
+			yield return PtOfficer( "Command" );
+			yield return PtPress( "Disembark" );
+			yield return PtWaitForScene( "Starport", 20.0f );
+			yield return Frames( 60 );
+		}
+
+		Check( "playthrough-20: into the Starport", ( SceneManager.GetActiveScene().name == "Starport" ) && ( DataController.m_instance.m_playerData.m_general.m_location == PD_General.Location.Starport ), SceneManager.GetActiveScene().name + " " + DataController.m_instance.m_playerData.m_general.m_location );
+
+		PlaythroughSave( "location=" + DataController.m_instance.m_playerData.m_general.m_location + " balance=" + DataController.m_instance.m_playerData.m_bank.m_currentBalance + " towed=" + towed );
+
+		Finish( "scenario=playthrough-20 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// stage 21: at the Starport after the win. Operations: Interstel's supplemental evaluation on the completion of the mission (and any towing charges), its pages
+	// with More; the Bank's ledger with the bonus; the docking bay still lets the ship out (the game goes on after the win)
+	IEnumerator ScenarioPlaythrough21()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var general = playerData.m_general;
+		var bank = playerData.m_bank;
+
+		ProbeKeyboard();
+
+		Log( "playthrough-21: loaded at the Starport: location " + general.m_location + ", won " + general.m_gameWon + ", balance " + bank.m_currentBalance + ", unread evaluation " + general.HasUnreadEvaluation() + ", supplemental evaluations " + general.m_supplementalEvaluationList.Count );
+
+		Check( "playthrough-21: the save of stage 20 is at the Starport with the win", ( general.m_location == PD_General.Location.Starport ) && general.m_gameWon, general.m_location + " " + general.m_gameWon );
+
+		// the docking bay first: an evaluation waits unread
+		var dockingBay = FindPanel<DockingBayPanel>();
+
+		yield return OpenPanel( dockingBay, "docking bay" );
+
+		var preflight = PreflightText( dockingBay );
+
+		yield return ClosePanel( dockingBay, "docking bay" );
+
+		Log( "playthrough-21: the docking bay before the evaluation: '" + preflight + "'" );
+
+		Check( "playthrough-21: the docking bay sends the crew to Operations for the evaluation", preflight.Contains( "Report to Operations for evaluation." ), preflight );
+
+		// Operations: the evaluation's pages
+		var operations = FindPanel<OperationsPanel>();
+		var balanceBefore = bank.m_currentBalance;
+
+		yield return OpenPanel( operations, "operations" );
+
+		PanelCall( "EvaluationClicked", () => operations.EvaluationClicked() );
+
+		yield return Frames( 3 );
+
+		var pages = new List<string>();
+
+		for ( var page = 0; page < 6; page++ )
+		{
+			var text = "";
+
+			foreach ( var tmp in operations.m_evaluationGameObject.GetComponentsInChildren<TMPro.TextMeshProUGUI>() )
+			{
+				text += PtText( tmp ) + " ";
+			}
+
+			pages.Add( text.Trim() );
+
+			if ( !operations.m_moreButton.gameObject.activeInHierarchy )
+			{
+				break;
+			}
+
+			PanelCall( "MoreClicked", () => operations.MoreClicked() );
+
+			yield return Frames( 3 );
+		}
+
+		PanelCall( "QuitClicked", () => operations.QuitClicked() );
+
+		yield return ClosePanel( operations, "operations" );
+
+		var all = string.Join( " ## ", pages );
+
+		Log( "playthrough-21: the evaluation, " + pages.Count + " pages: " + all + " | balance " + balanceBefore + " -> " + bank.m_currentBalance );
+
+		Check( "playthrough-21: Interstel's evaluation says the mission is complete", all.ToUpperInvariant().Contains( "MISSION" ) && ( all.ToUpperInvariant().Contains( "COMPLET" ) || all.ToUpperInvariant().Contains( "CRYSTAL" ) ), Head( all ) );
+
+		// the Bank: the bonus in the ledger
+		var bankPanel = FindPanel<BankPanel>();
+
+		yield return OpenPanel( bankPanel, "bank" );
+
+		var ledger = "";
+
+		foreach ( var transaction in bank.m_transactionList )
+		{
+			ledger += transaction.m_stardate + " " + transaction.m_description + " " + transaction.m_amount + "; ";
+		}
+
+		var balanceText = PtText( FieldOrNull( bankPanel, "m_currentBalanceText" ) as TMPro.TMP_Text );
+
+		yield return ClosePanel( bankPanel, "bank" );
+
+		Log( "playthrough-21: the bank: '" + balanceText + "', ledger " + ledger );
+
+		Check( "playthrough-21: the ledger has the 500,000 MU bonus", ledger.Contains( "Bonus 500000+" ), ledger );
+
+		// fuel for the next flight if the hold has none (a ship towed home has burnt it all)
+		if ( Endurium() < 100 )
+		{
+			var depot = FindPanel<TradeDepotPanel>();
+			var change = new int[ 1 ];
+
+			yield return OpenPanel( depot, "trade depot" );
+			yield return PtDepotTrade( depot, true, 5, "20", change );
+			yield return ClosePanel( depot, "trade depot" );
+
+			Log( "playthrough-21: bought 20 cubic meters of fuel for " + ( -change[ 0 ] ) + ", fuel now " + Endurium() );
+		}
+
+		// the game goes on after the win: the docking bay lets the ship out
+		yield return OpenPanel( dockingBay, "docking bay" );
+
+		var transporting = dockingBay.IsTransporting();
+		var after = PreflightText( dockingBay );
+
+		Check( "playthrough-21: after the evaluation the preflight check passes again", transporting, after );
+
+		yield return PtWaitForScene( "Spaceflight", 20.0f );
+		yield return Frames( 60 );
+
+		Log( "playthrough-21: the end: location " + DataController.m_instance.m_playerData.m_general.m_location + ", balance " + DataController.m_instance.m_playerData.m_bank.m_currentBalance + ", stardate " + DataController.m_instance.m_playerData.m_general.m_currentStardateYMD + ", encounters " + string.Join( " ## ", s_ptEncounters ) );
+
+		PlaythroughSave( "the end: location=" + DataController.m_instance.m_playerData.m_general.m_location + " balance=" + DataController.m_instance.m_playerData.m_bank.m_currentBalance );
+
+		Finish( "scenario=playthrough-21 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
