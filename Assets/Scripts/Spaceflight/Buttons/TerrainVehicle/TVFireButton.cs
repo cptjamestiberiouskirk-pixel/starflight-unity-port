@@ -99,7 +99,8 @@ public class TVFireButton : ShipButton
 		{
 			var lifeform = child.GetComponent<TerrainLifeform>();
 
-			if ( ( lifeform == null ) || ( lifeform.m_status == TerrainLifeform.Status.Dead ) )
+			// nothing in the air: "Airborne creatures may not be dealt with by the player" (planet.txt)
+			if ( ( lifeform == null ) || ( lifeform.m_status == TerrainLifeform.Status.Dead ) || lifeform.IsAirborne() )
 			{
 				continue;
 			}
