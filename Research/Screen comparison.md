@@ -80,8 +80,8 @@ The stellar parameters and the system map match the original (CONFIRMED, picture
 | Item | Status | Evidence | Owner |
 |---|---|---|---|
 | The lead-up to orbit (STANDING BY TO ORBIT, PRESS SPACEBAR TO ORBIT) | FIXED | PR 219 (CONFIRMED, code) | GAMEPLAY |
-| The port clears the text window at each step; the original lets the lines scroll on, from "...COMMENCING SYSTEM TRAVEL" to "...ORBIT ESTABLISHED" | OPEN | `StarSystem.cs:142`, `ManeuverButton.cs:194`, `InOrbit.cs:231`; starflt_141, starflt_143 (CONFIRMED) | GAMEPLAY |
-| "Orbit established." where the original has "...ORBIT ESTABLISHED" | OPEN, low priority | `InOrbit.cs:232`, starflt_143 (CONFIRMED) | GAMEPLAY |
+| The port clears the text window at each step; the original lets the lines scroll on, from "...COMMENCING SYSTEM TRAVEL" to "...ORBIT ESTABLISHED" | FIXED (the orbit lines PR) | `StarSystem.cs:142`, `ManeuverButton.cs:194`, `InOrbit.cs:231`; starflt_141, starflt_143 (CONFIRMED) | GAMEPLAY |
+| "Orbit established." where the original has "...ORBIT ESTABLISHED" | FIXED (the orbit lines PR) | `InOrbit.cs:232`, starflt_143 (CONFIRMED) | GAMEPLAY |
 | A frame in the main view ("IN ORBIT", "ORBIT VII · FROZEN", "ENCOUNTER", corner brackets) that the original does not have | OPEN | `ViewportFrame.cs:117, 129` (PR 260); pictures (CONFIRMED) | UI KIT |
 | The auxiliary view shows Status in the probe's orbit picture | PROBE | the probe left it on | |
 
