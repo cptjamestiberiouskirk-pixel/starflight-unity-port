@@ -102,6 +102,18 @@ public class GD_Species
 			{
 				speciesList.Add( Make( index, random ) );
 			}
+
+			// the animals that float (?CAN-FLOAT: "Floating (plant or animal)", planet.txt), a tenth of those that do not fly, with random numbers of their own so
+			// that the species drawn above stay as they were (the tenth is the port's, as the flyers' is)
+			var floatRandom = new System.Random( planet.m_id * 977 + 14 );
+
+			foreach ( var species in speciesList )
+			{
+				if ( ( species.m_niche != Niche.Producer ) && !species.m_canFly )
+				{
+					species.m_canFloat = floatRandom.Next( 10 ) == 0;
+				}
+			}
 		}
 
 		s_speciesOfPlanet[ planet.m_id ] = speciesList;
@@ -125,6 +137,12 @@ public class GD_Species
 			species.m_intelligence = 1 + random.Next( 10 );
 			species.m_movementRate = 0;
 			species.m_canFloat = random.Next( 10 ) == 0;
+
+			// a floating plant drifts (FLOAT needs ?MOVING; the rate is the port's)
+			if ( species.m_canFloat )
+			{
+				species.m_movementRate = 1;
+			}
 		}
 		else
 		{
