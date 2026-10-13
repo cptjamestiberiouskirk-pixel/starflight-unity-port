@@ -969,6 +969,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioShippedStrength();
 				break;
 
+			case "postureeffects":
+				yield return ScenarioPostureEffects();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -19346,8 +19350,8 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 3. the Elowan (44, neutral above their 25): two friendly statements calm them, the second by half as much as the first, and a question by half again of
-		// the third
+		// ---- 3. the Elowan (44): the player's friendly hail calms them by their full 10 (the player hailed first), then two friendly statements, the second by half
+		// as much as the first, and a question by half of a third (the phrases of the comm link, as the shipped game counts them)
 		var elowanSaid = new List<string>();
 
 		yield return MeetAndConnect( elowanId, GD_Comm.Stance.Friendly, elowanSaid );
@@ -19463,7 +19467,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "mood: the Spemin met in peace by a weaker ship talk tough and hold their fire", SaysALineOf( weakStatement, GameData.Race.Spemin, GD_Comm.Subject.Statement, GD_Comm.Stance.Hostile ) && ( weakStance != GD_Comm.Stance.Hostile ), weakStance + " | " + weakStatement );
 		Check( "mood: the Spemin met by a far stronger ship grovel", SaysALineOf( strongStatement, GameData.Race.Spemin, GD_Comm.Subject.Statement, GD_Comm.Stance.Obsequious ), strongStatement );
-		Check( "mood: friendly statements calm the Elowan, each by less than the one before, and a question by half", ( moodAtStart == 44.0f ) && ( moodAfterOne == 34.0f ) && ( moodAfterTwo == 29.0f ) && Mathf.Abs( moodAfterQuestion - ( 29.0f - 10.0f / 3.0f / 2.0f ) ) < 0.01f && ( elowanStance == GD_Comm.Stance.Neutral ), moodAtStart + " -> " + moodAfterOne + " -> " + moodAfterTwo + " -> " + moodAfterQuestion + ", " + elowanStance );
+		Check( "mood: friendly statements calm the Elowan, each by less than the one before, and a question by half", ( moodAtStart == 34.0f ) && ( moodAfterOne == 24.0f ) && ( moodAfterTwo == 19.0f ) && Mathf.Abs( moodAfterQuestion - ( 19.0f - 10.0f / 3.0f / 2.0f ) ) < 0.01f && ( elowanStance == GD_Comm.Stance.Friendly ), moodAtStart + " -> " + moodAfterOne + " -> " + moodAfterTwo + " -> " + moodAfterQuestion + ", " + elowanStance );
 		Check( "mood: too agitated to talk, the Elowan end the comm link and take flight from a stronger ship", !flightConnected && ( flightStance == GD_Comm.Stance.Obsequious ), flightConnected + ", " + flightStance );
 		Check( "mood: too agitated to talk, the Elowan end the comm link and fight a weaker ship", !fightConnected && ( fightStance == GD_Comm.Stance.Hostile ), fightConnected + ", " + fightStance );
 		Check( "mood: the Thrynn say their last phrase and then end the comm link, tired of talking", !thrynnConnectedAfter && thrynnLast.Contains( "Receiving:" ), thrynnConnectedAfter + " | " + thrynnLast );
@@ -19608,7 +19612,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "rivals: after the Thrynn the Elowan greet the crew as friends of the Thrynn, and start in their hostile band", elowanGreeting.Contains( CommText( 2 ) ) && ( elowanMood >= 60.0f ), elowanMood + " | " + elowanGreeting );
 		Check( "rivals: with a Thrynn aboard the Elowan have no dealings with the ship, end the comm link, and do not attack", noDealings.Contains( CommText( 1 ) ) && noDealingsDisconnected && ( noDealingsStance != GD_Comm.Stance.Hostile ), noDealingsDisconnected + ", " + noDealingsStance + " | " + noDealings );
 		Check( "rivals: with a Thrynn aboard an officer with no skill understands every word of the Thrynn, and without one not (control)", wholeWithThrynn && !wholeWithout, string.Join( " | ", withThrynn ) + " || " + string.Join( " | ", withoutThrynn ) );
-		Check( "rivals: with an Elowan aboard the Thrynn greet with \"most regrettable\", and start in their hostile band", regrettable.Contains( CommText( 297 ) ) && ( thrynnMood >= 60.0f ), thrynnMood + " | " + regrettable );
+		Check( "rivals: with an Elowan aboard the Thrynn greet with \"most regrettable\", and start in their hostile band (60, less the 8 of the player's friendly hail)", regrettable.Contains( CommText( 297 ) ) && ( thrynnMood >= 52.0f ), thrynnMood + " | " + regrettable );
 
 		Finish( "scenario=rivals first=" + firstAfter + " elowanMood=" + elowanMood + " thrynnMood=" + thrynnMood, 0 );
 	}
@@ -24808,6 +24812,153 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "shippedstrength: too agitated to talk, the Spemin fight a ship with no equipment (control)", bareShipFight.EndsWith( "Hostile" ), bareShipFight );
 
 		Finish( "scenario=shippedstrength", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 2: what moves the aliens' mood in the shipped game (COMM-OV <EDL>)
+
+	// enters an encounter and keeps the aliens from hailing for a few frames (their conversation timer held), so that the player can hail first
+	static IEnumerator EnterQuietly( int encounterId )
+	{
+		EnterEncounter( encounterId );
+
+		for ( var i = 0; i < 10; i++ )
+		{
+			var pdEncounter = SpaceflightController.m_instance.m_encounter.m_pdEncounter;
+
+			if ( pdEncounter != null )
+			{
+				pdEncounter.m_conversationTimer = 1000.0f;
+			}
+
+			yield return null;
+		}
+	}
+
+	// the aliens' mood now, set if it was not yet
+	static float MoodNow()
+	{
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		Call( encounter, "GetAlienTalkStance" );
+
+		return encounter.m_pdEncounter.m_mood;
+	}
+
+	IEnumerator ScenarioPostureEffects()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var said = new List<string>();
+
+		EnsureCrew();
+
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+
+		ship.m_armorPoints = 250;
+		ship.m_shieldPoints = 0;
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+
+		var encounterRange = SpaceflightController.m_instance.m_encounterRange;
+
+		SpaceflightController.m_instance.m_encounterRange = 0.0f;
+
+		var veloxId = FindEncounterOfRace( GameData.Race.Velox );
+		var thrynnId = FindEncounter( 1, 6, 3, 0, GameData.Race.Thrynn );
+
+		// ---- 1. the Veloxi (44): raising the shields during the encounter angers them by 5, arming the weapons by 10, lowering the shields calms them by 5
+		yield return EnterQuietly( veloxId );
+
+		var shieldsStart = MoodNow();
+
+		ship.m_shieldsAreUp = true;
+		yield return Frames( 2 );
+
+		var shieldsUp = MoodNow();
+
+		ship.m_weaponsAreArmed = true;
+		yield return Frames( 2 );
+
+		var weaponsArmed = MoodNow();
+
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+		yield return Frames( 2 );
+
+		var bothDown = MoodNow();
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 2. the Veloxi hail three times without a reply (the second angers them by 4, the third by 9), then the player replies grovelling (their full -8, and the
+		// reply counts as a phrase), and a grovelling statement after it moves them by -8 / 2
+		EnterEncounter( veloxId );
+		yield return Frames( 10 );
+
+		var hailMoods = new List<float>();
+
+		for ( var i = 0; i < 3; i++ )
+		{
+			yield return LetAliensSpeak( 1, said );
+
+			hailMoods.Add( MoodNow() );
+		}
+
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		encounter.Hail( GD_Comm.Stance.Obsequious, true );
+
+		var afterReply = MoodNow();
+
+		yield return LetAliensSpeak( 1, said );
+
+		encounter.m_pdEncounter.m_questionLikelihood = 0;
+
+		new StatementButton().Execute();
+		yield return Frames( 2 );
+
+		var afterStatement = MoodNow();
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 3. the player hails the Thrynn (44) first, friendly (their full -8), then turns hostile in the link (their full 20), hostile again (nothing more), and
+		// friendly again (nothing: that posture has had its effect)
+		yield return EnterQuietly( thrynnId );
+
+		var thrynnStart = MoodNow();
+		var aliensHailedFirst = encounter.m_pdEncounter.m_aliensWantToConnect;
+
+		encounter.Hail( GD_Comm.Stance.Friendly, false );
+
+		var afterFriendlyHail = MoodNow();
+
+		yield return LetAliensSpeak( 1, said );
+
+		var thrynnConnected = encounter.m_pdEncounter.m_connected;
+
+		encounter.Hail( GD_Comm.Stance.Hostile, false );
+
+		var afterHostile = MoodNow();
+
+		encounter.Hail( GD_Comm.Stance.Hostile, false );
+		encounter.Hail( GD_Comm.Stance.Friendly, false );
+
+		var afterRepeats = MoodNow();
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		SpaceflightController.m_instance.m_encounterRange = encounterRange;
+
+		Log( "postureeffects: veloxi shields " + shieldsStart + " -> up " + shieldsUp + " -> armed " + weaponsArmed + " -> both down " + bothDown + " | veloxi hails " + string.Join( ", ", hailMoods ) + " -> grovelling reply " + afterReply + " -> grovelling statement " + afterStatement + " | thrynn (aliens hailed first " + aliensHailedFirst + ") " + thrynnStart + " -> friendly hail " + afterFriendlyHail + " -> connected " + thrynnConnected + ", hostile " + afterHostile + " -> repeats " + afterRepeats );
+
+		Check( "postureeffects: raising the shields angers the Veloxi by 5, arming the weapons by 10, and lowering both calms them by 15, as the original", ( shieldsUp == shieldsStart + 5.0f ) && ( weaponsArmed == shieldsUp + 10.0f ) && ( bothDown == shieldsStart ), shieldsStart + " " + shieldsUp + " " + weaponsArmed + " " + bothDown );
+		Check( "postureeffects: the Veloxi's second hail without a reply angers them by 4 and the third by 9, as the original", ( hailMoods.Count == 3 ) && ( hailMoods[ 1 ] == hailMoods[ 0 ] + 4.0f ) && ( hailMoods[ 2 ] == hailMoods[ 1 ] + 9.0f ), string.Join( ", ", hailMoods ) );
+		Check( "postureeffects: a grovelling reply to the Veloxi's hail calms them by their full -8, and the statement after it by half, the reply being a phrase, as the original", ( hailMoods.Count == 3 ) && ( afterReply == hailMoods[ 2 ] - 8.0f ) && ( afterStatement == afterReply - 4.0f ), afterReply + " " + afterStatement );
+		Check( "postureeffects: the player who hails first has each posture's full effect once: friendly -8, hostile 20, and nothing for a posture used before, as the original", !aliensHailedFirst && ( afterFriendlyHail == thrynnStart - 8.0f ) && ( afterHostile == afterFriendlyHail + 20.0f ) && ( afterRepeats == afterHostile ), thrynnStart + " " + afterFriendlyHail + " " + afterHostile + " " + afterRepeats );
+
+		Finish( "scenario=postureeffects", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

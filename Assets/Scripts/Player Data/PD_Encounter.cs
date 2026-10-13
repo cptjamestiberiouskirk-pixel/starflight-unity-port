@@ -62,12 +62,19 @@ public class PD_Encounter : IComparable
 	public bool m_specialQuestionAsked;
 
 	// the aliens' mood (the original's "emotional disposition level", from 0 most calm to 100 most agitated, see AlienPersonality) and whether it has been set for
-	// this encounter, how many statements and questions the player has made in the current posture, and how many more phrases the aliens will say before they are
-	// tired of talking - 0 and false in older save files, and the mood is set again then
+	// this encounter, and how many more phrases the aliens will say before they are tired of talking - 0 and false in older save files, and the mood is set again
+	// then
 	public float m_mood;
 	public bool m_moodSet;
-	public int m_playerPhrasesInPosture;
 	public int m_alienPhrasesLeft;
+
+	// what moves the aliens' mood in the shipped game (COMM-OV <EDL>): how many phrases the player has made in this comm link (the reply to a hail, statements and
+	// questions: P-PHRASES), whether the player hailed first (HAILER), the postures the player has hailed or spoken in after hailing first, as posture bits (P-POSTURES),
+	// and how many times the aliens have hailed without a reply (#A-HAILS) - 0 and false in older save files
+	public int m_playerPhrases;
+	public bool m_playerHailedFirst;
+	public int m_playerPostures;
+	public int m_alienHails;
 
 	// set once the Elowan or the Thrynn have said what they think of the crew's other friends (false in older save files)
 	public bool m_rivalLineSaid;
