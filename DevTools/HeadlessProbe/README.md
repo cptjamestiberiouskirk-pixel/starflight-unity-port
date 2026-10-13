@@ -214,6 +214,7 @@ What the probe does:
 | `capture` | capturing a lifeform on planet 92: Cargo beside a living plant offers Capture, Record and Ignore, the capture puts it in stasis in the terrain vehicle's hold (off the surface, worth five times its data), Cargo beside a dead lifeform offers only Record, and back in the ship the specimen goes into the ship's hold (about 50 s) |
 | `starport-notices` | the Operations notices screen as the original's: today's date as the header beside NOTICES, END OF NOTICES after the newest notice and not after an earlier one, and with nothing new NO NEW NOTICES and REPEAT LAST NOTICE? with More and Quit as Yes and No, No back to the menu, Yes the last notice after REPEATING LAST NOTICE (about 20 s) |
 | `starport-training` | training asks how many sessions, as the original's HOW MANY TRAINING SESSIONS (0-N)?: for a human with no science and 11,700 M.U. the question offers 0 to 28 and trains nothing yet, three sessions train 27 points for 900 M.U., and asking for 999 trains the 25 left to the maximum of 250 (about 20 s) |
+| `starport-noyes` | the Starport's two yes or no questions (Personnel's DELETE THIS CREWMEMBER? and the Trade Depot's before an analysis) put No left of Yes, as the original's <-N Y->, with No selected first (about 15 s) |
 | `motiondetected` | the radar reports motion through a skilled science officer only, as the original's (above 150): in dark hyperspace with an alien group in reach, a science officer of science 100 says nothing and one of 200 says "Motion detected." (about 20 s) |
 | `launchlines` | the launch from the Starport says the original's lines in its order, OPENING DOCKING BAY DOORS, COMMENCING LAUNCH SEQUENCE... with the countdown, LEAVING STARPORT..., ...STARPORT CLEAR and STANDING BY TO MANEUVER, and keeps the last three together in the window (about 50 s) |
 | `starport-noticetyping` | a notice typed out as the original's: a paragraph every 0.3 s without a press, Quit while it is typed ends it with NOTICE ABORTED and the screen stays, the newest notice aborted says NOTICE ABORTED then END OF NOTICES, and a second Quit leaves (about 25 s) |
@@ -237,7 +238,7 @@ What the probe does:
 | `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 | `combatmessages` | the combat messages are the original's: WEAPONS NOT ARMED, NO TARGET PRESENT, WEAPON NOT AVAILABLE and OUT OF FUEL! when a weapon cannot fire, nothing of the port's own when the player's shot hits, and LASER CLASS n (LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (190 scenarios, about 153 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (191 scenarios, about 154 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

@@ -1105,6 +1105,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCombatMessages();
 				break;
 
+			case "starport-noyes":
+				yield return ScenarioStarportNoYes();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -28852,6 +28856,84 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		return null;
+	}
+
+	IEnumerator ScenarioStarportNoYes()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var personnel = FindPanel<PersonnelPanel>();
+		var depot = FindPanel<TradeDepotPanel>();
+
+		// the Personnel's delete question, on a file made here
+		yield return OpenPanel( personnel, "personnel" );
+
+		personnel.CreateClicked();
+
+		yield return Frames( 3 );
+
+		personnel.SelectClicked();
+
+		yield return Frames( 3 );
+
+		personnel.m_nameInputField.text = "Marvin";
+		personnel.OnEndEdit();
+
+		yield return Frames( 3 );
+
+		personnel.DeleteClicked();
+
+		yield return Frames( 5 );
+
+		var personnelNoX = personnel.m_noButton.transform.position.x;
+		var personnelYesX = personnel.m_yesButton.transform.position.x;
+		var personnelSelected = ( EventSystem.current != null ) && ( EventSystem.current.currentSelectedGameObject == personnel.m_noButton.gameObject );
+
+		personnel.NoClicked();
+
+		yield return Frames( 3 );
+
+		yield return ClosePanel( personnel, "personnel" );
+
+		// the Trade Depot's question before an analysis, with an artifact in the hold
+		playerData.m_playerShip.m_artifactStorage.m_artifactList.Clear();
+		playerData.m_playerShip.m_artifactStorage.Add( 1 );
+
+		yield return OpenPanel( depot, "trade depot" );
+
+		Call( depot, "SwitchToAnalyzeItemState", true );
+
+		yield return Frames( 3 );
+
+		Call( depot, "SwitchToAnalyzeConfirmState" );
+
+		yield return Frames( 5 );
+
+		UnityEngine.UI.Button depotYes = null;
+
+		foreach ( var button in depot.m_confirmAnalyzePanel.GetComponentsInChildren<UnityEngine.UI.Button>( true ) )
+		{
+			if ( button.gameObject.name == "Yes Button" )
+			{
+				depotYes = button;
+			}
+		}
+
+		var depotNoX = depot.m_noButton.transform.position.x;
+		var depotYesX = ( depotYes != null ) ? depotYes.transform.position.x : float.NaN;
+		var depotSelected = ( EventSystem.current != null ) && ( EventSystem.current.currentSelectedGameObject == depot.m_noButton.gameObject );
+
+		Call( depot, "SwitchToAnalyzeItemState", false );
+
+		yield return Frames( 3 );
+
+		yield return ClosePanel( depot, "trade depot" );
+
+		Log( "starport-noyes: personnel No x " + personnelNoX + " Yes x " + personnelYesX + " No selected " + personnelSelected + " | trade depot No x " + depotNoX + " Yes x " + depotYesX + " No selected " + depotSelected );
+
+		Check( "starport-noyes: DELETE THIS CREWMEMBER? puts No left of Yes, as the original's <-N Y->, with No selected", ( personnelNoX < personnelYesX ) && personnelSelected, personnelNoX + " / " + personnelYesX + " / " + personnelSelected );
+		Check( "starport-noyes: the Trade Depot's question before an analysis puts No left of Yes, with No selected", ( depotNoX < depotYesX ) && depotSelected, depotNoX + " / " + depotYesX + " / " + depotSelected );
+
+		Finish( "scenario=starport-noyes checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
