@@ -1101,6 +1101,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSaveCoords();
 				break;
 
+			case "combatmessages":
+				yield return ScenarioCombatMessages();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -3986,8 +3990,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		BringAliensClose();
 
-		// ---- the missile button on a ship that has never been given any missiles
+		// ---- the missile button on a ship that has never been given any missiles (with its weapons armed: they fire only then, as the original's)
 		var label = new FireMissileButton().GetLabel();
+
+		ship.m_weaponsAreArmed = true;
 
 		combat.SetTarget( FirstLivingAlien() );
 
@@ -3998,7 +4004,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "H8 missile button: label \"" + label + "\", launched=" + buttonLaunched + ", message: " + buttonMessage );
 
-		Check( "H8 a ship with a missile launcher can launch missiles", buttonLaunched && buttonMessage.Contains( "Missile launched" ) && !label.Contains( "(" ), "label \"" + label + "\", launched " + buttonLaunched + ", message: " + buttonMessage );
+		Check( "H8 a ship with a missile launcher can launch missiles", buttonLaunched && !label.Contains( "(" ), "label \"" + label + "\", launched " + buttonLaunched + ", message: " + buttonMessage );
 
 		// ---- fuel: 50 missiles and 100 laser shots
 		ship.m_fuelUsed = 0.0f;
@@ -4042,7 +4048,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "H8 no endurium: laser fired=" + laserWithNoFuel + " (" + laserMessage + "), missile launched=" + missileWithNoFuel + " (" + missileMessage + ")" );
 
-		Check( "H8 the weapons do not fire without endurium, and say why", !laserWithNoFuel && !missileWithNoFuel && laserMessage.Contains( "Insufficient fuel" ) && missileMessage.Contains( "Insufficient fuel" ), "laser " + laserWithNoFuel + " (" + laserMessage + "), missile " + missileWithNoFuel + " (" + missileMessage + ")" );
+		Check( "H8 the weapons do not fire without endurium, and say why", !laserWithNoFuel && !missileWithNoFuel && laserMessage.Contains( "Out of fuel!" ) && missileMessage.Contains( "Out of fuel!" ), "laser " + laserWithNoFuel + " (" + laserMessage + "), missile " + missileWithNoFuel + " (" + missileMessage + ")" );
 
 		Finish( "scenario=h8 label=[" + label + "] buttonLaunched=" + buttonLaunched + " missiles=" + missilesFired + "/" + usedByMissiles + " lasers=" + lasersFired + "/" + usedByLasers + " noFuel=laser:" + laserWithNoFuel + ",missile:" + missileWithNoFuel + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
@@ -28703,6 +28709,135 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "savecoords: a slot in a star system gives the system's coordinates, as above the main view", description.Contains( "Star System" ) && description.Contains( expected ), description + " (expected '" + expected + "')" );
 
 		Finish( "scenario=savecoords checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the combat messages are the original's (COMBAT-OV): WEAPONS NOT ARMED, WEAPON NOT AVAILABLE, OUT OF FUEL!, NO TARGET PRESENT when a weapon cannot fire, LASER
+	// CLASS n (or LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits, and nothing of the port's own when the player's shot hits
+	IEnumerator ScenarioCombatMessages()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var ship = playerData.m_playerShip;
+		var combat = CombatController.m_instance;
+		var messages = SpaceflightController.m_instance.m_messages;
+
+		EnsureCrew();
+
+		ship.m_laserCannonClass = 1;
+		ship.m_missileLauncherClass = 1;
+		ship.m_armorPoints = 100000;
+		ship.RestoreSystems();
+
+		if ( Endurium() < 50 )
+		{
+			ship.AddElement( 5, 100 );
+		}
+
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		EnterEncounter( speminId );
+
+		yield return Frames( 10 );
+
+		BringAliensClose();
+
+		var said = new Dictionary<string, string>();
+
+		// ---- 1. not armed
+		ship.m_weaponsAreArmed = false;
+		combat.SetTarget( FirstLivingAlien() );
+		messages.Clear();
+		new FireLaserButton().Execute();
+		said[ "unarmed" ] = MessageList();
+
+		// ---- 2. armed, no target
+		ship.m_weaponsAreArmed = true;
+		combat.SetTarget( -1 );
+		messages.Clear();
+		new FireLaserButton().Execute();
+		said[ "no target" ] = MessageList();
+
+		// ---- 3. armed, a target, no laser cannon
+		combat.SetTarget( FirstLivingAlien() );
+		ship.m_laserCannonClass = 0;
+		messages.Clear();
+		new FireLaserButton().Execute();
+		said[ "no laser" ] = MessageList();
+		ship.m_laserCannonClass = 1;
+
+		// ---- 4. no fuel
+		var endurium = Endurium();
+
+		ship.RemoveElement( 5, endurium );
+		messages.Clear();
+		new FireMissileButton().Execute();
+		said[ "no fuel" ] = MessageList();
+		ship.AddElement( 5, endurium );
+
+		// ---- 5. a shot that hits says nothing of the port's own
+		SetField( combat, "m_playerLaserCooldown", 0.0f );
+		BringAliensClose();
+		combat.SetTarget( FirstLivingAlien() );
+		messages.Clear();
+		new FireLaserButton().Execute();
+
+		yield return Frames( 5 );
+
+		said[ "hit" ] = MessageList();
+
+		// ---- 6. an alien laser hits the ship, without and with the Rod Device
+		GD_Vessel laserVessel = null;
+
+		foreach ( var vessel in gameData.m_vesselList )
+		{
+			if ( ( vessel.m_laserClass > 0 ) && !vessel.m_hasPlasmaBolts && ( laserVessel == null ) )
+			{
+				laserVessel = vessel;
+			}
+		}
+
+		var alienShip = FirstLivingAlienShip();
+
+		ship.m_shieldsAreUp = false;
+		messages.Clear();
+		combat.AlienFiresAtPlayer( alienShip, laserVessel );
+		said[ "alien laser" ] = MessageList();
+
+		ship.AddArtifact( gameData.FindArtifactId( "Rod Device" ) );
+		messages.Clear();
+		combat.AlienFiresAtPlayer( alienShip, laserVessel );
+		said[ "alien laser, Rod Device" ] = MessageList();
+
+		yield return Frames( 2 );
+
+		foreach ( var pair in said )
+		{
+			Log( "combatmessages: " + pair.Key + ": '" + pair.Value + "'" );
+		}
+
+		Check( "combatmessages: an unarmed weapon says the original's WEAPONS NOT ARMED", said[ "unarmed" ].Contains( "Weapons not armed" ), said[ "unarmed" ] );
+		Check( "combatmessages: with no target, NO TARGET PRESENT", said[ "no target" ].Contains( "No target present" ), said[ "no target" ] );
+		Check( "combatmessages: with no laser cannon, WEAPON NOT AVAILABLE", said[ "no laser" ].Contains( "Weapon not available" ), said[ "no laser" ] );
+		Check( "combatmessages: with no fuel, OUT OF FUEL!", said[ "no fuel" ].Contains( "Out of fuel!" ), said[ "no fuel" ] );
+		Check( "combatmessages: the player's own shot says nothing of the port's (no Hit! Target damaged.)", !said[ "hit" ].Contains( "Hit!" ) && !said[ "hit" ].Contains( "Missile launched" ), said[ "hit" ] );
+		Check( "combatmessages: an alien laser hit says LASER CLASS n, and with the Rod Device LASER PARTIALLY DEFLECTED", ( laserVessel != null ) && said[ "alien laser" ].Contains( "Laser class " + laserVessel.m_laserClass ) && said[ "alien laser, Rod Device" ].Contains( "Laser partially deflected" ), said[ "alien laser" ] + " | " + said[ "alien laser, Rod Device" ] );
+
+		Finish( "scenario=combatmessages checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the first living alien ship of the encounter
+	static PD_AlienShip FirstLivingAlienShip()
+	{
+		foreach ( var alienShip in SpaceflightController.m_instance.m_encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			if ( !alienShip.m_isDead )
+			{
+				return alienShip;
+			}
+		}
+
+		return null;
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
