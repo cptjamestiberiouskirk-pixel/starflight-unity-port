@@ -191,8 +191,7 @@ public class ManeuverButton : ShipButton
 						// no - transition to in orbit
 						m_nextLocation = PD_General.Location.InOrbit;
 
-						// display message
-						SpaceflightController.m_instance.m_messages.Clear();
+						// display message (under the lines before it: the original lets them scroll on, starflt_141 and 143)
 						SpaceflightController.m_instance.m_messages.AddText( "<color=white>Initiating orbital maneuver...</color>" );
 					}
 				}

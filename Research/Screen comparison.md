@@ -21,7 +21,7 @@ Not reported: art style, resolution, colours, fonts and 3D models.
 
 | | Items | FIXED | OPEN or PARTLY | Not a defect or owner's call |
 |---|---|---|---|---|
-| GAMEPLAY (with the items shared with the UI kit) | 52 | 24 | 23 | 5 |
+| GAMEPLAY (with the items shared with the UI kit) | 52 | 28 | 20 | 4 |
 | UI KIT | 41 | 0 | 40 | 1 |
 | The probe's pictures | 17 | 3 (PR 234) | 14 gaps | |
 
@@ -29,11 +29,10 @@ Since 2026-10-11 the gameplay side has been fixed in PRs 215, 216, 218, 219, 220
 
 The open gameplay items, most visible first:
 
-1. **Repair's choice of system** (section 13): the original lets the player choose what to repair; the port's engineer repairs the worst first, by the owner's ruling of 2026-10-11 (the DAMAGE display itself is done).
-2. **The bank books a recommendation's bonus or fine at once in the original** (section 21), where the port pays it on docking (the interest itself is done).
-3. **The notices screen** (section 18): its header, its end, "NO NEW NOTICES" with "REPEAT LAST NOTICE?", and the typing of a notice.
-4. **Combat messages and wounds** (section 12): the original names the weapon that hits ("MISSILE CLASS 2") and says how the crew is wounded; in the port combat never wounds the crew.
-5. **"MOTION DETECTED AT X: Y:"** (section 11), the shields and weapons messages (section 2), and several smaller ones.
+1. **The typing of a notice** (section 18): the original types a notice line by line, with an abort (the notices screen's header, its end and "NO NEW NOTICES" are done, as are the DAMAGE display, Repair's choice of system and the interest).
+2. **The bank books a recommendation's bonus or fine at once in the original** (section 21), where the port pays it on docking.
+3. **Combat messages and wounds** (section 12): the original names the weapon that hits ("MISSILE CLASS 2") and says how the crew is wounded; in the port combat never wounds the crew.
+4. **"MOTION DETECTED AT X: Y:"** (section 11), the shields and weapons messages (section 2), and several smaller ones.
 
 ---
 
@@ -54,7 +53,7 @@ The open gameplay items, most visible first:
 |---|---|---|---|
 | "Raise Shields" where the original has RAISE SHIELD | OPEN | `RaiseShieldsButton.cs:6` (CONFIRMED) | UI KIT |
 | "Drop Shields" and "Disarm Weapon" where the original has DROP SHIELD and DISARM | OPEN | `DropShieldsButton.cs:6`, `DisarmWeaponButton.cs:6`; `NAVIGATR.c` (CONFIRMED, code on both sides) | UI KIT |
-| The messages of the shields and weapons. Original: SHIELDS ARE NOW UP, SHIELDS ARE DOWN, ARMING MISSILES or ARMING LASERS, WEAPONS ARE DISARMED, and SHIELDS CAN'T BE RAISED with a beep; in a nebula MAGNETIC DISTURBANCES IN NEBULA / CAUSING ENERGY FLUCTUATIONS. Port: "Shields raised.", "Shields dropped.", "Weapons armed.", nothing at all when disarming (the button sets the flag and does not call `DisarmWeapons`), and its own lines for a nebula and for no fuel | OPEN | `PD_PlayerShip.cs:626, 637, 964, 974`, `DisarmWeaponButton.cs:13`, `RaiseShieldsButton.cs:30, 41`; `NAVIGATR.c` 190 to 323, 374 (CONFIRMED, code) | GAMEPLAY |
+| The messages of the shields and weapons. Original: SHIELDS ARE NOW UP, SHIELDS ARE DOWN, ARMING MISSILES or ARMING LASERS, WEAPONS ARE DISARMED, and SHIELDS CAN'T BE RAISED with a beep; in a nebula MAGNETIC DISTURBANCES IN NEBULA / CAUSING ENERGY FLUCTUATIONS. Port: "Shields raised.", "Shields dropped.", "Weapons armed.", nothing at all when disarming (the button sets the flag and does not call `DisarmWeapons`), and its own lines for a nebula and for no fuel | FIXED (the shields' and weapons' messages PR) | `PD_PlayerShip.cs:626, 637, 964, 974`, `DisarmWeaponButton.cs:13`, `RaiseShieldsButton.cs:30, 41`; `NAVIGATR.c` 190 to 323, 374 (CONFIRMED, code) | GAMEPLAY |
 
 ## 3. Star system
 
@@ -80,8 +79,8 @@ The stellar parameters and the system map match the original (CONFIRMED, picture
 | Item | Status | Evidence | Owner |
 |---|---|---|---|
 | The lead-up to orbit (STANDING BY TO ORBIT, PRESS SPACEBAR TO ORBIT) | FIXED | PR 219 (CONFIRMED, code) | GAMEPLAY |
-| The port clears the text window at each step; the original lets the lines scroll on, from "...COMMENCING SYSTEM TRAVEL" to "...ORBIT ESTABLISHED" | OPEN | `StarSystem.cs:142`, `ManeuverButton.cs:194`, `InOrbit.cs:231`; starflt_141, starflt_143 (CONFIRMED) | GAMEPLAY |
-| "Orbit established." where the original has "...ORBIT ESTABLISHED" | OPEN, low priority | `InOrbit.cs:232`, starflt_143 (CONFIRMED) | GAMEPLAY |
+| The port clears the text window at each step; the original lets the lines scroll on, from "...COMMENCING SYSTEM TRAVEL" to "...ORBIT ESTABLISHED" | FIXED (the orbit lines PR) | `StarSystem.cs:142`, `ManeuverButton.cs:194`, `InOrbit.cs:231`; starflt_141, starflt_143 (CONFIRMED) | GAMEPLAY |
+| "Orbit established." where the original has "...ORBIT ESTABLISHED" | FIXED (the orbit lines PR) | `InOrbit.cs:232`, starflt_143 (CONFIRMED) | GAMEPLAY |
 | A frame in the main view ("IN ORBIT", "ORBIT VII · FROZEN", "ENCOUNTER", corner brackets) that the original does not have | OPEN | `ViewportFrame.cs:117, 129` (PR 260); pictures (CONFIRMED) | UI KIT |
 | The auxiliary view shows Status in the probe's orbit picture | PROBE | the probe left it on | |
 
@@ -165,7 +164,7 @@ A vessel's reading matches the original's (mass, bio, energy, object constituent
 | Item | Status | Evidence | Owner |
 |---|---|---|---|
 | The DAMAGE display. Original (`ENGINEER.c`): Damage clears the auxiliary view and draws DAMAGE with a 40-pixel bar for each of HULL, ENGINES, SENSORS, COMM., SHIELD, MISSILE, LASER, green for what works and red for the rest, and writes no text. Port: there was no damage display; Damage wrote a "Damage Report:" text | FIXED (the DAMAGE display PR) | `DamageDisplay`, shown by Damage and at the start of Repair; the picture `13_damage.png` of `screenpictures` (CONFIRMED) | GAMEPLAY and UI KIT |
-| Repair. Original: shows the same display and lets the player scroll the seven rows; the text window gives each one ("ENGINES: SLIGHTLY DAMAGED", EFFICIENCY, CURRENT FUNCTIONALITY, ESTIMATED TIME FOR COMPLETE REPAIRS, CURRENTLY UNDER REPAIR), and the fire button chooses what to repair, with NO REPAIRS NEEDED, DAMAGED BEYOND REPAIR, "CEASE REPAIRS ON X AND BEGIN REPAIRS ON Y? [N Y]" and BEGINNING, CONTINUING or CEASING REPAIRS ON X. Port: Repair picks the system itself, the worst first, by the owner's ruling of 2026-10-11 for roadmap 1.2, made when no shipped source had the mechanics | OWNER'S CALL: the decompiled original now has them; the ruling stands until the owner changes it | `RepairButton.cs`; `ENGINEER.c` (CONFIRMED, code) | GAMEPLAY |
+| Repair. Original: shows the same display and lets the player scroll the seven rows; the text window gives each one ("ENGINES: SLIGHTLY DAMAGED", EFFICIENCY, CURRENT FUNCTIONALITY, ESTIMATED TIME FOR COMPLETE REPAIRS, CURRENTLY UNDER REPAIR), and the fire button chooses what to repair, with NO REPAIRS NEEDED, DAMAGED BEYOND REPAIR, "CEASE REPAIRS ON X AND BEGIN REPAIRS ON Y? [N Y]" and BEGINNING, CONTINUING or CEASING REPAIRS ON X. Port: Repair picked the system itself, the worst first, by the owner's ruling of 2026-10-11 for roadmap 1.2, made when no shipped source had the mechanics; on 2026-10-12 the owner ruled that it follows the original | FIXED (the Repair choice PR) | `RepairButton.cs`, the DAMAGE display's cursor; the `repairchoice` probe scenario and the picture `14_repair.png` (CONFIRMED) | GAMEPLAY |
 | No pictures | PROBE | | |
 
 ## 14. Medical (Examine and Treat)
@@ -203,9 +202,9 @@ The doors are where the original's are (Operations upper left, Personnel top, Cr
 | Item | Status | Evidence | Owner |
 |---|---|---|---|
 | The evaluations one to a page, the supplemental ones once, END OF EVALUATIONS, and each evaluation's heading | FIXED | PRs 254, 263 (CONFIRMED, code) | GAMEPLAY |
-| The notices' header. Original: "NOTICES 01-01-4620". Port: "Today is" and the date | OPEN | `OperationsPanel.cs:138`; `OP-OV.c` WE735 (CONFIRMED) | GAMEPLAY |
-| "***END OF NOTICES***" after the last notice | OPEN | not in the code or the scene; `OP-OV.c:902` (CONFIRMED) | GAMEPLAY |
-| With no unread notice the original says NO NEW NOTICES and asks REPEAT LAST NOTICE? [N Y], and on Y "***REPEATING LAST NOTICE***"; the port shows the last notice read again without asking | OPEN | `OperationsPanel.cs:143` to `164`; `OP-OV.c:1001` to `1020` (CONFIRMED) | GAMEPLAY |
+| The notices' header. Original: "NOTICES 01-01-4620". Port: "Today is" and the date | FIXED (the notices screen PR): the date beside the scene's NOTICES heading | `OperationsPanel.ShowNotices`; `OP-OV.c` WE735; the `starport-notices` probe scenario (CONFIRMED) | GAMEPLAY |
+| "***END OF NOTICES***" after the last notice | FIXED (the notices screen PR) | after the newest notice that is out; `OP-OV.c:902`; `starport-notices` (CONFIRMED) | GAMEPLAY |
+| With no unread notice the original says NO NEW NOTICES and asks REPEAT LAST NOTICE? [N Y], and on Y "***REPEATING LAST NOTICE***"; the port showed the last notice read again without asking | FIXED (the notices screen PR): More and Quit answer Yes and No meanwhile | `OperationsPanel.AskToRepeat`; `OP-OV.c:1001` to `1020`; `starport-notices` (CONFIRMED) | GAMEPLAY |
 | The original types a notice line by line with a pause (the spacebar skips it), with PRESS SPACEBAR TO CONTINUE / PRESS [] TO ABORT CURRENT NOTICE and ***NOTICE ABORTED***; the port shows one paragraph a press of More, with no abort | OPEN | `OperationsPanel.cs:441` to `476`; `OP-OV.c:536, 543, 879` (CONFIRMED, code) | GAMEPLAY (the flow), UI KIT (the prompts) |
 | After a notice the original shows "<- NEXT MESSAGE  PREVIOUS MESSAGE ->" and "PRESS SPACEBAR TO REPLAY OR [ QUIT ]"; the port has More, Previous, Next and Quit buttons and no Replay | OPEN | `OperationsPanel.cs:20` to `23`; `OP-OV.c:512, 519` (CONFIRMED) | UI KIT |
 | The original keeps NOTICES, EVALUATION and EXIT on screen inside both screens; the port hides them | OPEN | `OperationsPanel.cs:117` to `125` (CONFIRMED) | UI KIT |
@@ -289,9 +288,9 @@ The doors are where the original's are (Operations upper left, Personnel top, Cr
 
 One small PR per item, gameplay first. Each documented in the screenshots or the decompiled original, so D1 applies; a probe check that fails on the code before goes with each.
 
-1. **The DAMAGE display** (section 13), from `ENGINEER.c`: done. Repair's choice of system waits for the owner, since it would replace the ruling of 2026-10-11 that the engineer repairs the worst first.
+1. **The DAMAGE display and Repair's choice of system** (section 13), from `ENGINEER.c`: done (the choice by the owner's ruling of 2026-10-12, which replaced the worst first).
 2. **The bank's interest** (section 21): done. Left from it: the original books a recommendation's bonus or fine at once, which touches the colony rulings of roadmap 1.3.
-3. **The notices screen** (section 18): the header, END OF NOTICES, NO NEW NOTICES and REPEAT LAST NOTICE, then the typing and abort.
+3. **The notices screen** (section 18): the header, END OF NOTICES, NO NEW NOTICES and REPEAT LAST NOTICE are done; the typing and abort are left.
 4. **Combat messages and wounds** (section 12), from `DAMAGE-OV.c`.
 5. **MOTION DETECTED AT X: Y:** (section 11), from `HYPERMSG-OV.c`.
 6. **The shields and weapons messages** (section 2), from `NAVIGATR.c`.

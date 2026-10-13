@@ -725,6 +725,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportInterest();
 				break;
 
+			case "starport-notices":
+				yield return ScenarioStarportNotices();
+				break;
+
 			case "nebula":
 				yield return ScenarioNebula();
 				break;
@@ -759,6 +763,10 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "systemrepairs":
 				yield return ScenarioSystemRepairs();
+				break;
+
+			case "repairchoice":
+				yield return ScenarioRepairChoice();
 				break;
 
 			case "homeworlds":
@@ -995,6 +1003,14 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "analysisheading":
 				yield return ScenarioAnalysisHeading();
+				break;
+
+			case "orbitlines":
+				yield return ScenarioOrbitLines();
+				break;
+
+			case "shieldmessages":
+				yield return ScenarioShieldMessages();
 				break;
 
 			default:
@@ -3527,6 +3543,64 @@ public class ClaudeProbe : MonoBehaviour
 		return string.Join( " / ", DataController.m_instance.m_playerData.m_general.m_messageList ).Replace( '\n', '/' );
 	}
 
+	// the row Repair's cursor is on in the DAMAGE display (-1 if it is hidden, int.MinValue on the code before Repair's choice)
+	static int RepairCursorRow()
+	{
+		var display = FieldOrNull( SpaceflightController.m_instance.m_displayController, "m_damageDisplay" );
+		var getCursor = ( display == null ) ? null : display.GetType().GetMethod( "GetCursor" );
+
+		return ( getCursor == null ) ? int.MinValue : (int) getCursor.Invoke( display, null );
+	}
+
+	// Repair, and the stick down to a row, with the choice left open (the button stays Repair's)
+	static void RepairCursorRowAt( int row )
+	{
+		var buttonController = SpaceflightController.m_instance.m_buttonController;
+
+		PressButton( ButtonController.ButtonSet.Engineering, 1 );
+
+		for ( var step = 0; ( step < 8 ) && ( RepairCursorRow() != int.MinValue ) && ( RepairCursorRow() != row ); step++ )
+		{
+			ConsoleFrameWith( "m_south" );
+
+			Call( buttonController, "Update" );
+		}
+	}
+
+	// Repair as the player does it: the button, the stick down to the row (the DAMAGE display's rows: 0 the hull, then the engines, the sensors, the comm, the
+	// shield, the missiles and the laser) and the fire button - false if the cursor never came to it (on the code before Repair's choice the engineer asked about
+	// the worst item at once)
+	static bool RepairThroughTheConsole( int row )
+	{
+		var buttonController = SpaceflightController.m_instance.m_buttonController;
+
+		PressButton( ButtonController.ButtonSet.Engineering, 1 );
+
+		for ( var step = 0; step < 8; step++ )
+		{
+			var cursor = RepairCursorRow();
+
+			if ( cursor == int.MinValue )
+			{
+				return false;
+			}
+
+			if ( cursor == row )
+			{
+				ConsoleFrameWith( "m_submit" );
+
+				return true;
+			}
+
+			ConsoleFrameWith( "m_south" );
+
+			// (the stick back in the middle, so that the next push is a step of its own)
+			Call( buttonController, "Update" );
+		}
+
+		return false;
+	}
+
 	// answers the engineer's question about a repair mineral (No or Yes on the console), if the code asks one - returns whether it was asked
 	static bool AnswerRepairQuestion( bool yes )
 	{
@@ -3590,7 +3664,7 @@ public class ClaudeProbe : MonoBehaviour
 		// the engineer asks for the hull's repair mineral (since roadmap 1.2): aluminum in the hold, and yes
 		ship.AddElement( 0, 200 );
 
-		new RepairButton().Execute();
+		RepairThroughTheConsole( 0 );
 
 		AnswerRepairQuestion( true );
 
@@ -3602,7 +3676,7 @@ public class ClaudeProbe : MonoBehaviour
 		var armorAfter5s = ship.m_armorPoints;
 
 		// pressing the button again must not speed anything up
-		new RepairButton().Execute();
+		RepairThroughTheConsole( 0 );
 
 		var armorAfterSecondPress = ship.m_armorPoints;
 		var secondPressMessage = MessageList();
@@ -4418,7 +4492,7 @@ public class ClaudeProbe : MonoBehaviour
 		ship.AddElement( 0, 200 );
 
 		messages.Clear();
-		new RepairButton().Execute();
+		RepairThroughTheConsole( 0 );
 
 		AnswerRepairQuestion( true );
 
@@ -4436,7 +4510,7 @@ public class ClaudeProbe : MonoBehaviour
 		var doneMessage = MessageList();
 
 		messages.Clear();
-		new RepairButton().Execute();
+		RepairThroughTheConsole( 0 );
 
 		var nothingToRepairMessage = MessageList();
 		var startedWithNothingToRepair = ship.m_repairsAreUnderWay;
@@ -11031,6 +11105,117 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=starport-transport bytes=" + bytes + " alpha=" + alpha.ToString( "F4" ) + " asset=" + assetAlphaAfter.ToString( "F4" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
+	// ---------------------------------------------------------------- the screens' Step 2: the notices screen as the original's (OP-OV)
+
+	// the text of a button's label
+	static string ButtonLabel( UnityEngine.UI.Button button )
+	{
+		var text = ( button == null ) ? null : button.GetComponentInChildren<TMPro.TextMeshProUGUI>( true );
+
+		return ( text == null ) ? "" : text.text;
+	}
+
+	// More on the notices screen until the notice has been read to its end - returns the text then
+	static string ReadNoticeToTheEnd( OperationsPanel panel )
+	{
+		for ( var press = 0; ( press < 50 ) && !(bool) GetField( panel, "m_endOfMessageReached" ); press++ )
+		{
+			panel.MoreClicked();
+		}
+
+		return panel.m_messageText.text.Replace( "\r", "" );
+	}
+
+	IEnumerator ScenarioStarportNotices()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var panel = FindPanel<OperationsPanel>();
+
+		if ( ( panel == null ) || ( gameData.m_noticeList.Length < 2 ) )
+		{
+			Finish( "scenario=starport-notices abort: no operations panel or too few notices", 2 );
+			yield break;
+		}
+
+		// the day of the second notice, with none read: two notices are out
+		var secondDate = gameData.m_noticeList[ 1 ].m_stardate;
+
+		playerData.m_general.m_currentStardateYMD = secondDate;
+		playerData.m_starport.m_lastReadNoticeStardate = "0000-00-00";
+
+		yield return OpenPanel( panel, "operations" );
+
+		// ---- 1. the header, and the end of the notices after the newest
+		panel.NoticesClicked();
+
+		var header = panel.m_stardateText.text;
+		var firstRead = ReadNoticeToTheEnd( panel );
+
+		panel.NextClicked();
+
+		var secondRead = ReadNoticeToTheEnd( panel );
+
+		panel.QuitClicked();
+
+		Log( "starport-notices: on " + secondDate + " the header is '" + header + "' | the first notice ends '" + Tail( firstRead ) + "' | the second (the newest) ends '" + Tail( secondRead ) + "'" );
+
+		Check( "starport-notices: the header beside NOTICES is today's date, as the original's", header == DayMonthYear( secondDate ), "'" + header + "'" );
+		Check( "starport-notices: the newest notice ends with the original's END OF NOTICES, and an earlier one does not", secondRead.EndsWith( "\n\n***End of notices***" ) && !firstRead.Contains( "End of notices" ), Tail( firstRead ) + " | " + Tail( secondRead ) );
+
+		// ---- 2. nothing new: NO NEW NOTICES and REPEAT LAST NOTICE?, More as Yes and Quit as No
+		var moreLabelBefore = ButtonLabel( panel.m_moreButton );
+
+		panel.NoticesClicked();
+
+		var askingMethod = panel.GetType().GetMethod( "IsAskingToRepeat" );
+		var asked = ( askingMethod != null ) && (bool) askingMethod.Invoke( panel, null );
+		var question = panel.m_messageText.text.Replace( "\r", "" );
+		var labels = ButtonLabel( panel.m_moreButton ) + " / " + ButtonLabel( panel.m_quitButton );
+
+		// No: back to the menu
+		panel.QuitClicked();
+
+		var menuAfterNo = panel.m_welcomeGameObject.activeSelf && !panel.m_noticesGameObject.activeSelf;
+
+		// Yes: the last notice again
+		panel.NoticesClicked();
+		panel.MoreClicked();
+
+		var repeated = panel.m_messageText.text.Replace( "\r", "" );
+		var labelsAfterYes = ButtonLabel( panel.m_moreButton );
+		var stillAsking = ( askingMethod != null ) && (bool) askingMethod.Invoke( panel, null );
+
+		panel.QuitClicked();
+
+		yield return ClosePanel( panel, "operations" );
+
+		playerData.m_general.m_currentStardateYMD = "4620-01-01";
+
+		Log( "starport-notices: nothing new: asked " + asked + ", '" + question + "', buttons " + labels + " (More was '" + moreLabelBefore + "') | No: the menu " + menuAfterNo + " | Yes: '" + Head( repeated ) + "', More '" + labelsAfterYes + "', still asking " + stillAsking );
+
+		Check( "starport-notices: with nothing new the screen says so and asks whether to repeat the last notice, with Yes and No", asked && ( question == "No new notices\n\nRepeat last notice?" ) && ( labels == "Yes / No" ), asked + ", '" + question + "', " + labels );
+		Check( "starport-notices: No goes back to the menu", menuAfterNo, menuAfterNo.ToString() );
+		Check( "starport-notices: Yes shows the last notice read again after the original's REPEATING LAST NOTICE, and the buttons get their labels back", repeated.StartsWith( "***Repeating last notice***\n\n" + DayMonthYear( secondDate ) ) && ( labelsAfterYes == moreLabelBefore ) && !stillAsking, "'" + Head( repeated ) + "', More '" + labelsAfterYes + "' (was '" + moreLabelBefore + "'), still asking " + stillAsking );
+
+		Finish( "scenario=starport-notices header=" + header + " asked=" + asked + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the first and the last 60 characters of a text, for the log
+	static string Head( string text )
+	{
+		text = ( text ?? "" ).Replace( "\n", "/" );
+
+		return ( text.Length <= 60 ) ? text : text.Substring( 0, 60 );
+	}
+
+	static string Tail( string text )
+	{
+		text = ( text ?? "" ).Replace( "\n", "/" );
+
+		return ( text.Length <= 60 ) ? text : text.Substring( text.Length - 60 );
+	}
+
 	// ---------------------------------------------------------------- the screens' Step 2: the bank pays the original's interest
 
 	// the bank pays its interest up to today (PlayerData.PayInterest): what it paid, or -1 on the code before the interest
@@ -11794,7 +11979,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "dates: operations with the thai calendar: '" + today + "', the notice is dated '" + noticeDate + "' (its stardate is " + expectedNoticeDate + "), its ships log entry '" + logStardate + "' with the heading '" + logHeader + "'" );
 
-		Check( "dates: operations shows today's stardate with the thai calendar", today == "Today is 26-03-4620", today );
+		Check( "dates: operations shows today's stardate with the thai calendar", today == "26-03-4620", today );
 		Check( "dates: a notice is dated with its stardate with the thai calendar", ( expectedNoticeDate != "" ) && ( noticeDate == expectedNoticeDate ), "'" + noticeDate + "' (should be " + expectedNoticeDate + ")" );
 		Check( "dates: the ships log entry of a notice has its stardate with the thai calendar", ( expectedNoticeDate != "" ) && ( logStardate == expectedNoticeDate ) && ( logHeader == expectedNoticeDate ), "'" + logStardate + "' / '" + logHeader + "' (should be " + expectedNoticeDate + ")" );
 
@@ -12432,7 +12617,9 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "unmapped: within orbital range the player is told that the planet could not be mapped", rangeMessage.Contains( "Standing by to orbit" ) && rangeMessage.Contains( "could not be mapped" ), rangeMessage );
 		Check( "unmapped: in orbit the player is told so too, and the planet model has the plain maps", orbitMessage.Contains( "Orbit established" ) && orbitMessage.Contains( "could not be mapped" ) && ( orbitAlbedoSize == "4x4" ), orbitMessage + " | albedo " + orbitAlbedoSize );
 
-		// a planet with maps gets no such message (control)
+		// a planet with maps gets no such message (control) - the text window cleared first, since the lines of the last orbit scroll on
+		SpaceflightController.m_instance.m_messages.Clear();
+
 		yield return EnterOrbit( 94 );
 
 		var goodOrbitMessage = MessageList();
@@ -18543,7 +18730,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
-		// class 2 armor at half (375 of 750), the engines at 30, the lasers at 70 - the engines are the worst
+		// class 2 armor at half (375 of 750), the engines at 30, the lasers at 70 - the player chooses the engines
 		ship.m_armorClass = 2;
 		ship.m_armorPoints = 375;
 		ship.m_laserCannonClass = 1;
@@ -18557,7 +18744,7 @@ public class ClaudeProbe : MonoBehaviour
 		// ---- 1. without the engines' mineral in the hold the engineer asks for it and stops
 		controller.m_messages.Clear();
 
-		new RepairButton().Execute();
+		RepairThroughTheConsole( 1 );
 
 		var withoutMineral = MessageList();
 		var askedWithout = AnswerRepairQuestion( false );
@@ -18568,7 +18755,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		controller.m_messages.Clear();
 
-		new RepairButton().Execute();
+		RepairThroughTheConsole( 1 );
 
 		var question = MessageList();
 		var askedNo = AnswerRepairQuestion( false );
@@ -18578,14 +18765,14 @@ public class ClaudeProbe : MonoBehaviour
 		// ---- 3. yes: 7 cubic meters for the 70 missing, and the repairs begin on the engines
 		controller.m_messages.Clear();
 
-		new RepairButton().Execute();
+		RepairThroughTheConsole( 1 );
 
 		var askedYes = AnswerRepairQuestion( true );
 		var molybdenumAfterYes = HeldElement( molybdenum );
 		var underWayAfterYes = ship.m_repairsAreUnderWay;
 		var startText = MessageList();
 
-		// ---- 4. once the engines are whole he goes on to the next worst (the hull at 50: 5 cubic meters of aluminum, which the hold lacks)
+		// ---- 4. once the engines are whole he says so and waits to be told what to repair next (REPAIR-OV: "REPAIR COMPLETED", the owner's ruling of 2026-10-12)
 		controller.m_messages.Clear();
 
 		ship.UpdateRepairs( 10000.0f );
@@ -18594,6 +18781,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		var enginesAfter = SystemHealth().Length > 0 ? SystemHealth()[ 0 ] : -1;
 		var nextText = MessageList();
+		var underWayAfterDone = ship.m_repairsAreUnderWay;
+		var askedAfterDone = SpaceflightController.m_instance.m_buttonController.GetCurrentButtonSet() == ButtonController.ButtonSet.RepairMineral;
 
 		// ---- 5. the control: a whole ship needs no repairs
 		ship.m_armorPoints = ship.GetMaximumArmorPoints();
@@ -18609,19 +18798,183 @@ public class ClaudeProbe : MonoBehaviour
 
 		controller.m_messages.Clear();
 
-		new RepairButton().Execute();
+		RepairThroughTheConsole( 0 );
 
 		var wholeText = MessageList();
 
 		Log( "systemrepairs: without molybdenum: " + withoutMineral + " (asked " + askedWithout + ", under way " + underWayWithout + ") | with it: " + question + " -> no: " + afterNo + " (asked " + askedNo + ", molybdenum " + molybdenumAfterNo + ") | yes: molybdenum " + molybdenumAfterYes + ", under way " + underWayAfterYes + " (" + startText + ") | the engines after the repair " + enginesAfter + ": " + nextText + " | a whole ship: " + wholeText );
 
-		Check( "systemrepairs: the engineer asks for the worst system's mineral and stops without it", withoutMineral.Contains( "7 cubic meters of Molybdenum" ) && withoutMineral.Contains( "Ceasing repair" ) && !askedWithout && !underWayWithout, withoutMineral );
+		Check( "systemrepairs: the engineer asks for the chosen system's mineral and stops without it", withoutMineral.Contains( "7 cubic meters of Molybdenum" ) && withoutMineral.Contains( "Ceasing repair" ) && !askedWithout && !underWayWithout, withoutMineral );
 		Check( "systemrepairs: with the mineral in the hold he asks to take it, and no leaves it there", askedNo && question.Contains( "Shall I take this from cargo?" ) && afterNo.Contains( "Ceasing repair" ) && ( molybdenumAfterNo == 100 ), askedNo + ", " + molybdenumAfterNo + " | " + afterNo );
 		Check( "systemrepairs: yes takes the 7 cubic meters from the hold and the repairs begin on the engines", askedYes && ( molybdenumAfterYes == 30 ) && underWayAfterYes && startText.Contains( "engines" ), askedYes + ", " + molybdenumAfterYes + ", " + underWayAfterYes + " | " + startText );
-		Check( "systemrepairs: once the engines are whole the engineer goes on to the next worst, the hull", ( enginesAfter == 100 ) && nextText.Contains( "completed" ) && nextText.Contains( "5 cubic meters of Aluminum" ), enginesAfter + " | " + nextText );
-		Check( "systemrepairs: a whole ship needs no repairs", wholeText.Contains( "No repairs are required" ), wholeText );
+		Check( "systemrepairs: once the engines are whole the engineer says the repair is completed and waits to be told what to repair next", ( enginesAfter == 100 ) && nextText.Contains( "Repair completed." ) && !nextText.Contains( "cubic meter" ) && !underWayAfterDone && !askedAfterDone, enginesAfter + ", under way " + underWayAfterDone + ", asked " + askedAfterDone + " | " + nextText );
+		Check( "systemrepairs: a whole hull needs no repairs", wholeText.Contains( "Hull: No repairs needed." ), wholeText );
 
 		Finish( "scenario=systemrepairs molybdenum=" + molybdenumAfterNo + "/" + molybdenumAfterYes + " engines=" + enginesAfter, 0 );
+	}
+
+	// ---------------------------------------------------------------- the screens' Step 2: Repair's choice of system (the owner's ruling of 2026-10-12)
+
+	// Repair, the stick to a row and the text the engineer gives about it, as the player sees it before choosing (the button stays Repair's)
+	static string RepairRowText( int row )
+	{
+		var buttonController = SpaceflightController.m_instance.m_buttonController;
+
+		PressButton( ButtonController.ButtonSet.Engineering, 1 );
+
+		for ( var step = 0; ( step < 8 ) && ( RepairCursorRow() != int.MinValue ) && ( RepairCursorRow() != row ); step++ )
+		{
+			ConsoleFrameWith( "m_south" );
+
+			Call( buttonController, "Update" );
+		}
+
+		var text = ( RepairCursorRow() == row ) ? MessageList() : "(no cursor on row " + row + ": " + RepairCursorRow() + ") " + MessageList();
+
+		// the fire button on a row the ship has not got does nothing but end the choice (the missiles of this ship)
+		var fiveSteps = ( 5 - row + 7 ) % 7;
+
+		for ( var step = 0; ( step < fiveSteps ) && ( RepairCursorRow() >= 0 ); step++ )
+		{
+			ConsoleFrameWith( "m_south" );
+
+			Call( buttonController, "Update" );
+		}
+
+		if ( RepairCursorRow() >= 0 )
+		{
+			ConsoleFrameWith( "m_submit" );
+		}
+
+		return text;
+	}
+
+	IEnumerator ScenarioRepairChoice()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var displays = controller.m_displayController;
+
+		EnsureCrew();
+
+		// a bare hull at half its 250 points, the engines at 30, the sensors at 10, a laser cannon (whole) and no missile launcher
+		ship.m_armorClass = 0;
+		ship.m_armorPoints = 125;
+		ship.m_laserCannonClass = 1;
+		ship.m_missileLauncherClass = 0;
+
+		SetSystemHealth( 0, 30 );
+		SetSystemHealth( 1, 10 );
+		SetSystemHealth( 5, 100 );
+
+		const int molybdenum = 11;
+
+		ship.AddElement( molybdenum, 100 );
+
+		yield return Frames( 2 );
+
+		// ---- 1. Repair puts up the DAMAGE display with its cursor on the hull, and tells about each row the stick goes to
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.Engineering, 1 );
+
+		var displayShown = ( displays.m_damageDisplay != null ) && displays.m_damageDisplay.gameObject.activeInHierarchy;
+		var firstRow = RepairCursorRow();
+		var hullText = MessageList();
+
+		// (the fire button on the missile row ends this first choice)
+		for ( var step = 0; ( step < 5 ) && ( RepairCursorRow() >= 0 ); step++ )
+		{
+			ConsoleFrameWith( "m_south" );
+
+			Call( controller.m_buttonController, "Update" );
+		}
+
+		var missileText = MessageList();
+		var cursorOnMissiles = RepairCursorRow();
+
+		ConsoleFrameWith( "m_submit" );
+
+		var afterMissiles = MessageList();
+		var cursorAfterChoice = RepairCursorRow();
+		var underWayAfterMissiles = ship.m_repairsAreUnderWay;
+
+		var enginesText = RepairRowText( 1 );
+		var sensorsText = RepairRowText( 2 );
+
+		Log( "repairchoice: display shown " + displayShown + ", first row " + firstRow + " | hull: " + hullText + " | engines: " + enginesText + " | sensors: " + sensorsText + " | missiles (row " + cursorOnMissiles + "): " + missileText + " -> fire: '" + afterMissiles + "', cursor " + cursorAfterChoice + ", under way " + underWayAfterMissiles );
+
+		Check( "repairchoice: Repair puts up the DAMAGE display with its cursor on the hull, which it tells about (moderately damaged at half, its efficiency and the time a complete repair takes, no functionality line for the hull)", displayShown && ( firstRow == 0 ) && hullText.Contains( "Hull: Moderately damaged/Efficiency: 50%/Estimated time for complete repairs:/" ) && System.Text.RegularExpressions.Regex.IsMatch( hullText, @"repairs:/\d+ (minute|hour|day)s?\." ) && !hullText.Contains( "functionality" ), displayShown + ", row " + firstRow + " | " + hullText );
+		Check( "repairchoice: the stick moves the cursor down the rows, and each tells its damage in the original's words and whether it works (the engines at 30 heavily damaged and operative, the sensors at 10 critically damaged and inoperative below 25)", enginesText.StartsWith( "<color=white>Engines: Heavily damaged/Efficiency: 30%/Current functionality: Operative/" ) && sensorsText.StartsWith( "<color=white>Sensors: Critically damaged/Efficiency: 10%/Current functionality: Inoperative/" ), enginesText + " | " + sensorsText );
+		Check( "repairchoice: a row the ship has not got says NONE, and the fire button on it ends the choice and does nothing else", ( cursorOnMissiles == 5 ) && ( missileText == "<color=white>Missile launcher: None</color>" ) && ( cursorAfterChoice == -1 ) && !underWayAfterMissiles, "row " + cursorOnMissiles + ", '" + missileText + "', cursor after " + cursorAfterChoice + ", under way " + underWayAfterMissiles );
+
+		// ---- 2. the fire button on the engines: the repair begins, and the engineer asks for its mineral
+		controller.m_messages.Clear();
+
+		var choseEngines = RepairThroughTheConsole( 1 );
+		var beginText = MessageList();
+		var askedYes = AnswerRepairQuestion( true );
+		var afterYes = MessageList();
+		var underWayOnEngines = ship.m_repairsAreUnderWay && ( ship.m_repairItem == 1 );
+		var enginesUnderRepairText = RepairRowText( 1 );
+
+		// the engines again: already being repaired
+		controller.m_messages.Clear();
+
+		RepairThroughTheConsole( 1 );
+
+		var alreadyText = MessageList();
+
+		Log( "repairchoice: the engines chosen " + choseEngines + ": " + beginText + " -> yes " + askedYes + ": " + afterYes + ", under way " + underWayOnEngines + " | the engines' row: " + enginesUnderRepairText + " | again: " + alreadyText );
+
+		Check( "repairchoice: the fire button on the engines begins their repair and the engineer asks for its mineral; yes takes it and the repair goes on", choseEngines && beginText.StartsWith( "<color=white>Beginning repairs on engines.</color> / <color=white>Captain, we need 7 cubic meters of Molybdenum for repairs.</color>" ) && askedYes && afterYes.EndsWith( "Continuing repair</color>" ) && underWayOnEngines, choseEngines + ", asked " + askedYes + ", under way " + underWayOnEngines + " | " + beginText + " | " + afterYes );
+		Check( "repairchoice: the row of the item being repaired says so, and choosing it again says it is already undergoing repairs", enginesUnderRepairText.Contains( "/Currently under repair." ) && alreadyText.Contains( "Engines:/Already undergoing repairs." ) && ship.m_repairsAreUnderWay && ( ship.m_repairItem == 1 ), enginesUnderRepairText + " | " + alreadyText );
+
+		// ---- 3. the hull while the engines are being repaired: the engineer asks whether to cease one for the other - No, then Yes
+		controller.m_messages.Clear();
+
+		RepairThroughTheConsole( 0 );
+
+		var switchQuestion = MessageList();
+		var askedNo = AnswerRepairQuestion( false );
+		var afterNo = MessageList();
+		var stillOnEngines = ship.m_repairsAreUnderWay && ( ship.m_repairItem == 1 );
+
+		controller.m_messages.Clear();
+
+		RepairThroughTheConsole( 0 );
+
+		var askedSwitch = AnswerRepairQuestion( true );
+		var afterSwitch = MessageList();
+		var underWayAfterSwitch = ship.m_repairsAreUnderWay;
+
+		Log( "repairchoice: the hull during the engines' repair: " + switchQuestion + " -> no " + askedNo + ": " + afterNo + " (still on the engines " + stillOnEngines + ") -> yes " + askedSwitch + ": " + afterSwitch + " (under way " + underWayAfterSwitch + ")" );
+
+		Check( "repairchoice: choosing another item during a repair asks whether to cease one and begin the other, and No keeps on with the engines", switchQuestion.Contains( "Cease repairs on engines/and begin repairs on hull?" ) && askedNo && afterNo.Contains( "Continuing repairs on engines." ) && stillOnEngines, askedNo + ", still on the engines " + stillOnEngines + " | " + switchQuestion + " | " + afterNo );
+		Check( "repairchoice: Yes ceases the engines' repair and begins the hull's, whose aluminum the hold lacks (ceasing repair)", askedSwitch && afterSwitch.Contains( "Ceasing repairs on engines." ) && afterSwitch.Contains( "Beginning repairs on hull." ) && afterSwitch.Contains( "5 cubic meters of Aluminum" ) && afterSwitch.EndsWith( "Ceasing repair</color>" ) && !underWayAfterSwitch, askedSwitch + ", under way " + underWayAfterSwitch + " | " + afterSwitch );
+
+		// ---- 4. a whole item needs no repairs, and a destroyed one is beyond repair
+		controller.m_messages.Clear();
+
+		RepairThroughTheConsole( 6 );
+
+		var wholeLaser = MessageList();
+
+		SetSystemHealth( 5, 0 );
+
+		controller.m_messages.Clear();
+
+		RepairThroughTheConsole( 6 );
+
+		var destroyedLaser = MessageList();
+		var underWayOnDestroyed = ship.m_repairsAreUnderWay;
+
+		Log( "repairchoice: the laser whole: " + wholeLaser + " | destroyed: " + destroyedLaser + " (under way " + underWayOnDestroyed + ")" );
+
+		Check( "repairchoice: the laser cannon whole needs no repairs, and destroyed (0) is damaged beyond repair", wholeLaser.Contains( "Laser cannon: No repairs needed." ) && destroyedLaser.Contains( "Laser cannon:/Damaged beyond repair." ) && !underWayOnDestroyed, wholeLaser + " | " + destroyedLaser );
+
+		Finish( "scenario=repairchoice engines=" + underWayOnEngines + " switch=" + askedNo + "/" + askedSwitch + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 2: the home fleets' warnings
@@ -22959,13 +23312,24 @@ public class ClaudeProbe : MonoBehaviour
 
 		take( "damage" );
 
+		// Repair's choice: the cursor on the DAMAGE display, moved down to the engines, and what the engineer says about them
+		RepairCursorRowAt( 1 );
+
+		yield return Frames( 10 );
+
+		take( "repair" );
+
+		ConsoleFrameWith( "m_submit" );
+
+		AnswerRepairQuestion( false );
+
 		damagedShip.m_armorPoints = keptArmorPoints;
 		SetSystemHealth( 0, 100 );
 		SetSystemHealth( 2, 100 );
 
 		Log( "screenpictures: " + pictures.Count + " pictures in " + folder + ": " + string.Join( ", ", pictures ) );
 
-		Check( "screenpictures: a picture of every screen visited", pictures.Count == 13, pictures.Count.ToString() );
+		Check( "screenpictures: a picture of every screen visited", pictures.Count == 14, pictures.Count.ToString() );
 
 		Finish( "scenario=screenpictures pictures=" + pictures.Count, 0 );
 	}
@@ -25521,6 +25885,122 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "analysisheading: the analysis heading ends with a colon, as the original", analysis.Contains( "Analysis of Last Sensor Reading:" ), analysis );
 
 		Finish( "scenario=analysisheading", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the lines that lead up to orbit scroll on (starflt_141, starflt_143)
+
+	IEnumerator ScenarioOrbitLines()
+	{
+		EnsureCrew();
+
+		var arth = DataController.m_instance.m_gameData.m_misc.m_arthStarId;
+
+		EnterStarSystem( arth );
+
+		yield return Frames( 10 );
+
+		// a line from before the orbit, as the system travel leaves one
+		SpaceflightController.m_instance.m_messages.Clear();
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>...Commencing system travel.</color>" );
+
+		// (a planet of Arth's system other than Arth, whose orbit leads to the Starport)
+		var planetId = -1;
+
+		for ( var orbit = 1; ( orbit <= 8 ) && ( planetId < 0 ); orbit++ )
+		{
+			var candidate = PlanetInOrbit( arth, orbit );
+
+			if ( ( candidate >= 0 ) && ( candidate != DataController.m_instance.m_gameData.m_misc.m_arthPlanetId ) )
+			{
+				planetId = candidate;
+			}
+		}
+
+		yield return EnterOrbit( planetId );
+
+		var shown = MessageList();
+
+		Log( "orbitlines: " + shown );
+
+		Check( "orbitlines: going into orbit says \"...Orbit established\" under the lines before it, as the original", shown.Contains( "...Commencing system travel." ) && shown.Contains( "...Orbit established." ), shown );
+
+		Finish( "scenario=orbitlines", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the shields' and weapons' messages (NAVIGATR)
+
+	// presses a button of the console and returns what the text window shows
+	static string PressAndRead( ShipButton button )
+	{
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		button.Execute();
+
+		return MessageList();
+	}
+
+	IEnumerator ScenarioShieldMessages()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		// a ship with shields, missiles and lasers, all whole, and fuel
+		ship.m_shieldingClass = 1;
+		ship.m_missileLauncherClass = 1;
+		ship.m_laserCannonClass = 1;
+		ship.RestoreSystems();
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+
+		if ( ship.m_elementStorage.Find( 5 ) == null )
+		{
+			ship.AddElement( 5, 50 );
+		}
+
+		// ---- 1. up and down, armed and disarmed, through the console's buttons
+		var raised = PressAndRead( new RaiseShieldsButton() );
+		var dropped = PressAndRead( new DropShieldsButton() );
+		var armed = PressAndRead( new ArmWeaponButton() );
+		var armedFlag = ship.m_weaponsAreArmed;
+		var disarmed = PressAndRead( new DisarmWeaponButton() );
+		var disarmedFlag = ship.m_weaponsAreArmed;
+
+		// ---- 2. the missile launcher destroyed: only the lasers arm
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Missiles, 0 );
+
+		var lasersOnly = PressAndRead( new ArmWeaponButton() );
+
+		PressAndRead( new DisarmWeaponButton() );
+
+		ship.RestoreSystems();
+
+		// ---- 3. no fuel: the shields can't be raised
+		var fuel = ship.m_elementStorage.Find( 5 );
+
+		if ( fuel != null )
+		{
+			ship.RemoveElement( 5, fuel.m_volume );
+		}
+
+		var noFuel = PressAndRead( new RaiseShieldsButton() );
+		var noFuelFlag = ship.m_shieldsAreUp;
+
+		ship.AddElement( 5, 50 );
+
+		Log( "shieldmessages: raise [" + raised + "] drop [" + dropped + "] arm [" + armed + "] (" + armedFlag + ") disarm [" + disarmed + "] (" + disarmedFlag + ") | lasers only [" + lasersOnly + "] | no fuel [" + noFuel + "] (" + noFuelFlag + ")" );
+
+		Check( "shieldmessages: the shields say \"Shields are now up.\" and \"Shields are down.\", as the original", raised.Contains( "Shields are now up." ) && dropped.Contains( "Shields are down." ), raised + " | " + dropped );
+		Check( "shieldmessages: arming says \"Arming missiles.\" and \"Arming lasers.\", and only for the weapons that work, as the original", armed.Contains( "Arming missiles." ) && armed.Contains( "Arming lasers." ) && armedFlag && lasersOnly.Contains( "Arming lasers." ) && !lasersOnly.Contains( "Arming missiles." ), armed + " | " + lasersOnly );
+		Check( "shieldmessages: the Disarm button disarms and says \"Weapons are disarmed.\", as the original", !disarmedFlag && disarmed.Contains( "Weapons are disarmed." ), disarmedFlag + " | " + disarmed );
+		Check( "shieldmessages: without fuel the shields can't be raised, in the original's words", !noFuelFlag && noFuel.Contains( "Shields can't be raised." ), noFuelFlag + " | " + noFuel );
+
+		Finish( "scenario=shieldmessages", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
