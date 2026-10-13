@@ -1029,6 +1029,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLookFields();
 				break;
 
+			case "tvdistance":
+				yield return ScenarioTVDistance();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -26297,6 +26301,71 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lookfields: Look gives the original's fields in its order: Sky, Temperature and Gravity, Atmo, Hydro and Terrain", inOrder && !shown.Contains( "Weather:" ), shown );
 
 		Finish( "scenario=lookfields", 0 );
+	}
+
+	// the terrain vehicle's distance to the ship in the original's kilometers (6.4 to a degree of longitude, 5.3 to a degree of latitude, SITE-OV), along the
+	// ground: the height of the ship's place is not a part of it (MOVE-OV WF05A)
+	IEnumerator ScenarioTVDistance()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// on planet 92 of Arth, in the terrain vehicle
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		// (no weather: a storm would hide the bearing behind LOST!)
+		PlanetWeather.End();
+
+		yield return Frames( 10 );
+
+		var shipCoordinates = controller.m_disembarked.ApplyElevation( Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude ), false );
+		var vehicleCoordinates = playerData.m_general.m_lastDisembarkedCoordinates;
+		var atTheStart = ShipDistanceText();
+
+		// ---- 30.3 km west of the ship (30.3 / 6.4 degrees of longitude, 22.7556 world units to a degree), at the ship's own height and well below it
+		var west = shipCoordinates + Vector3.left * ( 30.3f / 6.4f * 8192.0f / 360.0f );
+
+		playerData.m_general.m_lastDisembarkedCoordinates = new Vector3( west.x, shipCoordinates.y, west.z );
+
+		yield return Frames( 3 );
+
+		var westLevel = ShipDistanceText();
+
+		playerData.m_general.m_lastDisembarkedCoordinates = new Vector3( west.x, shipCoordinates.y - 200.0f, west.z );
+
+		yield return Frames( 3 );
+
+		var westBelow = ShipDistanceText();
+
+		// ---- 20.3 km south of it (20.3 / 5.3 degrees of latitude, 17.0667 world units to a degree)
+		var south = shipCoordinates + Vector3.back * ( 20.3f / 5.3f * 3072.0f / 180.0f );
+
+		playerData.m_general.m_lastDisembarkedCoordinates = new Vector3( south.x, vehicleCoordinates.y, south.z );
+
+		yield return Frames( 3 );
+
+		var southText = ShipDistanceText();
+
+		// the vehicle back where it was
+		playerData.m_general.m_lastDisembarkedCoordinates = vehicleCoordinates;
+
+		Log( "tvdistance: the vehicle " + ( shipCoordinates - vehicleCoordinates ).ToString( "F1" ) + " from the ship's place: '" + atTheStart + "' | 30 km west at the ship's height '" + westLevel + "', 200 below it '" + westBelow + "' | 20 km south '" + southText + "'" );
+
+		Check( "tvdistance: 30 km west of the ship, in the original's kilometers, reads 30 KM. East", westLevel == "30 KM. East", "'" + westLevel + "'" );
+		Check( "tvdistance: the height of the ship's place is not a part of the distance", westBelow == westLevel, "'" + westBelow + "' and '" + westLevel + "'" );
+		Check( "tvdistance: 20 km south of the ship reads 20 KM. North", southText == "20 KM. North", "'" + southText + "'" );
+		Check( "tvdistance: just out of the ship (16 units south of its place) the vehicle is a few kilometers from it, not the height of the ground away", atTheStart == "4 KM. North", "'" + atTheStart + "'" );
+	}
+
+	// the terrain vehicle display's last row, the way back to the ship, without colour tags
+	static string ShipDistanceText()
+	{
+		var rows = SpaceflightController.m_instance.m_displayController.m_terrainVehicleDisplay.m_statusValues.text.Split( '\n' );
+
+		return ( rows.Length > 0 ) ? System.Text.RegularExpressions.Regex.Replace( rows[ rows.Length - 1 ], "<[^>]*>", "" ).Trim() : "";
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
