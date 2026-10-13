@@ -324,7 +324,7 @@ Every screen of this list has a picture now.
 | Binary Systems' page: the logo and Rod McConnell, Greg Johnson, T. C. Lee, Alec Kercso and Bob Gonsalves, as starflt_001 | NOT A DEFECT | `intropictures` `01_intro_page_1.png` (CONFIRMED) | |
 | The title page: STARFLIGHT, © 1987 Binary Systems and Electronic Arts, as starflt_002 | NOT A DEFECT | `intropictures` `02_intro_page_2.png` (CONFIRMED) | |
 | A page of the remake's credits (THE STARFLIGHT REMAKE PROJECT) the original does not have, then a black page under the warning | NOT A DEFECT (the port's own) | `intropictures` `03_intro_page_3.png`, `04_intro_page_4.png` (CONFIRMED) | |
-| The Interstel Police warning has the original's heading and four paragraphs, but "Galatic Treaty" where the original has "Galactic Treaty" | OPEN | `intropictures` `05_intro_page_5.png` against starflt_003; the Body Text of `Intro.unity`; `GAME-OV.c` (CONFIRMED) | GAMEPLAY (a typo in the original's text) |
+| The Interstel Police warning has the original's heading and four paragraphs, but "Galatic Treaty" where the original has "Galactic Treaty" | FIXED (the Galactic PR) | `intropictures` `05_intro_page_5.png` against starflt_003; the Body Text of `Intro.unity`; `GAME-OV.c` (CONFIRMED); the scene now reads "Galactic", and `intropictures` checks the warning's words with or without a graphics device | GAMEPLAY (a typo in the original's text) |
 | The security code after the warning | OWNER'S CALL | D4 in `ROADMAP.md`, as the launch's (section 16) | GAMEPLAY |
 
 ## 27. Load and save
