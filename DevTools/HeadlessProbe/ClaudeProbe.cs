@@ -28599,6 +28599,21 @@ public class ClaudeProbe : MonoBehaviour
 		var intro = UnityEngine.Object.FindFirstObjectByType<IntroController>();
 		var reached = ( SceneManager.GetActiveScene().name == "Intro" ) && ( intro != null );
 
+		// the warning page in the original's words (GAME-OV: "As provided by the Galactic Treaty of 4410"), with or without a graphics device
+		var warning = "";
+
+		foreach ( var text in UnityEngine.Object.FindObjectsByType<TMPro.TMP_Text>( FindObjectsInactive.Include, FindObjectsSortMode.None ) )
+		{
+			if ( text.text.Contains( "Treaty of 4410" ) )
+			{
+				warning = text.text;
+			}
+		}
+
+		Log( "intropictures: the warning begins '" + ( ( warning.Length > 60 ) ? warning.Substring( 0, 60 ) : warning ) + "'" );
+
+		Check( "intropictures: the warning names the original's Galactic Treaty of 4410", warning.Contains( "Galactic Treaty of 4410" ), "'" + warning + "'" );
+
 		if ( !reached || ( folder == "" ) )
 		{
 			Log( "intropictures: the Intro scene reached " + reached + ( ( folder == "" ) ? "; no graphics device (-nographics), so no pictures; run probe.ps1 with -Graphics for them" : "" ) );
