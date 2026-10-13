@@ -1073,6 +1073,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLaunchLines();
 				break;
 
+			case "starport-buyorder":
+				yield return ScenarioStarportBuyOrder();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -27737,6 +27741,41 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "launchlines: out of the Starport the window keeps LEAVING STARPORT..., ...STARPORT CLEAR and STANDING BY TO MANEUVER together, as starflt_139", string.Join( " | ", window ) == "Leaving starport... | ...Starport clear | Standing by to maneuver.", string.Join( " | ", window ) );
 
 		Finish( "scenario=launchlines checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the Trade Depot's Buy list has the Starport's elements in the original's order: Titanium, Promethium, Molybdenum, Cobalt, Aluminum, Endurium (starflt_078,
+	// starflt_097)
+	IEnumerator ScenarioStarportBuyOrder()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var depot = FindPanel<TradeDepotPanel>();
+
+		yield return OpenPanel( depot, "trade depot" );
+
+		Call( depot, "SwitchToBuyItemState", true );
+
+		yield return Frames( 2 );
+
+		var items = GetField( depot, "m_itemList" ) as IList;
+		var elements = new List<string>();
+
+		foreach ( var item in items )
+		{
+			if ( (int) GetField( item, "m_type" ) == 0 )
+			{
+				elements.Add( gameData.m_elementList[ (int) GetField( item, "m_id" ) ].m_name );
+			}
+		}
+
+		yield return ClosePanel( depot, "trade depot" );
+
+		var order = string.Join( ", ", elements );
+
+		Log( "starport-buyorder: the Buy list's elements: " + order );
+
+		Check( "starport-buyorder: the Buy list has the elements in the original's order", order == "Titanium, Promethium, Molybdenum, Cobalt, Aluminum, Endurium (Fuel)", order );
+
+		Finish( "scenario=starport-buyorder checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

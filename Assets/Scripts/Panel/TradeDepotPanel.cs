@@ -68,6 +68,33 @@ public class TradeDepotPanel : Panel
 	Vector3 m_baseSelectionOffsetMax;
 	float m_ignoreControllerTimer;
 	List<Item> m_itemList;
+
+	// the original's Buy list has the Starport's elements in this order: Titanium, Promethium, Molybdenum, Cobalt, Aluminum, Endurium (starflt_078, starflt_097)
+	static readonly int[] c_starportElementOrder = { 19, 15, 11, 3, 0, 5 };
+
+	// the elements the Starport sells, in the original's order (any other the game data has for sale after them)
+	static List<int> GetStarportElementOrder( GameData gameData )
+	{
+		var order = new List<int>();
+
+		foreach ( var elementId in c_starportElementOrder )
+		{
+			if ( ( elementId >= 0 ) && ( elementId < gameData.m_elementList.Length ) && gameData.m_elementList[ elementId ].m_availableInStarport )
+			{
+				order.Add( elementId );
+			}
+		}
+
+		for ( var elementId = 0; elementId < gameData.m_elementList.Length; elementId++ )
+		{
+			if ( gameData.m_elementList[ elementId ].m_availableInStarport && !order.Contains( elementId ) )
+			{
+				order.Add( elementId );
+			}
+		}
+
+		return order;
+	}
 	int m_rowCount;
 	int m_currentRowOffset;
 
@@ -639,12 +666,11 @@ public class TradeDepotPanel : Panel
 
 					if ( ( m_currentState == State.BuyItem ) || ( m_currentState == State.BuyAmount ) )
 					{
-						// add all elements available to buy in starport
-						for ( int elementId = 0; elementId < gameData.m_elementList.Length; elementId++ )
+						// add all elements available to buy in starport, in the original's order
+						foreach ( var elementId in GetStarportElementOrder( gameData ) )
 						{
 							GD_Element elementGameData = gameData.m_elementList[ elementId ];
 
-							if ( elementGameData.m_availableInStarport )
 							{
 								m_itemListText.text += elementGameData.m_name + Environment.NewLine;
 
