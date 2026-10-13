@@ -4322,6 +4322,22 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- M11: one source of truth for the maximum armor and shield points
 
+	// the rows of the DAMAGE display as it shows them ("HULL 100, ENGINES 80, ..., MISSILE -": "-" for a row with no bar), or "" if it is not the display on
+	// screen (and on the code before the display, when Damage wrote a report instead)
+	static string DamageDisplayRows()
+	{
+		var display = FieldOrNull( SpaceflightController.m_instance.m_displayController, "m_damageDisplay" ) as Component;
+
+		if ( ( display == null ) || !display.gameObject.activeInHierarchy )
+		{
+			return "";
+		}
+
+		var describe = display.GetType().GetMethod( "Describe" );
+
+		return ( describe == null ) ? "" : (string) describe.Invoke( display, null );
+	}
+
 	// what the status display shows for the ship as it is right now: the damage line of its text and how full its two gauges are
 	static string StatusDamageLine( out float armorGauge, out float shieldGauge )
 	{
@@ -4372,13 +4388,14 @@ public class ClaudeProbe : MonoBehaviour
 		new DamageButton().Execute();
 
 		var newReport = MessageList();
+		var newRows = DamageDisplayRows();
 
 		Log( "M11 new ship (" + newShip + "): status damage line '" + newDamageLine + "', armor gauge " + newArmorGauge.ToString( "F3" ) + ", shield gauge " + newShieldGauge.ToString( "F3" ) );
-		Log( "M11 new ship damage report: " + newReport );
+		Log( "M11 new ship damage display: " + newRows + " | text: '" + newReport + "'" );
 
 		Check( "M11 an undamaged new ship shows no damage", newDamageLine == "None", "status damage line '" + newDamageLine + "'" );
 		Check( "M11 an undamaged new ship has a full armor gauge and an empty shield gauge", Mathf.Approximately( newArmorGauge, 1.0f ) && ( newShieldGauge == 0.0f ), "armor gauge " + newArmorGauge.ToString( "F3" ) + ", shield gauge " + newShieldGauge.ToString( "F3" ) );
-		Check( "M11 the damage report gives the bare hull its 250 points", newReport.Contains( "(250/250)" ), newReport );
+		Check( "M11 Damage shows the DAMAGE display with the bare hull whole (its 250 of 250 points), no bars for the shield, missile and laser the new ship lacks, and writes nothing, as the original's does", ( newRows == "HULL 100, ENGINES 100, SENSORS 100, COMM. 100, SHIELD -, MISSILE -, LASER -" ) && ( newReport == "" ), newRows + " | text: '" + newReport + "'" );
 
 		// ---- 2. the bare hull damaged: 200 of 250, and the engineer (skill 100, so 2 points a second) repairs it
 		ship.m_armorPoints = 200;
@@ -4437,14 +4454,14 @@ public class ClaudeProbe : MonoBehaviour
 		messages.Clear();
 		new DamageButton().Execute();
 
-		var class2Report = MessageList();
+		var class2Rows = DamageDisplayRows();
 
 		Log( "M11 class 2 armor: at 750/750 status damage line '" + class2FullDamageLine + "', armor gauge " + class2FullArmorGauge.ToString( "F3" ) + " | at 300/750 '" + class2HurtDamageLine + "', armor gauge " + class2HurtArmorGauge.ToString( "F3" ) );
-		Log( "M11 class 2 armor damage report at 300/750: " + class2Report );
+		Log( "M11 class 2 armor damage display at 300/750: " + class2Rows );
 
 		Check( "M11 undamaged class 2 armor shows no damage and a full gauge", ( class2FullDamageLine == "None" ) && Mathf.Approximately( class2FullArmorGauge, 1.0f ), "status damage line '" + class2FullDamageLine + "', armor gauge " + class2FullArmorGauge.ToString( "F3" ) );
 		Check( "M11 class 2 armor at 300 of 750 shows heavy damage (the original's word for two fifths of the hull) and a gauge at two fifths", class2HurtDamageLine.Contains( ">Heavy<" ) && Mathf.Approximately( class2HurtArmorGauge, 0.4f ), "status damage line '" + class2HurtDamageLine + "', armor gauge " + class2HurtArmorGauge.ToString( "F3" ) );
-		Check( "M11 the damage report still gives installed armor its own points", class2Report.Contains( "40% (300/750)" ), class2Report );
+		Check( "M11 the DAMAGE display's hull bar counts installed armor by its own points (300 of 750: 40)", class2Rows.StartsWith( "HULL 40," ), class2Rows );
 
 		// ---- 4. shields: class 1 (500 points) half charged, class 5 (2500 points) fully charged, and none
 		ship.m_shieldingClass = 1;
@@ -4460,7 +4477,7 @@ public class ClaudeProbe : MonoBehaviour
 		messages.Clear();
 		new DamageButton().Execute();
 
-		var shieldReport = MessageList();
+		var shieldRows = DamageDisplayRows();
 
 		ship.m_shieldingClass = 0;
 		ship.m_shieldPoints = 0;
@@ -4468,10 +4485,10 @@ public class ClaudeProbe : MonoBehaviour
 		StatusDamageLine( out _, out var noShieldGauge );
 
 		Log( "M11 shield gauge: class 1 at 250/500 " + halfShieldGauge.ToString( "F3" ) + ", class 5 at 2500/2500 " + fullShieldGauge.ToString( "F3" ) + ", no shields " + noShieldGauge.ToString( "F3" ) );
-		Log( "M11 damage report with class 5 shields: " + shieldReport );
+		Log( "M11 damage display with class 5 shields: " + shieldRows );
 
 		Check( "M11 the shield gauge shows the charge of the installed shielding", Mathf.Approximately( halfShieldGauge, 0.5f ) && Mathf.Approximately( fullShieldGauge, 1.0f ) && ( noShieldGauge == 0.0f ), "class 1 at 250/500 " + halfShieldGauge.ToString( "F3" ) + ", class 5 at 2500/2500 " + fullShieldGauge.ToString( "F3" ) + ", none " + noShieldGauge.ToString( "F3" ) );
-		Check( "M11 the damage report still gives installed shielding its own points", shieldReport.Contains( "100% (2500/2500)" ), shieldReport );
+		Check( "M11 the DAMAGE display has a bar for the shield once shielding is installed", shieldRows.Contains( "SHIELD 100" ), shieldRows );
 
 		// ---- 5. the hull breach warning comes when less than a quarter of the armor points are left
 		ship.m_armorClass = 0;
@@ -18148,12 +18165,19 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		// ---- 3. the damage report lists the systems
+		// ---- 3. the DAMAGE display has a bar for the hull and each system the ship has, as whole as it is
 		SpaceflightController.m_instance.m_messages.Clear();
 
 		new DamageButton().Execute();
 
-		var report = MessageList();
+		var report = DamageDisplayRows();
+		var rowNames = new[] { "ENGINES", "SENSORS", "COMM.", "SHIELD", "MISSILE", "LASER" };
+		var expectedRows = "HULL " + ship.GetRepairItemHealth( 0 );
+
+		for ( var system = 0; ( system < rowNames.Length ) && ( system < afterMany.Length ); system++ )
+		{
+			expectedRows += ", " + rowNames[ system ] + " " + ( ship.HasSystem( (PD_PlayerShip.ShipSystem) system ) ? afterMany[ system ].ToString() : "-" );
+		}
 
 		// ---- 4. the systems' health is saved
 		var roundTrip = JsonUtility.FromJson<PD_PlayerShip>( JsonUtility.ToJson( ship ) );
@@ -18170,7 +18194,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "systemdamage: a new ship's systems are whole", ( whole.Length == 6 ) && ( string.Join( ",", whole ) == "100,100,100,100,100,100" ), string.Join( ",", whole ) );
 		Check( "systemdamage: a hit that gets through the shields also damages one system, by the same share as the hull (50 of 250: 20)", ( dropped == 1 ) && ( totalDrop == 20 ), dropped + " systems, " + totalDrop );
 		Check( "systemdamage: only the systems the ship has are damaged (no missile launcher: the missiles stay whole)", missilesWhole && ( othersHit >= 3 ), string.Join( ",", afterMany ) );
-		Check( "systemdamage: the damage report lists the systems, and their health is saved", report.Contains( "Engines:" ) && report.Contains( "Laser cannon:" ) && !report.Contains( "Missile launcher:" ) && survives, survives + " | " + report.Replace( '\n', '/' ) );
+		Check( "systemdamage: the DAMAGE display shows each system the ship has as whole as it is (no bar for the missiles it lacks), and their health is saved", ( report == expectedRows ) && report.Contains( "MISSILE -" ) && survives, survives + " | shown " + report + " | expected " + expectedRows );
 
 		Finish( "scenario=systemdamage afterOne=" + string.Join( ",", afterOne ) + " afterMany=" + string.Join( ",", afterMany ), 0 );
 	}
@@ -18536,7 +18560,9 @@ public class ClaudeProbe : MonoBehaviour
 		var thrynnBegun = ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == 165 );
 		var thrynnSaid = new List<string>();
 
-		yield return LetAliensSpeak( 3, thrynnSaid );
+		// their homeworld hails are the three the shipped game says only there ("within the limits", "additional warning", "pay the consequences"), not 394, which it
+		// says in space
+		yield return LetAliensSpeak( 2, thrynnSaid );
 
 		var hostileBeforeLast = thrynnBegun && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile );
 
@@ -18545,7 +18571,7 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 3 );
 
 		var thrynnHostile = thrynnBegun && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile ) && encounter.m_pdEncounter.m_disconnected;
-		var thrynnWarnings = new[] { 386, 387, 388, 394 };
+		var thrynnWarnings = new[] { 386, 387, 388 };
 		var thrynnInOrder = thrynnSaid.Count == thrynnWarnings.Length;
 
 		for ( var i = 0; thrynnInOrder && ( i < thrynnWarnings.Length ); i++ )
@@ -18557,7 +18583,9 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 2. the Veloxi home fleet (encounter 233, orbit 3 of 150,148): the ship hails first, and their one homeworld response is the last warning
+		// ---- 2. the Veloxi home fleet (encounter 233, orbit 3 of 150,148): the ship hails first, and the Veloxi, who have no homeworld response in the shipped game,
+		// answer with the first of their refusals ("Us are not answer the questions", never said before: every warning used to move one counter along); then their
+		// own hails in order, holding fire until the last ("Banzaii")
 		var veloxStar = StarAt( 150, 148 );
 
 		yield return GoIntoOrbit( veloxStar, PlanetInOrbit( veloxStar, 3 ) );
@@ -18572,14 +18600,60 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return LetAliensSpeak( 1, veloxSaid );
 
+		var veloxHostileAfterResponse = veloxBegun && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile );
+
+		yield return LetAliensSpeak( 4, veloxSaid );
+
 		yield return Frames( 3 );
 
-		var veloxResponse = ( veloxSaid.Count > 0 ) && veloxSaid[ 0 ].Contains( CommText( 483 ) );
+		var veloxResponse = ( veloxSaid.Count > 0 ) && SaysLine( veloxSaid[ 0 ], CommText( 473 ) );
+		var veloxHails = ( veloxSaid.Count == 5 ) && SaysLine( veloxSaid[ 1 ], CommText( 487 ) ) && SaysLine( veloxSaid[ 2 ], CommText( 488 ) ) && SaysLine( veloxSaid[ 3 ], CommText( 489 ) ) && SaysLine( veloxSaid[ 4 ], CommText( 490 ) );
 		var veloxHostile = veloxBegun && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile ) && !encounter.m_pdEncounter.m_connected;
 
 		ClearMissiles();
 		LeaveEncounter();
 		yield return Frames( 10 );
+
+		// ---- 2b. the Gazurtoid: the shipped game says their "holy land, the planet of the Gazurtoid" lines (94, 95) only at their homeworld, planet 4 of 86,55, where
+		// their fleet waits in orbit (encounter 65) - its hail is that line, and the last warning; the Gazurtoid guarding the Shimmering Ball's planet (encounter 33,
+		// orbit 1 of 68,66) are no home fleet, and none of their three hails is a homeworld line
+		var gazurtoidHome = StarAt( 86, 55 );
+
+		yield return GoIntoOrbit( gazurtoidHome, PlanetInOrbit( gazurtoidHome, 4 ) );
+
+		var gazurtoidHomeBegun = ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == 65 );
+		var gazurtoidHomeSaid = new List<string>();
+
+		yield return LetAliensSpeak( 1, gazurtoidHomeSaid );
+
+		yield return Frames( 3 );
+
+		var gazurtoidHomeLine = ( gazurtoidHomeSaid.Count > 0 ) && SaysLine( gazurtoidHomeSaid[ 0 ], CommText( 95 ) );
+		var gazurtoidHomeLast = gazurtoidHomeBegun && encounter.m_pdEncounter.m_homeworldWarningsGiven;
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		var shimmeringStar = StarAt( 68, 66 );
+
+		yield return GoIntoOrbit( shimmeringStar, PlanetInOrbit( shimmeringStar, 1 ) );
+
+		var gazurtoidAwayBegun = ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == 33 );
+		var gazurtoidAwaySaid = new List<string>();
+
+		yield return LetAliensSpeak( 3, gazurtoidAwaySaid );
+
+		var gazurtoidAwayHomeLine = gazurtoidAwaySaid.Exists( line => SaysLine( line, CommText( 94 ) ) || SaysLine( line, CommText( 95 ) ) );
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		Log( "homeworlds: gazurtoid fleet at home begun " + gazurtoidHomeBegun + ", said " + string.Join( " | ", gazurtoidHomeSaid ) + ", last warning " + gazurtoidHomeLast + " || gazurtoid at 68,66 begun " + gazurtoidAwayBegun + ", said " + string.Join( " | ", gazurtoidAwaySaid ) );
+
+		Check( "homeworlds: the Gazurtoid fleet at their homeworld hails with \"the holy land, the planet of the Gazurtoid\", its last warning", gazurtoidHomeBegun && gazurtoidHomeLine && gazurtoidHomeLast, gazurtoidHomeLine + ", " + gazurtoidHomeLast + " | " + string.Join( " | ", gazurtoidHomeSaid ) );
+		Check( "homeworlds: the Gazurtoid guarding the Shimmering Ball's planet are no home fleet and never say a homeworld line", gazurtoidAwayBegun && ( gazurtoidAwaySaid.Count == 3 ) && !gazurtoidAwayHomeLine, string.Join( " | ", gazurtoidAwaySaid ) );
 
 		// ---- 3. the control: a Thrynn patrol in their home system (encounter 157, met in flight) hails as any Thrynn ship does
 		EnterEncounter( 157 );
@@ -18609,7 +18683,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "homeworlds: the Thrynn home fleet gives its homeworld warnings one after the other while the ship does not answer", thrynnBegun && thrynnInOrder, string.Join( " | ", thrynnSaid ) );
 		Check( "homeworlds: the Thrynn hold their fire until the last warning, then end the comm link and attack", thrynnBegun && !hostileBeforeLast && thrynnHostile, hostileBeforeLast + " -> " + thrynnHostile );
-		Check( "homeworlds: the Veloxi home fleet answers a hail with its homeworld response and attacks", veloxBegun && veloxResponse && veloxHostile, veloxResponse + ", " + veloxHostile + " | " + string.Join( " | ", veloxSaid ) );
+		Check( "homeworlds: the Veloxi home fleet answers a hail with the first of its refusals, \"Us are not answer the questions\", and holds its fire", veloxBegun && veloxResponse && !veloxHostileAfterResponse, veloxResponse + ", hostile " + veloxHostileAfterResponse + " | " + string.Join( " | ", veloxSaid ) );
+		Check( "homeworlds: then the Veloxi give their four homeworld hails in order and attack after the last", veloxBegun && veloxHails && veloxHostile, veloxHails + ", " + veloxHostile + " | " + string.Join( " | ", veloxSaid ) );
 		Check( "homeworlds: a Thrynn patrol met in flight speaks no homeworld line and does not attack (control)", ( patrolLine.Contains( "Receiving" ) ) && !patrolWarned && !patrolHostile, patrolLine );
 
 		Finish( "scenario=homeworlds thrynn=" + thrynnSaid.Count + " velox=" + veloxSaid.Count, 0 );
@@ -22725,9 +22800,27 @@ public class ClaudeProbe : MonoBehaviour
 
 		take( "encounter_comm" );
 
+		// the DAMAGE display, with the hull and two systems damaged
+		var damagedShip = playerData.m_playerShip;
+		var keptArmorPoints = damagedShip.m_armorPoints;
+
+		damagedShip.m_armorPoints = damagedShip.GetMaximumArmorPoints() * 3 / 5;
+		SetSystemHealth( 0, 70 );
+		SetSystemHealth( 2, 25 );
+
+		new DamageButton().Execute();
+
+		yield return Frames( 10 );
+
+		take( "damage" );
+
+		damagedShip.m_armorPoints = keptArmorPoints;
+		SetSystemHealth( 0, 100 );
+		SetSystemHealth( 2, 100 );
+
 		Log( "screenpictures: " + pictures.Count + " pictures in " + folder + ": " + string.Join( ", ", pictures ) );
 
-		Check( "screenpictures: a picture of every screen visited", pictures.Count == 12, pictures.Count.ToString() );
+		Check( "screenpictures: a picture of every screen visited", pictures.Count == 13, pictures.Count.ToString() );
 
 		Finish( "scenario=screenpictures pictures=" + pictures.Count, 0 );
 	}
