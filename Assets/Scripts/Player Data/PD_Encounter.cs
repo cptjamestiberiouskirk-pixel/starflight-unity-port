@@ -52,6 +52,9 @@ public class PD_Encounter : IComparable
 	public int m_homeworldWarningCount;
 	public bool m_homeworldWarningsGiven;
 
+	// how many lines a home fleet has said from each of its homeworld lists: its hails, its responses and its refusals (null in older save files)
+	public int[] m_homeworldWarningCounts;
+
 	// set once the aliens have lost some of their ships and act cowardly (the Spemin, the Thrynn and the Veloxi) - false in older save files
 	public bool m_aliensAreCowardly;
 
