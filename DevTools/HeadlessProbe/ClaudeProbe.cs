@@ -1029,6 +1029,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLookFields();
 				break;
 
+			case "commpicture":
+				yield return ScenarioCommPicture();
+				break;
+
 			case "encounterviewscale":
 				yield return ScenarioEncounterViewScale();
 				break;
@@ -26304,6 +26308,80 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lookfields: Look gives the original's fields in its order: Sky, Temperature and Gravity, Atmo, Hydro and Terrain", inOrder && !shown.Contains( "Weather:" ), shown );
 
 		Finish( "scenario=lookfields", 0 );
+	}
+
+	// the comm link's picture clears: the interference as the link comes up (stronger with a less skilled communications officer) is gone once the link has settled,
+	// and the alien's portrait is shown clean from then on, as in the original, which garbles only the words
+	IEnumerator ScenarioCommPicture()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// an officer of little skill, whose link comes up through the strongest interference
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 30;
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		controller.m_encounterRange = 0.0f;
+
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+		var said = new List<string>();
+
+		yield return MeetAndConnect( speminId, GD_Comm.Stance.Friendly, said );
+
+		// wait for the comm screen to come on
+		CommScreen commScreen = null;
+
+		for ( var i = 0; ( i < 300 ) && ( commScreen == null ); i++ )
+		{
+			commScreen = FindFirstObjectByType<CommScreen>();
+
+			if ( commScreen == null )
+			{
+				yield return null;
+			}
+		}
+
+		if ( commScreen == null )
+		{
+			Check( "commpicture: the comm screen comes on", false, "no CommScreen enabled after the hail (" + string.Join( " | ", said ) + ")" );
+
+			yield break;
+		}
+
+		var coloredRays = commScreen.GetComponent( "ColoredRays" );
+		var lowResolution = (Behaviour) commScreen.GetComponent( "LowResolution" );
+		var waves = commScreen.GetComponent( "Waves" );
+		var headache = commScreen.GetComponent( "Headache" );
+
+		yield return Frames( 2 );
+
+		var raysAtStart = (float) GetField( coloredRays, "strength" );
+		var lowAtStart = lowResolution.enabled;
+
+		// the link settles (the interference takes 5 s to clear), then watch the picture for 8 s more
+		yield return new WaitForSecondsRealtime( commScreen.m_duration + 0.5f );
+
+		var raysSettled = (float) GetField( coloredRays, "strength" );
+		var lowSettled = lowResolution.enabled;
+		var largestDisturbance = 0.0f;
+		var watchEnd = Time.realtimeSinceStartup + 8.0f;
+
+		while ( Time.realtimeSinceStartup < watchEnd )
+		{
+			largestDisturbance = Mathf.Max( largestDisturbance, (float) GetField( waves, "strengthX" ), (float) GetField( headache, "strength" ), (float) GetField( coloredRays, "strength" ) );
+
+			yield return null;
+		}
+
+		Log( "commpicture: an officer of skill 30: at the start rays " + raysAtStart.ToString( "F2" ) + ", low resolution " + lowAtStart + "; settled rays " + raysSettled.ToString( "F2" ) + ", low resolution " + lowSettled + "; the largest disturbance in the 8 s after " + largestDisturbance.ToString( "F2" ) );
+
+		Check( "commpicture: the link comes up through interference (the setup is the case)", ( raysAtStart > 1.0f ) && lowAtStart, "rays " + raysAtStart.ToString( "F2" ) + ", low resolution " + lowAtStart );
+		Check( "commpicture: once the link has settled the portrait is clean: no coloured rays, full resolution", ( raysSettled == 0.0f ) && !lowSettled, "rays " + raysSettled.ToString( "F2" ) + ", low resolution " + lowSettled );
+		Check( "commpicture: and it stays clean (no bursts of interference later)", largestDisturbance == 0.0f, "largest " + largestDisturbance.ToString( "F2" ) );
 	}
 
 	// the encounter is seen at the original's fixed scale: the camera frames the alien ships out to their fire range and no further, so that it does not climb
