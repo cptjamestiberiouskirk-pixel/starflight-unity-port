@@ -117,16 +117,13 @@ public class TerrainVehicleDisplay : ShipDisplay
 
 		shipCoordinates = SpaceflightController.m_instance.m_disembarked.ApplyElevation( shipCoordinates, false );
 
-		// calculate vector from TV to ship coordinates
+		// calculate vector from TV to ship coordinates, along the ground (the height of the ship's place is not a part of the way to it)
 		var vectorToShip = shipCoordinates - playerData.m_general.m_lastDisembarkedCoordinates;
 
-		// how far is it in kilometers?
-		var distanceInKm = vectorToShip.magnitude * 225.0f / 2048.0f - 2.0f;
+		vectorToShip.y = 0.0f;
 
-		if ( distanceInKm < 0.0f )
-		{
-			distanceInKm = 0.0f;
-		}
+		// how far is it, in the original's kilometers
+		var distanceInKm = Tools.SurfaceDistanceInKm( playerData.m_general.m_lastDisembarkedCoordinates, shipCoordinates );
 
 		// convert rotation to euler angles
 		var eulerAngles = Quaternion.FromToRotation( Vector3.forward, vectorToShip ).eulerAngles;
@@ -143,8 +140,8 @@ public class TerrainVehicleDisplay : ShipDisplay
 		// get the amount of cargo space used as a percentage
 		var percentFull = 100 - playerData.m_terrainVehicle.GetPercentRemainingVolume();
 
-		// the distance as it is shown
-		var roundedDistanceInKm = Mathf.RoundToInt( distanceInKm );
+		// the distance as it is shown, in whole kilometers (the original's integer square root)
+		var roundedDistanceInKm = Mathf.FloorToInt( distanceInKm );
 
 		// in a storm or heavy snow the bearing to the ship is lost (the original shows "SHIP: LOST!")
 		var shipLost = PlanetWeather.IsShipLost();
