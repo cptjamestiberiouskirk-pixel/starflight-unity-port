@@ -285,6 +285,22 @@ public class PD_PlayerShip
 		}
 	}
 
+	// how many of the systems the ship has
+	public int GetInstalledSystemCount()
+	{
+		var installed = 0;
+
+		for ( var system = 0; system < (int) ShipSystem.Count; system++ )
+		{
+			if ( HasSystem( (ShipSystem) system ) )
+			{
+				installed++;
+			}
+		}
+
+		return installed;
+	}
+
 	// true if every system is whole
 	public bool AllSystemsAreWhole()
 	{
