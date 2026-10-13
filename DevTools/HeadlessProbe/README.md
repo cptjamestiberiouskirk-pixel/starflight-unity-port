@@ -163,6 +163,7 @@ What the probe does:
 | `ringdevice` | the Ring Device, in hyperspace with no encounter able to begin: the fluxes shown without it (none), the ship put at a hidden flux (the control, it goes through) and the fluxes shown with it in the hold (all) (about 30 s) |
 | `starport-endurium` | the price of Endurium: one cubic meter bought and sold at the real trade depot on 19-02-4620 (1000 both ways), 20-02-4620 (1500) and 15-05-4620 (2000), and what the Starport pays for molybdenum on the first and last date (the control, unchanged) (about 20 s) |
 | `nebula` | nebulae keep the shields down: Raise Shields in a star system outside the nebulae (the control, up and staying up), coming into a star system inside a nebula with them up (they collapse, with a message) and pressing it there (refused), and in hyperspace inside a nebula clear of the stars (refused) and outside the nebulae (the control, up) (about 40 s) |
+| `shieldmessages` | the shields' and weapons' messages in the original's words, through the console's buttons: up and down, arming the weapons that work (missiles and lasers, then lasers only), Disarm disarming and saying so, and no fuel (about 25 s) |
 | `starport-repair` | Repair in ship configuration: a whole ship (no repairs, nothing paid), class 1 armor at 200 of 500 with the shields empty (900 M.U., whole again with full shields), a bare hull at 100 of 250 (450 M.U. at the class 1 price) and with 10 M.U. in the bank (refused, nothing changes) (about 20 s) |
 | `distressconfirm` | the distress call asks first, as the original: Distress puts the question and No and Yes on the console; Yes in the docking bay says We're already home!, No in the star system puts the communications buttons back, Yes there tows the ship home with Initiating cryogenic stasis and Retrieval complete, crew revived, and Yes in an encounter says Transmission is being jammed (about 25 s) |
 | `disembarklines` | the disembark's lines in the original's words and order: a real disembark on planet 94 says Standby...scanning planet., Auto sampling devices activated., Initiating hull integrity check., Hull check complete. and Activating terrain vehicle. (about 35 s) |
@@ -210,7 +211,7 @@ What the probe does:
 | `lifeformpictures` | with `-Graphics`, renders the game view of planet 92 with the planet's lifeforms, then with all 17 models in a ring around the terrain vehicle, and a close-up of each model, into `Logs/lifeform-pictures/` (or `-probePictures`); without a graphics device it only lands (about 60 s) |
 | `look` | Look on planet 92 with one lifeform at a time beside the vehicle: a living plant (its body plan, not moving, alive), a test animal that wanders (wandering) and the plant made dead (dead) (about 40 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (163 scenarios, about 128 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (164 scenarios, about 129 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

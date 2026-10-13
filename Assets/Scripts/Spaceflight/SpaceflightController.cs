@@ -204,9 +204,11 @@ public class SpaceflightController : MonoBehaviour
 		// what they do is the owner's ruling of 2026-10-10 for roadmap 1.9)
 		if ( playerData.m_playerShip.m_shieldsAreUp && ShipIsInsideANebula() )
 		{
-			playerData.m_playerShip.DropShields();
+			// in the original's words (NAVIGATR >DOWN-SHIELD in a nebula), and then "Shields are down."
+			m_messages.AddText( "<color=white>Magnetic disturbances in nebula</color>" );
+			m_messages.AddText( "<color=white>causing energy fluctuations.</color>" );
 
-			m_messages.AddText( "<color=white>The nebula has collapsed the shields.</color>" );
+			playerData.m_playerShip.DropShields();
 		}
 
 		// the engineer and the doctor carry on with the repairs and the treatment they were told to do
