@@ -78,6 +78,7 @@ What the probe does:
 | `m26` | the planet generator tool (editor assembly, reached by reflection): it prepares the height map of all 811 planets from their source images, checks that the south pole padding rises to the highest point of the bottom row, and compares every row with the prepared height map in the planet file. Nothing is written, and the tool's settings in the editor preferences are not touched |
 | `m27` | the planet generator tool again: a blur with a radius of zero, the tool's check of its settings, a game data file that is not there, how many steps a single rain drop takes with and without evaporation and friction, and the whole erosion pass with neither on a small map. The tool is never started on the real planets |
 | `starport-ledger` | what the bank ledger says after the Trade Depot and Ship Configuration panels close with more or less money than they opened with, and the most of an element the player can afford with a very large balance |
+| `starport-ledgerrows` | the Bank's ledger, longer than its window, scrolls by whole rows: its top row is not cut in half under the headings and the newest row is still above the balance (about 15 s) |
 | `cargo` | volumes in cubic meters in the ship's cargo list, in the terrain vehicle's pickup message and cargo list; a deposit that does not fit into the hold; the size of a scanned vessel in the sensor analysis; that the terrain vehicle has not moved meanwhile |
 | `savedata` | the scene a saved game is loaded into for every location, the save panel's description of a game saved in the terrain vehicle, the terrain vehicle of a new game, and the stardate with the computer set to the Thai, Saudi Arabian, Persian and German cultures |
 | `combat` | a missile in the air while the game is paused, the size of an explosion that is used again, a launch with every missile of the pool in the air, and a ship that is fired at and hit again while it explodes |
@@ -239,7 +240,7 @@ What the probe does:
 | `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 | `combatmessages` | the combat messages are the original's: WEAPONS NOT ARMED, NO TARGET PRESENT, WEAPON NOT AVAILABLE and OUT OF FUEL! when a weapon cannot fire, nothing of the port's own when the player's shot hits, and LASER CLASS n (LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (192 scenarios, about 155 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (193 scenarios, about 156 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

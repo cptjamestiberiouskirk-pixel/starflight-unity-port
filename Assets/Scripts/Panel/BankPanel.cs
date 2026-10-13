@@ -67,6 +67,21 @@ public class BankPanel : Panel
 		// calculate the offset we need to show the bottom of the list
 		float offset = Mathf.Max( 0.0f, m_dateListText.renderedHeight - viewportHeight );
 
+		// scroll by whole rows, so that the top row is not cut in half under the headings (the original's ledger shows whole rows: starflt_046, starflt_053)
+		m_dateListText.ForceMeshUpdate();
+
+		var textInfo = m_dateListText.textInfo;
+
+		if ( ( offset > 0.0f ) && ( textInfo != null ) && ( textInfo.lineCount > 1 ) )
+		{
+			var rowHeight = textInfo.lineInfo[ 0 ].ascender - textInfo.lineInfo[ 1 ].ascender;
+
+			if ( rowHeight > 0.0f )
+			{
+				offset = Mathf.Ceil( offset / rowHeight - 0.01f ) * rowHeight;
+			}
+		}
+
 		// move up the text in all 3 columns
 		m_dateListText.rectTransform.offsetMax = new Vector3( 0.0f, offset, 0.0f );
 		m_transactionsListText.rectTransform.offsetMax = new Vector3( 0.0f, offset, 0.0f );
