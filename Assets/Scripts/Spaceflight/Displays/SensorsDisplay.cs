@@ -37,6 +37,9 @@ public class SensorsDisplay : ShipDisplay
 	};
 
 	// from 10^21 to 10^22 tons the original draws a planet's disc this many pixels across, plus this many for each unit of the leading digit of its mass
+	// where the values of a planet scan start, after their headings (TextMesh Pro's indent, which wrapped and following lines keep): the original writes each value on its heading's line, the lithosphere's elements under one another (starflt_144)
+	const string c_sensorValueIndent = "7.5em";
+
 	const int c_planetDiscDigitMassPower = 21;
 	const float c_planetDiscBasePixels = 2.0f;
 	const float c_planetDiscPixelsPerDigit = 4.0f;
@@ -265,11 +268,13 @@ public class SensorsDisplay : ShipDisplay
 					// get the planet info
 					var atmosphere = planet.GetAtmosphereText();
 					var hydrosphere = planet.GetHydrosphereText();
-					var lithosphere = planet.GetLithosphereText();
 
-					// update the messages text
+					// the lithosphere's elements, one a line (the original lists them under one another: starflt_144)
+					var lithosphere = gameData.m_elementList[ planet.m_elementIdA ].m_name + "\n" + gameData.m_elementList[ planet.m_elementIdB ].m_name + "\n" + gameData.m_elementList[ planet.m_elementIdC ].m_name;
+
+					// update the messages text: each value on its heading's line, lined up after the headings, as the original's ATMOSPHERE: FLUORINE, CHLORINE
 					SpaceflightController.m_instance.m_messages.Clear();
-					SpaceflightController.m_instance.m_messages.AddText( "Atmosphere:\n<color=white>" + atmosphere + "</color>\nHydrosphere:\n<color=white>" + hydrosphere + "</color>\nLithosphere:\n<color=white>" + lithosphere + "</color>" );
+					SpaceflightController.m_instance.m_messages.AddText( "Atmosphere:<indent=" + c_sensorValueIndent + "><color=white>" + atmosphere + "</color></indent>\nHydrosphere:<indent=" + c_sensorValueIndent + "><color=white>" + hydrosphere + "</color></indent>\nLithosphere:<indent=" + c_sensorValueIndent + "><color=white>" + lithosphere + "</color></indent>" );
 
 					break;
 				}
