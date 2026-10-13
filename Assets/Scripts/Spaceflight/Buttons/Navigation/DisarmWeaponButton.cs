@@ -10,7 +10,8 @@ public class DisarmWeaponButton : ShipButton
 	{
 		var playerData = DataController.m_instance.m_playerData;
 
-		playerData.m_playerShip.m_weaponsAreArmed = false;
+		// (and say so: NAVIGATR >DISARM, WEAPONS ARE DISARMED)
+		playerData.m_playerShip.DisarmWeapons();
 
 		SoundController.m_instance.PlaySound( SoundController.Sound.Deactivate );
 
