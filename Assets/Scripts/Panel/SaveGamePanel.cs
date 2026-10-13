@@ -335,7 +335,8 @@ public class SaveGamePanel : Panel
 					description += "Just Launched</color>\n";
 					break;
 				case PD_General.Location.StarSystem:
-					coordinates = Tools.WorldToGameCoordinates( playerData.m_general.m_lastStarSystemCoordinates );
+					// the system's own place, as the coordinates above the main view give it (the ship's place inside the system is not a hyperspace place)
+					coordinates = Tools.WorldToGameCoordinates( playerData.m_general.m_lastHyperspaceCoordinates );
 					description += "Star System</color>   Coordinates: <color=\"blue\">" + Mathf.RoundToInt( coordinates.x ) + ", " + Mathf.RoundToInt( coordinates.z ) + "</color>\n";
 					break;
 				case PD_General.Location.Hyperspace:
@@ -373,7 +374,7 @@ public class SaveGamePanel : Panel
 			description += "Engines: <color=\"blue\">" + playerData.m_playerShip.GetEngines().m_name + "</color>";
 			description += "   Shields: <color=\"blue\">" + playerData.m_playerShip.GetShielding().m_name + "</color>";
 			description += "   Armor: <color=\"blue\">" + playerData.m_playerShip.GetArmor().m_name + "</color>";
-			description += "   Missle Launcher: <color=\"blue\">" + playerData.m_playerShip.GetMissileLauncher().m_name + "</color>";
+			description += "   Missile Launcher: <color=\"blue\">" + playerData.m_playerShip.GetMissileLauncher().m_name + "</color>";
 			description += "   Laser Cannon: <color=\"blue\">" + playerData.m_playerShip.GetLaserCannon().m_name + "</color>";
 
 			// replace the description text for this save game slot (its values in the UI kit's colours)
