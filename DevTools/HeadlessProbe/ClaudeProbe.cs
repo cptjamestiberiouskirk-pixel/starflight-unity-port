@@ -981,6 +981,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAlienWaiting();
 				break;
 
+			case "heaven":
+				yield return ScenarioHeaven();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -8087,7 +8091,10 @@ public class ClaudeProbe : MonoBehaviour
 		for ( var i = 0; i < count; i++ )
 		{
 			pdEncounter.m_lastQuestionFromAliens = questionId;
-			pdEncounter.m_lastSubjectFromPlayer = GD_Comm.Subject.Yes;
+			pdEncounter.m_lastSubjectFromPlayer = GD_Comm.Subject.None;
+
+			// the answer as the player gives it, with the Yes button
+			new AnswerYesButton().Execute();
 
 			yield return Frames( 3 );
 		}
@@ -22968,6 +22975,9 @@ public class ClaudeProbe : MonoBehaviour
 		// ---- 1. the shields and weapons in each posture
 		pdEncounter.m_aliensAreCowardly = false;
 		pdEncounter.m_alienStance = GD_Comm.Stance.Neutral;
+		// (the Mechans' mood decides their posture: a mood that gives it, neutral from 10)
+		pdEncounter.m_mood = 48.0f;
+		pdEncounter.m_moodSet = true;
 
 		var neutral = AnalyzeScan( SensorsDisplay.ScanType.MechanScout );
 
@@ -22976,6 +22986,9 @@ public class ClaudeProbe : MonoBehaviour
 		var hostile = AnalyzeScan( SensorsDisplay.ScanType.MechanScout );
 
 		pdEncounter.m_alienStance = GD_Comm.Stance.Friendly;
+		// (the Mechans' mood decides their posture: a mood that gives it, friendly below 10)
+		pdEncounter.m_mood = 1.0f;
+		pdEncounter.m_moodSet = true;
 
 		var friendly = AnalyzeScan( SensorsDisplay.ScanType.MechanScout );
 
@@ -22986,6 +22999,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		pdEncounter.m_aliensAreCowardly = false;
 		pdEncounter.m_alienStance = GD_Comm.Stance.Neutral;
+		// (the Mechans' mood decides their posture: a mood that gives it, neutral from 10)
+		pdEncounter.m_mood = 48.0f;
+		pdEncounter.m_moodSet = true;
 
 		// ---- 2. a Gazurtoid warship and a Spemin scout
 		var gazurtoid = AnalyzeScan( SensorsDisplay.ScanType.GazurtoidWarship );
@@ -23771,6 +23787,9 @@ public class ClaudeProbe : MonoBehaviour
 		controller.m_messages.Clear();
 
 		pdEncounter.m_alienStance = GD_Comm.Stance.Friendly;
+		// (the Mechans' mood decides their posture: a mood that gives it, friendly below 10)
+		pdEncounter.m_mood = 1.0f;
+		pdEncounter.m_moodSet = true;
 
 		yield return Frames( 5 );
 
@@ -23780,6 +23799,9 @@ public class ClaudeProbe : MonoBehaviour
 		controller.m_messages.Clear();
 
 		pdEncounter.m_alienStance = GD_Comm.Stance.Neutral;
+		// (the Mechans' mood decides their posture: a mood that gives it, neutral from 10)
+		pdEncounter.m_mood = 48.0f;
+		pdEncounter.m_moodSet = true;
 
 		yield return Frames( 5 );
 
@@ -25138,6 +25160,104 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "alienwaiting: the aliens ask a question 30 times in 100, the Mechans 70, as the original", ( speminRate == 30 ) && ( mechanRate == 70 ), speminRate + ", " + mechanRate );
 
 		Finish( "scenario=alienwaiting", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 0 and 2: the Mechans' mood, and the fleet at Heaven (roadmap 0.2)
+
+	// the Mechans in the current encounter ask this question and the player answers it with the button
+	static IEnumerator AnswerMechanQuestion( int questionId, bool yes )
+	{
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		encounter.AddComm( GD_Comm.Subject.Question, false, CommById( questionId ) );
+
+		if ( yes )
+		{
+			new AnswerYesButton().Execute();
+		}
+		else
+		{
+			new AnswerNoButton().Execute();
+		}
+
+		yield return Frames( 3 );
+	}
+
+	IEnumerator ScenarioHeaven()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+		playerData.m_general.m_mechan9Unlocked = false;
+
+		ship.m_armorPoints = 100000;
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+
+		var encounterRange = SpaceflightController.m_instance.m_encounterRange;
+
+		SpaceflightController.m_instance.m_encounterRange = 0.0f;
+
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		// ---- 1. a Mechan scout group in space: one wrong answer of the kind worth 10 ("Our scanners show that your vessel is derived from Empire technology. Do you
+		// confirm?", 98, answered no) leaves them neutral
+		EnterEncounter( FindEncounterOfRace( GameData.Race.Mechan ) );
+		yield return Frames( 10 );
+
+		yield return AnswerMechanQuestion( 98, false );
+
+		var stanceAfterWrong = encounter.m_pdEncounter.m_alienStance;
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 2. into orbit around Heaven (145,107, orbit 4): the Mechan fleet stops the ship; four right answers (98, yes) make them friendly, mechan 9 is unlocked
+		// and the ship goes back into orbit
+		var heavenStar = StarAt( 145, 107 );
+
+		yield return GoIntoOrbit( heavenStar, PlanetInOrbit( heavenStar, 4 ) );
+
+		var heavenBegun = ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == 77 );
+		var unlockedAfter = new List<bool>();
+
+		for ( var i = 0; i < 4; i++ )
+		{
+			yield return AnswerMechanQuestion( 98, true );
+
+			unlockedAfter.Add( playerData.m_general.m_mechan9Unlocked );
+		}
+
+		// (the moment to read the last line)
+		var waitEnd = Time.realtimeSinceStartup + 4.0f;
+
+		while ( Time.realtimeSinceStartup < waitEnd )
+		{
+			yield return null;
+		}
+
+		var locationAfterUnlock = playerData.m_general.m_location;
+
+		// ---- 3. into orbit around Heaven again, from the star system: no fleet stops the ship any more
+		yield return GoIntoOrbit( heavenStar, PlanetInOrbit( heavenStar, 4 ) );
+
+		var locationAgain = playerData.m_general.m_location;
+
+		SpaceflightController.m_instance.m_encounterRange = encounterRange;
+
+		Log( "heaven: one wrong answer, stance " + stanceAfterWrong + " | heaven fleet begun " + heavenBegun + ", unlocked after each right answer " + string.Join( ",", unlockedAfter ) + ", then " + locationAfterUnlock + " | into orbit again: " + locationAgain );
+
+		Check( "heaven: a wrong answer worth 10 leaves the Mechans neutral, as the original", stanceAfterWrong == GD_Comm.Stance.Neutral, stanceAfterWrong.ToString() );
+		Check( "heaven: four right answers make the Mechans friendly and unlock mechan 9, as the original (48 less 4 times 10)", heavenBegun && ( unlockedAfter.Count == 4 ) && !unlockedAfter[ 2 ] && unlockedAfter[ 3 ], heavenBegun + " " + string.Join( ",", unlockedAfter ) );
+		Check( "heaven: friendly Mechans at Heaven let the ship back into orbit, as the original", locationAfterUnlock == PD_General.Location.InOrbit, locationAfterUnlock.ToString() );
+		Check( "heaven: once the Mechans are friendly, the fleet at Heaven no longer stops a ship going into orbit, as the original", locationAgain == PD_General.Location.InOrbit, locationAgain.ToString() );
+
+		playerData.m_general.m_mechan9Unlocked = false;
+
+		Finish( "scenario=heaven", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
