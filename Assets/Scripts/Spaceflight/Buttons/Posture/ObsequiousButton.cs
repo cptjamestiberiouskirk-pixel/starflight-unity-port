@@ -31,8 +31,8 @@ public class ObsequiousButton : ShipButton
 				}
 				else
 				{
-					// no - restore the bridge buttons
-					SpaceflightController.m_instance.m_buttonController.SetBridgeButtons();
+					// no - back to the communications officer's menu, as the original's
+					SpaceflightController.m_instance.m_buttonController.SetCommunicationsButtons();
 				}
 
 				return false;

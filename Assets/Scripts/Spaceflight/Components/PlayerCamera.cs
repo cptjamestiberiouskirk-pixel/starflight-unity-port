@@ -222,8 +222,8 @@ public class PlayerCamera : MonoBehaviour
 			// update the player location
 			SpaceflightController.m_instance.SwitchLocation( PD_General.Location.JustLaunched );
 
-			// restore the bridge buttons (this also ends the launch function)
-			SpaceflightController.m_instance.m_buttonController.SetBridgeButtons();
+			// the captain's menu, as the original's after the launch (this also ends the launch function)
+			SpaceflightController.m_instance.m_buttonController.SetCaptainButtons();
 		}
 		else
 		{
