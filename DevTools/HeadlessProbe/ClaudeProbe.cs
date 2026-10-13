@@ -725,6 +725,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportInterest();
 				break;
 
+			case "starport-notices":
+				yield return ScenarioStarportNotices();
+				break;
+
 			case "nebula":
 				yield return ScenarioNebula();
 				break;
@@ -995,6 +999,14 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "gazurtoidmood":
 				yield return ScenarioGazurtoidMood();
+				break;
+
+			case "orbitlines":
+				yield return ScenarioOrbitLines();
+				break;
+
+			case "shieldmessages":
+				yield return ScenarioShieldMessages();
 				break;
 
 			default:
@@ -11089,6 +11101,117 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=starport-transport bytes=" + bytes + " alpha=" + alpha.ToString( "F4" ) + " asset=" + assetAlphaAfter.ToString( "F4" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
+	// ---------------------------------------------------------------- the screens' Step 2: the notices screen as the original's (OP-OV)
+
+	// the text of a button's label
+	static string ButtonLabel( UnityEngine.UI.Button button )
+	{
+		var text = ( button == null ) ? null : button.GetComponentInChildren<TMPro.TextMeshProUGUI>( true );
+
+		return ( text == null ) ? "" : text.text;
+	}
+
+	// More on the notices screen until the notice has been read to its end - returns the text then
+	static string ReadNoticeToTheEnd( OperationsPanel panel )
+	{
+		for ( var press = 0; ( press < 50 ) && !(bool) GetField( panel, "m_endOfMessageReached" ); press++ )
+		{
+			panel.MoreClicked();
+		}
+
+		return panel.m_messageText.text.Replace( "\r", "" );
+	}
+
+	IEnumerator ScenarioStarportNotices()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var panel = FindPanel<OperationsPanel>();
+
+		if ( ( panel == null ) || ( gameData.m_noticeList.Length < 2 ) )
+		{
+			Finish( "scenario=starport-notices abort: no operations panel or too few notices", 2 );
+			yield break;
+		}
+
+		// the day of the second notice, with none read: two notices are out
+		var secondDate = gameData.m_noticeList[ 1 ].m_stardate;
+
+		playerData.m_general.m_currentStardateYMD = secondDate;
+		playerData.m_starport.m_lastReadNoticeStardate = "0000-00-00";
+
+		yield return OpenPanel( panel, "operations" );
+
+		// ---- 1. the header, and the end of the notices after the newest
+		panel.NoticesClicked();
+
+		var header = panel.m_stardateText.text;
+		var firstRead = ReadNoticeToTheEnd( panel );
+
+		panel.NextClicked();
+
+		var secondRead = ReadNoticeToTheEnd( panel );
+
+		panel.QuitClicked();
+
+		Log( "starport-notices: on " + secondDate + " the header is '" + header + "' | the first notice ends '" + Tail( firstRead ) + "' | the second (the newest) ends '" + Tail( secondRead ) + "'" );
+
+		Check( "starport-notices: the header beside NOTICES is today's date, as the original's", header == DayMonthYear( secondDate ), "'" + header + "'" );
+		Check( "starport-notices: the newest notice ends with the original's END OF NOTICES, and an earlier one does not", secondRead.EndsWith( "\n\n***End of notices***" ) && !firstRead.Contains( "End of notices" ), Tail( firstRead ) + " | " + Tail( secondRead ) );
+
+		// ---- 2. nothing new: NO NEW NOTICES and REPEAT LAST NOTICE?, More as Yes and Quit as No
+		var moreLabelBefore = ButtonLabel( panel.m_moreButton );
+
+		panel.NoticesClicked();
+
+		var askingMethod = panel.GetType().GetMethod( "IsAskingToRepeat" );
+		var asked = ( askingMethod != null ) && (bool) askingMethod.Invoke( panel, null );
+		var question = panel.m_messageText.text.Replace( "\r", "" );
+		var labels = ButtonLabel( panel.m_moreButton ) + " / " + ButtonLabel( panel.m_quitButton );
+
+		// No: back to the menu
+		panel.QuitClicked();
+
+		var menuAfterNo = panel.m_welcomeGameObject.activeSelf && !panel.m_noticesGameObject.activeSelf;
+
+		// Yes: the last notice again
+		panel.NoticesClicked();
+		panel.MoreClicked();
+
+		var repeated = panel.m_messageText.text.Replace( "\r", "" );
+		var labelsAfterYes = ButtonLabel( panel.m_moreButton );
+		var stillAsking = ( askingMethod != null ) && (bool) askingMethod.Invoke( panel, null );
+
+		panel.QuitClicked();
+
+		yield return ClosePanel( panel, "operations" );
+
+		playerData.m_general.m_currentStardateYMD = "4620-01-01";
+
+		Log( "starport-notices: nothing new: asked " + asked + ", '" + question + "', buttons " + labels + " (More was '" + moreLabelBefore + "') | No: the menu " + menuAfterNo + " | Yes: '" + Head( repeated ) + "', More '" + labelsAfterYes + "', still asking " + stillAsking );
+
+		Check( "starport-notices: with nothing new the screen says so and asks whether to repeat the last notice, with Yes and No", asked && ( question == "No new notices\n\nRepeat last notice?" ) && ( labels == "Yes / No" ), asked + ", '" + question + "', " + labels );
+		Check( "starport-notices: No goes back to the menu", menuAfterNo, menuAfterNo.ToString() );
+		Check( "starport-notices: Yes shows the last notice read again after the original's REPEATING LAST NOTICE, and the buttons get their labels back", repeated.StartsWith( "***Repeating last notice***\n\n" + DayMonthYear( secondDate ) ) && ( labelsAfterYes == moreLabelBefore ) && !stillAsking, "'" + Head( repeated ) + "', More '" + labelsAfterYes + "' (was '" + moreLabelBefore + "'), still asking " + stillAsking );
+
+		Finish( "scenario=starport-notices header=" + header + " asked=" + asked + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the first and the last 60 characters of a text, for the log
+	static string Head( string text )
+	{
+		text = ( text ?? "" ).Replace( "\n", "/" );
+
+		return ( text.Length <= 60 ) ? text : text.Substring( 0, 60 );
+	}
+
+	static string Tail( string text )
+	{
+		text = ( text ?? "" ).Replace( "\n", "/" );
+
+		return ( text.Length <= 60 ) ? text : text.Substring( text.Length - 60 );
+	}
+
 	// ---------------------------------------------------------------- the screens' Step 2: the bank pays the original's interest
 
 	// the bank pays its interest up to today (PlayerData.PayInterest): what it paid, or -1 on the code before the interest
@@ -11852,7 +11975,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "dates: operations with the thai calendar: '" + today + "', the notice is dated '" + noticeDate + "' (its stardate is " + expectedNoticeDate + "), its ships log entry '" + logStardate + "' with the heading '" + logHeader + "'" );
 
-		Check( "dates: operations shows today's stardate with the thai calendar", today == "Today is 26-03-4620", today );
+		Check( "dates: operations shows today's stardate with the thai calendar", today == "26-03-4620", today );
 		Check( "dates: a notice is dated with its stardate with the thai calendar", ( expectedNoticeDate != "" ) && ( noticeDate == expectedNoticeDate ), "'" + noticeDate + "' (should be " + expectedNoticeDate + ")" );
 		Check( "dates: the ships log entry of a notice has its stardate with the thai calendar", ( expectedNoticeDate != "" ) && ( logStardate == expectedNoticeDate ) && ( logHeader == expectedNoticeDate ), "'" + logStardate + "' / '" + logHeader + "' (should be " + expectedNoticeDate + ")" );
 
@@ -12490,7 +12613,9 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "unmapped: within orbital range the player is told that the planet could not be mapped", rangeMessage.Contains( "Standing by to orbit" ) && rangeMessage.Contains( "could not be mapped" ), rangeMessage );
 		Check( "unmapped: in orbit the player is told so too, and the planet model has the plain maps", orbitMessage.Contains( "Orbit established" ) && orbitMessage.Contains( "could not be mapped" ) && ( orbitAlbedoSize == "4x4" ), orbitMessage + " | albedo " + orbitAlbedoSize );
 
-		// a planet with maps gets no such message (control)
+		// a planet with maps gets no such message (control) - the text window cleared first, since the lines of the last orbit scroll on
+		SpaceflightController.m_instance.m_messages.Clear();
+
 		yield return EnterOrbit( 94 );
 
 		var goodOrbitMessage = MessageList();
@@ -25709,6 +25834,122 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "gazurtoidmood: met with the shields up and the weapons armed the Gazurtoid fight, as the original (41, fight from 40)", ( armedMood == 41.0f ) && ( armedStance == GD_Comm.Stance.Hostile ), armedMood + " " + armedStance );
 
 		Finish( "scenario=gazurtoidmood", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the lines that lead up to orbit scroll on (starflt_141, starflt_143)
+
+	IEnumerator ScenarioOrbitLines()
+	{
+		EnsureCrew();
+
+		var arth = DataController.m_instance.m_gameData.m_misc.m_arthStarId;
+
+		EnterStarSystem( arth );
+
+		yield return Frames( 10 );
+
+		// a line from before the orbit, as the system travel leaves one
+		SpaceflightController.m_instance.m_messages.Clear();
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>...Commencing system travel.</color>" );
+
+		// (a planet of Arth's system other than Arth, whose orbit leads to the Starport)
+		var planetId = -1;
+
+		for ( var orbit = 1; ( orbit <= 8 ) && ( planetId < 0 ); orbit++ )
+		{
+			var candidate = PlanetInOrbit( arth, orbit );
+
+			if ( ( candidate >= 0 ) && ( candidate != DataController.m_instance.m_gameData.m_misc.m_arthPlanetId ) )
+			{
+				planetId = candidate;
+			}
+		}
+
+		yield return EnterOrbit( planetId );
+
+		var shown = MessageList();
+
+		Log( "orbitlines: " + shown );
+
+		Check( "orbitlines: going into orbit says \"...Orbit established\" under the lines before it, as the original", shown.Contains( "...Commencing system travel." ) && shown.Contains( "...Orbit established." ), shown );
+
+		Finish( "scenario=orbitlines", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the shields' and weapons' messages (NAVIGATR)
+
+	// presses a button of the console and returns what the text window shows
+	static string PressAndRead( ShipButton button )
+	{
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		button.Execute();
+
+		return MessageList();
+	}
+
+	IEnumerator ScenarioShieldMessages()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		// a ship with shields, missiles and lasers, all whole, and fuel
+		ship.m_shieldingClass = 1;
+		ship.m_missileLauncherClass = 1;
+		ship.m_laserCannonClass = 1;
+		ship.RestoreSystems();
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+
+		if ( ship.m_elementStorage.Find( 5 ) == null )
+		{
+			ship.AddElement( 5, 50 );
+		}
+
+		// ---- 1. up and down, armed and disarmed, through the console's buttons
+		var raised = PressAndRead( new RaiseShieldsButton() );
+		var dropped = PressAndRead( new DropShieldsButton() );
+		var armed = PressAndRead( new ArmWeaponButton() );
+		var armedFlag = ship.m_weaponsAreArmed;
+		var disarmed = PressAndRead( new DisarmWeaponButton() );
+		var disarmedFlag = ship.m_weaponsAreArmed;
+
+		// ---- 2. the missile launcher destroyed: only the lasers arm
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Missiles, 0 );
+
+		var lasersOnly = PressAndRead( new ArmWeaponButton() );
+
+		PressAndRead( new DisarmWeaponButton() );
+
+		ship.RestoreSystems();
+
+		// ---- 3. no fuel: the shields can't be raised
+		var fuel = ship.m_elementStorage.Find( 5 );
+
+		if ( fuel != null )
+		{
+			ship.RemoveElement( 5, fuel.m_volume );
+		}
+
+		var noFuel = PressAndRead( new RaiseShieldsButton() );
+		var noFuelFlag = ship.m_shieldsAreUp;
+
+		ship.AddElement( 5, 50 );
+
+		Log( "shieldmessages: raise [" + raised + "] drop [" + dropped + "] arm [" + armed + "] (" + armedFlag + ") disarm [" + disarmed + "] (" + disarmedFlag + ") | lasers only [" + lasersOnly + "] | no fuel [" + noFuel + "] (" + noFuelFlag + ")" );
+
+		Check( "shieldmessages: the shields say \"Shields are now up.\" and \"Shields are down.\", as the original", raised.Contains( "Shields are now up." ) && dropped.Contains( "Shields are down." ), raised + " | " + dropped );
+		Check( "shieldmessages: arming says \"Arming missiles.\" and \"Arming lasers.\", and only for the weapons that work, as the original", armed.Contains( "Arming missiles." ) && armed.Contains( "Arming lasers." ) && armedFlag && lasersOnly.Contains( "Arming lasers." ) && !lasersOnly.Contains( "Arming missiles." ), armed + " | " + lasersOnly );
+		Check( "shieldmessages: the Disarm button disarms and says \"Weapons are disarmed.\", as the original", !disarmedFlag && disarmed.Contains( "Weapons are disarmed." ), disarmedFlag + " | " + disarmed );
+		Check( "shieldmessages: without fuel the shields can't be raised, in the original's words", !noFuelFlag && noFuel.Contains( "Shields can't be raised." ), noFuelFlag + " | " + noFuel );
+
+		Finish( "scenario=shieldmessages", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
