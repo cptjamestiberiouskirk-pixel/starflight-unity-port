@@ -335,6 +335,9 @@ public class OperationsPanel : Panel
 			general.m_supplementalEvaluationList.Clear();
 		}
 
+		// and their fines booked as they are shown, as the original's (OP-OV WE78B: WF045 and WF12C, WF02B)
+		DataController.m_instance.m_playerData.BookSupplementalFines();
+
 		if ( general.m_gameWon && !general.m_missionCompleteShown )
 		{
 			var storyText = DataController.m_instance.m_gameData.FindStoryText( "MissionComplete" );

@@ -202,6 +202,30 @@ public class PlayerData
 		return true;
 	}
 
+	// call this when the evaluation screen shows the supplemental evaluations: their fines are booked now, each a FINE in the ledger, as the original's (OP-OV
+	// WE78B: WF045 and WF12C, WF02B) - returns what they came to
+	public int BookSupplementalFines()
+	{
+		if ( ( m_general.m_supplementalFineList == null ) || ( m_general.m_supplementalFineList.Count == 0 ) )
+		{
+			return 0;
+		}
+
+		var total = 0;
+
+		foreach ( var fine in m_general.m_supplementalFineList )
+		{
+			m_bank.m_currentBalance -= fine;
+			m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Fine", fine + "-" ) );
+
+			total += fine;
+		}
+
+		m_general.m_supplementalFineList.Clear();
+
+		return total;
+	}
+
 	// what an unsuitable recommendation costs, as the shipped game works it out (CAPTAIN overlay WF348 and WF292, OP-OV WED0C, in the decompiled original): 10,000 MU
 	// for each unsuitable planet recommended before this one, at most 8 of them, and never less than 100 MU - so the first is a warning of 100 MU ("this is only a
 	// warning, your next fine will be heavy", shown with that one only), then 10,000, 20,000 and on to 80,000 (STRINFO 1.2 only says they "vary")

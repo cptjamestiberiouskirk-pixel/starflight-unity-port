@@ -229,8 +229,9 @@ What the probe does:
 | `starport-analyzelist` | the Trade Depot's Analysis lists the ship's own artifacts only, as the original's: with two artifacts for sale at the Starport and one in the hold, the list has the one under one Artifacts heading (about 15 s) |
 | `acceleration` | the ship's acceleration is the original's, the engines' class times 500 over the mass in whole G: 7 G for the equipped ship of starflt_076 (356 tons), 5 G for a bare class 1 ship and for a 500-ton class 5 one, 4 G for two more (about 15 s) |
 | `starport-buyorder` | the Trade Depot's Buy list has the Starport's elements in the original's order: Titanium, Promethium, Molybdenum, Cobalt, Aluminum, Endurium (about 15 s) |
+| `starport-supplementalfine` | a supplemental evaluation's fine is booked when Operations shows the evaluation, as the original's: towing charges of 15000 MU waiting, nothing paid before, 15000 and a FINE row when the evaluation screen shows them, nothing more the second time (about 15 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (183 scenarios, about 146 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (184 scenarios, about 147 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
