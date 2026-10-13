@@ -91,6 +91,7 @@ What the probe does:
 | `statusdisplay` | the Status display in the original's words: a ship with no shields and no weapons reads Down and Unarmed, 20 cubic meters of Endurium read 20.00, the cargo a whole percent, and the damage the original's word at 100, 97, 85, 60, 30 and 10 percent of the hull (None to Critical) (about 30 s) |
 | `tvdisplay` | the terrain vehicle's display in the original's words: on planet 92, with the weather stopped, the date has no hour (`01-01-4620`) and the bearing to the ship is spelled out (`North`) (about 35 s) |
 | `coordinatebar` | the coordinates above the main view after the terrain vehicle: on planet 92 they are its place, and back in orbit and in the star system, with the ship not moving, the ship's coordinates again (about 25 s) |
+| `landingsite` | where Select Site's crosshair starts, as the original's: a site chosen in orbit stays while the ship is in that orbit (the control), and is back at LAT 0 LONG 0 once the ship is in the star system or in hyperspace (about 20 s) |
 | `coordinates` | latitude and longitude as the original gives them: the terrain vehicle at 15 north, 30 west reads `15N x 30W` above the main view, and the landing map's LAT reads `15N` and LONG `30W` (about 35 s) |
 | `visual` | a floating object when its timer starts again, when an explosion is switched off, and how far the landing site crosshair moves in a second |
 | `screenpictures` | with `-Graphics`, the whole screen of the star system (with the system display and the status display), orbit with a real scan of the planet and its analysis, the landing map, the terrain vehicle, hyperspace away from any star, and an encounter of Spemin scouts with a real scan of one, its analysis and the comm link, and the DAMAGE display of a damaged ship with Repair's cursor, into `Logs/screen-pictures/spaceflight/` (14 pictures; the folder's older pictures go first); without a graphics device it does nothing (about 70 s) |
@@ -212,7 +213,7 @@ What the probe does:
 | `lifeformpictures` | with `-Graphics`, renders the game view of planet 92 with the planet's lifeforms, then with all 17 models in a ring around the terrain vehicle, and a close-up of each model, into `Logs/lifeform-pictures/` (or `-probePictures`); without a graphics device it only lands (about 60 s) |
 | `look` | Look on planet 92 with one lifeform at a time beside the vehicle: a living plant (its body plan, not moving, alive), a test animal that wanders (wandering) and the plant made dead (dead) (about 40 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (165 scenarios, about 130 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (166 scenarios, about 130 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
