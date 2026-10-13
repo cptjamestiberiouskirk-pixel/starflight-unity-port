@@ -387,9 +387,10 @@ public class SpaceflightController : MonoBehaviour
 					m_starSystem.Show();
 					m_playerShip.Show();
 					m_radar.Hide(); // hide the radar for JustLaunched - player hasn't entered the system yet
-					m_messages.Clear();
-					m_messages.AddText( "<color=white>Starport clear.</color>" );
-					m_messages.AddText( "<color=#FFFF00>Select Navigation → Maneuver to enter the star system.</color>" );
+					// under LEAVING STARPORT..., the original's ...STARPORT CLEAR and STANDING BY TO MANEUVER, the three kept together (HYPERMSG-OV WF0D5
+					// and WF001, LAUNCH-OV &LAUNCH; starflt_139)
+					m_messages.AddText( "<color=white>...Starport clear</color>" );
+					m_messages.AddText( "<color=white>Standing by to maneuver.</color>" );
 					break;
 
 				case PD_General.Location.StarSystem:

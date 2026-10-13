@@ -179,6 +179,14 @@ public class PlayerCamera : MonoBehaviour
 
 		// start the countdown animation
 		SpaceflightController.m_instance.m_countdown.Show();
+
+		// out of the docking bay the countdown is under the original's COMMENCING LAUNCH SEQUENCE..., on a cleared window (LAUNCH-OV LAUNCH: CTERASE, the line,
+		// COUNTDOWN) - a launch from a planet has said it already, as the countdown is all of its launch
+		if ( DataController.m_instance.m_playerData.m_general.m_location == PD_General.Location.DockingBay )
+		{
+			SpaceflightController.m_instance.m_messages.Clear();
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Commencing launch sequence...</color>" );
+		}
 	}
 
 	public void PlayerIsLaunching()
