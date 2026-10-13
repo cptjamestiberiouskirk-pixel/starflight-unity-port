@@ -47,41 +47,37 @@ public class DockingBayPanel : Panel
 		// get to the player data
 		var playerData = DataController.m_instance.m_playerData;
 
-		// let's start the pre-flight check
+		// let's start the pre-flight check, the original's (CHKFLIGHT-OV ?CAN-LEAVE)
 		var preflightCheckPassed = true;
 		m_errorText.text = "";
 
-		// do we have all of the crew positions assigned?
+		// an evaluation waiting unread keeps the ship at the Starport (WF40A, WF270: REPORT TO OPERATIONS FOR EVALUATION)
+		if ( playerData.m_general.HasUnreadEvaluation() )
+		{
+			m_errorText.text += "\u2022 Report to Operations for evaluation.\n";
+			preflightCheckPassed = false;
+		}
+
+		// do we have all of the crew positions assigned, and all of them alive? (WF450, WF2A8: REPORT TO CREW ASSIGNMENT, for a dead crew member too)
 		for ( var role = PD_CrewAssignment.Role.First; role < PD_CrewAssignment.Role.Count; role++ )
 		{
-			if ( !playerData.m_crewAssignment.IsAssigned( role ) )
+			var personnelFile = playerData.m_crewAssignment.IsAssigned( role ) ? playerData.m_crewAssignment.GetPersonnelFile( role ) : null;
+
+			if ( ( personnelFile == null ) || ( personnelFile.m_vitality <= 0 ) )
 			{
 				m_errorText.text += "\u2022 Report to Crew Assignment.\n";
 				preflightCheckPassed = false;
 				break;
 			}
-
-			var personnelFile = playerData.m_crewAssignment.GetPersonnelFile( role );
-
-			if ( personnelFile.m_vitality == 0 )
-			{
-				m_errorText.text += "\u2022 At least one of your crew members is dead.\n";
-				preflightCheckPassed = false;
-				break;
-			}
 		}
 
-		// did we name the ship?
-		if ( playerData.m_playerShip.m_name.Length == 0 )
-		{
-			m_errorText.text += "\u2022 Report to Ship Configuration to christen ship.\n";
-			preflightCheckPassed = false;
-		}
+		// did we name the ship, and does it have engines? (WF480, WF32B: REPORT TO SHIP-CONFIGURATION TO CHRISTEN SHIP AND PURCHASE ENGINES, as one line)
+		var needsName = ( playerData.m_playerShip.m_name.Length == 0 );
+		var needsEngines = ( playerData.m_playerShip.m_enginesClass == 0 );
 
-		// does the ship have engines?
-		if ( playerData.m_playerShip.m_enginesClass == 0 )
+		if ( needsName || needsEngines )
 		{
-			m_errorText.text += "\u2022 Report to Ship Configuration to purchase engines.\n";
+			m_errorText.text += "\u2022 Report to Ship Configuration to " + ( needsName ? "christen ship" : "" ) + ( ( needsName && needsEngines ) ? " and " : "" ) + ( needsEngines ? "purchase engines" : "" ) + ".\n";
 			preflightCheckPassed = false;
 		}
 
@@ -95,6 +91,10 @@ public class DockingBayPanel : Panel
 		// did we pass the pre-flight checks?
 		if ( preflightCheckPassed )
 		{
+			// the colony evaluations have been read: the original deletes them as the ship leaves (WF40A), and the next visit to the evaluation screen says
+			// that no new recommendation has been filed
+			playerData.m_general.GetColonyEvaluationList().Clear();
+
 			// yes - ok lets start transporting
 			m_isTransporting = true;
 

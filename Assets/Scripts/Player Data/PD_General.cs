@@ -131,12 +131,16 @@ public class PD_General
 	// before this list have their fines booked already)
 	public List<int> m_supplementalFineList;
 
-	// Interstel's evaluations of the planets recommended for colonization, oldest first - kept, and shown one to a page on every visit to the evaluation screen,
-	// the last followed by "END OF EVALUATIONS" (save files from before this list keep theirs in m_supplementalEvaluationList: GetColonyEvaluationList moves them)
+	// Interstel's evaluations of the planets recommended for colonization, oldest first - shown one to a page on every visit to the evaluation screen until the
+	// ship leaves the Starport with them read, which deletes them (CHKFLIGHT-OV WF40A), the last followed by "END OF EVALUATIONS" (save files from before this list keep theirs in m_supplementalEvaluationList: GetColonyEvaluationList moves them)
 	public List<string> m_colonyEvaluationList;
 
 	// whether the evaluation screen has shown Interstel's supplemental evaluation on the completion of the mission (the original shows it once, WMSG)
 	public bool m_missionCompleteShown;
+
+	// whether a colony evaluation has come since the evaluation screen was last seen (the original's ?EVAL, set by a recommendation in CAPTAIN WF37A and cleared
+	// by the evaluation screen in OP-OV WF47A): the ship cannot leave the Starport until it has been read (CHKFLIGHT-OV ?CAN-LEAVE)
+	public bool m_colonyEvaluationUnread;
 
 	// the planets recommended for colonization that Interstel has not evaluated yet (it does when the ship is back at the Starport), and how many recommended
 	// planets have proved unsuitable so far (the first one is only a warning - STRINFO 1.2)
@@ -475,6 +479,13 @@ public class PD_General
 
 	// this updates the game time
 	// call this to add a supplemental evaluation from Interstel (the Operations evaluation screen shows them)
+	// whether an evaluation waits unread: a colony evaluation, a supplemental evaluation (the lost terrain vehicle, the towing charges), or the completion of the
+	// mission (CHKFLIGHT-OV WF40A: ?EVAL, ?TV, ?RECALL)
+	public bool HasUnreadEvaluation()
+	{
+		return m_colonyEvaluationUnread || ( ( m_supplementalEvaluationList != null ) && ( m_supplementalEvaluationList.Count > 0 ) ) || ( m_gameWon && !m_missionCompleteShown );
+	}
+
 	// call this when a supplemental evaluation comes with a fine: it is booked when the evaluation screen shows the evaluation
 	public void AddSupplementalFine( int fine )
 	{
