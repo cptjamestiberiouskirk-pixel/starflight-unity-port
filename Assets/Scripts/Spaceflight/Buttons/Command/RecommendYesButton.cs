@@ -19,9 +19,20 @@ public class RecommendYesButton : ShipButton
 	{
 		var playerData = DataController.m_instance.m_playerData;
 
-		// is this a planet not recommended before? (only a new recommendation goes on to the bank)
-		var recommendations = playerData.m_general.m_colonyRecommendationList;
-		var isNew = ( recommendations == null ) || !recommendations.Contains( playerData.m_general.m_currentPlanetId );
+		// a planet recommended before in the game, evaluated or not, is not recommended again (CAPTAIN WF3D3: "THIS PLANET HAS ALREADY BEEN LOGGED.")
+		if ( playerData.m_general.IsPlanetLogged( playerData.m_general.m_currentPlanetId ) )
+		{
+			SpaceflightController.m_instance.m_messages.Clear();
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>This planet has already been logged.</color>" );
+
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+			LogPlanetButton.BackToCommandButtons();
+
+			return false;
+		}
+
+		var isNew = true;
 
 		playerData.m_general.AddColonyRecommendation( playerData.m_general.m_currentPlanetId );
 
