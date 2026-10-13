@@ -33,6 +33,10 @@ public class BlackEgg
 	// the time until the next number
 	float m_timer;
 
+	// after BOOM the main view flashes for 3 s, and the planet goes after it (DPART-OV EXPLOSION, then ?DELETEPLANET) - the time left (below 0 for none)
+	const float c_flashDuration = 3.0f;
+	float m_detonationDelay = -1.0f;
+
 	// call this every frame the game is not paused
 	public void Update()
 	{
@@ -84,6 +88,24 @@ public class BlackEgg
 			return;
 		}
 
+		// the explosion's flash, then the planet goes
+		if ( m_detonationDelay >= 0.0f )
+		{
+			m_detonationDelay -= Time.deltaTime;
+
+			if ( m_detonationDelay > 0.0f )
+			{
+				return;
+			}
+
+			m_detonationDelay = -1.0f;
+			m_droppedCargoId = -1;
+
+			Detonate( droppedCargo );
+
+			return;
+		}
+
 		m_timer -= Time.deltaTime;
 
 		if ( m_timer > 0.0f )
@@ -103,14 +125,14 @@ public class BlackEgg
 			return;
 		}
 
-		// boom
-		m_droppedCargoId = -1;
-
+		// boom, and the main view flashes (the planet goes when the flash is over)
 		spaceflightController.m_messages.AddText( "<color=red>BOOM!</color>" );
 
 		SoundController.m_instance.PlaySound( SoundController.Sound.Explosion );
 
-		Detonate( droppedCargo );
+		spaceflightController.m_viewport.StartFlash( c_flashDuration );
+
+		m_detonationDelay = c_flashDuration;
 	}
 
 	// the dropped Black Egg on a planet of this star (null if there is none)
@@ -183,6 +205,9 @@ public class BlackEgg
 		{
 			AddStoryText( "UhlekMindGanglionDestroyed" );
 		}
+
+		// the original's last word on it (DPART-OV ?DELETEPLANET: "PLANET OBLITERATED")
+		spaceflightController.m_messages.AddText( "<color=white>Planet obliterated.</color>" );
 
 		// a ship in orbit around it is in the star system now
 		if ( ( playerData.m_general.m_location == PD_General.Location.InOrbit ) && ( playerData.m_general.m_currentPlanetId == planetId ) )
