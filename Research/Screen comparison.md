@@ -54,7 +54,7 @@ The open gameplay items, most visible first:
 |---|---|---|---|
 | "Raise Shields" where the original has RAISE SHIELD | OPEN | `RaiseShieldsButton.cs:6` (CONFIRMED) | UI KIT |
 | "Drop Shields" and "Disarm Weapon" where the original has DROP SHIELD and DISARM | OPEN | `DropShieldsButton.cs:6`, `DisarmWeaponButton.cs:6`; `NAVIGATR.c` (CONFIRMED, code on both sides) | UI KIT |
-| The messages of the shields and weapons. Original: SHIELDS ARE NOW UP, SHIELDS ARE DOWN, ARMING MISSILES or ARMING LASERS, WEAPONS ARE DISARMED, and SHIELDS CAN'T BE RAISED with a beep; in a nebula MAGNETIC DISTURBANCES IN NEBULA / CAUSING ENERGY FLUCTUATIONS. Port: "Shields raised.", "Shields dropped.", "Weapons armed.", nothing at all when disarming (the button sets the flag and does not call `DisarmWeapons`), and its own lines for a nebula and for no fuel | OPEN | `PD_PlayerShip.cs:626, 637, 964, 974`, `DisarmWeaponButton.cs:13`, `RaiseShieldsButton.cs:30, 41`; `NAVIGATR.c` 190 to 323, 374 (CONFIRMED, code) | GAMEPLAY |
+| The messages of the shields and weapons. Original: SHIELDS ARE NOW UP, SHIELDS ARE DOWN, ARMING MISSILES or ARMING LASERS, WEAPONS ARE DISARMED, and SHIELDS CAN'T BE RAISED with a beep; in a nebula MAGNETIC DISTURBANCES IN NEBULA / CAUSING ENERGY FLUCTUATIONS. Port: "Shields raised.", "Shields dropped.", "Weapons armed.", nothing at all when disarming (the button sets the flag and does not call `DisarmWeapons`), and its own lines for a nebula and for no fuel | FIXED (the shields' and weapons' messages PR) | `PD_PlayerShip.cs:626, 637, 964, 974`, `DisarmWeaponButton.cs:13`, `RaiseShieldsButton.cs:30, 41`; `NAVIGATR.c` 190 to 323, 374 (CONFIRMED, code) | GAMEPLAY |
 
 ## 3. Star system
 
