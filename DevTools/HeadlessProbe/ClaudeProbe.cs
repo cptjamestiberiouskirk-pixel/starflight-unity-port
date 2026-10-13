@@ -16424,7 +16424,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "win: docking at the Starport paid " + paid + " MU (ledger: " + ( ( ledgerEntry == null ) ? "nothing" : ledgerEntry.m_description + " " + ledgerEntry.m_amount ) + "), docking again paid " + paidAgain + " | " + dockText );
 
-		Check( "win: back at the Starport Interstel pays the bonus of 500,000 MU, in the ledger and the messages", ( paid == 500000 ) && ( ledgerEntry != null ) && ( ledgerEntry.m_amount == "500000+" ) && dockText.Contains( "500,000" ), paid + ", " + ( ( ledgerEntry == null ) ? "no entry" : ledgerEntry.m_amount ) + ", " + dockText );
+		Check( "win: back at the Starport Interstel pays the bonus of 500,000 MU, in the ledger as the original's BONUS and in the messages", ( paid == 500000 ) && ( ledgerEntry != null ) && ( ledgerEntry.m_amount == "500000+" ) && ( ledgerEntry.m_description == "Bonus" ) && dockText.Contains( "500,000" ), paid + ", " + ( ( ledgerEntry == null ) ? "no entry" : ledgerEntry.m_description + " " + ledgerEntry.m_amount ) + ", " + dockText );
 		Check( "win: the bonus is paid once", paidAgain == 0, paidAgain.ToString() );
 
 		// a later scenario must not start from a won game
@@ -17891,7 +17891,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "distress: from star " + farthestStarId + " (" + farthest.ToString( "0" ) + " from Arth): fined " + fineFar + ", now " + whereFar + ", ledger '" + ledgerFar + "' | from Arth's system: fined " + fineNear + " | after the Starport: fined " + fineAfterStarport + ", now " + whereAfterStarport + " (" + textAfterStarport + ") | the evaluation: " + evaluationFar.Replace( '\n', '/' ) );
 
 		Check( "distress: a distress call gets the ship towed back to the Starport's docking bay", whereFar.StartsWith( "DockingBay" ) && whereFar.EndsWith( "star " + arthStarId ), whereFar );
-		Check( "distress: the fine runs from 15000 MU in Arth's system to 80000 MU from the farthest star, in the ledger and in Interstel's evaluation", ( fineNear == 15000 ) && ( fineFar == 80000 ) && ledgerFar.StartsWith( "Towing charges" ) && evaluationFar.Contains( "TOWING CHARGES" ) && evaluationFar.Contains( fineFar.ToString() ), fineNear + ", " + fineFar + ", '" + ledgerFar + "'" );
+		Check( "distress: the fine runs from 15000 MU in Arth's system to 80000 MU from the farthest star, in the ledger and in Interstel's evaluation", ( fineNear == 15000 ) && ( fineFar == 80000 ) && ledgerFar.StartsWith( "Fine" ) && evaluationFar.Contains( "TOWING CHARGES" ) && evaluationFar.Contains( fineFar.ToString() ), fineNear + ", " + fineFar + ", '" + ledgerFar + "'" );
 		Check( "distress: after the Starport has been destroyed there is no response, no fine and no tow (control)", ( fineAfterStarport == 0 ) && !whereAfterStarport.StartsWith( "DockingBay" ) && textAfterStarport.Contains( "NO RESPONSE" ), fineAfterStarport + ", " + whereAfterStarport );
 
 		Finish( "scenario=distress far=" + fineFar + " near=" + fineNear + " afterStarport=" + fineAfterStarport, 0 );
@@ -18250,11 +18250,11 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "colonies: planets " + heaven + " (Mardan 4), " + unsuitableA + " and " + unsuitableB + " recommended, " + notRecommended + " not (on the list among them: '" + onTheList + "') | asked for Mardan 4 " + askedForHeaven + ", pending before docking " + pendingCount + ", after " + pendingAfter + " | the bank " + change + ", ledger: " + ledger + " | reasons " + unsuitableA + ": " + reasonsA + "; " + unsuitableB + ": " + reasonsB + " | evaluations: " + evaluationText.Replace( '\n', '/' ) );
 
 		Check( "colonies: Log Planet asks whether to recommend the planet for colonization, and Yes recommends it while No does not", askedForHeaven && ( pendingCount == 3 ), askedForHeaven + ", " + pendingCount );
-		Check( "colonies: back at the Starport an optimal planet of Interstel's list earns its bonus", ledger.Contains( "Colony bonus 50000+" ) && evaluationText.Contains( "OPTIMAL PLANET" ) && evaluationText.Contains( "BONUS OF 50000" ), ledger );
-		Check( "colonies: the first unsuitable planet is a warning of 100 MU, with its reasons", ledger.Contains( "Colony fine 100-" ) && evaluationText.Contains( "FINED 100 MU'S.  THIS IS ONLY A WARNING" ) && ( reasonsA.Length > 0 ) && evaluationText.Contains( reasonsA.Split( ',' )[ 0 ].Trim() ), ledger + " | " + reasonsA );
+		Check( "colonies: back at the Starport an optimal planet of Interstel's list earns its bonus", ledger.Contains( "Bonus 50000+" ) && evaluationText.Contains( "OPTIMAL PLANET" ) && evaluationText.Contains( "BONUS OF 50000" ), ledger );
+		Check( "colonies: the first unsuitable planet is a warning of 100 MU, with its reasons", ledger.Contains( "Fine 100-" ) && evaluationText.Contains( "FINED 100 MU'S.  THIS IS ONLY A WARNING" ) && ( reasonsA.Length > 0 ) && evaluationText.Contains( reasonsA.Split( ',' )[ 0 ].Trim() ), ledger + " | " + reasonsA );
 		// the shipped game's fine (CAPTAIN overlay WF348 and WF292 in the decompiled original): 10,000 MU for each unsuitable planet recommended before, whatever the
 		// planet's reasons (the second planet has reasonCountB of them), and the warning with the first only
-		Check( "colonies: a later unsuitable planet is fined heavily, 10,000 MU for the one unsuitable planet before it (not by its reasons), with no warning", ledger.Contains( "Colony fine 10000-" ) && ( change == 50000 - 100 - 10000 ) && evaluationText.Contains( "FINED 10000 MU'S." ) && !evaluationText.Contains( "FINED 10000 MU'S.  THIS IS ONLY A WARNING" ) && ( pendingAfter == 0 ), ledger + " | " + change + " | reasons " + reasonCountB + " | pending " + pendingAfter );
+		Check( "colonies: a later unsuitable planet is fined heavily, 10,000 MU for the one unsuitable planet before it (not by its reasons), with no warning", ledger.Contains( "Fine 10000-" ) && ( change == 50000 - 100 - 10000 ) && evaluationText.Contains( "FINED 10000 MU'S." ) && !evaluationText.Contains( "FINED 10000 MU'S.  THIS IS ONLY A WARNING" ) && ( pendingAfter == 0 ), ledger + " | " + change + " | reasons " + reasonCountB + " | pending " + pendingAfter );
 
 		// ---- 5. the fine goes up 10,000 MU with each unsuitable planet before, to 80,000 MU from the ninth on: evaluated straight away, with 2, 8 and 12 unsuitable
 		// planets recommended before
@@ -20729,6 +20729,7 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 10 );
 
 		var balanceAfter = playerData.m_bank.m_currentBalance;
+		var lavaLedgerRow = LastLedgerRow();
 		var lostAfterDocking = TerrainVehicleIsLost();
 		var evaluations = FieldOrNull( playerData.m_general, "m_supplementalEvaluationList" ) as List<string>;
 		var evaluated = ( evaluations != null ) && evaluations.Exists( evaluation => evaluation.Contains( "LOSS OF TERRAIN VEHICLE" ) );
@@ -20741,7 +20742,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lava: the heat of the lava gives a warning first, and leaving it in time saves the vehicle", warning.Contains( "we're burning up" ) && savedByLeaving, savedByLeaving + " | " + warning );
 		Check( "lava: staying in the lava of a molten planet it is destroyed with its cargo, and the crew is back in the ship", landed && onSolidGround && ( lava != Vector3.zero ) && lostInLava && ( carriedAfter == 0 ) && ( afterLava == PD_General.Location.Planetside ) && lavaMessage.Contains( "destroyed by lava" ), lava + " " + afterLava + " " + lostInLava + " " + carriedAfter + " | " + lavaMessage );
 		Check( "lava: with the terrain vehicle lost there is no disembarking", disembarkMessage.Contains( "no terrain vehicle" ) && ( afterDisembark == PD_General.Location.Planetside ), afterDisembark + " | " + disembarkMessage );
-		Check( "lava: at the Starport a new terrain vehicle is installed for a fine of 10,000 MU, with Interstel's evaluation", !lostAfterDocking && ( balanceBefore - balanceAfter == 10000 ) && evaluated, ( balanceBefore - balanceAfter ) + " " + lostAfterDocking + " " + evaluated );
+		Check( "lava: at the Starport a new terrain vehicle is installed for a fine of 10,000 MU, a FINE in the ledger as the original's, with Interstel's evaluation", !lostAfterDocking && ( balanceBefore - balanceAfter == 10000 ) && lavaLedgerRow.EndsWith( " Fine 10000-" ) && evaluated, ( balanceBefore - balanceAfter ) + " " + lostAfterDocking + " " + evaluated + " '" + lavaLedgerRow + "'" );
 
 		Finish( "scenario=lava lost=" + lostInLava + " fine=" + ( balanceBefore - balanceAfter ), 0 );
 	}
