@@ -1033,6 +1033,18 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioTVDistance();
 				break;
 
+			case "starport-noticetyping":
+				yield return ScenarioStarportNoticeTyping();
+				break;
+
+			case "commpicture":
+				yield return ScenarioCommPicture();
+				break;
+
+			case "encounterviewscale":
+				yield return ScenarioEncounterViewScale();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -14326,13 +14338,16 @@ public class ClaudeProbe : MonoBehaviour
 
 			Check( "vessel " + vesselId + " (" + vesselName + ") gets a model in an encounter", hasModel, "model=" + ( ( model == null ) ? "none" : model.name ) );
 
-			// the smallest vessels are shown at 0.3 times the player ship (3.404 units long in its FBX, scale 15)
-			Check( "vessel " + vesselId + " is big enough to be seen (a quarter of the player ship or more)", longest >= 3.404f * 15.0f * 0.25f, "longest side=" + longest.ToString( "F1" ) );
+			// the smallest vessels are shown at 0.3 times the player ship (3.404 units long in its FBX, scale 15); an encounter draws every ship, the player's too,
+			// Encounter.c_shipViewScale times as large
+			Check( "vessel " + vesselId + " is big enough to be seen (a quarter of the player ship or more)", longest >= 3.404f * 15.0f * 0.25f * Encounter.c_shipViewScale, "longest side=" + longest.ToString( "F1" ) );
 
 			float expectedLength;
 
 			if ( c_shipModelLengths.TryGetValue( vesselId, out expectedLength ) )
 			{
+				expectedLength *= Encounter.c_shipViewScale;
+
 				Check( "vessel " + vesselId + " is " + expectedLength.ToString( "F1" ) + " units long", Mathf.Abs( longest - expectedLength ) <= expectedLength * 0.05f, "size=" + size.ToString( "F1" ) );
 				Check( "vessel " + vesselId + " is longest along its nose", size.z >= Mathf.Max( size.x, size.y ) * 0.999f, "size=" + size.ToString( "F1" ) );
 
@@ -26366,6 +26381,312 @@ public class ClaudeProbe : MonoBehaviour
 		var rows = SpaceflightController.m_instance.m_displayController.m_terrainVehicleDisplay.m_statusValues.text.Split( '\n' );
 
 		return ( rows.Length > 0 ) ? System.Text.RegularExpressions.Regex.Replace( rows[ rows.Length - 1 ], "<[^>]*>", "" ).Trim() : "";
+	}
+
+	// a notice is typed out a paragraph at a time, 0.3 s apart, as the original's (OP-OV WE912), and the abort key (Quit) ends the notice being typed with
+	// "***NOTICE ABORTED***" (and the end of the notices after the newest) before a second Quit leaves the screen
+	IEnumerator ScenarioStarportNoticeTyping()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var panel = FindPanel<OperationsPanel>();
+
+		if ( ( panel == null ) || ( gameData.m_noticeList.Length < 2 ) )
+		{
+			Finish( "scenario=starport-noticetyping abort: no operations panel or too few notices", 2 );
+			yield break;
+		}
+
+		// the day of the second notice, with none read: two notices are out, and the first (the objectives) has many paragraphs
+		var secondDate = gameData.m_noticeList[ 1 ].m_stardate;
+
+		playerData.m_general.m_currentStardateYMD = secondDate;
+		playerData.m_starport.m_lastReadNoticeStardate = "0000-00-00";
+
+		var firstParagraphs = gameData.m_noticeList[ 0 ].m_message.Split( new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries ).Length;
+
+		yield return OpenPanel( panel, "operations" );
+
+		// ---- 1. the first notice types itself out without a press
+		panel.NoticesClicked();
+
+		var atOnce = Paragraphs( panel );
+
+		yield return new WaitForSecondsRealtime( 0.1f );
+
+		var after01 = Paragraphs( panel );
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		var after11 = Paragraphs( panel );
+
+		// ---- 2. Quit while it is typed: the notice is aborted and the screen stays
+		panel.QuitClicked();
+
+		var aborted = panel.m_messageText.text.Replace( "\r", "" );
+		var stayed = panel.m_noticesGameObject.activeSelf;
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		var afterAbort = Paragraphs( panel );
+
+		// ---- 3. the newest notice aborted at once: aborted, then the end of the notices
+		panel.NextClicked();
+		panel.QuitClicked();
+
+		var newestAborted = panel.m_messageText.text.Replace( "\r", "" );
+
+		// ---- 4. a second Quit leaves the screen
+		panel.QuitClicked();
+
+		var backToMenu = panel.m_welcomeGameObject.activeSelf && !panel.m_noticesGameObject.activeSelf;
+
+		yield return ClosePanel( panel, "operations" );
+
+		playerData.m_general.m_currentStardateYMD = "4620-01-01";
+
+		Log( "starport-noticetyping: the first notice (" + firstParagraphs + " paragraphs): " + atOnce + " at once, " + after01 + " after 0.1 s, " + after11 + " after 1.1 s | Quit: stayed " + stayed + ", ends '" + Tail( aborted ) + "', " + afterAbort + " paragraphs 1 s later | the newest aborted: '" + Tail( newestAborted ) + "' | a second Quit: the menu " + backToMenu );
+
+		Check( "starport-noticetyping: a notice is typed out a paragraph at a time without a press, 0.3 s apart", ( atOnce == 1 ) && ( after01 == 1 ) && ( after11 >= 4 ) && ( after11 <= 5 ), atOnce + ", " + after01 + ", " + after11 );
+		Check( "starport-noticetyping: Quit while a notice is typed ends it with the original's NOTICE ABORTED, and the screen stays", stayed && aborted.EndsWith( "\n\n***Notice aborted***" ) && ( afterAbort == after11 ) && ( after11 < firstParagraphs ), "stayed " + stayed + ", '" + Tail( aborted ) + "', " + afterAbort + " after (" + after11 + " before, of " + firstParagraphs + ")" );
+		Check( "starport-noticetyping: the newest notice aborted says NOTICE ABORTED, then END OF NOTICES", newestAborted.EndsWith( "\n\n***Notice aborted***\n\n***End of notices***" ), "'" + Tail( newestAborted ) + "'" );
+		Check( "starport-noticetyping: a second Quit goes back to the menu", backToMenu, backToMenu.ToString() );
+	}
+
+	// the paragraphs of the notice shown (after its date)
+	static int Paragraphs( OperationsPanel panel )
+	{
+		var parts = panel.m_messageText.text.Replace( "\r", "" ).Split( new[] { "\n\n" }, StringSplitOptions.RemoveEmptyEntries );
+		var count = 0;
+
+		foreach ( var part in parts )
+		{
+			if ( !part.StartsWith( "***" ) )
+			{
+				count++;
+			}
+		}
+
+		// the first part is the date
+		return Mathf.Max( 0, count - 1 );
+	}
+
+	// the comm link's picture clears: the interference as the link comes up (stronger with a less skilled communications officer) is gone once the link has settled,
+	// and the alien's portrait is shown clean from then on, as in the original, which garbles only the words
+	IEnumerator ScenarioCommPicture()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// an officer of little skill, whose link comes up through the strongest interference
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 30;
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		controller.m_encounterRange = 0.0f;
+
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+		var said = new List<string>();
+
+		yield return MeetAndConnect( speminId, GD_Comm.Stance.Friendly, said );
+
+		// wait for the comm screen to come on
+		CommScreen commScreen = null;
+
+		for ( var i = 0; ( i < 300 ) && ( commScreen == null ); i++ )
+		{
+			commScreen = FindFirstObjectByType<CommScreen>();
+
+			if ( commScreen == null )
+			{
+				yield return null;
+			}
+		}
+
+		if ( commScreen == null )
+		{
+			Check( "commpicture: the comm screen comes on", false, "no CommScreen enabled after the hail (" + string.Join( " | ", said ) + ")" );
+
+			yield break;
+		}
+
+		var coloredRays = commScreen.GetComponent( "ColoredRays" );
+		var lowResolution = (Behaviour) commScreen.GetComponent( "LowResolution" );
+		var waves = commScreen.GetComponent( "Waves" );
+		var headache = commScreen.GetComponent( "Headache" );
+
+		yield return Frames( 2 );
+
+		var raysAtStart = (float) GetField( coloredRays, "strength" );
+		var lowAtStart = lowResolution.enabled;
+
+		// the link settles (the interference takes 5 s to clear), then watch the picture for 8 s more
+		yield return new WaitForSecondsRealtime( commScreen.m_duration + 0.5f );
+
+		var raysSettled = (float) GetField( coloredRays, "strength" );
+		var lowSettled = lowResolution.enabled;
+		var largestDisturbance = 0.0f;
+		var watchEnd = Time.realtimeSinceStartup + 8.0f;
+
+		while ( Time.realtimeSinceStartup < watchEnd )
+		{
+			largestDisturbance = Mathf.Max( largestDisturbance, (float) GetField( waves, "strengthX" ), (float) GetField( headache, "strength" ), (float) GetField( coloredRays, "strength" ) );
+
+			yield return null;
+		}
+
+		Log( "commpicture: an officer of skill 30: at the start rays " + raysAtStart.ToString( "F2" ) + ", low resolution " + lowAtStart + "; settled rays " + raysSettled.ToString( "F2" ) + ", low resolution " + lowSettled + "; the largest disturbance in the 8 s after " + largestDisturbance.ToString( "F2" ) );
+
+		Check( "commpicture: the link comes up through interference (the setup is the case)", ( raysAtStart > 1.0f ) && lowAtStart, "rays " + raysAtStart.ToString( "F2" ) + ", low resolution " + lowAtStart );
+		Check( "commpicture: once the link has settled the portrait is clean: no coloured rays, full resolution", ( raysSettled == 0.0f ) && !lowSettled, "rays " + raysSettled.ToString( "F2" ) + ", low resolution " + lowSettled );
+		Check( "commpicture: and it stays clean (no bursts of interference later)", largestDisturbance == 0.0f, "largest " + largestDisturbance.ToString( "F2" ) );
+	}
+
+	// the encounter is seen at the original's fixed scale: the camera frames the alien ships out to their fire range and no further, so that it does not climb
+	// so high that the ships are specks, and a ship in range is in view
+	IEnumerator ScenarioEncounterViewScale()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// a mechan encounter: its ships start far from the player
+		var mechanId = -1;
+
+		for ( var i = 0; i < gameData.m_encounterList.Length; i++ )
+		{
+			if ( gameData.m_encounterList[ i ].m_race == GameData.Race.Mechan )
+			{
+				mechanId = i;
+
+				break;
+			}
+		}
+
+		EnterStarSystem( gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		var flightScale = controller.m_playerShip.m_ship.localScale;
+
+		EnterEncounter( mechanId );
+
+		yield return new WaitForSecondsRealtime( 5.0f );
+
+		var encounter = controller.m_encounter;
+		var offset = (float) GetField( encounter, "m_currentOffset" );
+		var encounterScale = controller.m_playerShip.m_ship.localScale;
+
+		// the first alien ship model against its template
+		var slot = encounter.m_alienShipModelList[ 0 ];
+		var slotShip = ( (PD_AlienShip[]) GetField( encounter, "m_alienShipList" ) )[ 0 ];
+		var alienScale = ( slot.transform.childCount > 0 ) ? slot.transform.GetChild( 0 ).localScale.x : 0.0f;
+		var templateScale = encounter.m_alienShipModelTemplate[ slotShip.m_vesselId ].transform.localScale.x;
+		var camera = controller.m_playerCamera.m_camera;
+
+		// pictures of the view, with -Graphics (the folder is empty without a graphics device)
+		var pictureFolder = ScreenPictureFolder( "encounter-view" );
+
+		if ( pictureFolder != "" )
+		{
+			RenderCameraPicture( Camera.main, System.IO.Path.Combine( pictureFolder, "1-ships-far.png" ) );
+		}
+
+		// the alien ships: the farthest living one, and whether every living one within the fire range is in view
+		var farthest = 0.0f;
+		var inRange = 0;
+		var inRangeInView = 0;
+		var distances = "";
+
+		foreach ( var alienShip in encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			if ( alienShip.m_isDead || !alienShip.m_addedToEncounter )
+			{
+				continue;
+			}
+
+			var distance = Vector3.Distance( alienShip.m_coordinates, playerData.m_general.m_coordinates );
+
+			distances += distance.ToString( "F0" ) + " ";
+
+			farthest = Mathf.Max( farthest, distance );
+
+			if ( distance < 1000.0f )
+			{
+				inRange++;
+
+				var viewportPoint = camera.WorldToViewportPoint( alienShip.m_coordinates );
+
+				if ( ( viewportPoint.z > 0.0f ) && ( viewportPoint.x >= 0.0f ) && ( viewportPoint.x <= 1.0f ) && ( viewportPoint.y >= 0.0f ) && ( viewportPoint.y <= 1.0f ) )
+				{
+					inRangeInView++;
+				}
+			}
+		}
+
+		// the highest the camera has to be to frame the fire range and the margin around it, with the field of view the encounter uses
+		var verticalFieldOfView = controller.m_viewport.m_camera.fieldOfView * Mathf.Deg2Rad;
+		var highest = ( 1000.0f + 192.0f ) * Mathf.Tan( Mathf.PI * 0.5f - verticalFieldOfView * 0.5f );
+
+		Log( "encounterviewscale: 5 s in, the camera " + offset.ToString( "F0" ) + " above the ship (the fire range needs at most " + highest.ToString( "F0" ) + "), alien ships at " + distances + "(" + inRangeInView + " of " + inRange + " in range in view)" );
+
+		Check( "encounterviewscale: an alien ship is still beyond the fire range 5 s in (the setup is the case)", farthest > 1300.0f, "farthest " + farthest.ToString( "F0" ) );
+		Check( "encounterviewscale: the camera is no higher than framing the fire range needs", offset <= highest + 1.0f, "offset " + offset.ToString( "F0" ) + ", at most " + highest.ToString( "F0" ) );
+		Check( "encounterviewscale: every alien ship within the fire range is in view", inRangeInView == inRange, inRangeInView + " of " + inRange );
+
+		// ---- a ship brought within the fire range, toward a corner of the view, is in view once the camera has settled
+		PD_AlienShip nearShip = null;
+
+		foreach ( var alienShip in encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			if ( !alienShip.m_isDead && alienShip.m_addedToEncounter )
+			{
+				nearShip = alienShip;
+
+				break;
+			}
+		}
+
+		var nearOffset = new Vector3( 650.0f, 0.0f, 500.0f );
+
+		nearShip.m_coordinates = playerData.m_general.m_coordinates + nearOffset;
+		nearShip.m_targetCoordinates = nearShip.m_coordinates;
+
+		yield return new WaitForSecondsRealtime( 4.0f );
+
+		var nearDistance = Vector3.Distance( nearShip.m_coordinates, playerData.m_general.m_coordinates );
+		var nearPoint = camera.WorldToViewportPoint( nearShip.m_coordinates );
+		var nearInView = ( nearPoint.z > 0.0f ) && ( nearPoint.x >= 0.0f ) && ( nearPoint.x <= 1.0f ) && ( nearPoint.y >= 0.0f ) && ( nearPoint.y <= 1.0f );
+
+		Log( "encounterviewscale: a ship brought to " + nearDistance.ToString( "F0" ) + " away, 4 s later: viewport " + nearPoint + ", the camera " + ( (float) GetField( encounter, "m_currentOffset" ) ).ToString( "F0" ) + " above the ship" );
+
+		if ( pictureFolder != "" )
+		{
+			RenderCameraPicture( Camera.main, System.IO.Path.Combine( pictureFolder, "2-ship-in-range.png" ) );
+		}
+
+		Check( "encounterviewscale: an alien ship within the fire range is in view", ( nearDistance < 1000.0f ) && nearInView, "distance " + nearDistance.ToString( "F0" ) + ", viewport " + nearPoint );
+
+		// ---- the ships are drawn twice as large in the encounter, and the player ship has its own size again after it
+		LeaveEncounter();
+
+		yield return Frames( 10 );
+
+		var afterScale = controller.m_playerShip.m_ship.localScale;
+
+		Log( "encounterviewscale: the player ship's scale in flight " + flightScale + ", in the encounter " + encounterScale + ", after it " + afterScale + "; the first alien model " + alienScale + " (its template " + templateScale + ")" );
+
+		Check( "encounterviewscale: the player ship is drawn twice as large in the encounter", Vector3.Distance( encounterScale, flightScale * 2.0f ) < 0.001f, flightScale + " -> " + encounterScale );
+		Check( "encounterviewscale: an alien ship is drawn twice as large as its template", Mathf.Abs( alienScale - templateScale * 2.0f ) < 0.001f, alienScale + " for a template of " + templateScale );
+		Check( "encounterviewscale: the player ship has its own size again once the encounter is over", Vector3.Distance( afterScale, flightScale ) < 0.001f, afterScale + " (in flight " + flightScale + ")" );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
