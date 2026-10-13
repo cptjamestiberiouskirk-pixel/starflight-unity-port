@@ -1085,6 +1085,14 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportPreflight();
 				break;
 
+			case "flightpictures":
+				yield return ScenarioFlightPictures();
+				break;
+
+			case "intropictures":
+				yield return ScenarioIntroPictures();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -28045,6 +28053,509 @@ public class ClaudeProbe : MonoBehaviour
 	static string PreflightText( DockingBayPanel dockingBay )
 	{
 		return dockingBay.m_errorText.text.Replace( "• ", "" ).Replace( "\n", " | " ).Trim();
+	}
+
+	// ---------------------------------------------------------------- phase 7: pictures of the flight screens the other picture scenarios do not reach (probe.ps1 -Graphics)
+
+	// the whole screen of Science's and Navigation's menus with their officer label, the save panel and two of its questions, combat in an encounter of Spemin
+	// scouts (the combat menu, a laser shot and a missile), the starmap in hyperspace (on the ship and with the cursor moved), Log Planet and its question (and
+	// Log Planet again after No), Land and the descent to the surface, and the Black Egg's countdown and its explosion when the ship goes back up into orbit,
+	// into Logs/screen-pictures/flight/ (or -probePictures); without a graphics device it does nothing
+	IEnumerator ScenarioFlightPictures()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+		var ship = playerData.m_playerShip;
+		var folder = ScreenPictureFolder( "flight" );
+		var pictures = new List<string>();
+
+		EnsureCrew();
+
+		if ( folder == "" )
+		{
+			Log( "flightpictures: no graphics device (-nographics), so no pictures; run probe.ps1 with -Graphics for them" );
+
+			Finish( "scenario=flightpictures pictures=0", 0 );
+			yield break;
+		}
+
+		// no encounter begins by itself while the pictures are taken
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		System.Action<string> take = name =>
+		{
+			var path = System.IO.Path.Combine( folder, ( pictures.Count + 1 ).ToString( "00" ) + "_" + name + ".png" );
+
+			RenderScreenPicture( path );
+			pictures.Add( name );
+		};
+
+		var arthStarId = gameData.m_misc.m_arthStarId;
+		var arthStar = gameData.m_starList[ arthStarId ];
+
+		// ---- Arth's star system, with the ship at Arth's place in hyperspace (so that the coordinates above the main view are Arth's 125 100)
+		playerData.m_general.m_lastHyperspaceCoordinates = arthStar.GetWorldCoordinates();
+
+		EnterStarSystem( arthStarId );
+
+		var start = Time.realtimeSinceStartup;
+
+		while ( controller.m_starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 40.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 30 );
+
+		// ---- Science's menu and its officer label (the original's starflt_144: SENSORS, ANALYSIS, STATUS, BRIDGE under SCIENCE OFF.)
+		buttonController.ChangeButtonSet( ButtonController.ButtonSet.Bridge );
+		PressButton( ButtonController.ButtonSet.Bridge, 1 );
+
+		yield return Frames( 10 );
+
+		var scienceMenu = ButtonSetLabels( buttonController.GetCurrentButtonSet() ) + " / " + buttonController.m_currentOfficer.text;
+
+		take( "science_menu" );
+
+		// ---- Navigation's menu and its officer label (starflt_204: MANEUVER, STARMAP, RAISE SHIELD, ARM WEAPON, COMBAT, BRIDGE under NAVIGATOR)
+		buttonController.ChangeButtonSet( ButtonController.ButtonSet.Bridge );
+		PressButton( ButtonController.ButtonSet.Bridge, 2 );
+
+		yield return Frames( 10 );
+
+		var navigationMenu = ButtonSetLabels( buttonController.GetCurrentButtonSet() ) + " / " + buttonController.m_currentOfficer.text;
+
+		take( "navigation_menu" );
+
+		// ---- the save panel, opened with Escape as the player opens it (the original's Load and Save screens, starflt_004 to 006, 024, 025), then its Switch and
+		// Reset questions
+		PressEscape();
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var savePanel = PanelController.m_instance.m_saveGamePanel;
+		var savePanelOpen = PanelController.m_instance.HasActivePanel();
+
+		take( "save_panel" );
+
+		try
+		{
+			savePanel.SwitchClicked();
+		}
+		catch ( Exception exception )
+		{
+			Log( "flightpictures: Switch threw " + exception.Message );
+		}
+
+		yield return Frames( 10 );
+
+		take( "save_switch" );
+
+		try
+		{
+			savePanel.CancelClicked();
+			savePanel.ResetClicked();
+		}
+		catch ( Exception exception )
+		{
+			Log( "flightpictures: Reset threw " + exception.Message );
+		}
+
+		yield return Frames( 10 );
+
+		take( "save_reset" );
+
+		try
+		{
+			savePanel.CancelClicked();
+		}
+		catch ( Exception exception )
+		{
+			Log( "flightpictures: Cancel threw " + exception.Message );
+		}
+
+		yield return CloseTheSavePanel();
+		yield return Frames( 10 );
+
+		// ---- combat in an encounter of Spemin scouts in Arth's system: a ship with a laser and a missile launcher, the weapons armed through the Navigator's
+		// menu, then Combat's menu, a target and a laser shot, and a missile (the original's COMBAT keeps the Navigator's menu and says HIT SPACE BAR TO FIRE
+		// WEAPON / HIT RETURN TO EXIT COMBAT, COMBAT-OV WF414; Combat/Damage.png)
+		var keptLaser = ship.m_laserCannonClass;
+		var keptLauncher = ship.m_missileLauncherClass;
+		var keptArmor = ship.m_armorPoints;
+
+		ship.m_laserCannonClass = 1;
+		ship.m_missileLauncherClass = 1;
+		ship.RestoreSystems();
+
+		if ( ship.m_elementStorage.Find( 5 ) == null )
+		{
+			ship.AddElement( 5, 50 );
+		}
+
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		ForceVessel( speminId, 2 );
+		EnterEncounter( speminId );
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		BringAliensClose();
+
+		yield return Frames( 10 );
+
+		buttonController.ChangeButtonSet( ButtonController.ButtonSet.Bridge );
+		PressButton( ButtonController.ButtonSet.Bridge, 2 );
+		PressButton( buttonController.GetCurrentButtonSet(), 3 );
+
+		yield return Frames( 5 );
+
+		controller.m_messages.Clear();
+
+		PressButton( buttonController.GetCurrentButtonSet(), 4 );
+
+		yield return Frames( 10 );
+
+		var combatMenu = ButtonSetLabels( buttonController.GetCurrentButtonSet() );
+		var inCombatMenu = ( buttonController.GetCurrentButtonSet() == ButtonController.ButtonSet.Combat );
+
+		take( "combat_menu" );
+
+		var laserFired = false;
+		var missileFired = false;
+
+		if ( inCombatMenu )
+		{
+			BringAliensClose();
+
+			PressButton( ButtonController.ButtonSet.Combat, 0 );
+
+			yield return Frames( 5 );
+
+			ship.m_armorPoints = ship.GetMaximumArmorPoints();
+
+			PressButton( ButtonController.ButtonSet.Combat, 1 );
+
+			laserFired = playerData.m_general.m_location == PD_General.Location.Encounter;
+
+			yield return Frames( 3 );
+
+			take( "combat_laser" );
+
+			yield return new WaitForSecondsRealtime( 1.0f );
+
+			ship.RestoreSystems();
+
+			BringAliensClose();
+
+			PressButton( ButtonController.ButtonSet.Combat, 2 );
+
+			missileFired = playerData.m_general.m_location == PD_General.Location.Encounter;
+
+			yield return new WaitForSecondsRealtime( 0.4f );
+
+			take( "combat_missile" );
+		}
+
+		var combatText = MessageList();
+
+		ClearMissiles();
+		LeaveEncounter();
+
+		yield return Frames( 10 );
+
+		ship.m_armorPoints = keptArmor;
+		ship.m_laserCannonClass = keptLaser;
+		ship.m_missileLauncherClass = keptLauncher;
+		ship.m_weaponsAreArmed = false;
+		ship.RestoreSystems();
+
+		// ---- the starmap in hyperspace near Arth (at 120, 96: at Arth's own place the ship drops into its star system at once), through Navigation's Starmap
+		// button, then with the cursor at 140, 110
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 120.0f, 0.0f, 96.0f ) );
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 30 );
+
+		buttonController.ChangeButtonSet( ButtonController.ButtonSet.Bridge );
+		PressButton( ButtonController.ButtonSet.Bridge, 2 );
+		PressButton( buttonController.GetCurrentButtonSet(), 1 );
+
+		yield return Frames( 5 );
+
+		var starmap = controller.m_starmap;
+		var starmapOpen = starmap.IsOpen();
+		var starmapLabel = controller.m_viewport.m_label.text;
+
+		take( "starmap" );
+
+		var cursorLabel = "";
+
+		if ( starmapOpen )
+		{
+			var scale = starmap.m_starmap.transform.localScale;
+			var offset = new Vector3( 140.0f * scale.x, 110.0f * scale.y, 0.0f );
+
+			SetField( starmap, "m_positionOffset", offset );
+
+			starmap.m_starmap.transform.localPosition = starmap.m_originalPosition - offset;
+
+			Call( starmap, "UpdateLabel" );
+
+			yield return Frames( 5 );
+
+			cursorLabel = controller.m_viewport.m_label.text;
+
+			take( "starmap_cursor" );
+
+			starmap.Hide();
+			controller.m_radar.Show();
+		}
+
+		// ---- in orbit around Arth's planet 94: Log Planet, its question (starflt_147), No, and Log Planet again (the ship back at Arth's place in hyperspace
+		// first, so that the coordinates above the main view are Arth's 125 100 and not the starmap's 120 96)
+		playerData.m_general.m_lastHyperspaceCoordinates = arthStar.GetWorldCoordinates();
+
+		EnterStarSystem( arthStarId );
+
+		yield return Frames( 10 );
+		yield return EnterOrbit( 94 );
+		yield return Frames( 20 );
+
+		buttonController.ChangeButtonSet( ButtonController.ButtonSet.Bridge );
+		PressButton( ButtonController.ButtonSet.Bridge, 0 );
+
+		var commandSet = buttonController.GetCurrentButtonSet();
+
+		PressButton( commandSet, 3 );
+
+		yield return Frames( 10 );
+
+		var logQuestion = MessageList();
+		var asked = ( buttonController.GetCurrentButtonSet() == ButtonController.ButtonSet.RecommendPlanet );
+
+		take( "log_planet" );
+
+		if ( asked )
+		{
+			PressButton( ButtonController.ButtonSet.RecommendPlanet, 0 );
+		}
+
+		yield return Frames( 5 );
+
+		PressButton( commandSet, 3 );
+
+		yield return Frames( 10 );
+
+		var logAgain = MessageList();
+		var askedAgain = ( buttonController.GetCurrentButtonSet() == ButtonController.ButtonSet.RecommendPlanet );
+
+		take( "log_planet_again" );
+
+		if ( askedAgain )
+		{
+			PressButton( ButtonController.ButtonSet.RecommendPlanet, 0 );
+		}
+
+		// ---- Land (the terrain map and Select Site, Descend, Abort; starflt_148) and the descent: just after Descend (Computing descent profile, starflt_151), a
+		// second after Autopilot engaged (starflt_160), a second after Topography net locked on (starflt_170) and the ship landed (starflt_177, 178)
+		PressButton( commandSet, 0 );
+
+		yield return Frames( 10 );
+
+		take( "land" );
+
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.Land, 1 );
+
+		yield return new WaitForSecondsRealtime( 2.0f );
+
+		take( "descent_profile" );
+
+		var descentEnd = Time.realtimeSinceStartup + 45.0f;
+		var tookAutopilot = false;
+		var tookTopography = false;
+		var autopilotSeen = -1.0f;
+		var topographySeen = -1.0f;
+		var safeLandingSeen = -1.0f;
+
+		// (Topography net locked on comes once the ship is down, and Safe landing after it)
+		while ( ( Time.realtimeSinceStartup < descentEnd ) && !( ( safeLandingSeen > 0.0f ) && ( tookTopography || ( Time.realtimeSinceStartup - safeLandingSeen > 3.0f ) ) ) )
+		{
+			var said = MessageList();
+
+			if ( ( safeLandingSeen < 0.0f ) && said.Contains( "Safe landing" ) )
+			{
+				safeLandingSeen = Time.realtimeSinceStartup;
+			}
+
+			if ( ( autopilotSeen < 0.0f ) && said.Contains( "Autopilot engaged" ) )
+			{
+				autopilotSeen = Time.realtimeSinceStartup;
+			}
+
+			if ( ( topographySeen < 0.0f ) && said.Contains( "Topography net" ) )
+			{
+				topographySeen = Time.realtimeSinceStartup;
+			}
+
+			if ( !tookAutopilot && ( autopilotSeen > 0.0f ) && ( Time.realtimeSinceStartup - autopilotSeen > 1.0f ) )
+			{
+				take( "descent_autopilot" );
+
+				tookAutopilot = true;
+			}
+
+			if ( !tookTopography && ( topographySeen > 0.0f ) && ( Time.realtimeSinceStartup - topographySeen > 1.0f ) )
+			{
+				take( "descent_topography" );
+
+				tookTopography = true;
+			}
+
+			yield return null;
+		}
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var landedAt = playerData.m_general.m_location;
+		var landedText = MessageList();
+
+		take( "landed" );
+
+		// ---- the Black Egg: lying armed where the ship landed on planet 94 (as the terrain vehicle drops it), the ship back up in orbit with the Navigator's
+		// menu (the original's countdown runs as the ship departs, starflt_072 to 074): the countdown at 3, then BOOM
+		var blackEggId = gameData.FindArtifactId( "Black Egg" );
+
+		playerData.m_planetSurfaces.AddDroppedCargo( 94, 0.0f, 0.0f, 0.0f, -1, 0, blackEggId );
+
+		controller.m_messages.Clear();
+		controller.SwitchLocation( PD_General.Location.InOrbit );
+
+		yield return Frames( 2 );
+
+		buttonController.ChangeButtonSet( ButtonController.ButtonSet.Bridge );
+		PressButton( ButtonController.ButtonSet.Bridge, 2 );
+
+		var countdownEnd = Time.realtimeSinceStartup + 10.0f;
+
+		while ( ( Time.realtimeSinceStartup < countdownEnd ) && !MessageList().Contains( ">3<" ) && !MessageList().Contains( "BOOM" ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 10 );
+
+		var countdownText = MessageList();
+
+		take( "black_egg_countdown" );
+
+		while ( ( Time.realtimeSinceStartup < countdownEnd ) && !MessageList().Contains( "BOOM" ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		take( "black_egg_boom" );
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var boomText = MessageList();
+		var locationAfterBoom = playerData.m_general.m_location;
+
+		take( "black_egg_after" );
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "flightpictures: " + pictures.Count + " pictures in " + folder + ": " + string.Join( ", ", pictures ) );
+		Log( "flightpictures: science '" + scienceMenu + "' | navigation '" + navigationMenu + "' | save panel open " + savePanelOpen );
+		Log( "flightpictures: combat menu '" + combatMenu + "', laser " + laserFired + ", missile " + missileFired + " | " + combatText );
+		Log( "flightpictures: starmap open " + starmapOpen + " '" + starmapLabel + "', with the cursor moved '" + cursorLabel + "'" );
+		Log( "flightpictures: Log Planet asked " + asked + " | " + logQuestion + " || again asked " + askedAgain + " | " + logAgain );
+		Log( "flightpictures: after the descent " + landedAt + " | " + landedText );
+		Log( "flightpictures: Black Egg | " + countdownText + " || " + boomText + " | location " + locationAfterBoom );
+
+		Check( "flightpictures: a picture of every screen visited: the menus, the save panel open, the combat menu, the starmap, Log Planet's question, the landing and the countdown's BOOM", ( pictures.Count == 20 ) && savePanelOpen && inCombatMenu && starmapOpen && asked && ( landedAt == PD_General.Location.Planetside ) && boomText.Contains( "BOOM" ), pictures.Count + ", save panel " + savePanelOpen + ", combat " + inCombatMenu + ", starmap " + starmapOpen + ", asked " + asked + ", " + landedAt );
+
+		Finish( "scenario=flightpictures pictures=" + pictures.Count, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: pictures of the Intro (probe.ps1 -Graphics)
+
+	// the Intro scene's pages, each at a time when it is fully faded in, with the game clock stopped so that the page stays (the scene's times: page 1 from 4 s,
+	// page 2 from 16 s, page 3 from 34 s, page 4 from 41.5 s and page 5 from 41.7 s, which stays over page 4), into Logs/screen-pictures/intro/ (or
+	// -probePictures); without a graphics device it only checks that the Intro scene is reached
+	IEnumerator ScenarioIntroPictures()
+	{
+		var folder = ScreenPictureFolder( "intro" );
+		var pictures = new List<string>();
+
+		SceneManager.LoadScene( "Intro" );
+
+		yield return WaitForScene( "Intro" );
+
+		// (the scene fades in)
+		yield return new WaitForSecondsRealtime( 2.5f );
+
+		var intro = UnityEngine.Object.FindFirstObjectByType<IntroController>();
+		var reached = ( SceneManager.GetActiveScene().name == "Intro" ) && ( intro != null );
+
+		if ( !reached || ( folder == "" ) )
+		{
+			Log( "intropictures: the Intro scene reached " + reached + ( ( folder == "" ) ? "; no graphics device (-nographics), so no pictures; run probe.ps1 with -Graphics for them" : "" ) );
+
+			Check( "intropictures: the probe reaches the Intro scene", reached, SceneManager.GetActiveScene().name );
+
+			Finish( "scenario=intropictures pictures=0", 0 );
+			yield break;
+		}
+
+		// the page timer stands still (it counts Time.deltaTime)
+		var keptTimeScale = Time.timeScale;
+
+		Time.timeScale = 0.0f;
+
+		var times = new[] { 10.0f, 25.0f, 38.0f, 41.55f, 45.0f };
+		var names = new[] { "intro_page_1", "intro_page_2", "intro_page_3", "intro_page_4", "intro_page_5" };
+		var shown = new List<string>();
+
+		for ( var i = 0; i < times.Length; i++ )
+		{
+			SetField( intro, "m_timer", times[ i ] );
+
+			yield return Frames( 5 );
+
+			var active = new List<string>();
+
+			for ( var page = 0; page < intro.m_pages.Length; page++ )
+			{
+				if ( intro.m_pages[ page ].gameObject.activeSelf )
+				{
+					active.Add( ( page + 1 ) + "@" + intro.m_pages[ page ].alpha.ToString( "F2" ) );
+				}
+			}
+
+			shown.Add( names[ i ] + " (pages " + string.Join( " ", active ) + ")" );
+
+			var path = System.IO.Path.Combine( folder, ( pictures.Count + 1 ).ToString( "00" ) + "_" + names[ i ] + ".png" );
+
+			RenderScreenPicture( path );
+			pictures.Add( names[ i ] );
+		}
+
+		Time.timeScale = keptTimeScale;
+
+		Log( "intropictures: " + pictures.Count + " pictures in " + folder + ": " + string.Join( ", ", shown ) );
+
+		Check( "intropictures: a picture of every page of the Intro", pictures.Count == 5, pictures.Count.ToString() );
+
+		Finish( "scenario=intropictures pictures=" + pictures.Count, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
