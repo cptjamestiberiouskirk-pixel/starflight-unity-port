@@ -26377,6 +26377,8 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "tvdistance: the height of the ship's place is not a part of the distance", westBelow == westLevel, "'" + westBelow + "' and '" + westLevel + "'" );
 		Check( "tvdistance: 20 km south of the ship reads 20 KM. North", southText == "20 KM. North", "'" + southText + "'" );
 		Check( "tvdistance: just out of the ship (16 units south of its place) the vehicle is a few kilometers from it, not the height of the ground away", atTheStart == "4 KM. North", "'" + atTheStart + "'" );
+
+		Finish( "scenario=tvdistance checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// the terrain vehicle display's last row, the way back to the ship, without colour tags
@@ -26455,6 +26457,8 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-noticetyping: Quit while a notice is typed ends it with the original's NOTICE ABORTED, and the screen stays", stayed && aborted.EndsWith( "\n\n***Notice aborted***" ) && ( afterAbort == after11 ) && ( after11 < firstParagraphs ), "stayed " + stayed + ", '" + Tail( aborted ) + "', " + afterAbort + " after (" + after11 + " before, of " + firstParagraphs + ")" );
 		Check( "starport-noticetyping: the newest notice aborted says NOTICE ABORTED, then END OF NOTICES", newestAborted.EndsWith( "\n\n***Notice aborted***\n\n***End of notices***" ), "'" + Tail( newestAborted ) + "'" );
 		Check( "starport-noticetyping: a second Quit goes back to the menu", backToMenu, backToMenu.ToString() );
+
+		Finish( "scenario=starport-noticetyping checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// the paragraphs of the notice shown (after its date)
@@ -26514,6 +26518,7 @@ public class ClaudeProbe : MonoBehaviour
 		{
 			Check( "commpicture: the comm screen comes on", false, "no CommScreen enabled after the hail (" + string.Join( " | ", said ) + ")" );
 
+			Finish( "scenario=commpicture abort: no comm screen", 2 );
 			yield break;
 		}
 
@@ -26547,6 +26552,8 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "commpicture: the link comes up through interference (the setup is the case)", ( raysAtStart > 1.0f ) && lowAtStart, "rays " + raysAtStart.ToString( "F2" ) + ", low resolution " + lowAtStart );
 		Check( "commpicture: once the link has settled the portrait is clean: no coloured rays, full resolution", ( raysSettled == 0.0f ) && !lowSettled, "rays " + raysSettled.ToString( "F2" ) + ", low resolution " + lowSettled );
 		Check( "commpicture: and it stays clean (no bursts of interference later)", largestDisturbance == 0.0f, "largest " + largestDisturbance.ToString( "F2" ) );
+
+		Finish( "scenario=commpicture checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// the encounter is seen at the original's fixed scale: the camera frames the alien ships out to their fire range and no further, so that it does not climb
@@ -26691,6 +26698,8 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "encounterviewscale: the player ship is drawn twice as large in the encounter", Vector3.Distance( encounterScale, flightScale * 2.0f ) < 0.001f, flightScale + " -> " + encounterScale );
 		Check( "encounterviewscale: an alien ship is drawn twice as large as its template", Mathf.Abs( alienScale - templateScale * 2.0f ) < 0.001f, alienScale + " for a template of " + templateScale );
 		Check( "encounterviewscale: the player ship has its own size again once the encounter is over", Vector3.Distance( afterScale, flightScale ) < 0.001f, afterScale + " (in flight " + flightScale + ")" );
+
+		Finish( "scenario=encounterviewscale checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// training asks how many sessions, as the original's "HOW MANY TRAINING SESSIONS (0-N)?" (PERSONNEL-OV WEE65, WF2CD): N is the fewer of the sessions left to
@@ -26778,6 +26787,8 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-training: the fire button on a skill asks how many sessions, from 0 to the fewer of those left to the maximum and those the balance pays for, and trains nothing yet", asked && ( question == "How many training sessions (0-" + expectedMost + ")? 1" ) && ( scienceAfterAsking == 0 ) && ( balanceAfterAsking == 11700 ), "'" + question + "', asked " + asked + ", science " + scienceAfterAsking + ", balance " + balanceAfterAsking );
 		Check( "starport-training: three sessions train the skill three times over at 300 M.U. each", threeRight, afterThree );
 		Check( "starport-training: asking for more than the most trains the most, to the skill's maximum", mostRight && ( secondQuestion == "How many training sessions (0-" + ( expectedMost - 3 ) + ")? 1" ), "'" + secondQuestion + "', " + afterMost + " (expected " + maximum + " science, " + ( 11700 - 300 * expectedMost ) + " M.U.)" );
+
+		Finish( "scenario=starport-training checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
