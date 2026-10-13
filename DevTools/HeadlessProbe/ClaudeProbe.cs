@@ -1049,6 +1049,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportTraining();
 				break;
 
+			case "motiondetected":
+				yield return ScenarioMotionDetected();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -26795,6 +26799,66 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-training: asking for more than the most trains the most, to the skill's maximum", mostRight && ( secondQuestion == "How many training sessions (0-" + ( expectedMost - 3 ) + ")? 1" ), "'" + secondQuestion + "', " + afterMost + " (expected " + maximum + " science, " + ( 11700 - 300 * expectedMost ) + " M.U.)" );
 
 		Finish( "scenario=starport-training checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the original tells of motion only through a science officer whose science skill is above 150 (HYPERMSG-OV TRAK-E and WF28B: the ASSIGN-CREW slot at 0x14 is
+	// the science officer, the CREWMEMBER byte at 0x1a the science skill); the radar's blips and sound are the port's and stay for everyone
+	IEnumerator ScenarioMotionDetected()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		var scienceOfficer = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer );
+		var encounterRange = controller.m_encounterRange;
+
+		// out in dark hyperspace, with no encounter able to begin
+		controller.m_encounterRange = 0.0f;
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 4.0f, 0.0f, 4.0f ) );
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 30 );
+
+		// a group of aliens within the radar's reach (2048 units in hyperspace)
+		PD_Encounter group = null;
+
+		foreach ( var pdEncounter in playerData.m_encounterList )
+		{
+			if ( pdEncounter.GetLocation() == PD_General.Location.Hyperspace )
+			{
+				group = pdEncounter;
+
+				break;
+			}
+		}
+
+		group.m_currentCoordinates = playerData.m_general.m_coordinates + new Vector3( 700.0f, 0.0f, 700.0f );
+
+		// ---- a science officer of science 100: the radar sweeps over the group (a turn takes 6 s) and nothing is said
+		scienceOfficer.m_science = 100;
+		controller.m_messages.Clear();
+
+		yield return new WaitForSecondsRealtime( 7.0f );
+
+		var unskilled = MessageList();
+
+		// ---- of science 200: the motion is reported
+		scienceOfficer.m_science = 200;
+		controller.m_messages.Clear();
+
+		yield return new WaitForSecondsRealtime( 7.0f );
+
+		var skilled = MessageList();
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "motiondetected: the group " + Vector3.Distance( group.m_currentCoordinates, playerData.m_general.m_coordinates ).ToString( "F0" ) + " away | science 100: '" + unskilled + "' | science 200: '" + skilled + "'" );
+
+		Check( "motiondetected: a science officer of science 100 reports no motion, as the original's (above 150 only)", !unskilled.Contains( "Motion detected" ), "'" + unskilled + "'" );
+		Check( "motiondetected: a science officer of science 200 reports the motion", skilled.Contains( "Motion detected" ), "'" + skilled + "'" );
+
+		Finish( "scenario=motiondetected checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
