@@ -42,6 +42,11 @@ public class OperationsPanel : Panel
 	string m_moreLabel;
 	string m_quitLabel;
 
+	// the original types a notice out a paragraph at a time, 0.3 s apart (OP-OV WE912: 300 of the game's milliseconds after every paragraph but the last); the
+	// spacebar (More) shows the next one at once, and the abort key (Quit) ends the notice with "***NOTICE ABORTED***"
+	const float c_paragraphDelay = 0.3f;
+	float m_paragraphTimer;
+
 	// the text of the evaluation screen, and what it says in the scene (that no colony world recommendations have been filed)
 	TextMeshProUGUI m_evaluationText;
 	string m_evaluationSceneText;
@@ -87,6 +92,19 @@ public class OperationsPanel : Panel
 
 		// move up the message text game object
 		m_messageText.rectTransform.offsetMax = new Vector3( 0.0f, m_currentOffset, 0.0f );
+
+		// type out the notice shown, a paragraph at a time
+		if ( m_noticesGameObject.activeSelf && !m_askingToRepeat && !m_endOfMessageReached )
+		{
+			m_paragraphTimer += Time.deltaTime;
+
+			if ( m_paragraphTimer >= c_paragraphDelay )
+			{
+				ShowNextLine();
+
+				UpdateButtons();
+			}
+		}
 	}
 
 	// call this to enter the welcome screen
@@ -478,6 +496,18 @@ public class OperationsPanel : Panel
 	{
 		InputController.m_instance.Debounce();
 
+		// while a notice is being typed out, the abort key ends it (OP-OV WE912: "***NOTICE ABORTED***", and after the newest notice the end of the notices)
+		if ( m_noticesGameObject.activeSelf && !m_askingToRepeat && !m_endOfMessageReached )
+		{
+			AbortNotice();
+
+			UpdateButtons();
+
+			SoundController.m_instance.PlaySound( SoundController.Sound.Deactivate );
+
+			return;
+		}
+
 		// No to "REPEAT LAST NOTICE?" (or Quit): back to the menu
 		if ( m_askingToRepeat )
 		{
@@ -564,6 +594,9 @@ public class OperationsPanel : Panel
 			}
 		}
 
+		// the next paragraph comes after the full delay again
+		m_paragraphTimer = 0.0f;
+
 		// get the current line of the message
 		string[] subStrings = currentNotice.m_message.Split( new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries );
 
@@ -578,11 +611,27 @@ public class OperationsPanel : Panel
 				m_endOfMessageReached = true;
 
 				// after the newest notice the original says there are no more (OP-OV, WE912)
-				if ( m_currentNoticeId >= m_latestNoticeId )
-				{
-					m_messageText.text += "\r\n\r\n***End of notices***";
-				}
+				AddEndOfNotices();
 			}
+		}
+	}
+
+	// the rest of the notice shown is not typed: the original's "***NOTICE ABORTED***", then the end of the notices if it was the newest
+	void AbortNotice()
+	{
+		m_endOfMessageReached = true;
+
+		m_messageText.text += "\r\n\r\n***Notice aborted***";
+
+		AddEndOfNotices();
+	}
+
+	// after the newest notice the original says there are no more (OP-OV, WE912)
+	void AddEndOfNotices()
+	{
+		if ( m_currentNoticeId >= m_latestNoticeId )
+		{
+			m_messageText.text += "\r\n\r\n***End of notices***";
 		}
 	}
 }

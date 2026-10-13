@@ -53,6 +53,28 @@ class Tools
 		return new Vector3( x, 0.0f, z );
 	}
 
+	// the original's planet surface is 2304 by 960 of its units, a kilometer each, 6.4 to a degree of longitude and 5.3 to a degree of latitude (SITE-OV .LON
+	// and WEFA0: the degrees are the units * 10 / 64 and * 10 / 53)
+	const float c_kmPerDegreeOfLongitude = 6.4f;
+	const float c_kmPerDegreeOfLatitude = 5.3f;
+
+	// the distance between two places on a planet's surface in the original's kilometers, along the surface (the heights of the places do not count), as the
+	// terrain vehicle's display gives the distance to the ship (MOVE-OV WF05A: the square root of the sum of the squares of the differences)
+	public static float SurfaceDistanceInKm( Vector3 from, Vector3 to )
+	{
+		WorldToLatLongCoordinates( from, out var fromLongitude, out var fromLatitude );
+		WorldToLatLongCoordinates( to, out var toLongitude, out var toLatitude );
+
+		// the short way around the planet
+		var degreesEastWest = Mathf.Repeat( toLongitude - fromLongitude + 180.0f, 360.0f ) - 180.0f;
+		var degreesNorthSouth = toLatitude - fromLatitude;
+
+		var kmEastWest = degreesEastWest * c_kmPerDegreeOfLongitude;
+		var kmNorthSouth = degreesNorthSouth * c_kmPerDegreeOfLatitude;
+
+		return Mathf.Sqrt( kmEastWest * kmEastWest + kmNorthSouth * kmNorthSouth );
+	}
+
 	// convert from world coordinates to map coordinates
 	public static void WorldToMapCoordinates( Vector3 worldCoordinates, out float mapX, out float mapY, int mapWidth, int mapHeight )
 	{

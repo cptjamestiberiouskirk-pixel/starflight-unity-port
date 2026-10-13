@@ -1029,6 +1029,18 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLookFields();
 				break;
 
+			case "tvdistance":
+				yield return ScenarioTVDistance();
+				break;
+
+			case "starport-noticetyping":
+				yield return ScenarioStarportNoticeTyping();
+				break;
+
+			case "commpicture":
+				yield return ScenarioCommPicture();
+				break;
+
 			case "encounterviewscale":
 				yield return ScenarioEncounterViewScale();
 				break;
@@ -26308,6 +26320,233 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lookfields: Look gives the original's fields in its order: Sky, Temperature and Gravity, Atmo, Hydro and Terrain", inOrder && !shown.Contains( "Weather:" ), shown );
 
 		Finish( "scenario=lookfields", 0 );
+	}
+
+	// the terrain vehicle's distance to the ship in the original's kilometers (6.4 to a degree of longitude, 5.3 to a degree of latitude, SITE-OV), along the
+	// ground: the height of the ship's place is not a part of it (MOVE-OV WF05A)
+	IEnumerator ScenarioTVDistance()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// on planet 92 of Arth, in the terrain vehicle
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		// (no weather: a storm would hide the bearing behind LOST!)
+		PlanetWeather.End();
+
+		yield return Frames( 10 );
+
+		var shipCoordinates = controller.m_disembarked.ApplyElevation( Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude ), false );
+		var vehicleCoordinates = playerData.m_general.m_lastDisembarkedCoordinates;
+		var atTheStart = ShipDistanceText();
+
+		// ---- 30.3 km west of the ship (30.3 / 6.4 degrees of longitude, 22.7556 world units to a degree), at the ship's own height and well below it
+		var west = shipCoordinates + Vector3.left * ( 30.3f / 6.4f * 8192.0f / 360.0f );
+
+		playerData.m_general.m_lastDisembarkedCoordinates = new Vector3( west.x, shipCoordinates.y, west.z );
+
+		yield return Frames( 3 );
+
+		var westLevel = ShipDistanceText();
+
+		playerData.m_general.m_lastDisembarkedCoordinates = new Vector3( west.x, shipCoordinates.y - 200.0f, west.z );
+
+		yield return Frames( 3 );
+
+		var westBelow = ShipDistanceText();
+
+		// ---- 20.3 km south of it (20.3 / 5.3 degrees of latitude, 17.0667 world units to a degree)
+		var south = shipCoordinates + Vector3.back * ( 20.3f / 5.3f * 3072.0f / 180.0f );
+
+		playerData.m_general.m_lastDisembarkedCoordinates = new Vector3( south.x, vehicleCoordinates.y, south.z );
+
+		yield return Frames( 3 );
+
+		var southText = ShipDistanceText();
+
+		// the vehicle back where it was
+		playerData.m_general.m_lastDisembarkedCoordinates = vehicleCoordinates;
+
+		Log( "tvdistance: the vehicle " + ( shipCoordinates - vehicleCoordinates ).ToString( "F1" ) + " from the ship's place: '" + atTheStart + "' | 30 km west at the ship's height '" + westLevel + "', 200 below it '" + westBelow + "' | 20 km south '" + southText + "'" );
+
+		Check( "tvdistance: 30 km west of the ship, in the original's kilometers, reads 30 KM. East", westLevel == "30 KM. East", "'" + westLevel + "'" );
+		Check( "tvdistance: the height of the ship's place is not a part of the distance", westBelow == westLevel, "'" + westBelow + "' and '" + westLevel + "'" );
+		Check( "tvdistance: 20 km south of the ship reads 20 KM. North", southText == "20 KM. North", "'" + southText + "'" );
+		Check( "tvdistance: just out of the ship (16 units south of its place) the vehicle is a few kilometers from it, not the height of the ground away", atTheStart == "4 KM. North", "'" + atTheStart + "'" );
+	}
+
+	// the terrain vehicle display's last row, the way back to the ship, without colour tags
+	static string ShipDistanceText()
+	{
+		var rows = SpaceflightController.m_instance.m_displayController.m_terrainVehicleDisplay.m_statusValues.text.Split( '\n' );
+
+		return ( rows.Length > 0 ) ? System.Text.RegularExpressions.Regex.Replace( rows[ rows.Length - 1 ], "<[^>]*>", "" ).Trim() : "";
+	}
+
+	// a notice is typed out a paragraph at a time, 0.3 s apart, as the original's (OP-OV WE912), and the abort key (Quit) ends the notice being typed with
+	// "***NOTICE ABORTED***" (and the end of the notices after the newest) before a second Quit leaves the screen
+	IEnumerator ScenarioStarportNoticeTyping()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var panel = FindPanel<OperationsPanel>();
+
+		if ( ( panel == null ) || ( gameData.m_noticeList.Length < 2 ) )
+		{
+			Finish( "scenario=starport-noticetyping abort: no operations panel or too few notices", 2 );
+			yield break;
+		}
+
+		// the day of the second notice, with none read: two notices are out, and the first (the objectives) has many paragraphs
+		var secondDate = gameData.m_noticeList[ 1 ].m_stardate;
+
+		playerData.m_general.m_currentStardateYMD = secondDate;
+		playerData.m_starport.m_lastReadNoticeStardate = "0000-00-00";
+
+		var firstParagraphs = gameData.m_noticeList[ 0 ].m_message.Split( new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries ).Length;
+
+		yield return OpenPanel( panel, "operations" );
+
+		// ---- 1. the first notice types itself out without a press
+		panel.NoticesClicked();
+
+		var atOnce = Paragraphs( panel );
+
+		yield return new WaitForSecondsRealtime( 0.1f );
+
+		var after01 = Paragraphs( panel );
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		var after11 = Paragraphs( panel );
+
+		// ---- 2. Quit while it is typed: the notice is aborted and the screen stays
+		panel.QuitClicked();
+
+		var aborted = panel.m_messageText.text.Replace( "\r", "" );
+		var stayed = panel.m_noticesGameObject.activeSelf;
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		var afterAbort = Paragraphs( panel );
+
+		// ---- 3. the newest notice aborted at once: aborted, then the end of the notices
+		panel.NextClicked();
+		panel.QuitClicked();
+
+		var newestAborted = panel.m_messageText.text.Replace( "\r", "" );
+
+		// ---- 4. a second Quit leaves the screen
+		panel.QuitClicked();
+
+		var backToMenu = panel.m_welcomeGameObject.activeSelf && !panel.m_noticesGameObject.activeSelf;
+
+		yield return ClosePanel( panel, "operations" );
+
+		playerData.m_general.m_currentStardateYMD = "4620-01-01";
+
+		Log( "starport-noticetyping: the first notice (" + firstParagraphs + " paragraphs): " + atOnce + " at once, " + after01 + " after 0.1 s, " + after11 + " after 1.1 s | Quit: stayed " + stayed + ", ends '" + Tail( aborted ) + "', " + afterAbort + " paragraphs 1 s later | the newest aborted: '" + Tail( newestAborted ) + "' | a second Quit: the menu " + backToMenu );
+
+		Check( "starport-noticetyping: a notice is typed out a paragraph at a time without a press, 0.3 s apart", ( atOnce == 1 ) && ( after01 == 1 ) && ( after11 >= 4 ) && ( after11 <= 5 ), atOnce + ", " + after01 + ", " + after11 );
+		Check( "starport-noticetyping: Quit while a notice is typed ends it with the original's NOTICE ABORTED, and the screen stays", stayed && aborted.EndsWith( "\n\n***Notice aborted***" ) && ( afterAbort == after11 ) && ( after11 < firstParagraphs ), "stayed " + stayed + ", '" + Tail( aborted ) + "', " + afterAbort + " after (" + after11 + " before, of " + firstParagraphs + ")" );
+		Check( "starport-noticetyping: the newest notice aborted says NOTICE ABORTED, then END OF NOTICES", newestAborted.EndsWith( "\n\n***Notice aborted***\n\n***End of notices***" ), "'" + Tail( newestAborted ) + "'" );
+		Check( "starport-noticetyping: a second Quit goes back to the menu", backToMenu, backToMenu.ToString() );
+	}
+
+	// the paragraphs of the notice shown (after its date)
+	static int Paragraphs( OperationsPanel panel )
+	{
+		var parts = panel.m_messageText.text.Replace( "\r", "" ).Split( new[] { "\n\n" }, StringSplitOptions.RemoveEmptyEntries );
+		var count = 0;
+
+		foreach ( var part in parts )
+		{
+			if ( !part.StartsWith( "***" ) )
+			{
+				count++;
+			}
+		}
+
+		// the first part is the date
+		return Mathf.Max( 0, count - 1 );
+	}
+
+	// the comm link's picture clears: the interference as the link comes up (stronger with a less skilled communications officer) is gone once the link has settled,
+	// and the alien's portrait is shown clean from then on, as in the original, which garbles only the words
+	IEnumerator ScenarioCommPicture()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// an officer of little skill, whose link comes up through the strongest interference
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 30;
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		controller.m_encounterRange = 0.0f;
+
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+		var said = new List<string>();
+
+		yield return MeetAndConnect( speminId, GD_Comm.Stance.Friendly, said );
+
+		// wait for the comm screen to come on
+		CommScreen commScreen = null;
+
+		for ( var i = 0; ( i < 300 ) && ( commScreen == null ); i++ )
+		{
+			commScreen = FindFirstObjectByType<CommScreen>();
+
+			if ( commScreen == null )
+			{
+				yield return null;
+			}
+		}
+
+		if ( commScreen == null )
+		{
+			Check( "commpicture: the comm screen comes on", false, "no CommScreen enabled after the hail (" + string.Join( " | ", said ) + ")" );
+
+			yield break;
+		}
+
+		var coloredRays = commScreen.GetComponent( "ColoredRays" );
+		var lowResolution = (Behaviour) commScreen.GetComponent( "LowResolution" );
+		var waves = commScreen.GetComponent( "Waves" );
+		var headache = commScreen.GetComponent( "Headache" );
+
+		yield return Frames( 2 );
+
+		var raysAtStart = (float) GetField( coloredRays, "strength" );
+		var lowAtStart = lowResolution.enabled;
+
+		// the link settles (the interference takes 5 s to clear), then watch the picture for 8 s more
+		yield return new WaitForSecondsRealtime( commScreen.m_duration + 0.5f );
+
+		var raysSettled = (float) GetField( coloredRays, "strength" );
+		var lowSettled = lowResolution.enabled;
+		var largestDisturbance = 0.0f;
+		var watchEnd = Time.realtimeSinceStartup + 8.0f;
+
+		while ( Time.realtimeSinceStartup < watchEnd )
+		{
+			largestDisturbance = Mathf.Max( largestDisturbance, (float) GetField( waves, "strengthX" ), (float) GetField( headache, "strength" ), (float) GetField( coloredRays, "strength" ) );
+
+			yield return null;
+		}
+
+		Log( "commpicture: an officer of skill 30: at the start rays " + raysAtStart.ToString( "F2" ) + ", low resolution " + lowAtStart + "; settled rays " + raysSettled.ToString( "F2" ) + ", low resolution " + lowSettled + "; the largest disturbance in the 8 s after " + largestDisturbance.ToString( "F2" ) );
+
+		Check( "commpicture: the link comes up through interference (the setup is the case)", ( raysAtStart > 1.0f ) && lowAtStart, "rays " + raysAtStart.ToString( "F2" ) + ", low resolution " + lowAtStart );
+		Check( "commpicture: once the link has settled the portrait is clean: no coloured rays, full resolution", ( raysSettled == 0.0f ) && !lowSettled, "rays " + raysSettled.ToString( "F2" ) + ", low resolution " + lowSettled );
+		Check( "commpicture: and it stays clean (no bursts of interference later)", largestDisturbance == 0.0f, "largest " + largestDisturbance.ToString( "F2" ) );
 	}
 
 	// the encounter is seen at the original's fixed scale: the camera frames the alien ships out to their fire range and no further, so that it does not climb
