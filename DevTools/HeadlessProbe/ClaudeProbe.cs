@@ -1045,6 +1045,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioEncounterViewScale();
 				break;
 
+			case "starport-training":
+				yield return ScenarioStarportTraining();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -26687,6 +26691,93 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "encounterviewscale: the player ship is drawn twice as large in the encounter", Vector3.Distance( encounterScale, flightScale * 2.0f ) < 0.001f, flightScale + " -> " + encounterScale );
 		Check( "encounterviewscale: an alien ship is drawn twice as large as its template", Mathf.Abs( alienScale - templateScale * 2.0f ) < 0.001f, alienScale + " for a template of " + templateScale );
 		Check( "encounterviewscale: the player ship has its own size again once the encounter is over", Vector3.Distance( afterScale, flightScale ) < 0.001f, afterScale + " (in flight " + flightScale + ")" );
+	}
+
+	// training asks how many sessions, as the original's "HOW MANY TRAINING SESSIONS (0-N)?" (PERSONNEL-OV WEE65, WF2CD): N is the fewer of the sessions left to
+	// the skill's maximum and the sessions the balance pays for, and the chosen number is trained at once, 300 M.U. a session
+	IEnumerator ScenarioStarportTraining()
+	{
+		var dataController = DataController.m_instance;
+		var gameData = dataController.m_gameData;
+		var playerData = dataController.m_playerData;
+		var panel = FindPanel<PersonnelPanel>();
+
+		// a human with no science, the only file, and the balance of the original's picture (starflt_040)
+		var race = gameData.m_crewRaceList[ 0 ];
+		var file = playerData.m_personnel.CreateNewPersonnel();
+
+		file.m_name = "Probe";
+		file.m_crewRaceId = 0;
+		file.m_vitality = 100.0f;
+		file.m_science = 0;
+
+		playerData.m_personnel.m_personnelList.Clear();
+		playerData.m_personnel.m_personnelList.Add( file );
+		playerData.m_bank.m_currentBalance = 11700;
+
+		var maximum = race.GetMaximumSkill( 0 );
+		var rate = race.m_learningRate;
+		var expectedMost = Mathf.Min( ( maximum + rate - 1 ) / rate, 11700 / 300 );
+
+		yield return OpenPanel( panel, "personnel" );
+
+		panel.TrainClicked();
+
+		yield return Frames( 3 );
+
+		var train = typeof( PersonnelPanel ).GetMethod( "TrainSelectedSkill", c_any );
+		var setCount = typeof( PersonnelPanel ).GetMethod( "SetSessionCount", c_any );
+		var trainSessions = typeof( PersonnelPanel ).GetMethod( "TrainSessions", c_any );
+		var choosingField = typeof( PersonnelPanel ).GetField( "m_choosingSessions", c_any );
+
+		// ---- 1. the fire button on science asks the question and trains nothing yet
+		train.Invoke( panel, null );
+
+		var question = panel.m_trainingText.text;
+		var asked = ( choosingField != null ) && (bool) choosingField.GetValue( panel );
+		var scienceAfterAsking = file.m_science;
+		var balanceAfterAsking = playerData.m_bank.m_currentBalance;
+
+		// ---- 2. three sessions at once
+		var afterThree = "no SetSessionCount";
+
+		if ( ( setCount != null ) && ( trainSessions != null ) )
+		{
+			setCount.Invoke( panel, new object[] { 3 } );
+			trainSessions.Invoke( panel, null );
+
+			afterThree = file.m_science + " science, " + playerData.m_bank.m_currentBalance + " M.U.";
+		}
+
+		var threeRight = ( file.m_science == Mathf.Min( maximum, 3 * rate ) ) && ( playerData.m_bank.m_currentBalance == 11700 - 900 );
+
+		// ---- 3. more than the most there can be: the most, which takes the skill to its maximum
+		var secondQuestion = "";
+		var afterMost = "no SetSessionCount";
+
+		if ( ( setCount != null ) && ( trainSessions != null ) )
+		{
+			train.Invoke( panel, null );
+
+			secondQuestion = panel.m_trainingText.text;
+
+			setCount.Invoke( panel, new object[] { 999 } );
+			trainSessions.Invoke( panel, null );
+
+			afterMost = file.m_science + " science, " + playerData.m_bank.m_currentBalance + " M.U.";
+		}
+
+		var mostRight = ( file.m_science == maximum ) && ( playerData.m_bank.m_currentBalance == 11700 - 300 * expectedMost );
+
+		panel.CancelClicked();
+
+		yield return ClosePanel( panel, "personnel" );
+
+		Log( "starport-training: a human (science maximum " + maximum + ", " + rate + " a session) with 11700 M.U.: '" + question + "', asked " + asked + ", then " + scienceAfterAsking + " science and " + balanceAfterAsking + " M.U. | 3 sessions: " + afterThree + " | '" + secondQuestion + "', 999: " + afterMost );
+
+		Check( "starport-training: the fire button on a skill asks how many sessions, from 0 to the fewer of those left to the maximum and those the balance pays for, and trains nothing yet", asked && ( question == "How many training sessions (0-" + expectedMost + ")? 1" ) && ( scienceAfterAsking == 0 ) && ( balanceAfterAsking == 11700 ), "'" + question + "', asked " + asked + ", science " + scienceAfterAsking + ", balance " + balanceAfterAsking );
+		Check( "starport-training: three sessions train the skill three times over at 300 M.U. each", threeRight, afterThree );
+		Check( "starport-training: asking for more than the most trains the most, to the skill's maximum", mostRight && ( secondQuestion == "How many training sessions (0-" + ( expectedMost - 3 ) + ")? 1" ), "'" + secondQuestion + "', " + afterMost + " (expected " + maximum + " science, " + ( 11700 - 300 * expectedMost ) + " M.U.)" );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

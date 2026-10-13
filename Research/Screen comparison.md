@@ -221,7 +221,7 @@ The doors are where the original's are (Operations upper left, Personnel top, Cr
 | DURABILITY and LRN RATE in the right column beside RACE in the original | OPEN | picture (CONFIRMED) | UI KIT |
 | The empty file: the original shows FILE #, VITALITY %, RACE, DURABILITY and LRN RATE with no values; the port's "No Personnel Files Found" | OPEN | `PersonnelPanel.cs:487`, picture (CONFIRMED) | UI KIT |
 | AVG. HT., AVG. WT., LRN RATE as Average Height, Average Weight, Learn Rate | OPEN | picture (CONFIRMED) | UI KIT |
-| Training. Original: "BALANCE: 11700 COST: 300 MU/SESSION / HOW MANY TRAINING SESSIONS (0-23)?" (starflt_040). Port: one session a press | OPEN | `PersonnelPanel.cs:720`, `760` to `800` (CONFIRMED, code and screenshot) | GAMEPLAY (the count), UI KIT (the text) |
+| Training. Original: "BALANCE: 11700 COST: 300 MU/SESSION / HOW MANY TRAINING SESSIONS (0-23)?" (starflt_040). Port: one session a press | FIXED (the training sessions PR) for the count: the fire button on a skill asks "How many training sessions (0-N)?", N the fewer of the sessions left to the skill's maximum and those the balance pays for (up to 100,000 M.U.), as `PERSONNEL-OV.c` WEE65; the stick sets the number (right and left one more and one fewer, up the most, down none) where the original takes typed digits, and the fire button trains them all at once (WF2CD); the balance and cost lines stay the UI kit's | `PersonnelPanel.SetSessionCount`, `TrainSessions`; the `starport-training` probe scenario (CONFIRMED) | GAMEPLAY (the count), UI KIT (the text) |
 | No pictures of choosing a race, naming, training or deleting | PROBE | | |
 
 ## 20. Crew Assignment

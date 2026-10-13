@@ -72,6 +72,15 @@ public class PersonnelPanel : Panel
 	const int c_numRaces = 5;
 	const int c_numSkills = 5;
 
+	// the original asks how many sessions to train the chosen skill for, "HOW MANY TRAINING SESSIONS (0-N)?", N being the fewer of the sessions the skill has left
+	// to its maximum and the sessions the balance pays for (counted up to 100,000 M.U.), and trains them all at once (PERSONNEL-OV WEE65 and WF2CD); the port
+	// sets the number with the stick: right and left one more and one fewer, up the most and down none, and the fire button trains that many
+	const int c_sessionCost = 300;
+	const int c_largestBalanceCounted = 100000;
+	bool m_choosingSessions;
+	int m_sessionCount;
+	int m_maximumSessions;
+
 	// unity awake
 	void Awake()
 	{
@@ -195,6 +204,14 @@ public class PersonnelPanel : Panel
 	// controller updates for when we are currently selecting a race
 	public void UpdateControllerForTrainCrewmemberState()
 	{
+		// the number of sessions is being chosen
+		if ( m_choosingSessions )
+		{
+			UpdateControllerForSessionCount();
+
+			return;
+		}
+
 		// check if we moved the stick down
 		if ( InputController.m_instance.m_south )
 		{
@@ -251,6 +268,59 @@ public class PersonnelPanel : Panel
 			InputController.m_instance.Debounce();
 
 			SwitchToViewFileState();
+
+			SoundController.m_instance.PlaySound( SoundController.Sound.Deactivate );
+		}
+	}
+
+	// controller updates for when the number of training sessions is being chosen
+	void UpdateControllerForSessionCount()
+	{
+		var input = InputController.m_instance;
+
+		if ( input.m_east || input.m_west || input.m_north || input.m_south )
+		{
+			if ( m_ignoreControllerTimer == 0.0f )
+			{
+				m_ignoreControllerTimer = 0.15f;
+
+				if ( input.m_east )
+				{
+					SetSessionCount( m_sessionCount + 1 );
+				}
+				else if ( input.m_west )
+				{
+					SetSessionCount( m_sessionCount - 1 );
+				}
+				else if ( input.m_north )
+				{
+					SetSessionCount( m_maximumSessions );
+				}
+				else
+				{
+					SetSessionCount( 0 );
+				}
+			}
+		}
+		else // we have centered the stick
+		{
+			m_ignoreControllerTimer = 0.0f;
+		}
+
+		// the fire button trains the skill for that many sessions
+		if ( input.m_submit )
+		{
+			input.Debounce();
+
+			TrainSessions();
+		}
+
+		// the cancel button trains it for none
+		if ( input.m_cancel )
+		{
+			input.Debounce();
+
+			StopChoosingSessions();
 
 			SoundController.m_instance.PlaySound( SoundController.Sound.Deactivate );
 		}
@@ -326,6 +396,9 @@ public class PersonnelPanel : Panel
 	{
 		// change the current state
 		m_currentState = State.TrainCrewmember;
+
+		// no question is open yet
+		m_choosingSessions = false;
 
 		// select the first skill by default
 		m_currentSkillIndex = 0;
@@ -792,20 +865,20 @@ public class PersonnelPanel : Panel
 			}
 			else if ( currentSkill < maximumSkill ) // check if we are still below the maximum skill points
 			{
-				// increase the skill by the learn amount
-				personnelFile.SetSkill( m_currentSkillIndex, Math.Min( maximumSkill, currentSkill + race.m_learningRate ) );
+				// the sessions the skill has left to its maximum, and the sessions the balance pays for
+				var learningRate = Math.Max( 1, race.m_learningRate );
+				var sessionsToMaximum = ( maximumSkill - currentSkill + learningRate - 1 ) / learningRate;
+				var sessionsPaidFor = Math.Min( bank.m_currentBalance, c_largestBalanceCounted ) / c_sessionCost;
 
-				// take off 300 credits from the bank balance
-				bank.m_currentBalance -= 300;
+				m_maximumSessions = Math.Max( 0, Math.Min( sessionsToMaximum, sessionsPaidFor ) );
 
-				// update the bank balance text
-				UpdateBankBalanceText();
+				// ask how many
+				m_choosingSessions = true;
 
-				// update the skill values text
-				UpdateSkillValues();
+				SetSessionCount( 1 );
 
 				// play a ui sound
-				SoundController.m_instance.PlaySound( SoundController.Sound.Update );
+				SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 			}
 			else // the selected skill is already maxxed out
 			{
@@ -814,6 +887,61 @@ public class PersonnelPanel : Panel
 				SoundController.m_instance.PlaySound( SoundController.Sound.Error );
 			}
 		}
+	}
+
+	// the number of sessions chosen, from none to the most there can be, and the question with it
+	void SetSessionCount( int sessionCount )
+	{
+		var newCount = Math.Max( 0, Math.Min( m_maximumSessions, sessionCount ) );
+
+		if ( newCount != m_sessionCount )
+		{
+			SoundController.m_instance.PlaySound( SoundController.Sound.Click );
+		}
+
+		m_sessionCount = newCount;
+
+		m_trainingText.text = "How many training sessions (0-" + m_maximumSessions + ")? " + m_sessionCount;
+
+		m_trainingText.gameObject.SetActive( true );
+	}
+
+	// train the selected skill for the sessions chosen, all at once: the skill goes up by the race's learning rate for each, up to its maximum, and the bank takes
+	// 300 M.U. for each
+	void TrainSessions()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var bank = playerData.m_bank;
+		var personnelFile = playerData.m_personnel.m_personnelList[ m_currentFileIndex ];
+		var race = DataController.m_instance.m_gameData.m_crewRaceList[ m_currentRaceIndex ];
+
+		var sessions = Math.Max( 0, Math.Min( m_maximumSessions, m_sessionCount ) );
+
+		if ( sessions > 0 )
+		{
+			var currentSkill = personnelFile.GetSkill( m_currentSkillIndex );
+			var maximumSkill = race.GetMaximumSkill( m_currentSkillIndex );
+
+			personnelFile.SetSkill( m_currentSkillIndex, Math.Min( maximumSkill, currentSkill + race.m_learningRate * sessions ) );
+
+			bank.m_currentBalance -= c_sessionCost * sessions;
+
+			UpdateBankBalanceText();
+
+			UpdateSkillValues();
+
+			SoundController.m_instance.PlaySound( SoundController.Sound.Update );
+		}
+
+		StopChoosingSessions();
+	}
+
+	// the question is over: back to choosing a skill
+	void StopChoosingSessions()
+	{
+		m_choosingSessions = false;
+
+		UpdateTrainingText( 0 );
 	}
 
 	// this is called if we clicked on the create button
