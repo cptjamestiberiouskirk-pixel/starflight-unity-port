@@ -708,7 +708,8 @@ public class TradeDepotPanel : Panel
 					}
 				}
 
-				if ( ( m_currentState == State.BuyItem ) || ( m_currentState == State.BuyAmount ) || ( m_currentState == State.AnalyzeItem ) || ( m_currentState == State.AnalyzeConfirm ) || ( m_currentState == State.AnalyzeShow ) )
+				// the Starport's own artifacts are on the Buy list only: the original's Analysis lists the ship's (starflt_080, starflt_099)
+				if ( ( m_currentState == State.BuyItem ) || ( m_currentState == State.BuyAmount ) )
 				{
 					// add artifacts heading
 					m_itemListText.text += "<color=#A35514>Artifacts</color>" + Environment.NewLine;
