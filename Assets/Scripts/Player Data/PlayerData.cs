@@ -196,7 +196,8 @@ public class PlayerData
 
 		m_bank.m_currentBalance += PD_General.c_winBonus;
 
-		m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Mission completed", PD_General.c_winBonus.ToString() + "+" ) );
+		// the original books the win's bonus as a BONUS (DPART-OV in the decompiled original, transaction type 3)
+		m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Bonus", PD_General.c_winBonus.ToString() + "+" ) );
 
 		return true;
 	}
@@ -248,7 +249,8 @@ public class PlayerData
 			{
 				// yes - the bonus
 				m_bank.m_currentBalance += colonyEvaluation.m_bonus;
-				m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Colony bonus", colonyEvaluation.m_bonus + "+" ) );
+				// a BONUS in the original's ledger (CAPTAIN in the decompiled original, transaction type 3)
+				m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Bonus", colonyEvaluation.m_bonus + "+" ) );
 
 				var text = gameData.FindStoryText( ( colonyEvaluation.m_rating == "Optimal" ) ? "EvaluationOptimal" : "EvaluationSuitable" );
 
@@ -269,7 +271,8 @@ public class PlayerData
 			m_general.m_unsuitableRecommendationCount++;
 
 			m_bank.m_currentBalance -= fine;
-			m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Colony fine", fine + "-" ) );
+			// a FINE in the original's ledger (CAPTAIN, transaction type 0)
+			m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Fine", fine + "-" ) );
 
 			var unsuitable = gameData.FindStoryText( "EvaluationUnsuitable" );
 

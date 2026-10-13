@@ -35,6 +35,13 @@ public class OperationsPanel : Panel
 	float m_currentOffset;
 	bool m_endOfMessageReached;
 
+	// true while the screen asks whether to repeat the last notice (the original's "NO NEW NOTICES" and "REPEAT LAST NOTICE? [N Y]", OP-OV in the decompiled
+	// original), the line said before the notice shown ("***REPEATING LAST NOTICE***"), and the labels of More and Quit, which answer Yes and No meanwhile
+	bool m_askingToRepeat;
+	string m_noticePreface;
+	string m_moreLabel;
+	string m_quitLabel;
+
 	// the text of the evaluation screen, and what it says in the scene (that no colony world recommendations have been filed)
 	TextMeshProUGUI m_evaluationText;
 	string m_evaluationSceneText;
@@ -85,6 +92,12 @@ public class OperationsPanel : Panel
 	// call this to enter the welcome screen
 	public void ShowWelcome()
 	{
+		// a question left open ends with the screen
+		if ( m_askingToRepeat )
+		{
+			StopAskingToRepeat();
+		}
+
 		// show and hide objects
 		m_welcomeGameObject.SetActive( true );
 		m_noticesGameObject.SetActive( false );
@@ -134,11 +147,13 @@ public class OperationsPanel : Panel
 		// get access to the game data
 		GameData gameData = DataController.m_instance.m_gameData;
 
-		// update the stardate text (the way the game shows stardates, not in the date format of the computer's region)
-		m_stardateText.text = "Today is " + PD_General.GetDisplayStardate( playerData.m_general.m_currentStardateYMD );
+		// update the stardate text (the way the game shows stardates, not in the date format of the computer's region) - the heading beside it says NOTICES, and
+		// the original's header is that word and today's date (OP-OV, WE735)
+		m_stardateText.text = PD_General.GetDisplayStardate( playerData.m_general.m_currentStardateYMD );
 
-		// figure out which notice we should be showing (current notice)
-		string earliestNewNoticeStardate = "9999-12-31";
+		// figure out which notice we should be showing: the first one not read yet, or else the last one read (the original's WEA28)
+		var newNoticeId = -1;
+		var lastReadNoticeId = 0;
 
 		for ( int noticeId = 0; noticeId < gameData.m_noticeList.Length; noticeId++ )
 		{
@@ -148,23 +163,91 @@ public class OperationsPanel : Panel
 			{
 				m_latestNoticeId = noticeId;
 
-				if ( string.Compare( notice.m_stardate, playerData.m_starport.m_lastReadNoticeStardate ) >= 0 )
+				if ( string.Compare( notice.m_stardate, playerData.m_starport.m_lastReadNoticeStardate ) > 0 )
 				{
-					if ( string.Compare( earliestNewNoticeStardate, notice.m_stardate ) >= 0 )
+					if ( newNoticeId < 0 )
 					{
-						if ( notice.m_stardate != playerData.m_starport.m_lastReadNoticeStardate )
-						{
-							earliestNewNoticeStardate = notice.m_stardate;
-						}
-
-						m_currentNoticeId = noticeId;
+						newNoticeId = noticeId;
 					}
+				}
+				else
+				{
+					lastReadNoticeId = noticeId;
 				}
 			}
 		}
 
-		// show the current message
-		ShowCurrentMessage();
+		m_noticePreface = "";
+
+		// a new notice: show it
+		if ( newNoticeId >= 0 )
+		{
+			m_currentNoticeId = newNoticeId;
+
+			ShowCurrentMessage();
+
+			return;
+		}
+
+		// none: the original says so and asks whether to repeat the last one (Yes and No on the screen's More and Quit)
+		m_currentNoticeId = lastReadNoticeId;
+
+		AskToRepeat();
+	}
+
+	// "NO NEW NOTICES" and "REPEAT LAST NOTICE? [N Y]", with More as Yes and Quit as No
+	void AskToRepeat()
+	{
+		m_askingToRepeat = true;
+		m_currentOffset = 0;
+
+		m_messageText.text = "No new notices\r\n\r\nRepeat last notice?";
+
+		m_previousButton.gameObject.SetActive( false );
+		m_nextButton.gameObject.SetActive( false );
+
+		SetButtonLabel( m_moreButton, ref m_moreLabel, "Yes" );
+		SetButtonLabel( m_quitButton, ref m_quitLabel, "No" );
+
+		m_moreButton.interactable = true;
+
+		m_quitButton.Select();
+	}
+
+	// the question is answered: More and Quit get their labels back, and the notice buttons come back
+	void StopAskingToRepeat()
+	{
+		m_askingToRepeat = false;
+
+		SetButtonLabel( m_moreButton, ref m_moreLabel, null );
+		SetButtonLabel( m_quitButton, ref m_quitLabel, null );
+
+		m_previousButton.gameObject.SetActive( true );
+		m_nextButton.gameObject.SetActive( true );
+	}
+
+	// gives a button another label, keeping its own the first time (null puts its own back)
+	static void SetButtonLabel( Button button, ref string ownLabel, string label )
+	{
+		var text = ( button == null ) ? null : button.GetComponentInChildren<TextMeshProUGUI>( true );
+
+		if ( text == null )
+		{
+			return;
+		}
+
+		if ( ownLabel == null )
+		{
+			ownLabel = text.text;
+		}
+
+		text.text = label ?? ownLabel;
+	}
+
+	// true while the screen asks whether to repeat the last notice
+	public bool IsAskingToRepeat()
+	{
+		return m_askingToRepeat;
 	}
 
 	// call this to enter the evaluations screen
@@ -335,6 +418,20 @@ public class OperationsPanel : Panel
 			return;
 		}
 
+		// Yes to "REPEAT LAST NOTICE?": the last notice again, after the original's "***REPEATING LAST NOTICE***"
+		if ( m_askingToRepeat )
+		{
+			StopAskingToRepeat();
+
+			m_noticePreface = "***Repeating last notice***\r\n\r\n";
+
+			ShowCurrentMessage();
+
+			SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+
+			return;
+		}
+
 		// show the next line of the notice
 		ShowNextLine();
 
@@ -380,6 +477,12 @@ public class OperationsPanel : Panel
 	public void QuitClicked()
 	{
 		InputController.m_instance.Debounce();
+
+		// No to "REPEAT LAST NOTICE?" (or Quit): back to the menu
+		if ( m_askingToRepeat )
+		{
+			StopAskingToRepeat();
+		}
 
 		// show the welcome screen
 		ShowWelcome();
@@ -449,8 +552,10 @@ public class OperationsPanel : Panel
 		// check if we are displaying the first line
 		if ( m_currentLine == 0 )
 		{
-			// clear the text and add the date (a stardate too)
-			m_messageText.text = PD_General.GetDisplayStardate( currentNotice.m_stardate );
+			// clear the text and add the date (a stardate too), after the line said before the notice if there is one
+			m_messageText.text = m_noticePreface + PD_General.GetDisplayStardate( currentNotice.m_stardate );
+
+			m_noticePreface = "";
 
 			// remember the newest notice read
 			if ( string.Compare( currentNotice.m_stardate, DataController.m_instance.m_playerData.m_starport.m_lastReadNoticeStardate ) > 0 )
@@ -471,6 +576,12 @@ public class OperationsPanel : Panel
 			if ( m_currentLine == subStrings.Length )
 			{
 				m_endOfMessageReached = true;
+
+				// after the newest notice the original says there are no more (OP-OV, WE912)
+				if ( m_currentNoticeId >= m_latestNoticeId )
+				{
+					m_messageText.text += "\r\n\r\n***End of notices***";
+				}
 			}
 		}
 	}

@@ -102,7 +102,7 @@ public class ShipConfigurationPanel : Panel
 			var sign = ( deltaBalance > 0 ) ? "-" : "+";
 
 			// the amount without its own sign, the sign goes behind it (money that came in used to read "-1400+")
-			var transaction = new PD_Bank.Transaction( DataController.m_instance.m_playerData.m_general.m_currentStardateYMD, "Ship Configuration", Mathf.Abs( deltaBalance ).ToString() + sign );
+			var transaction = new PD_Bank.Transaction( DataController.m_instance.m_playerData.m_general.m_currentStardateYMD, "Ship configuration", Mathf.Abs( deltaBalance ).ToString() + sign );
 
 			DataController.m_instance.m_playerData.m_bank.m_transactionList.Add( transaction );
 		}
