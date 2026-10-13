@@ -905,6 +905,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCoordinates();
 				break;
 
+			case "landingsite":
+				yield return ScenarioLandingSite();
+				break;
+
 			case "alienanalysis":
 				yield return ScenarioAlienAnalysis();
 				break;
@@ -1001,6 +1005,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioGazurtoidMood();
 				break;
 
+			case "combatwounds":
+				yield return ScenarioCombatWounds();
+				break;
+
 			case "floaters":
 				yield return ScenarioFloaters();
 				break;
@@ -1023,6 +1031,10 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "commpicture":
 				yield return ScenarioCommPicture();
+				break;
+
+			case "encounterviewscale":
+				yield return ScenarioEncounterViewScale();
 				break;
 
 			default:
@@ -2563,8 +2575,10 @@ public class ClaudeProbe : MonoBehaviour
 			ship.m_shieldingClass = 1;
 		}
 
-		ship.m_shieldsAreUp = true;
-		ship.m_shieldPoints = ship.GetMaximumShieldPoints();
+		// (shields down and the armor low, so that the hit gives the hull breach warning, a message with a colour tag: the original names no damage, so the port
+		// no longer writes the shields' and the hull's numbers)
+		ship.m_shieldsAreUp = false;
+		ship.m_armorPoints = Mathf.Max( 20, ship.GetMaximumArmorPoints() / 5 );
 
 		var armorBefore = ship.m_armorPoints;
 		var shown = "";
@@ -2588,7 +2602,7 @@ public class ClaudeProbe : MonoBehaviour
 			shown += messagesText.GetParsedText().Replace( '\n', '/' );
 		}
 
-		Check( "the shield message shows its words and no tag", shown.Contains( "Shields absorb 10 damage!" ) && !shown.Contains( "<color" ), "shown=[" + shown + "] armor " + armorBefore + "->" + ship.m_armorPoints );
+		Check( "the hull breach message shows its words and no tag", shown.Contains( "Hull breach imminent!" ) && !shown.Contains( "<color" ), "shown=[" + shown + "] armor " + armorBefore + "->" + ship.m_armorPoints );
 
 		Finish( "scenario=colournames named=" + named + " unknown=" + unknown.Count, 0 );
 	}
@@ -14316,13 +14330,16 @@ public class ClaudeProbe : MonoBehaviour
 
 			Check( "vessel " + vesselId + " (" + vesselName + ") gets a model in an encounter", hasModel, "model=" + ( ( model == null ) ? "none" : model.name ) );
 
-			// the smallest vessels are shown at 0.3 times the player ship (3.404 units long in its FBX, scale 15)
-			Check( "vessel " + vesselId + " is big enough to be seen (a quarter of the player ship or more)", longest >= 3.404f * 15.0f * 0.25f, "longest side=" + longest.ToString( "F1" ) );
+			// the smallest vessels are shown at 0.3 times the player ship (3.404 units long in its FBX, scale 15); an encounter draws every ship, the player's too,
+			// Encounter.c_shipViewScale times as large
+			Check( "vessel " + vesselId + " is big enough to be seen (a quarter of the player ship or more)", longest >= 3.404f * 15.0f * 0.25f * Encounter.c_shipViewScale, "longest side=" + longest.ToString( "F1" ) );
 
 			float expectedLength;
 
 			if ( c_shipModelLengths.TryGetValue( vesselId, out expectedLength ) )
 			{
+				expectedLength *= Encounter.c_shipViewScale;
+
 				Check( "vessel " + vesselId + " is " + expectedLength.ToString( "F1" ) + " units long", Mathf.Abs( longest - expectedLength ) <= expectedLength * 0.05f, "size=" + size.ToString( "F1" ) );
 				Check( "vessel " + vesselId + " is longest along its nose", size.z >= Mathf.Max( size.x, size.y ) * 0.999f, "size=" + size.ToString( "F1" ) );
 
@@ -23403,6 +23420,52 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 7: latitude and longitude as the original gives them
 
+	// ---------------------------------------------------------------- the screens' Step 2: where Select Site's crosshair starts (SITE-OV, WF014)
+
+	IEnumerator ScenarioLandingSite()
+	{
+		var general = DataController.m_instance.m_playerData.m_general;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		yield return EnterOrbit( 94 );
+
+		// a site chosen in this orbit stays while the ship is in it (the original keeps WEF1D and WEF9C)
+		general.m_selectedLatitude = 30.0f;
+		general.m_selectedLongitude = -20.0f;
+
+		controller.SwitchLocation( PD_General.Location.InOrbit );
+
+		yield return Frames( 5 );
+
+		var inOrbit = general.m_selectedLatitude + " " + general.m_selectedLongitude;
+
+		// leaving orbit for the star system: the next landing starts at LAT 0 LONG 0
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+
+		var inTheSystem = general.m_selectedLatitude + " " + general.m_selectedLongitude;
+
+		// and in hyperspace
+		general.m_selectedLatitude = 40.0f;
+		general.m_selectedLongitude = 10.0f;
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 5 );
+
+		var inHyperspace = general.m_selectedLatitude + " " + general.m_selectedLongitude;
+
+		Log( "landingsite: a site of 30 -20 chosen in orbit: still in orbit " + inOrbit + " | in the star system " + inTheSystem + " | 40 10, then hyperspace " + inHyperspace );
+
+		Check( "landingsite: within one orbit the last site chosen stays (control)", inOrbit == "30 -20", inOrbit );
+		Check( "landingsite: once the ship has left orbit, Select Site's crosshair starts in the middle of the map again, as the original's (DEPART, then SITE-OV WF014)", ( inTheSystem == "0 0" ) && ( inHyperspace == "0 0" ), inTheSystem + " | " + inHyperspace );
+
+		Finish( "scenario=landingsite orbit=" + inOrbit + " system=" + inTheSystem + " hyperspace=" + inHyperspace, 0 );
+	}
+
 	IEnumerator ScenarioCoordinates()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -25862,6 +25925,77 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=gazurtoidmood", 0 );
 	}
 
+	// ---------------------------------------------------------------- phase 7: the combat messages and the crew's wounds (DAMAGE-OV)
+
+	IEnumerator ScenarioCombatWounds()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var ship = playerData.m_playerShip;
+		var combat = CombatController.m_instance;
+
+		EnsureCrew();
+
+		var captain = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Captain );
+
+		captain.m_vitality = 100.0f;
+		captain.m_isDead = false;
+
+		ship.m_armorPoints = 100000;
+		ship.m_shieldsAreUp = false;
+
+		var encounterRange = SpaceflightController.m_instance.m_encounterRange;
+
+		SpaceflightController.m_instance.m_encounterRange = 0.0f;
+
+		EnterEncounter( FindEncounter( 1, 6, 3, 0 ) );
+		yield return Frames( 10 );
+
+		// ---- 1. sixty hits that get through the shields (none are up): some fall on the crew, and the text window says how badly they are wounded, with no numbers
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		var said = "";
+
+		for ( var i = 0; i < 60; i++ )
+		{
+			combat.ApplyDamageToPlayer( 20, Vector3.forward );
+
+			said += MessageList() + " / ";
+
+			SpaceflightController.m_instance.m_messages.Clear();
+		}
+
+		var vitalityAfter = captain.m_vitality;
+		var wounded = said.Contains( " wounded." );
+		var numbers = said.Contains( "Hull takes" ) || said.Contains( "damage!" );
+
+		// ---- 2. a plasma bolt (an Uhlek warship's) says what hit the ship, in the original's words
+		var alienShip = SpaceflightController.m_instance.m_encounter.m_pdEncounter.GetAlienShipList()[ 0 ];
+		var uhlekWarship = gameData.m_vesselList[ 17 ];
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		combat.AlienFiresAtPlayer( alienShip, uhlekWarship );
+
+		var plasma = MessageList();
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		SpaceflightController.m_instance.m_encounterRange = encounterRange;
+
+		captain.m_vitality = 100.0f;
+
+		Log( "combatwounds: after 60 hits the captain's vitality " + vitalityAfter + ", wounded said " + wounded + ", numbers said " + numbers + " | plasma: " + plasma + " | said: " + ( said.Length > 600 ? said.Substring( 0, 600 ) : said ) );
+
+		Check( "combatwounds: hits that get through the shields wound the crew at times, and the text window says how badly, as the original", ( vitalityAfter < 100.0f ) && ( vitalityAfter > 0.0f ) && wounded, vitalityAfter + " " + wounded );
+		Check( "combatwounds: the text window gives no numbers of damage, as the original", !numbers, said.Length > 300 ? said.Substring( 0, 300 ) : said );
+		Check( "combatwounds: a plasma bolt that hits says \"Plasma bolt\", as the original", plasma.Contains( "Plasma bolt" ) && !plasma.Contains( "incoming" ), plasma );
+
+		Finish( "scenario=combatwounds", 0 );
+	}
+
 	// ---------------------------------------------------------------- phase 6: lifeforms that float (lf-behav.txt FLOAT)
 
 	IEnumerator ScenarioFloaters()
@@ -26248,6 +26382,150 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "commpicture: the link comes up through interference (the setup is the case)", ( raysAtStart > 1.0f ) && lowAtStart, "rays " + raysAtStart.ToString( "F2" ) + ", low resolution " + lowAtStart );
 		Check( "commpicture: once the link has settled the portrait is clean: no coloured rays, full resolution", ( raysSettled == 0.0f ) && !lowSettled, "rays " + raysSettled.ToString( "F2" ) + ", low resolution " + lowSettled );
 		Check( "commpicture: and it stays clean (no bursts of interference later)", largestDisturbance == 0.0f, "largest " + largestDisturbance.ToString( "F2" ) );
+	}
+
+	// the encounter is seen at the original's fixed scale: the camera frames the alien ships out to their fire range and no further, so that it does not climb
+	// so high that the ships are specks, and a ship in range is in view
+	IEnumerator ScenarioEncounterViewScale()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// a mechan encounter: its ships start far from the player
+		var mechanId = -1;
+
+		for ( var i = 0; i < gameData.m_encounterList.Length; i++ )
+		{
+			if ( gameData.m_encounterList[ i ].m_race == GameData.Race.Mechan )
+			{
+				mechanId = i;
+
+				break;
+			}
+		}
+
+		EnterStarSystem( gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		var flightScale = controller.m_playerShip.m_ship.localScale;
+
+		EnterEncounter( mechanId );
+
+		yield return new WaitForSecondsRealtime( 5.0f );
+
+		var encounter = controller.m_encounter;
+		var offset = (float) GetField( encounter, "m_currentOffset" );
+		var encounterScale = controller.m_playerShip.m_ship.localScale;
+
+		// the first alien ship model against its template
+		var slot = encounter.m_alienShipModelList[ 0 ];
+		var slotShip = ( (PD_AlienShip[]) GetField( encounter, "m_alienShipList" ) )[ 0 ];
+		var alienScale = ( slot.transform.childCount > 0 ) ? slot.transform.GetChild( 0 ).localScale.x : 0.0f;
+		var templateScale = encounter.m_alienShipModelTemplate[ slotShip.m_vesselId ].transform.localScale.x;
+		var camera = controller.m_playerCamera.m_camera;
+
+		// pictures of the view, with -Graphics (the folder is empty without a graphics device)
+		var pictureFolder = ScreenPictureFolder( "encounter-view" );
+
+		if ( pictureFolder != "" )
+		{
+			RenderCameraPicture( Camera.main, System.IO.Path.Combine( pictureFolder, "1-ships-far.png" ) );
+		}
+
+		// the alien ships: the farthest living one, and whether every living one within the fire range is in view
+		var farthest = 0.0f;
+		var inRange = 0;
+		var inRangeInView = 0;
+		var distances = "";
+
+		foreach ( var alienShip in encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			if ( alienShip.m_isDead || !alienShip.m_addedToEncounter )
+			{
+				continue;
+			}
+
+			var distance = Vector3.Distance( alienShip.m_coordinates, playerData.m_general.m_coordinates );
+
+			distances += distance.ToString( "F0" ) + " ";
+
+			farthest = Mathf.Max( farthest, distance );
+
+			if ( distance < 1000.0f )
+			{
+				inRange++;
+
+				var viewportPoint = camera.WorldToViewportPoint( alienShip.m_coordinates );
+
+				if ( ( viewportPoint.z > 0.0f ) && ( viewportPoint.x >= 0.0f ) && ( viewportPoint.x <= 1.0f ) && ( viewportPoint.y >= 0.0f ) && ( viewportPoint.y <= 1.0f ) )
+				{
+					inRangeInView++;
+				}
+			}
+		}
+
+		// the highest the camera has to be to frame the fire range and the margin around it, with the field of view the encounter uses
+		var verticalFieldOfView = controller.m_viewport.m_camera.fieldOfView * Mathf.Deg2Rad;
+		var highest = ( 1000.0f + 192.0f ) * Mathf.Tan( Mathf.PI * 0.5f - verticalFieldOfView * 0.5f );
+
+		Log( "encounterviewscale: 5 s in, the camera " + offset.ToString( "F0" ) + " above the ship (the fire range needs at most " + highest.ToString( "F0" ) + "), alien ships at " + distances + "(" + inRangeInView + " of " + inRange + " in range in view)" );
+
+		Check( "encounterviewscale: an alien ship is still beyond the fire range 5 s in (the setup is the case)", farthest > 1300.0f, "farthest " + farthest.ToString( "F0" ) );
+		Check( "encounterviewscale: the camera is no higher than framing the fire range needs", offset <= highest + 1.0f, "offset " + offset.ToString( "F0" ) + ", at most " + highest.ToString( "F0" ) );
+		Check( "encounterviewscale: every alien ship within the fire range is in view", inRangeInView == inRange, inRangeInView + " of " + inRange );
+
+		// ---- a ship brought within the fire range, toward a corner of the view, is in view once the camera has settled
+		PD_AlienShip nearShip = null;
+
+		foreach ( var alienShip in encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			if ( !alienShip.m_isDead && alienShip.m_addedToEncounter )
+			{
+				nearShip = alienShip;
+
+				break;
+			}
+		}
+
+		var nearOffset = new Vector3( 650.0f, 0.0f, 500.0f );
+
+		nearShip.m_coordinates = playerData.m_general.m_coordinates + nearOffset;
+		nearShip.m_targetCoordinates = nearShip.m_coordinates;
+
+		yield return new WaitForSecondsRealtime( 4.0f );
+
+		var nearDistance = Vector3.Distance( nearShip.m_coordinates, playerData.m_general.m_coordinates );
+		var nearPoint = camera.WorldToViewportPoint( nearShip.m_coordinates );
+		var nearInView = ( nearPoint.z > 0.0f ) && ( nearPoint.x >= 0.0f ) && ( nearPoint.x <= 1.0f ) && ( nearPoint.y >= 0.0f ) && ( nearPoint.y <= 1.0f );
+
+		Log( "encounterviewscale: a ship brought to " + nearDistance.ToString( "F0" ) + " away, 4 s later: viewport " + nearPoint + ", the camera " + ( (float) GetField( encounter, "m_currentOffset" ) ).ToString( "F0" ) + " above the ship" );
+
+		if ( pictureFolder != "" )
+		{
+			RenderCameraPicture( Camera.main, System.IO.Path.Combine( pictureFolder, "2-ship-in-range.png" ) );
+		}
+
+		Check( "encounterviewscale: an alien ship within the fire range is in view", ( nearDistance < 1000.0f ) && nearInView, "distance " + nearDistance.ToString( "F0" ) + ", viewport " + nearPoint );
+
+		// ---- the ships are drawn twice as large in the encounter, and the player ship has its own size again after it
+		LeaveEncounter();
+
+		yield return Frames( 10 );
+
+		var afterScale = controller.m_playerShip.m_ship.localScale;
+
+		Log( "encounterviewscale: the player ship's scale in flight " + flightScale + ", in the encounter " + encounterScale + ", after it " + afterScale + "; the first alien model " + alienScale + " (its template " + templateScale + ")" );
+
+		Check( "encounterviewscale: the player ship is drawn twice as large in the encounter", Vector3.Distance( encounterScale, flightScale * 2.0f ) < 0.001f, flightScale + " -> " + encounterScale );
+		Check( "encounterviewscale: an alien ship is drawn twice as large as its template", Mathf.Abs( alienScale - templateScale * 2.0f ) < 0.001f, alienScale + " for a template of " + templateScale );
+		Check( "encounterviewscale: the player ship has its own size again once the encounter is over", Vector3.Distance( afterScale, flightScale ) < 0.001f, afterScale + " (in flight " + flightScale + ")" );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

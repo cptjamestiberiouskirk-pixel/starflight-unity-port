@@ -39,6 +39,14 @@ public class Encounter : MonoBehaviour
 	const float c_backdropRadiusPerScale = 8.0f;
 	const float c_backdropDepth = 600.0f;
 
+	// the ships are drawn larger in an encounter than in flight, as the original draws its ship icons at about a sixteenth of the view's height while the camera
+	// is high enough to show the aliens' fire range; only the models are larger: where the ships are, and every range, stay as they are
+	public const float c_shipViewScale = 2.0f;
+
+	// the player ship's own scale, kept while it is drawn larger in an encounter
+	Vector3 m_playerShipScale;
+	bool m_playerShipScaled;
+
 	// the race models
 	public GameObject[] m_alienRaceModelList;
 
@@ -516,6 +524,13 @@ public class Encounter : MonoBehaviour
 	// sources do not say)
 	const float c_salvageRange = 64.0f;
 
+	// how far away an alien ship can fire on the player
+	const float c_alienFireRange = 1000.0f;
+
+	// the camera frames the alien ships out to this distance from the player and no further: the original shows an encounter at a fixed scale, and ships
+	// farther away come into view as they close in (framing every ship of the encounter took the camera so high that the ships were specks)
+	const float c_cameraViewRange = c_alienFireRange;
+
 	void UpdateSalvage()
 	{
 		if ( ( m_pdEncounter == null ) || m_pdEncounter.m_connected )
@@ -654,6 +669,14 @@ public class Encounter : MonoBehaviour
 			CombatController.m_instance.ClearMissiles();
 		}
 
+		// the player ship goes back to its own size
+		if ( m_playerShipScaled && ( SpaceflightController.m_instance != null ) )
+		{
+			SpaceflightController.m_instance.m_playerShip.m_ship.localScale = m_playerShipScale;
+
+			m_playerShipScaled = false;
+		}
+
 		// hide the encounter objects
 		gameObject.SetActive( false );
 
@@ -700,6 +723,16 @@ public class Encounter : MonoBehaviour
 
 		// update the player rotation
 		SpaceflightController.m_instance.m_playerShip.m_ship.rotation = newRotation;
+
+		// draw the player ship at the encounter's scale (its own scale is kept for when the encounter ends)
+		if ( !m_playerShipScaled )
+		{
+			m_playerShipScale = SpaceflightController.m_instance.m_playerShip.m_ship.localScale;
+
+			SpaceflightController.m_instance.m_playerShip.m_ship.localScale = m_playerShipScale * c_shipViewScale;
+
+			m_playerShipScaled = true;
+		}
 
 		// unfreeze the player
 		SpaceflightController.m_instance.m_playerShip.Unfreeze();
@@ -1142,6 +1175,9 @@ public class Encounter : MonoBehaviour
 				}
 
 				var clonedAlienShipModel = Instantiate( alienShipModelTemplate, alienShipModelTemplate.transform.localPosition, alienShipModelTemplate.transform.localRotation, alienShipModel.transform );
+
+				// drawn at the encounter's scale, as the player ship is
+				clonedAlienShipModel.transform.localScale *= c_shipViewScale;
 
 				clonedAlienShipModel.SetActive( true );
 
@@ -2442,7 +2478,7 @@ public class Encounter : MonoBehaviour
 
 				// check range
 				float distance = Vector3.Distance( alienShip.m_coordinates, playerData.m_general.m_coordinates );
-				if ( distance < 1000.0f )
+				if ( distance < c_alienFireRange )
 				{
 					eligibleShips.Add( i );
 				}
@@ -2582,9 +2618,9 @@ public class Encounter : MonoBehaviour
 			}
 		}
 
-		// add some space around the extents
-		xExtent += 192.0f;
-		zExtent += 192.0f;
+		// frame no farther than the view range, then add some space around the extents
+		xExtent = Mathf.Min( xExtent, c_cameraViewRange ) + 192.0f;
+		zExtent = Mathf.Min( zExtent, c_cameraViewRange ) + 192.0f;
 
 		// recalculate what the camera distance from the zero plane should be
 		var verticalFieldOfView = SpaceflightController.m_instance.m_viewport.m_camera.fieldOfView * Mathf.Deg2Rad;
