@@ -159,6 +159,7 @@ The project features a **deterministic visualization system** that renders plane
 - A quarter of the planets hold random ruins: ancient crystal ruins with Endurium or truly amazing artifacts, and Old Empire ruins with artifacts
 - Destroyed ships leave debris the ship can salvage by flying over it
 - The science officer's skill decides how much of an analysis is known, and a planet's reading is analyzed once
+- The bank pays the original's 12% interest a year on the balance, when the crew goes aboard at the Starport and on a new colony recommendation, with an Interest row in the ledger
 - Hits damage the ship's systems (engines, sensors, comm, shield generator, missile launcher, laser cannon) as well as the hull, and damaged systems work in proportion to their health; Damage shows the original's DAMAGE display, a bar for the hull and each system, and the engineer repairs them worst first with minerals from the hold
 - The game can be won: destroying the Crystal Planet ends the flares, and Interstel pays its 500,000 MU bonus and its supplemental evaluation at the Starport
 - Arth's sun flares on 01-01-4621 unless the game has been won: the Starport is destroyed, and a ship in Arth's system is incinerated

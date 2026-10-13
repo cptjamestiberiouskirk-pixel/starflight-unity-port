@@ -204,12 +204,13 @@ What the probe does:
 | `floaters` | lifeforms that float (lf-behav.txt FLOAT): every planet's species (floating plants drift, some animals float, none flies as well), a floating plant on planet 92 floats up as it moves, the weapons and the cargo pass over it, and stunned it comes down and the weapons find it again (control) (about 35 s) |
 | `lifeformdata` | recording lifeform data on planet 92: Cargo beside a plant offers it and Record collects its data (a new class, worth 50 and the plant's bonus), the same species again (worth nothing), a test animal beside the vehicle that wanders off (it got away), and the payment at the Starport (about 50 s) |
 | `capture` | capturing a lifeform on planet 92: Cargo beside a living plant offers Capture, Record and Ignore, the capture puts it in stasis in the terrain vehicle's hold (off the surface, worth five times its data), Cargo beside a dead lifeform offers only Record, and back in the ship the specimen goes into the ship's hold (about 50 s) |
+| `starport-interest` | the bank's interest: less than 1 M.U. pays nothing and the days count on, 100 M.U. over 250 days earn 10 with an Interest row, a recommendation starts the count again, a save file from before the interest counts from today, and going aboard through the real docking bay pays 6,000 on 100,000 M.U. for 150 days (about 20 s) |
 | `starport-specimens` | a specimen in the ship's hold is listed for sale at the Trade Depot under Specimens, and selling it pays its value and frees its room (about 25 s) |
 | `lifeformmodels` | the lifeform models: every body plan's prefab is in `Resources/Lifeforms` and fits a cube of one unit, the snake lies along +Z (the models face +Z), and on planet 92 every lifeform is its model, its skin in the species colour, standing on the ground (about 40 s) |
 | `lifeformpictures` | with `-Graphics`, renders the game view of planet 92 with the planet's lifeforms, then with all 17 models in a ring around the terrain vehicle, and a close-up of each model, into `Logs/lifeform-pictures/` (or `-probePictures`); without a graphics device it only lands (about 60 s) |
 | `look` | Look on planet 92 with one lifeform at a time beside the vehicle: a living plant (its body plan, not moving, alive), a test animal that wanders (wandering) and the plant made dead (dead) (about 40 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (162 scenarios, about 129 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (163 scenarios, about 129 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
