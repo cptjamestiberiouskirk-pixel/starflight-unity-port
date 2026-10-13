@@ -21,7 +21,7 @@ Not reported: art style, resolution, colours, fonts and 3D models.
 
 | | Items | FIXED | OPEN or PARTLY | Not a defect or owner's call |
 |---|---|---|---|---|
-| GAMEPLAY (with the items shared with the UI kit) | 52 | 28 | 20 | 4 |
+| GAMEPLAY (with the items shared with the UI kit) | 52 | 32 | 16 | 4 |
 | UI KIT | 41 | 0 | 40 | 1 |
 | The probe's pictures | 17 | 3 (PR 234) | 14 gaps | |
 
@@ -239,7 +239,7 @@ The doors are where the original's are (Operations upper left, Personnel top, Cr
 |---|---|---|---|
 | **The bank paid no interest.** The screen says INTEREST RATE: 12%, and the original's ledger has INTEREST rows (starflt_060). The original (`BANK-OV.c`, INT%) pays 12% a year of the balance for the days since it last paid (the balance times 12 over 100, then times the days over 300, each rounded down), when the crew goes aboard at the Starport (`PORTMENU-OV.c`, WEBA2) and on a new colony recommendation (`CAPTAIN.c`, which then starts the count again) | FIXED (the bank interest PR) | `PlayerData.PayInterest`, `PD_Bank.GetInterestDue`; the `starport-interest` probe scenario (CONFIRMED) | GAMEPLAY |
 | A colony recommendation's bonus or fine. The original books it in the ledger when the planet is recommended (`CAPTAIN.c`, WF292: T+BALANCE, then TRANSACT as BONUS or FINE, after the interest); the port pays it when the ship docks, with Interstel's evaluation (roadmap 1.3, PR 142) | OPEN | `PlayerData.cs` (the colony evaluations at docking); which planet field gives the original's amount (WE096, times 1000, at least 100) is not worked out (INFERRED) | GAMEPLAY |
-| The ledger's descriptions. The original has seven: FINE, SHIP CONFIGURATION, TRADE DEPOT, BONUS, PERSONNEL, INTEREST, GAME PURCHASE. The port writes "Lifeform data", "Mission completed" and "Colony bonus" (the original's BONUS) and "Colony fine", "Towing charges" and "Terrain vehicle replaced" (the original's FINE) | OPEN | `PlayerData.cs:157, 173, 225, 246`, `DistressYesButton.cs:42`, `DockingBay.cs:82`; `data.h` BANKTRANS_STRINGS (CONFIRMED) | GAMEPLAY |
+| The ledger's descriptions. The original has seven: FINE, SHIP CONFIGURATION, TRADE DEPOT, BONUS, PERSONNEL, INTEREST, GAME PURCHASE. The port wrote "Lifeform data", "Mission completed" and "Colony bonus" (the original's BONUS) and "Colony fine", "Towing charges" and "Terrain vehicle replaced" (the original's FINE) | FIXED (the ledger names PR): Bonus and Fine as the original books them (the win in DPART-OV, a colony evaluation in CAPTAIN, the supplemental evaluations in OP-OV), and "Ship configuration" in sentence case; "Lifeform data" keeps its name, since the shipped game has no such payment (the 1984 notes, ruling D3) | `PlayerData.cs`, `DistressYesButton.cs`, `DockingBay.cs`; `data.h` BANKTRANS_STRINGS; the `colonies`, `distress`, `win` and `lava` probe checks (CONFIRMED) | GAMEPLAY |
 | AMT. as AMOUNT; dot leaders after the description ("GAME PURCHASE......") | OPEN, low priority | picture (CONFIRMED) | UI KIT |
 | The balance line: the original's "BALANCE......12000" and "( INTEREST RATE: 12% )", the port's "Your current balance is 1,000,000 M.U." | OPEN | `BankPanel.cs:56` (CONFIRMED); the 1,000,000 itself is the Editor's starting balance by design (`PD_Bank.GetStartingBalance`) | UI KIT |
 | PRESS SPACEBAR TO EXIT as an EXIT button | OPEN, low priority | picture (CONFIRMED) | UI KIT |
@@ -294,7 +294,7 @@ One small PR per item, gameplay first. Each documented in the screenshots or the
 4. **Combat messages and wounds** (section 12), from `DAMAGE-OV.c`.
 5. **MOTION DETECTED AT X: Y:** (section 11), from `HYPERMSG-OV.c`.
 6. **The shields and weapons messages** (section 2), from `NAVIGATR.c`.
-7. Smaller: the temperature range (7), the analysis heading's colon (7), the orbit lines scrolling on (5), the crosshair's start (8), Look's temperature and hydrosphere (10), the weather as the first line on the surface (10), the bank's transaction names (21), Personnel's number of training sessions (19), the terrain vehicle's distance to the ship (10, once the scale is checked).
+7. Smaller: the temperature range (7), the analysis heading's colon (7), the orbit lines scrolling on (5), the crosshair's start (8), Look's temperature and hydrosphere (10), the weather as the first line on the surface (10), Personnel's number of training sessions (19), the terrain vehicle's distance to the ship (10, once the scale is checked).
 8. **The probe's pictures**: the missing screens of section 25, the landing map after the crosshair is placed, the encounter with the aliens in view, so that the next comparison can see them.
 
 The UI kit items are left to the UI kit's work. Two items are the owner's call: the security code (D4) and the Ship's Log as a menu.

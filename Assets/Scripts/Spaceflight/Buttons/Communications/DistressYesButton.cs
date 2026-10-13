@@ -39,7 +39,8 @@ public class DistressYesButton : ShipButton
 		var fine = playerData.GetTowingFine();
 
 		playerData.m_bank.m_currentBalance -= fine;
-		playerData.m_bank.m_transactionList.Add( new PD_Bank.Transaction( playerData.m_general.m_currentStardateYMD, "Towing charges", fine + "-" ) );
+		// a FINE in the original's ledger, like every supplemental evaluation's (OP-OV in the decompiled original, transaction type 0)
+		playerData.m_bank.m_transactionList.Add( new PD_Bank.Transaction( playerData.m_general.m_currentStardateYMD, "Fine", fine + "-" ) );
 
 		var towingCharges = DataController.m_instance.m_gameData.FindStoryText( "TowingCharges" );
 
