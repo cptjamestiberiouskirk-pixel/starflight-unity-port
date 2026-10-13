@@ -1139,6 +1139,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLightMode();
 				break;
 
+			case "scifibuttons":
+				yield return ScenarioSciFiButtons();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -29297,6 +29301,104 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lightmode: back in the dark mode the buttons have the dark mode's tints again (the light mode gives several roles one colour)", ColorUtility.ToHtmlStringRGB( panelButtonColourAfterClick ) == ColorUtility.ToHtmlStringRGB( darkTheme.m_backgroundRaised ), ColorUtility.ToHtmlStringRGB( panelButtonColourAfterClick ) );
 
 		Finish( "scenario=lightmode checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioSciFiButtons()
+	{
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+
+		EnsureCrew();
+
+		controller.m_encounterRange = 0.0f;
+
+		buttonController.ChangeButtonSet( ButtonController.ButtonSet.Bridge );
+		PressButton( ButtonController.ButtonSet.Bridge, 1 );
+
+		yield return Frames( 10 );
+
+		// the console: a sci-fi button behind each row with a button, and the highlight in the same shape (found by name, so the old code is checked the same way)
+		var rowButtons = 0;
+		var rowsShown = 0;
+
+		foreach ( var image in buttonController.GetComponentsInChildren<UnityEngine.UI.Image>( true ) )
+		{
+			if ( image.gameObject.name.StartsWith( "UI Kit Row Button" ) && ( image.sprite != null ) && ( image.sprite.name == "UI Kit - Button" ) && ( image.transform.Find( "UI Kit Button Frame" ) != null ) )
+			{
+				rowButtons++;
+
+				if ( image.gameObject.activeInHierarchy )
+				{
+					rowsShown++;
+				}
+			}
+		}
+
+		var highlightSprite = ( buttonController.m_selectionHighlight.sprite != null ) ? buttonController.m_selectionHighlight.sprite.name : "(none)";
+
+		// (where each row's text and button are on the screen)
+		var places = new List<string>();
+
+		for ( var i = 0; i < buttonController.m_buttonLabelList.Length; i++ )
+		{
+			var label = buttonController.m_buttonLabelList[ i ];
+			var rowName = "UI Kit Row Button " + i;
+			var rowTransform = Array.Find( buttonController.transform.root.GetComponentsInChildren<RectTransform>( true ), t => t.name == rowName );
+
+			label.ForceMeshUpdate();
+
+			var textMiddle = label.rectTransform.TransformPoint( new Vector3( 0.0f, label.textBounds.center.y, 0.0f ) ).y;
+			var boxMiddle = label.rectTransform.TransformPoint( label.rectTransform.rect.center ).y;
+			var rowMiddle = ( rowTransform != null ) ? rowTransform.TransformPoint( rowTransform.rect.center ).y : float.NaN;
+
+			places.Add( i + ": text " + textMiddle.ToString( "F1" ) + " box " + boxMiddle.ToString( "F1" ) + " row " + rowMiddle.ToString( "F1" ) + " (\"" + label.text + "\")" );
+		}
+
+		Log( "scifibuttons places: " + string.Join( " | ", places ) );
+
+		// the save panel: its buttons are sci-fi buttons with a frame
+		PressEscape();
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var resume = PanelController.m_instance.m_saveGamePanel.m_resumeButton;
+		var resumeImage = resume.targetGraphic as UnityEngine.UI.Image;
+		var resumeSprite = ( ( resumeImage != null ) && ( resumeImage.sprite != null ) ) ? resumeImage.sprite.name : "(none)";
+		var resumeFrame = resume.transform.Find( "UI Kit Button Frame" );
+		var darkFrameColour = ( resumeFrame != null ) ? ColorUtility.ToHtmlStringRGB( resumeFrame.GetComponent<UnityEngine.UI.Image>().color ) : "(none)";
+
+		// the frame takes the light mode's accent colour by itself
+		var themeType = typeof( UIKitTheme );
+		var setMode = themeType.GetMethod( "SetMode" );
+		var modeType = themeType.GetNestedType( "Mode" );
+		var lightFrameColour = "(none)";
+		var lightAccent = "(none)";
+
+		if ( ( setMode != null ) && ( modeType != null ) && ( resumeFrame != null ) )
+		{
+			setMode.Invoke( null, new object[] { Enum.Parse( modeType, "Light" ), false } );
+
+			yield return Frames( 5 );
+
+			lightFrameColour = ColorUtility.ToHtmlStringRGB( resumeFrame.GetComponent<UnityEngine.UI.Image>().color );
+			lightAccent = ColorUtility.ToHtmlStringRGB( UIKitTheme.Get().m_borderAccent );
+
+			setMode.Invoke( null, new object[] { Enum.Parse( modeType, "Dark" ), false } );
+
+			yield return Frames( 5 );
+		}
+
+		PressEscape();
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		Log( "scifibuttons: " + rowButtons + " row buttons, " + rowsShown + " shown | highlight " + highlightSprite + " | resume " + resumeSprite + " frame " + darkFrameColour + " then " + lightFrameColour + " (light accent " + lightAccent + ")" );
+
+		Check( "scifibuttons: each of the console's six rows has a sci-fi button, shown where the row has a button (Science has four), and the highlight has the same shape", ( rowButtons == 6 ) && ( rowsShown == 4 ) && ( highlightSprite == "UI Kit - Button" ), rowButtons + " / " + rowsShown + " / " + highlightSprite );
+		Check( "scifibuttons: the save panel's buttons are sci-fi buttons with a frame", ( resumeSprite == "UI Kit - Button" ) && ( resumeFrame != null ), resumeSprite );
+		Check( "scifibuttons: a button's frame takes the light mode's accent colour", ( lightFrameColour == lightAccent ) && ( lightFrameColour != "(none)" ), lightFrameColour + " / " + lightAccent );
+
+		Finish( "scenario=scifibuttons checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
