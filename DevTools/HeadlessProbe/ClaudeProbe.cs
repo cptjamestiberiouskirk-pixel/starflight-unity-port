@@ -973,6 +973,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioPostureEffects();
 				break;
 
+			case "phraselimit":
+				yield return ScenarioPhraseLimit();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -19436,6 +19440,7 @@ public class ClaudeProbe : MonoBehaviour
 		yield return MeetAndConnect( thrynnId, GD_Comm.Stance.Friendly, thrynnSaid );
 
 		SetEncounterField( "m_alienPhrasesLeft", 1 );
+		SetEncounterField( "m_alienPhraseLimit", EncounterField( "m_alienPhrases", 0 ) + 1 );
 
 		yield return LetAliensSpeak( 2, thrynnSaid );
 
@@ -24959,6 +24964,79 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "postureeffects: the player who hails first has each posture's full effect once: friendly -8, hostile 20, and nothing for a posture used before, as the original", !aliensHailedFirst && ( afterFriendlyHail == thrynnStart - 8.0f ) && ( afterHostile == afterFriendlyHail + 20.0f ) && ( afterRepeats == afterHostile ), thrynnStart + " " + afterFriendlyHail + " " + afterHostile + " " + afterRepeats );
 
 		Finish( "scenario=postureeffects", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 2: how long the aliens talk, by the shipped game's phrase limits
+
+	IEnumerator ScenarioPhraseLimit()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var said = new List<string>();
+
+		EnsureCrew();
+
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+
+		ship.m_armorPoints = 250;
+		ship.m_shieldPoints = 0;
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+
+		var encounterRange = SpaceflightController.m_instance.m_encounterRange;
+
+		SpaceflightController.m_instance.m_encounterRange = 0.0f;
+
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		// ---- 1. the limits drawn for each posture, 400 times each: grovelling 10 to 19, friendly 10 to 14, neutral 5 to 9, hostile 4 to 6
+		var ranges = new Dictionary<GD_Comm.Stance, string>();
+		var rangeSummary = "";
+
+		foreach ( var posture in new[] { GD_Comm.Stance.Obsequious, GD_Comm.Stance.Friendly, GD_Comm.Stance.Neutral, GD_Comm.Stance.Hostile } )
+		{
+			var lowest = int.MaxValue;
+			var highest = int.MinValue;
+
+			for ( var i = 0; i < 400; i++ )
+			{
+				var limit = (int) Call( encounter, "GetPhraseLimit", posture );
+
+				lowest = Mathf.Min( lowest, limit );
+				highest = Mathf.Max( highest, limit );
+			}
+
+			ranges[ posture ] = lowest + "-" + highest;
+			rangeSummary += posture + " " + ranges[ posture ] + " ";
+		}
+
+		// ---- 2. the Thrynn in a comm link: a change of their mood (the player's friendly statement) draws their limit again; the aliens talking does not
+		yield return MeetAndConnect( FindEncounter( 1, 6, 3, 0, GameData.Race.Thrynn ), GD_Comm.Stance.Friendly, said );
+
+		SetEncounterField( "m_alienPhraseLimit", 99 );
+
+		yield return LetAliensSpeak( 1, said );
+
+		var limitAfterTalk = EncounterField( "m_alienPhraseLimit", -1 );
+
+		new StatementButton().Execute();
+		yield return Frames( 2 );
+
+		var limitAfterStatement = EncounterField( "m_alienPhraseLimit", -1 );
+		var thrynnPosture = Call( encounter, "GetAlienTalkStance" ).ToString();
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		SpaceflightController.m_instance.m_encounterRange = encounterRange;
+
+		Log( "phraselimit: drawn " + rangeSummary + " | thrynn limit after talking " + limitAfterTalk + ", after a statement " + limitAfterStatement + " (" + thrynnPosture + ")" );
+
+		Check( "phraselimit: the aliens' phrase limits are the shipped game's: grovelling 10 to 19, friendly 10 to 14, neutral 5 to 9, hostile 4 to 6", ( ranges[ GD_Comm.Stance.Obsequious ] == "10-19" ) && ( ranges[ GD_Comm.Stance.Friendly ] == "10-14" ) && ( ranges[ GD_Comm.Stance.Neutral ] == "5-9" ) && ( ranges[ GD_Comm.Stance.Hostile ] == "4-6" ), rangeSummary );
+		Check( "phraselimit: a change of the aliens' mood draws their phrase limit again, as the original", ( limitAfterStatement >= 4 ) && ( limitAfterStatement <= 19 ), limitAfterStatement.ToString() );
+		Check( "phraselimit: the aliens talking does not draw their phrase limit again, only a change of their mood does, as the original", limitAfterTalk == 99, limitAfterTalk.ToString() );
+
+		Finish( "scenario=phraselimit", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

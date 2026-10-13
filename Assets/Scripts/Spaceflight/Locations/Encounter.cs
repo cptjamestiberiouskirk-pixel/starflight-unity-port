@@ -819,7 +819,8 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_aliensAreCowardly = false;
 			m_pdEncounter.m_specialQuestionAsked = false;
 			m_pdEncounter.m_moodSet = false;
-			m_pdEncounter.m_alienPhrasesLeft = 0;
+			m_pdEncounter.m_alienPhrases = 0;
+			m_pdEncounter.m_alienPhraseLimit = 0;
 			m_pdEncounter.m_playerPhrases = 0;
 			m_pdEncounter.m_playerHailedFirst = false;
 			m_pdEncounter.m_playerPostures = 0;
@@ -2219,8 +2220,8 @@ public class Encounter : MonoBehaviour
 						// the aliens will have said something
 						aliensSaidSomething = true;
 
-						// one phrase fewer left to say
-						m_pdEncounter.m_alienPhrasesLeft--;
+						// one phrase more said in this comm link
+						m_pdEncounter.m_alienPhrases++;
 
 						// was there a pending question from the player?
 						if ( ( m_pdEncounter.m_lastSubjectFromPlayer >= GD_Comm.Subject.Themselves ) && ( m_pdEncounter.m_lastSubjectFromPlayer <= GD_Comm.Subject.TheAncients ) )
@@ -2943,6 +2944,9 @@ public class Encounter : MonoBehaviour
 		EnsureMood( personality );
 
 		m_pdEncounter.m_mood = Mathf.Clamp( m_pdEncounter.m_mood + delta, 0.0f, 100.0f );
+
+		// the shipped game draws the aliens' phrase limit again for their posture whenever their mood changes (COMM-OV +!EDL, EDL>POSTURE, GET-PHRASE-LIMIT)
+		DrawPhraseLimit();
 	}
 
 	// the player's Yes or No moves the aliens' mood by the change their question has for it (COMM-OV YES>EDL and NO-EDL: Velox "Of course Veloxi are superior all
@@ -2962,29 +2966,50 @@ public class Encounter : MonoBehaviour
 		}
 	}
 
-	// how many phrases the aliens say before they are tired of talking: "a random number in the range determined by the alien's initial posture" (compart.txt 11)
+	// how many phrases the aliens say in a comm link before they are tired of talking, drawn for their posture: grovelling 10 to 19, friendly 10 to 14, neutral 5 to 9,
+	// hostile 4 to 6 (COMM-OV GET-PHRASE-LIMIT: OP#, FP#, NP#, HP# and RRND)
 	static int GetPhraseLimit( GD_Comm.Stance posture )
 	{
 		switch ( posture )
 		{
 			case GD_Comm.Stance.Obsequious:
-				return Random.Range( 10, 21 );
+				return Random.Range( 10, 20 );
 
 			case GD_Comm.Stance.Friendly:
-				return Random.Range( 5, 16 );
+				return Random.Range( 10, 15 );
 
 			case GD_Comm.Stance.Hostile:
-				return Random.Range( 2, 6 );
+				return Random.Range( 4, 7 );
 		}
 
-		return Random.Range( 3, 9 );
+		return Random.Range( 5, 10 );
 	}
 
-	// true once aliens with a personality have said all their phrases - never a home fleet, whose talk ends with its last warning (it attacks then; a Veloxi fleet
-	// hailed first has its refusal and four hails to give)
+	// draws the phrase limit of aliens with a personality for the posture they are in now
+	void DrawPhraseLimit()
+	{
+		if ( AlienPersonality.Find( m_gdEncounter.m_race ) != null )
+		{
+			m_pdEncounter.m_alienPhraseLimit = GetPhraseLimit( GetAlienTalkStance() );
+		}
+	}
+
+	// true once aliens with a personality have said as many phrases in this comm link as their limit (COMM-OV ?TIRED-OF-TALKING) - never a home fleet, whose talk
+	// ends with its last warning (it attacks then; a Veloxi fleet hailed first has its refusal and four hails to give)
 	bool IsTiredOfTalking()
 	{
-		return ( AlienPersonality.Find( m_gdEncounter.m_race ) != null ) && ( m_pdEncounter.m_alienPhrasesLeft <= 0 ) && !IsHomeFleet();
+		if ( ( AlienPersonality.Find( m_gdEncounter.m_race ) == null ) || IsHomeFleet() )
+		{
+			return false;
+		}
+
+		// a save file written before the limit was kept has none yet
+		if ( m_pdEncounter.m_alienPhraseLimit <= 0 )
+		{
+			DrawPhraseLimit();
+		}
+
+		return m_pdEncounter.m_alienPhrases >= m_pdEncounter.m_alienPhraseLimit;
 	}
 
 	// true if the aliens transmit rather than talk: the Minstrels' song, the Nomad probe's planetary data, the Noah 9 derelict's recorded message and the Mysterions'
@@ -3904,11 +3929,11 @@ public class Encounter : MonoBehaviour
 			SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Comm );
 		}
 
-		// aliens with a personality say only so many phrases, picked by their posture as the conversation begins (compart.txt 11)
-		if ( AlienPersonality.Find( m_gdEncounter.m_race ) != null )
-		{
-			m_pdEncounter.m_alienPhrasesLeft = GetPhraseLimit( GetAlienTalkStance() );
-		}
+		// aliens with a personality say only so many phrases in a comm link, drawn for their posture as it begins and again whenever their mood changes (COMM-OV
+		// GET-PHRASE-LIMIT)
+		m_pdEncounter.m_alienPhrases = 0;
+
+		DrawPhraseLimit();
 
 		// the first comm link with the Thrynn or the Elowan is remembered for the rest of the game
 		var playerGeneral = DataController.m_instance.m_playerData.m_general;
