@@ -34,6 +34,7 @@ public class TradeDepotPanel : Panel
 	public TextMeshProUGUI m_itemListText;
 	public TextMeshProUGUI m_volumeListText;
 	public TextMeshProUGUI m_unitValueListText;
+	public TextMeshProUGUI m_unitValueHeadingText;
 	public TextMeshProUGUI m_currentBalanceText;
 	public TextMeshProUGUI m_amountLabelText;
 	public TextMeshProUGUI m_errorMessageText;
@@ -552,6 +553,12 @@ public class TradeDepotPanel : Panel
 				m_welcomeGameObject.SetActive( false );
 				m_tradeGameObject.SetActive( true );
 
+				// the price column is what the Starport asks on the buy list and what it pays on the others, as the original's UNIT COST and UNIT VALUE (starflt_097, starflt_052)
+				if ( m_unitValueHeadingText != null )
+				{
+					m_unitValueHeadingText.text = ( ( m_currentState == State.BuyItem ) || ( m_currentState == State.BuyAmount ) ) ? "Unit Cost" : "Unit Value";
+				}
+
 				// get access to the game data
 				GameData gameData = DataController.m_instance.m_gameData;
 
@@ -868,7 +875,7 @@ public class TradeDepotPanel : Panel
 				m_unitValueListText.rectTransform.offsetMax = new Vector3( 0.0f, -textOffset, 0.0f );
 
 				// update bank balance amount
-				m_currentBalanceText.text = "Your account balance is: " + playerData.m_bank.m_currentBalance + " M.U.";
+				m_currentBalanceText.text = "Your account balance is: " + string.Format( "{0:n0}", playerData.m_bank.m_currentBalance ) + " M.U.";
 			}
 		}
 
@@ -1044,7 +1051,7 @@ public class TradeDepotPanel : Panel
 
 				if ( desiredAmount > maximumAmount )
 				{
-					SwitchToErrorMessageState( "Insufficent funds" );
+					SwitchToErrorMessageState( "Insufficient funds" );
 				}
 				else
 				{

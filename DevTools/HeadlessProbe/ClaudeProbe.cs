@@ -1105,6 +1105,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCombatMessages();
 				break;
 
+			case "starport-tradetexts":
+				yield return ScenarioStarportTradeTexts();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -28852,6 +28856,94 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		return null;
+	}
+
+	IEnumerator ScenarioStarportTradeTexts()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var depot = FindPanel<TradeDepotPanel>();
+		var shipConfiguration = FindPanel<ShipConfigurationPanel>();
+
+		// a balance with thousands, and an empty hold
+		playerData.m_bank.m_currentBalance = 1234567;
+
+		var ship = playerData.m_playerShip;
+
+		ship.m_elementStorage.m_elementList.Clear();
+		ship.m_artifactStorage.m_artifactList.Clear();
+		ship.m_numCargoPods = 16;
+		ship.RecalculateVolume();
+		ship.RecalculateVolumeUsed();
+
+		// the heading over the price column and the welcome text, found by name and words so that the old code is checked the same way
+		TMPro.TextMeshProUGUI heading = null;
+		TMPro.TextMeshProUGUI welcome = null;
+
+		foreach ( var text in depot.GetComponentsInChildren<TMPro.TextMeshProUGUI>( true ) )
+		{
+			if ( text.gameObject.name == "Unit Value Text" )
+			{
+				heading = text;
+			}
+
+			if ( text.text.StartsWith( "Welcome to the Trade Depot" ) )
+			{
+				welcome = text;
+			}
+		}
+
+		yield return OpenPanel( depot, "trade depot" );
+
+		var welcomeText = ( welcome != null ) ? welcome.text.Split( '\n' )[ 0 ].Trim() : "(none)";
+
+		Call( depot, "SwitchToBuyItemState", true );
+
+		yield return Frames( 2 );
+
+		var buyHeading = ( heading != null ) ? heading.text : "(none)";
+		var depotBalance = depot.m_currentBalanceText.text;
+
+		// ask for 5000 cubic meters of the first element (titanium, 480 each), more than the balance pays for
+		Call( depot, "SwitchToBuyAmountState" );
+
+		yield return Frames( 2 );
+
+		depot.m_amountInputField.text = "5000";
+
+		Call( depot, "OnEndEdit" );
+
+		yield return Frames( 2 );
+
+		var errorText = depot.m_errorMessageText.text;
+
+		// the sell list, with something in the hold to sell
+		playerData.m_playerShip.m_artifactStorage.m_artifactList.Clear();
+		playerData.m_playerShip.m_artifactStorage.Add( 1 );
+
+		Call( depot, "SwitchToSellItemState", true );
+
+		yield return Frames( 2 );
+
+		var sellHeading = ( heading != null ) ? heading.text : "(none)";
+
+		yield return ClosePanel( depot, "trade depot" );
+
+		yield return OpenPanel( shipConfiguration, "ship configuration" );
+
+		yield return Frames( 2 );
+
+		var shipBalance = shipConfiguration.m_currentBalanceText.text;
+
+		yield return ClosePanel( shipConfiguration, "ship configuration" );
+
+		Log( "starport-tradetexts: welcome \"" + welcomeText + "\" | buy heading \"" + buyHeading + "\" | sell heading \"" + sellHeading + "\" | error \"" + errorText + "\" | depot \"" + depotBalance + "\" | ship configuration \"" + shipBalance + "\"" );
+
+		Check( "starport-tradetexts: the buy list's price column is UNIT COST and the sell list's UNIT VALUE, as the original's", ( buyHeading == "Unit Cost" ) && ( sellHeading == "Unit Value" ), buyHeading + " / " + sellHeading );
+		Check( "starport-tradetexts: the welcome has no exclamation mark, as the original's WELCOME TO THE TRADE DEPOT", welcomeText == "Welcome to the Trade Depot", welcomeText );
+		Check( "starport-tradetexts: too little money says \"Insufficient funds\", spelt right", errorText == "Insufficient funds", errorText );
+		Check( "starport-tradetexts: the Trade Depot and Ship Configuration show the balance with thousands separators, as the Bank and Personnel do", depotBalance.Contains( string.Format( "{0:n0}", 1234567 ) ) && shipBalance.Contains( string.Format( "{0:n0}", 1234567 ) ), depotBalance + " / " + shipBalance );
+
+		Finish( "scenario=starport-tradetexts checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
