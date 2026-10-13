@@ -15946,6 +15946,18 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "cargodisplay: the cargo button shows the cargo display, with the element and the Hypercube in it", shownOnOpen && !vehicleShownOnOpen && labelsOnOpen.Contains( elementName ) && labelsOnOpen.Contains( "Hypercube" ) && valuesOnOpen.Contains( "3.0" ), shownOnOpen + "/" + vehicleShownOnOpen + " " + labelsOnOpen.Replace( '\n', '/' ) );
 
+		// each item with its value, as the original's list (starflt_190, 191: MOLYBDENUM 9.6 160): an element at what the Starport pays for a cubic meter of it,
+		// an artifact at its value
+		var elementValue = ElementSaleValue( elementId ).ToString();
+		var hypercubeValue = gameData.m_artifactList[ hypercubeId ].m_actualValue.ToString();
+		var valueRows = valuesOnOpen.Split( '\n' );
+		var elementRow = ( valueRows.Length > 2 ) ? valueRows[ 2 ] : "";
+		var hypercubeRow = ( valueRows.Length > 3 ) ? valueRows[ 3 ] : "";
+
+		Log( "cargodisplay: the element's row '" + elementRow + "' (worth " + elementValue + "), the Hypercube's '" + hypercubeRow + "' (worth " + hypercubeValue + ")" );
+
+		Check( "cargodisplay: each item is listed with its value, as the original's cargo list", elementRow.EndsWith( " " + elementValue ) && hypercubeRow.EndsWith( " " + hypercubeValue ), "'" + elementRow + "' | '" + hypercubeRow + "'" );
+
 		// ---- 2. an update with nothing changed takes no memory (the text is made again only when the hold changes), with the control that shows the measurement works
 		var controlBytes = AllocatedByTheControl();
 		var updateBytes = ( cargoDisplay == null ) ? -1 : Allocated( () => cargoDisplay.Update(), c_meterCalls );
