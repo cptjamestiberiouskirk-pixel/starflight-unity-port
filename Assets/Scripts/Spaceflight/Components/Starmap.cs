@@ -84,8 +84,9 @@ public class Starmap : MonoBehaviour
 		}
 	}
 
-	// shows the coordinates of the cursor and the fuel estimate: the Endurium the engines would use to fly there from where the ship is in hyperspace ("STARMAP -
-	// The fuel estimate will be working", alpha.txt - how it is shown is the port's choice)
+	// shows the original's bar (MAP-OV WE72B: POSITION, DESTINATION, DISTANCE, FUEL): the ship's place in hyperspace, the cursor's, the distance between them in
+	// whole coordinates, and the fuel estimate, the Endurium the engines would use to fly there ("STARMAP - The fuel estimate will be working", alpha.txt - its
+	// tenths are the port's)
 	void UpdateLabel()
 	{
 		var x = Mathf.RoundToInt( m_positionOffset.x / m_starmap.transform.localScale.x );
@@ -96,7 +97,8 @@ public class Starmap : MonoBehaviour
 		var distance = Vector2.Distance( new Vector2( x, y ), new Vector2( ship.x, ship.z ) );
 		var fuel = playerData.m_playerShip.GetFuelForDistance( distance );
 
-		m_label = x + "   " + y + "   Fuel " + fuel.ToString( "0.0", System.Globalization.CultureInfo.InvariantCulture );
+		// (the words shortened, so that the four fit on the one line above the main view)
+		m_label = "Pos " + Mathf.RoundToInt( ship.x ) + " " + Mathf.RoundToInt( ship.z ) + "   Dest " + x + " " + y + "   Dist " + Mathf.RoundToInt( distance ) + "   Fuel " + fuel.ToString( "0.0", System.Globalization.CultureInfo.InvariantCulture );
 
 		SpaceflightController.m_instance.m_viewport.UpdateLabel( m_label );
 	}
