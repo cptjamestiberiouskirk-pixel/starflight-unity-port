@@ -19,7 +19,7 @@ public class DistressButton : ShipButton
 		SpaceflightController.m_instance.m_messages.Clear();
 
 		// the original asks first, wherever the ship is (SHIPCON, TOW-US: "TRANSMIT EMERGENCY DISTRESS CALL / CONFIRM: [N Y]") - Yes sends it (DistressYesButton)
-		SpaceflightController.m_instance.m_messages.AddText( "<color=yellow>Transmit emergency distress call?</color>" );
+		SpaceflightController.m_instance.m_messages.AddText( "<color=yellow>Transmit emergency distress call\nConfirm?</color>" );
 
 		buttonController.ChangeButtonSet( ButtonController.ButtonSet.Distress );
 
