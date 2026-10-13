@@ -216,6 +216,7 @@ What the probe does:
 | `starport-training` | training asks how many sessions, as the original's HOW MANY TRAINING SESSIONS (0-N)?: for a human with no science and 11,700 M.U. the question offers 0 to 28 and trains nothing yet, three sessions train 27 points for 900 M.U., and asking for 999 trains the 25 left to the maximum of 250 (about 20 s) |
 | `motiondetected` | the radar reports motion through a skilled science officer only, as the original's (above 150): in dark hyperspace with an alien group in reach, a science officer of science 100 says nothing and one of 200 says "Motion detected." (about 20 s) |
 | `launchlines` | the launch from the Starport says the original's lines in its order, OPENING DOCKING BAY DOORS, COMMENCING LAUNCH SEQUENCE... with the countdown, LEAVING STARPORT..., ...STARPORT CLEAR and STANDING BY TO MANEUVER, and keeps the last three together in the window (about 50 s) |
+| `consolemenus` | the console's menu after a hail and after the launch, as the original's: a hail that is not answered at once leaves the communications officer's menu (HAIL, DISTRESS, BRIDGE) on the console, and the launch from the Starport ends on the captain's menu (about 60 s) |
 | `starport-noticetyping` | a notice typed out as the original's: a paragraph every 0.3 s without a press, Quit while it is typed ends it with NOTICE ABORTED and the screen stays, the newest notice aborted says NOTICE ABORTED then END OF NOTICES, and a second Quit leaves (about 25 s) |
 | `starport-interest` | the bank's interest: less than 1 M.U. pays nothing and the days count on, 100 M.U. over 250 days earn 10 with an Interest row, a recommendation starts the count again, a save file from before the interest counts from today, and going aboard through the real docking bay pays 6,000 on 100,000 M.U. for 150 days (about 20 s) |
 | `starport-specimens` | a specimen in the ship's hold is listed for sale at the Trade Depot under Specimens, and selling it pays its value and frees its room (about 25 s) |
@@ -237,7 +238,7 @@ What the probe does:
 | `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 | `combatmessages` | the combat messages are the original's: WEAPONS NOT ARMED, NO TARGET PRESENT, WEAPON NOT AVAILABLE and OUT OF FUEL! when a weapon cannot fire, nothing of the port's own when the player's shot hits, and LASER CLASS n (LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (190 scenarios, about 153 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (191 scenarios, about 154 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

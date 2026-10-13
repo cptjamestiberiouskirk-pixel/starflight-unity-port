@@ -1105,6 +1105,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCombatMessages();
 				break;
 
+			case "consolemenus":
+				yield return ScenarioConsoleMenus();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -28852,6 +28856,69 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		return null;
+	}
+
+	IEnumerator ScenarioConsoleMenus()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+
+		EnsureCrew();
+
+		// a hail that is not answered at once: Communications, Hail, Friendly
+		var encounterId = FindEncounterOfRace( GameData.Race.Elowan );
+
+		EnterEncounter( encounterId );
+
+		yield return Frames( 10 );
+
+		PressButton( ButtonController.ButtonSet.Bridge, 4 );
+
+		yield return Frames( 2 );
+
+		var commSet = buttonController.GetCurrentButtonSet();
+
+		PressButton( commSet, 0 );
+
+		yield return Frames( 2 );
+
+		var postureSet = buttonController.GetCurrentButtonSet();
+
+		PressButton( postureSet, 0 );
+
+		yield return Frames( 2 );
+
+		var afterHailSet = buttonController.GetCurrentButtonSet();
+		var afterHailOfficer = buttonController.m_currentOfficer.text;
+		var connected = controller.m_encounter.IsConnected();
+
+		// the launch from the Starport: Launch, Yes, and wait until the ship is out
+		controller.SwitchLocation( PD_General.Location.DockingBay );
+
+		yield return Frames( 10 );
+
+		PressButton( ButtonController.ButtonSet.CommandA, 0 );
+
+		yield return Frames( 2 );
+
+		PressButtonLabelled( ButtonController.ButtonSet.Launch, "Yes" );
+
+		yield return WaitForLocation( PD_General.Location.JustLaunched, 45.0f );
+
+		yield return Frames( 5 );
+
+		var afterLaunchLocation = playerData.m_general.m_location;
+		var afterLaunchSet = buttonController.GetCurrentButtonSet();
+		var afterLaunchOfficer = buttonController.m_currentOfficer.text;
+
+		Log( "consolemenus: hail - " + commSet + " then " + postureSet + ", after the hail " + afterHailSet + " \"" + afterHailOfficer + "\" connected " + connected + " | launch - " + afterLaunchLocation + ", " + afterLaunchSet + " \"" + afterLaunchOfficer + "\"" );
+
+		Check( "consolemenus: the setup hailed (Communications, then Hail, then a posture) and the aliens did not answer at once", ( ( commSet == ButtonController.ButtonSet.CommunicationsA ) || ( commSet == ButtonController.ButtonSet.CommunicationsB ) ) && ( ( postureSet == ButtonController.ButtonSet.Hail ) || ( postureSet == ButtonController.ButtonSet.Respond ) ) && !connected, commSet + " / " + postureSet + " / " + connected );
+		Check( "consolemenus: after a hail the console keeps the communications officer's menu (HAIL, DISTRESS, BRIDGE), as the original's", ( ( afterHailSet == ButtonController.ButtonSet.CommunicationsA ) || ( afterHailSet == ButtonController.ButtonSet.CommunicationsB ) ) && afterHailOfficer.StartsWith( "Officer" ), afterHailSet + " / " + afterHailOfficer );
+		Check( "consolemenus: after the launch from the Starport the console shows the captain's menu, as the original's", ( afterLaunchLocation == PD_General.Location.JustLaunched ) && ( afterLaunchSet == ButtonController.ButtonSet.CommandB ) && afterLaunchOfficer.StartsWith( "Captain" ), afterLaunchLocation + " / " + afterLaunchSet + " / " + afterLaunchOfficer );
+
+		Finish( "scenario=consolemenus checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
