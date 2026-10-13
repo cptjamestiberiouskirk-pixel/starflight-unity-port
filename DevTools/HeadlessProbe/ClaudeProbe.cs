@@ -1093,6 +1093,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioIntroPictures();
 				break;
 
+			case "savecoords":
+				yield return ScenarioSaveCoords();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -28556,6 +28560,45 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "intropictures: a picture of every page of the Intro", pictures.Count == 5, pictures.Count.ToString() );
 
 		Finish( "scenario=intropictures pictures=" + pictures.Count, 0 );
+	}
+
+	// a save slot in a star system gives the system's coordinates, as the coordinates above the main view do (Arth's system: 125, 100), not the ship's place inside
+	// the system taken for a place in hyperspace
+	IEnumerator ScenarioSaveCoords()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var panel = FindPanel<SaveGamePanel>();
+
+		EnsureCrew();
+
+		controller.m_encounterRange = 0.0f;
+
+		EnterStarSystem( gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		// the ship somewhere in the system, away from its middle
+		playerData.m_general.m_lastStarSystemCoordinates = new Vector3( 4000.0f, 0.0f, 2500.0f );
+
+		var slot = dataController.m_activeSaveGameSlotNumber;
+
+		dataController.m_playerDataList[ slot ] = playerData;
+
+		Call( panel, "UpdateDescriptions" );
+
+		var description = System.Text.RegularExpressions.Regex.Replace( panel.m_slotDescriptionText[ slot ].text, "<[^>]*>", "" ).Replace( "\n", " / " );
+		var arth = gameData.m_starList[ gameData.m_misc.m_arthStarId ];
+		var expected = "Coordinates: " + arth.m_xCoordinate + ", " + arth.m_yCoordinate;
+		var viewport = controller.m_viewport.m_label.text;
+
+		Log( "savecoords: in Arth's system (above the main view '" + viewport + "'): " + description );
+
+		Check( "savecoords: a slot in a star system gives the system's coordinates, as above the main view", description.Contains( "Star System" ) && description.Contains( expected ), description + " (expected '" + expected + "')" );
+
+		Finish( "scenario=savecoords checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

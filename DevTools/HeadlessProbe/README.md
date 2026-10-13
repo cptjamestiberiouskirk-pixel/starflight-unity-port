@@ -233,8 +233,9 @@ What the probe does:
 | `starport-preflight` | the docking bay's preflight check as the original's: an unread evaluation keeps the ship at the Starport (Report to Operations for evaluation), a dead crew member gets Report to Crew Assignment, no name and no engines are one line, and leaving with the evaluations read deletes the colony evaluations, after which none new has been filed (about 30 s) |
 | `flightpictures` | with `-Graphics`, the whole screen of the flight screens the other picture scenarios do not reach, in Arth's system: Science's and Navigation's menus with their officer label, the save panel opened with Escape and its Switch and Reset questions, combat in an encounter of Spemin scouts (Combat's menu, a laser shot, a missile), the starmap in hyperspace on the ship and with the cursor moved, Log Planet's question in orbit around planet 94 and Log Planet again after No, Land and the descent (just after Descend, after Autopilot engaged, after Topography net locked on, landed), and a Black Egg lying where the ship landed counting down as the ship goes back up into orbit (at 3, BOOM and after), into `Logs/screen-pictures/flight/` (20 pictures); without a graphics device it does nothing (about 60 s) |
 | `intropictures` | the Intro scene, loaded from the flight scene; with `-Graphics` each of its five pages fully faded in (the page timer stopped), into `Logs/screen-pictures/intro/` (5 pictures); without a graphics device it only checks that the Intro is reached (about 10 s) |
+| `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (187 scenarios, about 150 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (188 scenarios, about 151 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
