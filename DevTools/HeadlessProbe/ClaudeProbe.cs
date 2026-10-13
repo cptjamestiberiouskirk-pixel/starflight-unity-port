@@ -1085,6 +1085,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportPreflight();
 				break;
 
+			case "logplanet":
+				yield return ScenarioLogPlanet();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -28045,6 +28049,91 @@ public class ClaudeProbe : MonoBehaviour
 	static string PreflightText( DockingBayPanel dockingBay )
 	{
 		return dockingBay.m_errorText.text.Replace( "• ", "" ).Replace( "\n", " | " ).Trim();
+	}
+
+	// Log Planet as the original's (CAPTAIN (/LOG-PLAN)): a cleared window with only the question, the question again after No, THIS PLANET HAS ALREADY BEEN LOGGED
+	// for a planet recommended before (even after Interstel's evaluation, so it earns no second bonus), and THAT'S ARTH YOU FOOL! in orbit of Arth
+	IEnumerator ScenarioLogPlanet()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var bank = playerData.m_bank;
+		var asked = new bool[ 1 ];
+
+		EnsureCrew();
+
+		bank.m_currentBalance = 100000;
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		// Mardan 4, an optimal planet of Interstel's list (no encounter waits in its orbit)
+		var mardan = gameData.FindPlanetFromSun( 217, 88, 4 );
+
+		// ---- 1. No, then Log Planet again: the question again, on a cleared window
+		var saidFirst = new List<string>();
+
+		yield return LogAndRecommend( mardan, false, asked, null, saidFirst );
+
+		var askedFirst = asked[ 0 ];
+
+		yield return LogAndRecommend( mardan, false, asked );
+
+		var askedAgain = asked[ 0 ];
+
+		// the window while the question is up (then No)
+		new LogPlanetButton().Execute();
+
+		yield return Frames( 2 );
+
+		var windowAgain = MessageList();
+
+		if ( controller.m_buttonController.GetCurrentButtonSet() == ButtonController.ButtonSet.RecommendPlanet )
+		{
+			PressButton( ButtonController.ButtonSet.RecommendPlanet, 0 );
+
+			yield return Frames( 2 );
+		}
+
+		// ---- 2. Yes: recommended; evaluated at the Starport; then Yes again: already logged, no second bonus
+		yield return LogAndRecommend( mardan, true, asked, "" );
+
+		var askedThird = asked[ 0 ];
+
+		playerData.EvaluateColonyRecommendations();
+
+		var balanceBefore = bank.m_currentBalance;
+		var saidAfterEvaluation = new List<string>();
+
+		yield return LogAndRecommend( mardan, true, asked, "", saidAfterEvaluation );
+
+		var askedAfterEvaluation = asked[ 0 ];
+		var secondBonus = bank.m_currentBalance - balanceBefore;
+		var answerAfterEvaluation = ( saidAfterEvaluation.Count > 0 ) ? saidAfterEvaluation[ 0 ] : "";
+
+		// ---- 3. in orbit of Arth's planet
+		yield return GoIntoOrbit( gameData.m_misc.m_arthStarId, gameData.m_misc.m_arthPlanetId );
+
+		new LogPlanetButton().Execute();
+
+		yield return Frames( 2 );
+
+		var atArth = MessageList();
+		var setAtArth = controller.m_buttonController.GetCurrentButtonSet();
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "logplanet: first asked " + askedFirst + " (" + string.Join( " || ", saidFirst ) + ") | after No asked " + askedAgain + ", window '" + windowAgain + "' | Yes asked " + askedThird + " | after the evaluation asked " + askedAfterEvaluation + ", '" + answerAfterEvaluation + "', bank " + secondBonus + " | at Arth: '" + atArth + "' (" + setAtArth + ")" );
+
+		Check( "logplanet: Log Planet asks only the question, on a cleared window, as the original's RECOMMEND THIS PLANET FOR COLONIZATION?", askedFirst && askedAgain && ( windowAgain == "<color=white>Recommend this planet for colonization?</color>" ), "'" + windowAgain + "'" );
+		Check( "logplanet: after No the question comes again, as the original's", askedAgain && askedThird, askedAgain + ", " + askedThird );
+		Check( "logplanet: Yes for a planet recommended before says THIS PLANET HAS ALREADY BEEN LOGGED, and pays no second bonus", answerAfterEvaluation.Contains( "This planet has already been logged." ) && ( secondBonus <= 0 ), "'" + answerAfterEvaluation + "', bank " + secondBonus );
+		Check( "logplanet: in orbit of Arth it says THAT'S ARTH YOU FOOL! and asks nothing", atArth.Contains( "That's Arth you fool!" ) && ( setAtArth != ButtonController.ButtonSet.RecommendPlanet ), "'" + atArth + "', " + setAtArth );
+
+		Finish( "scenario=logplanet checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

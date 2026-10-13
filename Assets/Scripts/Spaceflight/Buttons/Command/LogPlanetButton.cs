@@ -56,6 +56,20 @@ public class LogPlanetButton : ShipButton
 			case PD_General.Location.Planetside:
 			case PD_General.Location.Disembarked:
 
+				// Arth itself is not a planet to recommend (CAPTAIN (/LOG-PLAN): "THAT'S ARTH YOU FOOL!")
+				if ( playerData.m_general.m_currentPlanetId == gameData.m_misc.m_arthPlanetId )
+				{
+					SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+					SpaceflightController.m_instance.m_messages.Clear();
+
+					SpaceflightController.m_instance.m_messages.AddText( "<color=white>That's Arth you fool!</color>" );
+
+					SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
+					break;
+				}
+
 				// get planet and star data
 				var planet = gameData.m_planetList[ playerData.m_general.m_currentPlanetId ];
 				var star = gameData.m_starList[ playerData.m_general.m_currentStarId ];
@@ -84,34 +98,21 @@ public class LogPlanetButton : ShipButton
 				// get stardate
 				var stardate = playerData.m_general.m_currentStardateDHMY;
 
-				// try to add to ship's log
-				bool wasAdded = playerData.m_shipsLog.AddPlanetLog( planet.m_id, stardate, planetName, message );
+				// the planet's data goes into the port's ship's log, once
+				playerData.m_shipsLog.AddPlanetLog( planet.m_id, stardate, planetName, message );
+
+				// the original clears the window and asks only whether to recommend the planet, every time (CAPTAIN (/LOG-PLAN): "RECOMMEND THIS PLANET FOR /
+				// COLONIZATION? [N Y]") - a planet recommended before is answered after Yes (RecommendYesButton)
+				s_commandButtonSet = SpaceflightController.m_instance.m_buttonController.GetCurrentButtonSet();
 
 				SpaceflightController.m_instance.m_messages.Clear();
+				SpaceflightController.m_instance.m_messages.AddText( "<color=white>Recommend this planet for colonization?</color>" );
 
-				if ( wasAdded )
-				{
-					// the original asks whether to recommend the planet that has just been logged (SS Log Planet: "Recommend this planet for colonization? <- N Y ->")
-					s_commandButtonSet = SpaceflightController.m_instance.m_buttonController.GetCurrentButtonSet();
+				SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 
-					SpaceflightController.m_instance.m_messages.AddText( "<color=green>Planet logged:</color>\n<color=white>" + planetName + "</color>" );
-					SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+				SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.RecommendPlanet );
 
-					SpaceflightController.m_instance.m_messages.AddText( "<color=white>Recommend this planet for colonization?</color>" );
-
-					SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.RecommendPlanet );
-
-					return false;
-				}
-				else
-				{
-					SpaceflightController.m_instance.m_messages.AddText( "<color=white>This planet has already been logged.</color>" );
-					SoundController.m_instance.PlaySound( SoundController.Sound.Error );
-				}
-
-				SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
-
-				break;
+				return false;
 		}
 
 		return false;
