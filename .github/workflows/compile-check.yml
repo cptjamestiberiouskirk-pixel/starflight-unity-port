@@ -77,8 +77,10 @@ jobs:
             Library-
 
       # Unity version comes from ProjectSettings/ProjectVersion.txt
+      # pinned to the commit of v4.4.0, since a tag can be moved and this step
+      # gets the Unity secrets; to update, look up the new release's commit
       - name: Compile (EditMode test run)
-        uses: game-ci/unity-test-runner@v4
+        uses: game-ci/unity-test-runner@32e57712352b500e17974b245a6dce9e11a73213 # v4.4.0
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
