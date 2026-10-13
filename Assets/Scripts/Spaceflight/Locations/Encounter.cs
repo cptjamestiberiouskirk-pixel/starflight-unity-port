@@ -1493,9 +1493,11 @@ public class Encounter : MonoBehaviour
 		UpdateAlienCombat();
 	}
 
-	// update encounter with gazurtoid
+	// update encounter with gazurtoid - their mood decides their posture (COMM-OV): abuse, and once it reaches 40, fight or flight
 	void UpdateGazurtoidEncounter()
 	{
+		UpdateMood();
+
 		DefaultEncounterUpdate();
 	}
 

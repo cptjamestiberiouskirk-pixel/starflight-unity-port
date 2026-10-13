@@ -57,6 +57,14 @@ public class AlienPersonality
 		m_friendlyEffect = 0.0f, m_hostileEffect = 0.0f, m_obsequiousEffect = 0.0f
 	};
 
+	// the Gazurtoid: never friendly nor diplomatic (AET = BET = 0), they talk abuse from the start and fight from 40, which a ship that meets them with its shields
+	// up and its weapons armed already brings; grovelling calms them a lot, hostility angers them a lot (EDL 26, AET 0, BET 0, CET 40, OPE -20, FPE 0, HPE 30)
+	static readonly AlienPersonality s_gazurtoid = new AlienPersonality
+	{
+		m_friendlyBelow = 0.0f, m_hostileFrom = 0.0f, m_fightFrom = 40.0f, m_startingMood = 26.0f,
+		m_friendlyEffect = 0.0f, m_hostileEffect = 30.0f, m_obsequiousEffect = -20.0f
+	};
+
 	// the races whose shipped starting posture is friendly: their mood (BASE-EDL) is below every threshold (the Mysterions 1 under 99, the Nomad probes 1 under
 	// 100, the Veloxi drones 1 under 98, the Minstrels 0 under 99, the Enterprise 48 under 99, the Noah 9 derelict 50 under 101) - the others start neutral, as
 	// they did (the Mechans are neutral in the shipped game too; the Gazurtoids' hostile posture is talk, which needs a mood of their own; the Uhlek fight)
@@ -101,6 +109,9 @@ public class AlienPersonality
 
 			case GameData.Race.Mechan:
 				return s_mechan;
+
+			case GameData.Race.Gazurtoid:
+				return s_gazurtoid;
 		}
 
 		return null;

@@ -133,6 +133,7 @@ What the probe does:
 | `phraselimit` | how long the aliens talk by the shipped game's phrase limits: 400 draws for each posture (grovelling 10 to 19, friendly 10 to 14, neutral 5 to 9, hostile 4 to 6), and in a Thrynn comm link the limit drawn again by a change of their mood and not by their talking (about 25 s) |
 | `alienwaiting` | how the aliens wait for the player by the shipped game's rules: a Thrynn hail without a reply three times and then nothing, two "waiting" lines after a Thrynn question without an answer ("You will pleasse answerrr."), and the question rates (Spemin 30, Mechans 70) (about 25 s) |
 | `heaven` | the Mechans' mood and the fleet at Heaven: one wrong answer worth 10 leaves Mechan scouts neutral, four right answers make the Heaven fleet friendly and unlock mechan 9, the ship goes back into orbit, and going into orbit there again meets no fleet (about 30 s) |
+| `gazurtoidmood` | the Gazurtoid's mood by the shipped game's numbers: met in peace they talk abuse and hold their fire (26), a grovelling hail calms them by 20, and met with the shields up and the weapons armed (41) they fight (about 25 s) |
 | `flaredata` | the flare day of the 36 stars that flared before the game began (negative, Earth's sun -60), the 234 still to flare (days 4 to 792, Arth 300) and their date fields in a calendar of 10 months of 30 days as controls, and the shine of Earth's sun (a stable sun) next to Arth's (about 35 s) |
 | `sunlife` | the living surface of the star system's sun: a small flare rises from the rim within 6 s and falls back, the size of the shine is untouched by it (control), and the sun takes nothing from the game's `Random` and no memory in a frame (control) |
 | `calendar` | the stardate texts of the clock in the original's calendar of 10 months of 30 days (day 0 as the control, the turn of a month, day 40, day 299, day 300, day 365), the day of Arth's flare against the date fields of its star, and a save made in the real-world calendar (bank, ship's log, current date) next to one made in the original's (the control) after loading (about 30 s) |
@@ -207,7 +208,7 @@ What the probe does:
 | `lifeformpictures` | with `-Graphics`, renders the game view of planet 92 with the planet's lifeforms, then with all 17 models in a ring around the terrain vehicle, and a close-up of each model, into `Logs/lifeform-pictures/` (or `-probePictures`); without a graphics device it only lands (about 60 s) |
 | `look` | Look on planet 92 with one lifeform at a time beside the vehicle: a living plant (its body plan, not moving, alive), a test animal that wanders (wandering) and the plant made dead (dead) (about 40 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (160 scenarios, about 127 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (161 scenarios, about 128 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
