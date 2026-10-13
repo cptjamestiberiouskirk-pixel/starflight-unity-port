@@ -18570,19 +18570,31 @@ public class ClaudeProbe : MonoBehaviour
 
 		var whole = SystemHealth();
 
-		// ---- 1. one hit of 50 (a fifth of the hull): the hull loses 50 and one system a fifth of itself
-		combat.ApplyDamageToPlayer( 50, Vector3.forward );
-
+		// ---- 1. one hit of 50 (a fifth of the hull): the hull loses 50 and one system a fifth of itself - a hit falls on the crew instead about once in
+		// seven since the combat wounds (DAMAGE-OV picks one of the fields), so the hit is made again on a whole ship until it falls on a system
 		var afterOne = SystemHealth();
 		var dropped = 0;
 		var totalDrop = 0;
 
-		for ( var system = 0; ( system < afterOne.Length ) && ( system < whole.Length ); system++ )
+		for ( var attempt = 0; ( attempt < 20 ) && ( dropped == 0 ); attempt++ )
 		{
-			if ( afterOne[ system ] < whole[ system ] )
+			ship.RestoreSystems();
+			ship.m_armorPoints = ship.GetMaximumArmorPoints();
+
+			whole = SystemHealth();
+
+			combat.ApplyDamageToPlayer( 50, Vector3.forward );
+
+			afterOne = SystemHealth();
+			totalDrop = 0;
+
+			for ( var system = 0; ( system < afterOne.Length ) && ( system < whole.Length ); system++ )
 			{
-				dropped++;
-				totalDrop += whole[ system ] - afterOne[ system ];
+				if ( afterOne[ system ] < whole[ system ] )
+				{
+					dropped++;
+					totalDrop += whole[ system ] - afterOne[ system ];
+				}
 			}
 		}
 
@@ -21356,6 +21368,22 @@ public class ClaudeProbe : MonoBehaviour
 		lifeform.position = vehicle + direction.normalized * distance + Vector3.up * 2.0f;
 	}
 
+	// every crew member's vitality set to this
+	static void SetCrewVitality( float vitality )
+	{
+		var crewAssignment = DataController.m_instance.m_playerData.m_crewAssignment;
+
+		for ( var role = PD_CrewAssignment.Role.First; role < PD_CrewAssignment.Role.Count; role++ )
+		{
+			var file = crewAssignment.GetPersonnelFile( role );
+
+			if ( file != null )
+			{
+				file.m_vitality = vitality;
+			}
+		}
+	}
+
 	IEnumerator ScenarioLifeBehaviour()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -21406,19 +21434,27 @@ public class ClaudeProbe : MonoBehaviour
 		var calmMoved = Vector3.Distance( placeBefore, lifeform.position );
 		var calmAttacked = MessageList().Contains( "being attacked" );
 
-		// ---- 2. made dangerous, it attacks the crew
-		crewMember.m_vitality = 100.0f;
+		// ---- 2. made dangerous, it attacks the crew (the whole crew at full vitality, and the attack read as soon as it comes: a dangerous lifeform attacks
+		// every half second, and a few unlucky blows used to kill the crew before the 4 s were up)
+		SetCrewVitality( 100.0f );
 
 		SetLifeformField( lifeform, "m_aggression", 95 );
 
 		controller.m_messages.Clear();
 
-		yield return new WaitForSecondsRealtime( 4.0f );
+		var attackEnd = Time.realtimeSinceStartup + 4.0f;
+
+		while ( ( Time.realtimeSinceStartup < attackEnd ) && !MessageList().Contains( "being attacked" ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 2 );
 
 		var attackMessages = MessageList();
 		var vitalityAfter = crewMember.m_vitality;
 
-		crewMember.m_vitality = 100.0f;
+		SetCrewVitality( 100.0f );
 
 		// ---- 3. made to move, and dangerous, 40 units away: it comes at the vehicle
 		SetLifeformField( lifeform, "m_movementRate", 3, true );
