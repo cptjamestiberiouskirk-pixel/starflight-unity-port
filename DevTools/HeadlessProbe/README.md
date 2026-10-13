@@ -94,6 +94,7 @@ What the probe does:
 | `statusdisplay` | the Status display in the original's words: a ship with no shields and no weapons reads Down and Unarmed, 20 cubic meters of Endurium read 20.00, the cargo a whole percent, and the damage the original's word at 100, 97, 85, 60, 30 and 10 percent of the hull (None to Critical) (about 30 s) |
 | `tvdisplay` | the terrain vehicle's display in the original's words: on planet 92, with the weather stopped, the date has no hour (`01-01-4620`) and the bearing to the ship is spelled out (`North`) (about 35 s) |
 | `tvdistance` | the terrain vehicle's distance to the ship in the original's kilometers along the ground: 30.3 km west reads 30 KM. East whatever the height, 20.3 km south reads 20 KM. North, and just out of the ship 4 KM. North (about 30 s) |
+| `reboard` | the terrain vehicle goes back into the ship on raised ground: on planet 94 (the ship at height 258.6), Move and Enter 1 km from the ship along the ground take it in, and 5 km away leave it out (the control) (about 40 s) |
 | `coordinatebar` | the coordinates above the main view after the terrain vehicle: on planet 92 they are its place, and back in orbit and in the star system, with the ship not moving, the ship's coordinates again (about 25 s) |
 | `landingsite` | where Select Site's crosshair starts, as the original's: a site chosen in orbit stays while the ship is in that orbit (the control), and is back at LAT 0 LONG 0 once the ship is in the star system or in hyperspace (about 20 s) |
 | `coordinates` | latitude and longitude as the original gives them: the terrain vehicle at 15 north, 30 west reads `15N x 30W` above the main view, and the landing map's LAT reads `15N` and LONG `30W` (about 35 s) |
@@ -244,7 +245,7 @@ What the probe does:
 | `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 | `combatmessages` | the combat messages are the original's: WEAPONS NOT ARMED, NO TARGET PRESENT, WEAPON NOT AVAILABLE and OUT OF FUEL! when a weapon cannot fire, nothing of the port's own when the player's shot hits, and LASER CLASS n (LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (197 scenarios, about 160 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (198 scenarios, about 161 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
