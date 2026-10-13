@@ -52,12 +52,18 @@ public static class PlanetWeather
 	static Sky s_sky = Sky.Clear;
 	static int s_rolledHour = -1;
 
-	// the terrain vehicle goes out: the first sky is rolled and shown
+	// the terrain vehicle goes out: the first sky is rolled and shown, alone in the text window, as the original's first line on the surface ("IT IS CLEAR.",
+	// starflt_179: the lines of the disembarking are gone by then)
 	public static void Begin()
 	{
 		s_rolledHour = GetGameHour();
 
 		Roll();
+
+		if ( SpaceflightController.m_instance != null )
+		{
+			SpaceflightController.m_instance.m_messages.Clear();
+		}
 
 		Show();
 	}

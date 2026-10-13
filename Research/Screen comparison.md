@@ -132,7 +132,7 @@ A vessel's reading matches the original's (mass, bio, energy, object constituent
 | The coordinates' order, with no "x" | FIXED | PR 215; picture "1S x 0E" (CONFIRMED) | GAMEPLAY |
 | The bearing to the ship abbreviated | FIXED | PR 218; picture "North" (CONFIRMED) | GAMEPLAY |
 | "SHIP 14 KM. North" with the ship's model just above the vehicle; the original shows "1KM." with the ship beside it (starflt_179) | OPEN | `TerrainVehicleDisplay.cs:124` (CONFIRMED, picture); that the scale is wrong is INFERRED | GAMEPLAY |
-| The weather is the first line on the surface in the original ("IT IS CLEAR.", alone in the window); the port writes it as a sixth line under the disembark lines | PARTLY | `PlanetWeather.cs:218` (PR 210); picture (CONFIRMED) | GAMEPLAY |
+| The weather is the first line on the surface in the original ("IT IS CLEAR.", alone in the window); the port wrote it as a sixth line under the disembark lines | FIXED (the weather line PR): the text window is cleared before the first sky | `PlanetWeather.Begin`; starflt_179; the `disembarklines` probe check (CONFIRMED) | GAMEPLAY |
 | Look: the port writes Surface, Weather, Sky, Atmosphere and Gravity; the original writes SKY, TEMPERATURE, GRAVITY, ATMO, HYDRO and TERRAIN (starflt_180): no temperature and no hydrosphere in the port | FIXED (the Look fields PR; the temperature is the planet's, the port has no regions) | `LookButton.cs:40` to `46` (INFERRED: code, no picture) | GAMEPLAY |
 | No CREW VITALITY box with dot leaders | OPEN | picture (CONFIRMED) | UI KIT |
 | MAP for MAPS, EFFICIENCY for EFF. | OPEN | `MapButton.cs:10`, `Spaceflight.unity:65137` (CONFIRMED) | UI KIT |
