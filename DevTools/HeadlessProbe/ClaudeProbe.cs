@@ -905,6 +905,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCoordinates();
 				break;
 
+			case "landingsite":
+				yield return ScenarioLandingSite();
+				break;
+
 			case "alienanalysis":
 				yield return ScenarioAlienAnalysis();
 				break;
@@ -23398,6 +23402,52 @@ public class ClaudeProbe : MonoBehaviour
 	}
 
 	// ---------------------------------------------------------------- phase 7: latitude and longitude as the original gives them
+
+	// ---------------------------------------------------------------- the screens' Step 2: where Select Site's crosshair starts (SITE-OV, WF014)
+
+	IEnumerator ScenarioLandingSite()
+	{
+		var general = DataController.m_instance.m_playerData.m_general;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		yield return EnterOrbit( 94 );
+
+		// a site chosen in this orbit stays while the ship is in it (the original keeps WEF1D and WEF9C)
+		general.m_selectedLatitude = 30.0f;
+		general.m_selectedLongitude = -20.0f;
+
+		controller.SwitchLocation( PD_General.Location.InOrbit );
+
+		yield return Frames( 5 );
+
+		var inOrbit = general.m_selectedLatitude + " " + general.m_selectedLongitude;
+
+		// leaving orbit for the star system: the next landing starts at LAT 0 LONG 0
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+
+		var inTheSystem = general.m_selectedLatitude + " " + general.m_selectedLongitude;
+
+		// and in hyperspace
+		general.m_selectedLatitude = 40.0f;
+		general.m_selectedLongitude = 10.0f;
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 5 );
+
+		var inHyperspace = general.m_selectedLatitude + " " + general.m_selectedLongitude;
+
+		Log( "landingsite: a site of 30 -20 chosen in orbit: still in orbit " + inOrbit + " | in the star system " + inTheSystem + " | 40 10, then hyperspace " + inHyperspace );
+
+		Check( "landingsite: within one orbit the last site chosen stays (control)", inOrbit == "30 -20", inOrbit );
+		Check( "landingsite: once the ship has left orbit, Select Site's crosshair starts in the middle of the map again, as the original's (DEPART, then SITE-OV WF014)", ( inTheSystem == "0 0" ) && ( inHyperspace == "0 0" ), inTheSystem + " | " + inHyperspace );
+
+		Finish( "scenario=landingsite orbit=" + inOrbit + " system=" + inTheSystem + " hyperspace=" + inHyperspace, 0 );
+	}
 
 	IEnumerator ScenarioCoordinates()
 	{

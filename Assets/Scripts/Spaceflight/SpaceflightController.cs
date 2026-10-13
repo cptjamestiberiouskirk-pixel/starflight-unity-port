@@ -336,6 +336,15 @@ public class SpaceflightController : MonoBehaviour
 			m_orbitPermissions.Clear();
 		}
 
+		// a ship in the star system or in hyperspace has left any orbit, and the next planet's landing site starts at LAT 0 LONG 0: the original's DEPART sets PLHI to
+		// -1 on leaving orbit, and Select Site then puts its crosshair in the middle of the map (SITE-OV in the decompiled original, WF014) - within one orbit the
+		// last site chosen stays
+		if ( ( newLocation == PD_General.Location.StarSystem ) || ( newLocation == PD_General.Location.Hyperspace ) )
+		{
+			playerData.m_general.m_selectedLatitude = 0.0f;
+			playerData.m_general.m_selectedLongitude = 0.0f;
+		}
+
 		// make sure the display is updated (in case we are loading from a save game)
 		m_messages.Refresh();
 
