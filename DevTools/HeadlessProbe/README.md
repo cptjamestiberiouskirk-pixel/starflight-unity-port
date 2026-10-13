@@ -217,8 +217,9 @@ What the probe does:
 | `lifeformpictures` | with `-Graphics`, renders the game view of planet 92 with the planet's lifeforms, then with all 17 models in a ring around the terrain vehicle, and a close-up of each model, into `Logs/lifeform-pictures/` (or `-probePictures`); without a graphics device it only lands (about 60 s) |
 | `look` | Look on planet 92 with one lifeform at a time beside the vehicle: a living plant (its body plan, not moving, alive), a test animal that wanders (wandering) and the plant made dead (dead) (about 40 s) |
 | `lookfields` | Look on planet 92 gives the original's fields in its order: Sky, Temperature and Gravity, Atmo, Hydro, Terrain, and no Weather (about 30 s) |
+| `encounterviewscale` | the encounter view at the original's scale: with the Mechans still far off the camera climbs no higher than framing the aliens' fire range needs, a ship brought within that range is in view, the ships are drawn twice as large in the encounter and the player ship has its own size again after it; pictures with `-Graphics` (Logs/screen-pictures/encounter-view) (about 30 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (171 scenarios, about 134 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (172 scenarios, about 135 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

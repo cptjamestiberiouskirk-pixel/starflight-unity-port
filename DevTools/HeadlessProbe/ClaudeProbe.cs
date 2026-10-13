@@ -1029,6 +1029,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLookFields();
 				break;
 
+			case "encounterviewscale":
+				yield return ScenarioEncounterViewScale();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -14322,13 +14326,16 @@ public class ClaudeProbe : MonoBehaviour
 
 			Check( "vessel " + vesselId + " (" + vesselName + ") gets a model in an encounter", hasModel, "model=" + ( ( model == null ) ? "none" : model.name ) );
 
-			// the smallest vessels are shown at 0.3 times the player ship (3.404 units long in its FBX, scale 15)
-			Check( "vessel " + vesselId + " is big enough to be seen (a quarter of the player ship or more)", longest >= 3.404f * 15.0f * 0.25f, "longest side=" + longest.ToString( "F1" ) );
+			// the smallest vessels are shown at 0.3 times the player ship (3.404 units long in its FBX, scale 15); an encounter draws every ship, the player's too,
+			// Encounter.c_shipViewScale times as large
+			Check( "vessel " + vesselId + " is big enough to be seen (a quarter of the player ship or more)", longest >= 3.404f * 15.0f * 0.25f * Encounter.c_shipViewScale, "longest side=" + longest.ToString( "F1" ) );
 
 			float expectedLength;
 
 			if ( c_shipModelLengths.TryGetValue( vesselId, out expectedLength ) )
 			{
+				expectedLength *= Encounter.c_shipViewScale;
+
 				Check( "vessel " + vesselId + " is " + expectedLength.ToString( "F1" ) + " units long", Mathf.Abs( longest - expectedLength ) <= expectedLength * 0.05f, "size=" + size.ToString( "F1" ) );
 				Check( "vessel " + vesselId + " is longest along its nose", size.z >= Mathf.Max( size.x, size.y ) * 0.999f, "size=" + size.ToString( "F1" ) );
 
@@ -26297,6 +26304,150 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lookfields: Look gives the original's fields in its order: Sky, Temperature and Gravity, Atmo, Hydro and Terrain", inOrder && !shown.Contains( "Weather:" ), shown );
 
 		Finish( "scenario=lookfields", 0 );
+	}
+
+	// the encounter is seen at the original's fixed scale: the camera frames the alien ships out to their fire range and no further, so that it does not climb
+	// so high that the ships are specks, and a ship in range is in view
+	IEnumerator ScenarioEncounterViewScale()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// a mechan encounter: its ships start far from the player
+		var mechanId = -1;
+
+		for ( var i = 0; i < gameData.m_encounterList.Length; i++ )
+		{
+			if ( gameData.m_encounterList[ i ].m_race == GameData.Race.Mechan )
+			{
+				mechanId = i;
+
+				break;
+			}
+		}
+
+		EnterStarSystem( gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		var flightScale = controller.m_playerShip.m_ship.localScale;
+
+		EnterEncounter( mechanId );
+
+		yield return new WaitForSecondsRealtime( 5.0f );
+
+		var encounter = controller.m_encounter;
+		var offset = (float) GetField( encounter, "m_currentOffset" );
+		var encounterScale = controller.m_playerShip.m_ship.localScale;
+
+		// the first alien ship model against its template
+		var slot = encounter.m_alienShipModelList[ 0 ];
+		var slotShip = ( (PD_AlienShip[]) GetField( encounter, "m_alienShipList" ) )[ 0 ];
+		var alienScale = ( slot.transform.childCount > 0 ) ? slot.transform.GetChild( 0 ).localScale.x : 0.0f;
+		var templateScale = encounter.m_alienShipModelTemplate[ slotShip.m_vesselId ].transform.localScale.x;
+		var camera = controller.m_playerCamera.m_camera;
+
+		// pictures of the view, with -Graphics (the folder is empty without a graphics device)
+		var pictureFolder = ScreenPictureFolder( "encounter-view" );
+
+		if ( pictureFolder != "" )
+		{
+			RenderCameraPicture( Camera.main, System.IO.Path.Combine( pictureFolder, "1-ships-far.png" ) );
+		}
+
+		// the alien ships: the farthest living one, and whether every living one within the fire range is in view
+		var farthest = 0.0f;
+		var inRange = 0;
+		var inRangeInView = 0;
+		var distances = "";
+
+		foreach ( var alienShip in encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			if ( alienShip.m_isDead || !alienShip.m_addedToEncounter )
+			{
+				continue;
+			}
+
+			var distance = Vector3.Distance( alienShip.m_coordinates, playerData.m_general.m_coordinates );
+
+			distances += distance.ToString( "F0" ) + " ";
+
+			farthest = Mathf.Max( farthest, distance );
+
+			if ( distance < 1000.0f )
+			{
+				inRange++;
+
+				var viewportPoint = camera.WorldToViewportPoint( alienShip.m_coordinates );
+
+				if ( ( viewportPoint.z > 0.0f ) && ( viewportPoint.x >= 0.0f ) && ( viewportPoint.x <= 1.0f ) && ( viewportPoint.y >= 0.0f ) && ( viewportPoint.y <= 1.0f ) )
+				{
+					inRangeInView++;
+				}
+			}
+		}
+
+		// the highest the camera has to be to frame the fire range and the margin around it, with the field of view the encounter uses
+		var verticalFieldOfView = controller.m_viewport.m_camera.fieldOfView * Mathf.Deg2Rad;
+		var highest = ( 1000.0f + 192.0f ) * Mathf.Tan( Mathf.PI * 0.5f - verticalFieldOfView * 0.5f );
+
+		Log( "encounterviewscale: 5 s in, the camera " + offset.ToString( "F0" ) + " above the ship (the fire range needs at most " + highest.ToString( "F0" ) + "), alien ships at " + distances + "(" + inRangeInView + " of " + inRange + " in range in view)" );
+
+		Check( "encounterviewscale: an alien ship is still beyond the fire range 5 s in (the setup is the case)", farthest > 1300.0f, "farthest " + farthest.ToString( "F0" ) );
+		Check( "encounterviewscale: the camera is no higher than framing the fire range needs", offset <= highest + 1.0f, "offset " + offset.ToString( "F0" ) + ", at most " + highest.ToString( "F0" ) );
+		Check( "encounterviewscale: every alien ship within the fire range is in view", inRangeInView == inRange, inRangeInView + " of " + inRange );
+
+		// ---- a ship brought within the fire range, toward a corner of the view, is in view once the camera has settled
+		PD_AlienShip nearShip = null;
+
+		foreach ( var alienShip in encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			if ( !alienShip.m_isDead && alienShip.m_addedToEncounter )
+			{
+				nearShip = alienShip;
+
+				break;
+			}
+		}
+
+		var nearOffset = new Vector3( 650.0f, 0.0f, 500.0f );
+
+		nearShip.m_coordinates = playerData.m_general.m_coordinates + nearOffset;
+		nearShip.m_targetCoordinates = nearShip.m_coordinates;
+
+		yield return new WaitForSecondsRealtime( 4.0f );
+
+		var nearDistance = Vector3.Distance( nearShip.m_coordinates, playerData.m_general.m_coordinates );
+		var nearPoint = camera.WorldToViewportPoint( nearShip.m_coordinates );
+		var nearInView = ( nearPoint.z > 0.0f ) && ( nearPoint.x >= 0.0f ) && ( nearPoint.x <= 1.0f ) && ( nearPoint.y >= 0.0f ) && ( nearPoint.y <= 1.0f );
+
+		Log( "encounterviewscale: a ship brought to " + nearDistance.ToString( "F0" ) + " away, 4 s later: viewport " + nearPoint + ", the camera " + ( (float) GetField( encounter, "m_currentOffset" ) ).ToString( "F0" ) + " above the ship" );
+
+		if ( pictureFolder != "" )
+		{
+			RenderCameraPicture( Camera.main, System.IO.Path.Combine( pictureFolder, "2-ship-in-range.png" ) );
+		}
+
+		Check( "encounterviewscale: an alien ship within the fire range is in view", ( nearDistance < 1000.0f ) && nearInView, "distance " + nearDistance.ToString( "F0" ) + ", viewport " + nearPoint );
+
+		// ---- the ships are drawn twice as large in the encounter, and the player ship has its own size again after it
+		LeaveEncounter();
+
+		yield return Frames( 10 );
+
+		var afterScale = controller.m_playerShip.m_ship.localScale;
+
+		Log( "encounterviewscale: the player ship's scale in flight " + flightScale + ", in the encounter " + encounterScale + ", after it " + afterScale + "; the first alien model " + alienScale + " (its template " + templateScale + ")" );
+
+		Check( "encounterviewscale: the player ship is drawn twice as large in the encounter", Vector3.Distance( encounterScale, flightScale * 2.0f ) < 0.001f, flightScale + " -> " + encounterScale );
+		Check( "encounterviewscale: an alien ship is drawn twice as large as its template", Mathf.Abs( alienScale - templateScale * 2.0f ) < 0.001f, alienScale + " for a template of " + templateScale );
+		Check( "encounterviewscale: the player ship has its own size again once the encounter is over", Vector3.Distance( afterScale, flightScale ) < 0.001f, afterScale + " (in flight " + flightScale + ")" );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
