@@ -408,6 +408,29 @@ public class ButtonController : MonoBehaviour
 		UpdateButtonSprites();
 	}
 
+	// unity on enable
+	void OnEnable()
+	{
+		// the labels and the highlight take the colours of the kit's mode, so they are shown again when it changes
+		UIKitTheme.Changed -= ModeChanged;
+		UIKitTheme.Changed += ModeChanged;
+	}
+
+	// unity on disable
+	void OnDisable()
+	{
+		UIKitTheme.Changed -= ModeChanged;
+	}
+
+	// the kit's mode changed: show the buttons' states in its colours
+	void ModeChanged()
+	{
+		if ( m_buttonImageList != null )
+		{
+			ShowButtonStates( m_currentButton != null );
+		}
+	}
+
 	// go through each button and show it as selected or not (none of them running)
 	public void UpdateButtonSprites()
 	{

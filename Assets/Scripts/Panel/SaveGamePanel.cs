@@ -51,6 +51,9 @@ public class SaveGamePanel : Panel
 	// the callback object
 	object m_callbackObject;
 
+	// the button that switches the UI kit between its dark and light modes (made from the resume button the first time the panel opens, so the scene needs no new objects)
+	Button m_modeButton;
+
 	// call this to open this panel
 	public override bool Open()
 	{
@@ -62,6 +65,9 @@ public class SaveGamePanel : Panel
 		m_switchPanel.SetActive( false );
 		m_copyPanel.SetActive( false );
 		m_resetPanel.SetActive( false );
+
+		// the button for the kit's mode
+		MakeModeButton();
 
 		// enable the main menu buttons
 		EnableMenuButtons( true );
@@ -182,6 +188,70 @@ public class SaveGamePanel : Panel
 
 		// close this panel
 		PanelController.m_instance.Close();
+	}
+
+	// called when the player clicks on the button for the kit's mode: the light mode in steel grey, or back to the dark one
+	public void ModeClicked()
+	{
+		InputController.m_instance.Debounce();
+
+		var mode = ( UIKitTheme.GetMode() == UIKitTheme.Mode.Dark ) ? UIKitTheme.Mode.Light : UIKitTheme.Mode.Dark;
+
+		UIKitTheme.SetMode( mode );
+
+		// the button now offers the other mode, and the descriptions are written in the new colours
+		UpdateModeButtonLabel();
+		UpdateDescriptions();
+
+		// play a ui sound
+		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+	}
+
+	// makes the button for the kit's mode: a copy of the resume button, in front of it
+	void MakeModeButton()
+	{
+		if ( ( m_modeButton != null ) || ( m_resumeButton == null ) )
+		{
+			return;
+		}
+
+		m_modeButton = Instantiate( m_resumeButton, m_resumeButton.transform.parent );
+
+		m_modeButton.name = "Mode Button";
+		m_modeButton.transform.SetSiblingIndex( m_resumeButton.transform.GetSiblingIndex() );
+
+		// the copy has the resume button's click: it gets its own instead
+		m_modeButton.onClick = new Button.ButtonClickedEvent();
+		m_modeButton.onClick.AddListener( ModeClicked );
+
+		UpdateModeButtonLabel();
+	}
+
+	// the button for the kit's mode offers the mode that is not in use
+	void UpdateModeButtonLabel()
+	{
+		if ( m_modeButton == null )
+		{
+			return;
+		}
+
+		var label = ( UIKitTheme.GetMode() == UIKitTheme.Mode.Dark ) ? "Light Mode" : "Dark Mode";
+
+		var text = m_modeButton.GetComponentInChildren<TMPro.TMP_Text>( true );
+
+		if ( text != null )
+		{
+			text.text = label;
+		}
+		else
+		{
+			var legacyText = m_modeButton.GetComponentInChildren<Text>( true );
+
+			if ( legacyText != null )
+			{
+				legacyText.text = label;
+			}
+		}
 	}
 
 	// called when the player clicks on quit
@@ -389,5 +459,10 @@ public class SaveGamePanel : Panel
 		m_copyButton.interactable = enable;
 		m_resetButton.interactable = enable;
 		m_resumeButton.interactable = enable;
+
+		if ( m_modeButton != null )
+		{
+			m_modeButton.interactable = enable;
+		}
 	}
 }

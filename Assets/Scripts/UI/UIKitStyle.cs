@@ -31,7 +31,17 @@ public class UIKitStyle : MonoBehaviour
 	// unity on enable
 	void OnEnable()
 	{
+		// the element takes the new look when the player changes the kit's mode
+		UIKitTheme.Changed -= Apply;
+		UIKitTheme.Changed += Apply;
+
 		Apply();
+	}
+
+	// unity on disable
+	void OnDisable()
+	{
+		UIKitTheme.Changed -= Apply;
 	}
 
 #if UNITY_EDITOR

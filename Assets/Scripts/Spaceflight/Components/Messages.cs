@@ -89,6 +89,20 @@ public class Messages : MonoBehaviour
 	}
 
 	// update the display with the current message lines
+	// unity on enable
+	void OnEnable()
+	{
+		// the messages are shown in the colours of the kit's mode, so they are shown again when it changes
+		UIKitTheme.Changed -= Refresh;
+		UIKitTheme.Changed += Refresh;
+	}
+
+	// unity on disable
+	void OnDisable()
+	{
+		UIKitTheme.Changed -= Refresh;
+	}
+
 	void UpdateDisplay()
 	{
 		var playerData = DataController.m_instance.m_playerData;
