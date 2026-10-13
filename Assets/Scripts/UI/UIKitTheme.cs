@@ -9,6 +9,21 @@ public class UIKitTheme : ScriptableObject
 	// the name of the asset in Resources
 	public const string c_resourceName = "UI Kit Theme";
 
+	// the name of the light mode's asset in Resources: the kit in steel grey (the owner's request of 2026-10-13)
+	public const string c_lightResourceName = "UI Kit Theme Light";
+
+	// the kit's two looks: the dark one it was drawn with, and a light one in steel grey, which the player picks in the save panel
+	public enum Mode
+	{
+		Dark, Light
+	}
+
+	// where the player's choice is kept: a setting of this computer, not of a saved game
+	public const string c_modeKey = "UI Kit Mode";
+
+	// raised when the mode changes, so that everything on screen takes the new look
+	public static event System.Action Changed;
+
 	// a text style of the kit: a font, its size, the space between the letters (in hundredths of an em, as TextMesh Pro counts it) and whether it is all capitals
 	[System.Serializable]
 	public class TextStyle
@@ -217,23 +232,120 @@ public class UIKitTheme : ScriptableObject
 		}
 	}
 
-	// the loaded theme
-	static UIKitTheme s_instance;
+	// the loaded themes, one per mode
+	static UIKitTheme[] s_themes = new UIKitTheme[ 2 ];
 
-	// returns the theme (loaded from Resources the first time, null if the asset is missing)
+	// the mode in use, and whether it has been read from the player's setting yet
+	static Mode s_mode;
+	static bool s_modeKnown;
+
+	// returns the theme of the mode in use (loaded from Resources the first time, null if the asset is missing)
 	public static UIKitTheme Get()
 	{
-		if ( s_instance == null )
-		{
-			s_instance = Resources.Load<UIKitTheme>( c_resourceName );
+		var theme = Load( GetMode() );
 
-			if ( s_instance == null )
+		// without the light mode's asset the kit stays dark
+		if ( ( theme == null ) && ( GetMode() != Mode.Dark ) )
+		{
+			theme = Load( Mode.Dark );
+		}
+
+		return theme;
+	}
+
+	// returns the theme of a mode (loaded from Resources the first time, null if the asset is missing)
+	public static UIKitTheme Load( Mode mode )
+	{
+		var index = ( mode == Mode.Light ) ? 1 : 0;
+
+		if ( s_themes[ index ] == null )
+		{
+			var name = ( mode == Mode.Light ) ? c_lightResourceName : c_resourceName;
+
+			s_themes[ index ] = Resources.Load<UIKitTheme>( name );
+
+			if ( s_themes[ index ] == null )
 			{
-				Debug.LogWarning( "The UI kit theme (Resources/" + c_resourceName + ") is missing" );
+				Debug.LogWarning( "The UI kit theme (Resources/" + name + ") is missing" );
 			}
 		}
 
-		return s_instance;
+		return s_themes[ index ];
+	}
+
+	// returns the mode in use (the player's setting, dark if there is none or it cannot be read)
+	public static Mode GetMode()
+	{
+		if ( !s_modeKnown )
+		{
+			s_mode = Mode.Dark;
+
+			try
+			{
+				s_mode = ( PlayerPrefs.GetInt( c_modeKey, (int) Mode.Dark ) == (int) Mode.Light ) ? Mode.Light : Mode.Dark;
+			}
+			catch ( System.Exception exception )
+			{
+				Debug.LogWarning( "The UI kit's mode could not be read: " + exception.Message );
+			}
+
+			s_modeKnown = true;
+		}
+
+		return s_mode;
+	}
+
+	// changes the mode and lets everything on screen know (remember false leaves the player's setting as it is, for a test)
+	public static void SetMode( Mode mode, bool remember = true )
+	{
+		var previousMode = GetMode();
+
+		if ( remember )
+		{
+			try
+			{
+				PlayerPrefs.SetInt( c_modeKey, (int) mode );
+				PlayerPrefs.Save();
+			}
+			catch ( System.Exception exception )
+			{
+				Debug.LogWarning( "The UI kit's mode could not be saved: " + exception.Message );
+			}
+		}
+
+		if ( mode == previousMode )
+		{
+			return;
+		}
+
+		s_mode = mode;
+
+		// the message colours are made from the theme, so they are made again
+		s_messageColourTags = null;
+
+		Changed?.Invoke();
+	}
+
+	// returns the role whose colour this is in a theme (Keep if none): used to give colours copied into the scenes the other mode's
+	public static ColorRole FindRole( UIKitTheme theme, Color color )
+	{
+		if ( theme == null )
+		{
+			return ColorRole.Keep;
+		}
+
+		// the roles in the order they are looked for: a colour shared by two roles is taken for the first (the backgrounds come before the borders that share them)
+		for ( var role = ColorRole.BackgroundApp; role <= ColorRole.SensorWindow; role++ )
+		{
+			var roleColor = theme.GetColor( role );
+
+			if ( ( Mathf.Abs( roleColor.r - color.r ) < 0.004f ) && ( Mathf.Abs( roleColor.g - color.g ) < 0.004f ) && ( Mathf.Abs( roleColor.b - color.b ) < 0.004f ) )
+			{
+				return role;
+			}
+		}
+
+		return ColorRole.Keep;
 	}
 
 	// the colour tags the game's messages are written with, and the kit's colour role each of them shows as (each keeps its meaning: green stays green)
@@ -252,6 +364,14 @@ public class UIKitTheme : ScriptableObject
 		( "#ffff00", ColorRole.TextWarning ),
 		( "orange", ColorRole.TextWarning ),
 		( "grey", ColorRole.TextSecondary ),
+		( "#00ffff", ColorRole.TextAccent ),
+		( "#0ff", ColorRole.TextAccent ),
+		( "#00ff00", ColorRole.StatusFuel ),
+		( "#808080", ColorRole.TextSecondary ),
+		( "#a35514", ColorRole.AccentSecondary ),
+		( "#ff0000", ColorRole.TextAlert ),
+		( "#ffa500", ColorRole.TextWarning ),
+		( "#e6f0ff", ColorRole.TextPrimary ),
 	};
 
 	// the tags as they are written (<color=green> and <color="green">) and what they become, made the first time

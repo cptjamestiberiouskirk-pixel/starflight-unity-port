@@ -329,6 +329,20 @@ public class ClaudeProbe : MonoBehaviour
 
 		var scenario = GetArg( "-probeScenario", "h6" );
 
+		// PROBE_UI_MODE=light runs the scenario with the UI kit's light mode, without keeping it in the player's settings (looked up so that a tree without the mode compiles)
+		if ( Environment.GetEnvironmentVariable( "PROBE_UI_MODE" ) == "light" )
+		{
+			var modeType = typeof( UIKitTheme ).GetNestedType( "Mode" );
+			var setMode = typeof( UIKitTheme ).GetMethod( "SetMode" );
+
+			if ( ( modeType != null ) && ( setMode != null ) )
+			{
+				setMode.Invoke( null, new object[] { Enum.Parse( modeType, "Light" ), false } );
+
+				Log( "the UI kit's light mode is on (PROBE_UI_MODE)" );
+			}
+		}
+
 		Log( "scenario=" + scenario + " frame=" + Time.frameCount + " location=" + DataController.m_instance.m_playerData.m_general.m_location + " exceptionsSoFar=" + s_exceptionCount );
 
 		switch ( scenario )
@@ -1119,6 +1133,10 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "starport-ledgerrows":
 				yield return ScenarioStarportLedgerRows();
+				break;
+
+			case "lightmode":
+				yield return ScenarioLightMode();
 				break;
 
 			default:
@@ -29134,6 +29152,151 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-ledgerrows: the newest row is still in the window, above the balance", offset >= hidden - 0.5f, offset + " / " + hidden );
 
 		Finish( "scenario=starport-ledgerrows checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioLightMode()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+		var folder = ScreenPictureFolder( "lightmode" );
+		var pictures = new List<string>();
+
+		EnsureCrew();
+
+		// the player's own setting of the mode, put back at the end (the probe runs in the editor, whose settings are the player's)
+		var modeKey = "UI Kit Mode";
+		var savedSetting = PlayerPrefs.HasKey( modeKey ) ? PlayerPrefs.GetInt( modeKey ) : -1;
+
+		System.Action<string> take = name =>
+		{
+			if ( folder != "" )
+			{
+				var path = System.IO.Path.Combine( folder, ( pictures.Count + 1 ).ToString( "00" ) + "_" + name + ".png" );
+
+				RenderScreenPicture( path );
+				pictures.Add( name );
+			}
+		};
+
+		// no encounter begins by itself
+		controller.m_encounterRange = 0.0f;
+
+		// Arth's star system, as the flight pictures have it
+		var arthStarId = gameData.m_misc.m_arthStarId;
+
+		playerData.m_general.m_lastHyperspaceCoordinates = gameData.m_starList[ arthStarId ].GetWorldCoordinates();
+
+		EnterStarSystem( arthStarId );
+
+		var start = Time.realtimeSinceStartup;
+
+		while ( controller.m_starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 40.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 30 );
+
+		buttonController.ChangeButtonSet( ButtonController.ButtonSet.Bridge );
+		PressButton( ButtonController.ButtonSet.Bridge, 1 );
+
+		controller.m_messages.Clear();
+		controller.m_messages.AddText( "<color=white>Orbit established.</color>" );
+
+		yield return Frames( 10 );
+
+		take( "dark_science_menu" );
+
+		// a text the kit styles with its primary text colour
+		UIKitStyle styledText = null;
+
+		foreach ( var style in UnityEngine.Object.FindObjectsByType<UIKitStyle>( FindObjectsInactive.Exclude, FindObjectsSortMode.None ) )
+		{
+			if ( ( style.m_color == UIKitTheme.ColorRole.TextPrimary ) && style.TryGetComponent<TMPro.TMP_Text>( out _ ) )
+			{
+				styledText = style;
+				break;
+			}
+		}
+
+		var themeType = typeof( UIKitTheme );
+		var lightTheme = themeType.GetMethod( "Load" ) != null ? themeType.GetMethod( "Load" ).Invoke( null, new object[] { Enum.Parse( themeType.GetNestedType( "Mode" ), "Light" ) } ) as UIKitTheme : null;
+		var darkTheme = UIKitTheme.Get();
+
+		// ---- the light mode, set as the save panel does but without keeping it in the player's settings
+		var setMode = themeType.GetMethod( "SetMode" );
+
+		if ( setMode != null )
+		{
+			setMode.Invoke( null, new object[] { Enum.Parse( themeType.GetNestedType( "Mode" ), "Light" ), false } );
+		}
+
+		yield return Frames( 10 );
+
+		var themeInUse = UIKitTheme.Get();
+		var styledColour = ( styledText != null ) ? styledText.GetComponent<TMPro.TMP_Text>().color : Color.magenta;
+		var messagesText = ( GetField( controller.m_messages, "m_messagesUI" ) as TMPro.TMP_Text ).text;
+
+		// a button of the save panel, tinted by the kit's tool in the dark mode's colours
+		UnityEngine.UI.Button panelButton = PanelController.m_instance.m_saveGamePanel.m_resumeButton;
+		var panelButtonColour = panelButton.colors.normalColor;
+
+		take( "light_science_menu" );
+
+		// ---- the save panel, with the button for the mode
+		PressEscape();
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var savePanel = PanelController.m_instance.m_saveGamePanel;
+		// (looked up so that the old code, which has no such button, is checked the same way)
+		var modeButtonField = savePanel.GetType().GetField( "m_modeButton", c_any );
+		var modeButton = ( modeButtonField != null ) ? modeButtonField.GetValue( savePanel ) as UnityEngine.UI.Button : null;
+		var modeLabelInLight = ( modeButton != null ) ? modeButton.GetComponentInChildren<TMPro.TMP_Text>( true ).text : "(none)";
+
+		take( "light_save_panel" );
+
+		// the button switches back to the dark mode
+		if ( modeButton != null )
+		{
+			Call( savePanel, "ModeClicked" );
+		}
+
+		yield return Frames( 10 );
+
+		var themeAfterClick = UIKitTheme.Get();
+		var modeLabelInDark = ( modeButton != null ) ? modeButton.GetComponentInChildren<TMPro.TMP_Text>( true ).text : "(none)";
+		var styledColourAfterClick = ( styledText != null ) ? styledText.GetComponent<TMPro.TMP_Text>().color : Color.magenta;
+		var panelButtonColourAfterClick = panelButton.colors.normalColor;
+
+		take( "dark_save_panel" );
+
+		// the player's own setting back as it was
+		if ( savedSetting < 0 )
+		{
+			PlayerPrefs.DeleteKey( modeKey );
+		}
+		else
+		{
+			PlayerPrefs.SetInt( modeKey, savedSetting );
+		}
+
+		PlayerPrefs.Save();
+
+		PressEscape();
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		Log( "lightmode: theme in use \"" + ( ( themeInUse != null ) ? themeInUse.name : "none" ) + "\" | styled text " + ( ( styledText != null ) ? styledText.name : "none" ) + " " + ColorUtility.ToHtmlStringRGB( styledColour ) + " | resume button " + ColorUtility.ToHtmlStringRGB( panelButtonColour ) + " | mode button \"" + modeLabelInLight + "\" then \"" + modeLabelInDark + "\" | after the click \"" + ( ( themeAfterClick != null ) ? themeAfterClick.name : "none" ) + "\" " + ColorUtility.ToHtmlStringRGB( styledColourAfterClick ) + " | pictures " + string.Join( ", ", pictures ) );
+
+		Check( "lightmode: the light mode's theme is in use, and a text the kit styles takes its primary text colour", ( lightTheme != null ) && ( themeInUse == lightTheme ) && ( styledText != null ) && ( ColorUtility.ToHtmlStringRGB( styledColour ) == ColorUtility.ToHtmlStringRGB( lightTheme.m_textPrimary ) ), ColorUtility.ToHtmlStringRGB( styledColour ) );
+		Check( "lightmode: the buttons the kit's tool tinted take the light mode's tints, and the messages its colours", ( lightTheme != null ) && ( ColorUtility.ToHtmlStringRGB( panelButtonColour ) == ColorUtility.ToHtmlStringRGB( lightTheme.m_backgroundRaised ) ) && messagesText.Contains( ColorUtility.ToHtmlStringRGB( lightTheme.m_textPrimary ) ), ColorUtility.ToHtmlStringRGB( panelButtonColour ) + " / " + messagesText );
+		Check( "lightmode: the save panel has a button for the mode, which offers the other mode and switches back to the dark one", ( modeLabelInLight == "Dark Mode" ) && ( modeLabelInDark == "Light Mode" ) && ( themeAfterClick == darkTheme ) && ( ColorUtility.ToHtmlStringRGB( styledColourAfterClick ) == ColorUtility.ToHtmlStringRGB( darkTheme.m_textPrimary ) ), modeLabelInLight + " / " + modeLabelInDark );
+		Check( "lightmode: back in the dark mode the buttons have the dark mode's tints again (the light mode gives several roles one colour)", ColorUtility.ToHtmlStringRGB( panelButtonColourAfterClick ) == ColorUtility.ToHtmlStringRGB( darkTheme.m_backgroundRaised ), ColorUtility.ToHtmlStringRGB( panelButtonColourAfterClick ) );
+
+		Finish( "scenario=lightmode checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
