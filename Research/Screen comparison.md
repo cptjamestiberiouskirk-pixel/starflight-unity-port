@@ -21,7 +21,7 @@ Not reported: art style, resolution, colours, fonts and 3D models.
 
 | | Items | FIXED | OPEN or PARTLY | Not a defect or owner's call |
 |---|---|---|---|---|
-| GAMEPLAY (with the items shared with the UI kit) | 52 | 24 | 23 | 5 |
+| GAMEPLAY (with the items shared with the UI kit) | 52 | 32 | 16 | 4 |
 | UI KIT | 41 | 0 | 40 | 1 |
 | The probe's pictures | 17 | 3 (PR 234) | 14 gaps | |
 
@@ -29,11 +29,10 @@ Since 2026-10-11 the gameplay side has been fixed in PRs 215, 216, 218, 219, 220
 
 The open gameplay items, most visible first:
 
-1. **Repair's choice of system** (section 13): the original lets the player choose what to repair; the port's engineer repairs the worst first, by the owner's ruling of 2026-10-11 (the DAMAGE display itself is done).
-2. **The bank books a recommendation's bonus or fine at once in the original** (section 21), where the port pays it on docking (the interest itself is done).
-3. **The notices screen** (section 18): its header, its end, "NO NEW NOTICES" with "REPEAT LAST NOTICE?", and the typing of a notice.
-4. **Combat messages and wounds** (section 12): the original names the weapon that hits ("MISSILE CLASS 2") and says how the crew is wounded; in the port combat never wounds the crew.
-5. **"MOTION DETECTED AT X: Y:"** (section 11), the shields and weapons messages (section 2), and several smaller ones.
+1. **The typing of a notice** (section 18): the original types a notice line by line, with an abort (the notices screen's header, its end and "NO NEW NOTICES" are done, as are the DAMAGE display, Repair's choice of system and the interest).
+2. **The bank books a recommendation's bonus or fine at once in the original** (section 21), where the port pays it on docking.
+3. **Combat messages and wounds** (section 12): the original names the weapon that hits ("MISSILE CLASS 2") and says how the crew is wounded; in the port combat never wounds the crew.
+4. **"MOTION DETECTED AT X: Y:"** (section 11), the shields and weapons messages (section 2), and several smaller ones.
 
 ---
 
@@ -54,7 +53,7 @@ The open gameplay items, most visible first:
 |---|---|---|---|
 | "Raise Shields" where the original has RAISE SHIELD | OPEN | `RaiseShieldsButton.cs:6` (CONFIRMED) | UI KIT |
 | "Drop Shields" and "Disarm Weapon" where the original has DROP SHIELD and DISARM | OPEN | `DropShieldsButton.cs:6`, `DisarmWeaponButton.cs:6`; `NAVIGATR.c` (CONFIRMED, code on both sides) | UI KIT |
-| The messages of the shields and weapons. Original: SHIELDS ARE NOW UP, SHIELDS ARE DOWN, ARMING MISSILES or ARMING LASERS, WEAPONS ARE DISARMED, and SHIELDS CAN'T BE RAISED with a beep; in a nebula MAGNETIC DISTURBANCES IN NEBULA / CAUSING ENERGY FLUCTUATIONS. Port: "Shields raised.", "Shields dropped.", "Weapons armed.", nothing at all when disarming (the button sets the flag and does not call `DisarmWeapons`), and its own lines for a nebula and for no fuel | OPEN | `PD_PlayerShip.cs:626, 637, 964, 974`, `DisarmWeaponButton.cs:13`, `RaiseShieldsButton.cs:30, 41`; `NAVIGATR.c` 190 to 323, 374 (CONFIRMED, code) | GAMEPLAY |
+| The messages of the shields and weapons. Original: SHIELDS ARE NOW UP, SHIELDS ARE DOWN, ARMING MISSILES or ARMING LASERS, WEAPONS ARE DISARMED, and SHIELDS CAN'T BE RAISED with a beep; in a nebula MAGNETIC DISTURBANCES IN NEBULA / CAUSING ENERGY FLUCTUATIONS. Port: "Shields raised.", "Shields dropped.", "Weapons armed.", nothing at all when disarming (the button sets the flag and does not call `DisarmWeapons`), and its own lines for a nebula and for no fuel | FIXED (the shields' and weapons' messages PR) | `PD_PlayerShip.cs:626, 637, 964, 974`, `DisarmWeaponButton.cs:13`, `RaiseShieldsButton.cs:30, 41`; `NAVIGATR.c` 190 to 323, 374 (CONFIRMED, code) | GAMEPLAY |
 
 ## 3. Star system
 
@@ -80,8 +79,8 @@ The stellar parameters and the system map match the original (CONFIRMED, picture
 | Item | Status | Evidence | Owner |
 |---|---|---|---|
 | The lead-up to orbit (STANDING BY TO ORBIT, PRESS SPACEBAR TO ORBIT) | FIXED | PR 219 (CONFIRMED, code) | GAMEPLAY |
-| The port clears the text window at each step; the original lets the lines scroll on, from "...COMMENCING SYSTEM TRAVEL" to "...ORBIT ESTABLISHED" | OPEN | `StarSystem.cs:142`, `ManeuverButton.cs:194`, `InOrbit.cs:231`; starflt_141, starflt_143 (CONFIRMED) | GAMEPLAY |
-| "Orbit established." where the original has "...ORBIT ESTABLISHED" | OPEN, low priority | `InOrbit.cs:232`, starflt_143 (CONFIRMED) | GAMEPLAY |
+| The port clears the text window at each step; the original lets the lines scroll on, from "...COMMENCING SYSTEM TRAVEL" to "...ORBIT ESTABLISHED" | FIXED (the orbit lines PR) | `StarSystem.cs:142`, `ManeuverButton.cs:194`, `InOrbit.cs:231`; starflt_141, starflt_143 (CONFIRMED) | GAMEPLAY |
+| "Orbit established." where the original has "...ORBIT ESTABLISHED" | FIXED (the orbit lines PR) | `InOrbit.cs:232`, starflt_143 (CONFIRMED) | GAMEPLAY |
 | A frame in the main view ("IN ORBIT", "ORBIT VII · FROZEN", "ENCOUNTER", corner brackets) that the original does not have | OPEN | `ViewportFrame.cs:117, 129` (PR 260); pictures (CONFIRMED) | UI KIT |
 | The auxiliary view shows Status in the probe's orbit picture | PROBE | the probe left it on | |
 
@@ -103,8 +102,8 @@ A vessel's reading matches the original's (mass, bio, energy, object constituent
 | No picture of an analysis | FIXED | PR 234 (CONFIRMED) | |
 | An alien ship's shields and weapons were always "Not certain" | FIXED | PR 220; picture: "Shields: None apparent", "Weapon Status: Armed" (CONFIRMED) | GAMEPLAY |
 | "Size:" label before the ship's size | FIXED | PR 220 (CONFIRMED) | GAMEPLAY |
-| The heading has no colon: "Analysis of Last Sensor Reading"; the original's "ANALYSIS OF LAST SENSOR READING:" | OPEN, low priority | `AnalysisButton.cs:144`; `ANALYZE-OV.c:493`, starflt_145 (CONFIRMED) | GAMEPLAY |
-| A temperature range with the same word at both ends: "Sub-Arctic to Sub-Arctic"; the original prints the one word (it drops the second when they are equal) | OPEN | `GD_Planet.cs:346`; `ANALYZE-OV.c`, word WF068; the orbit analysis picture (CONFIRMED) | GAMEPLAY |
+| The heading has no colon: "Analysis of Last Sensor Reading"; the original's "ANALYSIS OF LAST SENSOR READING:" | FIXED (the analysis heading PR) | `AnalysisButton.cs:144`; `ANALYZE-OV.c:493`, starflt_145 (CONFIRMED) | GAMEPLAY |
+| A temperature range with the same word at both ends: "Sub-Arctic to Sub-Arctic"; the original prints the one word (it drops the second when they are equal) | FIXED (the analysis heading PR) | `GD_Planet.cs:346`; `ANALYZE-OV.c`, word WF068; the orbit analysis picture (CONFIRMED) | GAMEPLAY |
 
 ## 8. Landing map and descent
 
@@ -134,7 +133,7 @@ A vessel's reading matches the original's (mass, bio, energy, object constituent
 | The bearing to the ship abbreviated | FIXED | PR 218; picture "North" (CONFIRMED) | GAMEPLAY |
 | "SHIP 14 KM. North" with the ship's model just above the vehicle; the original shows "1KM." with the ship beside it (starflt_179) | OPEN | `TerrainVehicleDisplay.cs:124` (CONFIRMED, picture); that the scale is wrong is INFERRED | GAMEPLAY |
 | The weather is the first line on the surface in the original ("IT IS CLEAR.", alone in the window); the port writes it as a sixth line under the disembark lines | PARTLY | `PlanetWeather.cs:218` (PR 210); picture (CONFIRMED) | GAMEPLAY |
-| Look: the port writes Surface, Weather, Sky, Atmosphere and Gravity; the original writes SKY, TEMPERATURE, GRAVITY, ATMO, HYDRO and TERRAIN (starflt_180): no temperature and no hydrosphere in the port | OPEN | `LookButton.cs:40` to `46` (INFERRED: code, no picture) | GAMEPLAY |
+| Look: the port writes Surface, Weather, Sky, Atmosphere and Gravity; the original writes SKY, TEMPERATURE, GRAVITY, ATMO, HYDRO and TERRAIN (starflt_180): no temperature and no hydrosphere in the port | FIXED (the Look fields PR; the temperature is the planet's, the port has no regions) | `LookButton.cs:40` to `46` (INFERRED: code, no picture) | GAMEPLAY |
 | No CREW VITALITY box with dot leaders | OPEN | picture (CONFIRMED) | UI KIT |
 | MAP for MAPS, EFFICIENCY for EFF. | OPEN | `MapButton.cs:10`, `Spaceflight.unity:65137` (CONFIRMED) | UI KIT |
 | A menu of six on the console; the original's is a bar of seven across the bottom with ICONS, which opens two ICON KEY screens | OPEN | `ButtonController.cs:127` (CONFIRMED) | UI KIT |
@@ -156,8 +155,8 @@ A vessel's reading matches the original's (mass, bio, energy, object constituent
 | "LEAVING ENCOUNTER... / ...ENCOUNTER TERMINATED" | FIXED | PR 242 (CONFIRMED, code) | GAMEPLAY |
 | "THEY'VE ARMED THEIR WEAPONS" and the other shield and weapon news | FIXED | PR 224 (CONFIRMED, code) | GAMEPLAY |
 | Combat messages. Original: MISSILE CLASS n or PLASMA BOLT, and "<name> IS SLIGHTLY / MODERATELY / HEAVILY / CRITICALLY WOUNDED" or KILLED. Port: "Incoming torpedo!", "Plasma bolt incoming!", "Hull takes N damage!", and combat never wounds the crew (`InjureCrewMember` is called only by lifeforms and the weather) | FIXED (the combat wounds PR: the original's words, and a hit on the crew wounds them) | `CombatController.cs:642, 878` to `935`; `DAMAGE-OV.c:1160` to `1243`, `1872` (CONFIRMED, code) | GAMEPLAY |
-| No alien ship and no scan bracket in the encounter picture, and the player's ship is a speck | PARTLY | `TargetBracket.cs` exists (PR 253) but the picture, 4 s after entering, shows neither; the cause (the probe's timing or the camera) is not checked (CONFIRMED, picture) | GAMEPLAY or UI KIT |
-| The comm link's main view shows coloured static where the alien's portrait should be | PARTLY | `Encounter.Connect` (`Encounter.cs:3603`) turns on the race's portrait and camera; whether the static is a capture artifact is not checked (CONFIRMED, picture) | GAMEPLAY or art |
+| No alien ship and no scan bracket in the encounter picture, and the player's ship is a speck | OWNER'S CALL | Not the probe: its `EnterEncounter` does what `SpaceflightController.BeginEncounter` does. Measured with a graphics run on 2026-10-12: the encounter camera climbs to 7,000 to 11,000 units above the ship (perspective, 30 degrees) to frame alien ships that start about 3,700 units away, off the left edge at 4 s and in view from about 6 s; at that height a 90-unit Spemin scout covers under 2% of the screen and the player's ship is a speck. The original draws the ships as icons at a fixed scale. How large the ships look is a look decision for the owner (the camera's height, or the ships' scale) (CONFIRMED, probe log and picture) | GAMEPLAY or UI KIT |
+| The comm link's main view shows coloured static where the alien's portrait should be | OWNER'S CALL | Not a capture artifact: the portrait is there (seen at 8 s, the Spemin under the static), and the static is the port's own `CommScreen` effect (coloured rays, waves, low resolution), stronger the lower the communications officer's skill (the probe's crew has little). The original shows the portrait clean and garbles only the words. Whether the port keeps its reception effect is a look decision for the owner (CONFIRMED, pictures at 3 s and 8 s, `CommScreen.cs:170`) | GAMEPLAY or art |
 | The encounter pictures show the coordinates 118 96 in Arth's system | PROBE | the probe enters Arth's system without moving the hyperspace coordinates (INFERRED) | |
 
 ## 13. Engineering (Damage and Repair)
@@ -165,7 +164,7 @@ A vessel's reading matches the original's (mass, bio, energy, object constituent
 | Item | Status | Evidence | Owner |
 |---|---|---|---|
 | The DAMAGE display. Original (`ENGINEER.c`): Damage clears the auxiliary view and draws DAMAGE with a 40-pixel bar for each of HULL, ENGINES, SENSORS, COMM., SHIELD, MISSILE, LASER, green for what works and red for the rest, and writes no text. Port: there was no damage display; Damage wrote a "Damage Report:" text | FIXED (the DAMAGE display PR) | `DamageDisplay`, shown by Damage and at the start of Repair; the picture `13_damage.png` of `screenpictures` (CONFIRMED) | GAMEPLAY and UI KIT |
-| Repair. Original: shows the same display and lets the player scroll the seven rows; the text window gives each one ("ENGINES: SLIGHTLY DAMAGED", EFFICIENCY, CURRENT FUNCTIONALITY, ESTIMATED TIME FOR COMPLETE REPAIRS, CURRENTLY UNDER REPAIR), and the fire button chooses what to repair, with NO REPAIRS NEEDED, DAMAGED BEYOND REPAIR, "CEASE REPAIRS ON X AND BEGIN REPAIRS ON Y? [N Y]" and BEGINNING, CONTINUING or CEASING REPAIRS ON X. Port: Repair picks the system itself, the worst first, by the owner's ruling of 2026-10-11 for roadmap 1.2, made when no shipped source had the mechanics | OWNER'S CALL: the decompiled original now has them; the ruling stands until the owner changes it | `RepairButton.cs`; `ENGINEER.c` (CONFIRMED, code) | GAMEPLAY |
+| Repair. Original: shows the same display and lets the player scroll the seven rows; the text window gives each one ("ENGINES: SLIGHTLY DAMAGED", EFFICIENCY, CURRENT FUNCTIONALITY, ESTIMATED TIME FOR COMPLETE REPAIRS, CURRENTLY UNDER REPAIR), and the fire button chooses what to repair, with NO REPAIRS NEEDED, DAMAGED BEYOND REPAIR, "CEASE REPAIRS ON X AND BEGIN REPAIRS ON Y? [N Y]" and BEGINNING, CONTINUING or CEASING REPAIRS ON X. Port: Repair picked the system itself, the worst first, by the owner's ruling of 2026-10-11 for roadmap 1.2, made when no shipped source had the mechanics; on 2026-10-12 the owner ruled that it follows the original | FIXED (the Repair choice PR) | `RepairButton.cs`, the DAMAGE display's cursor; the `repairchoice` probe scenario and the picture `14_repair.png` (CONFIRMED) | GAMEPLAY |
 | No pictures | PROBE | | |
 
 ## 14. Medical (Examine and Treat)
@@ -203,9 +202,9 @@ The doors are where the original's are (Operations upper left, Personnel top, Cr
 | Item | Status | Evidence | Owner |
 |---|---|---|---|
 | The evaluations one to a page, the supplemental ones once, END OF EVALUATIONS, and each evaluation's heading | FIXED | PRs 254, 263 (CONFIRMED, code) | GAMEPLAY |
-| The notices' header. Original: "NOTICES 01-01-4620". Port: "Today is" and the date | OPEN | `OperationsPanel.cs:138`; `OP-OV.c` WE735 (CONFIRMED) | GAMEPLAY |
-| "***END OF NOTICES***" after the last notice | OPEN | not in the code or the scene; `OP-OV.c:902` (CONFIRMED) | GAMEPLAY |
-| With no unread notice the original says NO NEW NOTICES and asks REPEAT LAST NOTICE? [N Y], and on Y "***REPEATING LAST NOTICE***"; the port shows the last notice read again without asking | OPEN | `OperationsPanel.cs:143` to `164`; `OP-OV.c:1001` to `1020` (CONFIRMED) | GAMEPLAY |
+| The notices' header. Original: "NOTICES 01-01-4620". Port: "Today is" and the date | FIXED (the notices screen PR): the date beside the scene's NOTICES heading | `OperationsPanel.ShowNotices`; `OP-OV.c` WE735; the `starport-notices` probe scenario (CONFIRMED) | GAMEPLAY |
+| "***END OF NOTICES***" after the last notice | FIXED (the notices screen PR) | after the newest notice that is out; `OP-OV.c:902`; `starport-notices` (CONFIRMED) | GAMEPLAY |
+| With no unread notice the original says NO NEW NOTICES and asks REPEAT LAST NOTICE? [N Y], and on Y "***REPEATING LAST NOTICE***"; the port showed the last notice read again without asking | FIXED (the notices screen PR): More and Quit answer Yes and No meanwhile | `OperationsPanel.AskToRepeat`; `OP-OV.c:1001` to `1020`; `starport-notices` (CONFIRMED) | GAMEPLAY |
 | The original types a notice line by line with a pause (the spacebar skips it), with PRESS SPACEBAR TO CONTINUE / PRESS [] TO ABORT CURRENT NOTICE and ***NOTICE ABORTED***; the port shows one paragraph a press of More, with no abort | OPEN | `OperationsPanel.cs:441` to `476`; `OP-OV.c:536, 543, 879` (CONFIRMED, code) | GAMEPLAY (the flow), UI KIT (the prompts) |
 | After a notice the original shows "<- NEXT MESSAGE  PREVIOUS MESSAGE ->" and "PRESS SPACEBAR TO REPLAY OR [ QUIT ]"; the port has More, Previous, Next and Quit buttons and no Replay | OPEN | `OperationsPanel.cs:20` to `23`; `OP-OV.c:512, 519` (CONFIRMED) | UI KIT |
 | The original keeps NOTICES, EVALUATION and EXIT on screen inside both screens; the port hides them | OPEN | `OperationsPanel.cs:117` to `125` (CONFIRMED) | UI KIT |
@@ -240,7 +239,7 @@ The doors are where the original's are (Operations upper left, Personnel top, Cr
 |---|---|---|---|
 | **The bank paid no interest.** The screen says INTEREST RATE: 12%, and the original's ledger has INTEREST rows (starflt_060). The original (`BANK-OV.c`, INT%) pays 12% a year of the balance for the days since it last paid (the balance times 12 over 100, then times the days over 300, each rounded down), when the crew goes aboard at the Starport (`PORTMENU-OV.c`, WEBA2) and on a new colony recommendation (`CAPTAIN.c`, which then starts the count again) | FIXED (the bank interest PR) | `PlayerData.PayInterest`, `PD_Bank.GetInterestDue`; the `starport-interest` probe scenario (CONFIRMED) | GAMEPLAY |
 | A colony recommendation's bonus or fine. The original books it in the ledger when the planet is recommended (`CAPTAIN.c`, WF292: T+BALANCE, then TRANSACT as BONUS or FINE, after the interest); the port pays it when the ship docks, with Interstel's evaluation (roadmap 1.3, PR 142) | OPEN | `PlayerData.cs` (the colony evaluations at docking); which planet field gives the original's amount (WE096, times 1000, at least 100) is not worked out (INFERRED) | GAMEPLAY |
-| The ledger's descriptions. The original has seven: FINE, SHIP CONFIGURATION, TRADE DEPOT, BONUS, PERSONNEL, INTEREST, GAME PURCHASE. The port writes "Lifeform data", "Mission completed" and "Colony bonus" (the original's BONUS) and "Colony fine", "Towing charges" and "Terrain vehicle replaced" (the original's FINE) | OPEN | `PlayerData.cs:157, 173, 225, 246`, `DistressYesButton.cs:42`, `DockingBay.cs:82`; `data.h` BANKTRANS_STRINGS (CONFIRMED) | GAMEPLAY |
+| The ledger's descriptions. The original has seven: FINE, SHIP CONFIGURATION, TRADE DEPOT, BONUS, PERSONNEL, INTEREST, GAME PURCHASE. The port wrote "Lifeform data", "Mission completed" and "Colony bonus" (the original's BONUS) and "Colony fine", "Towing charges" and "Terrain vehicle replaced" (the original's FINE) | FIXED (the ledger names PR): Bonus and Fine as the original books them (the win in DPART-OV, a colony evaluation in CAPTAIN, the supplemental evaluations in OP-OV), and "Ship configuration" in sentence case; "Lifeform data" keeps its name, since the shipped game has no such payment (the 1984 notes, ruling D3) | `PlayerData.cs`, `DistressYesButton.cs`, `DockingBay.cs`; `data.h` BANKTRANS_STRINGS; the `colonies`, `distress`, `win` and `lava` probe checks (CONFIRMED) | GAMEPLAY |
 | AMT. as AMOUNT; dot leaders after the description ("GAME PURCHASE......") | OPEN, low priority | picture (CONFIRMED) | UI KIT |
 | The balance line: the original's "BALANCE......12000" and "( INTEREST RATE: 12% )", the port's "Your current balance is 1,000,000 M.U." | OPEN | `BankPanel.cs:56` (CONFIRMED); the 1,000,000 itself is the Editor's starting balance by design (`PD_Bank.GetStartingBalance`) | UI KIT |
 | PRESS SPACEBAR TO EXIT as an EXIT button | OPEN, low priority | picture (CONFIRMED) | UI KIT |
@@ -289,13 +288,13 @@ The doors are where the original's are (Operations upper left, Personnel top, Cr
 
 One small PR per item, gameplay first. Each documented in the screenshots or the decompiled original, so D1 applies; a probe check that fails on the code before goes with each.
 
-1. **The DAMAGE display** (section 13), from `ENGINEER.c`: done. Repair's choice of system waits for the owner, since it would replace the ruling of 2026-10-11 that the engineer repairs the worst first.
+1. **The DAMAGE display and Repair's choice of system** (section 13), from `ENGINEER.c`: done (the choice by the owner's ruling of 2026-10-12, which replaced the worst first).
 2. **The bank's interest** (section 21): done. Left from it: the original books a recommendation's bonus or fine at once, which touches the colony rulings of roadmap 1.3.
-3. **The notices screen** (section 18): the header, END OF NOTICES, NO NEW NOTICES and REPEAT LAST NOTICE, then the typing and abort.
+3. **The notices screen** (section 18): the header, END OF NOTICES, NO NEW NOTICES and REPEAT LAST NOTICE are done; the typing and abort are left.
 4. **Combat messages and wounds** (section 12), from `DAMAGE-OV.c`.
 5. **MOTION DETECTED AT X: Y:** (section 11), from `HYPERMSG-OV.c`.
 6. **The shields and weapons messages** (section 2), from `NAVIGATR.c`.
-7. Smaller: the temperature range (7), the analysis heading's colon (7), the orbit lines scrolling on (5), the crosshair's start (8), Look's temperature and hydrosphere (10), the weather as the first line on the surface (10), the bank's transaction names (21), Personnel's number of training sessions (19), the terrain vehicle's distance to the ship (10, once the scale is checked).
+7. Smaller: the temperature range (7), the analysis heading's colon (7), the orbit lines scrolling on (5), the crosshair's start (8), Look's temperature and hydrosphere (10), the weather as the first line on the surface (10), Personnel's number of training sessions (19), the terrain vehicle's distance to the ship (10, once the scale is checked).
 8. **The probe's pictures**: the missing screens of section 25, the landing map after the crosshair is placed, the encounter with the aliens in view, so that the next comparison can see them.
 
 The UI kit items are left to the UI kit's work. Two items are the owner's call: the security code (D4) and the Ship's Log as a menu.

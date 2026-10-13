@@ -26,6 +26,10 @@ public class DamageDisplay : ShipDisplay
 	// how whole each row was when its bar was drawn (-1 for a row with no bar, int.MinValue before it is drawn)
 	int[] m_shownHealth;
 
+	// the cursor of Repair's choice, over the label of a row (the original's light blue bar, (/REPAIR) WF3C5), and the row it is on (-1 when hidden)
+	RectTransform m_cursor;
+	int m_cursorRow = -1;
+
 	// makes the display, hidden, under the other displays
 	public static DamageDisplay Create( Transform parent )
 	{
@@ -70,6 +74,14 @@ public class DamageDisplay : ShipDisplay
 		UpdateBars();
 	}
 
+	public override void Hide()
+	{
+		// Repair's cursor goes with the display
+		SetCursor( -1 );
+
+		base.Hide();
+	}
+
 	public override void Update()
 	{
 		// the bars follow the repairs under way
@@ -85,6 +97,30 @@ public class DamageDisplay : ShipDisplay
 		}
 
 		return m_shownHealth[ item ];
+	}
+
+	// puts Repair's cursor on a row (by repair item), or hides it with -1
+	public void SetCursor( int row )
+	{
+		m_cursorRow = ( ( row >= 0 ) && ( row < c_rowLabels.Length ) ) ? row : -1;
+
+		if ( m_cursor == null )
+		{
+			return;
+		}
+
+		m_cursor.gameObject.SetActive( m_cursorRow >= 0 );
+
+		if ( m_cursorRow >= 0 )
+		{
+			Place( m_cursor, c_sideMargin - c_framePadding, c_labelWidth - c_framePadding, 0.0f, c_topMargin + m_cursorRow * c_rowHeight, c_rowHeight );
+		}
+	}
+
+	// the row Repair's cursor is on (-1 when hidden)
+	public int GetCursor()
+	{
+		return m_cursorRow;
 	}
 
 	// the rows as the display shows them, for the probe ("HULL 100, ENGINES 80, ..., MISSILE -")
@@ -150,6 +186,12 @@ public class DamageDisplay : ShipDisplay
 		var frame = MakeImage( "Frame", transform, UIKitTheme.SpriteRole.PanelOutline, UIKitTheme.ColorRole.BorderDefault );
 
 		Place( frame.rectTransform, barLeft - c_framePadding, -1.0f, c_sideMargin - c_framePadding, c_topMargin - c_framePadding, rowCount * c_rowHeight + 2.0f * c_framePadding );
+
+		// Repair's cursor, behind the labels, hidden until Repair shows it
+		var cursor = MakeImage( "Cursor", transform, UIKitTheme.SpriteRole.Panel, UIKitTheme.ColorRole.AccentPrimaryDim );
+
+		m_cursor = cursor.rectTransform;
+		m_cursor.gameObject.SetActive( false );
 
 		for ( var item = 0; item < rowCount; item++ )
 		{

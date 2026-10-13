@@ -141,7 +141,8 @@ public class AnalysisButton : ShipButton
 		if ( sensorsDisplay.m_hasSensorData )
 		{
 			// yes - start building the new messages text
-			text = "<color=white>Analysis of Last Sensor Reading</color>\n";
+			// (the original's heading has a colon: ANALYZE-OV, "ANALYSIS OF LAST SENSOR READING:")
+			text = "<color=white>Analysis of Last Sensor Reading:</color>\n";
 
 			// what did we just scan
 			switch ( SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.m_scanType )

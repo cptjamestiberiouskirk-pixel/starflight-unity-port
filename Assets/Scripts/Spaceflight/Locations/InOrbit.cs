@@ -227,9 +227,9 @@ public class InOrbit : MonoBehaviour
 		// play the docking bay music track
 		MusicController.m_instance.ChangeToTrack( MusicController.Track.InOrbit );
 
-		// let the player know we've established orbit
-		SpaceflightController.m_instance.m_messages.Clear();
-		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Orbit established.</color>" );
+		// let the player know we've established orbit, under the lines that led up to it, in the original's words (starflt_143: the lines scroll on from
+		// "...COMMENCING SYSTEM TRAVEL" to "...ORBIT ESTABLISHED")
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>...Orbit established.</color>" );
 
 		// say so if this is a planet whose maps could not be generated (that is why it is a plain grey ball, and why we can't land on it)
 		if ( planetController.CouldNotBeMapped() )
