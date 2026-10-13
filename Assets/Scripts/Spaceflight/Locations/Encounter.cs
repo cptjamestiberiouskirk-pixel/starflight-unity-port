@@ -809,7 +809,7 @@ public class Encounter : MonoBehaviour
 			// the races the shipped game starts friendly are friendly, the others neutral
 			m_pdEncounter.m_alienStance = AlienPersonality.StartsFriendly( m_gdEncounter.m_race ) ? GD_Comm.Stance.Friendly : GD_Comm.Stance.Neutral;
 			m_pdEncounter.m_playerStance = GD_Comm.Stance.Neutral;
-			m_pdEncounter.m_questionLikelihood = 50;
+			m_pdEncounter.m_questionLikelihood = c_questionLikelihood;
 			m_pdEncounter.m_numCorrectAnswers = 0;
 			m_pdEncounter.m_mechan9NoHumansWarningDone = false;
 			m_pdEncounter.m_attackedByPlayer = false;
@@ -1207,8 +1207,8 @@ public class Encounter : MonoBehaviour
 			// set connection timer
 			m_pdEncounter.m_connectionTimer = Random.Range( 120.0f, 300.0f );
 
-			// start at 50% question likelihood
-			m_pdEncounter.m_questionLikelihood = 50;
+			// the Mechans ask questions more than the other races do (COMM-OV ?MAKE-STATEMENT: 70 in 100 for ALIEN-RACE 3)
+			m_pdEncounter.m_questionLikelihood = c_mechanQuestionLikelihood;
 		}
 		else
 		{
@@ -1287,9 +1287,18 @@ public class Encounter : MonoBehaviour
 		// set connection timer
 		m_pdEncounter.m_connectionTimer = Random.Range( 120.0f, 300.0f );
 
-		// start at 50% question likelihood
-		m_pdEncounter.m_questionLikelihood = 50;
+		// the shipped game's question rate
+		m_pdEncounter.m_questionLikelihood = c_questionLikelihood;
 	}
+
+	// how often the aliens ask a question instead of making a statement, in percent: 30, and 70 for the Mechans (COMM-OV ?MAKE-STATEMENT)
+	const int c_questionLikelihood = 30;
+	const int c_mechanQuestionLikelihood = 70;
+
+	// how long the aliens wait for the player to reply to their hail or answer their question before they hail again or say they are waiting, and how many hails
+	// (or a question and its reminders) they make before they wait no more (COMM-OV SET-TIRED-TIME: 20 seconds; ?REPEAT: #A-HAILS below 3)
+	const float c_tiredOfWaitingTime = 20.0f;
+	const int c_maximumHails = 3;
 
 	// update encounter with elowan
 	void UpdateElowanEncounter()
@@ -1573,14 +1582,7 @@ public class Encounter : MonoBehaviour
 		}
 
 		// do the default encounter stuff
-		if ( DefaultEncounterUpdate() )
-		{
-			// mechans more likely to ask questions as time goes by to try and figure out who the player is
-			if ( m_pdEncounter.m_alienStance == GD_Comm.Stance.Neutral )
-			{
-				m_pdEncounter.m_questionLikelihood += 25;
-			}
-		}
+		DefaultEncounterUpdate();
 	}
 
 	// update encounter with mysterion
@@ -2181,6 +2183,22 @@ public class Encounter : MonoBehaviour
 		// have we already disconnected?
 		if ( !m_pdEncounter.m_disconnected )
 		{
+			// are the aliens waiting for the answer to their question? after 20 seconds they say they are waiting, twice at most (COMM-OV TIRED-OF-WAITING)
+			if ( ( m_pdEncounter.m_lastQuestionFromAliens != 0 ) && m_pdEncounter.m_connected && ( m_pdEncounter.m_lastSubjectFromPlayer == GD_Comm.Subject.None ) )
+			{
+				m_pdEncounter.m_conversationTimer -= Time.deltaTime;
+
+				if ( ( m_pdEncounter.m_conversationTimer <= 0.0f ) && ( m_pdEncounter.m_alienHails < c_maximumHails ) )
+				{
+					m_pdEncounter.m_conversationTimer = c_tiredOfWaitingTime;
+					m_pdEncounter.m_alienHails++;
+
+					AddComm( GD_Comm.Subject.WaitingForResponse, false );
+
+					aliensSaidSomething = true;
+				}
+			}
+
 			// did the aliens ask a question?
 			if ( m_pdEncounter.m_lastQuestionFromAliens == 0 )
 			{
@@ -2274,10 +2292,13 @@ public class Encounter : MonoBehaviour
 								// yes - do a response
 								AddComm( GD_Comm.Subject.GreetingResponse, false );
 							}
-							else
+							// no - do a hail, unless the aliens have hailed three times without a reply: they hail again after 20 seconds without one, and
+							// then wait (COMM-OV HAIL, TIRED-OF-WAITING and ?REPEAT) - a home fleet gives every one of its homeworld warnings
+							else if ( ( m_pdEncounter.m_alienHails < c_maximumHails ) || IsHomeFleet() )
 							{
-								// no - do a hail
 								AddComm( GD_Comm.Subject.GreetingHail, false );
+
+								m_pdEncounter.m_conversationTimer = c_tiredOfWaitingTime;
 							}
 						}
 					}
@@ -3822,6 +3843,10 @@ public class Encounter : MonoBehaviour
 
 				// remember the question from the aliens
 				m_pdEncounter.m_lastQuestionFromAliens = comm.m_id;
+
+				// and wait 20 seconds for the answer before saying so, twice at most (COMM-OV QUESTION: SET-TIRED-TIME, #A-HAILS 1)
+				m_pdEncounter.m_conversationTimer = c_tiredOfWaitingTime;
+				m_pdEncounter.m_alienHails = 1;
 			}
 
 			// was this an answer?
