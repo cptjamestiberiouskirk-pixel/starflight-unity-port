@@ -18,32 +18,18 @@ public class LookButton : ShipButton
 
 		SpaceflightController.m_instance.m_messages.Clear();
 
-		// get environmental info
-		var atmosphere = planet.GetAtmosphereText();
-		var weather = gameData.m_weatherList[ planet.m_weatherId ].m_name;
-		var surface = gameData.m_surfaceList[ planet.m_surfaceId ].m_name;
-		var gravity = planet.m_gravity;
+		// the planet's fields as the original gives them on the surface, in its order (MAPS-OV WF4F4): SKY, TEMPERATURE and GRAVITY on one line, ATMO, HYDRO and
+		// TERRAIN - the atmosphere and the hydrosphere by their main compound; the temperature is the planet's (the original's is the region's, which the port
+		// does not have)
+		var atmosphere = ( ( planet.m_atmosphereIdA >= 0 ) && ( planet.m_atmosphereIdA < gameData.m_atmosphereList.Length ) ) ? gameData.m_atmosphereList[ planet.m_atmosphereIdA ].m_name : "None";
+		var hydrosphere = ( ( planet.m_hydrosphereId >= 0 ) && ( planet.m_hydrosphereId < gameData.m_hydrosphereList.Length ) ) ? gameData.m_hydrosphereList[ planet.m_hydrosphereId ].m_name : "None";
 
-		// determine gravity description
-		string gravityDesc;
-		if ( gravity < 50 )
-			gravityDesc = "Very Low";
-		else if ( gravity < 80 )
-			gravityDesc = "Low";
-		else if ( gravity < 120 )
-			gravityDesc = "Normal";
-		else if ( gravity < 200 )
-			gravityDesc = "High";
-		else
-			gravityDesc = "Crushing";
-
-		// build observation report
 		var report = "<color=#FFFF00>You observe your surroundings:</color>\n";
-		report += "Surface: <color=white>" + surface + "</color>\n";
-		report += "Weather: <color=white>" + weather + "</color>\n";
 		report += "Sky: <color=white>" + PlanetWeather.GetSkyText() + "</color>\n";
-		report += "Atmosphere: <color=white>" + atmosphere + "</color>\n";
-		report += "Gravity: <color=white>" + gravityDesc + " (" + gravity + "%)</color>";
+		report += "Temperature: <color=white>" + planet.GetTemperatureText() + "</color>  Gravity: <color=white>" + planet.GetGravityText() + "</color>\n";
+		report += "Atmo: <color=white>" + atmosphere + "</color>\n";
+		report += "Hydro: <color=white>" + hydrosphere + "</color>\n";
+		report += "Terrain: <color=white>" + planet.GetSurfaceText() + "</color>";
 
 		// what is next to the terrain vehicle (planet.txt, LOOK: "a description of the icon the eyeball is over is given" - the port describes what is nearest)
 		report += DescribeNearby();
