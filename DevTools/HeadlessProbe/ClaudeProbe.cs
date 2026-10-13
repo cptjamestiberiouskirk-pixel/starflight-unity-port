@@ -1049,6 +1049,14 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportTraining();
 				break;
 
+			case "surfacepictures":
+				yield return ScenarioSurfacePictures();
+				break;
+
+			case "bridgepictures":
+				yield return ScenarioBridgePictures();
+				break;
+
 			case "motiondetected":
 				yield return ScenarioMotionDetected();
 				break;
@@ -23310,7 +23318,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		take( "star_system_status" );
 
-		// ---- in orbit around Arth's planet 90, with its sensor reading
+		// ---- in orbit around Arth's planet 90, with its sensor reading (the system display, as Maneuver leaves it when the player flies into orbit: the original's
+		// orbit shows the system map, starflt_143)
+		displays.ChangeDisplay( displays.m_systemDisplay );
+
 		yield return EnterOrbit( 90 );
 		yield return Frames( 30 );
 
@@ -23331,9 +23342,14 @@ public class ClaudeProbe : MonoBehaviour
 
 		take( "orbit_analysis" );
 
-		// ---- the landing map
+		// ---- the landing map, with the crosshair moved to 15 north, 30 west (the original's starflt_150 reads LAT 15N LONG 30W), as the stick moves it
 		displays.ChangeDisplay( displays.m_terrainMapDisplay );
 		displays.m_terrainMapDisplay.ShowSelectSite();
+
+		playerData.m_general.m_selectedLatitude = -30.0f;
+		playerData.m_general.m_selectedLongitude = 15.0f;
+
+		displays.m_terrainMapDisplay.MoveCrosshairs();
 
 		yield return Frames( 10 );
 
@@ -23353,7 +23369,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		take( "hyperspace" );
 
-		// ---- an encounter of Spemin scouts in Arth's system, once the ships have come close
+		// ---- an encounter of Spemin scouts in Arth's system, once the ships have come close (the ship back at Arth's place in hyperspace first, so that the
+		// coordinates above the main view are Arth's 125 100 and not the hyperspace picture's)
+		var arthStar = DataController.m_instance.m_gameData.m_starList[ DataController.m_instance.m_gameData.m_misc.m_arthStarId ];
+
+		playerData.m_general.m_lastHyperspaceCoordinates = arthStar.GetWorldCoordinates();
+
 		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
 
 		yield return Frames( 10 );
@@ -23481,11 +23502,270 @@ public class ClaudeProbe : MonoBehaviour
 			yield return Frames( 10 );
 		}
 
+		// ---- the rooms' screens after the first, numbered after the rooms' pictures
+		var roomsPictures = pictures.Count;
+
+		yield return StarportRoomScreens( take );
+
 		Log( "starport-screenpictures: " + pictures.Count + " pictures in " + folder + ": " + string.Join( ", ", pictures ) );
 
-		Check( "starport-screenpictures: a picture of the Starport and of each of its rooms", pictures.Count == 8, pictures.Count.ToString() );
+		Check( "starport-screenpictures: a picture of the Starport and of each of its rooms", roomsPictures == 8, roomsPictures.ToString() );
+		Check( "starport-screenpictures: a picture of each of the rooms' screens after the first", pictures.Count - roomsPictures == 21, ( pictures.Count - roomsPictures ).ToString() );
 
 		Finish( "scenario=starport-screenpictures pictures=" + pictures.Count, 0 );
+	}
+
+	// runs a call of a panel for a picture, and logs what it throws instead of ending the scenario
+	static void PanelCall( string label, System.Action action )
+	{
+		try
+		{
+			action();
+		}
+		catch ( Exception exception )
+		{
+			s_exceptionCount++;
+
+			Log( label + " threw " + exception.GetType().Name + ": " + exception.Message );
+		}
+	}
+
+	// the screens of the Starport's rooms after the first, as the original's screenshots show them: the notices and the evaluation, a new crew member
+	// (race, name, file, training, deleting), the crew assignment with a crew member on file, a full ledger, an equipped ship with the buy and sell lists
+	// and the naming, and the trade depot's lists
+	IEnumerator StarportRoomScreens( System.Action<string> take )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+
+		// ---- Operations: the first notice of the game being typed out, the end of the notices, and the evaluation with no recommendations (starflt_009 to 011)
+		var operations = FindPanel<OperationsPanel>();
+
+		playerData.m_starport.m_lastReadNoticeStardate = "0000-00-00";
+
+		yield return OpenPanel( operations, "operations" );
+
+		PanelCall( "NoticesClicked", () => operations.NoticesClicked() );
+
+		yield return new WaitForSecondsRealtime( 0.7f );
+
+		take( "operations_notice" );
+
+		// the rest of the notice typed out as the player sees it, a paragraph every 0.3 s without a press
+		var typedEnd = Time.realtimeSinceStartup + 15.0f;
+
+		while ( !(bool) GetField( operations, "m_endOfMessageReached" ) && ( Time.realtimeSinceStartup < typedEnd ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 30 );
+
+		take( "operations_notices_end" );
+
+		Log( "starport-screenpictures: the notice read to its end ends '" + Tail( operations.m_messageText.text.Replace( "\r", "" ) ) + "'" );
+
+		PanelCall( "QuitClicked", () => operations.QuitClicked() );
+		PanelCall( "EvaluationClicked", () => operations.EvaluationClicked() );
+
+		yield return Frames( 5 );
+
+		take( "operations_evaluation" );
+
+		PanelCall( "QuitClicked", () => operations.QuitClicked() );
+
+		yield return ClosePanel( operations, "operations" );
+
+		// ---- Personnel: a new crew member, from the choice of race to the question of deleting them (starflt_026 to 040)
+		var personnel = FindPanel<PersonnelPanel>();
+
+		yield return OpenPanel( personnel, "personnel" );
+
+		PanelCall( "CreateClicked", () => personnel.CreateClicked() );
+
+		yield return Frames( 5 );
+
+		take( "personnel_race" );
+
+		PanelCall( "SelectClicked", () => personnel.SelectClicked() );
+
+		yield return Frames( 5 );
+
+		take( "personnel_name" );
+
+		PanelCall( "OnEndEdit", () =>
+		{
+			personnel.m_nameInputField.text = "Marvin";
+			personnel.OnEndEdit();
+		} );
+
+		yield return Frames( 5 );
+
+		take( "personnel_file" );
+
+		PanelCall( "TrainClicked", () => personnel.TrainClicked() );
+
+		yield return Frames( 5 );
+
+		take( "personnel_train" );
+
+		Call( personnel, "TrainSelectedSkill" );
+
+		yield return Frames( 5 );
+
+		take( "personnel_sessions" );
+
+		PanelCall( "CancelClicked", () => personnel.CancelClicked() );
+		PanelCall( "DeleteClicked", () => personnel.DeleteClicked() );
+
+		yield return Frames( 5 );
+
+		take( "personnel_delete" );
+
+		PanelCall( "NoClicked", () => personnel.NoClicked() );
+
+		yield return ClosePanel( personnel, "personnel" );
+
+		// ---- Crew Assignment with that crew member on file, and the choice of the captain (starflt_041)
+		var crewAssignment = FindPanel<CrewAssignmentPanel>();
+
+		yield return OpenPanel( crewAssignment, "crew assignment" );
+		yield return Frames( 5 );
+
+		take( "crew_assignment_file" );
+
+		PanelCall( "AssignClicked", () => crewAssignment.AssignClicked() );
+
+		yield return Frames( 5 );
+
+		take( "crew_assignment_assign" );
+
+		Call( crewAssignment, "SwitchToMenuBarState" );
+
+		yield return ClosePanel( crewAssignment, "crew assignment" );
+
+		// ---- the Bank with a ledger longer than its window, the rows of the original's starflt_042 and more in the port's names
+		var bank = FindPanel<BankPanel>();
+		var rows = new[]
+		{
+			"4620-01-01|Ship configuration|3000-", "4620-01-07|Interest|21+", "4620-01-07|Trade depot|45358+", "4620-01-07|Ship configuration|5000-",
+			"4620-01-07|Personnel|42000-", "4620-01-20|Interest|290+", "4620-01-20|Trade depot|231962+", "4620-01-20|Ship configuration|274100-",
+			"4620-01-25|Interest|31+", "4620-01-25|Bonus|35000+", "4620-02-07|Interest|242+", "4620-02-07|Bonus|30000+", "4620-02-11|Fine|15000-",
+			"4620-02-15|Trade depot|173256+", "4620-02-21|Interest|58+", "4620-02-21|Bonus|35000+", "4620-02-28|Interest|166+", "4620-02-28|Bonus|55000+",
+			"4620-03-01|Interest|137+", "4620-03-01|Trade depot|156830+", "4620-03-01|Ship configuration|123900-"
+		};
+
+		foreach ( var row in rows )
+		{
+			var parts = row.Split( '|' );
+
+			playerData.m_bank.m_transactionList.Add( new PD_Bank.Transaction( parts[ 0 ], parts[ 1 ], parts[ 2 ] ) );
+		}
+
+		yield return OpenPanel( bank, "bank" );
+		yield return Frames( 5 );
+
+		take( "bank_ledger" );
+
+		yield return ClosePanel( bank, "bank" );
+
+		// ---- Ship Configuration: the original's equipped ship of starflt_076 (16 cargo pods, engines, shields, missiles and lasers class 5, armor class 3), the
+		// buy list and its classes, the sell list and the naming
+		var shipConfiguration = FindPanel<ShipConfigurationPanel>();
+
+		playerData.m_bank.m_currentBalance = 5000000;
+
+		yield return OpenPanel( shipConfiguration, "ship configuration" );
+
+		var classes = new[] { 0, 4, 4, 2, 4, 4 };
+
+		for ( var part = 1; part < classes.Length; part++ )
+		{
+			SetField( shipConfiguration, "m_currentPartIndex", part );
+			SetField( shipConfiguration, "m_currentClassIndex", classes[ part ] );
+			Call( shipConfiguration, "BuySelectedClass" );
+		}
+
+		for ( var pod = 0; pod < 16; pod++ )
+		{
+			SetField( shipConfiguration, "m_currentPartIndex", 0 );
+			Call( shipConfiguration, "BuyCargoPod" );
+		}
+
+		Call( shipConfiguration, "SwitchToMenuBarState" );
+
+		yield return Frames( 5 );
+
+		take( "ship_equipped" );
+
+		PanelCall( "BuyClicked", () => shipConfiguration.BuyClicked() );
+
+		yield return Frames( 5 );
+
+		take( "ship_buy" );
+
+		SetField( shipConfiguration, "m_currentPartIndex", 1 );
+		Call( shipConfiguration, "SwitchToSelectClassState", true );
+
+		yield return Frames( 5 );
+
+		take( "ship_buy_class" );
+
+		PanelCall( "SellClicked", () => shipConfiguration.SellClicked() );
+
+		yield return Frames( 5 );
+
+		take( "ship_sell" );
+
+		PanelCall( "NameClicked", () => shipConfiguration.NameClicked() );
+
+		yield return Frames( 5 );
+
+		take( "ship_name" );
+
+		Call( shipConfiguration, "SwitchToMenuBarState" );
+
+		yield return ClosePanel( shipConfiguration, "ship configuration" );
+
+		// ---- the Trade Depot: the buy list, the amount to buy, the sell list (the new game's Endurium and a Whining Orb) and the analysis list (starflt_052,
+		// 078 to 080)
+		var tradeDepot = FindPanel<TradeDepotPanel>();
+		var orbId = gameData.FindArtifactId( "Whining Orb" );
+
+		if ( orbId >= 0 )
+		{
+			playerData.m_playerShip.AddArtifact( orbId );
+		}
+
+		yield return OpenPanel( tradeDepot, "trade depot" );
+
+		PanelCall( "BuyClicked", () => tradeDepot.BuyClicked() );
+
+		yield return Frames( 5 );
+
+		take( "trade_buy" );
+
+		Call( tradeDepot, "SwitchToBuyAmountState" );
+
+		yield return Frames( 5 );
+
+		take( "trade_buy_amount" );
+
+		PanelCall( "SellClicked", () => tradeDepot.SellClicked() );
+
+		yield return Frames( 5 );
+
+		take( "trade_sell" );
+
+		PanelCall( "AnalyzeClicked", () => tradeDepot.AnalyzeClicked() );
+
+		yield return Frames( 5 );
+
+		take( "trade_analyze" );
+
+		Call( tradeDepot, "SwitchToMenuBarState" );
+
+		yield return ClosePanel( tradeDepot, "trade depot" );
 	}
 
 	// ---------------------------------------------------------------- phase 7: latitude and longitude as the original gives them
@@ -26848,6 +27128,353 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-training: asking for more than the most trains the most, to the skill's maximum", mostRight && ( secondQuestion == "How many training sessions (0-" + ( expectedMost - 3 ) + ")? 1" ), "'" + secondQuestion + "', " + afterMost + " (expected " + maximum + " science, " + ( 11700 - 300 * expectedMost ) + " M.U.)" );
 
 		Finish( "scenario=starport-training checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: pictures of the landed ship and of the terrain vehicle's screens (probe.ps1 -Graphics)
+
+	IEnumerator ScenarioSurfacePictures()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+		var done = new bool[ 1 ];
+		var folder = ScreenPictureFolder( "surface" );
+		var pictures = new List<string>();
+
+		EnsureCrew();
+
+		if ( folder == "" )
+		{
+			Log( "surfacepictures: no graphics device (-nographics), so no pictures; run probe.ps1 with -Graphics for them" );
+
+			Finish( "scenario=surfacepictures pictures=0", 0 );
+			yield break;
+		}
+
+		// no encounter begins while the pictures are taken
+		controller.m_encounterRange = 0.0f;
+
+		System.Action<string> take = name =>
+		{
+			var path = System.IO.Path.Combine( folder, ( pictures.Count + 1 ).ToString( "00" ) + "_" + name + ".png" );
+
+			RenderScreenPicture( path );
+			pictures.Add( name );
+		};
+
+		// ---- the ship landed on planet 92 of Arth (it has life), before the terrain vehicle goes out (the original's starflt_178)
+		yield return GoIntoOrbit( gameData.m_misc.m_arthStarId, 92 );
+
+		playerData.m_general.m_selectedLatitude = 0.0f;
+		playerData.m_general.m_selectedLongitude = 0.0f;
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		// (the map fades in over 2 s)
+		yield return new WaitForSecondsRealtime( 2.5f );
+
+		take( "landed" );
+
+		// ---- out in the terrain vehicle, then landed again beside the planet's first lifeform, which is then on the screen
+		yield return DisembarkNow( done );
+
+		var lifeforms = LifeformsOnTheGround();
+		var firstPlace = ( lifeforms.Count > 0 ) ? lifeforms[ 0 ].position : Vector3.zero;
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
+		yield return Frames( 30 );
+
+		var outInTheVehicle = done[ 0 ];
+
+		// the nearest lifeform put beside the vehicle, on the ground, where it is in view and within reach of Cargo and the weapons
+		var vehicle = controller.m_terrainVehicle;
+		var populator = FieldOrNull( controller.m_disembarked.m_terrainGrid, "m_terrainLifeforms" ) as TerrainLifeforms;
+		Transform nearest = null;
+
+		foreach ( var lifeform in LifeformsOnTheGround() )
+		{
+			if ( ( nearest == null ) || ( DistanceToVehicle( lifeform ) < DistanceToVehicle( nearest ) ) )
+			{
+				nearest = lifeform;
+			}
+		}
+
+		if ( nearest != null )
+		{
+			var place = BesideTheVehicle( vehicle );
+			var ground = place.y;
+
+			if ( populator != null )
+			{
+				populator.GetGround( place, out ground );
+			}
+
+			nearest.position = new Vector3( place.x, ground, place.z );
+		}
+
+		yield return Frames( 10 );
+
+		take( "lifeform" );
+
+		// ---- Look, Scan, and Cargo beside the lifeform (it offers it), each through the console as the player presses it (starflt_180, 183, 184)
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 3 );
+
+		yield return Frames( 10 );
+
+		take( "look" );
+
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 4 );
+
+		yield return Frames( 10 );
+
+		take( "scan" );
+
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 2 );
+
+		yield return Frames( 10 );
+
+		take( "cargo_lifeform" );
+
+		if ( buttonController.GetCurrentButtonSet() == ButtonController.ButtonSet.TerrainVehicleLifeform )
+		{
+			// Ignore
+			PressButton( ButtonController.ButtonSet.TerrainVehicleLifeform, 2 );
+		}
+
+		// ---- Weapon: the weapon buttons, then a laser shot (starflt_185)
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 5 );
+
+		yield return Frames( 10 );
+
+		take( "weapon" );
+
+		PressButton( ButtonController.ButtonSet.TerrainVehicleWeapon, 0 );
+
+		yield return Frames( 10 );
+
+		take( "weapon_fire" );
+
+		// Back
+		PressButton( ButtonController.ButtonSet.TerrainVehicleWeapon, 2 );
+
+		// ---- Cargo with 3 cubic meters of the planet's first element in the vehicle and nothing beside it: the cargo list (starflt_182, 189 to 191)
+		var terrainVehicle = controller.m_terrainVehicle;
+
+		foreach ( var deposit in controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true ) )
+		{
+			if ( Vector3.Distance( deposit.transform.position, terrainVehicle.transform.position ) < 50.0f )
+			{
+				deposit.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		foreach ( var lifeform in LifeformsOnTheGround() )
+		{
+			if ( Vector3.Distance( lifeform.position, terrainVehicle.transform.position ) < 50.0f )
+			{
+				lifeform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		playerData.m_terrainVehicle.AddElement( gameData.m_planetList[ 92 ].m_elementIdA, 30 );
+
+		yield return Frames( 5 );
+
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 2 );
+
+		yield return Frames( 10 );
+
+		take( "cargo_list" );
+
+		if ( buttonController.GetCurrentButtonSet() == ButtonController.ButtonSet.TerrainVehicleCargo )
+		{
+			// Back
+			PressButton( ButtonController.ButtonSet.TerrainVehicleCargo, 2 );
+		}
+
+		// ---- Maps: the camera high above the vehicle (starflt_181)
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 0 );
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		take( "maps" );
+
+		Log( "surfacepictures: " + pictures.Count + " pictures in " + folder + ": " + string.Join( ", ", pictures ) + " | out in the vehicle beside a lifeform " + outInTheVehicle + " (" + lifeforms.Count + " lifeforms)" );
+
+		Check( "surfacepictures: a picture of every screen visited, with the terrain vehicle out beside a lifeform", ( pictures.Count == 9 ) && outInTheVehicle && ( lifeforms.Count > 0 ), pictures.Count + ", out " + outInTheVehicle + ", " + lifeforms.Count + " lifeforms" );
+
+		Finish( "scenario=surfacepictures pictures=" + pictures.Count, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: pictures of the flight scene's docking bay, its departments and the launch (probe.ps1 -Graphics)
+
+	IEnumerator ScenarioBridgePictures()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+		var folder = ScreenPictureFolder( "bridge" );
+		var pictures = new List<string>();
+
+		EnsureCrew();
+
+		if ( folder == "" )
+		{
+			Log( "bridgepictures: no graphics device (-nographics), so no pictures; run probe.ps1 with -Graphics for them" );
+
+			Finish( "scenario=bridgepictures pictures=0", 0 );
+			yield break;
+		}
+
+		var crewMember = playerData.m_personnel.m_personnelList[ 0 ];
+
+		System.Action<string> take = name =>
+		{
+			var path = System.IO.Path.Combine( folder, ( pictures.Count + 1 ).ToString( "00" ) + "_" + name + ".png" );
+
+			RenderScreenPicture( path );
+			pictures.Add( name );
+		};
+
+		// ---- the docking bay, as the ship is when the crew comes aboard (the original's starflt_192)
+		controller.SwitchLocation( PD_General.Location.DockingBay );
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		take( "docking_bay" );
+
+		// ---- Medical: Examine and Treat ask who, then answer for the one chosen (starflt_129 to 132)
+		PressButton( ButtonController.ButtonSet.Bridge, 5 );
+
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.Medical, 0 );
+
+		yield return Frames( 10 );
+
+		take( "examine_question" );
+
+		var examined = ChooseCrewMember( crewMember );
+
+		yield return Frames( 10 );
+
+		take( "examine" );
+
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.Medical, 1 );
+
+		yield return Frames( 10 );
+
+		take( "treat_question" );
+
+		var treated = ChooseCrewMember( crewMember );
+
+		yield return Frames( 10 );
+
+		take( "treat" );
+
+		// ---- Communications: Hail with no one to hail, and Distress's question (starflt_127, 128)
+		PressButton( ButtonController.ButtonSet.Medical, 2 );
+		PressButton( ButtonController.ButtonSet.Bridge, 4 );
+
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.CommunicationsA, 0 );
+
+		yield return Frames( 10 );
+
+		take( "hail_nobody" );
+
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.CommunicationsA, 1 );
+
+		yield return Frames( 10 );
+
+		take( "distress_question" );
+
+		var distressAnswered = PressDistressChoice( 0 );
+
+		// ---- the Captain's menu, Launch's question, the launch, and the ship out of the Starport (starflt_104, 133, 136 to 139)
+		PressButton( ButtonController.ButtonSet.CommunicationsA, 2 );
+		PressButton( ButtonController.ButtonSet.Bridge, 0 );
+
+		yield return Frames( 10 );
+
+		take( "captain" );
+
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.CommandA, 0 );
+
+		yield return Frames( 10 );
+
+		take( "launch_question" );
+
+		PressButtonLabelled( ButtonController.ButtonSet.Launch, "Yes" );
+
+		yield return new WaitForSecondsRealtime( 3.0f );
+
+		take( "launch" );
+
+		yield return WaitForLocation( PD_General.Location.JustLaunched, 30.0f );
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		var launched = playerData.m_general.m_location;
+
+		take( "launched" );
+
+		// ---- Hail in an encounter of Spemin scouts in Arth's system: the postures to hail with, then a friendly hail (Encounters/Hail, starflt_044, 047)
+		EnterStarSystem( gameData.m_misc.m_arthStarId );
+
+		var start = Time.realtimeSinceStartup;
+
+		while ( controller.m_starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 40.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 10 );
+
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		ForceVessel( speminId, 2 );
+		EnterEncounter( speminId );
+
+		yield return new WaitForSecondsRealtime( 4.0f );
+
+		PressButton( ButtonController.ButtonSet.Bridge, 4 );
+
+		var communicationsSet = buttonController.GetCurrentButtonSet();
+
+		controller.m_messages.Clear();
+
+		PressButton( communicationsSet, 0 );
+
+		yield return Frames( 10 );
+
+		var postureSet = buttonController.GetCurrentButtonSet();
+
+		take( "hail_postures" );
+
+		PressButton( postureSet, 0 );
+
+		yield return Frames( 30 );
+
+		take( "hail_friendly" );
+
+		Log( "bridgepictures: " + pictures.Count + " pictures in " + folder + ": " + string.Join( ", ", pictures ) + " | examined " + examined + ", treated " + treated + ", distress answered " + distressAnswered + ", after the launch " + launched + ", hail " + communicationsSet + " -> " + postureSet );
+
+		Check( "bridgepictures: a picture of every screen visited, the doctor's questions answered and the ship launched", ( pictures.Count == 13 ) && examined && treated && distressAnswered && ( launched == PD_General.Location.JustLaunched ), pictures.Count + ", examined " + examined + ", treated " + treated + ", distress " + distressAnswered + ", " + launched );
+
+		Finish( "scenario=bridgepictures pictures=" + pictures.Count, 0 );
 	}
 
 	// the original tells of motion only through a science officer whose science skill is above 150 (HYPERMSG-OV TRAK-E and WF28B: the ASSIGN-CREW slot at 0x14 is
