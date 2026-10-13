@@ -297,8 +297,8 @@ public class OperationsPanel : Panel
 
 	// the evaluation screen's pages, as the original's (OP-OV in the decompiled original): first Interstel's supplemental evaluations, each once (the towing
 	// charges, the lost terrain vehicle, and the completion of the mission after the win, STRINFO 1.2), then the evaluations of the planets recommended for
-	// colonization, every time, the last of them followed by "END OF EVALUATIONS" - or, with none filed, the scene's "You have not filed any colony world
-	// recommendations"
+	// colonization until the ship leaves with them read, the last of them followed by "END OF EVALUATIONS" - or, with none, the scene's "You have not filed any
+	// colony world recommendations", with the original's NEW once recommendations have been filed (OP-OV WEBC1)
 	void MakeEvaluationPages()
 	{
 		m_evaluationPages.Clear();
@@ -350,17 +350,25 @@ public class OperationsPanel : Panel
 			general.m_missionCompleteShown = true;
 		}
 
-		// the colony evaluations, every time
+		// the colony evaluations, until the ship leaves the Starport with them read (CHKFLIGHT-OV WF40A deletes them then)
 		if ( colonyEvaluations.Count > 0 )
 		{
 			m_evaluationPages.AddRange( colonyEvaluations );
 
 			m_evaluationPages[ m_evaluationPages.Count - 1 ] += "\n\n\nEND OF EVALUATIONS";
 		}
+		else if ( general.m_colonyRecommendationCount > 0 )
+		{
+			// recommendations have been filed, but none since the evaluations were last read: the original's NEW (OP-OV WEBC1)
+			m_evaluationPages.Add( m_evaluationSceneText.Replace( "not filed any colony", "not filed any new colony" ) );
+		}
 		else
 		{
 			m_evaluationPages.Add( m_evaluationSceneText );
 		}
+
+		// read now
+		general.m_colonyEvaluationUnread = false;
 	}
 
 	// shows the current page of the evaluation screen - More is there while there is another page to see
