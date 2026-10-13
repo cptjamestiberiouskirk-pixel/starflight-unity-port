@@ -209,8 +209,62 @@ public class PlayerData
 	public const int c_unsuitableFineStep = 10000;
 	public const int c_unsuitableFineSteps = 8;
 
+	// the planet of Interstel's list that this one is (null for an unsuitable planet)
+	GD_ColonyEvaluation FindColonyEvaluation( int planetId )
+	{
+		GD_ColonyEvaluation colonyEvaluation = null;
+
+		foreach ( var candidate in DataController.m_instance.m_gameData.m_colonyEvaluationList )
+		{
+			if ( candidate.m_planetId == planetId )
+			{
+				colonyEvaluation = candidate;
+			}
+		}
+
+		return colonyEvaluation;
+	}
+
+	// call this when a planet is recommended for colonization: the original books its bonus or its fine in the ledger at once, after the interest (CAPTAIN overlay
+	// (/LOG-PLAN): I-TRANS, then WF37A with WF348 and WF292, T+BALANCE and TRANSACT as BONUS or FINE) - Interstel's evaluation itself is read at the Starport
+	public void BookColonyRecommendation( PD_General.ColonyRecommendation record )
+	{
+		if ( ( record == null ) || record.m_booked )
+		{
+			return;
+		}
+
+		var colonyEvaluation = FindColonyEvaluation( record.m_planetId );
+
+		if ( colonyEvaluation != null )
+		{
+			// a planet of Interstel's list - the bonus, a BONUS in the original's ledger (transaction type 3)
+			m_bank.m_currentBalance += colonyEvaluation.m_bonus;
+			m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Bonus", colonyEvaluation.m_bonus + "+" ) );
+
+			record.m_fine = 0;
+			record.m_firstUnsuitable = false;
+		}
+		else
+		{
+			// an unsuitable planet - the fine, a FINE in the original's ledger (transaction type 0)
+			var unsuitableBefore = System.Math.Max( 0, m_general.m_unsuitableRecommendationCount );
+			var fine = System.Math.Max( c_firstUnsuitableFine, c_unsuitableFineStep * System.Math.Min( unsuitableBefore, c_unsuitableFineSteps ) );
+
+			m_general.m_unsuitableRecommendationCount++;
+
+			m_bank.m_currentBalance -= fine;
+			m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Fine", fine + "-" ) );
+
+			record.m_fine = fine;
+			record.m_firstUnsuitable = ( unsuitableBefore == 0 );
+		}
+
+		record.m_booked = true;
+	}
+
 	// call this when the ship is back at the Starport: Interstel evaluates the planets recommended for colonization since the last visit - a planet of its list
-	// earns its bonus, any other is unsuitable and fined (STRINFO 1.2) - returns how many it evaluated
+	// earns its bonus, any other is unsuitable and fined (STRINFO 1.2), both booked when the planet was recommended - returns how many it evaluated
 	public int EvaluateColonyRecommendations()
 	{
 		var gameData = DataController.m_instance.m_gameData;
@@ -234,24 +288,18 @@ public class PlayerData
 			// the heading the original's evaluation screen puts above each evaluation
 			var heading = GetColonyEvaluationHeading( planetId );
 
-			// is it a planet of Interstel's list?
-			GD_ColonyEvaluation colonyEvaluation = null;
+			// the bonus or the fine was booked when the planet was recommended (a recommendation from a save file before that is booked now; one with no record
+			// at all, from before the records, gets one for the booking)
+			var record = m_general.FindColonyRecommendation( planetId ) ?? new PD_General.ColonyRecommendation { m_planetId = planetId };
 
-			foreach ( var candidate in gameData.m_colonyEvaluationList )
-			{
-				if ( candidate.m_planetId == planetId )
-				{
-					colonyEvaluation = candidate;
-				}
-			}
+			BookColonyRecommendation( record );
+
+			// is it a planet of Interstel's list?
+			var colonyEvaluation = FindColonyEvaluation( planetId );
 
 			if ( colonyEvaluation != null )
 			{
 				// yes - the bonus
-				m_bank.m_currentBalance += colonyEvaluation.m_bonus;
-				// a BONUS in the original's ledger (CAPTAIN in the decompiled original, transaction type 3)
-				m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Bonus", colonyEvaluation.m_bonus + "+" ) );
-
 				var text = gameData.FindStoryText( ( colonyEvaluation.m_rating == "Optimal" ) ? "EvaluationOptimal" : "EvaluationSuitable" );
 
 				if ( text != null )
@@ -264,15 +312,8 @@ public class PlayerData
 
 			// no - unsuitable, and fined
 			var reasons = gameData.m_planetList[ planetId ].GetUnsuitableReasons();
-			var unsuitableBefore = System.Math.Max( 0, m_general.m_unsuitableRecommendationCount );
-			var firstTime = ( unsuitableBefore == 0 );
-			var fine = System.Math.Max( c_firstUnsuitableFine, c_unsuitableFineStep * System.Math.Min( unsuitableBefore, c_unsuitableFineSteps ) );
-
-			m_general.m_unsuitableRecommendationCount++;
-
-			m_bank.m_currentBalance -= fine;
-			// a FINE in the original's ledger (CAPTAIN, transaction type 0)
-			m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Fine", fine + "-" ) );
+			var firstTime = record.m_firstUnsuitable;
+			var fine = record.m_fine;
 
 			var unsuitable = gameData.FindStoryText( "EvaluationUnsuitable" );
 

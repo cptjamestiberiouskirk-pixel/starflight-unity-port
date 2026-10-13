@@ -25,10 +25,13 @@ public class RecommendYesButton : ShipButton
 
 		playerData.m_general.AddColonyRecommendation( playerData.m_general.m_currentPlanetId );
 
-		// the bank pays its interest up to today and counts again from today, as the original's does on a new recommendation (CAPTAIN: I-TRANS, then PORTDAT)
+		// the bank pays its interest up to today and counts again from today, as the original's does on a new recommendation (CAPTAIN: I-TRANS, then PORTDAT), and
+		// books the recommendation's bonus or fine at once (WF37A)
 		if ( isNew )
 		{
 			playerData.PayInterest( true );
+
+			playerData.BookColonyRecommendation( playerData.m_general.FindColonyRecommendation( playerData.m_general.m_currentPlanetId ) );
 		}
 
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
