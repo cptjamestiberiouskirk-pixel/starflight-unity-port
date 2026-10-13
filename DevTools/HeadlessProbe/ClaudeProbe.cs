@@ -1025,6 +1025,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLookFields();
 				break;
 
+			case "starport-noticetyping":
+				yield return ScenarioStarportNoticeTyping();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -26220,6 +26224,94 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lookfields: Look gives the original's fields in its order: Sky, Temperature and Gravity, Atmo, Hydro and Terrain", inOrder && !shown.Contains( "Weather:" ), shown );
 
 		Finish( "scenario=lookfields", 0 );
+	}
+
+	// a notice is typed out a paragraph at a time, 0.3 s apart, as the original's (OP-OV WE912), and the abort key (Quit) ends the notice being typed with
+	// "***NOTICE ABORTED***" (and the end of the notices after the newest) before a second Quit leaves the screen
+	IEnumerator ScenarioStarportNoticeTyping()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var panel = FindPanel<OperationsPanel>();
+
+		if ( ( panel == null ) || ( gameData.m_noticeList.Length < 2 ) )
+		{
+			Finish( "scenario=starport-noticetyping abort: no operations panel or too few notices", 2 );
+			yield break;
+		}
+
+		// the day of the second notice, with none read: two notices are out, and the first (the objectives) has many paragraphs
+		var secondDate = gameData.m_noticeList[ 1 ].m_stardate;
+
+		playerData.m_general.m_currentStardateYMD = secondDate;
+		playerData.m_starport.m_lastReadNoticeStardate = "0000-00-00";
+
+		var firstParagraphs = gameData.m_noticeList[ 0 ].m_message.Split( new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries ).Length;
+
+		yield return OpenPanel( panel, "operations" );
+
+		// ---- 1. the first notice types itself out without a press
+		panel.NoticesClicked();
+
+		var atOnce = Paragraphs( panel );
+
+		yield return new WaitForSecondsRealtime( 0.1f );
+
+		var after01 = Paragraphs( panel );
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		var after11 = Paragraphs( panel );
+
+		// ---- 2. Quit while it is typed: the notice is aborted and the screen stays
+		panel.QuitClicked();
+
+		var aborted = panel.m_messageText.text.Replace( "\r", "" );
+		var stayed = panel.m_noticesGameObject.activeSelf;
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		var afterAbort = Paragraphs( panel );
+
+		// ---- 3. the newest notice aborted at once: aborted, then the end of the notices
+		panel.NextClicked();
+		panel.QuitClicked();
+
+		var newestAborted = panel.m_messageText.text.Replace( "\r", "" );
+
+		// ---- 4. a second Quit leaves the screen
+		panel.QuitClicked();
+
+		var backToMenu = panel.m_welcomeGameObject.activeSelf && !panel.m_noticesGameObject.activeSelf;
+
+		yield return ClosePanel( panel, "operations" );
+
+		playerData.m_general.m_currentStardateYMD = "4620-01-01";
+
+		Log( "starport-noticetyping: the first notice (" + firstParagraphs + " paragraphs): " + atOnce + " at once, " + after01 + " after 0.1 s, " + after11 + " after 1.1 s | Quit: stayed " + stayed + ", ends '" + Tail( aborted ) + "', " + afterAbort + " paragraphs 1 s later | the newest aborted: '" + Tail( newestAborted ) + "' | a second Quit: the menu " + backToMenu );
+
+		Check( "starport-noticetyping: a notice is typed out a paragraph at a time without a press, 0.3 s apart", ( atOnce == 1 ) && ( after01 == 1 ) && ( after11 >= 4 ) && ( after11 <= 5 ), atOnce + ", " + after01 + ", " + after11 );
+		Check( "starport-noticetyping: Quit while a notice is typed ends it with the original's NOTICE ABORTED, and the screen stays", stayed && aborted.EndsWith( "\n\n***Notice aborted***" ) && ( afterAbort == after11 ) && ( after11 < firstParagraphs ), "stayed " + stayed + ", '" + Tail( aborted ) + "', " + afterAbort + " after (" + after11 + " before, of " + firstParagraphs + ")" );
+		Check( "starport-noticetyping: the newest notice aborted says NOTICE ABORTED, then END OF NOTICES", newestAborted.EndsWith( "\n\n***Notice aborted***\n\n***End of notices***" ), "'" + Tail( newestAborted ) + "'" );
+		Check( "starport-noticetyping: a second Quit goes back to the menu", backToMenu, backToMenu.ToString() );
+	}
+
+	// the paragraphs of the notice shown (after its date)
+	static int Paragraphs( OperationsPanel panel )
+	{
+		var parts = panel.m_messageText.text.Replace( "\r", "" ).Split( new[] { "\n\n" }, StringSplitOptions.RemoveEmptyEntries );
+		var count = 0;
+
+		foreach ( var part in parts )
+		{
+			if ( !part.StartsWith( "***" ) )
+			{
+				count++;
+			}
+		}
+
+		// the first part is the date
+		return Mathf.Max( 0, count - 1 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
