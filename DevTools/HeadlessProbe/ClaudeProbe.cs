@@ -18340,8 +18340,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "starmapfuel: the label on opening '" + labelOnShip + "', at 60, 40 (20 from the ship) '" + labelAt20 + "', with the Tesseract '" + labelWithTesseract + "'" );
 
-		Check( "starmapfuel: the starmap opens with the cursor on the ship and no fuel needed to get there", labelOnShip.Contains( "40   40" ) && labelOnShip.Contains( "Fuel 0.0" ), labelOnShip );
-		Check( "starmapfuel: the starmap shows the Endurium the engines need to fly to the cursor (20 coordinates at 0.48 = 9.6)", labelAt20.Contains( "60   40" ) && labelAt20.Contains( "Fuel 9.6" ), labelAt20 );
+		Check( "starmapfuel: the starmap opens with the cursor on the ship and no fuel needed to get there", labelOnShip.Contains( "Dest 40 40" ) && labelOnShip.Contains( "Fuel 0.0" ), labelOnShip );
+		Check( "starmapfuel: the starmap shows the Endurium the engines need to fly to the cursor (20 coordinates at 0.48 = 9.6)", labelAt20.Contains( "Dest 60 40" ) && labelAt20.Contains( "Fuel 9.6" ), labelAt20 );
+		Check( "starmapfuel: the starmap gives the original's POSITION, DESTINATION, DISTANCE and FUEL (MAP-OV WE72B)", labelAt20 == "Pos 40 40   Dest 60 40   Dist 20   Fuel 9.6", labelAt20 );
 		Check( "starmapfuel: with the Tesseract the estimate is half (4.8)", labelWithTesseract.Contains( "Fuel 4.8" ), labelWithTesseract );
 
 		Finish( "scenario=starmapfuel onShip='" + labelOnShip + "' at20='" + labelAt20 + "' tesseract='" + labelWithTesseract + "'", 0 );
