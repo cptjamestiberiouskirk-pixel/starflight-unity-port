@@ -78,10 +78,11 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 		{
 			foreach ( var elementRef in elementStorage.m_elementList )
 			{
-				var elementName = gameData.m_elementList[ elementRef.m_elementId ].m_name;
-				labels += elementName + "\n";
-				// (the cargo hold counts in tenths of a cubic meter)
-				values += Tools.VolumeToText( elementRef.m_volume ) + " m³\n";
+				var elementGameData = gameData.m_elementList[ elementRef.m_elementId ];
+				labels += elementGameData.m_name + "\n";
+				// (the cargo hold counts in tenths of a cubic meter) - and its value, what the Starport pays for a cubic meter of it, as the original's list
+				// (starflt_190: MOLYBDENUM 9.6 160)
+				values += Tools.VolumeToText( elementRef.m_volume ) + " m³  " + elementGameData.GetActualValue() + "\n";
 			}
 		}
 
@@ -90,9 +91,10 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 		{
 			foreach ( var artifactRef in artifactStorage.m_artifactList )
 			{
-				var artifactName = gameData.m_artifactList[ artifactRef.m_artifactId ].m_name;
-				labels += "<color=#00FFFF>" + artifactName + "</color>\n";
-				values += "\n";
+				var artifactGameData = gameData.m_artifactList[ artifactRef.m_artifactId ];
+				labels += "<color=#00FFFF>" + artifactGameData.m_name + "</color>\n";
+				// its volume and its value
+				values += Tools.VolumeToText( artifactGameData.m_volume ) + " m³  " + artifactGameData.m_actualValue + "\n";
 			}
 		}
 
@@ -104,7 +106,7 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 			foreach ( var specimen in specimenStorage.m_specimenList )
 			{
 				labels += "<color=#00FF00>" + specimen.m_name + "</color>\n";
-				values += Tools.VolumeToText( specimen.m_volume ) + " m³\n";
+				values += Tools.VolumeToText( specimen.m_volume ) + " m³  " + specimen.m_value + "\n";
 			}
 		}
 
