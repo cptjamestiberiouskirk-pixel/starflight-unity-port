@@ -1061,12 +1061,20 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioMotionDetected();
 				break;
 
+			case "starport-analyzelist":
+				yield return ScenarioStarportAnalyzeList();
+				break;
+
 			case "acceleration":
 				yield return ScenarioAcceleration();
 				break;
 
 			case "launchlines":
 				yield return ScenarioLaunchLines();
+				break;
+
+			case "starport-buyorder":
+				yield return ScenarioStarportBuyOrder();
 				break;
 
 			default:
@@ -27541,6 +27549,57 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=motiondetected checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
+	// the Trade Depot's Analysis lists the ship's own artifacts only, at their value, as the original's ANALYSIS screen (starflt_080, starflt_099): the Starport's
+	// artifacts for sale are on the Buy list, not here
+	IEnumerator ScenarioStarportAnalyzeList()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var depot = FindPanel<TradeDepotPanel>();
+
+		// one artifact in the ship's hold, and the Starport's own for sale
+		var shipArtifacts = playerData.m_playerShip.m_artifactStorage;
+		var starportArtifacts = playerData.m_starport.m_artifactStorage;
+
+		shipArtifacts.m_artifactList.Clear();
+		shipArtifacts.Add( 1 );
+
+		var starportCount = ( ( starportArtifacts != null ) && ( starportArtifacts.m_artifactList != null ) ) ? starportArtifacts.m_artifactList.Count : 0;
+
+		yield return OpenPanel( depot, "trade depot" );
+
+		Call( depot, "SwitchToAnalyzeItemState", true );
+
+		yield return Frames( 2 );
+
+		var items = GetField( depot, "m_itemList" ) as IList;
+		var listed = new List<string>();
+		var notTheShips = 0;
+
+		foreach ( var item in items )
+		{
+			var type = (int) GetField( item, "m_type" );
+			var id = (int) GetField( item, "m_id" );
+
+			listed.Add( type + ":" + id );
+
+			if ( ( type != 1 ) || ( shipArtifacts.Find( id ) == null ) )
+			{
+				notTheShips++;
+			}
+		}
+
+		var text = System.Text.RegularExpressions.Regex.Replace( depot.m_itemListText.text, "<[^>]*>", "" ).Replace( "\r", "" ).Replace( "\n", " | " );
+
+		yield return ClosePanel( depot, "trade depot" );
+
+		Log( "starport-analyzelist: the Starport has " + starportCount + " artifacts for sale, the ship 1 | the Analysis list: " + text + " | items " + string.Join( " ", listed ) );
+
+		Check( "starport-analyzelist: the Starport has artifacts for sale (the setup is the case)", starportCount > 0, starportCount.ToString() );
+		Check( "starport-analyzelist: the Analysis lists the ship's own artifacts only, under one Artifacts heading, as the original's", ( items.Count == 1 ) && ( notTheShips == 0 ) && ( text.Split( new[] { "Artifacts" }, StringSplitOptions.None ).Length == 2 ), text );
+
+		Finish( "scenario=starport-analyzelist checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
 	// the ship's acceleration is the original's: the engines' class times 500 over the ship's mass, in whole G (SHIPGRPH-OV (.ACC)), so the equipped ship of
 	// starflt_076 (class 5 engines, 16 pods, class 3 armor, shields, missiles and lasers, 356 tons) reads 7 G
 	IEnumerator ScenarioAcceleration()
@@ -27682,6 +27741,41 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "launchlines: out of the Starport the window keeps LEAVING STARPORT..., ...STARPORT CLEAR and STANDING BY TO MANEUVER together, as starflt_139", string.Join( " | ", window ) == "Leaving starport... | ...Starport clear | Standing by to maneuver.", string.Join( " | ", window ) );
 
 		Finish( "scenario=launchlines checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the Trade Depot's Buy list has the Starport's elements in the original's order: Titanium, Promethium, Molybdenum, Cobalt, Aluminum, Endurium (starflt_078,
+	// starflt_097)
+	IEnumerator ScenarioStarportBuyOrder()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var depot = FindPanel<TradeDepotPanel>();
+
+		yield return OpenPanel( depot, "trade depot" );
+
+		Call( depot, "SwitchToBuyItemState", true );
+
+		yield return Frames( 2 );
+
+		var items = GetField( depot, "m_itemList" ) as IList;
+		var elements = new List<string>();
+
+		foreach ( var item in items )
+		{
+			if ( (int) GetField( item, "m_type" ) == 0 )
+			{
+				elements.Add( gameData.m_elementList[ (int) GetField( item, "m_id" ) ].m_name );
+			}
+		}
+
+		yield return ClosePanel( depot, "trade depot" );
+
+		var order = string.Join( ", ", elements );
+
+		Log( "starport-buyorder: the Buy list's elements: " + order );
+
+		Check( "starport-buyorder: the Buy list has the elements in the original's order", order == "Titanium, Promethium, Molybdenum, Cobalt, Aluminum, Endurium (Fuel)", order );
+
+		Finish( "scenario=starport-buyorder checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
