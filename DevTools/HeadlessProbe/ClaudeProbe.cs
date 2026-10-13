@@ -24500,6 +24500,16 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "disembarklines: disembarking says the original's lines in its order, with Hull check complete", ( playerData.m_general.m_location == PD_General.Location.Disembarked ) && said.StartsWith( expected ), said );
 
+		// out on the surface the first line is the weather, alone in the text window, as the original's ("IT IS CLEAR.", starflt_179)
+		yield return Frames( 5 );
+
+		var onTheSurface = playerData.m_general.m_messageList.Count;
+		var surfaceText = MessageList();
+
+		Log( "disembarklines: on the surface the text window has " + onTheSurface + " lines: " + surfaceText );
+
+		Check( "disembarklines: out on the surface the weather is the only line in the text window", ( onTheSurface == 1 ) && surfaceText.Contains( PlanetWeather.GetSkyText() ) && !surfaceText.Contains( "Activating terrain vehicle" ), onTheSurface + " | " + surfaceText );
+
 		Finish( "scenario=disembarklines", 0 );
 	}
 
