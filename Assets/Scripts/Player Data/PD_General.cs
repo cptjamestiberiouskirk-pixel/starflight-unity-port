@@ -145,6 +145,10 @@ public class PD_General
 	// the planets recommended for colonization that Interstel has not evaluated yet (it does when the ship is back at the Starport), and how many recommended
 	// planets have proved unsuitable so far (the first one is only a warning - STRINFO 1.2)
 	public List<int> m_colonyRecommendationList;
+
+	// every planet recommended in the game, evaluated or not: the original marks a planet as logged when it is recommended and never again lets it be
+	// (CAPTAIN WF3D3: "THIS PLANET HAS ALREADY BEEN LOGGED.") - save files from before this list have the planets still waiting in m_colonyRecommendationList
+	public List<int> m_loggedPlanetList;
 	public int m_unsuitableRecommendationCount;
 
 	// what the original keeps of a recommendation for its evaluation screen (CAPTAIN overlay, (/LOG-PLAN) in the decompiled original): its number, counted over
@@ -551,6 +555,17 @@ public class PD_General
 		{
 			m_colonyRecommendationList.Add( planetId );
 
+			// logged for good
+			if ( m_loggedPlanetList == null )
+			{
+				m_loggedPlanetList = new List<int>();
+			}
+
+			if ( !m_loggedPlanetList.Contains( planetId ) )
+			{
+				m_loggedPlanetList.Add( planetId );
+			}
+
 			// the record the evaluation screen shows: the next number and today's stardate (the name comes when the player has typed it)
 			if ( m_colonyRecommendationRecordList == null )
 			{
@@ -561,6 +576,12 @@ public class PD_General
 
 			m_colonyRecommendationRecordList.Add( new ColonyRecommendation { m_planetId = planetId, m_number = m_colonyRecommendationCount, m_stardateYMD = m_currentStardateYMD, m_name = "" } );
 		}
+	}
+
+	// whether this planet has been recommended before in the game (the original's logged planets, CAPTAIN WF3D3)
+	public bool IsPlanetLogged( int planetId )
+	{
+		return ( ( m_loggedPlanetList != null ) && m_loggedPlanetList.Contains( planetId ) ) || ( ( m_colonyRecommendationList != null ) && m_colonyRecommendationList.Contains( planetId ) );
 	}
 
 	// the record of a pending recommendation of this planet (null if there is none: a save file from before the records)
