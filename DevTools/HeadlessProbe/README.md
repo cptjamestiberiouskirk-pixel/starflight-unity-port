@@ -226,8 +226,9 @@ What the probe does:
 | `encounterviewscale` | the encounter view at the original's scale: with the Mechans still far off the camera climbs no higher than framing the aliens' fire range needs, a ship brought within that range is in view, the ships are drawn twice as large in the encounter and the player ship has its own size again after it; pictures with `-Graphics` (Logs/screen-pictures/encounter-view) (about 30 s) |
 | `surfacepictures` | with `-Graphics`, the whole screen on planet 92 of Arth: the ship landed, the terrain vehicle beside a lifeform, Look, Scan, Cargo beside the lifeform, Weapon and a laser shot, the cargo list and Maps, into `Logs/screen-pictures/surface/` (9 pictures); without a graphics device it does nothing (about 30 s) |
 | `bridgepictures` | with `-Graphics`, the whole screen of the flight scene's docking bay: Examine and Treat with their questions, Hail with no one to hail, Distress's question, the Captain's menu, Launch's question, the launch and the ship out of the Starport, then Hail in an encounter of Spemin scouts (the postures, a friendly hail), into `Logs/screen-pictures/bridge/` (13 pictures); without a graphics device it does nothing (about 35 s) |
+| `acceleration` | the ship's acceleration is the original's, the engines' class times 500 over the mass in whole G: 7 G for the equipped ship of starflt_076 (356 tons), 5 G for a bare class 1 ship and for a 500-ton class 5 one, 4 G for two more (about 15 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (180 scenarios, about 143 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (181 scenarios, about 144 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

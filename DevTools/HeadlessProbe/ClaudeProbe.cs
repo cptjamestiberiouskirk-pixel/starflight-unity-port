@@ -1061,6 +1061,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioMotionDetected();
 				break;
 
+			case "acceleration":
+				yield return ScenarioAcceleration();
+				break;
+
 			case "launchlines":
 				yield return ScenarioLaunchLines();
 				break;
@@ -27535,6 +27539,64 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "motiondetected: a science officer of science 200 reports the motion", skilled.Contains( "Motion detected" ), "'" + skilled + "'" );
 
 		Finish( "scenario=motiondetected checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the ship's acceleration is the original's: the engines' class times 500 over the ship's mass, in whole G (SHIPGRPH-OV (.ACC)), so the equipped ship of
+	// starflt_076 (class 5 engines, 16 pods, class 3 armor, shields, missiles and lasers, 356 tons) reads 7 G
+	IEnumerator ScenarioAcceleration()
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+
+		var saved = new[] { ship.m_numCargoPods, ship.m_enginesClass, ship.m_shieldingClass, ship.m_armorClass, ship.m_missileLauncherClass, ship.m_laserCannonClass };
+
+		var results = new List<string>();
+
+		// pods, engines, shielding, armor, missiles, lasers, and the original's G
+		var cases = new[]
+		{
+			new[] { 16, 5, 1, 3, 1, 1, 7 },
+			new[] { 0, 1, 0, 0, 0, 0, 5 },
+			new[] { 0, 1, 0, 1, 0, 0, 4 },
+			new[] { 16, 5, 1, 5, 1, 1, 5 },
+			new[] { 8, 2, 1, 2, 1, 1, 4 },
+		};
+
+		var allRight = true;
+
+		foreach ( var c in cases )
+		{
+			ship.m_numCargoPods = c[ 0 ];
+			ship.m_enginesClass = c[ 1 ];
+			ship.m_shieldingClass = c[ 2 ];
+			ship.m_armorClass = c[ 3 ];
+			ship.m_missileLauncherClass = c[ 4 ];
+			ship.m_laserCannonClass = c[ 5 ];
+
+			ship.RecalculateMass();
+			ship.RecalculateAcceleration();
+
+			results.Add( c[ 0 ] + " pods, engines " + c[ 1 ] + ", armor " + c[ 3 ] + ": " + ship.m_mass + " tons, " + ship.m_acceleration + " G (the original's " + c[ 6 ] + ")" );
+
+			allRight &= ( ship.m_acceleration == c[ 6 ] );
+		}
+
+		ship.m_numCargoPods = saved[ 0 ];
+		ship.m_enginesClass = saved[ 1 ];
+		ship.m_shieldingClass = saved[ 2 ];
+		ship.m_armorClass = saved[ 3 ];
+		ship.m_missileLauncherClass = saved[ 4 ];
+		ship.m_laserCannonClass = saved[ 5 ];
+
+		ship.RecalculateMass();
+		ship.RecalculateAcceleration();
+
+		yield return Frames( 2 );
+
+		Log( "acceleration: " + string.Join( " | ", results ) );
+
+		Check( "acceleration: the ship's acceleration is the engines' class times 500 over its mass, as the original's (7 G for the ship of starflt_076, 5 G for a 500-ton ship)", allRight, string.Join( " | ", results ) );
+
+		Finish( "scenario=acceleration checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// the launch from the Starport says the original's lines in its order (LAUNCH-OV &LAUNCH, LAUNCH; HYPERMSG-OV WF0D5 and WF001): OPENING DOCKING BAY DOORS,

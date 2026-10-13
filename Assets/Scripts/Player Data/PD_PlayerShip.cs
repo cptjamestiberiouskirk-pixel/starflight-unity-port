@@ -9,6 +9,9 @@ public class PD_PlayerShip
 	// the armor points of a ship with no armor plating installed (the bare hull)
 	public const int c_bareHullArmorPoints = 250;
 
+	// the acceleration is the engines' class times this over the ship's mass in tons (SHIPGRPH-OV (.ACC): 0x01f4)
+	const int c_accelerationPerEngineClassTon = 500;
+
 	public string m_name;
 
 	public int m_numCargoPods;
@@ -460,11 +463,9 @@ public class PD_PlayerShip
 
 	public void RecalculateAcceleration()
 	{
-		// get our engines
-		var engines = GetEngines();
-
-		// this formula closely matches the original starflight game
-		m_acceleration = Mathf.RoundToInt( Mathf.Pow( ( 500.0f - m_mass ) / 500.0f, engines.m_powerCurve ) * engines.m_powerScale * engines.m_maximumAcceleration + engines.m_minimumAcceleration );
+		// the original's: the engines' class times 500 over the ship's mass, in whole G (SHIPGRPH-OV (.ACC)) - the port's curve before this gave 6 G where the
+		// original reads 7 (starflt_076), and went wrong above 500 tons
+		m_acceleration = ( m_mass > 0 ) ? ( m_enginesClass * c_accelerationPerEngineClassTon / m_mass ) : 0;
 	}
 
 	public void AddCargoPod()
