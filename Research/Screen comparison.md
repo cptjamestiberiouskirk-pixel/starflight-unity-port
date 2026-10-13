@@ -111,7 +111,7 @@ A vessel's reading matches the original's (mass, bio, energy, object constituent
 |---|---|---|---|
 | LAT and LONG swapped | FIXED | PR 215 (CONFIRMED, code) | GAMEPLAY |
 | The extra "Retro rockets firing..." and the order of the descent's lines | FIXED | PR 226 (CONFIRMED, code) | GAMEPLAY |
-| Where the crosshair starts. Original: LAT 0, LONG 0 after Select Site (starflt_149). Port: the last site chosen, since the selection is never reset on Land (0, 0 only in a new game) | OPEN | `TerrainMapDisplay.cs:158` to `185` (CONFIRMED, code); whether the original resets it on every landing is INFERRED from one screenshot | GAMEPLAY |
+| Where the crosshair starts. Original: LAT 0, LONG 0 after Select Site (starflt_149): SITE-OV's WF014 puts it in the middle when PLHI is -1, which DEPART sets on leaving orbit, and keeps the last site within one orbit. Port: the last site chosen, reset only in a new game | FIXED (the landing site PR): reset on entering the star system or hyperspace | `SpaceflightController.SwitchLocation`; `SITE-OV.c` WF014, `DPART-OV.c` DEPART; the `landingsite` probe scenario (CONFIRMED); that DEPART runs on leaving orbit is INFERRED from what it does (the Black Egg's countdown, the planet obliterated) | GAMEPLAY |
 | The original shows the LAT and LONG labels, empty, before Select Site (starflt_148); the port shows them only once Select Site is pressed (they are children of the Select Site object, which is hidden) | OPEN | the scene's hierarchy (INFERRED: not seen in a picture) | UI KIT |
 | A SELECT SITE heading inside the auxiliary view | OPEN, low priority | picture (CONFIRMED) | UI KIT |
 | The probe's landing map picture reads "LAT 180W LONG 90S" | PROBE | the probe opens Select Site without moving the crosshair, so the scene's placeholder texts show (which are still in the old swapped form) | |
@@ -132,7 +132,7 @@ A vessel's reading matches the original's (mass, bio, energy, object constituent
 | The coordinates' order, with no "x" | FIXED | PR 215; picture "1S x 0E" (CONFIRMED) | GAMEPLAY |
 | The bearing to the ship abbreviated | FIXED | PR 218; picture "North" (CONFIRMED) | GAMEPLAY |
 | "SHIP 14 KM. North" with the ship's model just above the vehicle; the original shows "1KM." with the ship beside it (starflt_179) | OPEN | `TerrainVehicleDisplay.cs:124` (CONFIRMED, picture); that the scale is wrong is INFERRED | GAMEPLAY |
-| The weather is the first line on the surface in the original ("IT IS CLEAR.", alone in the window); the port writes it as a sixth line under the disembark lines | PARTLY | `PlanetWeather.cs:218` (PR 210); picture (CONFIRMED) | GAMEPLAY |
+| The weather is the first line on the surface in the original ("IT IS CLEAR.", alone in the window); the port wrote it as a sixth line under the disembark lines | FIXED (the weather line PR): the text window is cleared before the first sky | `PlanetWeather.Begin`; starflt_179; the `disembarklines` probe check (CONFIRMED) | GAMEPLAY |
 | Look: the port writes Surface, Weather, Sky, Atmosphere and Gravity; the original writes SKY, TEMPERATURE, GRAVITY, ATMO, HYDRO and TERRAIN (starflt_180): no temperature and no hydrosphere in the port | FIXED (the Look fields PR; the temperature is the planet's, the port has no regions) | `LookButton.cs:40` to `46` (INFERRED: code, no picture) | GAMEPLAY |
 | No CREW VITALITY box with dot leaders | OPEN | picture (CONFIRMED) | UI KIT |
 | MAP for MAPS, EFFICIENCY for EFF. | OPEN | `MapButton.cs:10`, `Spaceflight.unity:65137` (CONFIRMED) | UI KIT |
