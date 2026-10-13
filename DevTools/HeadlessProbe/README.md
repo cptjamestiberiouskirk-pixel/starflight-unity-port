@@ -52,6 +52,7 @@ What the probe does:
 | `m7` | sensor scan types |
 | `sensorpictures` | the picture each kind of scan puts in the sensor window: a planet in orbit (its mask), a Spemin scout (control: its own picture), every vessel whose picture was traced by `DevTools/SensorPictures` (its own picture; the list grows with each race), the window clipping a wide picture (the Enterprise) to its magenta panel, an unknown object, which has no picture (window left empty and black inside its magenta border, no readout, the original's message at the end of the scan, also straight after a scan that had one, scan type kept; a scan with a picture and a display just shown keep it magenta), debris that names no vessel (window left empty), the debris of every vessel scanned by its vessel id, and the wreck of a ship destroyed in a real encounter for a Spemin scout, a Mechan scout, a Thrynn scout (its own debris) and a Spemin warship (control: the picture every wreck had before), and the readout once the scan is over for a Spemin scout, a Mechan scout and a Minstrel (mass in tons, bio, energy, as the original shows them) and a Spemin scout wreck, with a planet's minerals as the control (about 22 s of scanning) |
 | `sensorplanet` | the planet's own surface in the sensor window: a planet with maps (94) is drawn with the Sensor Planet shader and its own albedo map, the scan starts as the noise and ends with the planet, the disc keeps its size by mass, the readout is still there (control), the planet turns after the scan and stands still while the game is paused, a vessel scan is the noise (control), a picture whose maps are destroyed goes back to the noise, a planet that could not be mapped (90, given a file that cannot be read) is the noise, a planet with maps after it shows its surface again, and nothing throws |
+| `sensorlines` | a planet scan's text as the original's (starflt_144): each value on its heading's line, and the lithosphere's elements one a line under one another (planet 94, about 25 s) |
 | `colournames` | every `<color=name>` in `Assets/Scripts` is a name TextMesh Pro reads (red, lightblue, blue, grey, black, green, white, orange, purple, yellow; any other prints the tag as text), and the shield message as the message box renders it after a hit the shields absorb |
 | `m8` | `JsonSaveSystem` in a scratch directory |
 | `m24` | gravity text |
@@ -242,7 +243,7 @@ What the probe does:
 | `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 | `combatmessages` | the combat messages are the original's: WEAPONS NOT ARMED, NO TARGET PRESENT, WEAPON NOT AVAILABLE and OUT OF FUEL! when a weapon cannot fire, nothing of the port's own when the player's shot hits, and LASER CLASS n (LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (195 scenarios, about 158 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (196 scenarios, about 159 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

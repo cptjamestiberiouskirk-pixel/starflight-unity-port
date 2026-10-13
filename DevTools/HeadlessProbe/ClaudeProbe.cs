@@ -1139,6 +1139,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLightMode();
 				break;
 
+			case "sensorlines":
+				yield return ScenarioSensorLines();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -29297,6 +29301,63 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lightmode: back in the dark mode the buttons have the dark mode's tints again (the light mode gives several roles one colour)", ColorUtility.ToHtmlStringRGB( panelButtonColourAfterClick ) == ColorUtility.ToHtmlStringRGB( darkTheme.m_backgroundRaised ), ColorUtility.ToHtmlStringRGB( panelButtonColourAfterClick ) );
 
 		Finish( "scenario=lightmode checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioSensorLines()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var sensors = SpaceflightController.m_instance.m_displayController.m_sensorsDisplay;
+
+		EnsureCrew();
+
+		// the small rock planet of the Arth system, scanned to the end
+		yield return EnterOrbit( 94 );
+
+		var planet = gameData.m_planetList[ 94 ];
+
+		SpaceflightController.m_instance.m_displayController.ChangeDisplay( sensors );
+
+		yield return Frames( 3 );
+
+		sensors.StartScanning( SensorsDisplay.ScanType.Planet, 18, planet.m_mass, planet.m_bioDensity, planet.m_mineralDensity );
+
+		var end = Time.realtimeSinceStartup + 30.0f;
+
+		while ( ( (bool) GetField( sensors, "m_isDoingCinematics" ) ) && ( Time.realtimeSinceStartup < end ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 3 );
+
+		var text = System.Text.RegularExpressions.Regex.Replace( string.Join( "\n", playerData.m_general.m_messageList ), "<[^>]*>", "" ).Replace( "\r", "" );
+		var lines = new List<string>( text.Split( '\n' ) );
+
+		var elements = new[] { gameData.m_elementList[ planet.m_elementIdA ].m_name, gameData.m_elementList[ planet.m_elementIdB ].m_name, gameData.m_elementList[ planet.m_elementIdC ].m_name };
+
+		var atmosphereLine = lines.Find( l => l.StartsWith( "Atmosphere:" ) ) ?? "";
+		var hydrosphereLine = lines.Find( l => l.StartsWith( "Hydrosphere:" ) ) ?? "";
+		var lithosphereIndex = lines.FindIndex( l => l.StartsWith( "Lithosphere:" ) );
+
+		var elementLines = new List<string>();
+
+		if ( lithosphereIndex >= 0 )
+		{
+			elementLines.Add( lines[ lithosphereIndex ].Substring( "Lithosphere:".Length ).Trim() );
+
+			for ( var i = lithosphereIndex + 1; i < lines.Count; i++ )
+			{
+				elementLines.Add( lines[ i ].Trim() );
+			}
+		}
+
+		Log( "sensorlines: " + text.Replace( "\n", " | " ) );
+
+		Check( "sensorlines: each value is on its heading's line, as the original's ATMOSPHERE: ... (starflt_144)", ( atmosphereLine.Length > "Atmosphere:".Length + 1 ) && ( hydrosphereLine.Length > "Hydrosphere:".Length + 1 ), atmosphereLine + " / " + hydrosphereLine );
+		Check( "sensorlines: the lithosphere lists one element a line, the first on the heading's line", ( elementLines.Count == 3 ) && ( elementLines[ 0 ] == elements[ 0 ] ) && ( elementLines[ 1 ] == elements[ 1 ] ) && ( elementLines[ 2 ] == elements[ 2 ] ), string.Join( " / ", elementLines ) );
+
+		Finish( "scenario=sensorlines checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
