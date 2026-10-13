@@ -85,8 +85,8 @@ The stellar parameters and the system map match the original (CONFIRMED, picture
 | Item | Status | Evidence | Owner |
 |---|---|---|---|
 | No picture of a scan | FIXED | PR 234: a planet and a Spemin scout scanned (CONFIRMED) | |
-| Each value sits on the line under its heading; the original writes it on the heading's line, in a five-line window | OPEN | `SensorsDisplay.cs:272` (CONFIRMED) | UI KIT |
-| The lithosphere is one line ("Tin, Lead, Gold"); the original lists one element a line under the values | OPEN | `SensorsDisplay.cs:272`, starflt_144 (CONFIRMED) | UI KIT |
+| Each value sits on the line under its heading; the original writes it on the heading's line, in a five-line window | FIXED (the sensor lines PR) | `SensorsDisplay.cs:272` (CONFIRMED); each value is now on its heading's line, lined up after the headings (`sensorlines`) | UI KIT |
+| The lithosphere is one line ("Tin, Lead, Gold"); the original lists one element a line under the values | FIXED (the sensor lines PR) | `SensorsDisplay.cs:272`, starflt_144 (CONFIRMED); the elements are now one a line under one another, as in starflt_144 (`sensorlines`) | UI KIT |
 | Mass above the scan picture and Bio and Min below it; the original stacks them in a column on its left | OPEN, low priority | pictures against starflt_144 (CONFIRMED) | UI KIT |
 
 A vessel's reading matches the original's (mass, bio, energy, object constituents; CONFIRMED, picture). The probe's sensor pictures show the bridge's menu because the probe runs the Sensors button directly (PROBE).
