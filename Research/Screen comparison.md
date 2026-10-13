@@ -21,7 +21,7 @@ Not reported: art style, resolution, colours, fonts and 3D models.
 
 | | Items | FIXED | OPEN or PARTLY | Not a defect or owner's call |
 |---|---|---|---|---|
-| GAMEPLAY (with the items shared with the UI kit) | 52 | 24 | 23 | 5 |
+| GAMEPLAY (with the items shared with the UI kit) | 52 | 25 | 23 | 4 |
 | UI KIT | 41 | 0 | 40 | 1 |
 | The probe's pictures | 17 | 3 (PR 234) | 14 gaps | |
 
@@ -29,7 +29,7 @@ Since 2026-10-11 the gameplay side has been fixed in PRs 215, 216, 218, 219, 220
 
 The open gameplay items, most visible first:
 
-1. **Repair's choice of system** (section 13): the original lets the player choose what to repair; the port's engineer repairs the worst first, by the owner's ruling of 2026-10-11 (the DAMAGE display itself is done).
+1. **The notices screen** (section 18): its header, its end, "NO NEW NOTICES" with "REPEAT LAST NOTICE?", and the typing of a notice (the DAMAGE display and Repair's choice of system are done).
 2. **The bank books a recommendation's bonus or fine at once in the original** (section 21), where the port pays it on docking (the interest itself is done).
 3. **The notices screen** (section 18): its header, its end, "NO NEW NOTICES" with "REPEAT LAST NOTICE?", and the typing of a notice.
 4. **Combat messages and wounds** (section 12): the original names the weapon that hits ("MISSILE CLASS 2") and says how the crew is wounded; in the port combat never wounds the crew.
@@ -165,7 +165,7 @@ A vessel's reading matches the original's (mass, bio, energy, object constituent
 | Item | Status | Evidence | Owner |
 |---|---|---|---|
 | The DAMAGE display. Original (`ENGINEER.c`): Damage clears the auxiliary view and draws DAMAGE with a 40-pixel bar for each of HULL, ENGINES, SENSORS, COMM., SHIELD, MISSILE, LASER, green for what works and red for the rest, and writes no text. Port: there was no damage display; Damage wrote a "Damage Report:" text | FIXED (the DAMAGE display PR) | `DamageDisplay`, shown by Damage and at the start of Repair; the picture `13_damage.png` of `screenpictures` (CONFIRMED) | GAMEPLAY and UI KIT |
-| Repair. Original: shows the same display and lets the player scroll the seven rows; the text window gives each one ("ENGINES: SLIGHTLY DAMAGED", EFFICIENCY, CURRENT FUNCTIONALITY, ESTIMATED TIME FOR COMPLETE REPAIRS, CURRENTLY UNDER REPAIR), and the fire button chooses what to repair, with NO REPAIRS NEEDED, DAMAGED BEYOND REPAIR, "CEASE REPAIRS ON X AND BEGIN REPAIRS ON Y? [N Y]" and BEGINNING, CONTINUING or CEASING REPAIRS ON X. Port: Repair picks the system itself, the worst first, by the owner's ruling of 2026-10-11 for roadmap 1.2, made when no shipped source had the mechanics | OWNER'S CALL: the decompiled original now has them; the ruling stands until the owner changes it | `RepairButton.cs`; `ENGINEER.c` (CONFIRMED, code) | GAMEPLAY |
+| Repair. Original: shows the same display and lets the player scroll the seven rows; the text window gives each one ("ENGINES: SLIGHTLY DAMAGED", EFFICIENCY, CURRENT FUNCTIONALITY, ESTIMATED TIME FOR COMPLETE REPAIRS, CURRENTLY UNDER REPAIR), and the fire button chooses what to repair, with NO REPAIRS NEEDED, DAMAGED BEYOND REPAIR, "CEASE REPAIRS ON X AND BEGIN REPAIRS ON Y? [N Y]" and BEGINNING, CONTINUING or CEASING REPAIRS ON X. Port: Repair picked the system itself, the worst first, by the owner's ruling of 2026-10-11 for roadmap 1.2, made when no shipped source had the mechanics; on 2026-10-12 the owner ruled that it follows the original | FIXED (the Repair choice PR) | `RepairButton.cs`, the DAMAGE display's cursor; the `repairchoice` probe scenario and the picture `14_repair.png` (CONFIRMED) | GAMEPLAY |
 | No pictures | PROBE | | |
 
 ## 14. Medical (Examine and Treat)
@@ -289,7 +289,7 @@ The doors are where the original's are (Operations upper left, Personnel top, Cr
 
 One small PR per item, gameplay first. Each documented in the screenshots or the decompiled original, so D1 applies; a probe check that fails on the code before goes with each.
 
-1. **The DAMAGE display** (section 13), from `ENGINEER.c`: done. Repair's choice of system waits for the owner, since it would replace the ruling of 2026-10-11 that the engineer repairs the worst first.
+1. **The DAMAGE display and Repair's choice of system** (section 13), from `ENGINEER.c`: done (the choice by the owner's ruling of 2026-10-12, which replaced the worst first).
 2. **The bank's interest** (section 21): done. Left from it: the original books a recommendation's bonus or fine at once, which touches the colony rulings of roadmap 1.3.
 3. **The notices screen** (section 18): the header, END OF NOTICES, NO NEW NOTICES and REPEAT LAST NOTICE, then the typing and abort.
 4. **Combat messages and wounds** (section 12), from `DAMAGE-OV.c`.

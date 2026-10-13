@@ -747,6 +747,34 @@ public class PD_PlayerShip
 		return GetSystemHealth( (ShipSystem) ( item - 1 ) );
 	}
 
+	// true if a repair item works at all (the original's Repair shows "CURRENT FUNCTIONALITY: OPERATIVE" or "INOPERATIVE"): a system works in proportion to its
+	// health, and not at all at 0, and the sensors give no readings below c_sensorsNeedHealth (the owner's rulings of 2026-10-11); the hull while it has armor
+	// points
+	public bool IsRepairItemOperative( int item )
+	{
+		if ( item == c_hullRepairItem )
+		{
+			return m_armorPoints > 0;
+		}
+
+		if ( ( item <= 0 ) || ( item >= c_repairItemCount ) )
+		{
+			return false;
+		}
+
+		var system = (ShipSystem) ( item - 1 );
+		var health = GetSystemHealth( system );
+
+		return ( system == ShipSystem.Sensors ) ? ( health >= c_sensorsNeedHealth ) : ( health > 0 );
+	}
+
+	// call this when the engineer stops repairing (the original's "CEASING REPAIRS ON ...")
+	public void StopRepairs()
+	{
+		m_repairsAreUnderWay = false;
+		m_repairProgress = 0.0f;
+	}
+
 	// true if the ship has this repair item (the hull always)
 	public bool HasRepairItem( int item )
 	{
@@ -757,31 +785,6 @@ public class PD_PlayerShip
 	public string GetRepairItemName( int item )
 	{
 		return ( item == c_hullRepairItem ) ? GetArmorName() : GetSystemName( (ShipSystem) ( item - 1 ) ).ToLower();
-	}
-
-	// the most damaged item the ship has (the engineer repairs the worst first) - -1 if everything is whole
-	public int FindWorstRepairItem()
-	{
-		var worst = -1;
-		var worstHealth = 100;
-
-		for ( var item = 0; item < c_repairItemCount; item++ )
-		{
-			if ( !HasRepairItem( item ) )
-			{
-				continue;
-			}
-
-			var health = GetRepairItemHealth( item );
-
-			if ( health < worstHealth )
-			{
-				worst = item;
-				worstHealth = health;
-			}
-		}
-
-		return worst;
 	}
 
 	// the element id of a repair item's mineral (-1 if the game data has no such element)
@@ -893,10 +896,8 @@ public class PD_PlayerShip
 			m_repairsAreUnderWay = false;
 			m_repairProgress = 0.0f;
 
-			SpaceflightController.m_instance.m_messages.AddText( "<color=green>Repairs on the " + GetArmorName() + " all completed, sir.</color>" );
-
-			// and on to the next
-			RepairNext();
+			// the original's line (REPAIR-OV in the decompiled original: "REPAIR COMPLETED", and the engineer waits to be told what to repair next)
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Repair completed.</color>" );
 		}
 	}
 
@@ -940,18 +941,8 @@ public class PD_PlayerShip
 			m_repairsAreUnderWay = false;
 			m_repairProgress = 0.0f;
 
-			SpaceflightController.m_instance.m_messages.AddText( "<color=green>Repairs on the " + GetRepairItemName( m_repairItem ) + " all completed, sir.</color>" );
-
-			RepairNext();
-		}
-	}
-
-	// once a repair is done the engineer moves on to the most damaged item left (and asks for its mineral)
-	void RepairNext()
-	{
-		if ( ( SpaceflightController.m_instance != null ) && ( FindWorstRepairItem() >= 0 ) )
-		{
-			RepairButton.AskForRepair( FindWorstRepairItem() );
+			// the original's line (REPAIR-OV: "REPAIR COMPLETED", and the engineer waits to be told what to repair next)
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Repair completed.</color>" );
 		}
 	}
 
