@@ -721,6 +721,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportEndurium();
 				break;
 
+			case "starport-interest":
+				yield return ScenarioStarportInterest();
+				break;
+
 			case "nebula":
 				yield return ScenarioNebula();
 				break;
@@ -11027,6 +11031,135 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-transport: the fade reaches the astronaut and leaves the material assets alone", Mathf.Approximately( alpha, expectedAlpha ) && Mathf.Approximately( assetAlphaAfter, assetAlphaBefore ), "alpha " + alpha.ToString( "F4" ) + " (wanted " + expectedAlpha.ToString( "F4" ) + "), asset " + assetAlphaBefore.ToString( "F4" ) + " -> " + assetAlphaAfter.ToString( "F4" ) );
 
 		Finish( "scenario=starport-transport bytes=" + bytes + " alpha=" + alpha.ToString( "F4" ) + " asset=" + assetAlphaAfter.ToString( "F4" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the screens' Step 2: the bank pays the original's interest
+
+	// the bank pays its interest up to today (PlayerData.PayInterest): what it paid, or -1 on the code before the interest
+	static int PayInterestIfPresent( bool restartTheCount )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var method = playerData.GetType().GetMethod( "PayInterest" );
+
+		return ( method == null ) ? -1 : (int) method.Invoke( playerData, new object[] { restartTheCount } );
+	}
+
+	// sets the day of the game, and the stardate it shows (the Starport's clock does not run)
+	static void SetStarportDay( int day )
+	{
+		var general = DataController.m_instance.m_playerData.m_general;
+
+		general.m_day = day;
+		general.m_currentStardateYMD = PD_General.GetStardateYMD( day );
+	}
+
+	// the last row of the bank's ledger ("4620-06-01 Interest 6000+")
+	static string LastLedgerRow()
+	{
+		var list = DataController.m_instance.m_playerData.m_bank.m_transactionList;
+
+		if ( ( list == null ) || ( list.Count == 0 ) )
+		{
+			return "";
+		}
+
+		var row = list[ list.Count - 1 ];
+
+		return row.m_stardate + " " + row.m_description + " " + row.m_amount;
+	}
+
+	IEnumerator ScenarioStarportInterest()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var bank = playerData.m_bank;
+
+		// ---- 1. the rules, through the bank's own method: a balance of 100 earns 12 M.U. a year
+		bank.m_currentBalance = 100;
+		SetFieldIfPresent( bank, "m_interestDay", 150 );
+		SetFieldIfPresent( bank, "m_interestDayIsSet", true );
+
+		// ten days of it is less than 1 M.U.: nothing is paid, and the days count on
+		SetStarportDay( 160 );
+
+		var paidAfter10Days = PayInterestIfPresent( false );
+		var dayAfter10Days = IntFieldOrMin( bank, "m_interestDay" );
+
+		// 250 days since the last payment: 12 times 250 over 300 is 10
+		SetStarportDay( 400 );
+
+		var paidAfter250Days = PayInterestIfPresent( false );
+		var dayAfter250Days = IntFieldOrMin( bank, "m_interestDay" );
+		var balanceAfter250Days = bank.m_currentBalance;
+		var rowAfter250Days = LastLedgerRow();
+
+		// a recommendation starts the count again, even when nothing is paid
+		SetStarportDay( 410 );
+
+		var paidOnRestart = PayInterestIfPresent( true );
+		var dayOnRestart = IntFieldOrMin( bank, "m_interestDay" );
+
+		// a save file from before the interest: nothing is paid for the days before, and the count starts today
+		SetFieldIfPresent( bank, "m_interestDayIsSet", false );
+		SetFieldIfPresent( bank, "m_interestDay", 0 );
+		bank.m_currentBalance = 100000;
+		SetStarportDay( 600 );
+
+		var paidOnAnOldSave = PayInterestIfPresent( false );
+		var dayOnAnOldSave = IntFieldOrMin( bank, "m_interestDay" );
+		var balanceOnAnOldSave = bank.m_currentBalance;
+
+		Log( "starport-interest: 100 M.U. from day 150: day 160 paid " + paidAfter10Days + " (paid up to day " + dayAfter10Days + "), day 400 paid " + paidAfter250Days + " (up to day " + dayAfter250Days + ", balance " + balanceAfter250Days + ", '" + rowAfter250Days + "'), restart on day 410 paid " + paidOnRestart + " (up to day " + dayOnRestart + ") | an old save on day 600 paid " + paidOnAnOldSave + " (up to day " + dayOnAnOldSave + ", balance " + balanceOnAnOldSave + ")" );
+
+		Check( "starport-interest: less than 1 M.U. of interest pays nothing, and those days count on (the original moves PORTDAT only when it pays)", ( paidAfter10Days == 0 ) && ( dayAfter10Days == 150 ), paidAfter10Days + ", up to day " + dayAfter10Days );
+		Check( "starport-interest: 12% a year of 300 days, rounded down at each step as the original works it out (100 M.U. over 250 days: 10), with an Interest row in the ledger", ( paidAfter250Days == 10 ) && ( dayAfter250Days == 400 ) && ( balanceAfter250Days == 110 ) && ( rowAfter250Days == "4621-04-11 Interest 10+" ), paidAfter250Days + ", up to day " + dayAfter250Days + ", balance " + balanceAfter250Days + ", '" + rowAfter250Days + "'" );
+		Check( "starport-interest: a recommendation starts the count again whatever was paid", ( paidOnRestart == 0 ) && ( dayOnRestart == 410 ), paidOnRestart + ", up to day " + dayOnRestart );
+		Check( "starport-interest: a save file from before the interest is paid nothing for the days before, and counts from today", ( paidOnAnOldSave == 0 ) && ( dayOnAnOldSave == 600 ) && ( balanceOnAnOldSave == 100000 ), paidOnAnOldSave + ", up to day " + dayOnAnOldSave + ", balance " + balanceOnAnOldSave );
+
+		// ---- 2. the real docking bay: 100,000 M.U. for half a year (150 days) earn 6,000 when the crew goes aboard
+		EnsureCrew();
+
+		playerData.m_playerShip.m_name = "Probe";
+		playerData.m_playerShip.m_enginesClass = 1;
+
+		if ( playerData.m_playerShip.m_elementStorage.Find( 5 ) == null )
+		{
+			playerData.m_playerShip.AddElement( 5, 50 );
+		}
+
+		bank.m_currentBalance = 100000;
+		SetFieldIfPresent( bank, "m_interestDay", 0 );
+		SetFieldIfPresent( bank, "m_interestDayIsSet", true );
+		SetStarportDay( 150 );
+
+		var rowsBefore = bank.m_transactionList.Count;
+		var panel = FindPanel<DockingBayPanel>();
+
+		if ( panel == null )
+		{
+			Finish( "scenario=starport-interest abort: no docking bay panel", 2 );
+			yield break;
+		}
+
+		PanelController.m_instance.Open( panel );
+
+		var transporting = panel.IsTransporting();
+		var start = Time.realtimeSinceStartup;
+
+		// until the crew is aboard (the panel then saves and fades to the ship)
+		while ( panel.IsTransporting() && ( Time.realtimeSinceStartup - start < 20.0f ) )
+		{
+			yield return null;
+		}
+
+		var balanceAboard = bank.m_currentBalance;
+		var rowsAboard = bank.m_transactionList.Count;
+		var rowAboard = LastLedgerRow();
+
+		Log( "starport-interest: the docking bay with 100,000 M.U. on day 150: transporting " + transporting + ", balance aboard " + balanceAboard + ", ledger rows " + rowsBefore + " -> " + rowsAboard + ", last '" + rowAboard + "'" );
+
+		Check( "starport-interest: going aboard at the Starport pays the interest up to today (100,000 M.U. for 150 days: 6,000), as the original's docking bay does", transporting && ( balanceAboard == 106000 ) && ( rowsAboard == rowsBefore + 1 ) && ( rowAboard == "4620-06-01 Interest 6000+" ), "transporting " + transporting + ", balance " + balanceAboard + ", rows " + rowsBefore + " -> " + rowsAboard + ", '" + rowAboard + "'" );
+
+		Finish( "scenario=starport-interest paid=" + paidAfter10Days + "/" + paidAfter250Days + "/" + paidOnRestart + "/" + paidOnAnOldSave + " aboard=" + balanceAboard + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- Low: the ship's log after an empty log (where the list is scrolled to, and the two loops that scroll it)
