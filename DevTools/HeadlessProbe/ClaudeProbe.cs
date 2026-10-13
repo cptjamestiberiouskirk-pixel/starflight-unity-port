@@ -15176,10 +15176,11 @@ public class ClaudeProbe : MonoBehaviour
 		var expectedRuins = siteKeys.Count + randomMessages;
 
 		// ---- land at 11N x 104W (the crosshair's "latitude" is east-west in the port, its "longitude" north-south) and go out in the terrain vehicle
+		yield return GoIntoOrbit( 0, c_earth );
+
+		// the site is chosen in orbit, as the player does: the star system on the way puts it back in the middle (SITE-OV, after DEPART)
 		playerData.m_general.m_selectedLatitude = -104.0f;
 		playerData.m_general.m_selectedLongitude = 11.0f;
-
-		yield return GoIntoOrbit( 0, c_earth );
 
 		controller.m_planetside.UpdateTerrainGridNow();
 		controller.SwitchLocation( PD_General.Location.Planetside );
@@ -15401,10 +15402,11 @@ public class ClaudeProbe : MonoBehaviour
 		const int c_earth = 5;
 		var hypercubeId = gameData.FindArtifactId( "Hypercube" );
 
+		yield return GoIntoOrbit( 0, c_earth );
+
+		// the site is chosen in orbit, as the player does: the star system on the way puts it back in the middle (SITE-OV, after DEPART)
 		playerData.m_general.m_selectedLatitude = -104.0f;
 		playerData.m_general.m_selectedLongitude = 11.0f;
-
-		yield return GoIntoOrbit( 0, c_earth );
 
 		controller.m_planetside.UpdateTerrainGridNow();
 		controller.SwitchLocation( PD_General.Location.Planetside );
@@ -15523,10 +15525,11 @@ public class ClaudeProbe : MonoBehaviour
 		ruins[ 0 ] = null;
 
 		// the crosshair's "latitude" is east-west in the port, its "longitude" north-south
+		yield return GoIntoOrbit( starId, planetId );
+
+		// the site is chosen in orbit, as the player does: the star system on the way puts it back in the middle (SITE-OV, after DEPART)
 		playerData.m_general.m_selectedLatitude = eastLongitude;
 		playerData.m_general.m_selectedLongitude = northLatitude;
-
-		yield return GoIntoOrbit( starId, planetId );
 
 		controller.m_planetside.UpdateTerrainGridNow();
 		controller.SwitchLocation( PD_General.Location.Planetside );
@@ -20664,10 +20667,11 @@ public class ClaudeProbe : MonoBehaviour
 		// (the port's "latitude" is the east-west coordinate - see Tools.LatLongToWorldCoordinates)
 		Tools.WorldToLatLongCoordinates( place, out var x, out var z );
 
+		yield return GoIntoOrbit( 25, 94 );
+
+		// the site is chosen in orbit, as the player does: the star system on the way puts it back in the middle (SITE-OV, after DEPART)
 		playerData.m_general.m_selectedLatitude = x;
 		playerData.m_general.m_selectedLongitude = z;
-
-		yield return GoIntoOrbit( 25, 94 );
 
 		controller.m_planetside.UpdateTerrainGridNow();
 		controller.SwitchLocation( PD_General.Location.Planetside );
@@ -21032,10 +21036,11 @@ public class ClaudeProbe : MonoBehaviour
 		// (the port's "latitude" is the east-west coordinate - see Tools.LatLongToWorldCoordinates)
 		Tools.WorldToLatLongCoordinates( place, out var x, out var z );
 
+		yield return GoIntoOrbit( 25, planetId );
+
+		// the site is chosen in orbit, as the player does: the star system on the way puts it back in the middle (SITE-OV, after DEPART)
 		playerData.m_general.m_selectedLatitude = x;
 		playerData.m_general.m_selectedLongitude = z;
-
-		yield return GoIntoOrbit( 25, planetId );
 
 		controller.m_planetside.UpdateTerrainGridNow();
 		controller.SwitchLocation( PD_General.Location.Planetside );
@@ -24426,10 +24431,11 @@ public class ClaudeProbe : MonoBehaviour
 		// (the port's "latitude" is the east-west coordinate - see Tools.LatLongToWorldCoordinates)
 		Tools.WorldToLatLongCoordinates( place, out var x, out var z );
 
+		yield return GoIntoOrbit( starId, planetId );
+
+		// the site is chosen in orbit, as the player does: the star system on the way puts it back in the middle (SITE-OV, after DEPART)
 		playerData.m_general.m_selectedLatitude = x;
 		playerData.m_general.m_selectedLongitude = z;
-
-		yield return GoIntoOrbit( starId, planetId );
 
 		controller.m_planetside.UpdateTerrainGridNow();
 		controller.SwitchLocation( PD_General.Location.Planetside );
