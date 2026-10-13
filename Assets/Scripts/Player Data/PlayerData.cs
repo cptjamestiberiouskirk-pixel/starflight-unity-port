@@ -137,6 +137,32 @@ public class PlayerData
 		return null;
 	}
 
+	// the bank pays its interest up to today, as the original's does when the crew goes aboard the ship at the Starport and when a planet is recommended for
+	// colonization (BANK-OV, INT%, called from the Starport's docking bay and from the captain's Log Planet), with an INTEREST row in the ledger - nothing is paid
+	// while the interest comes to less than 1 M.U., and those days count on (the original moves its PORTDAT only when it pays); a recommendation starts the
+	// count again whatever was paid (the original sets PORTDAT after it), so pass restartTheCount for it - returns what it paid
+	public int PayInterest( bool restartTheCount )
+	{
+		var today = m_general.m_day;
+		var interest = m_bank.GetInterestDue( today );
+
+		if ( interest > 0 )
+		{
+			m_bank.m_currentBalance += interest;
+
+			m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Interest", interest.ToString() + "+" ) );
+		}
+
+		// a save file from before the interest starts counting now
+		if ( ( interest > 0 ) || restartTheCount || !m_bank.m_interestDayIsSet )
+		{
+			m_bank.m_interestDay = today;
+			m_bank.m_interestDayIsSet = true;
+		}
+
+		return interest;
+	}
+
 	// call this when the ship is back at the Starport: after the win Interstel pays the bonus that comes with its medal, once ("this award includes a special bonus of
 	// 500,000 MU when you return to Starport" - STRINFO 2.12) - returns true if it was paid now
 	// Interstel pays for the lifeform data recorded since the last visit (planet.txt: "When the player returns to starport recorded information is automatically
