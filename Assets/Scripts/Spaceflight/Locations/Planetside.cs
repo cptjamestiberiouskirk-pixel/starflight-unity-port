@@ -119,8 +119,8 @@ public class Planetside : MonoBehaviour
 		// make sure skybox rotation is reset
 		StarflightSkybox.m_instance.m_currentRotation = Quaternion.identity;
 
-		// change the ship display
-		SpaceflightController.m_instance.m_displayController.ChangeDisplay( SpaceflightController.m_instance.m_displayController.m_statusDisplay );
+		// the auxiliary view keeps the terrain map with the landing site's LAT and LONG, as the original's on the ground (starflt_178)
+		SpaceflightController.m_instance.m_displayController.ChangeDisplay( SpaceflightController.m_instance.m_displayController.m_terrainMapDisplay );
 	}
 
 	// update the terrain grid now (after planet generator has run)
