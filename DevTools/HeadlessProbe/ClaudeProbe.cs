@@ -24681,6 +24681,15 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "landinglines: the landing says the original's lines and no others (no Retro rockets firing)", !said.Contains( "Retro rockets" ) && ( autopilot >= 0 ) && ( topography >= 0 ) && ( safeLanding >= 0 ), said );
 		Check( "landinglines: Topography net locked on comes after Autopilot engaged, once the terrain is there, as the original's", ( topography > autopilot ) && ( safeLanding > topography ) && ( topography >= 0 ) && lines[ topography ].EndsWith( "@Planetside" ), said );
 
+		// landed, the auxiliary view keeps the terrain map with LAT and LONG, as the original's (starflt_178)
+		var displayController = SpaceflightController.m_instance.m_displayController;
+		var shownDisplay = GetField( displayController, "m_currentDisplay" ) as ShipDisplay;
+		var shownName = ( shownDisplay != null ) ? shownDisplay.GetType().Name : "none";
+
+		Log( "landinglines: landed, the auxiliary view shows " + shownName );
+
+		Check( "landinglines: landed, the auxiliary view keeps the terrain map, as the original's starflt_178", shownDisplay == displayController.m_terrainMapDisplay, shownName );
+
 		Finish( "scenario=landinglines", 0 );
 	}
 

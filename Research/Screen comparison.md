@@ -121,7 +121,7 @@ A vessel's reading matches the original's (mass, bio, energy, object constituent
 |---|---|---|---|
 | The "HULL CHECK COMPLETE" line was missing | FIXED | PR 231 (CONFIRMED) | GAMEPLAY |
 | "Stand by, scanning planet..." for "STANDBY...SCANNING PLANET." | FIXED | PR 231 (CONFIRMED) | GAMEPLAY |
-| The landed ship: the coordinates (125 100) and the bridge are the original's, but the auxiliary view shows Status where the original keeps the terrain map with the site's LAT and LONG (starflt_178, Landing) | OPEN, low priority | `Planetside.Show` changes to the status display (`Planetside.cs:123`); `surfacepictures` `01_landed.png` (CONFIRMED). The text window still has the orbit's lines in the picture because the probe skips the descent (PROBE) | GAMEPLAY |
+| The landed ship: the coordinates (125 100) and the bridge are the original's, but the auxiliary view shows Status where the original keeps the terrain map with the site's LAT and LONG (starflt_178, Landing) | FIXED (the landed terrain map PR) | `Planetside.Show` now leaves the terrain map in the auxiliary view; the `landinglines` probe scenario checks it after a real landing (CONFIRMED). The text window still has the orbit's lines in the picture because the probe skips the descent (PROBE) | GAMEPLAY |
 
 ## 10. Terrain vehicle
 
