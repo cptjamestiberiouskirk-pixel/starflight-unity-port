@@ -300,10 +300,7 @@ public class ButtonController : MonoBehaviour
 				SpaceflightController.m_instance.m_messages.AddText( "<color=white>Ship computer activated.\nPre-launch procedures complete.\nStanding by to initiate launch.</color>" );
 				break;
 
-			case PD_General.Location.JustLaunched:
-				SpaceflightController.m_instance.m_messages.Clear();
-				SpaceflightController.m_instance.m_messages.AddText( "<color=white>Starport clear.\nStanding by to maneuver.</color>" );
-				break;
+			// (out of the Starport the window keeps the launch's last lines, which the switch to the location has said)
 		}
 	}
 

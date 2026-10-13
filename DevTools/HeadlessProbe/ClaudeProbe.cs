@@ -1065,6 +1065,14 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportAnalyzeList();
 				break;
 
+			case "acceleration":
+				yield return ScenarioAcceleration();
+				break;
+
+			case "launchlines":
+				yield return ScenarioLaunchLines();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -27586,6 +27594,149 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-analyzelist: the Analysis lists the ship's own artifacts only, under one Artifacts heading, as the original's", ( items.Count == 1 ) && ( notTheShips == 0 ) && ( text.Split( new[] { "Artifacts" }, StringSplitOptions.None ).Length == 2 ), text );
 
 		Finish( "scenario=starport-analyzelist checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the ship's acceleration is the original's: the engines' class times 500 over the ship's mass, in whole G (SHIPGRPH-OV (.ACC)), so the equipped ship of
+	// starflt_076 (class 5 engines, 16 pods, class 3 armor, shields, missiles and lasers, 356 tons) reads 7 G
+	IEnumerator ScenarioAcceleration()
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+
+		var saved = new[] { ship.m_numCargoPods, ship.m_enginesClass, ship.m_shieldingClass, ship.m_armorClass, ship.m_missileLauncherClass, ship.m_laserCannonClass };
+
+		var results = new List<string>();
+
+		// pods, engines, shielding, armor, missiles, lasers, and the original's G
+		var cases = new[]
+		{
+			new[] { 16, 5, 1, 3, 1, 1, 7 },
+			new[] { 0, 1, 0, 0, 0, 0, 5 },
+			new[] { 0, 1, 0, 1, 0, 0, 4 },
+			new[] { 16, 5, 1, 5, 1, 1, 5 },
+			new[] { 8, 2, 1, 2, 1, 1, 4 },
+		};
+
+		var allRight = true;
+
+		foreach ( var c in cases )
+		{
+			ship.m_numCargoPods = c[ 0 ];
+			ship.m_enginesClass = c[ 1 ];
+			ship.m_shieldingClass = c[ 2 ];
+			ship.m_armorClass = c[ 3 ];
+			ship.m_missileLauncherClass = c[ 4 ];
+			ship.m_laserCannonClass = c[ 5 ];
+
+			ship.RecalculateMass();
+			ship.RecalculateAcceleration();
+
+			results.Add( c[ 0 ] + " pods, engines " + c[ 1 ] + ", armor " + c[ 3 ] + ": " + ship.m_mass + " tons, " + ship.m_acceleration + " G (the original's " + c[ 6 ] + ")" );
+
+			allRight &= ( ship.m_acceleration == c[ 6 ] );
+		}
+
+		ship.m_numCargoPods = saved[ 0 ];
+		ship.m_enginesClass = saved[ 1 ];
+		ship.m_shieldingClass = saved[ 2 ];
+		ship.m_armorClass = saved[ 3 ];
+		ship.m_missileLauncherClass = saved[ 4 ];
+		ship.m_laserCannonClass = saved[ 5 ];
+
+		ship.RecalculateMass();
+		ship.RecalculateAcceleration();
+
+		yield return Frames( 2 );
+
+		Log( "acceleration: " + string.Join( " | ", results ) );
+
+		Check( "acceleration: the ship's acceleration is the engines' class times 500 over its mass, as the original's (7 G for the ship of starflt_076, 5 G for a 500-ton ship)", allRight, string.Join( " | ", results ) );
+
+		Finish( "scenario=acceleration checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the launch from the Starport says the original's lines in its order (LAUNCH-OV &LAUNCH, LAUNCH; HYPERMSG-OV WF0D5 and WF001): OPENING DOCKING BAY DOORS,
+	// COMMENCING LAUNCH SEQUENCE... with the countdown, then LEAVING STARPORT..., ...STARPORT CLEAR and STANDING BY TO MANEUVER kept together (starflt_136 to 139)
+	IEnumerator ScenarioLaunchLines()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		controller.SwitchLocation( PD_General.Location.DockingBay );
+
+		yield return Frames( 10 );
+
+		// Launch, then Yes
+		PressButton( ButtonController.ButtonSet.CommandA, 0 );
+
+		yield return Frames( 2 );
+
+		PressButtonLabelled( ButtonController.ButtonSet.Launch, "Yes" );
+
+		// every line said during the launch, in the order it first came up, until the ship is out and a few seconds after
+		var lines = new List<string>();
+		var end = Time.realtimeSinceStartup + 45.0f;
+		var outSince = -1.0f;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			foreach ( var message in playerData.m_general.m_messageList )
+			{
+				foreach ( var part in System.Text.RegularExpressions.Regex.Replace( message, "<[^>]*>", "" ).Split( '\n' ) )
+				{
+					if ( ( part.Trim() != "" ) && !lines.Contains( part.Trim() ) )
+					{
+						lines.Add( part.Trim() );
+					}
+				}
+			}
+
+			if ( ( playerData.m_general.m_location == PD_General.Location.JustLaunched ) && ( outSince < 0.0f ) )
+			{
+				outSince = Time.realtimeSinceStartup;
+			}
+
+			if ( ( outSince >= 0.0f ) && ( Time.realtimeSinceStartup > outSince + 3.0f ) )
+			{
+				break;
+			}
+
+			yield return null;
+		}
+
+		// what the window holds at the end
+		var window = new List<string>();
+
+		foreach ( var message in playerData.m_general.m_messageList )
+		{
+			foreach ( var part in System.Text.RegularExpressions.Regex.Replace( message, "<[^>]*>", "" ).Split( '\n' ) )
+			{
+				if ( part.Trim() != "" )
+				{
+					window.Add( part.Trim() );
+				}
+			}
+		}
+
+		Log( "launchlines: said in order: " + string.Join( " | ", lines ) + " || the window at the end (" + playerData.m_general.m_location + "): " + string.Join( " | ", window ) );
+
+		var expected = new[] { "Opening docking bay doors...", "Commencing launch sequence...", "Leaving starport...", "...Starport clear", "Standing by to maneuver." };
+		var inOrder = true;
+		var at = -1;
+
+		foreach ( var line in expected )
+		{
+			var index = lines.IndexOf( line );
+
+			inOrder &= ( index > at );
+			at = index;
+		}
+
+		Check( "launchlines: the launch says the original's lines in its order, the countdown under COMMENCING LAUNCH SEQUENCE...", inOrder, string.Join( " | ", lines ) );
+		Check( "launchlines: out of the Starport the window keeps LEAVING STARPORT..., ...STARPORT CLEAR and STANDING BY TO MANEUVER together, as starflt_139", string.Join( " | ", window ) == "Leaving starport... | ...Starport clear | Standing by to maneuver.", string.Join( " | ", window ) );
+
+		Finish( "scenario=launchlines checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
