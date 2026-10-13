@@ -187,7 +187,7 @@ The project features a **deterministic visualization system** that renders plane
 
 ### 📊 Completion: 59 of the 59 items of the roadmap to parity
 
-Every item of [ROADMAP.md](ROADMAP.md) is done or decided. What is left against the original game is the UI kit's work on labels, layout and look (`Research/Screen comparison.md`, whose gameplay items are all closed). The headless probe plays every scenario of it (190), but no one has yet played the port through to the win by hand.
+Every item of [ROADMAP.md](ROADMAP.md) is done or decided. Every item of the comparison of the screens with the original's (`Research/Screen comparison.md`) is fixed or decided as well, the UI kit's included. The headless probe plays every scenario of it, but no one has yet played the port through to the win by hand.
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
