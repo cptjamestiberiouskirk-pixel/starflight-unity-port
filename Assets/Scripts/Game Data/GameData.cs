@@ -305,7 +305,23 @@ public class GameData
 			m_ancientRuinSiteList = recoveredData.m_ancientRuinSiteList;
 		}
 
-		// the shipped game's posture masks of the comm lines (recovered from STARB.COM)
+		// the shipped game's strengths of the vessels (recovered from the original's VESSEL records)
+		if ( recoveredData.m_vesselStrengthList != null )
+		{
+			foreach ( var vesselStrength in recoveredData.m_vesselStrengthList )
+			{
+				if ( ( vesselStrength.m_vesselId > 0 ) && ( vesselStrength.m_vesselId < m_vesselList.Length ) )
+				{
+					m_vesselList[ vesselStrength.m_vesselId ].m_strength = vesselStrength.m_strength;
+				}
+				else
+				{
+					UnityEngine.Debug.LogError( "Recovered vessel strength names vessel " + vesselStrength.m_vesselId + ", which the game data does not have" );
+				}
+			}
+		}
+
+		// the shipped game's posture masks, actions and answers' mood changes of the comm lines (recovered from STARB.COM)
 		if ( recoveredData.m_commPostureList != null )
 		{
 			var commsById = new System.Collections.Generic.Dictionary<int, GD_Comm>();
@@ -320,6 +336,10 @@ public class GameData
 				if ( commsById.TryGetValue( commPosture.m_commId, out var comm ) )
 				{
 					comm.m_postureMask = commPosture.m_postureMask;
+					comm.m_endsCommLink = commPosture.m_action == 127;
+					comm.m_moodAction = ( ( commPosture.m_action == 127 ) || ( commPosture.m_action == -127 ) ) ? 0 : commPosture.m_action;
+					comm.m_deltaNo = commPosture.m_deltaNo;
+					comm.m_deltaYes = commPosture.m_deltaYes;
 				}
 				else
 				{

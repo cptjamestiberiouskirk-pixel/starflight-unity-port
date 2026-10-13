@@ -47,6 +47,15 @@ public class GD_Comm
 	// not have, which is said in its m_stance only)
 	[NonSerialized] public int m_postureMask;
 
+	// what saying the line does in the shipped game (GD_CommPosture.m_action, COMM-OV DO-UA): it ends the comm link (127), or moves the speaking aliens' mood
+	// by this much (0 for nothing, the shipped game's -127)
+	[NonSerialized] public bool m_endsCommLink;
+	[NonSerialized] public int m_moodAction;
+
+	// how much the player's No and Yes move the aliens' mood when the line is their question (GD_CommPosture, COMM-OV DELTA-NO and DELTA-YES)
+	[NonSerialized] public int m_deltaNo;
+	[NonSerialized] public int m_deltaYes;
+
 	// the bit of a posture in a posture mask (COMM-OV: 1 obsequious, 2 friendly, 4 neutral, 8 hostile)
 	public static int GetPostureBit( Stance stance )
 	{

@@ -359,6 +359,9 @@ public class Encounter : MonoBehaviour
 		// tell the captain when the aliens raise or lower their shields, or arm or disarm their weapons
 		UpdateShieldsAndWeaponsNews();
 
+		// and let the aliens' mood follow the player's shields and weapons
+		UpdatePlayerShieldsAndWeapons();
+
 		// do we want to update the ships (both alien and player)?
 		if ( !m_pdEncounter.m_connected )
 		{
@@ -674,6 +677,9 @@ public class Encounter : MonoBehaviour
 		// the aliens' shields and weapons are taken as they are when the encounter shows, without a word (the original's IAPWR sets them without one)
 		m_shieldsAndWeaponsKnown = false;
 
+		// and so are the player's, for the aliens' mood
+		m_playerShieldsSeen = false;
+
 		// show the main encounter location stuff
 		m_main.SetActive( true );
 
@@ -803,7 +809,7 @@ public class Encounter : MonoBehaviour
 			// the races the shipped game starts friendly are friendly, the others neutral
 			m_pdEncounter.m_alienStance = AlienPersonality.StartsFriendly( m_gdEncounter.m_race ) ? GD_Comm.Stance.Friendly : GD_Comm.Stance.Neutral;
 			m_pdEncounter.m_playerStance = GD_Comm.Stance.Neutral;
-			m_pdEncounter.m_questionLikelihood = 50;
+			m_pdEncounter.m_questionLikelihood = c_questionLikelihood;
 			m_pdEncounter.m_numCorrectAnswers = 0;
 			m_pdEncounter.m_mechan9NoHumansWarningDone = false;
 			m_pdEncounter.m_attackedByPlayer = false;
@@ -813,8 +819,12 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_aliensAreCowardly = false;
 			m_pdEncounter.m_specialQuestionAsked = false;
 			m_pdEncounter.m_moodSet = false;
-			m_pdEncounter.m_playerPhrasesInPosture = 0;
-			m_pdEncounter.m_alienPhrasesLeft = 0;
+			m_pdEncounter.m_alienPhrases = 0;
+			m_pdEncounter.m_alienPhraseLimit = 0;
+			m_pdEncounter.m_playerPhrases = 0;
+			m_pdEncounter.m_playerHailedFirst = false;
+			m_pdEncounter.m_playerPostures = 0;
+			m_pdEncounter.m_alienHails = 0;
 			m_pdEncounter.m_rivalLineSaid = false;
 
 			// initialize race encounter
@@ -1186,8 +1196,8 @@ public class Encounter : MonoBehaviour
 			// player has unlocked the mechans
 			m_pdEncounter.m_alienStance = GD_Comm.Stance.Friendly;
 
-			// start at 0% question likelihood
-			m_pdEncounter.m_questionLikelihood = 0;
+			// they still ask as many questions as the Mechans do (COMM-OV ?MAKE-STATEMENT)
+			m_pdEncounter.m_questionLikelihood = c_mechanQuestionLikelihood;
 		}
 		else if ( playerData.m_crewAssignment.HasAtLeastOneHumanCrew() )
 		{
@@ -1197,8 +1207,8 @@ public class Encounter : MonoBehaviour
 			// set connection timer
 			m_pdEncounter.m_connectionTimer = Random.Range( 120.0f, 300.0f );
 
-			// start at 50% question likelihood
-			m_pdEncounter.m_questionLikelihood = 50;
+			// the Mechans ask questions more than the other races do (COMM-OV ?MAKE-STATEMENT: 70 in 100 for ALIEN-RACE 3)
+			m_pdEncounter.m_questionLikelihood = c_mechanQuestionLikelihood;
 		}
 		else
 		{
@@ -1214,6 +1224,9 @@ public class Encounter : MonoBehaviour
 
 		// mechans have not warned the player yet
 		m_pdEncounter.m_mechan9NoHumansWarningDone = false;
+
+		// and have not let the ship back into orbit
+		m_returnToOrbitTimer = -1.0f;
 	}
 
 	// initialize encounter with mysterion
@@ -1277,9 +1290,18 @@ public class Encounter : MonoBehaviour
 		// set connection timer
 		m_pdEncounter.m_connectionTimer = Random.Range( 120.0f, 300.0f );
 
-		// start at 50% question likelihood
-		m_pdEncounter.m_questionLikelihood = 50;
+		// the shipped game's question rate
+		m_pdEncounter.m_questionLikelihood = c_questionLikelihood;
 	}
+
+	// how often the aliens ask a question instead of making a statement, in percent: 30, and 70 for the Mechans (COMM-OV ?MAKE-STATEMENT)
+	const int c_questionLikelihood = 30;
+	const int c_mechanQuestionLikelihood = 70;
+
+	// how long the aliens wait for the player to reply to their hail or answer their question before they hail again or say they are waiting, and how many hails
+	// (or a question and its reminders) they make before they wait no more (COMM-OV SET-TIRED-TIME: 20 seconds; ?REPEAT: #A-HAILS below 3)
+	const float c_tiredOfWaitingTime = 20.0f;
+	const int c_maximumHails = 3;
 
 	// update encounter with elowan
 	void UpdateElowanEncounter()
@@ -1471,9 +1493,11 @@ public class Encounter : MonoBehaviour
 		UpdateAlienCombat();
 	}
 
-	// update encounter with gazurtoid
+	// update encounter with gazurtoid - their mood decides their posture (COMM-OV): abuse, and once it reaches 40, fight or flight
 	void UpdateGazurtoidEncounter()
 	{
+		UpdateMood();
+
 		DefaultEncounterUpdate();
 	}
 
@@ -1509,67 +1533,59 @@ public class Encounter : MonoBehaviour
 			}
 		}
 
-		// did the mechans ask a question?
-		if ( m_pdEncounter.m_lastQuestionFromAliens != 0 )
+		// the answers to the Mechans' questions move their mood (each right one takes 10, a wrong one adds 10, or 100 for "Are you Group 9?", "Do you serve Layton?"
+		// and "Are you an enemy of Noah?": their answers' changes in the recovered data, ApplyAnswer), and their mood decides their posture (COMM-OV)
+		UpdateMood();
+
+		// friendly Mechans are friendly for good: mechan 9 is unlocked, and the fleet at Heaven lets the ship in (COMM-OV +!EDL) - not Mechans the player has fired on,
+		// whose mood no longer decides
+		if ( !playerData.m_general.m_mechan9Unlocked && m_pdEncounter.m_moodSet && MoodDecides() && ( GetAlienTalkStance() == GD_Comm.Stance.Friendly ) )
 		{
-			// yes - did the player answer?
-			if ( m_pdEncounter.m_lastSubjectFromPlayer != GD_Comm.Subject.None )
+			UnlockMechans();
+		}
+
+		// has the fleet at Heaven let the ship in? back into orbit once the player has had a moment to read it
+		if ( m_returnToOrbitTimer >= 0.0f )
+		{
+			m_returnToOrbitTimer -= Time.deltaTime;
+
+			if ( m_returnToOrbitTimer < 0.0f )
 			{
-				// yes - get the correct answer
-				GD_Comm.Subject correctAnswer = GD_Comm.Subject.Yes;
-
-				switch ( m_pdEncounter.m_lastQuestionFromAliens )
+				if ( m_pdEncounter.m_connected )
 				{
-					case 101:
-					case 102:
-					case 103:
-					case 105:
-						correctAnswer = GD_Comm.Subject.No;
-						break;
+					Disconnect();
 				}
 
-				// did the player answer correctly?
-				if ( m_pdEncounter.m_lastSubjectFromPlayer == correctAnswer )
-				{
-					// yes - add to the number of correct answers
-					m_pdEncounter.m_numCorrectAnswers++;
+				LeaveEncounter();
 
-					// did the player answer enough questions correctly? (mechans that have been fired on stay hostile until the player
-					// leaves, whatever the answers are - without this they still unlocked mechan 9 for every later encounter)
-					if ( ( m_pdEncounter.m_numCorrectAnswers == 5 ) && !m_pdEncounter.m_attackedByPlayer )
-					{
-						// yes - yay! we are are friends!
-						playerData.m_general.m_mechan9Unlocked = true;
-
-						// mechans are friendly now
-						m_pdEncounter.m_alienStance = GD_Comm.Stance.Friendly;
-
-						// no more questions from the mechans
-						m_pdEncounter.m_questionLikelihood = 0;
-					}
-				}
-				else
-				{
-					// no - oh boy mechans hate the player now
-					m_pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
-
-					// no more questions from the mechans
-					m_pdEncounter.m_questionLikelihood = 0;
-
-					// mechans want to terminate comms shortly
-					m_pdEncounter.m_connectionTimer = 15.0f;
-				}
+				return;
 			}
 		}
 
 		// do the default encounter stuff
-		if ( DefaultEncounterUpdate() )
+		DefaultEncounterUpdate();
+	}
+
+	// the encounter of the Mechan fleet in orbit around Heaven (145,107, orbit 4), the original's *HEAVEN
+	public const int c_heavenEncounterId = 77;
+
+	// the Mechans' mood once they have been friendly (COMM-OV +!EDL sets their BASE-EDL and EDL to 1)
+	const float c_unlockedMechanMood = 1.0f;
+
+	// the Mechans have become friendly: from now on they start friendly (their BASE-EDL 1, the port's m_mechan9Unlocked), the fleet at Heaven no longer stops the ship
+	// (the *HEAVEN encounter made inactive, SpaceflightController.BeginInOrbitEncounter), and a ship in that encounter goes back into orbit (SKIP2NEST)
+	void UnlockMechans()
+	{
+		DataController.m_instance.m_playerData.m_general.m_mechan9Unlocked = true;
+
+		m_pdEncounter.m_mood = c_unlockedMechanMood;
+		m_pdEncounter.m_alienStance = GD_Comm.Stance.Friendly;
+
+		if ( m_pdEncounter.m_encounterId == c_heavenEncounterId )
 		{
-			// mechans more likely to ask questions as time goes by to try and figure out who the player is
-			if ( m_pdEncounter.m_alienStance == GD_Comm.Stance.Neutral )
-			{
-				m_pdEncounter.m_questionLikelihood += 25;
-			}
+			SpaceflightController.m_instance.GrantOrbitPermission( m_pdEncounter.m_encounterId );
+
+			m_returnToOrbitTimer = c_returnToOrbitDelay;
 		}
 	}
 
@@ -2171,6 +2187,22 @@ public class Encounter : MonoBehaviour
 		// have we already disconnected?
 		if ( !m_pdEncounter.m_disconnected )
 		{
+			// are the aliens waiting for the answer to their question? after 20 seconds they say they are waiting, twice at most (COMM-OV TIRED-OF-WAITING)
+			if ( ( m_pdEncounter.m_lastQuestionFromAliens != 0 ) && m_pdEncounter.m_connected && ( m_pdEncounter.m_lastSubjectFromPlayer == GD_Comm.Subject.None ) )
+			{
+				m_pdEncounter.m_conversationTimer -= Time.deltaTime;
+
+				if ( ( m_pdEncounter.m_conversationTimer <= 0.0f ) && ( m_pdEncounter.m_alienHails < c_maximumHails ) )
+				{
+					m_pdEncounter.m_conversationTimer = c_tiredOfWaitingTime;
+					m_pdEncounter.m_alienHails++;
+
+					AddComm( GD_Comm.Subject.WaitingForResponse, false );
+
+					aliensSaidSomething = true;
+				}
+			}
+
 			// did the aliens ask a question?
 			if ( m_pdEncounter.m_lastQuestionFromAliens == 0 )
 			{
@@ -2210,8 +2242,8 @@ public class Encounter : MonoBehaviour
 						// the aliens will have said something
 						aliensSaidSomething = true;
 
-						// one phrase fewer left to say
-						m_pdEncounter.m_alienPhrasesLeft--;
+						// one phrase more said in this comm link
+						m_pdEncounter.m_alienPhrases++;
 
 						// was there a pending question from the player?
 						if ( ( m_pdEncounter.m_lastSubjectFromPlayer >= GD_Comm.Subject.Themselves ) && ( m_pdEncounter.m_lastSubjectFromPlayer <= GD_Comm.Subject.TheAncients ) )
@@ -2264,10 +2296,13 @@ public class Encounter : MonoBehaviour
 								// yes - do a response
 								AddComm( GD_Comm.Subject.GreetingResponse, false );
 							}
-							else
+							// no - do a hail, unless the aliens have hailed three times without a reply: they hail again after 20 seconds without one, and
+							// then wait (COMM-OV HAIL, TIRED-OF-WAITING and ?REPEAT) - a home fleet gives every one of its homeworld warnings
+							else if ( ( m_pdEncounter.m_alienHails < c_maximumHails ) || IsHomeFleet() )
 							{
-								// no - do a hail
 								AddComm( GD_Comm.Subject.GreetingHail, false );
+
+								m_pdEncounter.m_conversationTimer = c_tiredOfWaitingTime;
 							}
 						}
 					}
@@ -2590,8 +2625,16 @@ public class Encounter : MonoBehaviour
 	{
 		if ( !m_pdEncounter.m_moodSet )
 		{
-			// the race's mood, and more against a ship that meets them with its shields up or its weapons armed
-			m_pdEncounter.m_mood = personality.m_startingMood + AlienPersonality.GetMeetingMood( DataController.m_instance.m_playerData.m_playerShip );
+			// the race's mood (the Mechans' is 1 once they have been friendly, COMM-OV +!EDL), and more against a ship that meets them with its shields up or its
+			// weapons armed
+			var startingMood = personality.m_startingMood;
+
+			if ( ( m_gdEncounter.m_race == GameData.Race.Mechan ) && DataController.m_instance.m_playerData.m_general.m_mechan9Unlocked )
+			{
+				startingMood = c_unlockedMechanMood;
+			}
+
+			m_pdEncounter.m_mood = startingMood + AlienPersonality.GetMeetingMood( DataController.m_instance.m_playerData.m_playerShip );
 			m_pdEncounter.m_moodSet = true;
 
 			// the Elowan and the Thrynn hold the crew's friendship with their rival race against it: they start in their hostile band (the owner's ruling of 2026-10-11),
@@ -2603,26 +2646,65 @@ public class Encounter : MonoBehaviour
 		}
 	}
 
-	// the notes' "strength differential": the player's strength less the aliens' weighed by their aggression / 5 - positive, and the aliens grovel where they would
-	// threaten (compart.txt 5) - a strength is the port's: the armor and shield points of the player's ship, and those of the aliens' living ships
-	float GetStrengthDifferential( AlienPersonality personality )
+	// how much stronger than the aliens the player must be for them to grovel instead of threatening, and to take flight instead of fighting (COMM-OV EDL>POSTURE)
+	const int c_grovelOverHostile = 15;
+	const int c_fleeOverFight = 5;
+
+	// the player's strength as the shipped game weighs it (COMM-OV): the classes of the ship's armor, shields, missile launcher and laser cannon, and as much again
+	// for every 500 points by which the captain's five skills together pass 550
+	int GetPlayerStrength()
 	{
-		var ship = DataController.m_instance.m_playerData.m_playerShip;
-		var playerStrength = (float) ( Mathf.Max( 0, ship.m_armorPoints ) + Mathf.Max( 0, ship.m_shieldPoints ) );
-		var alienStrength = 0.0f;
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+
+		var classes = Mathf.Max( 0, ship.m_armorClass ) + Mathf.Max( 0, ship.m_shieldingClass ) + Mathf.Max( 0, ship.m_missileLauncherClass ) + Mathf.Max( 0, ship.m_laserCannonClass );
+
+		var captain = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Captain );
+
+		if ( captain == null )
+		{
+			return classes;
+		}
+
+		var skills = captain.m_science + captain.m_navigation + captain.m_engineering + captain.m_communications + captain.m_medicine;
+
+		return classes + classes * Mathf.Max( 0, skills - 550 ) / 500;
+	}
+
+	// the aliens' strength as the shipped game weighs it (COMM-OV IAPWR): each ship that is there adds its vessel's strength, by the share of its armor and shields
+	// that it has left
+	int GetAlienStrength()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var alienStrength = 0;
 
 		foreach ( var alienShip in m_pdEncounter.GetAlienShipList() )
 		{
-			if ( alienShip.m_addedToEncounter && !alienShip.m_isDead )
+			if ( ( alienShip == null ) || !alienShip.m_addedToEncounter || alienShip.m_isDead || ( alienShip.m_vesselId <= 0 ) || ( alienShip.m_vesselId >= gameData.m_vesselList.Length ) )
 			{
-				alienStrength += Mathf.Max( 0, alienShip.m_armorPoints ) + Mathf.Max( 0, alienShip.m_shieldPoints );
+				continue;
+			}
+
+			var vessel = gameData.m_vesselList[ alienShip.m_vesselId ];
+			var fullPoints = vessel.m_armor + vessel.m_shields;
+
+			if ( fullPoints > 0 )
+			{
+				alienStrength += (int) ( (long) vessel.m_strength * ( Mathf.Max( 0, alienShip.m_armorPoints ) + Mathf.Max( 0, alienShip.m_shieldPoints ) ) / fullPoints );
 			}
 		}
 
-		return playerStrength - alienStrength * personality.m_aggression / 5.0f;
+		return alienStrength;
 	}
 
-	// the posture the aliens' mood gives them below "fight or flight": friendly, diplomatic (neutral), or hostile or obsequious by their strength (compart.txt 4)
+	// the player's strength less the aliens' (COMM-OV EDL>POSTURE)
+	int GetStrengthDifferential()
+	{
+		return GetPlayerStrength() - GetAlienStrength();
+	}
+
+	// the posture the aliens' mood gives them below "fight or flight": friendly, diplomatic (neutral), or hostile - obsequious instead against a player more than 15
+	// stronger (compart.txt 4, COMM-OV EDL>POSTURE)
 	GD_Comm.Stance GetMoodPosture( AlienPersonality personality )
 	{
 		var mood = m_pdEncounter.m_mood;
@@ -2637,7 +2719,7 @@ public class Encounter : MonoBehaviour
 			return GD_Comm.Stance.Neutral;
 		}
 
-		return ( GetStrengthDifferential( personality ) > 0.0f ) ? GD_Comm.Stance.Obsequious : GD_Comm.Stance.Hostile;
+		return ( GetStrengthDifferential() > c_grovelOverHostile ) ? GD_Comm.Stance.Obsequious : GD_Comm.Stance.Hostile;
 	}
 
 	// true if a ship of this encounter that is still there matches (the original's IAPWR looks over the encounter's ships for shields and for weapons)
@@ -2793,7 +2875,7 @@ public class Encounter : MonoBehaviour
 				AddComm( GD_Comm.Subject.Terminate, false );
 			}
 
-			m_pdEncounter.m_alienStance = ( GetStrengthDifferential( personality ) > 0.0f ) ? GD_Comm.Stance.Obsequious : GD_Comm.Stance.Hostile;
+			m_pdEncounter.m_alienStance = ( GetStrengthDifferential() > c_fleeOverFight ) ? GD_Comm.Stance.Obsequious : GD_Comm.Stance.Hostile;
 
 			return;
 		}
@@ -2803,53 +2885,164 @@ public class Encounter : MonoBehaviour
 		m_pdEncounter.m_alienStance = ( posture == GD_Comm.Stance.Hostile ) ? GD_Comm.Stance.Neutral : posture;
 	}
 
-	// a statement of the player's moves the aliens' mood by the effect of the player's posture on their race, and a question by half of it - the more phrases the
-	// player has made in the posture, the less ("DELTA-EDL = PPE * [1/(#-THIS-POSTURE + 1)]", compart.txt 7)
+	// a statement of the player's moves the aliens' mood by the effect of the player's posture on their race, divided by the number of phrases the player has made
+	// in this comm link with it, and a question by half of that (COMM-OV STATEMENT-EDL and the question's rule: POSTURE-EFFECT / P-PHRASES, and 2/ for a question)
 	void ApplyPlayerPosture( bool isQuestion )
 	{
+		m_pdEncounter.m_playerPhrases++;
+
 		var personality = AlienPersonality.Find( m_gdEncounter.m_race );
 
-		if ( ( personality == null ) || !MoodDecides() )
+		if ( personality == null )
 		{
 			return;
 		}
 
-		EnsureMood( personality );
-
-		var effect = personality.GetPostureEffect( m_pdEncounter.m_playerStance ) / ( m_pdEncounter.m_playerPhrasesInPosture + 1 );
+		var effect = personality.GetPostureEffect( m_pdEncounter.m_playerStance ) / m_pdEncounter.m_playerPhrases;
 
 		if ( isQuestion )
 		{
 			effect *= 0.5f;
 		}
 
-		m_pdEncounter.m_playerPhrasesInPosture++;
-		m_pdEncounter.m_mood = Mathf.Clamp( m_pdEncounter.m_mood + effect, 0.0f, 100.0f );
+		ChangeMood( effect );
 	}
 
-	// how many phrases the aliens say before they are tired of talking: "a random number in the range determined by the alien's initial posture" (compart.txt 11)
+	// the full effect of the player's posture on the aliens' mood: once for the reply to their hail, and once for every posture the player hails or speaks in after
+	// hailing first (COMM-OV RESPOND>EDL and NEW-POSTURE>EDL)
+	void ApplyFullPostureEffect()
+	{
+		var personality = AlienPersonality.Find( m_gdEncounter.m_race );
+
+		if ( personality != null )
+		{
+			ChangeMood( personality.GetPostureEffect( m_pdEncounter.m_playerStance ) );
+		}
+	}
+
+	// after the player has hailed first, the first use of each posture in the encounter has its full effect on the aliens' mood (COMM-OV NEW-POSTURE>EDL)
+	void ApplyNewPosture()
+	{
+		var postureBit = GD_Comm.GetPostureBit( m_pdEncounter.m_playerStance );
+
+		if ( !m_pdEncounter.m_playerHailedFirst || ( postureBit == 0 ) || ( ( m_pdEncounter.m_playerPostures & postureBit ) != 0 ) )
+		{
+			return;
+		}
+
+		m_pdEncounter.m_playerPostures |= postureBit;
+
+		ApplyFullPostureEffect();
+	}
+
+	// the player's shields and weapons as the aliens' mood last saw them (not saved: they are seen again when an encounter is shown)
+	bool m_playerShieldsSeen;
+	bool m_playerShieldsWereUp;
+	bool m_playerWeaponsWereArmed;
+
+	// raising the shields during an encounter angers the aliens by 5 and lowering them calms them by 5, arming the weapons by 10 (COMM-OV <EDL>: +5>EDL, -5, +10,
+	// -10) - before the mood is set the meeting counts the shields and weapons as they are (AlienPersonality.GetMeetingMood)
+	void UpdatePlayerShieldsAndWeapons()
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+
+		if ( m_playerShieldsSeen && m_pdEncounter.m_moodSet )
+		{
+			if ( ship.m_shieldsAreUp != m_playerShieldsWereUp )
+			{
+				ChangeMood( ship.m_shieldsAreUp ? 5.0f : -5.0f );
+			}
+
+			if ( ship.m_weaponsAreArmed != m_playerWeaponsWereArmed )
+			{
+				ChangeMood( ship.m_weaponsAreArmed ? 10.0f : -10.0f );
+			}
+		}
+
+		m_playerShieldsSeen = true;
+		m_playerShieldsWereUp = ship.m_shieldsAreUp;
+		m_playerWeaponsWereArmed = ship.m_weaponsAreArmed;
+	}
+
+	// moves the aliens' mood by a line of theirs or by the player's answer to their question, kept within 0 to 100 (COMM-OV +!EDL) - only where the mood decides
+	void ChangeMood( float delta )
+	{
+		var personality = AlienPersonality.Find( m_gdEncounter.m_race );
+
+		if ( ( personality == null ) || !MoodDecides() || ( delta == 0.0f ) )
+		{
+			return;
+		}
+
+		EnsureMood( personality );
+
+		m_pdEncounter.m_mood = Mathf.Clamp( m_pdEncounter.m_mood + delta, 0.0f, 100.0f );
+
+		// the shipped game draws the aliens' phrase limit again for their posture whenever their mood changes (COMM-OV +!EDL, EDL>POSTURE, GET-PHRASE-LIMIT)
+		DrawPhraseLimit();
+	}
+
+	// the player's Yes or No moves the aliens' mood by the change their question has for it (COMM-OV YES>EDL and NO-EDL: Velox "Of course Veloxi are superior all
+	// the time. Agreeing?" No 10, Yes 0)
+	void ApplyAnswer( bool yes )
+	{
+		if ( m_pdEncounter.m_lastQuestionFromAliens == 0 )
+		{
+			return;
+		}
+
+		var question = FindRaceComm( m_pdEncounter.m_lastQuestionFromAliens );
+
+		if ( question != null )
+		{
+			ChangeMood( yes ? question.m_deltaYes : question.m_deltaNo );
+		}
+	}
+
+	// how many phrases the aliens say in a comm link before they are tired of talking, drawn for their posture: grovelling 10 to 19, friendly 10 to 14, neutral 5 to 9,
+	// hostile 4 to 6 (COMM-OV GET-PHRASE-LIMIT: OP#, FP#, NP#, HP# and RRND)
 	static int GetPhraseLimit( GD_Comm.Stance posture )
 	{
 		switch ( posture )
 		{
 			case GD_Comm.Stance.Obsequious:
-				return Random.Range( 10, 21 );
+				return Random.Range( 10, 20 );
 
 			case GD_Comm.Stance.Friendly:
-				return Random.Range( 5, 16 );
+				return Random.Range( 10, 15 );
 
 			case GD_Comm.Stance.Hostile:
-				return Random.Range( 2, 6 );
+				return Random.Range( 4, 7 );
 		}
 
-		return Random.Range( 3, 9 );
+		return Random.Range( 5, 10 );
 	}
 
-	// true once aliens with a personality have said all their phrases - never a home fleet, whose talk ends with its last warning (it attacks then; a Veloxi fleet
-	// hailed first has its refusal and four hails to give)
+	// draws the phrase limit of aliens with a personality for the posture they are in now
+	void DrawPhraseLimit()
+	{
+		if ( AlienPersonality.Find( m_gdEncounter.m_race ) != null )
+		{
+			m_pdEncounter.m_alienPhraseLimit = GetPhraseLimit( GetAlienTalkStance() );
+		}
+	}
+
+	// true once aliens with a personality have said as many phrases in this comm link as their limit (COMM-OV ?TIRED-OF-TALKING) - never a home fleet, whose talk
+	// ends with its last warning (it attacks then; a Veloxi fleet hailed first has its refusal and four hails to give)
 	bool IsTiredOfTalking()
 	{
-		return ( AlienPersonality.Find( m_gdEncounter.m_race ) != null ) && ( m_pdEncounter.m_alienPhrasesLeft <= 0 ) && !IsHomeFleet();
+		if ( ( AlienPersonality.Find( m_gdEncounter.m_race ) == null ) || IsHomeFleet() )
+		{
+			return false;
+		}
+
+		// a save file written before the limit was kept has none yet
+		if ( m_pdEncounter.m_alienPhraseLimit <= 0 )
+		{
+			DrawPhraseLimit();
+		}
+
+		return m_pdEncounter.m_alienPhrases >= m_pdEncounter.m_alienPhraseLimit;
 	}
 
 	// true if the aliens transmit rather than talk: the Minstrels' song, the Nomad probe's planetary data, the Noah 9 derelict's recorded message and the Mysterions'
@@ -2873,6 +3066,45 @@ public class Encounter : MonoBehaviour
 	// the next line of a transmission, in the order of the game data - null once all of it has been sent in this encounter
 	GD_Comm FindNextTransmission()
 	{
+		var general = DataController.m_instance.m_playerData.m_general;
+		var lines = new List<GD_Comm>();
+		var endsCommLink = false;
+
+		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
+		{
+			if ( ( comm.m_race == m_gdEncounter.m_race ) && ( comm.m_subject == GD_Comm.Subject.NoMoreInformation ) )
+			{
+				lines.Add( comm );
+
+				endsCommLink = endsCommLink || comm.m_endsCommLink;
+			}
+		}
+
+		// a transmission with lines that end the comm link (each of the Nomad probes' planets, every second verse of the Minstrels' song) goes on with the line used
+		// least in the game so far, the first of them on a tie, at this meeting or the next - so it goes on from the line after the last one sent, and from the first
+		// again after the last - and the line that ends the link ends it (COMM-OV FIND-PHRASE and DO-UA; the counts are FindComm's)
+		if ( ( lines.Count > 0 ) && endsCommLink )
+		{
+			GD_Comm nextLine = null;
+			var leastUses = int.MaxValue;
+
+			foreach ( var line in lines )
+			{
+				var uses = general.GetCommUseCount( line.m_id );
+
+				if ( uses < leastUses )
+				{
+					nextLine = line;
+					leastUses = uses;
+				}
+			}
+
+			general.AddCommUse( nextLine.m_id );
+			m_pdEncounter.m_shownCommList.Add( nextLine.m_id );
+
+			return nextLine;
+		}
+
 		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
 		{
 			if ( ( comm.m_race == m_gdEncounter.m_race ) && ( comm.m_subject == GD_Comm.Subject.NoMoreInformation ) && !m_pdEncounter.m_shownCommList.Contains( comm.m_id ) )
@@ -3348,6 +3580,41 @@ public class Encounter : MonoBehaviour
 			ApplyPlayerPosture( subject != GD_Comm.Subject.Statement );
 		}
 
+		// and so does the player's answer to their question
+		if ( outgoing && ( ( subject == GD_Comm.Subject.Yes ) || ( subject == GD_Comm.Subject.No ) ) )
+		{
+			ApplyAnswer( subject == GD_Comm.Subject.Yes );
+		}
+
+		// and the hails: the player's reply to the aliens' hail has the posture's full effect and counts as a phrase, a hail of the player's before the aliens have
+		// hailed makes the player the hailer, whose postures each have their full effect once, and the aliens' second and third hail without a reply anger them by 4
+		// and by 9 (COMM-OV >RESPOND and RESPOND>EDL, HAILER and NEW-POSTURE>EDL, <TALK> and +4/9>EDL)
+		if ( outgoing && ( subject == GD_Comm.Subject.GreetingResponse ) )
+		{
+			m_pdEncounter.m_playerPhrases++;
+			m_pdEncounter.m_alienHails = 0;
+
+			ApplyFullPostureEffect();
+		}
+		else if ( outgoing && ( subject == GD_Comm.Subject.GreetingHail ) )
+		{
+			if ( !m_pdEncounter.m_aliensWantToConnect )
+			{
+				m_pdEncounter.m_playerHailedFirst = true;
+			}
+
+			ApplyNewPosture();
+		}
+		else if ( !outgoing && ( subject == GD_Comm.Subject.GreetingHail ) )
+		{
+			m_pdEncounter.m_alienHails++;
+
+			if ( ( m_pdEncounter.m_alienHails >= 2 ) && ( m_pdEncounter.m_alienHails < 4 ) )
+			{
+				ChangeMood( m_pdEncounter.m_alienHails * m_pdEncounter.m_alienHails );
+			}
+		}
+
 		// copy the comm text (because we will replace tokens)
 		var text = comm.m_text;
 
@@ -3588,6 +3855,10 @@ public class Encounter : MonoBehaviour
 
 				// remember the question from the aliens
 				m_pdEncounter.m_lastQuestionFromAliens = comm.m_id;
+
+				// and wait 20 seconds for the answer before saying so, twice at most (COMM-OV QUESTION: SET-TIRED-TIME, #A-HAILS 1)
+				m_pdEncounter.m_conversationTimer = c_tiredOfWaitingTime;
+				m_pdEncounter.m_alienHails = 1;
 			}
 
 			// was this an answer?
@@ -3626,10 +3897,21 @@ public class Encounter : MonoBehaviour
 			}
 		}
 
+		// what saying the line does in the shipped game, for a line of the aliens' (COMM-OV DO-UA): it moves their mood (the Spemin's "Enough jabbering. It is
+		// time for a glorious Spemin victory!" by 100, to fight), or it ends the comm link
+		if ( !outgoing )
+		{
+			ChangeMood( comm.m_moodAction );
+		}
+
 		// did we want the communications to terminate?
 		if ( subject == GD_Comm.Subject.Terminate )
 		{
 			// yes - get out of video chat
+			Disconnect();
+		}
+		else if ( !outgoing && comm.m_endsCommLink && m_pdEncounter.m_connected )
+		{
 			Disconnect();
 		}
 	}
@@ -3684,11 +3966,11 @@ public class Encounter : MonoBehaviour
 			SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Comm );
 		}
 
-		// aliens with a personality say only so many phrases, picked by their posture as the conversation begins (compart.txt 11)
-		if ( AlienPersonality.Find( m_gdEncounter.m_race ) != null )
-		{
-			m_pdEncounter.m_alienPhrasesLeft = GetPhraseLimit( GetAlienTalkStance() );
-		}
+		// aliens with a personality say only so many phrases in a comm link, drawn for their posture as it begins and again whenever their mood changes (COMM-OV
+		// GET-PHRASE-LIMIT)
+		m_pdEncounter.m_alienPhrases = 0;
+
+		DrawPhraseLimit();
 
 		// the first comm link with the Thrynn or the Elowan is remembered for the rest of the game
 		var playerGeneral = DataController.m_instance.m_playerData.m_general;
@@ -3733,6 +4015,10 @@ public class Encounter : MonoBehaviour
 		// no one wants to connect any more
 		m_pdEncounter.m_playerWantsToConnect = false;
 		m_pdEncounter.m_aliensWantToConnect = false;
+
+		// the next comm link counts its phrases and its hailer again (COMM-OV clears P-PHRASES and HAILER at the end of a link)
+		m_pdEncounter.m_playerPhrases = 0;
+		m_pdEncounter.m_playerHailedFirst = false;
 	}
 
 	// call this to find out if there are living alien ships in the encounter
@@ -3775,14 +4061,14 @@ public class Encounter : MonoBehaviour
 	// hail (or respond to) the alien ships
 	public void Hail( GD_Comm.Stance stance, bool responding )
 	{
-		// a new posture counts its phrases from the start (each phrase in the same posture moves the aliens' mood less)
-		if ( stance != m_pdEncounter.m_playerStance )
-		{
-			m_pdEncounter.m_playerPhrasesInPosture = 0;
-		}
-
 		// set the stance to what the player selected
 		m_pdEncounter.m_playerStance = stance;
+
+		// a posture the player has not used yet, after hailing first, moves the aliens' mood (the hail itself does it in AddComm)
+		if ( m_pdEncounter.m_connected )
+		{
+			ApplyNewPosture();
+		}
 
 		// have we connected already?
 		if ( !m_pdEncounter.m_connected )
