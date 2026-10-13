@@ -84,6 +84,8 @@ MonoBehaviour:
   m_diamondSprite: {fileID: 21300000, guid: 17b616fe62522e346b19ecc26908ca25, type: 3}
   m_diamondOutlineSprite: {fileID: 21300000, guid: 75f104f17c8d1bc41b4621f0c4473b5e,
     type: 3}
+  m_buttonSprite: {fileID: 21300000, guid: 275c10ce1850423bbbc2647bbeed5295, type: 3}
+  m_buttonFrameSprite: {fileID: 21300000, guid: 370d8230e2a245279f6329e7bafe39df, type: 3}
   m_bulletOffSprite: {fileID: 21300000, guid: 2605642f58192a44fa3c0cf00e28ff68, type: 3}
   m_bulletOnSprite: {fileID: 21300000, guid: 8e76a2acd528ddd4985a1fd39d4db4e0, type: 3}
   m_bulletActiveSprite: {fileID: 21300000, guid: 6b2869550aafa3a4986ace9ed640484a,
