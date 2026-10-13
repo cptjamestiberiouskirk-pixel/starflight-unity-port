@@ -18325,6 +18325,24 @@ public class ClaudeProbe : MonoBehaviour
 		}
 	}
 
+	// the bonuses and fines booked in the ledger from this entry on
+	static string BonusesAndFines( PD_Bank bank, int fromIndex )
+	{
+		var booked = new List<string>();
+
+		for ( var index = fromIndex; index < bank.m_transactionList.Count; index++ )
+		{
+			var transaction = bank.m_transactionList[ index ];
+
+			if ( ( transaction.m_description == "Bonus" ) || ( transaction.m_description == "Fine" ) )
+			{
+				booked.Add( transaction.m_description + " " + transaction.m_amount );
+			}
+		}
+
+		return string.Join( "; ", booked );
+	}
+
 	IEnumerator ScenarioColonies()
 	{
 		var dataController = DataController.m_instance;
@@ -18361,16 +18379,29 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		// ---- 1. Log Planet asks whether to recommend the planet, and Yes recommends it; the player names it ("New EdenX" and a backspace, a name longer than the
-		// original's 15 characters, and none at all)
+		// original's 15 characters, and none at all) - the ledger from here on, and what each recommendation books at once
 		var saidForHeaven = new List<string>();
 		var saidForA = new List<string>();
+		var ledgerAtStart = bank.m_transactionList.Count;
+		var bookedAtOnce = "";
 
 		yield return LogAndRecommend( heaven, true, asked, "New EdenX\b", saidForHeaven );
 
 		var askedForHeaven = asked[ 0 ];
 
+		bookedAtOnce += "Mardan 4: " + BonusesAndFines( bank, ledgerAtStart ) + " | ";
+
+		var ledgerAfterHeaven = bank.m_transactionList.Count;
+
 		yield return LogAndRecommend( unsuitableA, true, asked, "ABCDEFGHIJKLMNOPQRS", saidForA );
+
+		bookedAtOnce += unsuitableA + ": " + BonusesAndFines( bank, ledgerAfterHeaven ) + " | ";
+
+		var ledgerAfterA = bank.m_transactionList.Count;
+
 		yield return LogAndRecommend( unsuitableB, true, asked, "" );
+
+		bookedAtOnce += unsuitableB + ": " + BonusesAndFines( bank, ledgerAfterA );
 
 		// ---- 2. the control: No does not recommend it
 		yield return LogAndRecommend( notRecommended, false, asked );
@@ -18391,12 +18422,23 @@ public class ClaudeProbe : MonoBehaviour
 
 		controller.m_encounterRange = encounterRange;
 
-		var change = bank.m_currentBalance - balanceBefore;
+		// what docking booked, and the bonuses and fines of the three recommendations, wherever they were booked
+		var bookedAtDocking = BonusesAndFines( bank, ledgerBefore );
+		var change = 0;
 		var ledger = "";
 
-		for ( var index = ledgerBefore; index < bank.m_transactionList.Count; index++ )
+		for ( var index = ledgerAtStart; index < bank.m_transactionList.Count; index++ )
 		{
-			ledger += bank.m_transactionList[ index ].m_description + " " + bank.m_transactionList[ index ].m_amount + "; ";
+			var transaction = bank.m_transactionList[ index ];
+
+			ledger += transaction.m_description + " " + transaction.m_amount + "; ";
+
+			if ( ( transaction.m_description == "Bonus" ) || ( transaction.m_description == "Fine" ) )
+			{
+				var amount = int.Parse( transaction.m_amount.TrimEnd( '+', '-' ) );
+
+				change += transaction.m_amount.EndsWith( "-" ) ? -amount : amount;
+			}
 		}
 
 		// the colony evaluations have a list of their own since the evaluation screen pages them (before that they were among the supplemental ones)
@@ -18422,7 +18464,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "colonies: planets " + heaven + " (Mardan 4), " + unsuitableA + " and " + unsuitableB + " recommended, " + notRecommended + " not (on the list among them: '" + onTheList + "') | asked for Mardan 4 " + askedForHeaven + ", pending before docking " + pendingCount + ", after " + pendingAfter + " | the bank " + change + ", ledger: " + ledger + " | reasons " + unsuitableA + ": " + reasonsA + "; " + unsuitableB + ": " + reasonsB + " | evaluations: " + evaluationText.Replace( '\n', '/' ) );
 
+		Log( "colonies: booked as each planet was recommended: " + bookedAtOnce + " | booked at docking: '" + bookedAtDocking + "' (the bank " + ( bank.m_currentBalance - balanceBefore ) + " at docking)" );
+
 		Check( "colonies: Log Planet asks whether to recommend the planet for colonization, and Yes recommends it while No does not", askedForHeaven && ( pendingCount == 3 ), askedForHeaven + ", " + pendingCount );
+		Check( "colonies: the bonus or the fine is booked in the ledger as the planet is recommended, as the original's, and docking books none", ( bookedAtOnce == "Mardan 4: Bonus 50000+ | " + unsuitableA + ": Fine 100- | " + unsuitableB + ": Fine 10000-" ) && ( bookedAtDocking == "" ), bookedAtOnce + " | at docking '" + bookedAtDocking + "'" );
 		Check( "colonies: back at the Starport an optimal planet of Interstel's list earns its bonus", ledger.Contains( "Bonus 50000+" ) && evaluationText.Contains( "OPTIMAL PLANET" ) && evaluationText.Contains( "BONUS OF 50000" ), ledger );
 		Check( "colonies: the first unsuitable planet is a warning of 100 MU, with its reasons", ledger.Contains( "Fine 100-" ) && evaluationText.Contains( "FINED 100 MU'S.  THIS IS ONLY A WARNING" ) && ( reasonsA.Length > 0 ) && evaluationText.Contains( reasonsA.Split( ',' )[ 0 ].Trim() ), ledger + " | " + reasonsA );
 		// the shipped game's fine (CAPTAIN overlay WF348 and WF292 in the decompiled original): 10,000 MU for each unsuitable planet recommended before, whatever the
