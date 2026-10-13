@@ -725,6 +725,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportInterest();
 				break;
 
+			case "starport-notices":
+				yield return ScenarioStarportNotices();
+				break;
+
 			case "nebula":
 				yield return ScenarioNebula();
 				break;
@@ -999,6 +1003,10 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "gazurtoidmood":
 				yield return ScenarioGazurtoidMood();
+				break;
+
+			case "analysisheading":
+				yield return ScenarioAnalysisHeading();
 				break;
 
 			case "orbitlines":
@@ -11101,6 +11109,117 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=starport-transport bytes=" + bytes + " alpha=" + alpha.ToString( "F4" ) + " asset=" + assetAlphaAfter.ToString( "F4" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
+	// ---------------------------------------------------------------- the screens' Step 2: the notices screen as the original's (OP-OV)
+
+	// the text of a button's label
+	static string ButtonLabel( UnityEngine.UI.Button button )
+	{
+		var text = ( button == null ) ? null : button.GetComponentInChildren<TMPro.TextMeshProUGUI>( true );
+
+		return ( text == null ) ? "" : text.text;
+	}
+
+	// More on the notices screen until the notice has been read to its end - returns the text then
+	static string ReadNoticeToTheEnd( OperationsPanel panel )
+	{
+		for ( var press = 0; ( press < 50 ) && !(bool) GetField( panel, "m_endOfMessageReached" ); press++ )
+		{
+			panel.MoreClicked();
+		}
+
+		return panel.m_messageText.text.Replace( "\r", "" );
+	}
+
+	IEnumerator ScenarioStarportNotices()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var panel = FindPanel<OperationsPanel>();
+
+		if ( ( panel == null ) || ( gameData.m_noticeList.Length < 2 ) )
+		{
+			Finish( "scenario=starport-notices abort: no operations panel or too few notices", 2 );
+			yield break;
+		}
+
+		// the day of the second notice, with none read: two notices are out
+		var secondDate = gameData.m_noticeList[ 1 ].m_stardate;
+
+		playerData.m_general.m_currentStardateYMD = secondDate;
+		playerData.m_starport.m_lastReadNoticeStardate = "0000-00-00";
+
+		yield return OpenPanel( panel, "operations" );
+
+		// ---- 1. the header, and the end of the notices after the newest
+		panel.NoticesClicked();
+
+		var header = panel.m_stardateText.text;
+		var firstRead = ReadNoticeToTheEnd( panel );
+
+		panel.NextClicked();
+
+		var secondRead = ReadNoticeToTheEnd( panel );
+
+		panel.QuitClicked();
+
+		Log( "starport-notices: on " + secondDate + " the header is '" + header + "' | the first notice ends '" + Tail( firstRead ) + "' | the second (the newest) ends '" + Tail( secondRead ) + "'" );
+
+		Check( "starport-notices: the header beside NOTICES is today's date, as the original's", header == DayMonthYear( secondDate ), "'" + header + "'" );
+		Check( "starport-notices: the newest notice ends with the original's END OF NOTICES, and an earlier one does not", secondRead.EndsWith( "\n\n***End of notices***" ) && !firstRead.Contains( "End of notices" ), Tail( firstRead ) + " | " + Tail( secondRead ) );
+
+		// ---- 2. nothing new: NO NEW NOTICES and REPEAT LAST NOTICE?, More as Yes and Quit as No
+		var moreLabelBefore = ButtonLabel( panel.m_moreButton );
+
+		panel.NoticesClicked();
+
+		var askingMethod = panel.GetType().GetMethod( "IsAskingToRepeat" );
+		var asked = ( askingMethod != null ) && (bool) askingMethod.Invoke( panel, null );
+		var question = panel.m_messageText.text.Replace( "\r", "" );
+		var labels = ButtonLabel( panel.m_moreButton ) + " / " + ButtonLabel( panel.m_quitButton );
+
+		// No: back to the menu
+		panel.QuitClicked();
+
+		var menuAfterNo = panel.m_welcomeGameObject.activeSelf && !panel.m_noticesGameObject.activeSelf;
+
+		// Yes: the last notice again
+		panel.NoticesClicked();
+		panel.MoreClicked();
+
+		var repeated = panel.m_messageText.text.Replace( "\r", "" );
+		var labelsAfterYes = ButtonLabel( panel.m_moreButton );
+		var stillAsking = ( askingMethod != null ) && (bool) askingMethod.Invoke( panel, null );
+
+		panel.QuitClicked();
+
+		yield return ClosePanel( panel, "operations" );
+
+		playerData.m_general.m_currentStardateYMD = "4620-01-01";
+
+		Log( "starport-notices: nothing new: asked " + asked + ", '" + question + "', buttons " + labels + " (More was '" + moreLabelBefore + "') | No: the menu " + menuAfterNo + " | Yes: '" + Head( repeated ) + "', More '" + labelsAfterYes + "', still asking " + stillAsking );
+
+		Check( "starport-notices: with nothing new the screen says so and asks whether to repeat the last notice, with Yes and No", asked && ( question == "No new notices\n\nRepeat last notice?" ) && ( labels == "Yes / No" ), asked + ", '" + question + "', " + labels );
+		Check( "starport-notices: No goes back to the menu", menuAfterNo, menuAfterNo.ToString() );
+		Check( "starport-notices: Yes shows the last notice read again after the original's REPEATING LAST NOTICE, and the buttons get their labels back", repeated.StartsWith( "***Repeating last notice***\n\n" + DayMonthYear( secondDate ) ) && ( labelsAfterYes == moreLabelBefore ) && !stillAsking, "'" + Head( repeated ) + "', More '" + labelsAfterYes + "' (was '" + moreLabelBefore + "'), still asking " + stillAsking );
+
+		Finish( "scenario=starport-notices header=" + header + " asked=" + asked + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the first and the last 60 characters of a text, for the log
+	static string Head( string text )
+	{
+		text = ( text ?? "" ).Replace( "\n", "/" );
+
+		return ( text.Length <= 60 ) ? text : text.Substring( 0, 60 );
+	}
+
+	static string Tail( string text )
+	{
+		text = ( text ?? "" ).Replace( "\n", "/" );
+
+		return ( text.Length <= 60 ) ? text : text.Substring( text.Length - 60 );
+	}
+
 	// ---------------------------------------------------------------- the screens' Step 2: the bank pays the original's interest
 
 	// the bank pays its interest up to today (PlayerData.PayInterest): what it paid, or -1 on the code before the interest
@@ -11864,7 +11983,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "dates: operations with the thai calendar: '" + today + "', the notice is dated '" + noticeDate + "' (its stardate is " + expectedNoticeDate + "), its ships log entry '" + logStardate + "' with the heading '" + logHeader + "'" );
 
-		Check( "dates: operations shows today's stardate with the thai calendar", today == "Today is 26-03-4620", today );
+		Check( "dates: operations shows today's stardate with the thai calendar", today == "26-03-4620", today );
 		Check( "dates: a notice is dated with its stardate with the thai calendar", ( expectedNoticeDate != "" ) && ( noticeDate == expectedNoticeDate ), "'" + noticeDate + "' (should be " + expectedNoticeDate + ")" );
 		Check( "dates: the ships log entry of a notice has its stardate with the thai calendar", ( expectedNoticeDate != "" ) && ( logStardate == expectedNoticeDate ) && ( logHeader == expectedNoticeDate ), "'" + logStardate + "' / '" + logHeader + "' (should be " + expectedNoticeDate + ")" );
 
@@ -16438,7 +16557,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "win: docking at the Starport paid " + paid + " MU (ledger: " + ( ( ledgerEntry == null ) ? "nothing" : ledgerEntry.m_description + " " + ledgerEntry.m_amount ) + "), docking again paid " + paidAgain + " | " + dockText );
 
-		Check( "win: back at the Starport Interstel pays the bonus of 500,000 MU, in the ledger and the messages", ( paid == 500000 ) && ( ledgerEntry != null ) && ( ledgerEntry.m_amount == "500000+" ) && dockText.Contains( "500,000" ), paid + ", " + ( ( ledgerEntry == null ) ? "no entry" : ledgerEntry.m_amount ) + ", " + dockText );
+		Check( "win: back at the Starport Interstel pays the bonus of 500,000 MU, in the ledger as the original's BONUS and in the messages", ( paid == 500000 ) && ( ledgerEntry != null ) && ( ledgerEntry.m_amount == "500000+" ) && ( ledgerEntry.m_description == "Bonus" ) && dockText.Contains( "500,000" ), paid + ", " + ( ( ledgerEntry == null ) ? "no entry" : ledgerEntry.m_description + " " + ledgerEntry.m_amount ) + ", " + dockText );
 		Check( "win: the bonus is paid once", paidAgain == 0, paidAgain.ToString() );
 
 		// a later scenario must not start from a won game
@@ -17905,7 +18024,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "distress: from star " + farthestStarId + " (" + farthest.ToString( "0" ) + " from Arth): fined " + fineFar + ", now " + whereFar + ", ledger '" + ledgerFar + "' | from Arth's system: fined " + fineNear + " | after the Starport: fined " + fineAfterStarport + ", now " + whereAfterStarport + " (" + textAfterStarport + ") | the evaluation: " + evaluationFar.Replace( '\n', '/' ) );
 
 		Check( "distress: a distress call gets the ship towed back to the Starport's docking bay", whereFar.StartsWith( "DockingBay" ) && whereFar.EndsWith( "star " + arthStarId ), whereFar );
-		Check( "distress: the fine runs from 15000 MU in Arth's system to 80000 MU from the farthest star, in the ledger and in Interstel's evaluation", ( fineNear == 15000 ) && ( fineFar == 80000 ) && ledgerFar.StartsWith( "Towing charges" ) && evaluationFar.Contains( "TOWING CHARGES" ) && evaluationFar.Contains( fineFar.ToString() ), fineNear + ", " + fineFar + ", '" + ledgerFar + "'" );
+		Check( "distress: the fine runs from 15000 MU in Arth's system to 80000 MU from the farthest star, in the ledger and in Interstel's evaluation", ( fineNear == 15000 ) && ( fineFar == 80000 ) && ledgerFar.StartsWith( "Fine" ) && evaluationFar.Contains( "TOWING CHARGES" ) && evaluationFar.Contains( fineFar.ToString() ), fineNear + ", " + fineFar + ", '" + ledgerFar + "'" );
 		Check( "distress: after the Starport has been destroyed there is no response, no fine and no tow (control)", ( fineAfterStarport == 0 ) && !whereAfterStarport.StartsWith( "DockingBay" ) && textAfterStarport.Contains( "NO RESPONSE" ), fineAfterStarport + ", " + whereAfterStarport );
 
 		Finish( "scenario=distress far=" + fineFar + " near=" + fineNear + " afterStarport=" + fineAfterStarport, 0 );
@@ -18264,11 +18383,11 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "colonies: planets " + heaven + " (Mardan 4), " + unsuitableA + " and " + unsuitableB + " recommended, " + notRecommended + " not (on the list among them: '" + onTheList + "') | asked for Mardan 4 " + askedForHeaven + ", pending before docking " + pendingCount + ", after " + pendingAfter + " | the bank " + change + ", ledger: " + ledger + " | reasons " + unsuitableA + ": " + reasonsA + "; " + unsuitableB + ": " + reasonsB + " | evaluations: " + evaluationText.Replace( '\n', '/' ) );
 
 		Check( "colonies: Log Planet asks whether to recommend the planet for colonization, and Yes recommends it while No does not", askedForHeaven && ( pendingCount == 3 ), askedForHeaven + ", " + pendingCount );
-		Check( "colonies: back at the Starport an optimal planet of Interstel's list earns its bonus", ledger.Contains( "Colony bonus 50000+" ) && evaluationText.Contains( "OPTIMAL PLANET" ) && evaluationText.Contains( "BONUS OF 50000" ), ledger );
-		Check( "colonies: the first unsuitable planet is a warning of 100 MU, with its reasons", ledger.Contains( "Colony fine 100-" ) && evaluationText.Contains( "FINED 100 MU'S.  THIS IS ONLY A WARNING" ) && ( reasonsA.Length > 0 ) && evaluationText.Contains( reasonsA.Split( ',' )[ 0 ].Trim() ), ledger + " | " + reasonsA );
+		Check( "colonies: back at the Starport an optimal planet of Interstel's list earns its bonus", ledger.Contains( "Bonus 50000+" ) && evaluationText.Contains( "OPTIMAL PLANET" ) && evaluationText.Contains( "BONUS OF 50000" ), ledger );
+		Check( "colonies: the first unsuitable planet is a warning of 100 MU, with its reasons", ledger.Contains( "Fine 100-" ) && evaluationText.Contains( "FINED 100 MU'S.  THIS IS ONLY A WARNING" ) && ( reasonsA.Length > 0 ) && evaluationText.Contains( reasonsA.Split( ',' )[ 0 ].Trim() ), ledger + " | " + reasonsA );
 		// the shipped game's fine (CAPTAIN overlay WF348 and WF292 in the decompiled original): 10,000 MU for each unsuitable planet recommended before, whatever the
 		// planet's reasons (the second planet has reasonCountB of them), and the warning with the first only
-		Check( "colonies: a later unsuitable planet is fined heavily, 10,000 MU for the one unsuitable planet before it (not by its reasons), with no warning", ledger.Contains( "Colony fine 10000-" ) && ( change == 50000 - 100 - 10000 ) && evaluationText.Contains( "FINED 10000 MU'S." ) && !evaluationText.Contains( "FINED 10000 MU'S.  THIS IS ONLY A WARNING" ) && ( pendingAfter == 0 ), ledger + " | " + change + " | reasons " + reasonCountB + " | pending " + pendingAfter );
+		Check( "colonies: a later unsuitable planet is fined heavily, 10,000 MU for the one unsuitable planet before it (not by its reasons), with no warning", ledger.Contains( "Fine 10000-" ) && ( change == 50000 - 100 - 10000 ) && evaluationText.Contains( "FINED 10000 MU'S." ) && !evaluationText.Contains( "FINED 10000 MU'S.  THIS IS ONLY A WARNING" ) && ( pendingAfter == 0 ), ledger + " | " + change + " | reasons " + reasonCountB + " | pending " + pendingAfter );
 
 		// ---- 5. the fine goes up 10,000 MU with each unsuitable planet before, to 80,000 MU from the ninth on: evaluated straight away, with 2, 8 and 12 unsuitable
 		// planets recommended before
@@ -20743,6 +20862,7 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 10 );
 
 		var balanceAfter = playerData.m_bank.m_currentBalance;
+		var lavaLedgerRow = LastLedgerRow();
 		var lostAfterDocking = TerrainVehicleIsLost();
 		var evaluations = FieldOrNull( playerData.m_general, "m_supplementalEvaluationList" ) as List<string>;
 		var evaluated = ( evaluations != null ) && evaluations.Exists( evaluation => evaluation.Contains( "LOSS OF TERRAIN VEHICLE" ) );
@@ -20755,7 +20875,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lava: the heat of the lava gives a warning first, and leaving it in time saves the vehicle", warning.Contains( "we're burning up" ) && savedByLeaving, savedByLeaving + " | " + warning );
 		Check( "lava: staying in the lava of a molten planet it is destroyed with its cargo, and the crew is back in the ship", landed && onSolidGround && ( lava != Vector3.zero ) && lostInLava && ( carriedAfter == 0 ) && ( afterLava == PD_General.Location.Planetside ) && lavaMessage.Contains( "destroyed by lava" ), lava + " " + afterLava + " " + lostInLava + " " + carriedAfter + " | " + lavaMessage );
 		Check( "lava: with the terrain vehicle lost there is no disembarking", disembarkMessage.Contains( "no terrain vehicle" ) && ( afterDisembark == PD_General.Location.Planetside ), afterDisembark + " | " + disembarkMessage );
-		Check( "lava: at the Starport a new terrain vehicle is installed for a fine of 10,000 MU, with Interstel's evaluation", !lostAfterDocking && ( balanceBefore - balanceAfter == 10000 ) && evaluated, ( balanceBefore - balanceAfter ) + " " + lostAfterDocking + " " + evaluated );
+		Check( "lava: at the Starport a new terrain vehicle is installed for a fine of 10,000 MU, a FINE in the ledger as the original's, with Interstel's evaluation", !lostAfterDocking && ( balanceBefore - balanceAfter == 10000 ) && lavaLedgerRow.EndsWith( " Fine 10000-" ) && evaluated, ( balanceBefore - balanceAfter ) + " " + lostAfterDocking + " " + evaluated + " '" + lavaLedgerRow + "'" );
 
 		Finish( "scenario=lava lost=" + lostInLava + " fine=" + ( balanceBefore - balanceAfter ), 0 );
 	}
@@ -25768,6 +25888,54 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "gazurtoidmood: met with the shields up and the weapons armed the Gazurtoid fight, as the original (41, fight from 40)", ( armedMood == 41.0f ) && ( armedStance == GD_Comm.Stance.Hostile ), armedMood + " " + armedStance );
 
 		Finish( "scenario=gazurtoidmood", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the analysis heading's colon and the one-word temperature (ANALYZE-OV)
+
+	IEnumerator ScenarioAnalysisHeading()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+
+		EnsureCrew();
+
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer ).m_science = 250;
+
+		// ---- 1. a planet whose temperature has the same word at both ends, and one with a range
+		GD_Planet same = null;
+		GD_Planet range = null;
+
+		foreach ( var planet in gameData.m_planetList )
+		{
+			if ( ( planet.m_temperatureIdA == planet.m_temperatureIdB ) && ( same == null ) )
+			{
+				same = planet;
+			}
+
+			if ( ( planet.m_temperatureIdA != planet.m_temperatureIdB ) && ( range == null ) )
+			{
+				range = planet;
+			}
+		}
+
+		var sameText = same.GetTemperatureText();
+		var rangeText = range.GetTemperatureText();
+
+		// ---- 2. the heading of an analysis (a Mechan scout's)
+		EnterEncounter( FindEncounterOfRace( GameData.Race.Mechan ) );
+		yield return Frames( 10 );
+
+		var analysis = AnalyzeScan( SensorsDisplay.ScanType.MechanScout );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		Log( "analysisheading: planet " + same.m_id + " temperature [" + sameText + "], planet " + range.m_id + " [" + rangeText + "] | " + analysis );
+
+		Check( "analysisheading: a temperature with the same word at both ends is the one word, as the original", !sameText.Contains( " to " ) && rangeText.Contains( " to " ), sameText + " | " + rangeText );
+		Check( "analysisheading: the analysis heading ends with a colon, as the original", analysis.Contains( "Analysis of Last Sensor Reading:" ), analysis );
+
+		Finish( "scenario=analysisheading", 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 7: the lines that lead up to orbit scroll on (starflt_141, starflt_143)

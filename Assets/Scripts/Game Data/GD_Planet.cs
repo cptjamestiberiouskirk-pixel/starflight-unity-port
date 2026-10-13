@@ -338,10 +338,15 @@ public class GD_Planet
 		return gameData.m_atmosphereDensityList[ m_atmosphereDensityId ].m_name;
 	}
 
-	// get the temperature text
+	// get the temperature text: the range, or the one word when both ends are the same (the original drops the second, ANALYZE-OV WF068)
 	public string GetTemperatureText()
 	{
 		var gameData = DataController.m_instance.m_gameData;
+
+		if ( m_temperatureIdA == m_temperatureIdB )
+		{
+			return gameData.m_temperatureList[ m_temperatureIdA ].m_name;
+		}
 
 		return gameData.m_temperatureList[ m_temperatureIdA ].m_name + " to " + gameData.m_temperatureList[ m_temperatureIdB ].m_name;
 	}

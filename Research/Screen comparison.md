@@ -21,7 +21,7 @@ Not reported: art style, resolution, colours, fonts and 3D models.
 
 | | Items | FIXED | OPEN or PARTLY | Not a defect or owner's call |
 |---|---|---|---|---|
-| GAMEPLAY (with the items shared with the UI kit) | 52 | 25 | 23 | 4 |
+| GAMEPLAY (with the items shared with the UI kit) | 52 | 32 | 16 | 4 |
 | UI KIT | 41 | 0 | 40 | 1 |
 | The probe's pictures | 17 | 3 (PR 234) | 14 gaps | |
 
@@ -29,11 +29,10 @@ Since 2026-10-11 the gameplay side has been fixed in PRs 215, 216, 218, 219, 220
 
 The open gameplay items, most visible first:
 
-1. **The notices screen** (section 18): its header, its end, "NO NEW NOTICES" with "REPEAT LAST NOTICE?", and the typing of a notice (the DAMAGE display and Repair's choice of system are done).
-2. **The bank books a recommendation's bonus or fine at once in the original** (section 21), where the port pays it on docking (the interest itself is done).
-3. **The notices screen** (section 18): its header, its end, "NO NEW NOTICES" with "REPEAT LAST NOTICE?", and the typing of a notice.
-4. **Combat messages and wounds** (section 12): the original names the weapon that hits ("MISSILE CLASS 2") and says how the crew is wounded; in the port combat never wounds the crew.
-5. **"MOTION DETECTED AT X: Y:"** (section 11), the shields and weapons messages (section 2), and several smaller ones.
+1. **The typing of a notice** (section 18): the original types a notice line by line, with an abort (the notices screen's header, its end and "NO NEW NOTICES" are done, as are the DAMAGE display, Repair's choice of system and the interest).
+2. **The bank books a recommendation's bonus or fine at once in the original** (section 21), where the port pays it on docking.
+3. **Combat messages and wounds** (section 12): the original names the weapon that hits ("MISSILE CLASS 2") and says how the crew is wounded; in the port combat never wounds the crew.
+4. **"MOTION DETECTED AT X: Y:"** (section 11), the shields and weapons messages (section 2), and several smaller ones.
 
 ---
 
@@ -103,8 +102,8 @@ A vessel's reading matches the original's (mass, bio, energy, object constituent
 | No picture of an analysis | FIXED | PR 234 (CONFIRMED) | |
 | An alien ship's shields and weapons were always "Not certain" | FIXED | PR 220; picture: "Shields: None apparent", "Weapon Status: Armed" (CONFIRMED) | GAMEPLAY |
 | "Size:" label before the ship's size | FIXED | PR 220 (CONFIRMED) | GAMEPLAY |
-| The heading has no colon: "Analysis of Last Sensor Reading"; the original's "ANALYSIS OF LAST SENSOR READING:" | OPEN, low priority | `AnalysisButton.cs:144`; `ANALYZE-OV.c:493`, starflt_145 (CONFIRMED) | GAMEPLAY |
-| A temperature range with the same word at both ends: "Sub-Arctic to Sub-Arctic"; the original prints the one word (it drops the second when they are equal) | OPEN | `GD_Planet.cs:346`; `ANALYZE-OV.c`, word WF068; the orbit analysis picture (CONFIRMED) | GAMEPLAY |
+| The heading has no colon: "Analysis of Last Sensor Reading"; the original's "ANALYSIS OF LAST SENSOR READING:" | FIXED (the analysis heading PR) | `AnalysisButton.cs:144`; `ANALYZE-OV.c:493`, starflt_145 (CONFIRMED) | GAMEPLAY |
+| A temperature range with the same word at both ends: "Sub-Arctic to Sub-Arctic"; the original prints the one word (it drops the second when they are equal) | FIXED (the analysis heading PR) | `GD_Planet.cs:346`; `ANALYZE-OV.c`, word WF068; the orbit analysis picture (CONFIRMED) | GAMEPLAY |
 
 ## 8. Landing map and descent
 
@@ -203,9 +202,9 @@ The doors are where the original's are (Operations upper left, Personnel top, Cr
 | Item | Status | Evidence | Owner |
 |---|---|---|---|
 | The evaluations one to a page, the supplemental ones once, END OF EVALUATIONS, and each evaluation's heading | FIXED | PRs 254, 263 (CONFIRMED, code) | GAMEPLAY |
-| The notices' header. Original: "NOTICES 01-01-4620". Port: "Today is" and the date | OPEN | `OperationsPanel.cs:138`; `OP-OV.c` WE735 (CONFIRMED) | GAMEPLAY |
-| "***END OF NOTICES***" after the last notice | OPEN | not in the code or the scene; `OP-OV.c:902` (CONFIRMED) | GAMEPLAY |
-| With no unread notice the original says NO NEW NOTICES and asks REPEAT LAST NOTICE? [N Y], and on Y "***REPEATING LAST NOTICE***"; the port shows the last notice read again without asking | OPEN | `OperationsPanel.cs:143` to `164`; `OP-OV.c:1001` to `1020` (CONFIRMED) | GAMEPLAY |
+| The notices' header. Original: "NOTICES 01-01-4620". Port: "Today is" and the date | FIXED (the notices screen PR): the date beside the scene's NOTICES heading | `OperationsPanel.ShowNotices`; `OP-OV.c` WE735; the `starport-notices` probe scenario (CONFIRMED) | GAMEPLAY |
+| "***END OF NOTICES***" after the last notice | FIXED (the notices screen PR) | after the newest notice that is out; `OP-OV.c:902`; `starport-notices` (CONFIRMED) | GAMEPLAY |
+| With no unread notice the original says NO NEW NOTICES and asks REPEAT LAST NOTICE? [N Y], and on Y "***REPEATING LAST NOTICE***"; the port showed the last notice read again without asking | FIXED (the notices screen PR): More and Quit answer Yes and No meanwhile | `OperationsPanel.AskToRepeat`; `OP-OV.c:1001` to `1020`; `starport-notices` (CONFIRMED) | GAMEPLAY |
 | The original types a notice line by line with a pause (the spacebar skips it), with PRESS SPACEBAR TO CONTINUE / PRESS [] TO ABORT CURRENT NOTICE and ***NOTICE ABORTED***; the port shows one paragraph a press of More, with no abort | OPEN | `OperationsPanel.cs:441` to `476`; `OP-OV.c:536, 543, 879` (CONFIRMED, code) | GAMEPLAY (the flow), UI KIT (the prompts) |
 | After a notice the original shows "<- NEXT MESSAGE  PREVIOUS MESSAGE ->" and "PRESS SPACEBAR TO REPLAY OR [ QUIT ]"; the port has More, Previous, Next and Quit buttons and no Replay | OPEN | `OperationsPanel.cs:20` to `23`; `OP-OV.c:512, 519` (CONFIRMED) | UI KIT |
 | The original keeps NOTICES, EVALUATION and EXIT on screen inside both screens; the port hides them | OPEN | `OperationsPanel.cs:117` to `125` (CONFIRMED) | UI KIT |
@@ -240,7 +239,7 @@ The doors are where the original's are (Operations upper left, Personnel top, Cr
 |---|---|---|---|
 | **The bank paid no interest.** The screen says INTEREST RATE: 12%, and the original's ledger has INTEREST rows (starflt_060). The original (`BANK-OV.c`, INT%) pays 12% a year of the balance for the days since it last paid (the balance times 12 over 100, then times the days over 300, each rounded down), when the crew goes aboard at the Starport (`PORTMENU-OV.c`, WEBA2) and on a new colony recommendation (`CAPTAIN.c`, which then starts the count again) | FIXED (the bank interest PR) | `PlayerData.PayInterest`, `PD_Bank.GetInterestDue`; the `starport-interest` probe scenario (CONFIRMED) | GAMEPLAY |
 | A colony recommendation's bonus or fine. The original books it in the ledger when the planet is recommended (`CAPTAIN.c`, WF292: T+BALANCE, then TRANSACT as BONUS or FINE, after the interest); the port pays it when the ship docks, with Interstel's evaluation (roadmap 1.3, PR 142) | OPEN | `PlayerData.cs` (the colony evaluations at docking); which planet field gives the original's amount (WE096, times 1000, at least 100) is not worked out (INFERRED) | GAMEPLAY |
-| The ledger's descriptions. The original has seven: FINE, SHIP CONFIGURATION, TRADE DEPOT, BONUS, PERSONNEL, INTEREST, GAME PURCHASE. The port writes "Lifeform data", "Mission completed" and "Colony bonus" (the original's BONUS) and "Colony fine", "Towing charges" and "Terrain vehicle replaced" (the original's FINE) | OPEN | `PlayerData.cs:157, 173, 225, 246`, `DistressYesButton.cs:42`, `DockingBay.cs:82`; `data.h` BANKTRANS_STRINGS (CONFIRMED) | GAMEPLAY |
+| The ledger's descriptions. The original has seven: FINE, SHIP CONFIGURATION, TRADE DEPOT, BONUS, PERSONNEL, INTEREST, GAME PURCHASE. The port wrote "Lifeform data", "Mission completed" and "Colony bonus" (the original's BONUS) and "Colony fine", "Towing charges" and "Terrain vehicle replaced" (the original's FINE) | FIXED (the ledger names PR): Bonus and Fine as the original books them (the win in DPART-OV, a colony evaluation in CAPTAIN, the supplemental evaluations in OP-OV), and "Ship configuration" in sentence case; "Lifeform data" keeps its name, since the shipped game has no such payment (the 1984 notes, ruling D3) | `PlayerData.cs`, `DistressYesButton.cs`, `DockingBay.cs`; `data.h` BANKTRANS_STRINGS; the `colonies`, `distress`, `win` and `lava` probe checks (CONFIRMED) | GAMEPLAY |
 | AMT. as AMOUNT; dot leaders after the description ("GAME PURCHASE......") | OPEN, low priority | picture (CONFIRMED) | UI KIT |
 | The balance line: the original's "BALANCE......12000" and "( INTEREST RATE: 12% )", the port's "Your current balance is 1,000,000 M.U." | OPEN | `BankPanel.cs:56` (CONFIRMED); the 1,000,000 itself is the Editor's starting balance by design (`PD_Bank.GetStartingBalance`) | UI KIT |
 | PRESS SPACEBAR TO EXIT as an EXIT button | OPEN, low priority | picture (CONFIRMED) | UI KIT |
@@ -291,11 +290,11 @@ One small PR per item, gameplay first. Each documented in the screenshots or the
 
 1. **The DAMAGE display and Repair's choice of system** (section 13), from `ENGINEER.c`: done (the choice by the owner's ruling of 2026-10-12, which replaced the worst first).
 2. **The bank's interest** (section 21): done. Left from it: the original books a recommendation's bonus or fine at once, which touches the colony rulings of roadmap 1.3.
-3. **The notices screen** (section 18): the header, END OF NOTICES, NO NEW NOTICES and REPEAT LAST NOTICE, then the typing and abort.
+3. **The notices screen** (section 18): the header, END OF NOTICES, NO NEW NOTICES and REPEAT LAST NOTICE are done; the typing and abort are left.
 4. **Combat messages and wounds** (section 12), from `DAMAGE-OV.c`.
 5. **MOTION DETECTED AT X: Y:** (section 11), from `HYPERMSG-OV.c`.
 6. **The shields and weapons messages** (section 2), from `NAVIGATR.c`.
-7. Smaller: the temperature range (7), the analysis heading's colon (7), the orbit lines scrolling on (5), the crosshair's start (8), Look's temperature and hydrosphere (10), the weather as the first line on the surface (10), the bank's transaction names (21), Personnel's number of training sessions (19), the terrain vehicle's distance to the ship (10, once the scale is checked).
+7. Smaller: the temperature range (7), the analysis heading's colon (7), the orbit lines scrolling on (5), the crosshair's start (8), Look's temperature and hydrosphere (10), the weather as the first line on the surface (10), Personnel's number of training sessions (19), the terrain vehicle's distance to the ship (10, once the scale is checked).
 8. **The probe's pictures**: the missing screens of section 25, the landing map after the crosshair is placed, the encounter with the aliens in view, so that the next comparison can see them.
 
 The UI kit items are left to the UI kit's work. Two items are the owner's call: the security code (D4) and the Ship's Log as a menu.
