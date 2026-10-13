@@ -304,6 +304,43 @@ public class ButtonController : MonoBehaviour
 		}
 	}
 
+	// go back to the communications officer's menu (after a hail, the original's console keeps HAIL, DISTRESS, BRIDGE: starflt_044, starflt_047)
+	public void SetCommunicationsButtons()
+	{
+		ActivateBridgeButton<CommunicationsButton>();
+	}
+
+	// go to the captain's menu (after the launch from the Starport the original's console shows the captain's: starflt_139)
+	public void SetCaptainButtons()
+	{
+		ActivateBridgeButton<CommandButton>();
+	}
+
+	// run one of the bridge's buttons as if it had been pressed, and make it the current button (the communications officer's keeps its menu up to date)
+	void ActivateBridgeButton<T>() where T : ShipButton
+	{
+		// there is no current function
+		ClearCurrentButton();
+
+		foreach ( var button in m_buttonSets[ (int) ButtonSet.Bridge ] )
+		{
+			if ( button is T )
+			{
+				if ( button.Execute() )
+				{
+					m_currentButton = button;
+
+					m_currentButton.Update();
+				}
+
+				return;
+			}
+		}
+
+		// (every bridge button is in the bridge's set, so this is not reached)
+		SetBridgeButtons();
+	}
+
 	// set the maneuver buttons
 	public void SetManeuverButtons()
 	{
