@@ -187,6 +187,7 @@ What the probe does:
 | `starstability` | the stability line of the star system scan: a star that flared before the game began (stable, post-flare) and one that flares on day 284 (its days to the flare, and 100 once the day is 100 before it); no star of the game data is more than 792 days from its flare, so "slightly unstable" is not shown (about 30 s) |
 | `alienshields` | the captain is told when the aliens raise or lower their shields or arm or disarm: in a Mechan encounter nothing is said at the start, turning hostile they arm, turning friendly they lower their shields and disarm, turning neutral they raise their shields (about 20 s) |
 | `alienanalysis` | the analysis of an alien ship in the original's words: in a Mechan encounter the scouts' shields read Class 2 equivalent raised when neutral or hostile and lowered when friendly or surrendering, the weapons Armed only when hostile; a Gazurtoid warship's shields Unknown, a Spemin scout's None apparent; and the size with no label, as a whole number or the decimals to the first that is not zero (about 20 s) |
+| `analysisheading` | the Analysis heading's colon on a Mechan scout's reading, and a planet's temperature with the same word at both ends given as the one word (and a range as a range) (about 25 s) |
 | `ancientsites` | the ancient ruins STRINFO's editors place: on planet 5 of 145,107 a ruin at 36N x 90E with 3.1 cubic meters of Endurium, on planet 2 of 154,62 two ruins at 42S x 13W with 3.1 and 5.9 (about 30 s) |
 | `analysisskill` | the science officer's skill and the analysis, in orbit of planet 90: skill 250 (every line, the control), the same reading again ("already attempted"), skill 0 (only the object's class, 6 lines unknown), skill 100 over 20 readings (about half of 120 lines unknown) and an alien ship analyzed twice (allowed) (about 25 s) |
 | `salvage` | salvage from debris, two Spemin ships destroyed in a star system with a hold of 16 pods: a wreck 2000 units away (the control, not taken), the wreck under the ship (its vessel's Endurium and debris come aboard, with the message), the same wreck again (nothing more), a wreck with the hold full ("no room") and the sensor reading of a wreck (its constituents) (about 25 s) |
@@ -213,7 +214,7 @@ What the probe does:
 | `lifeformpictures` | with `-Graphics`, renders the game view of planet 92 with the planet's lifeforms, then with all 17 models in a ring around the terrain vehicle, and a close-up of each model, into `Logs/lifeform-pictures/` (or `-probePictures`); without a graphics device it only lands (about 60 s) |
 | `look` | Look on planet 92 with one lifeform at a time beside the vehicle: a living plant (its body plan, not moving, alive), a test animal that wanders (wandering) and the plant made dead (dead) (about 40 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (166 scenarios, about 130 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (167 scenarios, about 131 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
