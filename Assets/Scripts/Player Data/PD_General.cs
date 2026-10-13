@@ -126,6 +126,11 @@ public class PD_General
 	// original (OP-OV in the decompiled original), each is shown once, on a page of its own, before the colony evaluations
 	public List<string> m_supplementalEvaluationList;
 
+	// the fines of the supplemental evaluations not shown yet (the towing charges, the lost terrain vehicle): the original books each in the ledger when the
+	// evaluation screen shows it (OP-OV WE78B: WF045 and WF12C call WF02B, T+BALANCE and TRANSACT as a FINE) - PlayerData.BookSupplementalFines (save files from
+	// before this list have their fines booked already)
+	public List<int> m_supplementalFineList;
+
 	// Interstel's evaluations of the planets recommended for colonization, oldest first - kept, and shown one to a page on every visit to the evaluation screen,
 	// the last followed by "END OF EVALUATIONS" (save files from before this list keep theirs in m_supplementalEvaluationList: GetColonyEvaluationList moves them)
 	public List<string> m_colonyEvaluationList;
@@ -470,6 +475,22 @@ public class PD_General
 
 	// this updates the game time
 	// call this to add a supplemental evaluation from Interstel (the Operations evaluation screen shows them)
+	// call this when a supplemental evaluation comes with a fine: it is booked when the evaluation screen shows the evaluation
+	public void AddSupplementalFine( int fine )
+	{
+		if ( fine <= 0 )
+		{
+			return;
+		}
+
+		if ( m_supplementalFineList == null )
+		{
+			m_supplementalFineList = new List<int>();
+		}
+
+		m_supplementalFineList.Add( fine );
+	}
+
 	public void AddSupplementalEvaluation( string evaluation )
 	{
 		// save files from before the list have none

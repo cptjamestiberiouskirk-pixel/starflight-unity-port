@@ -1077,6 +1077,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportBuyOrder();
 				break;
 
+			case "starport-supplementalfine":
+				yield return ScenarioStarportSupplementalFine();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -17991,6 +17995,20 @@ public class ClaudeProbe : MonoBehaviour
 	// ---------------------------------------------------------------- phase 1: distress
 
 	// enters a star system, sends a distress call - returns what it cost, where the ship is then, and the last supplemental evaluation (or "")
+	// what the last distress call booked in the ledger at once
+	static int s_distressBookedAtOnce;
+
+	// the supplemental evaluations' fines booked as the evaluation screen books them (PlayerData.BookSupplementalFines, where the code has it)
+	static void BookSupplementalFines()
+	{
+		var method = typeof( PlayerData ).GetMethod( "BookSupplementalFines" );
+
+		if ( method != null )
+		{
+			method.Invoke( DataController.m_instance.m_playerData, null );
+		}
+	}
+
 	static IEnumerator DistressFrom( int starId, int[] fine, string[] where, string[] evaluation )
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -18017,6 +18035,11 @@ public class ClaudeProbe : MonoBehaviour
 		PressDistressChoice( 1 );
 
 		yield return Frames( 5 );
+
+		// what the call booked at once, then the fine as it stands once Interstel's evaluation has been shown (the original books it then)
+		s_distressBookedAtOnce = balanceBefore - playerData.m_bank.m_currentBalance;
+
+		BookSupplementalFines();
 
 		fine[ 0 ] = balanceBefore - playerData.m_bank.m_currentBalance;
 		where[ 0 ] = playerData.m_general.m_location + " at star " + playerData.m_general.m_currentStarId;
@@ -18066,6 +18089,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return DistressFrom( farthestStarId, fine, where, evaluation );
 
+		var bookedAtOnceFar = s_distressBookedAtOnce;
 		var fineFar = fine[ 0 ];
 		var whereFar = where[ 0 ];
 		var evaluationFar = evaluation[ 0 ];
@@ -18093,6 +18117,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "distress: a distress call gets the ship towed back to the Starport's docking bay", whereFar.StartsWith( "DockingBay" ) && whereFar.EndsWith( "star " + arthStarId ), whereFar );
 		Check( "distress: the fine runs from 15000 MU in Arth's system to 80000 MU from the farthest star, in the ledger and in Interstel's evaluation", ( fineNear == 15000 ) && ( fineFar == 80000 ) && ledgerFar.StartsWith( "Fine" ) && evaluationFar.Contains( "TOWING CHARGES" ) && evaluationFar.Contains( fineFar.ToString() ), fineNear + ", " + fineFar + ", '" + ledgerFar + "'" );
+		Log( "distress: booked at once from the farthest star " + bookedAtOnceFar + ", booked when the evaluation is shown " + ( fineFar - bookedAtOnceFar ) );
+
+		Check( "distress: the towing charges are booked when Interstel's evaluation shows them, as the original's, not at the call", ( bookedAtOnceFar == 0 ) && ( fineFar == 80000 ), "at once " + bookedAtOnceFar + ", in all " + fineFar );
 		Check( "distress: after the Starport has been destroyed there is no response, no fine and no tow (control)", ( fineAfterStarport == 0 ) && !whereAfterStarport.StartsWith( "DockingBay" ) && textAfterStarport.Contains( "NO RESPONSE" ), fineAfterStarport + ", " + whereAfterStarport );
 
 		Finish( "scenario=distress far=" + fineFar + " near=" + fineNear + " afterStarport=" + fineAfterStarport, 0 );
@@ -20974,6 +21001,9 @@ public class ClaudeProbe : MonoBehaviour
 		controller.SwitchLocation( PD_General.Location.DockingBay );
 
 		yield return Frames( 10 );
+
+		// (the fine is booked when Interstel's evaluation is shown in Operations)
+		BookSupplementalFines();
 
 		var balanceAfter = playerData.m_bank.m_currentBalance;
 		var lavaLedgerRow = LastLedgerRow();
@@ -24209,6 +24239,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		var towed = MessageList();
 		var locationTowed = playerData.m_general.m_location;
+
+		// (the towing charges are booked when Interstel's evaluation is shown)
+		BookSupplementalFines();
+
 		var paidTowed = balanceBefore - playerData.m_bank.m_currentBalance;
 
 		// ---- 4. in an encounter: the question, then Yes - jammed
@@ -27776,6 +27810,67 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-buyorder: the Buy list has the elements in the original's order", order == "Titanium, Promethium, Molybdenum, Cobalt, Aluminum, Endurium (Fuel)", order );
 
 		Finish( "scenario=starport-buyorder checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// a supplemental evaluation's fine is booked in the ledger when Operations shows the evaluation, as the original's (OP-OV WE78B: WF045 and WF12C, WF02B), and
+	// only once
+	IEnumerator ScenarioStarportSupplementalFine()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var panel = FindPanel<OperationsPanel>();
+		var bank = playerData.m_bank;
+
+		bank.m_currentBalance = 100000;
+
+		// towing charges of 15000 MU waiting to be shown
+		playerData.m_general.AddSupplementalEvaluation( "SUPPLEMENTAL EVALUATION\nTOWING CHARGES\nTHE PROBE'S TOWING CHARGES OF 15000 MU." );
+
+		var addFine = typeof( PD_General ).GetMethod( "AddSupplementalFine" );
+
+		if ( addFine != null )
+		{
+			addFine.Invoke( playerData.m_general, new object[] { 15000 } );
+		}
+
+		var balanceBefore = bank.m_currentBalance;
+		var ledgerBefore = bank.m_transactionList.Count;
+
+		yield return OpenPanel( panel, "operations" );
+
+		var balanceBeforeShown = bank.m_currentBalance;
+
+		// the evaluation screen shows it
+		panel.EvaluationClicked();
+
+		yield return Frames( 2 );
+
+		var shown = System.Text.RegularExpressions.Regex.Replace( panel.m_evaluationGameObject.GetComponentInChildren<TMPro.TextMeshProUGUI>().text, "<[^>]*>", "" ).Replace( "\n", " / " );
+		var paidWhenShown = balanceBeforeShown - bank.m_currentBalance;
+		var ledger = ( bank.m_transactionList.Count > ledgerBefore ) ? bank.m_transactionList[ bank.m_transactionList.Count - 1 ].m_description + " " + bank.m_transactionList[ bank.m_transactionList.Count - 1 ].m_amount : "nothing";
+
+		panel.QuitClicked();
+
+		yield return Frames( 2 );
+
+		// shown again: not booked a second time
+		var balanceBeforeAgain = bank.m_currentBalance;
+
+		panel.EvaluationClicked();
+
+		yield return Frames( 2 );
+
+		var paidAgain = balanceBeforeAgain - bank.m_currentBalance;
+
+		panel.QuitClicked();
+
+		yield return ClosePanel( panel, "operations" );
+
+		Log( "starport-supplementalfine: paid before Operations " + ( balanceBefore - balanceBeforeShown ) + ", when the evaluation was shown " + paidWhenShown + " (ledger '" + ledger + "'), shown again " + paidAgain + " | shown: " + shown );
+
+		Check( "starport-supplementalfine: the fine is booked when Operations shows the evaluation, as a FINE in the ledger, as the original's", ( paidWhenShown == 15000 ) && ( ledger == "Fine 15000-" ), paidWhenShown + ", '" + ledger + "'" );
+		Check( "starport-supplementalfine: and only once", paidAgain == 0, paidAgain.ToString() );
+
+		Finish( "scenario=starport-supplementalfine checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

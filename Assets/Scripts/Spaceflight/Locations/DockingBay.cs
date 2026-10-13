@@ -78,9 +78,8 @@ public class DockingBay : MonoBehaviour
 		{
 			playerData.m_terrainVehicle.m_isLost = false;
 
-			playerData.m_bank.m_currentBalance -= PD_TerrainVehicle.c_lossFine;
-			// a FINE in the original's ledger, like every supplemental evaluation's (OP-OV in the decompiled original, transaction type 0)
-			playerData.m_bank.m_transactionList.Add( new PD_Bank.Transaction( playerData.m_general.m_currentStardateYMD, "Fine", PD_TerrainVehicle.c_lossFine + "-" ) );
+			// a FINE in the original's ledger, like every supplemental evaluation's, booked when the evaluation screen shows the loss (OP-OV WF045, WF02B)
+			playerData.m_general.AddSupplementalFine( PD_TerrainVehicle.c_lossFine );
 
 			var lossText = DataController.m_instance.m_gameData.FindStoryText( "TerrainVehicleLost" );
 
