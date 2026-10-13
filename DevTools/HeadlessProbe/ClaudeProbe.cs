@@ -1065,6 +1065,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAcceleration();
 				break;
 
+			case "launchlines":
+				yield return ScenarioLaunchLines();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -27593,6 +27597,91 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "acceleration: the ship's acceleration is the engines' class times 500 over its mass, as the original's (7 G for the ship of starflt_076, 5 G for a 500-ton ship)", allRight, string.Join( " | ", results ) );
 
 		Finish( "scenario=acceleration checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the launch from the Starport says the original's lines in its order (LAUNCH-OV &LAUNCH, LAUNCH; HYPERMSG-OV WF0D5 and WF001): OPENING DOCKING BAY DOORS,
+	// COMMENCING LAUNCH SEQUENCE... with the countdown, then LEAVING STARPORT..., ...STARPORT CLEAR and STANDING BY TO MANEUVER kept together (starflt_136 to 139)
+	IEnumerator ScenarioLaunchLines()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		controller.SwitchLocation( PD_General.Location.DockingBay );
+
+		yield return Frames( 10 );
+
+		// Launch, then Yes
+		PressButton( ButtonController.ButtonSet.CommandA, 0 );
+
+		yield return Frames( 2 );
+
+		PressButtonLabelled( ButtonController.ButtonSet.Launch, "Yes" );
+
+		// every line said during the launch, in the order it first came up, until the ship is out and a few seconds after
+		var lines = new List<string>();
+		var end = Time.realtimeSinceStartup + 45.0f;
+		var outSince = -1.0f;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			foreach ( var message in playerData.m_general.m_messageList )
+			{
+				foreach ( var part in System.Text.RegularExpressions.Regex.Replace( message, "<[^>]*>", "" ).Split( '\n' ) )
+				{
+					if ( ( part.Trim() != "" ) && !lines.Contains( part.Trim() ) )
+					{
+						lines.Add( part.Trim() );
+					}
+				}
+			}
+
+			if ( ( playerData.m_general.m_location == PD_General.Location.JustLaunched ) && ( outSince < 0.0f ) )
+			{
+				outSince = Time.realtimeSinceStartup;
+			}
+
+			if ( ( outSince >= 0.0f ) && ( Time.realtimeSinceStartup > outSince + 3.0f ) )
+			{
+				break;
+			}
+
+			yield return null;
+		}
+
+		// what the window holds at the end
+		var window = new List<string>();
+
+		foreach ( var message in playerData.m_general.m_messageList )
+		{
+			foreach ( var part in System.Text.RegularExpressions.Regex.Replace( message, "<[^>]*>", "" ).Split( '\n' ) )
+			{
+				if ( part.Trim() != "" )
+				{
+					window.Add( part.Trim() );
+				}
+			}
+		}
+
+		Log( "launchlines: said in order: " + string.Join( " | ", lines ) + " || the window at the end (" + playerData.m_general.m_location + "): " + string.Join( " | ", window ) );
+
+		var expected = new[] { "Opening docking bay doors...", "Commencing launch sequence...", "Leaving starport...", "...Starport clear", "Standing by to maneuver." };
+		var inOrder = true;
+		var at = -1;
+
+		foreach ( var line in expected )
+		{
+			var index = lines.IndexOf( line );
+
+			inOrder &= ( index > at );
+			at = index;
+		}
+
+		Check( "launchlines: the launch says the original's lines in its order, the countdown under COMMENCING LAUNCH SEQUENCE...", inOrder, string.Join( " | ", lines ) );
+		Check( "launchlines: out of the Starport the window keeps LEAVING STARPORT..., ...STARPORT CLEAR and STANDING BY TO MANEUVER together, as starflt_139", string.Join( " | ", window ) == "Leaving starport... | ...Starport clear | Standing by to maneuver.", string.Join( " | ", window ) );
+
+		Finish( "scenario=launchlines checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

@@ -215,6 +215,7 @@ What the probe does:
 | `starport-notices` | the Operations notices screen as the original's: today's date as the header beside NOTICES, END OF NOTICES after the newest notice and not after an earlier one, and with nothing new NO NEW NOTICES and REPEAT LAST NOTICE? with More and Quit as Yes and No, No back to the menu, Yes the last notice after REPEATING LAST NOTICE (about 20 s) |
 | `starport-training` | training asks how many sessions, as the original's HOW MANY TRAINING SESSIONS (0-N)?: for a human with no science and 11,700 M.U. the question offers 0 to 28 and trains nothing yet, three sessions train 27 points for 900 M.U., and asking for 999 trains the 25 left to the maximum of 250 (about 20 s) |
 | `motiondetected` | the radar reports motion through a skilled science officer only, as the original's (above 150): in dark hyperspace with an alien group in reach, a science officer of science 100 says nothing and one of 200 says "Motion detected." (about 20 s) |
+| `launchlines` | the launch from the Starport says the original's lines in its order, OPENING DOCKING BAY DOORS, COMMENCING LAUNCH SEQUENCE... with the countdown, LEAVING STARPORT..., ...STARPORT CLEAR and STANDING BY TO MANEUVER, and keeps the last three together in the window (about 50 s) |
 | `starport-noticetyping` | a notice typed out as the original's: a paragraph every 0.3 s without a press, Quit while it is typed ends it with NOTICE ABORTED and the screen stays, the newest notice aborted says NOTICE ABORTED then END OF NOTICES, and a second Quit leaves (about 25 s) |
 | `starport-interest` | the bank's interest: less than 1 M.U. pays nothing and the days count on, 100 M.U. over 250 days earn 10 with an Interest row, a recommendation starts the count again, a save file from before the interest counts from today, and going aboard through the real docking bay pays 6,000 on 100,000 M.U. for 150 days (about 20 s) |
 | `starport-specimens` | a specimen in the ship's hold is listed for sale at the Trade Depot under Specimens, and selling it pays its value and frees its room (about 25 s) |
@@ -227,7 +228,7 @@ What the probe does:
 | `bridgepictures` | with `-Graphics`, the whole screen of the flight scene's docking bay: Examine and Treat with their questions, Hail with no one to hail, Distress's question, the Captain's menu, Launch's question, the launch and the ship out of the Starport, then Hail in an encounter of Spemin scouts (the postures, a friendly hail), into `Logs/screen-pictures/bridge/` (13 pictures); without a graphics device it does nothing (about 35 s) |
 | `acceleration` | the ship's acceleration is the original's, the engines' class times 500 over the mass in whole G: 7 G for the equipped ship of starflt_076 (356 tons), 5 G for a bare class 1 ship and for a 500-ton class 5 one, 4 G for two more (about 15 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (180 scenarios, about 143 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (181 scenarios, about 144 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
