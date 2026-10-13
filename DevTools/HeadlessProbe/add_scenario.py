@@ -17,6 +17,9 @@ snippet = io.open(snippet_path, encoding='utf-8').read().replace('\r\n', '\n')
 
 assert ('case "' + name + '":') not in s, 'scenario already present'
 
+# a scenario that does not end with Finish runs into the probe's 120 s watchdog and reports RESULT timeout although its checks passed
+assert ('Finish( "scenario=' + name) in snippet, 'the snippet has no Finish( "scenario=' + name + ' ...", 0 ) call'
+
 default_anchor = '''			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );'''
 assert s.count(default_anchor) == 1
