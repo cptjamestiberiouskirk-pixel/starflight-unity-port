@@ -1,18 +1,16 @@
-﻿
-using UnityEngine;
+﻿using UnityEngine;
 using MorePPEffects;
 
+// the comm link's picture comes in through a burst of interference that clears as the link settles, after which the alien's portrait is shown clean: the original
+// shows the portrait clean and garbles only the words, by the communications officer's skill (Encounter.AddComm), so the interference is the port's, and how strong
+// it is at the start is the only part the officer's skill decides
 public class CommScreen : MonoBehaviour
 {
-	// how long the effect lasts
+	// how long the interference takes to clear
 	public float m_duration = 5.0f;
 
 	// how long to fade in
 	public float m_fadeInDuration = 1.0f;
-
-	// how long to do those random waves and headaches
-	public float m_randomWaveDuration = 0.5f;
-	public float m_randomHeadacheDuration = 0.5f;
 
 	// camera fx components we will be controlling
 	ColoredRays m_coloredRays;
@@ -26,16 +24,12 @@ public class CommScreen : MonoBehaviour
 	// are we fading in?
 	bool m_fadingIn;
 
-	// the current training level of the comms officer
-	float m_trainingLevel;
+	// how strong the coloured rays and how low the resolution are when the link comes up
+	float m_startingRays;
+	float m_startingResolution;
 
-	// our random waves and headache timers
-	float m_waveTimer;
-	float m_headacheTimer;
-
-	// are we doing a random waves or headache?
-	bool m_doingWaves;
-	bool m_doingHeadache;
+	// the full resolution the low resolution effect clears to
+	const float c_fullResolution = 512.0f;
 
 	// unity awake
 	void Awake()
@@ -50,87 +44,40 @@ public class CommScreen : MonoBehaviour
 	// unity update
 	void Update()
 	{
-		// are we fading in?
-		if ( m_fadingIn )
+		// is the interference still clearing?
+		if ( !m_fadingIn )
 		{
-			// update the timer
-			m_timer += Time.deltaTime;
-
-			// calculate new strength of effects
-			var strength = Mathf.Clamp( m_timer / m_duration, 0.0f, 1.0f );
-
-			// update strength of effects
-			m_waves.strengthX = Mathf.SmoothStep( 3.0f, 0.0f, strength );
-			m_headache.strength = Mathf.SmoothStep( 10.0f, 0.0f, strength );
-
-			// are we done?
-			if ( m_timer >= m_duration )
-			{
-				// yes - we are no longer fading in
-				m_fadingIn = false;
-
-				// initialize random wave and headache timers
-				m_waveTimer = m_trainingLevel * Random.Range( 3.0f, 30.0f );
-				m_headacheTimer = m_trainingLevel * Random.Range( 3.0f, 30.0f );
-			}
+			return;
 		}
-		else
+
+		// update the timer
+		m_timer += Time.deltaTime;
+
+		// calculate new strength of effects
+		var strength = ( m_duration > 0.0f ) ? Mathf.Clamp( m_timer / m_duration, 0.0f, 1.0f ) : 1.0f;
+
+		// update strength of effects
+		m_waves.strengthX = Mathf.SmoothStep( 3.0f, 0.0f, strength );
+		m_headache.strength = Mathf.SmoothStep( 10.0f, 0.0f, strength );
+		m_coloredRays.strength = Mathf.SmoothStep( m_startingRays, 0.0f, strength );
+
+		// the resolution comes up to the full one
+		if ( m_lowResolution.enabled )
 		{
-			if ( m_doingWaves )
-			{
-				m_waveTimer += Time.deltaTime;
+			m_lowResolution.resolutionX = Mathf.FloorToInt( Mathf.SmoothStep( m_startingResolution, c_fullResolution, strength ) );
+			m_lowResolution.resolutionY = m_lowResolution.resolutionX;
+		}
 
-				var strength = 1.0f - Mathf.Abs( 1.0f - Mathf.Clamp( m_waveTimer * 2.0f / m_randomWaveDuration, 0.0f, 2.0f ) );
+		// are we done?
+		if ( m_timer >= m_duration )
+		{
+			// yes - the picture is clean from now on
+			m_fadingIn = false;
 
-				m_waves.strengthX = Mathf.SmoothStep( 0.0f, 3.0f, strength );
-
-				if ( m_waveTimer >= m_randomWaveDuration )
-				{
-					m_doingWaves = false;
-
-					m_waveTimer = m_trainingLevel * Random.Range( 3.0f, 30.0f );
-				}
-			}
-			else
-			{
-				m_waveTimer -= Time.deltaTime;
-
-				if ( m_waveTimer <= 0.0f )
-				{
-					m_doingWaves = true;
-					m_waveTimer = 0.0f;
-
-					PlaySound( SoundController.Sound.WarbleShort );
-				}
-			}
-
-			if ( m_doingHeadache )
-			{
-				m_headacheTimer += Time.deltaTime;
-
-				var strength = 1.0f - Mathf.Abs( 1.0f - Mathf.Clamp( m_headacheTimer * 2.0f / m_randomHeadacheDuration, 0.0f, 2.0f ) );
-
-				m_headache.strength = Mathf.SmoothStep( 0.0f, 10.0f, strength );
-
-				if ( m_headacheTimer >= m_randomHeadacheDuration )
-				{
-					m_doingHeadache = false;
-
-					m_headacheTimer = m_trainingLevel * Random.Range( 3.0f, 30.0f );
-				}
-			}
-			else
-			{
-				m_headacheTimer -= Time.deltaTime;
-
-				if ( m_headacheTimer <= 0.0f )
-				{
-					m_doingHeadache = true;
-					m_headacheTimer = 0.0f;
-
-					PlaySound( SoundController.Sound.StaticShort );
-				}
-			}
+			m_waves.strengthX = 0.0f;
+			m_headache.strength = 0.0f;
+			m_coloredRays.strength = 0.0f;
+			m_lowResolution.enabled = false;
 		}
 	}
 
@@ -155,7 +102,7 @@ public class CommScreen : MonoBehaviour
 		PlaySound( SoundController.Sound.StaticLong );
 
 		// the training level for the test scene
-		m_trainingLevel = 0.5f;
+		var trainingLevel = 0.5f;
 
 		// do we have a player (are we not in test scene?)
 		if ( DataController.m_instance != null )
@@ -167,25 +114,31 @@ public class CommScreen : MonoBehaviour
 			var personnelFile = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer );
 
 			// convert the communications training level to a 1 to 0 range
-			m_trainingLevel = personnelFile.m_communications / 250.0f;
+			if ( personnelFile != null )
+			{
+				trainingLevel = personnelFile.m_communications / 250.0f;
+			}
 		}
 
 		// re-range tranining level
-		m_trainingLevel = Mathf.Lerp( 0.1f, 1.0f, m_trainingLevel );
+		trainingLevel = Mathf.Lerp( 0.1f, 1.0f, Mathf.Clamp01( trainingLevel ) );
 
 		// colored rays
-		m_coloredRays.strength = 0.5f + 4.5f * ( 1.0f - m_trainingLevel );
+		m_startingRays = 0.5f + 4.5f * ( 1.0f - trainingLevel );
+		m_coloredRays.strength = m_startingRays;
 
 		// waves
 		m_waves.strengthY = 0.0f;
 		m_waves.frequencyX = 100.0f;
 
 		// low resolution
-		if ( m_trainingLevel < 0.75f )
+		if ( trainingLevel < 0.75f )
 		{
 			m_lowResolution.enabled = true;
 
-			m_lowResolution.resolutionX = Mathf.FloorToInt( 512.0f * m_trainingLevel );
+			m_startingResolution = Mathf.Floor( c_fullResolution * trainingLevel );
+
+			m_lowResolution.resolutionX = Mathf.FloorToInt( m_startingResolution );
 			m_lowResolution.resolutionY = m_lowResolution.resolutionX;
 		}
 		else
