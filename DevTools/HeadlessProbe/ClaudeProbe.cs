@@ -16203,6 +16203,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "blackegg: back in orbit the egg counts down from 5 and goes BOOM", countdownText.Contains( "COUNTDOWN TRANSMISSION FROM THE BLACK EGG" ) && countdownText.Contains( "5" ) && countdownText.Contains( "1" ) && countdownText.Contains( "BOOM!" ), countdownText );
 		Check( "blackegg: planet 90 is destroyed, saved, gone from its star system, and the ship is in the star system", planet90Destroyed && ( controllerOf90 == null ) && ( locationAfter == PD_General.Location.StarSystem ), planet90Destroyed + ", " + ( controllerOf90 == null ) + ", " + locationAfter );
+		Check( "blackegg: after BOOM the original's PLANET OBLITERATED", countdownText.IndexOf( "Planet obliterated." ) > countdownText.IndexOf( "BOOM!" ), countdownText );
 
 		// ---- 3. an egg on the Crystal Planet away from its control nexus: damaged but not destroyed
 		var crystalStarId = gameData.m_planetList[ 33 ].m_starId;
@@ -16223,7 +16224,19 @@ public class ClaudeProbe : MonoBehaviour
 			yield return null;
 		}
 
+		// the main view flashes after BOOM, as the original's (DPART-OV EXPLOSION), and the egg does its work when the flash is over
 		yield return Frames( 3 );
+
+		var isFlashing = typeof( Viewport ).GetMethod( "IsFlashing" );
+		var flashingAfterBoom = ( isFlashing != null ) && (bool) isFlashing.Invoke( controller.m_viewport, null );
+
+		yield return new WaitForSecondsRealtime( 3.5f );
+
+		var flashingLater = ( isFlashing != null ) && (bool) isFlashing.Invoke( controller.m_viewport, null );
+
+		Log( "blackegg: the main view flashing after BOOM " + flashingAfterBoom + ", 3.5 s later " + flashingLater );
+
+		Check( "blackegg: after BOOM the main view flashes for a while, as the original's", flashingAfterBoom && !flashingLater, flashingAfterBoom + ", " + flashingLater );
 
 		var damagedText = MessageList();
 		var crystalAfterAway = ( destroyed != null ) && destroyed.Contains( 33 );
