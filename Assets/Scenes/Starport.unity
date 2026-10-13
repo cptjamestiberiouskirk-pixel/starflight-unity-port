@@ -11745,7 +11745,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Welcome to the Trade Depot!
+  m_text: 'Welcome to the Trade Depot
 
 
 
@@ -28347,6 +28347,7 @@ MonoBehaviour:
   m_itemListText: {fileID: 214630451}
   m_volumeListText: {fileID: 1351731648}
   m_unitValueListText: {fileID: 583545853}
+  m_unitValueHeadingText: {fileID: 595144362}
   m_currentBalanceText: {fileID: 2090838211}
   m_amountLabelText: {fileID: 850515235}
   m_errorMessageText: {fileID: 1101141622}

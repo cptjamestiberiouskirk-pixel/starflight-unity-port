@@ -547,7 +547,7 @@ public class ShipConfigurationPanel : Panel
 		}
 
 		// update bank balance amount
-		m_currentBalanceText.text = "Your account balance is: " + playerData.m_bank.m_currentBalance + " M.U.";
+		m_currentBalanceText.text = "Your account balance is: " + string.Format( "{0:n0}", playerData.m_bank.m_currentBalance ) + " M.U.";
 	}
 
 	// update screen for the buy part state
