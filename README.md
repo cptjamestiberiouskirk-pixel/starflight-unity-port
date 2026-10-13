@@ -183,9 +183,9 @@ The project features a **deterministic visualization system** that renders plane
 ### 🔧 In Progress
 - The fidelity pass: every screen against the original's (roadmap Phase 7)
 
-### 📊 Completion: 57 of the 59 items of the roadmap to parity
+### 📊 Completion: 58 of the 59 items of the roadmap to parity
 
-[ROADMAP.md](ROADMAP.md) lists what the port still lacks against the original game: the owner's play test of the early visual changes, and the fidelity pass's comparison of every screen with the original's. No one has yet played the port through to the win by hand.
+[ROADMAP.md](ROADMAP.md) lists what the port still lacks against the original game: the rest of the fidelity pass's comparison of every screen with the original's. No one has yet played the port through to the win by hand.
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
