@@ -1005,6 +1005,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioGazurtoidMood();
 				break;
 
+			case "combatwounds":
+				yield return ScenarioCombatWounds();
+				break;
+
 			case "floaters":
 				yield return ScenarioFloaters();
 				break;
@@ -2563,8 +2567,10 @@ public class ClaudeProbe : MonoBehaviour
 			ship.m_shieldingClass = 1;
 		}
 
-		ship.m_shieldsAreUp = true;
-		ship.m_shieldPoints = ship.GetMaximumShieldPoints();
+		// (shields down and the armor low, so that the hit gives the hull breach warning, a message with a colour tag: the original names no damage, so the port
+		// no longer writes the shields' and the hull's numbers)
+		ship.m_shieldsAreUp = false;
+		ship.m_armorPoints = Mathf.Max( 20, ship.GetMaximumArmorPoints() / 5 );
 
 		var armorBefore = ship.m_armorPoints;
 		var shown = "";
@@ -2588,7 +2594,7 @@ public class ClaudeProbe : MonoBehaviour
 			shown += messagesText.GetParsedText().Replace( '\n', '/' );
 		}
 
-		Check( "the shield message shows its words and no tag", shown.Contains( "Shields absorb 10 damage!" ) && !shown.Contains( "<color" ), "shown=[" + shown + "] armor " + armorBefore + "->" + ship.m_armorPoints );
+		Check( "the hull breach message shows its words and no tag", shown.Contains( "Hull breach imminent!" ) && !shown.Contains( "<color" ), "shown=[" + shown + "] armor " + armorBefore + "->" + ship.m_armorPoints );
 
 		Finish( "scenario=colournames named=" + named + " unknown=" + unknown.Count, 0 );
 	}
@@ -25906,6 +25912,77 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "gazurtoidmood: met with the shields up and the weapons armed the Gazurtoid fight, as the original (41, fight from 40)", ( armedMood == 41.0f ) && ( armedStance == GD_Comm.Stance.Hostile ), armedMood + " " + armedStance );
 
 		Finish( "scenario=gazurtoidmood", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the combat messages and the crew's wounds (DAMAGE-OV)
+
+	IEnumerator ScenarioCombatWounds()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var ship = playerData.m_playerShip;
+		var combat = CombatController.m_instance;
+
+		EnsureCrew();
+
+		var captain = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Captain );
+
+		captain.m_vitality = 100.0f;
+		captain.m_isDead = false;
+
+		ship.m_armorPoints = 100000;
+		ship.m_shieldsAreUp = false;
+
+		var encounterRange = SpaceflightController.m_instance.m_encounterRange;
+
+		SpaceflightController.m_instance.m_encounterRange = 0.0f;
+
+		EnterEncounter( FindEncounter( 1, 6, 3, 0 ) );
+		yield return Frames( 10 );
+
+		// ---- 1. sixty hits that get through the shields (none are up): some fall on the crew, and the text window says how badly they are wounded, with no numbers
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		var said = "";
+
+		for ( var i = 0; i < 60; i++ )
+		{
+			combat.ApplyDamageToPlayer( 20, Vector3.forward );
+
+			said += MessageList() + " / ";
+
+			SpaceflightController.m_instance.m_messages.Clear();
+		}
+
+		var vitalityAfter = captain.m_vitality;
+		var wounded = said.Contains( " wounded." );
+		var numbers = said.Contains( "Hull takes" ) || said.Contains( "damage!" );
+
+		// ---- 2. a plasma bolt (an Uhlek warship's) says what hit the ship, in the original's words
+		var alienShip = SpaceflightController.m_instance.m_encounter.m_pdEncounter.GetAlienShipList()[ 0 ];
+		var uhlekWarship = gameData.m_vesselList[ 17 ];
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		combat.AlienFiresAtPlayer( alienShip, uhlekWarship );
+
+		var plasma = MessageList();
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		SpaceflightController.m_instance.m_encounterRange = encounterRange;
+
+		captain.m_vitality = 100.0f;
+
+		Log( "combatwounds: after 60 hits the captain's vitality " + vitalityAfter + ", wounded said " + wounded + ", numbers said " + numbers + " | plasma: " + plasma + " | said: " + ( said.Length > 600 ? said.Substring( 0, 600 ) : said ) );
+
+		Check( "combatwounds: hits that get through the shields wound the crew at times, and the text window says how badly, as the original", ( vitalityAfter < 100.0f ) && ( vitalityAfter > 0.0f ) && wounded, vitalityAfter + " " + wounded );
+		Check( "combatwounds: the text window gives no numbers of damage, as the original", !numbers, said.Length > 300 ? said.Substring( 0, 300 ) : said );
+		Check( "combatwounds: a plasma bolt that hits says \"Plasma bolt\", as the original", plasma.Contains( "Plasma bolt" ) && !plasma.Contains( "incoming" ), plasma );
+
+		Finish( "scenario=combatwounds", 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 6: lifeforms that float (lf-behav.txt FLOAT)

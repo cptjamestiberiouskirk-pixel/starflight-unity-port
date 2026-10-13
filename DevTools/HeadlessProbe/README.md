@@ -81,6 +81,7 @@ What the probe does:
 | `cargo` | volumes in cubic meters in the ship's cargo list, in the terrain vehicle's pickup message and cargo list; a deposit that does not fit into the hold; the size of a scanned vessel in the sensor analysis; that the terrain vehicle has not moved meanwhile |
 | `savedata` | the scene a saved game is loaded into for every location, the save panel's description of a game saved in the terrain vehicle, the terrain vehicle of a new game, and the stardate with the computer set to the Thai, Saudi Arabian, Persian and German cultures |
 | `combat` | a missile in the air while the game is paused, the size of an explosion that is used again, a launch with every missile of the pool in the air, and a ship that is fired at and hit again while it explodes |
+| `combatwounds` | the combat messages and the crew's wounds of the original (DAMAGE-OV): sixty hits through lowered shields wound the crew at times, the text window says how badly ("is slightly wounded.") and gives no damage numbers, and a plasma bolt says "Plasma bolt" (about 25 s) |
 | `encounters` | a ship that has just launched and the hyperspace encounters, the side the aliens appear on in a star system, two encounters that reach the ship in the same frame, and the radar with an encounter dead astern |
 | `comms` | the captain's name in what the aliens say, Mechan 9 after five right answers with and without having fired on the Mechans, a press of the fire button when the aliens ask a question before the press is carried out, and a Thrynn patrol's statements least used first: six in the order of the game data, then three more at a second meeting carrying on |
 | `systemtravel` | the messages of travel in a star system in the original's words: Maneuver after the launch and leaving orbit say Leaving orbit... and ...Commencing system travel, over Arth Standing by to dock with Starport, over planet 94 Standing by to orbit and Press Enter to orbit, away from the planets Outside orbital range, and docking Closing docking bay doors (about 45 s) |
@@ -217,7 +218,7 @@ What the probe does:
 | `look` | Look on planet 92 with one lifeform at a time beside the vehicle: a living plant (its body plan, not moving, alive), a test animal that wanders (wandering) and the plant made dead (dead) (about 40 s) |
 | `lookfields` | Look on planet 92 gives the original's fields in its order: Sky, Temperature and Gravity, Atmo, Hydro, Terrain, and no Weather (about 30 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (170 scenarios, about 133 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (171 scenarios, about 134 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

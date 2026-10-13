@@ -618,10 +618,6 @@ public class CombatController : MonoBehaviour
 			// play shield hit sound
 			SoundController.m_instance.PlaySound( SoundController.Sound.ShieldHit );
 
-			if ( shieldAbsorb > 0 )
-			{
-				SpaceflightController.m_instance.m_messages.AddText( $"<color=#00FFFF>Shields absorb {shieldAbsorb} damage!</color>" );
-			}
 		}
 
 		// remaining damage to armor
@@ -629,8 +625,16 @@ public class CombatController : MonoBehaviour
 		{
 			playerData.m_playerShip.m_armorPoints -= damage;
 
-			// and one of the ship's other systems takes its share
-			playerData.m_playerShip.DamageRandomSystem( damage );
+			// and one of the ship's other fields takes its share: one of its systems, or the crew (the original's damage picks one of eight fields for a hit, the
+			// seventh the crew, DAMAGE-OV #>?FIEL and #>DAMAG)
+			if ( UnityEngine.Random.Range( 0, playerData.m_playerShip.GetInstalledSystemCount() + 1 ) == 0 )
+			{
+				WoundCrew( damage );
+			}
+			else
+			{
+				playerData.m_playerShip.DamageRandomSystem( damage );
+			}
 
 			// show hull hit
 			var hullHit = GetAvailableHullHit();
@@ -638,8 +642,6 @@ public class CombatController : MonoBehaviour
 			{
 				hullHit.Play( playerPosition, hitDirection );
 			}
-
-			SpaceflightController.m_instance.m_messages.AddText( $"<color=red>Hull takes {damage} damage!</color>" );
 
 			// play red alert if armor is critically low (below 25% of the most this ship can have)
 			int maxArmor = playerData.m_playerShip.GetMaximumArmorPoints();
@@ -875,7 +877,8 @@ public class CombatController : MonoBehaviour
 			int damage = 30 + vessel.m_shieldClass * 10;
 			ApplyDamageToPlayer( damage, direction );
 
-			SpaceflightController.m_instance.m_messages.AddText( $"<color=red>Plasma bolt incoming!</color>" );
+			// what hit the ship, in the original's words (DAMAGE-OV: PLASMA BOLT)
+			SpaceflightController.m_instance.m_messages.AddText( "<color=red>Plasma bolt</color>" );
 		}
 		else if ( vessel.m_laserClass > 0 )
 		{
@@ -898,8 +901,6 @@ public class CombatController : MonoBehaviour
 			}
 
 			ApplyDamageToPlayer( damage, direction );
-
-			SpaceflightController.m_instance.m_messages.AddText( $"<color=red>Enemy laser fire!</color>" );
 		}
 		else if ( vessel.m_missileClass > 0 )
 		{
@@ -914,6 +915,9 @@ public class CombatController : MonoBehaviour
 				{
 					if ( didHit )
 					{
+						// what hit the ship, in the original's words (DAMAGE-OV: MISSILE CLASS n)
+						SpaceflightController.m_instance.m_messages.AddText( "<color=red>Missile class " + vessel.m_missileClass + "</color>" );
+
 						ApplyDamageToPlayer( damage, direction );
 					}
 
@@ -932,7 +936,6 @@ public class CombatController : MonoBehaviour
 				// play torpedo launch sound
 				SoundController.m_instance.PlaySound( SoundController.Sound.TorpedoFire );
 
-				SpaceflightController.m_instance.m_messages.AddText( $"<color=red>Incoming torpedo!</color>" );
 			}
 			else
 			{
@@ -941,6 +944,58 @@ public class CombatController : MonoBehaviour
 			}
 		}
 	}
+
+	// a hit that falls on the crew wounds each of them who is alive with a chance of 70 in 100, by the hit's share of their durability - 5 at least - and the text
+	// window says how badly each is wounded (DAMAGE-OV WF0E0, WED5E, WED6A and WF02E: "<NAME> IS MODERATELY WOUNDED")
+	void WoundCrew( int damage )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var crewAssignment = playerData.m_crewAssignment;
+		var crew = new List<PD_Personnel.PD_PersonnelFile>();
+
+		for ( var role = PD_CrewAssignment.Role.First; role < PD_CrewAssignment.Role.Count; role++ )
+		{
+			if ( !crewAssignment.IsAssigned( role ) )
+			{
+				continue;
+			}
+
+			var file = crewAssignment.GetPersonnelFile( role );
+
+			if ( ( file != null ) && !file.m_isDead && ( file.m_vitality > 0.0f ) && !crew.Contains( file ) )
+			{
+				crew.Add( file );
+			}
+		}
+
+		foreach ( var file in crew )
+		{
+			if ( UnityEngine.Random.Range( 0, 100 ) >= c_woundChance )
+			{
+				continue;
+			}
+
+			var durability = 1;
+
+			if ( ( file.m_crewRaceId >= 0 ) && ( file.m_crewRaceId < gameData.m_crewRaceList.Length ) )
+			{
+				durability = Mathf.Max( 1, gameData.m_crewRaceList[ file.m_crewRaceId ].m_durability );
+			}
+
+			var wound = Mathf.Max( c_leastWound, UnityEngine.Random.Range( 1, Mathf.Max( 1, damage ) + 1 ) / durability / 10 );
+
+			// (at 0 the crew member dies, and with nobody left the game is lost: PD_CrewAssignment.InjureCrewMember says so)
+			if ( !crewAssignment.InjureCrewMember( file, wound ) )
+			{
+				SpaceflightController.m_instance.m_messages.AddText( "<color=red>" + file.m_name + " is " + ExamineButton.GetWoundWord( Mathf.CeilToInt( file.m_vitality ) ) + " wounded.</color>" );
+			}
+		}
+	}
+
+	// the chance of each crew member to be wounded by a hit on the crew, in 100, and the least wound (DAMAGE-OV WED5E: 70; WED6A: 5)
+	const int c_woundChance = 70;
+	const int c_leastWound = 5;
 
 	// get available laser from pool
 	LaserBeam GetAvailableLaser()
