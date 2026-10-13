@@ -138,8 +138,7 @@ public class StarSystem : MonoBehaviour
 					m_planetToOrbitId = orbitPlanetController.m_planet.m_id;
 
 					// let the player know, in the original's words (STARB.COM: "STANDING BY TO DOCK WITH STARPORT" at Arth, else "STANDING BY TO ORBIT" and
-					// "PRESS SPACEBAR TO ORBIT" - the port's key for it is Enter)
-					SpaceflightController.m_instance.m_messages.Clear();
+					// "PRESS SPACEBAR TO ORBIT" - the port's key for it is Enter), under the lines before it: the original lets them scroll on (starflt_141)
 
 					if ( orbitPlanetController.m_planet.m_id == DataController.m_instance.m_gameData.m_misc.m_arthPlanetId )
 					{

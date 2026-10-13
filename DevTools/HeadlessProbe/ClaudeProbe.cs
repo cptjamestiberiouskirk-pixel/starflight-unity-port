@@ -989,6 +989,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioGazurtoidMood();
 				break;
 
+			case "orbitlines":
+				yield return ScenarioOrbitLines();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -12295,7 +12299,9 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "unmapped: within orbital range the player is told that the planet could not be mapped", rangeMessage.Contains( "Standing by to orbit" ) && rangeMessage.Contains( "could not be mapped" ), rangeMessage );
 		Check( "unmapped: in orbit the player is told so too, and the planet model has the plain maps", orbitMessage.Contains( "Orbit established" ) && orbitMessage.Contains( "could not be mapped" ) && ( orbitAlbedoSize == "4x4" ), orbitMessage + " | albedo " + orbitAlbedoSize );
 
-		// a planet with maps gets no such message (control)
+		// a planet with maps gets no such message (control) - the text window cleared first, since the lines of the last orbit scroll on
+		SpaceflightController.m_instance.m_messages.Clear();
+
 		yield return EnterOrbit( 94 );
 
 		var goodOrbitMessage = MessageList();
@@ -25336,6 +25342,46 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "gazurtoidmood: met with the shields up and the weapons armed the Gazurtoid fight, as the original (41, fight from 40)", ( armedMood == 41.0f ) && ( armedStance == GD_Comm.Stance.Hostile ), armedMood + " " + armedStance );
 
 		Finish( "scenario=gazurtoidmood", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the lines that lead up to orbit scroll on (starflt_141, starflt_143)
+
+	IEnumerator ScenarioOrbitLines()
+	{
+		EnsureCrew();
+
+		var arth = DataController.m_instance.m_gameData.m_misc.m_arthStarId;
+
+		EnterStarSystem( arth );
+
+		yield return Frames( 10 );
+
+		// a line from before the orbit, as the system travel leaves one
+		SpaceflightController.m_instance.m_messages.Clear();
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>...Commencing system travel.</color>" );
+
+		// (a planet of Arth's system other than Arth, whose orbit leads to the Starport)
+		var planetId = -1;
+
+		for ( var orbit = 1; ( orbit <= 8 ) && ( planetId < 0 ); orbit++ )
+		{
+			var candidate = PlanetInOrbit( arth, orbit );
+
+			if ( ( candidate >= 0 ) && ( candidate != DataController.m_instance.m_gameData.m_misc.m_arthPlanetId ) )
+			{
+				planetId = candidate;
+			}
+		}
+
+		yield return EnterOrbit( planetId );
+
+		var shown = MessageList();
+
+		Log( "orbitlines: " + shown );
+
+		Check( "orbitlines: going into orbit says \"...Orbit established\" under the lines before it, as the original", shown.Contains( "...Commencing system travel." ) && shown.Contains( "...Orbit established." ), shown );
+
+		Finish( "scenario=orbitlines", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
