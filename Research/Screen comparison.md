@@ -103,8 +103,8 @@ A vessel's reading matches the original's (mass, bio, energy, object constituent
 | No picture of an analysis | FIXED | PR 234 (CONFIRMED) | |
 | An alien ship's shields and weapons were always "Not certain" | FIXED | PR 220; picture: "Shields: None apparent", "Weapon Status: Armed" (CONFIRMED) | GAMEPLAY |
 | "Size:" label before the ship's size | FIXED | PR 220 (CONFIRMED) | GAMEPLAY |
-| The heading has no colon: "Analysis of Last Sensor Reading"; the original's "ANALYSIS OF LAST SENSOR READING:" | OPEN, low priority | `AnalysisButton.cs:144`; `ANALYZE-OV.c:493`, starflt_145 (CONFIRMED) | GAMEPLAY |
-| A temperature range with the same word at both ends: "Sub-Arctic to Sub-Arctic"; the original prints the one word (it drops the second when they are equal) | OPEN | `GD_Planet.cs:346`; `ANALYZE-OV.c`, word WF068; the orbit analysis picture (CONFIRMED) | GAMEPLAY |
+| The heading has no colon: "Analysis of Last Sensor Reading"; the original's "ANALYSIS OF LAST SENSOR READING:" | FIXED (the analysis heading PR) | `AnalysisButton.cs:144`; `ANALYZE-OV.c:493`, starflt_145 (CONFIRMED) | GAMEPLAY |
+| A temperature range with the same word at both ends: "Sub-Arctic to Sub-Arctic"; the original prints the one word (it drops the second when they are equal) | FIXED (the analysis heading PR) | `GD_Planet.cs:346`; `ANALYZE-OV.c`, word WF068; the orbit analysis picture (CONFIRMED) | GAMEPLAY |
 
 ## 8. Landing map and descent
 

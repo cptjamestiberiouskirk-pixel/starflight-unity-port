@@ -993,6 +993,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioGazurtoidMood();
 				break;
 
+			case "analysisheading":
+				yield return ScenarioAnalysisHeading();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -25469,6 +25473,54 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "gazurtoidmood: met with the shields up and the weapons armed the Gazurtoid fight, as the original (41, fight from 40)", ( armedMood == 41.0f ) && ( armedStance == GD_Comm.Stance.Hostile ), armedMood + " " + armedStance );
 
 		Finish( "scenario=gazurtoidmood", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the analysis heading's colon and the one-word temperature (ANALYZE-OV)
+
+	IEnumerator ScenarioAnalysisHeading()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+
+		EnsureCrew();
+
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer ).m_science = 250;
+
+		// ---- 1. a planet whose temperature has the same word at both ends, and one with a range
+		GD_Planet same = null;
+		GD_Planet range = null;
+
+		foreach ( var planet in gameData.m_planetList )
+		{
+			if ( ( planet.m_temperatureIdA == planet.m_temperatureIdB ) && ( same == null ) )
+			{
+				same = planet;
+			}
+
+			if ( ( planet.m_temperatureIdA != planet.m_temperatureIdB ) && ( range == null ) )
+			{
+				range = planet;
+			}
+		}
+
+		var sameText = same.GetTemperatureText();
+		var rangeText = range.GetTemperatureText();
+
+		// ---- 2. the heading of an analysis (a Mechan scout's)
+		EnterEncounter( FindEncounterOfRace( GameData.Race.Mechan ) );
+		yield return Frames( 10 );
+
+		var analysis = AnalyzeScan( SensorsDisplay.ScanType.MechanScout );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		Log( "analysisheading: planet " + same.m_id + " temperature [" + sameText + "], planet " + range.m_id + " [" + rangeText + "] | " + analysis );
+
+		Check( "analysisheading: a temperature with the same word at both ends is the one word, as the original", !sameText.Contains( " to " ) && rangeText.Contains( " to " ), sameText + " | " + rangeText );
+		Check( "analysisheading: the analysis heading ends with a colon, as the original", analysis.Contains( "Analysis of Last Sensor Reading:" ), analysis );
+
+		Finish( "scenario=analysisheading", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
