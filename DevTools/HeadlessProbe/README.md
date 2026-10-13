@@ -227,6 +227,7 @@ What the probe does:
 | `surfacepictures` | with `-Graphics`, the whole screen on planet 92 of Arth: the ship landed, the terrain vehicle beside a lifeform, Look, Scan, Cargo beside the lifeform, Weapon and a laser shot, the cargo list and Maps, into `Logs/screen-pictures/surface/` (9 pictures); without a graphics device it does nothing (about 30 s) |
 | `bridgepictures` | with `-Graphics`, the whole screen of the flight scene's docking bay: Examine and Treat with their questions, Hail with no one to hail, Distress's question, the Captain's menu, Launch's question, the launch and the ship out of the Starport, then Hail in an encounter of Spemin scouts (the postures, a friendly hail), into `Logs/screen-pictures/bridge/` (13 pictures); without a graphics device it does nothing (about 35 s) |
 | `starport-analyzelist` | the Trade Depot's Analysis lists the ship's own artifacts only, as the original's: with two artifacts for sale at the Starport and one in the hold, the list has the one under one Artifacts heading (about 15 s) |
+| `starport-tradetexts` | the Trade Depot's texts as the original's: the price column reads Unit Cost on the buy list and Unit Value on the sell list, the welcome has no exclamation mark, too little money says "Insufficient funds", and the Trade Depot and Ship Configuration write the balance with thousands separators as the Bank and Personnel do (about 15 s) |
 | `acceleration` | the ship's acceleration is the original's, the engines' class times 500 over the mass in whole G: 7 G for the equipped ship of starflt_076 (356 tons), 5 G for a bare class 1 ship and for a 500-ton class 5 one, 4 G for two more (about 15 s) |
 | `starport-buyorder` | the Trade Depot's Buy list has the Starport's elements in the original's order: Titanium, Promethium, Molybdenum, Cobalt, Aluminum, Endurium (about 15 s) |
 | `starport-supplementalfine` | a supplemental evaluation's fine is booked when Operations shows the evaluation, as the original's: towing charges of 15000 MU waiting, nothing paid before, 15000 and a FINE row when the evaluation screen shows them, nothing more the second time (about 15 s) |
@@ -237,7 +238,7 @@ What the probe does:
 | `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 | `combatmessages` | the combat messages are the original's: WEAPONS NOT ARMED, NO TARGET PRESENT, WEAPON NOT AVAILABLE and OUT OF FUEL! when a weapon cannot fire, nothing of the port's own when the player's shot hits, and LASER CLASS n (LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (190 scenarios, about 153 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (191 scenarios, about 154 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 
