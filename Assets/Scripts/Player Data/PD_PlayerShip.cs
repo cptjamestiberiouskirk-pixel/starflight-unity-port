@@ -623,7 +623,8 @@ public class PD_PlayerShip
 
 			m_shieldsAreUp = true;
 
-			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Shields raised.</color>" );
+			// in the original's words (NAVIGATR WF359: SHIELDS ARE NOW UP)
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Shields are now up.</color>" );
 		}
 	}
 
@@ -634,7 +635,8 @@ public class PD_PlayerShip
 			// the shields keep their charge while they are down
 			m_shieldsAreUp = false;
 
-			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Shields dropped.</color>" );
+			// in the original's words (NAVIGATR >DOWN-SHIELD: SHIELDS ARE DOWN)
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Shields are down.</color>" );
 		}
 	}
 
@@ -946,14 +948,28 @@ public class PD_PlayerShip
 		}
 	}
 
+	// arms the weapons that work, saying which (NAVIGATR WF3FB: ARMING MISSILES, ARMING LASERS) - a ship whose weapons are all destroyed arms nothing
 	public void ArmWeapons()
 	{
-		if ( !m_weaponsAreArmed )
+		if ( m_weaponsAreArmed )
 		{
-			m_weaponsAreArmed = true;
-
-			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Weapons armed.</color>" );
+			return;
 		}
+
+		var missiles = ( m_missileLauncherClass > 0 ) && ( GetSystemHealth( ShipSystem.Missiles ) > 0 );
+		var lasers = ( m_laserCannonClass > 0 ) && ( GetSystemHealth( ShipSystem.Lasers ) > 0 );
+
+		if ( missiles )
+		{
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Arming missiles.</color>" );
+		}
+
+		if ( lasers )
+		{
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Arming lasers.</color>" );
+		}
+
+		m_weaponsAreArmed = missiles || lasers;
 	}
 
 	public void DisarmWeapons()
@@ -962,7 +978,8 @@ public class PD_PlayerShip
 		{
 			m_weaponsAreArmed = false;
 
-			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Weapons disarmed.</color>" );
+			// in the original's words (NAVIGATR >DISARM: WEAPONS ARE DISARMED)
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Weapons are disarmed.</color>" );
 		}
 	}
 

@@ -1001,6 +1001,14 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioGazurtoidMood();
 				break;
 
+			case "orbitlines":
+				yield return ScenarioOrbitLines();
+				break;
+
+			case "shieldmessages":
+				yield return ScenarioShieldMessages();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -12605,7 +12613,9 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "unmapped: within orbital range the player is told that the planet could not be mapped", rangeMessage.Contains( "Standing by to orbit" ) && rangeMessage.Contains( "could not be mapped" ), rangeMessage );
 		Check( "unmapped: in orbit the player is told so too, and the planet model has the plain maps", orbitMessage.Contains( "Orbit established" ) && orbitMessage.Contains( "could not be mapped" ) && ( orbitAlbedoSize == "4x4" ), orbitMessage + " | albedo " + orbitAlbedoSize );
 
-		// a planet with maps gets no such message (control)
+		// a planet with maps gets no such message (control) - the text window cleared first, since the lines of the last orbit scroll on
+		SpaceflightController.m_instance.m_messages.Clear();
+
 		yield return EnterOrbit( 94 );
 
 		var goodOrbitMessage = MessageList();
@@ -25823,6 +25833,122 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "gazurtoidmood: met with the shields up and the weapons armed the Gazurtoid fight, as the original (41, fight from 40)", ( armedMood == 41.0f ) && ( armedStance == GD_Comm.Stance.Hostile ), armedMood + " " + armedStance );
 
 		Finish( "scenario=gazurtoidmood", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the lines that lead up to orbit scroll on (starflt_141, starflt_143)
+
+	IEnumerator ScenarioOrbitLines()
+	{
+		EnsureCrew();
+
+		var arth = DataController.m_instance.m_gameData.m_misc.m_arthStarId;
+
+		EnterStarSystem( arth );
+
+		yield return Frames( 10 );
+
+		// a line from before the orbit, as the system travel leaves one
+		SpaceflightController.m_instance.m_messages.Clear();
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>...Commencing system travel.</color>" );
+
+		// (a planet of Arth's system other than Arth, whose orbit leads to the Starport)
+		var planetId = -1;
+
+		for ( var orbit = 1; ( orbit <= 8 ) && ( planetId < 0 ); orbit++ )
+		{
+			var candidate = PlanetInOrbit( arth, orbit );
+
+			if ( ( candidate >= 0 ) && ( candidate != DataController.m_instance.m_gameData.m_misc.m_arthPlanetId ) )
+			{
+				planetId = candidate;
+			}
+		}
+
+		yield return EnterOrbit( planetId );
+
+		var shown = MessageList();
+
+		Log( "orbitlines: " + shown );
+
+		Check( "orbitlines: going into orbit says \"...Orbit established\" under the lines before it, as the original", shown.Contains( "...Commencing system travel." ) && shown.Contains( "...Orbit established." ), shown );
+
+		Finish( "scenario=orbitlines", 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 7: the shields' and weapons' messages (NAVIGATR)
+
+	// presses a button of the console and returns what the text window shows
+	static string PressAndRead( ShipButton button )
+	{
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		button.Execute();
+
+		return MessageList();
+	}
+
+	IEnumerator ScenarioShieldMessages()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		// a ship with shields, missiles and lasers, all whole, and fuel
+		ship.m_shieldingClass = 1;
+		ship.m_missileLauncherClass = 1;
+		ship.m_laserCannonClass = 1;
+		ship.RestoreSystems();
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+
+		if ( ship.m_elementStorage.Find( 5 ) == null )
+		{
+			ship.AddElement( 5, 50 );
+		}
+
+		// ---- 1. up and down, armed and disarmed, through the console's buttons
+		var raised = PressAndRead( new RaiseShieldsButton() );
+		var dropped = PressAndRead( new DropShieldsButton() );
+		var armed = PressAndRead( new ArmWeaponButton() );
+		var armedFlag = ship.m_weaponsAreArmed;
+		var disarmed = PressAndRead( new DisarmWeaponButton() );
+		var disarmedFlag = ship.m_weaponsAreArmed;
+
+		// ---- 2. the missile launcher destroyed: only the lasers arm
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Missiles, 0 );
+
+		var lasersOnly = PressAndRead( new ArmWeaponButton() );
+
+		PressAndRead( new DisarmWeaponButton() );
+
+		ship.RestoreSystems();
+
+		// ---- 3. no fuel: the shields can't be raised
+		var fuel = ship.m_elementStorage.Find( 5 );
+
+		if ( fuel != null )
+		{
+			ship.RemoveElement( 5, fuel.m_volume );
+		}
+
+		var noFuel = PressAndRead( new RaiseShieldsButton() );
+		var noFuelFlag = ship.m_shieldsAreUp;
+
+		ship.AddElement( 5, 50 );
+
+		Log( "shieldmessages: raise [" + raised + "] drop [" + dropped + "] arm [" + armed + "] (" + armedFlag + ") disarm [" + disarmed + "] (" + disarmedFlag + ") | lasers only [" + lasersOnly + "] | no fuel [" + noFuel + "] (" + noFuelFlag + ")" );
+
+		Check( "shieldmessages: the shields say \"Shields are now up.\" and \"Shields are down.\", as the original", raised.Contains( "Shields are now up." ) && dropped.Contains( "Shields are down." ), raised + " | " + dropped );
+		Check( "shieldmessages: arming says \"Arming missiles.\" and \"Arming lasers.\", and only for the weapons that work, as the original", armed.Contains( "Arming missiles." ) && armed.Contains( "Arming lasers." ) && armedFlag && lasersOnly.Contains( "Arming lasers." ) && !lasersOnly.Contains( "Arming missiles." ), armed + " | " + lasersOnly );
+		Check( "shieldmessages: the Disarm button disarms and says \"Weapons are disarmed.\", as the original", !disarmedFlag && disarmed.Contains( "Weapons are disarmed." ), disarmedFlag + " | " + disarmed );
+		Check( "shieldmessages: without fuel the shields can't be raised, in the original's words", !noFuelFlag && noFuel.Contains( "Shields can't be raised." ), noFuelFlag + " | " + noFuel );
+
+		Finish( "scenario=shieldmessages", 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

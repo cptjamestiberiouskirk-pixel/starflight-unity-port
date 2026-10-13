@@ -20,25 +20,15 @@ public class RaiseShieldsButton : ShipButton
 
 			SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
 		}
-		else if ( SpaceflightController.m_instance.ShipIsInsideANebula() )
+		else if ( SpaceflightController.m_instance.ShipIsInsideANebula() || ( playerData.m_playerShip.m_elementStorage.Find( 5 ) == null ) )
 		{
-			// a nebula keeps the shields down
+			// a nebula keeps the shields down, and shields burn endurium, so they can't be raised without any - the original says the same for both, with a beep
+			// (NAVIGATR (/(UD)SHIELD): ?NEB or no fuel, SHIELDS CAN'T BE RAISED)
 			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
 
 			SpaceflightController.m_instance.m_messages.Clear();
 
-			SpaceflightController.m_instance.m_messages.AddText( "<color=white>The shields cannot be raised inside a nebula.</color>" );
-
-			SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
-		}
-		else if ( playerData.m_playerShip.m_elementStorage.Find( 5 ) == null )
-		{
-			// shields burn endurium, so they can't be raised without any
-			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
-
-			SpaceflightController.m_instance.m_messages.Clear();
-
-			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Insufficient fuel to raise shields.</color>" );
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Shields can't be raised.</color>" );
 
 			SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
 		}
