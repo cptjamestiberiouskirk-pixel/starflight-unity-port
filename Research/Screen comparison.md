@@ -7,7 +7,7 @@ The messages the player sees are covered by `Research/STRINFO message audit.md`.
 ## Sources
 
 - **The original:** `Research/Screenshots/` (259 EGA pictures in 19 folders). Where the screenshots stop, the decompiled original ([s-macke/starflight-reverse](https://github.com/s-macke/starflight-reverse), `starflt1-out/overlays/`) says what a screen does: `ENGINEER.c` (Damage and Repair), `NAVIGATR.c` (shields and weapons), `ANALYZE-OV.c` (Analysis), `HYPERMSG-OV.c` (hyperspace messages), `OP-OV.c` (Operations), `DAMAGE-OV.c` (combat damage), `LAUNCH-OV.c` (launch), `CAPTAIN.c` (the Captain's menu) and `data.h` (the bank's transaction names).
-- **The port:** pictures rendered by the headless probe with a graphics device (`DevTools/HeadlessProbe/probe.ps1 -Scenario screenpictures -Graphics` and `starport-screenpictures`), 12 of the flight screens and 8 of the Starport's rooms, into `Logs/screen-pictures/` (not committed). Where a screen has no picture, the port side comes from the code.
+- **The port:** pictures rendered by the headless probe with a graphics device (`DevTools/HeadlessProbe/probe.ps1 -Scenario screenpictures -Graphics` and `starport-screenpictures`), 12 of the flight screens and 8 of the Starport's rooms, into `Logs/screen-pictures/` (not committed). Since 2026-10-13 also `surfacepictures` (the landed ship and the terrain vehicle's screens) and `bridgepictures` (the flight scene's docking bay, Medical, Communications and the launch), and `starport-screenpictures` goes on into the rooms' other screens (29 pictures). Where a screen has no picture, the port side comes from the code.
 
 Not reported: art style, resolution, colours, fonts and 3D models.
 
@@ -81,7 +81,7 @@ The stellar parameters and the system map match the original (CONFIRMED, picture
 | The port clears the text window at each step; the original lets the lines scroll on, from "...COMMENCING SYSTEM TRAVEL" to "...ORBIT ESTABLISHED" | FIXED (the orbit lines PR) | `StarSystem.cs:142`, `ManeuverButton.cs:194`, `InOrbit.cs:231`; starflt_141, starflt_143 (CONFIRMED) | GAMEPLAY |
 | "Orbit established." where the original has "...ORBIT ESTABLISHED" | FIXED (the orbit lines PR) | `InOrbit.cs:232`, starflt_143 (CONFIRMED) | GAMEPLAY |
 | A frame in the main view ("IN ORBIT", "ORBIT VII · FROZEN", "ENCOUNTER", corner brackets) that the original does not have | OPEN | `ViewportFrame.cs:117, 129` (PR 260); pictures (CONFIRMED) | UI KIT |
-| The auxiliary view shows Status in the probe's orbit picture | PROBE | the probe left it on | |
+| The auxiliary view in orbit | NOT A DEFECT | the game keeps the display Maneuver leaves on, the system map, as the original's starflt_143 (Orbit); the probe had left Status on and now shows the system display (`screenpictures` `03_orbit.png`) (CONFIRMED) | |
 
 ## 6. Sensors
 
@@ -113,7 +113,7 @@ A vessel's reading matches the original's (mass, bio, energy, object constituent
 | Where the crosshair starts. Original: LAT 0, LONG 0 after Select Site (starflt_149): SITE-OV's WF014 puts it in the middle when PLHI is -1, which DEPART sets on leaving orbit, and keeps the last site within one orbit. Port: the last site chosen, reset only in a new game | FIXED (the landing site PR): reset on entering the star system or hyperspace | `SpaceflightController.SwitchLocation`; `SITE-OV.c` WF014, `DPART-OV.c` DEPART; the `landingsite` probe scenario (CONFIRMED); that DEPART runs on leaving orbit is INFERRED from what it does (the Black Egg's countdown, the planet obliterated) | GAMEPLAY |
 | The original shows the LAT and LONG labels, empty, before Select Site (starflt_148); the port shows them only once Select Site is pressed (they are children of the Select Site object, which is hidden) | OPEN | the scene's hierarchy (INFERRED: not seen in a picture) | UI KIT |
 | A SELECT SITE heading inside the auxiliary view | OPEN, low priority | picture (CONFIRMED) | UI KIT |
-| The probe's landing map picture reads "LAT 180W LONG 90S" | PROBE | the probe opens Select Site without moving the crosshair, so the scene's placeholder texts show (which are still in the old swapped form) | |
+| The landing map with the crosshair moved to 15 north, 30 west reads LAT 15N LONG 30W, the crosshair west of and above the middle of the map, as the original's | NOT A DEFECT | `screenpictures` `06_landing_map.png` against starflt_150 (Ship UI/Land) (CONFIRMED). The menu in that picture is the bridge's, since the probe opens Select Site directly (PROBE) | GAMEPLAY |
 
 ## 9. Planetside (landed)
 
@@ -121,7 +121,7 @@ A vessel's reading matches the original's (mass, bio, energy, object constituent
 |---|---|---|---|
 | The "HULL CHECK COMPLETE" line was missing | FIXED | PR 231 (CONFIRMED) | GAMEPLAY |
 | "Stand by, scanning planet..." for "STANDBY...SCANNING PLANET." | FIXED | PR 231 (CONFIRMED) | GAMEPLAY |
-| No picture of the landed ship | PROBE | the probe goes from orbit straight to the terrain vehicle | |
+| The landed ship: the coordinates (125 100) and the bridge are the original's, but the auxiliary view shows Status where the original keeps the terrain map with the site's LAT and LONG (starflt_178, Landing) | OPEN, low priority | `Planetside.Show` changes to the status display (`Planetside.cs:123`); `surfacepictures` `01_landed.png` (CONFIRMED). The text window still has the orbit's lines in the picture because the probe skips the descent (PROBE) | GAMEPLAY |
 
 ## 10. Terrain vehicle
 
@@ -136,8 +136,15 @@ A vessel's reading matches the original's (mass, bio, energy, object constituent
 | No CREW VITALITY box with dot leaders | OPEN | picture (CONFIRMED) | UI KIT |
 | MAP for MAPS, EFFICIENCY for EFF. | OPEN | `MapButton.cs:10`, `Spaceflight.unity:65137` (CONFIRMED) | UI KIT |
 | A menu of six on the console; the original's is a bar of seven across the bottom with ICONS, which opens two ICON KEY screens | OPEN | `ButtonController.cs:127` (CONFIRMED) | UI KIT |
-| Weapon: Fire, Switch, Back; the original's STUNNER / LASER / CHOOSE WEAPON / RETURN= AIM | OPEN | `ButtonController.cs:129` (INFERRED: code) | UI KIT |
-| No pictures of Maps, Look, Scan, Cargo, Weapon or a lifeform on screen | PROBE | | |
+| Weapon: Fire, Switch, Back; the original's STUNNER / LASER / CHOOSE WEAPON / RETURN= AIM | OPEN | `ButtonController.cs:129`; `surfacepictures` `06_weapon.png` against starflt_185 (CONFIRMED) | UI KIT |
+| A lifeform on screen: the 3D model of its body plan beside the vehicle, where the original draws an icon on its map | NOT A DEFECT (art) | `surfacepictures` `02_lifeform.png` against starflt_055 (CONFIRMED) | |
+| Look describes at once, under a heading of the port's ("You observe your surroundings:") and with the nearest object's description; the original moves an eyeball cursor over the map and describes the icon under it (planet.txt LOOK). The text window shows its last five lines only, so the heading, SKY and TEMPERATURE have scrolled out of the picture | OPEN | `LookButton.cs`; `surfacepictures` `03_look.png` against starflt_180, starflt_183 (CONFIRMED) | GAMEPLAY (the cursor), UI KIT (the heading and the window) |
+| Scan reports at once ("Local Scan Results:", mineral and bio density, the elements, the nearby objects with a LIFEFORM label in the main view); the original scans what is under a cursor ("YOUR SHIP") | OPEN | `ScanButton.cs`; `surfacepictures` `04_scan.png` against starflt_184 (CONFIRMED) | GAMEPLAY |
+| Cargo. Original: a list in the text window, PLANET SURFACE (what is in reach) and TERRAIN VEHICLE (what it carries), each item with its volume and value, SCROLL ITEMS and QUIT, and the item to pick up chosen from it. Port: Cargo acts at once (beside a lifeform it offers Capture, Record and Ignore), and with nothing in reach lists the vehicle's hold only, in a CARGO display that replaces Status, with no values, and Next, Drop and Back | OPEN | `TVCargoButton.cs`; `surfacepictures` `05_cargo_lifeform.png`, `08_cargo_list.png` against starflt_182, starflt_189 to 191 (CONFIRMED) | GAMEPLAY (no surface list, no values), UI KIT (the layout) |
+| Fire hits the nearest living lifeform in range ("The laser hits the lifeform."); the original aims with a cursor (RETURN= AIM) | OPEN, design choice | `TVFireButton.cs`; `surfacepictures` `07_weapon_fire.png` against starflt_185 (CONFIRMED) | GAMEPLAY |
+| Map raises the camera high over the vehicle; the original's MAPS shows a wider map of the region with a box around the vehicle's part of it | OPEN | `MapButton.cs`; `surfacepictures` `09_maps.png` against starflt_181 (CONFIRMED) | UI KIT |
+
+In the surface pictures the 3D view stops at about x 1265 of 1920 with the sky beyond it, and in these and the other flight pictures the left part of the view, up to about x 968, is darker than the rest; the frame's corner marks end at the same x 960. They are taken for PROBE artifacts of rendering every camera into one 1920 by 1080 picture, not seen in the game (HYPOTHESIZED: not checked in the Editor).
 
 ## 11. Hyperspace
 
@@ -156,7 +163,7 @@ A vessel's reading matches the original's (mass, bio, energy, object constituent
 | Combat messages. Original: MISSILE CLASS n or PLASMA BOLT, and "<name> IS SLIGHTLY / MODERATELY / HEAVILY / CRITICALLY WOUNDED" or KILLED. Port: "Incoming torpedo!", "Plasma bolt incoming!", "Hull takes N damage!", and combat never wounds the crew (`InjureCrewMember` is called only by lifeforms and the weather) | FIXED (the combat wounds PR: the original's words, and a hit on the crew wounds them) | `CombatController.cs:642, 878` to `935`; `DAMAGE-OV.c:1160` to `1243`, `1872` (CONFIRMED, code) | GAMEPLAY |
 | No alien ship and no scan bracket in the encounter picture, and the player's ship is a speck | FIXED (the encounter view PR) | Not the probe: its `EnterEncounter` does what `SpaceflightController.BeginEncounter` does. Measured with a graphics run on 2026-10-12: the encounter camera climbed to 7,000 to 11,000 units above the ship (perspective, 30 degrees) to frame alien ships that start about 3,700 units away, off the left edge at 4 s and in view from about 6 s; at that height a 90-unit Spemin scout covered under 2% of the screen and the player's ship was a speck. The original draws the ships as icons at a fixed scale, about a sixteenth of the view's height. Claude's call by the owner's leave (2026-10-12), both parts: the camera frames the ships out to the aliens' fire range and no further (at most about 4,450 units), and the ships are drawn twice as large in an encounter, about a twentieth of the view at the camera's highest (CONFIRMED, `encounterviewscale` probe scenario and its pictures) | GAMEPLAY or UI KIT |
 | The comm link's main view shows coloured static where the alien's portrait should be | FIXED (the comm picture PR) | Not a capture artifact: the portrait is there (seen at 8 s, the Spemin under the static), and the static was the port's own `CommScreen` effect (coloured rays, waves, low resolution), stronger the lower the communications officer's skill. The original shows the portrait clean and garbles only the words. Claude's call by the owner's leave (2026-10-12): the interference is now a tuning in that clears in 5 s and does not come back (CONFIRMED, `commpicture` probe scenario) | GAMEPLAY or art |
-| The encounter pictures show the coordinates 118 96 in Arth's system | PROBE | the probe enters Arth's system without moving the hyperspace coordinates (INFERRED) | |
+| The coordinates above an encounter in a star system are the system's | NOT A DEFECT | the 118 96 was the probe's: it put the ship in hyperspace away from Arth for the hyperspace picture and entered Arth's system from there. It now puts the ship back at Arth's place first, and the encounter reads 125 100 (`screenpictures` `09_encounter.png`, `bridgepictures` `12_hail_postures.png`), as the original's encounter shows its system's (starflt_044: 98 81) (CONFIRMED) | |
 
 ## 13. Engineering (Damage and Repair)
 
@@ -164,21 +171,24 @@ A vessel's reading matches the original's (mass, bio, energy, object constituent
 |---|---|---|---|
 | The DAMAGE display. Original (`ENGINEER.c`): Damage clears the auxiliary view and draws DAMAGE with a 40-pixel bar for each of HULL, ENGINES, SENSORS, COMM., SHIELD, MISSILE, LASER, green for what works and red for the rest, and writes no text. Port: there was no damage display; Damage wrote a "Damage Report:" text | FIXED (the DAMAGE display PR) | `DamageDisplay`, shown by Damage and at the start of Repair; the picture `13_damage.png` of `screenpictures` (CONFIRMED) | GAMEPLAY and UI KIT |
 | Repair. Original: shows the same display and lets the player scroll the seven rows; the text window gives each one ("ENGINES: SLIGHTLY DAMAGED", EFFICIENCY, CURRENT FUNCTIONALITY, ESTIMATED TIME FOR COMPLETE REPAIRS, CURRENTLY UNDER REPAIR), and the fire button chooses what to repair, with NO REPAIRS NEEDED, DAMAGED BEYOND REPAIR, "CEASE REPAIRS ON X AND BEGIN REPAIRS ON Y? [N Y]" and BEGINNING, CONTINUING or CEASING REPAIRS ON X. Port: Repair picked the system itself, the worst first, by the owner's ruling of 2026-10-11 for roadmap 1.2, made when no shipped source had the mechanics; on 2026-10-12 the owner ruled that it follows the original | FIXED (the Repair choice PR) | `RepairButton.cs`, the DAMAGE display's cursor; the `repairchoice` probe scenario and the picture `14_repair.png` (CONFIRMED) | GAMEPLAY |
-| No pictures | PROBE | | |
+| Pictures of Damage and Repair | NOT A DEFECT | `screenpictures` `13_damage.png` and `14_repair.png` against starflt_065, starflt_066 and the docking bay's starflt_119 to 126: the seven rows, bars only for what is installed, and Repair's "Engines: Slightly damaged / Efficiency: 70% / Current functionality: Operative / Estimated time for complete repairs" lines as the original's (CONFIRMED). The menu in `13_damage.png` is the comm link's, since the probe presses Damage directly (PROBE) | |
 
 ## 14. Medical (Examine and Treat)
 
 | Item | Status | Evidence | Owner |
 |---|---|---|---|
 | No choice of crew member and no durability | FIXED | PR 225: "Who should I examine?", "...is not wounded, and has a vitality of N and a durability of N." (CONFIRMED, code) | GAMEPLAY |
-| No pictures | PROBE | | |
+| Examine and Treat: "Who should I examine?" and "Who should I treat?" with the name and "Choose crewmember <-> and press Enter.", "<name> is not wounded, and has a vitality of 100 and a durability of 6.", "<name> doesn't need medical treatment.", as the original's (its SPACEBAR is the port's Enter, as in section 3) | NOT A DEFECT | `bridgepictures` `02_examine_question.png` to `05_treat.png` against starflt_129 to 132 (Docking Bay) (CONFIRMED) | GAMEPLAY |
 
 ## 15. Communications (Hail and Distress)
 
 | Item | Status | Evidence | Owner |
 |---|---|---|---|
 | Distress refused in the docking bay | FIXED | PR 222: "Transmit emergency distress call?" with No and Yes, "We're already home!" (CONFIRMED, code) | GAMEPLAY |
-| No pictures of Hail and Distress | PROBE | Hail's choice of posture matches the original (INFERRED, code) | |
+| Hail with no one to hail: "There's no one to hail." | NOT A DEFECT | `bridgepictures` `06_hail_nobody.png` against starflt_127 (CONFIRMED) | GAMEPLAY |
+| Distress asks "Transmit emergency distress call?" with no CONFIRM; the original's is TRANSMIT EMERGENCY DISTRESS CALL / CONFIRM: <-N Y->, and the port's own Launch asks "Ready to launch. Confirm?" | OPEN, low priority | `DistressButton.cs`; `bridgepictures` `07_distress_question.png` against starflt_128 (CONFIRMED) | GAMEPLAY |
+| Hail in an encounter: the postures to hail with (Friendly, Hostile, Obsequious), then "Transmitting:" and the friendly greeting "Greetings. We come in peace and wish to communicate, please identify yourselves." as the original's | NOT A DEFECT | `bridgepictures` `12_hail_postures.png`, `13_hail_friendly.png` against starflt_044 (Encounters/Hail) (CONFIRMED for the words; the choice of posture INFERRED, code) | GAMEPLAY |
+| After the hail the console goes back to the bridge's menu; the original keeps HAIL, DISTRESS, BRIDGE | OPEN, low priority | `bridgepictures` `13_hail_friendly.png` against starflt_044, starflt_047 (CONFIRMED) | UI KIT |
 
 ## 16. Docking bay and the Captain's menu
 
@@ -190,7 +200,11 @@ A vessel's reading matches the original's (mass, bio, energy, object constituent
 | "Confirm launch?" for READY TO LAUNCH / CONFIRM | FIXED | PR 223 (CONFIRMED, code) | GAMEPLAY |
 | The launch's security code | OWNER'S CALL | the copy protection, decision D4 in `ROADMAP.md` | GAMEPLAY |
 | The Ship's Log is a menu (notices, comms, messages); the original's is a free-text notepad with an EXIT tab | OWNER'S CALL | the port's Messages log is roadmap item 3.3 (INFERRED: a deliberate design) | GAMEPLAY |
-| No picture of the flight scene's docking bay or of the launch | PROBE | | |
+| The docking bay as the crew comes aboard: "Ship computer activated. / Pre-launch procedures complete. / Standing by to initiate launch.", the Status display and the bridge, as the original's | NOT A DEFECT | `bridgepictures` `01_docking_bay.png` against starflt_103, starflt_192 (CONFIRMED) | GAMEPLAY |
+| The coordinates 125 100 above the docking bay; the original's docking bay shows none at the start of a game (starflt_103, 192), and shows them on the way back in (starflt_075) | OPEN, low priority | `Viewport.UpdateCoordinates`; `bridgepictures` `01_docking_bay.png` (CONFIRMED) | UI KIT |
+| The launch from the Starport. Original (`LAUNCH-OV.c`, &LAUNCH and LAUNCH): OPENING DOCKING BAY DOORS, then the window cleared and COMMENCING LAUNCH SEQUENCE... with a countdown of 5 to 1 in the main view (COUNTDOWN), then LEAVING STARPORT..., ...STARPORT CLEAR and STANDING BY TO MANEUVER kept together (starflt_136 to 139). Port: "Opening docking bay doors..." during the whole launch, no COMMENCING LAUNCH SEQUENCE and no countdown, and at the end the window cleared to "Starport clear. / Standing by to maneuver." (no LEAVING STARPORT... left, no leading dots) | OPEN | `LaunchYesButton.cs:21`, `PlayerCamera.cs:191`, `ButtonController.cs:305`; `bridgepictures` `10_launch.png`, `11_launched.png` (CONFIRMED) | GAMEPLAY |
+| After the launch the console shows the bridge's menu; the original keeps the Captain's (LAND, DISEMBARK, ...) | OPEN, low priority | `bridgepictures` `11_launched.png` against starflt_139 (CONFIRMED) | UI KIT |
+| Launch's question "Ready to launch. Confirm?" with No and Yes | NOT A DEFECT | `bridgepictures` `09_launch_question.png` against starflt_133 (CONFIRMED); the security code of starflt_134 and 135 is D4 | GAMEPLAY |
 
 ## 17. Starport concourse
 
@@ -210,7 +224,7 @@ The doors are where the original's are (Operations upper left, Personnel top, Cr
 | The evaluation screen's prompts: the original's PRESS SPACEBAR FOR NEXT EVALUATION, [ QUIT ] and PRESS SPACEBAR TO CONTINUE; the port's More and Quit buttons | OPEN, design choice (PR 263) | `OperationsPanel.cs:178` to `188` (CONFIRMED) | UI KIT |
 | The original books a supplemental evaluation's fine in the ledger only when it is shown in Operations; the port books it at once | OPEN, low priority | `DistressYesButton.cs:42`, `DockingBay.cs:82`; `OP-OV.c` WF02B (INFERRED: code) | GAMEPLAY |
 | "YOU HAVE NOT FILED ANY NEW COLONY WORLD RECOMMENDATIONS", the original's variant with NEW | OPEN, low priority | `OP-OV.c:1119` to `1128`; what sets the count it tests is not known (HYPOTHESIZED) | GAMEPLAY |
-| No pictures of the notices and evaluation screens | PROBE | `starport-screenpictures` takes each room's first screen only | |
+| The notices screen: NOTICES and the date in the header, the notice's date, then the text typed out a paragraph at a time, as the original's; the evaluation with none filed: "You have not filed any colony world recommendations" | NOT A DEFECT | `starport-screenpictures` `09_operations_notice.png`, `10_operations_notices_end.png`, `11_operations_evaluation.png` against starflt_009 to 011 (CONFIRMED). Typed out without a press, the notice ends with ***End of notices*** at the bottom of the window, as starflt_010 | GAMEPLAY |
 
 ## 19. Personnel
 
@@ -221,16 +235,19 @@ The doors are where the original's are (Operations upper left, Personnel top, Cr
 | The empty file: the original shows FILE #, VITALITY %, RACE, DURABILITY and LRN RATE with no values; the port's "No Personnel Files Found" | OPEN | `PersonnelPanel.cs:487`, picture (CONFIRMED) | UI KIT |
 | AVG. HT., AVG. WT., LRN RATE as Average Height, Average Weight, Learn Rate | OPEN | picture (CONFIRMED) | UI KIT |
 | Training. Original: "BALANCE: 11700 COST: 300 MU/SESSION / HOW MANY TRAINING SESSIONS (0-23)?" (starflt_040). Port: one session a press | FIXED (the training sessions PR) for the count: the fire button on a skill asks "How many training sessions (0-N)?", N the fewer of the sessions left to the skill's maximum and those the balance pays for (up to 100,000 M.U.), as `PERSONNEL-OV.c` WEE65; the stick sets the number (right and left one more and one fewer, up the most, down none) where the original takes typed digits, and the fire button trains them all at once (WF2CD); the balance and cost lines stay the UI kit's | `PersonnelPanel.SetSessionCount`, `TrainSessions`; the `starport-training` probe scenario (CONFIRMED) | GAMEPLAY (the count), UI KIT (the text) |
-| No pictures of choosing a race, naming, training or deleting | PROBE | | |
+| Choosing a race: the race's skills, durability, learning rate, type, height and weight as the original's (a human: 50, 30, 30, 30, 30, 6, 9, Mammalian, 2.0 M, 80 KG) | NOT A DEFECT | `starport-screenpictures` `12_personnel_race.png` against starflt_026 to 030 (CONFIRMED) | GAMEPLAY |
+| The prompts of a new file: the original keeps FILE # and VITALITY over the race and writes SELECT RACE <-> AND PRESS SPACEBAR and TYPE THIS CREWMEMBER'S NAME at the file's name; the port shows a NEW PERSONNEL FILE heading, arrows with Select and Cancel, and the name in a dialog over the file with the original's words | OPEN | `starport-screenpictures` `12_personnel_race.png`, `13_personnel_name.png`, `14_personnel_file.png` against starflt_026, starflt_031, starflt_032 (CONFIRMED) | UI KIT |
+| Training: "How many training sessions (0-23)?" for a new human, the original's (0-23) for the same file; the balance line reads "Bank balance: 1,000,000 M.U. / Cost: 300 M.U. per session" for the original's BALANCE: 12000 COST: 300 MU/SESSION, and the original's SELECT SKILL <-> AND PRESS SPACEBAR is not written | NOT A DEFECT (the numbers), OPEN (the text) | `starport-screenpictures` `15_personnel_train.png`, `16_personnel_sessions.png` against starflt_034 to 036 (CONFIRMED) | GAMEPLAY (the numbers), UI KIT (the text) |
+| Deleting: "Delete this crewmember?" with Yes before No; the original asks DELETE THIS CREWMEMBER? <-N Y->, No first, as the port's flight console does | OPEN, low priority | `starport-screenpictures` `17_personnel_delete.png` against starflt_033, starflt_038 (CONFIRMED) | UI KIT |
 
 ## 20. Crew Assignment
 
 | Item | Status | Evidence | Owner |
 |---|---|---|---|
-| The original always shows the personnel file under the list (FILE #, VITALITY, SKILLS, RACE, DURABILITY, LRN RATE); the port hides it without a crew, and with one shows the name, the vitality and the skills only | OPEN | `CrewAssignmentPanel.cs:236`, `405`, `413` to `423` (CONFIRMED with no crew; INFERRED with one) | UI KIT |
+| The original always shows the personnel file under the list (FILE #, VITALITY, SKILLS, RACE, DURABILITY, LRN RATE); the port hides it without a crew, and with one shows the name, the vitality and the skills only | OPEN | `CrewAssignmentPanel.cs:236`, `405`, `413` to `423` (CONFIRMED with no crew, and with one in `starport-screenpictures` `18_crew_assignment_file.png` and `19_crew_assignment_assign.png` against starflt_041) | UI KIT |
 | A [Not Assigned] column the original does not have | OPEN | `CrewAssignmentPanel.cs:313` (CONFIRMED) | UI KIT |
 | ASSIGN and EXIT buttons for the original's PAGE THROUGH FILES / PRESS SPACEBAR TO ASSIGN CREWMEMBER | OPEN | picture (CONFIRMED) | UI KIT |
-| No picture with a crew on file | PROBE | | |
+| With a crew member on file the menu shows the roles and [Not Assigned] only, and the file appears once Assign is pressed | NOT A DEFECT beyond the first item of this section | `starport-screenpictures` `18_crew_assignment_file.png`, `19_crew_assignment_assign.png` against starflt_041 (CONFIRMED) | UI KIT |
 
 ## 21. Bank
 
@@ -242,22 +259,26 @@ The doors are where the original's are (Operations upper left, Personnel top, Cr
 | AMT. as AMOUNT; dot leaders after the description ("GAME PURCHASE......") | OPEN, low priority | picture (CONFIRMED) | UI KIT |
 | The balance line: the original's "BALANCE......12000" and "( INTEREST RATE: 12% )", the port's "Your current balance is 1,000,000 M.U." | OPEN | `BankPanel.cs:56` (CONFIRMED); the 1,000,000 itself is the Editor's starting balance by design (`PD_Bank.GetStartingBalance`) | UI KIT |
 | PRESS SPACEBAR TO EXIT as an EXIT button | OPEN, low priority | picture (CONFIRMED) | UI KIT |
-| No picture of a full ledger | PROBE | | |
+| A ledger longer than its window shows its latest rows, the newest just above the balance, as the original's (starflt_046, starflt_053, starflt_060), but the top row is cut in half under the headings | OPEN, low priority | `BankPanel.cs:68` to `73`; `starport-screenpictures` `20_bank_ledger.png` (CONFIRMED) | UI KIT |
 
 ## 22. Ship Configuration
 
 | Item | Status | Evidence | Owner |
 |---|---|---|---|
 | The balance has no thousands separators here, while the Bank and Personnel have them; the Trade Depot has none either | OPEN | `ShipConfigurationPanel.cs:550`, `BankPanel.cs:56`, `PersonnelPanel.cs:707`, `TradeDepotPanel.cs:844` (CONFIRMED) | UI KIT |
-| Naming: "Type ship name" for the original's "SHIP IS NAMED: ISS ... / TYPE NEW SHIP NAME: ISS" (starflt_077) | OPEN | scene (INFERRED: not seen in a picture) | UI KIT |
-| No pictures of an equipped ship, naming, or the buy and sell lists | PROBE | | |
+| Naming: "Type ship name" for the original's "SHIP IS NAMED: ISS ... / TYPE NEW SHIP NAME: ISS" (starflt_077), in a dialog with an empty field and no ISS | OPEN | `starport-screenpictures` `25_ship_name.png` (CONFIRMED) | UI KIT |
+| An equipped ship (16 cargo pods, engines, shields, missiles and lasers class 5, armor class 3) weighs 356 tons, as the original's starflt_076, but accelerates at 6 G where the original reads 7 G | OPEN | the port's own curve in `PD_PlayerShip.RecalculateAcceleration` (`PD_PlayerShip.cs:467`); `starport-screenpictures` `21_ship_equipped.png` against starflt_076 (CONFIRMED); the original's formula was not looked up | GAMEPLAY |
+| The buy and sell lists: the parts with the cargo pod's price (500), the classes with their prices, the installed equipment beside them; the original has dot leaders after the parts and classes | OPEN, low priority | `starport-screenpictures` `22_ship_buy.png`, `23_ship_buy_class.png`, `24_ship_sell.png` against starflt_019, starflt_076 (CONFIRMED) | UI KIT |
 
 ## 23. Trade Depot
 
 | Item | Status | Evidence | Owner |
 |---|---|---|---|
-| "Transfer how many cubic meters? (0.0 to 20.5)" for the original's "TRANSFER HOW MANY CUBIC METERS? / ENTER VOLUME (0-20.5)" | OPEN | `TradeDepotPanel.cs:584` (INFERRED: code) | UI KIT |
-| The lists: one "Unit Value" heading where the buy list says UNIT COST, no FOR SALE or CARGO title, and "Starship hold is empty" as an error message where the original shows it inside the CARGO list | OPEN | the scene, `TradeDepotPanel.cs:763, 885` (INFERRED: no picture) | UI KIT |
+| "Transfer how many cubic meters? (0.0 to 20.5)" for the original's "TRANSFER HOW MANY CUBIC METERS? / ENTER VOLUME (0-20.5)" | OPEN | `TradeDepotPanel.cs:584`; `starport-screenpictures` `27_trade_buy_amount.png` against starflt_052 (CONFIRMED) | UI KIT |
+| The lists: one "Unit Value" heading where the buy list says UNIT COST, no FOR SALE or CARGO title, and "Starship hold is empty" as an error message where the original shows it inside the CARGO list | OPEN | the scene, `TradeDepotPanel.cs:763, 885`; `starport-screenpictures` `26_trade_buy.png`, `28_trade_sell.png` against starflt_097, starflt_098 (CONFIRMED for the headings and titles; the empty hold INFERRED, no picture) | UI KIT |
+| The buy list's elements and artifacts, their prices and the hold's volumes are the original's (Endurium 1000, Flat Device 30000, Whining Orb 6000), and the sell list's (Endurium 20.0 at 1000) | NOT A DEFECT | `starport-screenpictures` `26_trade_buy.png`, `28_trade_sell.png` against starflt_097, starflt_098 (CONFIRMED) | GAMEPLAY |
+| The buy list's elements in the order of the game data (Aluminum, Cobalt, Endurium, Molybdenum, Promethium, Titanium); the original's order is Titanium, Promethium, Molybdenum, Cobalt, Aluminum, Endurium | OPEN, low priority | `TradeDepotPanel.cs:642`; `starport-screenpictures` `26_trade_buy.png` against starflt_078, starflt_097 (CONFIRMED) | GAMEPLAY |
+| Analyze lists the Starport's artifacts for sale at their price (Flat Device 30000, Whining Orb 6000) under one ARTIFACTS heading and the ship's under a second; the original lists the ship's artifacts only, at what the Starport pays, under one heading | OPEN | `TradeDepotPanel.cs:685` to `705`; `starport-screenpictures` `29_trade_analyze.png` against starflt_080, starflt_099 (CONFIRMED) | GAMEPLAY |
 | "Welcome to the Trade Depot!" with an exclamation mark the original does not have | OPEN, low priority | picture (CONFIRMED) | UI KIT |
 | The typo "Insufficent funds" | OPEN | `TradeDepotPanel.cs:1020` (CONFIRMED) | UI KIT |
 
@@ -274,12 +295,12 @@ The doors are where the original's are (Operations upper left, Personnel top, Cr
 |---|---|
 | Intro (credits, title, Interstel Police warning) | no picture, though PR 268 redid the intro |
 | Load and save | no picture of `SaveGamePanel` |
-| Each department's menu with its officer label | the bridge and the comm menu only |
-| The flight scene's docking bay and the launch | no picture |
+| Each department's menu with its officer label | the bridge, the comm menu, Medical, Communications and the Captain's in the docking bay (`bridgepictures`), Engineering's in `screenpictures`; not Science's and Navigation's |
+| The flight scene's docking bay and the launch | `bridgepictures` since 2026-10-13 |
 | Sensors and Analysis of a planet and of an alien ship | rendered since PR 234; Log Planet and its question are not |
 | Hyperspace, the Starmap, an encounter, the comm link, combat, debris | hyperspace (placed, not jumped), the encounter and the comm menu; no Starmap, no combat on a whole screen |
-| The descent, the landed ship, the terrain vehicle's sub-screens, a lifeform | the landing map and the terrain vehicle; the lifeform models in `lifeformpictures`; the rest not |
-| The Black Egg's countdown, and the Starport rooms' sub-screens | no picture: `starport-screenpictures` takes each room's first screen |
+| The descent, the landed ship, the terrain vehicle's sub-screens, a lifeform | the landing map and the terrain vehicle; the landed ship, Look, Scan, Cargo, Weapon, Map and a lifeform beside the vehicle in `surfacepictures`; the lifeform models in `lifeformpictures`; not the descent |
+| The Black Egg's countdown, and the Starport rooms' sub-screens | the rooms' sub-screens in `starport-screenpictures` since 2026-10-13; not the Black Egg's countdown |
 
 ---
 
