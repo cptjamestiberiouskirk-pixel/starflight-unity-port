@@ -73,7 +73,7 @@ public class ExamineButton : ShipButton
 	}
 
 	// how badly a crew member is wounded, by the bands of the original (DOCTOR, WF0E6)
-	static string GetWoundWord( int vitality )
+	public static string GetWoundWord( int vitality )
 	{
 		if ( vitality <= 20 )
 		{
