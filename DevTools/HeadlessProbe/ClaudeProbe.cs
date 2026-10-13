@@ -1117,6 +1117,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportTradeTexts();
 				break;
 
+			case "starport-ledgerrows":
+				yield return ScenarioStarportLedgerRows();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -29093,6 +29097,43 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-tradetexts: the Trade Depot and Ship Configuration show the balance with thousands separators, as the Bank and Personnel do", depotBalance.Contains( string.Format( "{0:n0}", 1234567 ) ) && shipBalance.Contains( string.Format( "{0:n0}", 1234567 ) ), depotBalance + " / " + shipBalance );
 
 		Finish( "scenario=starport-tradetexts checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioStarportLedgerRows()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var bank = FindPanel<BankPanel>();
+
+		// a ledger much longer than its window
+		for ( var i = 0; i < 40; i++ )
+		{
+			playerData.m_bank.m_transactionList.Add( new PD_Bank.Transaction( playerData.m_general.m_currentStardateYMD, "Trade depot", ( 100 + i ).ToString() + "+" ) );
+		}
+
+		yield return OpenPanel( bank, "bank" );
+
+		yield return Frames( 5 );
+
+		var text = bank.m_dateListText;
+
+		text.ForceMeshUpdate();
+
+		var offset = text.rectTransform.offsetMax.y;
+		var textInfo = text.textInfo;
+		var rowHeight = ( textInfo.lineCount > 1 ) ? ( textInfo.lineInfo[ 0 ].ascender - textInfo.lineInfo[ 1 ].ascender ) : 0.0f;
+		var viewportHeight = bank.m_dateMask.GetComponent<RectTransform>().rect.height;
+		var hidden = text.renderedHeight - viewportHeight;
+		var rows = ( rowHeight > 0.0f ) ? ( offset / rowHeight ) : -1.0f;
+
+		yield return ClosePanel( bank, "bank" );
+
+		Log( "starport-ledgerrows: " + textInfo.lineCount + " rows of " + rowHeight + " in a window of " + viewportHeight + " | " + hidden + " hidden, scrolled by " + offset + " (" + rows + " rows)" );
+
+		Check( "starport-ledgerrows: the setup's ledger is longer than its window", ( hidden > rowHeight ) && ( rowHeight > 0.0f ), hidden + " / " + rowHeight );
+		Check( "starport-ledgerrows: the ledger scrolls by whole rows, so that its top row is not cut in half under the headings", Mathf.Abs( rows - Mathf.Round( rows ) ) < 0.02f, rows.ToString() );
+		Check( "starport-ledgerrows: the newest row is still in the window, above the balance", offset >= hidden - 0.5f, offset + " / " + hidden );
+
+		Finish( "scenario=starport-ledgerrows checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
