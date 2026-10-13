@@ -1061,6 +1061,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioMotionDetected();
 				break;
 
+			case "starport-analyzelist":
+				yield return ScenarioStarportAnalyzeList();
+				break;
+
 			case "acceleration":
 				yield return ScenarioAcceleration();
 				break;
@@ -27539,6 +27543,57 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "motiondetected: a science officer of science 200 reports the motion", skilled.Contains( "Motion detected" ), "'" + skilled + "'" );
 
 		Finish( "scenario=motiondetected checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the Trade Depot's Analysis lists the ship's own artifacts only, at their value, as the original's ANALYSIS screen (starflt_080, starflt_099): the Starport's
+	// artifacts for sale are on the Buy list, not here
+	IEnumerator ScenarioStarportAnalyzeList()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var depot = FindPanel<TradeDepotPanel>();
+
+		// one artifact in the ship's hold, and the Starport's own for sale
+		var shipArtifacts = playerData.m_playerShip.m_artifactStorage;
+		var starportArtifacts = playerData.m_starport.m_artifactStorage;
+
+		shipArtifacts.m_artifactList.Clear();
+		shipArtifacts.Add( 1 );
+
+		var starportCount = ( ( starportArtifacts != null ) && ( starportArtifacts.m_artifactList != null ) ) ? starportArtifacts.m_artifactList.Count : 0;
+
+		yield return OpenPanel( depot, "trade depot" );
+
+		Call( depot, "SwitchToAnalyzeItemState", true );
+
+		yield return Frames( 2 );
+
+		var items = GetField( depot, "m_itemList" ) as IList;
+		var listed = new List<string>();
+		var notTheShips = 0;
+
+		foreach ( var item in items )
+		{
+			var type = (int) GetField( item, "m_type" );
+			var id = (int) GetField( item, "m_id" );
+
+			listed.Add( type + ":" + id );
+
+			if ( ( type != 1 ) || ( shipArtifacts.Find( id ) == null ) )
+			{
+				notTheShips++;
+			}
+		}
+
+		var text = System.Text.RegularExpressions.Regex.Replace( depot.m_itemListText.text, "<[^>]*>", "" ).Replace( "\r", "" ).Replace( "\n", " | " );
+
+		yield return ClosePanel( depot, "trade depot" );
+
+		Log( "starport-analyzelist: the Starport has " + starportCount + " artifacts for sale, the ship 1 | the Analysis list: " + text + " | items " + string.Join( " ", listed ) );
+
+		Check( "starport-analyzelist: the Starport has artifacts for sale (the setup is the case)", starportCount > 0, starportCount.ToString() );
+		Check( "starport-analyzelist: the Analysis lists the ship's own artifacts only, under one Artifacts heading, as the original's", ( items.Count == 1 ) && ( notTheShips == 0 ) && ( text.Split( new[] { "Artifacts" }, StringSplitOptions.None ).Length == 2 ), text );
+
+		Finish( "scenario=starport-analyzelist checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// the ship's acceleration is the original's: the engines' class times 500 over the ship's mass, in whole G (SHIPGRPH-OV (.ACC)), so the equipped ship of
