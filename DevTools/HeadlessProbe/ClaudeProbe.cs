@@ -1109,6 +1109,14 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioConsoleMenus();
 				break;
 
+			case "starport-noyes":
+				yield return ScenarioStarportNoYes();
+				break;
+
+			case "starport-tradetexts":
+				yield return ScenarioStarportTradeTexts();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -28919,6 +28927,172 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "consolemenus: after the launch from the Starport the console shows the captain's menu, as the original's", ( afterLaunchLocation == PD_General.Location.JustLaunched ) && ( afterLaunchSet == ButtonController.ButtonSet.CommandB ) && afterLaunchOfficer.StartsWith( "Captain" ), afterLaunchLocation + " / " + afterLaunchSet + " / " + afterLaunchOfficer );
 
 		Finish( "scenario=consolemenus checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioStarportNoYes()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var personnel = FindPanel<PersonnelPanel>();
+		var depot = FindPanel<TradeDepotPanel>();
+
+		// the Personnel's delete question, on a file made here
+		yield return OpenPanel( personnel, "personnel" );
+
+		personnel.CreateClicked();
+
+		yield return Frames( 3 );
+
+		personnel.SelectClicked();
+
+		yield return Frames( 3 );
+
+		personnel.m_nameInputField.text = "Marvin";
+		personnel.OnEndEdit();
+
+		yield return Frames( 3 );
+
+		personnel.DeleteClicked();
+
+		yield return Frames( 5 );
+
+		var personnelNoX = personnel.m_noButton.transform.position.x;
+		var personnelYesX = personnel.m_yesButton.transform.position.x;
+		var personnelSelected = ( EventSystem.current != null ) && ( EventSystem.current.currentSelectedGameObject == personnel.m_noButton.gameObject );
+
+		personnel.NoClicked();
+
+		yield return Frames( 3 );
+
+		yield return ClosePanel( personnel, "personnel" );
+
+		// the Trade Depot's question before an analysis, with an artifact in the hold
+		playerData.m_playerShip.m_artifactStorage.m_artifactList.Clear();
+		playerData.m_playerShip.m_artifactStorage.Add( 1 );
+
+		yield return OpenPanel( depot, "trade depot" );
+
+		Call( depot, "SwitchToAnalyzeItemState", true );
+
+		yield return Frames( 3 );
+
+		Call( depot, "SwitchToAnalyzeConfirmState" );
+
+		yield return Frames( 5 );
+
+		UnityEngine.UI.Button depotYes = null;
+
+		foreach ( var button in depot.m_confirmAnalyzePanel.GetComponentsInChildren<UnityEngine.UI.Button>( true ) )
+		{
+			if ( button.gameObject.name == "Yes Button" )
+			{
+				depotYes = button;
+			}
+		}
+
+		var depotNoX = depot.m_noButton.transform.position.x;
+		var depotYesX = ( depotYes != null ) ? depotYes.transform.position.x : float.NaN;
+		var depotSelected = ( EventSystem.current != null ) && ( EventSystem.current.currentSelectedGameObject == depot.m_noButton.gameObject );
+
+		Call( depot, "SwitchToAnalyzeItemState", false );
+
+		yield return Frames( 3 );
+
+		yield return ClosePanel( depot, "trade depot" );
+
+		Log( "starport-noyes: personnel No x " + personnelNoX + " Yes x " + personnelYesX + " No selected " + personnelSelected + " | trade depot No x " + depotNoX + " Yes x " + depotYesX + " No selected " + depotSelected );
+
+		Check( "starport-noyes: DELETE THIS CREWMEMBER? puts No left of Yes, as the original's <-N Y->, with No selected", ( personnelNoX < personnelYesX ) && personnelSelected, personnelNoX + " / " + personnelYesX + " / " + personnelSelected );
+		Check( "starport-noyes: the Trade Depot's question before an analysis puts No left of Yes, with No selected", ( depotNoX < depotYesX ) && depotSelected, depotNoX + " / " + depotYesX + " / " + depotSelected );
+
+		Finish( "scenario=starport-noyes checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioStarportTradeTexts()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var depot = FindPanel<TradeDepotPanel>();
+		var shipConfiguration = FindPanel<ShipConfigurationPanel>();
+
+		// a balance with thousands, and an empty hold
+		playerData.m_bank.m_currentBalance = 1234567;
+
+		var ship = playerData.m_playerShip;
+
+		ship.m_elementStorage.m_elementList.Clear();
+		ship.m_artifactStorage.m_artifactList.Clear();
+		ship.m_numCargoPods = 16;
+		ship.RecalculateVolume();
+		ship.RecalculateVolumeUsed();
+
+		// the heading over the price column and the welcome text, found by name and words so that the old code is checked the same way
+		TMPro.TextMeshProUGUI heading = null;
+		TMPro.TextMeshProUGUI welcome = null;
+
+		foreach ( var text in depot.GetComponentsInChildren<TMPro.TextMeshProUGUI>( true ) )
+		{
+			if ( text.gameObject.name == "Unit Value Text" )
+			{
+				heading = text;
+			}
+
+			if ( text.text.StartsWith( "Welcome to the Trade Depot" ) )
+			{
+				welcome = text;
+			}
+		}
+
+		yield return OpenPanel( depot, "trade depot" );
+
+		var welcomeText = ( welcome != null ) ? welcome.text.Split( '\n' )[ 0 ].Trim() : "(none)";
+
+		Call( depot, "SwitchToBuyItemState", true );
+
+		yield return Frames( 2 );
+
+		var buyHeading = ( heading != null ) ? heading.text : "(none)";
+		var depotBalance = depot.m_currentBalanceText.text;
+
+		// ask for 5000 cubic meters of the first element (titanium, 480 each), more than the balance pays for
+		Call( depot, "SwitchToBuyAmountState" );
+
+		yield return Frames( 2 );
+
+		depot.m_amountInputField.text = "5000";
+
+		Call( depot, "OnEndEdit" );
+
+		yield return Frames( 2 );
+
+		var errorText = depot.m_errorMessageText.text;
+
+		// the sell list, with something in the hold to sell
+		playerData.m_playerShip.m_artifactStorage.m_artifactList.Clear();
+		playerData.m_playerShip.m_artifactStorage.Add( 1 );
+
+		Call( depot, "SwitchToSellItemState", true );
+
+		yield return Frames( 2 );
+
+		var sellHeading = ( heading != null ) ? heading.text : "(none)";
+
+		yield return ClosePanel( depot, "trade depot" );
+
+		yield return OpenPanel( shipConfiguration, "ship configuration" );
+
+		yield return Frames( 2 );
+
+		var shipBalance = shipConfiguration.m_currentBalanceText.text;
+
+		yield return ClosePanel( shipConfiguration, "ship configuration" );
+
+		Log( "starport-tradetexts: welcome \"" + welcomeText + "\" | buy heading \"" + buyHeading + "\" | sell heading \"" + sellHeading + "\" | error \"" + errorText + "\" | depot \"" + depotBalance + "\" | ship configuration \"" + shipBalance + "\"" );
+
+		Check( "starport-tradetexts: the buy list's price column is UNIT COST and the sell list's UNIT VALUE, as the original's", ( buyHeading == "Unit Cost" ) && ( sellHeading == "Unit Value" ), buyHeading + " / " + sellHeading );
+		Check( "starport-tradetexts: the welcome has no exclamation mark, as the original's WELCOME TO THE TRADE DEPOT", welcomeText == "Welcome to the Trade Depot", welcomeText );
+		Check( "starport-tradetexts: too little money says \"Insufficient funds\", spelt right", errorText == "Insufficient funds", errorText );
+		Check( "starport-tradetexts: the Trade Depot and Ship Configuration show the balance with thousands separators, as the Bank and Personnel do", depotBalance.Contains( string.Format( "{0:n0}", 1234567 ) ) && shipBalance.Contains( string.Format( "{0:n0}", 1234567 ) ), depotBalance + " / " + shipBalance );
+
+		Finish( "scenario=starport-tradetexts checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
