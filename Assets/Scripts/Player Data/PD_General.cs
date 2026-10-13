@@ -556,12 +556,12 @@ public class PD_General
 		}
 	}
 
+	// 175.2 game hours pass in an hour of play (365 days in 50 hours - the sources do not give the original's rate, so the rate stays as it was when the calendar became the original's)
+	public const float c_gameSecondsPerSecond = ( 365.0f * 24.0f ) / 50.0f;
+
 	public void UpdateGameTime( float deltaTime )
 	{
-		// 175.2 game hours pass in an hour of play (365 days in 50 hours - the sources do not give the original's rate, so the rate stays as it was when the calendar became the original's)
-		var scale = ( 365.0f * 24.0f ) / 50.0f;
-
-		deltaTime *= scale;
+		deltaTime *= c_gameSecondsPerSecond;
 
 		// convert deltaTime to milliseconds as an integer
 		var deltaMilliseconds = Mathf.RoundToInt( deltaTime * 1000.0f );
