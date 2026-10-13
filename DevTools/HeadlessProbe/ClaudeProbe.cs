@@ -1081,6 +1081,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportSupplementalFine();
 				break;
 
+			case "starport-preflight":
+				yield return ScenarioStarportPreflight();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -27916,6 +27920,119 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-supplementalfine: and only once", paidAgain == 0, paidAgain.ToString() );
 
 		Finish( "scenario=starport-supplementalfine checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the docking bay's preflight check says the original's lines (CHKFLIGHT-OV ?CAN-LEAVE): REPORT TO OPERATIONS FOR EVALUATION while an evaluation waits unread,
+	// REPORT TO CREW ASSIGNMENT for a missing or dead crew member, REPORT TO SHIP-CONFIGURATION TO CHRISTEN SHIP AND PURCHASE ENGINES as one line, and leaving with
+	// the evaluations read deletes the colony evaluations (WF40A), after which the evaluation screen says the original's "not filed any new" (OP-OV WEBC1)
+	IEnumerator ScenarioStarportPreflight()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var dockingBay = FindPanel<DockingBayPanel>();
+		var operations = FindPanel<OperationsPanel>();
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+
+		var crewFile = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Captain );
+
+		// everything ready but what each case takes away
+		ship.m_name = "Probe";
+		ship.m_enginesClass = 1;
+
+		if ( ship.m_elementStorage.Find( 5 ) == null )
+		{
+			ship.m_elementStorage.Add( 5, 100 );
+		}
+
+		// ---- 1. an evaluation waiting unread (the towing charges) - and no engines, so that a check that does not look at the evaluations fails all the same
+		// instead of launching
+		playerData.m_general.AddSupplementalEvaluation( "SUPPLEMENTAL EVALUATION\nTOWING CHARGES\nTHE PROBE'S TOWING CHARGES." );
+
+		ship.m_enginesClass = 0;
+
+		yield return OpenPanel( dockingBay, "docking bay" );
+
+		var unread = PreflightText( dockingBay );
+
+		yield return ClosePanel( dockingBay, "docking bay" );
+
+		ship.m_enginesClass = 1;
+
+		// ---- 2. read in Operations; a dead crew member
+		yield return OpenPanel( operations, "operations" );
+
+		operations.EvaluationClicked();
+
+		yield return Frames( 2 );
+
+		operations.QuitClicked();
+
+		yield return ClosePanel( operations, "operations" );
+
+		crewFile.m_vitality = 0.0f;
+
+		yield return OpenPanel( dockingBay, "docking bay" );
+
+		var dead = PreflightText( dockingBay );
+
+		yield return ClosePanel( dockingBay, "docking bay" );
+
+		crewFile.m_vitality = 100.0f;
+
+		// ---- 3. no name and no engines
+		ship.m_name = "";
+		ship.m_enginesClass = 0;
+
+		yield return OpenPanel( dockingBay, "docking bay" );
+
+		var nameAndEngines = PreflightText( dockingBay );
+
+		yield return ClosePanel( dockingBay, "docking bay" );
+
+		ship.m_name = "Probe";
+		ship.m_enginesClass = 1;
+
+		// ---- 4. a colony evaluation read, then the check passed: the evaluations are deleted, and the screen says none new has been filed
+		playerData.m_general.AddColonyRecommendation( 0 );
+		playerData.m_general.GetColonyEvaluationList().Add( "RECOMMENDATION: 1\nTHE PROBE'S EVALUATION" );
+		playerData.m_general.m_colonyRecommendationList.Clear();
+
+		yield return OpenPanel( operations, "operations" );
+
+		operations.EvaluationClicked();
+
+		yield return Frames( 2 );
+
+		operations.QuitClicked();
+
+		yield return ClosePanel( operations, "operations" );
+
+		var evaluationsBefore = playerData.m_general.GetColonyEvaluationList().Count;
+
+		// the passing check starts the transporter: the evaluations and the evaluation screen are looked at in this frame, before the scene changes
+		var passed = !dockingBay.Open() && ( dockingBay.m_errorText.text.Trim() == "" );
+
+		var evaluationsAfter = playerData.m_general.GetColonyEvaluationList().Count;
+
+		operations.EvaluationClicked();
+
+		var noneNew = System.Text.RegularExpressions.Regex.Replace( operations.m_evaluationGameObject.transform.Find( "Display/Error Text Mask/Error Text" ).GetComponent<TMPro.TextMeshProUGUI>().text, "<[^>]*>", "" ).Replace( "\n", " " ).Trim();
+
+		Log( "starport-preflight: unread: '" + unread + "' | dead: '" + dead + "' | no name, no engines: '" + nameAndEngines + "' | passed " + passed + ", colony evaluations " + evaluationsBefore + " -> " + evaluationsAfter + " | then: '" + noneNew + "'" );
+
+		Check( "starport-preflight: with an evaluation unread the check says the original's REPORT TO OPERATIONS FOR EVALUATION", unread.Contains( "Report to Operations for evaluation." ), unread );
+		Check( "starport-preflight: a dead crew member gets the original's REPORT TO CREW ASSIGNMENT, not a line of the port's", dead.Contains( "Report to Crew Assignment." ) && !dead.Contains( "dead" ) && !dead.Contains( "Operations" ), dead );
+		Check( "starport-preflight: no name and no engines are one line, as the original's REPORT TO SHIP-CONFIGURATION TO CHRISTEN SHIP AND PURCHASE ENGINES", nameAndEngines.Contains( "Report to Ship Configuration to christen ship and purchase engines." ), nameAndEngines );
+		Check( "starport-preflight: leaving with the evaluations read deletes the colony evaluations, and then none new has been filed", passed && ( evaluationsBefore > 0 ) && ( evaluationsAfter == 0 ) && noneNew.Contains( "You have not filed any new colony world recommendations" ), passed + ", " + evaluationsBefore + " -> " + evaluationsAfter + ", '" + noneNew + "'" );
+
+		Finish( "scenario=starport-preflight checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// what the docking bay's preflight check said
+	static string PreflightText( DockingBayPanel dockingBay )
+	{
+		return dockingBay.m_errorText.text.Replace( "• ", "" ).Replace( "\n", " | " ).Trim();
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

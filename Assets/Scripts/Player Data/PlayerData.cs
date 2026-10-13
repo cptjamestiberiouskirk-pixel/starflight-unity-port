@@ -370,6 +370,12 @@ public class PlayerData
 
 		m_general.m_colonyRecommendationList.Clear();
 
+		// the evaluations wait to be read before the ship can leave again
+		if ( evaluated > 0 )
+		{
+			m_general.m_colonyEvaluationUnread = true;
+		}
+
 		if ( m_general.m_colonyRecommendationRecordList != null )
 		{
 			m_general.m_colonyRecommendationRecordList.Clear();
