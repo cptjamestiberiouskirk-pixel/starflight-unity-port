@@ -173,6 +173,9 @@ public class DockingBayPanel : Panel
 				// update the player location
 				playerData.m_general.m_location = PD_General.Location.DockingBay;
 
+				// the bank pays its interest, as the original's does when the crew goes aboard (PORTMENU-OV in the decompiled original: I-TRANS after the flight check)
+				playerData.PayInterest( false );
+
 				// save the player data
 				DataController.m_instance.SaveActiveGame();
 

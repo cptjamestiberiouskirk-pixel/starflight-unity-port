@@ -21,7 +21,7 @@ Not reported: art style, resolution, colours, fonts and 3D models.
 
 | | Items | FIXED | OPEN or PARTLY | Not a defect or owner's call |
 |---|---|---|---|---|
-| GAMEPLAY (with the items shared with the UI kit) | 51 | 23 | 23 | 5 |
+| GAMEPLAY (with the items shared with the UI kit) | 52 | 24 | 23 | 5 |
 | UI KIT | 41 | 0 | 40 | 1 |
 | The probe's pictures | 17 | 3 (PR 234) | 14 gaps | |
 
@@ -30,7 +30,7 @@ Since 2026-10-11 the gameplay side has been fixed in PRs 215, 216, 218, 219, 220
 The open gameplay items, most visible first:
 
 1. **Repair's choice of system** (section 13): the original lets the player choose what to repair; the port's engineer repairs the worst first, by the owner's ruling of 2026-10-11 (the DAMAGE display itself is done).
-2. **The bank pays no interest** (section 21): the screen says 12% and the original's ledger has INTEREST rows; no code pays it.
+2. **The bank books a recommendation's bonus or fine at once in the original** (section 21), where the port pays it on docking (the interest itself is done).
 3. **The notices screen** (section 18): its header, its end, "NO NEW NOTICES" with "REPEAT LAST NOTICE?", and the typing of a notice.
 4. **Combat messages and wounds** (section 12): the original names the weapon that hits ("MISSILE CLASS 2") and says how the crew is wounded; in the port combat never wounds the crew.
 5. **"MOTION DETECTED AT X: Y:"** (section 11), the shields and weapons messages (section 2), and several smaller ones.
@@ -238,7 +238,8 @@ The doors are where the original's are (Operations upper left, Personnel top, Cr
 
 | Item | Status | Evidence | Owner |
 |---|---|---|---|
-| **The bank pays no interest.** The screen says INTEREST RATE: 12%, and the original's ledger has INTEREST rows (starflt_060); no code pays interest and no INTEREST row is written | OPEN | no "interest" in `Assets/Scripts` but the comm texts (CONFIRMED) | GAMEPLAY |
+| **The bank paid no interest.** The screen says INTEREST RATE: 12%, and the original's ledger has INTEREST rows (starflt_060). The original (`BANK-OV.c`, INT%) pays 12% a year of the balance for the days since it last paid (the balance times 12 over 100, then times the days over 300, each rounded down), when the crew goes aboard at the Starport (`PORTMENU-OV.c`, WEBA2) and on a new colony recommendation (`CAPTAIN.c`, which then starts the count again) | FIXED (the bank interest PR) | `PlayerData.PayInterest`, `PD_Bank.GetInterestDue`; the `starport-interest` probe scenario (CONFIRMED) | GAMEPLAY |
+| A colony recommendation's bonus or fine. The original books it in the ledger when the planet is recommended (`CAPTAIN.c`, WF292: T+BALANCE, then TRANSACT as BONUS or FINE, after the interest); the port pays it when the ship docks, with Interstel's evaluation (roadmap 1.3, PR 142) | OPEN | `PlayerData.cs` (the colony evaluations at docking); which planet field gives the original's amount (WE096, times 1000, at least 100) is not worked out (INFERRED) | GAMEPLAY |
 | The ledger's descriptions. The original has seven: FINE, SHIP CONFIGURATION, TRADE DEPOT, BONUS, PERSONNEL, INTEREST, GAME PURCHASE. The port writes "Lifeform data", "Mission completed" and "Colony bonus" (the original's BONUS) and "Colony fine", "Towing charges" and "Terrain vehicle replaced" (the original's FINE) | OPEN | `PlayerData.cs:157, 173, 225, 246`, `DistressYesButton.cs:42`, `DockingBay.cs:82`; `data.h` BANKTRANS_STRINGS (CONFIRMED) | GAMEPLAY |
 | AMT. as AMOUNT; dot leaders after the description ("GAME PURCHASE......") | OPEN, low priority | picture (CONFIRMED) | UI KIT |
 | The balance line: the original's "BALANCE......12000" and "( INTEREST RATE: 12% )", the port's "Your current balance is 1,000,000 M.U." | OPEN | `BankPanel.cs:56` (CONFIRMED); the 1,000,000 itself is the Editor's starting balance by design (`PD_Bank.GetStartingBalance`) | UI KIT |
@@ -289,7 +290,7 @@ The doors are where the original's are (Operations upper left, Personnel top, Cr
 One small PR per item, gameplay first. Each documented in the screenshots or the decompiled original, so D1 applies; a probe check that fails on the code before goes with each.
 
 1. **The DAMAGE display** (section 13), from `ENGINEER.c`: done. Repair's choice of system waits for the owner, since it would replace the ruling of 2026-10-11 that the engineer repairs the worst first.
-2. **The bank's interest** (section 21). The rate and how often it is paid are in the original's bank code (not read yet).
+2. **The bank's interest** (section 21): done. Left from it: the original books a recommendation's bonus or fine at once, which touches the colony rulings of roadmap 1.3.
 3. **The notices screen** (section 18): the header, END OF NOTICES, NO NEW NOTICES and REPEAT LAST NOTICE, then the typing and abort.
 4. **Combat messages and wounds** (section 12), from `DAMAGE-OV.c`.
 5. **MOTION DETECTED AT X: Y:** (section 11), from `HYPERMSG-OV.c`.
