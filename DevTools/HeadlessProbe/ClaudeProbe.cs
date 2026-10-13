@@ -1085,12 +1085,20 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportPreflight();
 				break;
 
+			case "logplanet":
+				yield return ScenarioLogPlanet();
+				break;
+
 			case "flightpictures":
 				yield return ScenarioFlightPictures();
 				break;
 
 			case "intropictures":
 				yield return ScenarioIntroPictures();
+				break;
+
+			case "savecoords":
+				yield return ScenarioSaveCoords();
 				break;
 
 			default:
@@ -28055,6 +28063,91 @@ public class ClaudeProbe : MonoBehaviour
 		return dockingBay.m_errorText.text.Replace( "• ", "" ).Replace( "\n", " | " ).Trim();
 	}
 
+	// Log Planet as the original's (CAPTAIN (/LOG-PLAN)): a cleared window with only the question, the question again after No, THIS PLANET HAS ALREADY BEEN LOGGED
+	// for a planet recommended before (even after Interstel's evaluation, so it earns no second bonus), and THAT'S ARTH YOU FOOL! in orbit of Arth
+	IEnumerator ScenarioLogPlanet()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var bank = playerData.m_bank;
+		var asked = new bool[ 1 ];
+
+		EnsureCrew();
+
+		bank.m_currentBalance = 100000;
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		// Mardan 4, an optimal planet of Interstel's list (no encounter waits in its orbit)
+		var mardan = gameData.FindPlanetFromSun( 217, 88, 4 );
+
+		// ---- 1. No, then Log Planet again: the question again, on a cleared window
+		var saidFirst = new List<string>();
+
+		yield return LogAndRecommend( mardan, false, asked, null, saidFirst );
+
+		var askedFirst = asked[ 0 ];
+
+		yield return LogAndRecommend( mardan, false, asked );
+
+		var askedAgain = asked[ 0 ];
+
+		// the window while the question is up (then No)
+		new LogPlanetButton().Execute();
+
+		yield return Frames( 2 );
+
+		var windowAgain = MessageList();
+
+		if ( controller.m_buttonController.GetCurrentButtonSet() == ButtonController.ButtonSet.RecommendPlanet )
+		{
+			PressButton( ButtonController.ButtonSet.RecommendPlanet, 0 );
+
+			yield return Frames( 2 );
+		}
+
+		// ---- 2. Yes: recommended; evaluated at the Starport; then Yes again: already logged, no second bonus
+		yield return LogAndRecommend( mardan, true, asked, "" );
+
+		var askedThird = asked[ 0 ];
+
+		playerData.EvaluateColonyRecommendations();
+
+		var balanceBefore = bank.m_currentBalance;
+		var saidAfterEvaluation = new List<string>();
+
+		yield return LogAndRecommend( mardan, true, asked, "", saidAfterEvaluation );
+
+		var askedAfterEvaluation = asked[ 0 ];
+		var secondBonus = bank.m_currentBalance - balanceBefore;
+		var answerAfterEvaluation = ( saidAfterEvaluation.Count > 0 ) ? saidAfterEvaluation[ 0 ] : "";
+
+		// ---- 3. in orbit of Arth's planet
+		yield return GoIntoOrbit( gameData.m_misc.m_arthStarId, gameData.m_misc.m_arthPlanetId );
+
+		new LogPlanetButton().Execute();
+
+		yield return Frames( 2 );
+
+		var atArth = MessageList();
+		var setAtArth = controller.m_buttonController.GetCurrentButtonSet();
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "logplanet: first asked " + askedFirst + " (" + string.Join( " || ", saidFirst ) + ") | after No asked " + askedAgain + ", window '" + windowAgain + "' | Yes asked " + askedThird + " | after the evaluation asked " + askedAfterEvaluation + ", '" + answerAfterEvaluation + "', bank " + secondBonus + " | at Arth: '" + atArth + "' (" + setAtArth + ")" );
+
+		Check( "logplanet: Log Planet asks only the question, on a cleared window, as the original's RECOMMEND THIS PLANET FOR COLONIZATION?", askedFirst && askedAgain && ( windowAgain == "<color=white>Recommend this planet for colonization?</color>" ), "'" + windowAgain + "'" );
+		Check( "logplanet: after No the question comes again, as the original's", askedAgain && askedThird, askedAgain + ", " + askedThird );
+		Check( "logplanet: Yes for a planet recommended before says THIS PLANET HAS ALREADY BEEN LOGGED, and pays no second bonus", answerAfterEvaluation.Contains( "This planet has already been logged." ) && ( secondBonus <= 0 ), "'" + answerAfterEvaluation + "', bank " + secondBonus );
+		Check( "logplanet: in orbit of Arth it says THAT'S ARTH YOU FOOL! and asks nothing", atArth.Contains( "That's Arth you fool!" ) && ( setAtArth != ButtonController.ButtonSet.RecommendPlanet ), "'" + atArth + "', " + setAtArth );
+
+		Finish( "scenario=logplanet checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
 	// ---------------------------------------------------------------- phase 7: pictures of the flight screens the other picture scenarios do not reach (probe.ps1 -Graphics)
 
 	// the whole screen of Science's and Navigation's menus with their officer label, the save panel and two of its questions, combat in an encounter of Spemin
@@ -28571,6 +28664,45 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "intropictures: a picture of every page of the Intro", pictures.Count == 5, pictures.Count.ToString() );
 
 		Finish( "scenario=intropictures pictures=" + pictures.Count, 0 );
+	}
+
+	// a save slot in a star system gives the system's coordinates, as the coordinates above the main view do (Arth's system: 125, 100), not the ship's place inside
+	// the system taken for a place in hyperspace
+	IEnumerator ScenarioSaveCoords()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var panel = FindPanel<SaveGamePanel>();
+
+		EnsureCrew();
+
+		controller.m_encounterRange = 0.0f;
+
+		EnterStarSystem( gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 10 );
+
+		// the ship somewhere in the system, away from its middle
+		playerData.m_general.m_lastStarSystemCoordinates = new Vector3( 4000.0f, 0.0f, 2500.0f );
+
+		var slot = dataController.m_activeSaveGameSlotNumber;
+
+		dataController.m_playerDataList[ slot ] = playerData;
+
+		Call( panel, "UpdateDescriptions" );
+
+		var description = System.Text.RegularExpressions.Regex.Replace( panel.m_slotDescriptionText[ slot ].text, "<[^>]*>", "" ).Replace( "\n", " / " );
+		var arth = gameData.m_starList[ gameData.m_misc.m_arthStarId ];
+		var expected = "Coordinates: " + arth.m_xCoordinate + ", " + arth.m_yCoordinate;
+		var viewport = controller.m_viewport.m_label.text;
+
+		Log( "savecoords: in Arth's system (above the main view '" + viewport + "'): " + description );
+
+		Check( "savecoords: a slot in a star system gives the system's coordinates, as above the main view", description.Contains( "Star System" ) && description.Contains( expected ), description + " (expected '" + expected + "')" );
+
+		Finish( "scenario=savecoords checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
