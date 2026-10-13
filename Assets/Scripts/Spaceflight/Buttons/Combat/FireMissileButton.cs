@@ -28,10 +28,18 @@ public class FireMissileButton : ShipButton
 			return false;
 		}
 
-		// check if we have missile launcher
+		// the weapons fire only once they are armed (COMBAT-OV: "WEAPONS NOT ARMED")
+		if ( !playerData.m_playerShip.m_weaponsAreArmed )
+		{
+			SpaceflightController.m_instance.m_messages.AddText( "<color=red>Weapons not armed</color>" );
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+			return false;
+		}
+
+		// check if we have missile launcher (COMBAT-OV: "WEAPON NOT AVAILABLE")
 		if ( playerData.m_playerShip.m_missileLauncherClass <= 0 )
 		{
-			SpaceflightController.m_instance.m_messages.AddText( "<color=red>No missile launcher installed!</color>" );
+			SpaceflightController.m_instance.m_messages.AddText( "<color=red>Weapon not available</color>" );
 			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
 			return false;
 		}
@@ -39,7 +47,7 @@ public class FireMissileButton : ShipButton
 		// check if we have fuel (every launch uses a little endurium)
 		if ( !playerData.m_playerShip.HasFuel() )
 		{
-			SpaceflightController.m_instance.m_messages.AddText( "<color=red>Insufficient fuel to launch a missile!</color>" );
+			SpaceflightController.m_instance.m_messages.AddText( "<color=red>Out of fuel!</color>" );
 			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
 			return false;
 		}
@@ -47,7 +55,7 @@ public class FireMissileButton : ShipButton
 		// check if we have a target
 		if ( CombatController.m_instance.GetTargetIndex() < 0 )
 		{
-			SpaceflightController.m_instance.m_messages.AddText( "<color=yellow>Select a target first!</color>" );
+			SpaceflightController.m_instance.m_messages.AddText( "<color=yellow>No target present</color>" );
 			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
 			return false;
 		}

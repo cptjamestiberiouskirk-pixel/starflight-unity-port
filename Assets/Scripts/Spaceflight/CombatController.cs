@@ -501,7 +501,7 @@ public class CombatController : MonoBehaviour
 		// play torpedo launch sound
 		SoundController.m_instance.PlaySound( SoundController.Sound.TorpedoFire );
 
-		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Missile launched!</color>" );
+		// (the original says nothing of the player's own launches and hits: COMBAT-OV)
 
 		return true;
 	}
@@ -551,15 +551,7 @@ public class CombatController : MonoBehaviour
 				hullHit.Play( targetShip.m_coordinates, targetShip.m_coordinates - DataController.m_instance.m_playerData.m_general.m_coordinates );
 			}
 
-			// let the player know whether the hit got through the shields
-			if ( shieldAbsorb == damage )
-			{
-				SpaceflightController.m_instance.m_messages.AddText( $"<color=#00FF00>Hit! Target's shields absorbed it.</color>" );
-			}
-			else
-			{
-				SpaceflightController.m_instance.m_messages.AddText( $"<color=#00FF00>Hit! Target damaged.</color>" );
-			}
+			// (the original says nothing of the player's own hits: the hit effects show whether the shields took it)
 		}
 		else
 		{
@@ -899,6 +891,9 @@ public class CombatController : MonoBehaviour
 			{
 				damage /= 2;
 			}
+
+			// what hit the ship, in the original's words (COMBAT-OV WECEA: LASER CLASS n, or LASER PARTIALLY DEFLECTED with the Rod Device)
+			SpaceflightController.m_instance.m_messages.AddText( playerData.m_playerShip.HasArtifact( "Rod Device" ) ? "<color=red>Laser partially deflected</color>" : "<color=red>Laser class " + vessel.m_laserClass + "</color>" );
 
 			ApplyDamageToPlayer( damage, direction );
 		}
