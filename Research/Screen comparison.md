@@ -21,18 +21,17 @@ Not reported: art style, resolution, colours, fonts and 3D models.
 
 | | Items | FIXED | OPEN or PARTLY | Not a defect or owner's call |
 |---|---|---|---|---|
-| GAMEPLAY (with the items shared with the UI kit) | 52 | 32 | 16 | 4 |
+| GAMEPLAY (with the items shared with the UI kit) | 52 | 43 | 5 | 4 |
 | UI KIT | 41 | 0 | 40 | 1 |
 | The probe's pictures | 17 | 3 (PR 234) | 14 gaps | |
 
-Since 2026-10-11 the gameplay side has been fixed in PRs 215, 216, 218, 219, 220, 221, 222, 223, 224, 225, 226, 231, 242, 254 and 263; the probe pictures in PR 234. The UI kit items are all still open: the UI kit's PRs so far (213, 260, 268) redid the docking bay, the in-orbit view and the intro.
+Since 2026-10-11 the gameplay side has been fixed in PRs 215, 216, 218, 219, 220, 221, 222, 223, 224, 225, 226, 231, 242, 254 and 263, and since the comparison was checked again on 2026-10-12 in PRs 281 (the DAMAGE display), 282 (the interest), 284 (combat messages and wounds), 285 (the shields and weapons messages), 286 (Repair's choice), 287 (the orbit lines), 288 (the notices screen), 289 (the ledger's names), 290 (the analysis heading and the temperature), 291 (Look), 292 (the landing site), 294 (the weather line), 296 and 297 (the encounter pictures), 299 (the typing of a notice), 300 (the vehicle's distance) and 301 (the training sessions); the probe pictures in PR 234. The UI kit items are all still open: the UI kit's PRs so far (213, 260, 268) redid the docking bay, the in-orbit view and the intro, and the owner ruled on 2026-10-12 that the kit's own words stay (the bridge entries, the officer label, the button and bar labels).
 
-The open gameplay items, most visible first:
+The open gameplay items:
 
-1. **The typing of a notice** (section 18): the original types a notice line by line, with an abort (the notices screen's header, its end and "NO NEW NOTICES" are done, as are the DAMAGE display, Repair's choice of system and the interest).
-2. **The bank books a recommendation's bonus or fine at once in the original** (section 21), where the port pays it on docking.
-3. **Combat messages and wounds** (section 12): the original names the weapon that hits ("MISSILE CLASS 2") and says how the crew is wounded; in the port combat never wounds the crew.
-4. **"MOTION DETECTED AT X: Y:"** (section 11), the shields and weapons messages (section 2), and several smaller ones.
+1. **The bank books a recommendation's bonus or fine at once in the original** (section 21), where the port pays it on docking: it touches the colony rulings of roadmap 1.3, so it waits for the owner.
+2. **"MOTION DETECTED AT X: Y:"** (section 11): parked, since the numbers are the steps the original's alien groups take each star hour, and the port moves its aliens otherwise.
+3. Low priority: when a supplemental evaluation's fine is booked (18), the original's "NEW" in "YOU HAVE NOT FILED ANY NEW COLONY WORLD RECOMMENDATIONS" (18), and three pre-flight lines of the port's that no screenshot has (24).
 
 ---
 
@@ -288,13 +287,13 @@ The doors are where the original's are (Operations upper left, Personnel top, Cr
 
 One small PR per item, gameplay first. Each documented in the screenshots or the decompiled original, so D1 applies; a probe check that fails on the code before goes with each.
 
-1. **The DAMAGE display and Repair's choice of system** (section 13), from `ENGINEER.c`: done (the choice by the owner's ruling of 2026-10-12, which replaced the worst first).
-2. **The bank's interest** (section 21): done. Left from it: the original books a recommendation's bonus or fine at once, which touches the colony rulings of roadmap 1.3.
-3. **The notices screen** (section 18): the header, END OF NOTICES, NO NEW NOTICES and REPEAT LAST NOTICE are done; the typing and abort are left.
-4. **Combat messages and wounds** (section 12), from `DAMAGE-OV.c`.
-5. **MOTION DETECTED AT X: Y:** (section 11), from `HYPERMSG-OV.c`.
-6. **The shields and weapons messages** (section 2), from `NAVIGATR.c`.
-7. Smaller: the temperature range (7), the analysis heading's colon (7), the orbit lines scrolling on (5), the crosshair's start (8), Look's temperature and hydrosphere (10), the weather as the first line on the surface (10), Personnel's number of training sessions (19), the terrain vehicle's distance to the ship (10, once the scale is checked).
+1. **The DAMAGE display and Repair's choice of system** (section 13), from `ENGINEER.c`: done (PRs 281, 286; the choice by the owner's ruling of 2026-10-12, which replaced the worst first).
+2. **The bank's interest** (section 21): done (PR 282). Left from it: the original books a recommendation's bonus or fine at once, which touches the colony rulings of roadmap 1.3.
+3. **The notices screen** (section 18): done (PRs 288, 299).
+4. **Combat messages and wounds** (section 12), from `DAMAGE-OV.c`: done (PR 284).
+5. **MOTION DETECTED AT X: Y:** (section 11), from `HYPERMSG-OV.c`: parked.
+6. **The shields and weapons messages** (section 2), from `NAVIGATR.c`: done (PR 285).
+7. Smaller: all done (the temperature range and the analysis heading's colon, PR 290; the orbit lines, PR 287; the crosshair's start, PR 292; Look, PR 291; the weather line, PR 294; the ledger's names, PR 289; the training sessions, PR 301; the vehicle's distance, PR 300).
 8. **The probe's pictures**: the missing screens of section 25, the landing map after the crosshair is placed, the encounter with the aliens in view, so that the next comparison can see them.
 
 The UI kit items are left to the UI kit's work. Two items are the owner's call: the security code (D4) and the Ship's Log as a menu.
