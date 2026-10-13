@@ -21,7 +21,7 @@ Not reported: art style, resolution, colours, fonts and 3D models.
 
 | | Items | FIXED | OPEN or PARTLY | Not a defect or owner's call |
 |---|---|---|---|---|
-| GAMEPLAY (with the items shared with the UI kit) | 52 | 28 | 20 | 4 |
+| GAMEPLAY (with the items shared with the UI kit) | 52 | 32 | 16 | 4 |
 | UI KIT | 41 | 0 | 40 | 1 |
 | The probe's pictures | 17 | 3 (PR 234) | 14 gaps | |
 
