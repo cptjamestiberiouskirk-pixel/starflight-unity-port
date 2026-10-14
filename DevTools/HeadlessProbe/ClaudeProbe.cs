@@ -13281,6 +13281,35 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "unmapped: the player is told why", messageAfterLoad.Contains( "could not be mapped" ) && messageAfterLoad.Contains( "returned to orbit" ), messageAfterLoad );
 		Check( "unmapped: the cargo of the terrain vehicle comes on board with it, and it stands still", ( vehicleCargoBefore == 30 ) && ( vehicleCargoAfter == 0 ) && ( shipFreeAfter == shipFreeBefore - 30 ) && ( speedAfterLoad == 0.0f ), "vehicle " + vehicleCargoBefore + " -> " + vehicleCargoAfter + ", ship room " + shipFreeBefore + " -> " + shipFreeAfter + ", speed " + speedAfterLoad.ToString( "F1" ) );
 
+		// ---- 4b. a game loaded on the surface of a planet without maps stays there (Launch works, Disembark refuses), and the player is told why, as in orbit
+		playerData.m_general.m_currentPlanetId = 90;
+		controller.m_messages.Clear();
+
+		exceptionsBefore = s_exceptionCount;
+
+		SetField( starSystem, "m_currentStar", null );
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		StartProcessing( starSystem.GetPlanetController( 90 ).GetPlanetGenerator(), garbage );
+
+		start = Time.realtimeSinceStartup;
+
+		while ( starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 30.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 30 );
+
+		var surfaceLocation = playerData.m_general.m_location;
+		var surfaceMessage = MessageList();
+		var surfaceExceptions = s_exceptionCount - exceptionsBefore;
+
+		Log( "unmapped: loaded on the surface of planet 90 without maps: location " + surfaceLocation + ", exceptions " + surfaceExceptions + ", messages '" + surfaceMessage + "'" );
+
+		Check( "unmapped: a game loaded on the surface of a planet without maps stays there and the player is told it could not be mapped", ( surfaceLocation == PD_General.Location.Planetside ) && ( surfaceExceptions == 0 ) && surfaceMessage.Contains( "could not be mapped" ), surfaceLocation + ", exceptions " + surfaceExceptions + ", '" + surfaceMessage + "'" );
+
 		// ---- 5. a game loaded in the terrain vehicle on a planet that has its maps stays there (control) - planet 94, the star system generated again from its real files
 		playerData.m_general.m_currentPlanetId = 94;
 
