@@ -7,23 +7,13 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Veloxi Engine
-    second: {fileID: 2100000, guid: 95562a05e7c936242b13c84a6bb5175c, type: 2}
+      name: Veloxi Warship Engine
+    second: {fileID: 2100000, guid: 1402c07da5abacd4f8341d50e785ed64, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Veloxi Hull
-    second: {fileID: 2100000, guid: a516d4bef7186b543884cfc2177b6855, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Veloxi Light
-    second: {fileID: 2100000, guid: 4e683a2a6f11e774284948c4b32fba99, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Veloxi Trim
-    second: {fileID: 2100000, guid: 35c8249963b789a46b44712b4b6739db, type: 2}
+      name: Veloxi Warship Hull
+    second: {fileID: 2100000, guid: 9a7db839fd2ac554abc7e718d03412f4, type: 2}
   materials:
     materialImportMode: 1
     materialName: 0

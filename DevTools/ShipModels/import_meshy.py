@@ -153,11 +153,13 @@ def save_image(pixels, path):
 def glow_mask(base, glow=None):
     """Where the base colour (sRGB) is the crystal's blue or cyan: 1 there, 0 elsewhere, with a soft edge.
 
-    glow: a race file's "glow" settings (hue, saturation, value) in place of the defaults above."""
+    glow: a race file's "glow" settings (hue, saturation, value) in place of the defaults above. Its hue is one range
+    [from, to] or a list of them (the Veloxi's blue crystal and their red engine pods, whose red wraps round 0)."""
     glow = glow or {}
     glow_hue = glow.get("hue", GLOW_HUE)
     glow_saturation = glow.get("saturation", GLOW_SATURATION)
     glow_value = glow.get("value", GLOW_VALUE)
+    hue_ranges = glow_hue if isinstance(glow_hue[0], (list, tuple)) else [glow_hue]
     r, g, b = base[..., 0], base[..., 1], base[..., 2]
     high = numpy.maximum(numpy.maximum(r, g), b)
     low = numpy.minimum(numpy.minimum(r, g), b)
@@ -165,7 +167,10 @@ def glow_mask(base, glow=None):
     saturation = numpy.where(high > 0.0, (high - low) / numpy.maximum(high, 1e-6), 0.0)
 
     hue = numpy.where(high == r, (g - b) / spread % 6.0, numpy.where(high == g, (b - r) / spread + 2.0, (r - g) / spread + 4.0)) * 60.0
-    in_hue = (hue >= glow_hue[0]) & (hue <= glow_hue[1])
+    in_hue = numpy.zeros(hue.shape, dtype=bool)
+
+    for hue_range in hue_ranges:
+        in_hue |= (hue >= hue_range[0]) & (hue <= hue_range[1])
 
     return in_hue * numpy.clip((saturation - glow_saturation) / 0.2, 0.0, 1.0) * numpy.clip((high - glow_value) / 0.2, 0.0, 1.0)
 
