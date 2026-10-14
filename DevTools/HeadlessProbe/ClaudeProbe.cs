@@ -27357,7 +27357,7 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=commpicture checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
-	// ---------------------------------------------------------------- Low: the Spemin's comm portrait moves as the Genesis version's does (its eyes blink, its discs spin, slime drips, the body wobbles), and pictures of it with -Graphics
+	// ---------------------------------------------------------------- Low: the Spemin's comm portrait moves as the Genesis version's does (its eyes blink, its discs spin, slime drips, the body wobbles), the drips without a jump from one frame to the next, and pictures of it with -Graphics
 
 	// the largest angle any of the transforms turned between two snapshots of their local rotations, in degrees
 	static float LargestTurn( Transform[] parts, Quaternion[] before )
@@ -27524,6 +27524,52 @@ public class ClaudeProbe : MonoBehaviour
 			yield return null;
 		}
 
+		// then 5 s at a steady 30 frames a second, the drips' heights and widths every frame: a jump is a frame whose change stands out from
+		// the changes of the frames on either side of it (steady motion, fast or slow, changes about as much from one frame to the next)
+		const int c_steadyFrames = 150;
+		var animation = model.GetComponentInChildren<SpeminCommAnimation>( true );
+		var dripSize = ( ( animation != null ) && ( animation.m_dripSize > 0.0f ) ) ? animation.m_dripSize : 1.0f;
+		var dripWidths = new float[ c_steadyFrames, dripsStart.Length ];
+		var dripHeights = new float[ c_steadyFrames, dripsStart.Length ];
+
+		Time.captureDeltaTime = 1.0f / 30.0f;
+		yield return null;
+
+		for ( var frame = 0; frame < c_steadyFrames; frame++ )
+		{
+			for ( var i = 0; i < dripsStart.Length; i++ )
+			{
+				if ( dripsStart[ i ] != null )
+				{
+					dripWidths[ frame, i ] = dripsStart[ i ].localScale.x;
+					dripHeights[ frame, i ] = dripsStart[ i ].localScale.y;
+				}
+			}
+
+			yield return null;
+		}
+
+		Time.captureDeltaTime = 0.0f;
+
+		var largestJump = 0.0f;
+		var largestJumpAt = "none";
+
+		for ( var i = 0; i < dripsStart.Length; i++ )
+		{
+			for ( var frame = 2; frame < c_steadyFrames - 1; frame++ )
+			{
+				var widthJump = Mathf.Abs( dripWidths[ frame, i ] - dripWidths[ frame - 1, i ] ) - Mathf.Max( Mathf.Abs( dripWidths[ frame - 1, i ] - dripWidths[ frame - 2, i ] ), Mathf.Abs( dripWidths[ frame + 1, i ] - dripWidths[ frame, i ] ) );
+				var heightJump = Mathf.Abs( dripHeights[ frame, i ] - dripHeights[ frame - 1, i ] ) - Mathf.Max( Mathf.Abs( dripHeights[ frame - 1, i ] - dripHeights[ frame - 2, i ] ), Mathf.Abs( dripHeights[ frame + 1, i ] - dripHeights[ frame, i ] ) );
+				var jump = Mathf.Max( widthJump, heightJump ) / dripSize;
+
+				if ( jump > largestJump )
+				{
+					largestJump = jump;
+					largestJumpAt = "drip " + ( i + 1 ) + " frame " + frame + " (height " + dripHeights[ frame - 1, i ].ToString( "F2" ) + " to " + dripHeights[ frame, i ].ToString( "F2" ) + ", width " + dripWidths[ frame - 1, i ].ToString( "F2" ) + " to " + dripWidths[ frame, i ].ToString( "F2" ) + ")";
+				}
+			}
+		}
+
 		var discTurn = LargestTurn( discs, discStart );
 
 		Log( "commspemin: " + eyes.Length + " eyes (smallest " + smallestEye.ToString( "F2" ) + " of their size), " + discs.Length + " discs (largest turn " + discTurn.ToString( "F0" ) + " degrees), body " + ( ( body != null ) ? body.name : "none" ) + " (width change " + bodyWidthChange.ToString( "F3" ) + ", height change " + bodyHeightChange.ToString( "F3" ) + "), " + dripsStart.Length + " drips (fell " + dripFall.ToString( "F2" ) + ")" );
@@ -27532,6 +27578,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "commspemin: its discs spin", ( discs.Length > 0 ) && ( discTurn > 45.0f ), "largest turn " + discTurn.ToString( "F0" ) + " degrees" );
 		Check( "commspemin: its body wobbles in width and height, not only in depth", ( bodyWidthChange > 0.01f ) && ( bodyHeightChange > 0.01f ), "width " + bodyWidthChange.ToString( "F3" ) + ", height " + bodyHeightChange.ToString( "F3" ) );
 		Check( "commspemin: slime drips fall", ( dripsStart.Length > 0 ) && ( dripFall > 0.5f ), dripsStart.Length + " drips, fell " + dripFall.ToString( "F2" ) );
+		Check( "commspemin: the drips change shape without a jump (no frame's change stands out from its neighbours' by more than 0.3 of a drip's size)", ( dripsStart.Length > 0 ) && ( largestJump < 0.3f ), "largest " + largestJump.ToString( "F2" ) + " of a drip's size, " + largestJumpAt );
 
 		Finish( "scenario=commspemin pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}

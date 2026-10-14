@@ -60,6 +60,7 @@ public class SpeminCommAnimation : MonoBehaviour
 	float[] m_dripSwellTime;
 	float[] m_dripSpeed;
 	float[] m_dripSplat;
+	Vector3[] m_dripImpact;
 	float m_floorHeight;
 
 	// random numbers of its own
@@ -168,6 +169,7 @@ public class SpeminCommAnimation : MonoBehaviour
 		m_dripSwellTime = new float[ m_drips.Length ];
 		m_dripSpeed = new float[ m_drips.Length ];
 		m_dripSplat = new float[ m_drips.Length ];
+		m_dripImpact = new Vector3[ m_drips.Length ];
 
 		var centre = ( m_body != null ) ? transform.InverseTransformPoint( m_body.position ) : Vector3.zero;
 
@@ -296,14 +298,26 @@ public class SpeminCommAnimation : MonoBehaviour
 
 			m_dripTimer[ i ] += deltaTime;
 
-			// splashed on the floor: it spreads flat for a moment, then starts again
+			// splashed on the floor: its top keeps coming down at the speed it landed with until it is flat, and it spreads and sinks into
+			// the goo (to nothing, the size it starts again from), every step from the one before, so that no frame jumps
 			if ( m_dripSplat[ i ] >= 0.0f )
 			{
 				m_dripSplat[ i ] += deltaTime;
 
+				var flat = m_dripSize * 0.2f;
+				var landedHeight = Mathf.Max( flat, m_dripImpact[ i ].y - m_dripSpeed[ i ] * m_dripSplat[ i ] );
+				var squash = ( m_dripImpact[ i ].y > flat ) ? ( m_dripImpact[ i ].y - landedHeight ) / ( m_dripImpact[ i ].y - flat ) : 1.0f;
 				var spread = Mathf.Clamp01( m_dripSplat[ i ] / Mathf.Max( 0.01f, m_splatTime ) );
 
-				m_drips[ i ].localScale = new Vector3( m_dripSize * ( 1.0f + spread ), m_dripSize * 0.2f * ( 1.0f - spread ), m_dripSize * ( 1.0f + spread ) );
+				// it spreads to almost twice its size, then sinks away, slowing down to nothing at the end
+				var sink = ( 1.0f - spread * spread ) * ( 1.0f - spread * spread );
+				var width = Mathf.Lerp( m_dripImpact[ i ].x, m_dripSize, squash ) * ( 1.0f + 4.0f * spread ) * sink;
+				var height = landedHeight * sink;
+				var landed = m_drips[ i ].localPosition;
+
+				// its bottom stays on the floor
+				m_drips[ i ].localScale = new Vector3( width, height, width );
+				m_drips[ i ].localPosition = new Vector3( landed.x, m_floorHeight + height * 0.5f, landed.z );
 
 				if ( spread >= 1.0f )
 				{
@@ -315,29 +329,37 @@ public class SpeminCommAnimation : MonoBehaviour
 
 			if ( m_dripTimer[ i ] < m_dripSwellTime[ i ] )
 			{
-				// swelling: it grows and hangs a little lower as it does
+				// swelling: it grows, hangs a little lower and lengthens to the shape it falls in (twice as long as it is wide, and thinner, as a
+				// falling drip's stretch keeps its bulk)
 				var swell = m_dripTimer[ i ] / m_dripSwellTime[ i ];
+				var length = 1.0f + swell;
 
-				m_drips[ i ].localScale = new Vector3( m_dripSize * swell, m_dripSize * swell * ( 1.0f + swell ), m_dripSize * swell );
+				m_drips[ i ].localScale = new Vector3( m_dripSize * swell / Mathf.Sqrt( length ), m_dripSize * swell * length, m_dripSize * swell / Mathf.Sqrt( length ) );
 				m_drips[ i ].localPosition = m_dripHomes[ i ] - new Vector3( 0.0f, m_dripSize * swell, 0.0f );
 				continue;
 			}
 
-			// falling: it speeds up and stretches with its speed
+			// falling: it speeds up and stretches further with its speed, from the length it let go with
 			m_dripSpeed[ i ] += m_dripGravity * deltaTime;
 
 			var position = m_drips[ i ].localPosition - new Vector3( 0.0f, m_dripSpeed[ i ] * deltaTime, 0.0f );
-			var stretch = 1.0f + Mathf.Min( 2.0f, m_dripSpeed[ i ] * 0.08f );
+			var stretch = 2.0f + Mathf.Min( 1.0f, m_dripSpeed[ i ] * 0.04f );
+			var scale = new Vector3( m_dripSize / Mathf.Sqrt( stretch ), m_dripSize * stretch, m_dripSize / Mathf.Sqrt( stretch ) );
 
-			m_drips[ i ].localScale = new Vector3( m_dripSize / Mathf.Sqrt( stretch ), m_dripSize * stretch, m_dripSize / Mathf.Sqrt( stretch ) );
-			m_drips[ i ].localPosition = position;
-
-			// it reaches the goo on the floor and splashes
-			if ( position.y <= m_floorHeight )
+			// its bottom reaches the goo on the floor and it splashes: the bottom stops there and the top comes down where it was going to
+			if ( position.y - scale.y * 0.5f <= m_floorHeight )
 			{
-				m_drips[ i ].localPosition = new Vector3( position.x, m_floorHeight, position.z );
+				var top = position.y + scale.y * 0.5f;
+
+				scale.y = Mathf.Max( m_dripSize * 0.2f, top - m_floorHeight );
+				position.y = m_floorHeight + scale.y * 0.5f;
+
+				m_dripImpact[ i ] = scale;
 				m_dripSplat[ i ] = 0.0f;
 			}
+
+			m_drips[ i ].localScale = scale;
+			m_drips[ i ].localPosition = position;
 		}
 	}
 }
