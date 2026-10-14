@@ -64,6 +64,11 @@ In the Spaceflight scene the Cancel input (the Escape key) opens the save panel,
 - `ShipButton` (`Spaceflight/Buttons/`) is a **plain C# class, not a MonoBehaviour** (`GetLabel()`, `Execute()`, `Update()`). `ButtonController.Awake()` instantiates every button into sets keyed by the `ButtonSet` enum (max 6 per set). To add a button, subclass `ShipButton` and add it to a set there; to add a menu, add a `ButtonSet` value before `Count`. `Execute()` typically calls `SpaceflightController.m_instance.m_buttonController.ChangeButtonSet(...)`. The fire button activates the selected button 0.35 s after the press, and only if the button the press was made on is still the selected one: the buttons can change in between (an alien question puts Yes and No on the console).
 - Displays (`Spaceflight/Displays/`) subclass `ShipDisplay` and are switched by `DisplayController`.
 
+### UI kit colour schemes
+- The UI kit's colours come from a theme (`UIKitTheme`): fifteen schemes (`UIKitTheme.c_schemes`), each a dark and a light theme asset (`Resources/UI Kit Theme*`, `Resources/UI Kit Themes/`, made by `DevTools/UIKitSchemes/make_themes.py`), picked by the player on the save panel's Colors screen. Take colours from `UIKitTheme.Get()` or a `UIKitStyle` role, never hard-coded, and react to `UIKitTheme.Changed`.
+- The scenes are saved in the classic dark theme's colours; `UIKitModeApplier` maps them to the theme in use by matching those colours, so a colour copied into a scene must be one of the classic dark theme's.
+- Anything drawn over a 3D view (in the main viewport, under the object with `Viewport`, and the labels on the terrain) uses `UIKitTheme.GetViewTheme()`, the scheme's dark theme in either mode: `UIKitStyle` and the applier do this by themselves for what is in the viewport; code that colours such things itself calls `GetViewTheme()`.
+
 ### Starport panels
 `Panel` (`Scripts/Panel/`) is an abstract MonoBehaviour opened/closed via an `Animator` bool `"Open"`; the animation fires `PanelAnimationCallback` → `PanelController.Opened()/Closed()`. `AstronautController` opens panels when the astronaut enters a door.
 
