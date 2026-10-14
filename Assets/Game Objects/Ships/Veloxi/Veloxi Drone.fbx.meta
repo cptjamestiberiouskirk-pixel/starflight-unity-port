@@ -7,18 +7,13 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Veloxi Drone Eye
-    second: {fileID: 2100000, guid: d7f560d9e488eba42963658d2374d620, type: 2}
+      name: Veloxi Drone Engine
+    second: {fileID: 2100000, guid: 9389e1f16c61fc845a71eba68df344b8, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Veloxi Hull
-    second: {fileID: 2100000, guid: a516d4bef7186b543884cfc2177b6855, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Veloxi Trim
-    second: {fileID: 2100000, guid: 35c8249963b789a46b44712b4b6739db, type: 2}
+      name: Veloxi Drone Hull
+    second: {fileID: 2100000, guid: 5f34093d1929bc746806739a14dc9d4c, type: 2}
   materials:
     materialImportMode: 1
     materialName: 0
