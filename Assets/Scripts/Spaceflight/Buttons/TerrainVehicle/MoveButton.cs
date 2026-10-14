@@ -70,8 +70,11 @@ public class MoveButton : ShipButton
 
 			shipCoordinates = SpaceflightController.m_instance.m_disembarked.ApplyElevation( shipCoordinates, false );
 
-			// calculate vector from TV to ship coordinates
+			// calculate vector from TV to ship coordinates, along the ground: the vehicle's saved place is flat (the ground's height is only drawn) while the
+			// ship's has the ground's height, so measured with the height a ship on raised ground was never near enough to go back in
 			var vectorToShip = shipCoordinates - playerData.m_general.m_lastDisembarkedCoordinates;
+
+			vectorToShip.y = 0.0f;
 
 			// how far is it in kilometers?
 			var distanceInKm = vectorToShip.magnitude * 225.0f / 2048.0f - 2.0f;
