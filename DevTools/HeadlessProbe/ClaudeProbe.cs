@@ -33696,8 +33696,9 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "playthrough: out of the encounter: " + playerData.m_general.m_location + ", messages '" + PtMessages() + "'" );
 	}
 
-	// fights an encounter: shields up, weapons armed, Combat, Target and the lasers (and missiles) until every ship that came is destroyed or the time is up
-	IEnumerator PtFight( float seconds, int[] result )
+	// fights an encounter: shields up, weapons armed, Combat, Target and the lasers (and missiles) until every ship that came is destroyed, the time is up, the
+	// fight is being lost, or enough (when given) says the stage has had enough of it
+	IEnumerator PtFight( float seconds, int[] result, Func<bool> enough = null )
 	{
 		var playerData = DataController.m_instance.m_playerData;
 		var controller = SpaceflightController.m_instance;
@@ -33709,6 +33710,7 @@ public class ClaudeProbe : MonoBehaviour
 		var retargets = 0;
 		var outOfRange = 0;
 		var shotLog = new List<string>();
+		var alienPointsBefore = PtSumOfNumbers( PtAlienPoints() );
 
 		result[ 0 ] = 0;
 
@@ -33738,10 +33740,23 @@ public class ClaudeProbe : MonoBehaviour
 
 		while ( ( Time.realtimeSinceStartup < end ) && ( playerData.m_general.m_location == PD_General.Location.Encounter ) && !CombatController.m_instance.PlayerIsDestroyed() )
 		{
-			// a captain breaks off a fight that is being lost: the shields are gone and the hull is down to half
-			if ( ( ship.m_shieldPoints <= 0 ) && ( ship.m_armorPoints < ship.GetMaximumArmorPoints() / 2 ) )
+			// the weapons have been tried once the aliens have been hit, or after three presses of the weapons that did not hit
+			var aliensHit = PtSumOfNumbers( PtAlienPoints() ) < alienPointsBefore;
+			var tried = aliensHit || ( shots >= 3 );
+
+			// a captain breaks off a fight that is being lost: the shields are gone and the hull is down to half. Not before the weapons have been tried, though (a game
+			// loaded in the middle of such a fight fires first: a laser in range hits at once), unless the hull is down to a quarter
+			if ( ( ship.m_shieldPoints <= 0 ) && ( ship.m_armorPoints < ship.GetMaximumArmorPoints() / 2 ) && ( tried || ( ship.m_armorPoints < ship.GetMaximumArmorPoints() / 4 ) ) )
 			{
-				Log( "playthrough: the fight is broken off: shields " + ship.m_shieldPoints + ", armor " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() );
+				Log( "playthrough: the fight is broken off: shields " + ship.m_shieldPoints + ", armor " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() + ", after " + shots + " presses of the weapons, the aliens hit " + aliensHit );
+
+				break;
+			}
+
+			// a stage that has had enough of the fight ends it, once the weapons have been tried
+			if ( ( enough != null ) && tried && enough() )
+			{
+				Log( "playthrough: the stage has had enough of the fight: shields " + ship.m_shieldPoints + ", armor " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() + ", after " + shots + " presses of the weapons, the aliens hit " + aliensHit );
 
 				break;
 			}
@@ -34635,9 +34650,11 @@ public class ClaudeProbe : MonoBehaviour
 
 			Check( "playthrough-12: the Uhlek are hostile and do not answer a hail", !encounter.IsConnected() && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile ), encounter.IsConnected() + ", " + encounter.m_pdEncounter.m_alienStance );
 
-			yield return PtFight( 55.0f, result );
+			// the first part of the fight ends with the shields down to half, and stage 13 goes on with the other half: since alien ships fire their laser and missile
+			// each, 55 s of it took all the shields and the hull down to about half, and from there the ship could not fire on the Uhlek after loading and still get out
+			yield return PtFight( 55.0f, result, () => ship.m_shieldPoints <= ship.GetMaximumShieldPoints() / 2 );
 
-			Log( "playthrough-12: after 55 s of the fight: " + PtEncounterText() + ", armor " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() + ", shields " + ship.m_shieldPoints + ", systems " + string.Join( ",", Array.ConvertAll( SystemHealth(), h => h.ToString() ) ) + ", fuel " + Endurium() );
+			Log( "playthrough-12: after the first part of the fight: " + PtEncounterText() + ", armor " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() + ", shields " + ship.m_shieldPoints + ", systems " + string.Join( ",", Array.ConvertAll( SystemHealth(), h => h.ToString() ) ) + ", fuel " + Endurium() );
 
 			Check( "playthrough-12: the ship survives the first part of the fight", !CombatController.m_instance.PlayerIsDestroyed() && ( ship.m_armorPoints > 0 ), "armor " + ship.m_armorPoints );
 		}
@@ -34667,7 +34684,8 @@ public class ClaudeProbe : MonoBehaviour
 		return text.Trim();
 	}
 
-	// stage 13: the game saved in the fight with the Uhlek is loaded, and the fight goes on until a ship is destroyed, then the ship flies out
+	// stage 13: the game saved in the fight with the Uhlek is loaded, and the fight goes on until the weapons have hit and the shields are gone, then the ship
+	// flies out
 	IEnumerator ScenarioPlaythrough13()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -34688,7 +34706,9 @@ public class ClaudeProbe : MonoBehaviour
 		{
 			var armorBefore = ship.m_armorPoints;
 
-			yield return PtFight( 60.0f, result );
+			// once the weapons have hit and the shields are gone the captain breaks off, with the hull whole enough for the flight out of the encounter (the Uhlek
+			// scouts' class 5 missiles take 200 points a hit)
+			yield return PtFight( 60.0f, result, () => ship.m_shieldPoints <= 0 );
 
 			s_ptEncounters.Add( "Uhlek 261 after loading: " + result[ 0 ] + " destroyed, armor " + armorBefore + " -> " + ship.m_armorPoints );
 
