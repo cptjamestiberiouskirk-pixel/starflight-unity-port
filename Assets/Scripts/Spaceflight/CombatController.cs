@@ -187,7 +187,17 @@ public class CombatController : MonoBehaviour
 		{
 			missile.Cancel();
 		}
+
+		// a missile that is cancelled never calls back, so none of the aliens' is in the air any more
+		m_alienMissilesInFlight = 0;
 	}
+
+	// the aliens' missiles in the air, and how many there can be (COMBAT-OV WDFD2: fewer than 10 for another to be launched)
+	int m_alienMissilesInFlight;
+	const int c_maximumAlienMissilesInFlight = 10;
+
+	// how near the place an alien missile was aimed at the ship has to be for it to be hit (the port's map cell)
+	const float c_alienMissileHitRadius = 100.0f;
 
 	/// <summary>
 	/// True once the player ship has been destroyed (its explosion may still be playing, and the game over screen follows it).
@@ -897,7 +907,10 @@ public class CombatController : MonoBehaviour
 
 			ApplyDamageToPlayer( damage, direction );
 		}
-		else if ( vessel.m_missileClass > 0 )
+
+		// a ship with a missile launcher launches its missiles as well as firing its laser (COMBAT-OV <COMBAT> rolls the laser, WECEA, and the missile, WEC95, each
+		// on its own), while fewer than 10 of the aliens' missiles are in the air (WDFD2)
+		if ( !vessel.m_hasPlasmaBolts && ( vessel.m_missileClass > 0 ) && ( m_alienMissilesInFlight < c_maximumAlienMissilesInFlight ) )
 		{
 			// fire missile
 			var missile = GetAvailableMissile();
@@ -906,8 +919,16 @@ public class CombatController : MonoBehaviour
 				var playerShip = SpaceflightController.m_instance.m_playerShip;
 				int damage = c_missileDamage[ Mathf.Clamp( vessel.m_missileClass, 0, c_missileDamage.Length - 1 ) ];
 
-				missile.Fire( alienPosition, playerShip.transform, ( hitPosition, didHit ) =>
+				m_alienMissilesInFlight++;
+
+				// it flies to where the ship was when it was launched, and only the plasma bolt follows the ship (COMBAT-OV WE929): it hits if the ship is still
+				// within a cell of that place (the original's map cell; the port's cell is 100 units, as the laser's range of 800 is the original's 7 cells)
+				missile.Fire( alienPosition, playerShip.transform.position, ( hitPosition, reachedTarget ) =>
 				{
+					m_alienMissilesInFlight = Mathf.Max( 0, m_alienMissilesInFlight - 1 );
+
+					var didHit = reachedTarget && !m_playerIsDestroyed && ( Vector3.Distance( SpaceflightController.m_instance.m_playerShip.transform.position, hitPosition ) <= c_alienMissileHitRadius );
+
 					if ( didHit )
 					{
 						// what hit the ship, in the original's words (DAMAGE-OV: MISSILE CLASS n)
