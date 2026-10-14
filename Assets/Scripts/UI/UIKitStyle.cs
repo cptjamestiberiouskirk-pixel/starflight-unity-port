@@ -52,10 +52,10 @@ public class UIKitStyle : MonoBehaviour
 	}
 #endif
 
-	// gives the element its look
+	// gives the element its look (in the theme of the 3D views when it is drawn over one: dark in either mode)
 	public void Apply()
 	{
-		var theme = UIKitTheme.Get();
+		var theme = UIKitTheme.IsOverView( this ) ? UIKitTheme.GetViewTheme() : UIKitTheme.Get();
 
 		if ( theme == null )
 		{

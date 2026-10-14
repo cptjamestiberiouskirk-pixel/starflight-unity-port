@@ -80,7 +80,8 @@ public class TerrainObjectLabel : MonoBehaviour
 		// the text, in the UI kit's small label style (its font, capitals and spacing; the size is the label's own, in world units)
 		m_textMesh = m_labelObject.AddComponent<TextMeshPro>();
 
-		var theme = UIKitTheme.Get();
+		// (over the terrain, so in the theme of the 3D views: dark in either mode)
+		var theme = UIKitTheme.GetViewTheme();
 
 		if ( theme != null )
 		{

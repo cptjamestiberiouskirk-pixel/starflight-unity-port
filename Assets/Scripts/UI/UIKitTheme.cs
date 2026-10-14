@@ -419,6 +419,21 @@ public class UIKitTheme : ScriptableObject
 		return Get() == Load( Mode.Dark );
 	}
 
+	// returns the theme of what is drawn over the 3D views (the main viewport: its frame, labels and target bracket, the starmap and the ship's log, and
+	// the labels on the terrain): the dark theme of the scheme in use, in either mode, since space and the planets' surfaces are dark
+	public static UIKitTheme GetViewTheme()
+	{
+		var theme = LoadScheme( GetScheme(), Mode.Dark );
+
+		return ( theme != null ) ? theme : Load( Mode.Dark );
+	}
+
+	// whether this is drawn over a 3D view: it is in the main viewport (under the object that has the Viewport)
+	public static bool IsOverView( Component component )
+	{
+		return ( component != null ) && ( component.GetComponentInParent<Viewport>( true ) != null );
+	}
+
 	// returns the mode in use (the player's setting, dark if there is none or it cannot be read)
 	public static Mode GetMode()
 	{
@@ -474,6 +489,7 @@ public class UIKitTheme : ScriptableObject
 	{
 		// the message colours are made from the theme, so they are made again
 		s_messageColourTags = null;
+		s_viewColourTags = null;
 
 		Changed?.Invoke();
 	}
@@ -623,37 +639,59 @@ public class UIKitTheme : ScriptableObject
 		( "#ff0000", ColorRole.TextAlert ),
 		( "#ffa500", ColorRole.TextWarning ),
 		( "#e6f0ff", ColorRole.TextPrimary ),
+		// the terrain scan's count of lifeforms (it was pink), in the colour of the label the scan puts on a lifeform
+		( "#ff80ff", ColorRole.TextAlert ),
 	};
 
-	// the tags as they are written (<color=green> and <color="green">) and what they become, made the first time
+	// the tags as they are written (<color=green> and <color="green">) and what they become in the theme in use, made the first time
 	static (string from, string to)[] s_messageColourTags;
+
+	// the same for the theme of the 3D views, when it is another one
+	static (string from, string to)[] s_viewColourTags;
 
 	// returns the text with the colours of its colour tags turned into the kit's (the message box shows its messages through this, so the game's code keeps its tags)
 	public static string KitColors( string text )
 	{
-		var theme = Get();
+		return KitColors( text, false );
+	}
+
+	// returns the text with its colour tags in the colours of the theme in use, or of the theme of the 3D views for a text drawn over one
+	public static string KitColors( string text, bool overView )
+	{
+		var theme = overView ? GetViewTheme() : Get();
 
 		if ( string.IsNullOrEmpty( text ) || ( theme == null ) || ( text.IndexOf( "<color=", System.StringComparison.OrdinalIgnoreCase ) < 0 ) )
 		{
 			return text;
 		}
 
-		if ( s_messageColourTags == null )
+		var tags = overView ? s_viewColourTags : s_messageColourTags;
+
+		if ( tags == null )
 		{
-			var tags = new System.Collections.Generic.List<(string, string)>();
+			var list = new System.Collections.Generic.List<(string, string)>();
 
 			foreach ( var ( tag, role ) in c_messageColours )
 			{
 				var to = "<color=#" + ColorUtility.ToHtmlStringRGB( theme.GetColor( role ) ) + ">";
 
-				tags.Add( ( "<color=" + tag + ">", to ) );
-				tags.Add( ( "<color=\"" + tag + "\">", to ) );
+				list.Add( ( "<color=" + tag + ">", to ) );
+				list.Add( ( "<color=\"" + tag + "\">", to ) );
 			}
 
-			s_messageColourTags = tags.ToArray();
+			tags = list.ToArray();
+
+			if ( overView )
+			{
+				s_viewColourTags = tags;
+			}
+			else
+			{
+				s_messageColourTags = tags;
+			}
 		}
 
-		foreach ( var ( from, to ) in s_messageColourTags )
+		foreach ( var ( from, to ) in tags )
 		{
 			text = ReplaceIgnoringCase( text, from, to );
 		}
