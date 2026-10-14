@@ -90,6 +90,9 @@ jobs:
           testMode: editmode
           # pull requests and pushes have no inputs, so they always use the project's version
           unityVersion: ${{ inputs.unityVersion || 'auto' }}
+          # the game-ci CLI release to run: "latest" (the default) asks GitHub's API on every run, and an unauthenticated 403 from it failed the
+          # run before Unity was even reached (master, 2026-10-14); a pinned tag is downloaded without the API. Raise it by hand with a new release.
+          cliVersion: v0.1.72
 
       # list committed files Unity rewrote during the run (for example
       # Packages/packages-lock.json after a manifest change, or ProjectSettings
