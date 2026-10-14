@@ -1,11 +1,11 @@
-"""The player's Arth ship made with Meshy (Blender 5.2, background mode).
+"""The player's textured Arth ship (Blender 5.2, background mode).
 
 blender --background --factory-startup --python DevTools/ShipModels/import_meshy_arth.py -- DevTools/ShipModels/meshy-arth.json --source <folder> [--preview <png>] [--no-export]
 
 The game shows the ship's equipment: four scripts (PlayerShip, StatusDisplay, Disembarked, ShipConfigurationPanel) switch the
 16 cargo pods, the laser cannon and the missile launchers on and off, through the nodes of Arth Ship.FBX that the scenes
 reference by their names. So the new ship keeps the old file's tree: this script makes that tree anew (never from the file,
-which it overwrites), puts the Meshy hull (one GLB) where the old hull was, splits the Meshy sheet of parts (a second GLB: a
+which it overwrites), puts the new hull (one GLB) where the old hull was, splits the new sheet of parts (a second GLB: a
 cargo pod, a laser turret and a missile launcher) and puts them where the hull has room for them, and writes the FBX with
 the same names, the same root and the same units. The old file is in inches; Blender writes centimetres, so the parts go out in centimetres under a root of
 0.01 (a round trip of the old model through these settings gives the same transforms and bounds in Unity).
@@ -105,7 +105,7 @@ def build_nodes():
     nodes["Laser Cannon"] = node("Laser Cannon", root, False)
     nodes["Laser"] = node("Laser", nodes["Laser Cannon"], True)
 
-    # the old cannon had a separate base; the Meshy turret is one piece, so its base node stays as an empty node
+    # the old cannon had a separate base; the new turret is one piece, so its base node stays as an empty node
     nodes["Laser Base"] = node("Laser Base", nodes["Laser Cannon"], False)
     nodes["Missile Launchers"] = node("Missile Launchers", root, False)
     nodes["Missile Launcher - Left"] = node("Missile Launcher - Left", nodes["Missile Launchers"], True)
@@ -118,7 +118,7 @@ def build_nodes():
 
 
 def place_hull(hull_obj, glb_obj):
-    """Put the Meshy hull where the old hull was, in the root's frame (inches), and give the old Hull node its mesh."""
+    """Put the new hull where the old hull was, in the root's frame (inches), and give the old Hull node its mesh."""
     mesh = glb_obj.data
     points = vertices_of(mesh)
     low, high = bounds(points)
@@ -323,7 +323,7 @@ def scaled_copy(mesh, factor, name):
 def assemble(nodes, hull, pod, turret, launcher, parts_image):
     length = HULL_BACK - HULL_FRONT
 
-    # ---- cargo pods: the Meshy spine is thicker and shorter than the old one, so the 16 pods go in rings of four, an upper and
+    # ---- cargo pods: the new spine is thicker and shorter than the old one, so the 16 pods go in rings of four, an upper and
     # a lower pod on each side (from above still two rows along the spine, as in the original's picture), each pod's top
     # facing out; ring 1 is nearest the fork, and in each ring the upper pods come first: pod 4r+1 upper -X, 4r+2 upper +X,
     # 4r+3 lower -X, 4r+4 lower +X
@@ -403,9 +403,9 @@ def assemble(nodes, hull, pod, turret, launcher, parts_image):
 
 
 def glow_faces(obj, maps, faces, strength, glass=None):
-    """Light the bright texels of the given faces in the emissive map (the cockpit's windows, the engines' nozzles: Meshy
+    """Light the bright texels of the given faces in the emissive map (the cockpit's windows, the engines' nozzles: the model
     paints them near white, so their colour alone cannot find them, but where they are on the hull can). With glass (a
-    colour), the faces' dark grey texels glow that colour instead: the cockpit's canopy, which Meshy paints as dark glass."""
+    colour), the faces' dark grey texels glow that colour instead: the cockpit's canopy, which the model paints as dark glass."""
     albedo_image = bpy.data.images.load(os.path.join(ship_kit.PROJECT_ROOT, maps["Albedo"]))
     emissive_path = os.path.join(ship_kit.PROJECT_ROOT, maps["Emissive"])
     emissive_image = bpy.data.images.load(emissive_path)

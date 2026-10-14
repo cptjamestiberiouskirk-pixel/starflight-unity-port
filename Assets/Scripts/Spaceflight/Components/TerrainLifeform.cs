@@ -61,7 +61,7 @@ public class TerrainLifeform : MonoBehaviour
 	const float c_floatingHeight = 3.0f;
 
 	// the notes' ground-air transitions (lf-words.txt): "?WANTS-TO-FLY : Some randomly determined chance with a fairly high %", "?WANTS-TO-LAND : Some randomly
-	// determined chance with a low to moderate %" - the chances at each step of the behaviour are the port's, ruled by the owner - and "?OK-TO-LAND : Fasle if
+	// determined chance with a low to moderate %" - the chances at each step of the behaviour are the port's own, by design decision - and "?OK-TO-LAND : Fasle if
 	// the square the alien is on is liquid, lava, or occupied by another alien or the player", the square taken as half of one around it
 	const float c_wantsToFlyChance = 0.75f;
 
@@ -254,7 +254,7 @@ public class TerrainLifeform : MonoBehaviour
 			m_hits = 0;
 			m_status = Status.Dead;
 
-			// a dead flyer or floater comes down ("LAND <-- ?ALIVE FALSE ?ON-GROUND FALSE ?OK-TO-LAND TRUE", and over a liquid onto its surface, the owner's ruling)
+			// a dead flyer or floater comes down ("LAND <-- ?ALIVE FALSE ?ON-GROUND FALSE ?OK-TO-LAND TRUE", and over a liquid onto its surface, by design decision)
 			if ( IsAirborne() )
 			{
 				Land();

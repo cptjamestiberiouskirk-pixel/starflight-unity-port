@@ -81,7 +81,7 @@ public class PD_PlayerShip
 	public const int c_repairItemCount = (int) ShipSystem.Count + 1;
 
 	// the repair mineral of the hull and of each system, by its name in the game data, and how much of it the engineer needs: a cubic meter for every tenth
-	// repaired (the owner's ruling of 2026-10-11 for roadmap 1.2 - the original's engineer asks for "2 cubic meters of Molybdenum", "5 cubic meters of Aluminum",
+	// repaired (decided 2026-10-11 for roadmap 1.2 - the original's engineer asks for "2 cubic meters of Molybdenum", "5 cubic meters of Aluminum",
 	// SS Repair; which mineral goes with which system is the port's choice)
 	static readonly string[] c_repairMinerals = { "Aluminum", "Molybdenum", "Copper", "Silver", "Titanium", "Iron", "Platinum" };
 	public const int c_repairMineralPerTenth = 10;
@@ -307,13 +307,13 @@ public class PD_PlayerShip
 		m_systemHealth[ (int) system ] = Mathf.Clamp( health, 0, 100 );
 	}
 
-	// how much of its work a system does, from 0 to 1: a damaged system works in proportion to its health (the owner's ruling of 2026-10-11 for roadmap 1.2)
+	// how much of its work a system does, from 0 to 1: a damaged system works in proportion to its health (decided 2026-10-11 for roadmap 1.2)
 	public float GetSystemFactor( ShipSystem system )
 	{
 		return GetSystemHealth( system ) / 100.0f;
 	}
 
-	// the health below which the sensors give no readings (the owner's ruling of 2026-10-11)
+	// the health below which the sensors give no readings (decided 2026-10-11)
 	public const int c_sensorsNeedHealth = 25;
 
 	// true if the ship has this system (the engines, the sensors and the comm always; the shields, the missiles and the lasers once they are installed)
@@ -384,7 +384,7 @@ public class PD_PlayerShip
 	}
 
 	// a hit that has got through the shields damages the hull (the armor points) and one of the ship's other systems, chosen at random, by the same share of it as of
-	// the hull (the owner's ruling of 2026-10-11 for roadmap 1.2; the share is the port's choice) - returns the system it damaged (Count if none)
+	// the hull (decided 2026-10-11 for roadmap 1.2; the share is the port's choice) - returns the system it damaged (Count if none)
 	public ShipSystem DamageRandomSystem( int damage )
 	{
 		var maximumArmor = GetMaximumArmorPoints();
@@ -823,7 +823,7 @@ public class PD_PlayerShip
 	}
 
 	// true if a repair item works at all (the original's Repair shows "CURRENT FUNCTIONALITY: OPERATIVE" or "INOPERATIVE"): a system works in proportion to its
-	// health, and not at all at 0, and the sensors give no readings below c_sensorsNeedHealth (the owner's rulings of 2026-10-11); the hull while it has armor
+	// health, and not at all at 0, and the sensors give no readings below c_sensorsNeedHealth (decided 2026-10-11); the hull while it has armor
 	// points
 	public bool IsRepairItemOperative( int item )
 	{

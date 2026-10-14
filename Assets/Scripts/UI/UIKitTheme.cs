@@ -9,7 +9,7 @@ public class UIKitTheme : ScriptableObject
 	// the name of the asset in Resources
 	public const string c_resourceName = "UI Kit Theme";
 
-	// the name of the light mode's asset in Resources: the kit in steel grey (the owner's request of 2026-10-13)
+	// the name of the light mode's asset in Resources: the kit in steel grey (added 2026-10-13)
 	public const string c_lightResourceName = "UI Kit Theme Light";
 
 	// the two modes every colour scheme has (the classic scheme's are the dark look the kit was drawn with and a light one in steel grey); the player
@@ -48,7 +48,7 @@ public class UIKitTheme : ScriptableObject
 	public const string c_schemeFolder = "UI Kit Themes/";
 
 	// the kit's colour schemes, in the order the save panel's Colors screen shows them: the kit as it was drawn (the default), the two original
-	// games' own colours, and the twelve palettes the owner kept on 2026-10-14 (the player picks one at any time; each has a dark and a light mode)
+	// games' own colours, and the twelve palettes chosen on 2026-10-14 (the player picks one at any time; each has a dark and a light mode)
 	public static readonly Scheme[] c_schemes =
 	{
 		new Scheme( "Classic", "The kit as it was drawn: ice cyan on navy, and steel gray", c_resourceName, c_lightResourceName ),
@@ -136,7 +136,7 @@ public class UIKitTheme : ScriptableObject
 	public Color m_statusDanger = Hex( 0xFF5A6A );
 
 	[Header( "Sensor window" )]
-	// the window the sensor pictures are drawn on: steel blue, light enough that a vessel's black silhouette stands out on it (the original's was magenta; the owner chose steel blue on 2026-10-11)
+	// the window the sensor pictures are drawn on: steel blue, light enough that a vessel's black silhouette stands out on it (the original's was magenta; steel blue was chosen on 2026-10-11)
 	public Color m_sensorWindow = Hex( 0x2E4A73 );
 
 	[Header( "Text styles" )]

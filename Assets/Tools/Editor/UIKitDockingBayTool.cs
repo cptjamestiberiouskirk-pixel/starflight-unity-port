@@ -4,7 +4,7 @@ using UnityEditor;
 using UnityEngine;
 
 // gives the docking bay (the hangar the ship waits in before launch, in the Spaceflight scene) the colours of the UI kit, as the Starport concourse has them
-// (the owner's choice of 2026-10-12 for the concourse: the kit's colours with a soft glow, the same geometry): blue grey metal instead of grey,
+// (chosen 2026-10-12 for the concourse: the kit's colours with a soft glow, the same geometry): blue grey metal instead of grey,
 // Interstel's logo on the doors in the kit's amber and glowing, and amber sirens
 public static class UIKitDockingBayTool
 {

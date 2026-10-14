@@ -3,7 +3,7 @@ using UnityEngine;
 
 // the engineer's Repair, as the original's (ENGINEER in the decompiled original, (/REPAIR)): the DAMAGE display with a cursor that the stick moves up and down
 // its seven rows, the text window telling about the row under the cursor, and the fire button choosing what to repair - the engineer then asks for the
-// repair's mineral (SS Repair: "Captain, we need 2 cubic meters of Molybdenum for repairs. Shall I take this from cargo?"), the owner's ruling of 2026-10-12
+// repair's mineral (SS Repair: "Captain, we need 2 cubic meters of Molybdenum for repairs. Shall I take this from cargo?"), decided 2026-10-12
 // (which replaced the engineer repairing the worst first)
 public class RepairButton : ShipButton
 {

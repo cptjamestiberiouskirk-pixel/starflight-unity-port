@@ -3,7 +3,7 @@
 // wire.ps1 copies this file into Assets/, runs Unity in batch mode with
 //   -executeMethod ShipModelWiring.Run -shipManifest <manifest.json>
 // and removes it again. For every material of the manifest it makes (or updates) an SF - Standard material next to
-// the models, of flat colours or with the maps the manifest names (a Meshy model, import_meshy.py); for every vessel it sets up the import of its model and debris FBX (scale 1, materials remapped to those
+// the models, of flat colours or with the maps the manifest names (a textured model, import_meshy.py); for every vessel it sets up the import of its model and debris FBX (scale 1, materials remapped to those
 // materials), puts an inactive instance of the model under the other model templates of the Encounter location
 // (layer Encounter), and points the vessel's slots of Encounter.m_alienShipModelTemplate and m_alienShipDebrisTemplate
 // at the instance and the debris model. Running it again replaces what an earlier run made.
@@ -315,7 +315,7 @@ public static class ShipModelWiring
 		importer.materialImportMode = ModelImporterMaterialImportMode.ImportStandard;
 		importer.materialLocation = ModelImporterMaterialLocation.InPrefab;
 
-		// a model made again with other materials (a Meshy model in place of a procedural one) drops the remaps of the old ones
+		// a model made again with other materials (a textured model in place of a procedural one) drops the remaps of the old ones
 		var remaps = new List<AssetImporter.SourceAssetIdentifier>( importer.GetExternalObjectMap().Keys );
 
 		foreach ( var remap in remaps )

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 // a species of lifeform of a planet - the original's kernel made them per planet in code (dir.txt: VITA-OV, HP-OV and LP-OV), which is not in the sources, so they are
 // made here from the planet's seed and its bio density with the species record of the 1984 design notes (planet.txt, lf-words.txt): body plan, niche, size,
-// hit points, aggression, intelligence, stun points, movement and composition - the owner's ruling of 2026-10-11 (roadmap D3: rebuild from the notes); the
+// hit points, aggression, intelligence, stun points, movement and composition - decided 2026-10-11 (roadmap D3: rebuild from the notes); the
 // ranges and the kinds are the port's, where the notes give none
 public class GD_Species
 {

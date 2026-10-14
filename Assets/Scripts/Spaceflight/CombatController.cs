@@ -54,7 +54,7 @@ public class CombatController : MonoBehaviour
 	// what destroyed the player ship, when it was not the damage it took (null for that) - the game over screen says it
 	string m_gameOverCause;
 
-	// the Shimmering Ball cloaks the ship in combat, and a shot of the player drops the cloak for a while (the owner's ruling of 2026-10-10; how long is the port's
+	// the Shimmering Ball cloaks the ship in combat, and a shot of the player drops the cloak for a while (decided 2026-10-10; how long is the port's
 	// choice) - the time until it cloaks the ship again
 	const float c_uncloakedTime = 3.0f;
 	float m_uncloakedTimer;
