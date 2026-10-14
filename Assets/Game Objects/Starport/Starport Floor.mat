@@ -16,6 +16,7 @@ Material:
   - SF_DETAILNORMALMAP_ISCOMPRESSED
   - SF_DETAILNORMALMAP_ON
   - SF_EMISSIVEMAP_ON
+  - SF_PALETTEMAP_ON
   - SF_SPECULAR_ON
   m_InvalidKeywords:
   - ALBEDOMAP_ON
@@ -128,7 +129,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: 8958e563394ef64439bdb3b5bfb4bc56, type: 3}
+        m_Texture: {fileID: 2800000, guid: 78d1f6b294adf9144a12442f516b7cbe, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
@@ -224,6 +225,11 @@ Material:
     - SF_EmissiveColor: {r: 0, g: 0, b: 0, a: 1}
     - SF_EmissiveTint: {r: 0.21529411, g: 0.8117647, b: 0.9, a: 0.9}
     - SF_NormalMapScaleOffset: {r: 2, g: 2, b: 0, a: 0}
+    - SF_PaletteColor0: {r: 0.101960786, g: 0.15294118, b: 0.25882354, a: 1}
+    - SF_PaletteColor1: {r: 0.23921569, g: 0.9019608, b: 1, a: 1}
+    - SF_PaletteColor2: {r: 0.019607844, g: 0.02745098, b: 0.050980393, a: 1}
+    - SF_PaletteColor3: {r: 0.14117648, g: 0.21176471, b: 0.3529412, a: 1}
+    - SF_PaletteColor4: {r: 0.039215688, g: 0.05882353, b: 0.10980392, a: 1}
     - SF_ReflectionColor: {r: 1, g: 1, b: 1, a: 1}
     - SF_SpecularColor: {r: 0.08, g: 0.08, b: 0.08, a: 1}
     - SpecularColor: {r: 0.25, g: 0.25, b: 0.25, a: 1}

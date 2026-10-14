@@ -9,6 +9,14 @@ Shader "Starflight/Standard"
 		_DetailAlbedoMap( "Detail Albedo Map", 2D ) = "white" {}
 		SF_AlbedoColor( "Albedo Color", Color ) = ( 1, 1, 1, 1 )
 
+		/* Palette (SF_PALETTEMAP_ON: the albedo map holds the weights of the first four colours, the fifth takes what is left) */
+
+		SF_PaletteColor0( "Palette Color 0 (Red)", Color ) = ( 1, 1, 1, 1 )
+		SF_PaletteColor1( "Palette Color 1 (Green)", Color ) = ( 1, 1, 1, 1 )
+		SF_PaletteColor2( "Palette Color 2 (Blue)", Color ) = ( 1, 1, 1, 1 )
+		SF_PaletteColor3( "Palette Color 3 (Alpha)", Color ) = ( 1, 1, 1, 1 )
+		SF_PaletteColor4( "Palette Color 4 (Rest)", Color ) = ( 1, 1, 1, 1 )
+
 		SF_SpecularMap( "Specular Map", 2D ) = "gray" {}
 		SF_SpecularColor( "Specular Color", Color ) = ( 0.5, 0.5, 0.5, 1 )
 		SF_Smoothness( "Smoothness", Range( 0, 1 ) ) = 0.5
@@ -108,6 +116,7 @@ Shader "Starflight/Standard"
 
 				#pragma shader_feature SF_ALBEDOMAP_ON
 				#pragma shader_feature SF_DETAILALBEDOMAP_ON
+				#pragma shader_feature SF_PALETTEMAP_ON
 				#pragma shader_feature SF_ALPHA_ON
 				#pragma shader_feature SF_ALPHATEST_ON
 				#pragma shader_feature SF_SPECULARMAP_ON
@@ -152,6 +161,7 @@ Shader "Starflight/Standard"
 
 				#pragma shader_feature SF_ALBEDOMAP_ON
 				#pragma shader_feature SF_DETAILALBEDOMAP_ON
+				#pragma shader_feature SF_PALETTEMAP_ON
 				#pragma shader_feature SF_ALPHA_ON
 				#pragma shader_feature SF_ALPHATEST_ON
 				#pragma shader_feature SF_SPECULARMAP_ON

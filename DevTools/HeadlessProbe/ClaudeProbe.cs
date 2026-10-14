@@ -1284,6 +1284,14 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarmapColors();
 				break;
 
+			case "starport-hallcolors":
+				yield return ScenarioStarportHallColors();
+				break;
+
+			case "stationcolors":
+				yield return ScenarioStationColors();
+				break;
+
 			case "viewoverlays":
 				yield return ScenarioViewOverlays();
 				break;
@@ -31183,6 +31191,292 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "starmapcolors: " + pictures.Count + " pictures" + ( ( folder != "" ) ? " in " + folder : "" ) );
 
 		Finish( "scenario=starmapcolors checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the Starport station in the scheme's colours
+
+	// the station's materials that take the scheme's colours, with the theme's roles of their albedo and glow and the glow's strength, and their colours in the
+	// 1986 Starport (the original's EGA colours, which the original games' schemes give the station) and whether they glowed there (StarportColours' table,
+	// written out here so that the probe also runs on the code before it), and the floor's palette in roles and in 1986 colours
+	static readonly (string name, UIKitTheme.ColorRole albedo, UIKitTheme.ColorRole glow, float strength, string original, bool originalGlows)[] c_stationMaterials =
+	{
+		( "Starport Hull - Black", UIKitTheme.ColorRole.BackgroundPanel, UIKitTheme.ColorRole.Keep, 0.0f, "262626", false ),
+		( "Starport Hull - Dark", UIKitTheme.ColorRole.BorderDefault, UIKitTheme.ColorRole.Keep, 0.0f, "555555", false ),
+		( "Starport Hull - Light", UIKitTheme.ColorRole.TextSecondary, UIKitTheme.ColorRole.Keep, 0.0f, "AAAAAA", false ),
+		( "Starport Hull - Edge", UIKitTheme.ColorRole.TextSecondary, UIKitTheme.ColorRole.Keep, 0.0f, "FFFFFF", false ),
+		( "Starport Wall", UIKitTheme.ColorRole.SensorWindow, UIKitTheme.ColorRole.Keep, 0.0f, "0000AA", false ),
+		( "Starport Doors", UIKitTheme.ColorRole.AccentPrimaryDim, UIKitTheme.ColorRole.AccentPrimary, 0.3f, "AA0000", false ),
+		( "Starport Pad - Inside", UIKitTheme.ColorRole.BackgroundPanel, UIKitTheme.ColorRole.Keep, 0.0f, "555555", false ),
+		( "Starport Pad - Outside", UIKitTheme.ColorRole.BorderDefault, UIKitTheme.ColorRole.Keep, 0.0f, "AAAAAA", false ),
+		( "Starport Pad - Edge", UIKitTheme.ColorRole.AccentSecondary, UIKitTheme.ColorRole.AccentSecondary, 0.5f, "AA5500", true )
+	};
+
+	static readonly UIKitTheme.ColorRole[] c_stationFloorPalette = { UIKitTheme.ColorRole.BackgroundHover, UIKitTheme.ColorRole.AccentPrimary, UIKitTheme.ColorRole.BackgroundApp, UIKitTheme.ColorRole.BorderDefault, UIKitTheme.ColorRole.BackgroundPanel };
+	static readonly string[] c_stationOriginalFloorPalette = { "55FFFF", "55FFFF", "000000", "555555", "5555FF" };
+
+	// a colour written as RRGGBB
+	static Color StationHex( string hex )
+	{
+		ColorUtility.TryParseHtmlString( "#" + hex, out var colour );
+
+		return colour;
+	}
+
+	// the renderers of the loaded scenes that draw with one of the station's materials (hidden ones too), each with the index of that material
+	static List<(Renderer renderer, int index, Material material)> StationMaterialSlots()
+	{
+		var slots = new List<(Renderer renderer, int index, Material material)>();
+
+		foreach ( var stationRenderer in Resources.FindObjectsOfTypeAll<Renderer>() )
+		{
+			if ( !stationRenderer.gameObject.scene.IsValid() || !stationRenderer.gameObject.scene.isLoaded )
+			{
+				continue;
+			}
+
+			var materials = stationRenderer.sharedMaterials;
+
+			for ( var i = 0; i < materials.Length; i++ )
+			{
+				if ( ( materials[ i ] != null ) && ( ( materials[ i ].name == "Starport Floor" ) || Array.Exists( c_stationMaterials, m => m.name == materials[ i ].name ) ) )
+				{
+					slots.Add( ( stationRenderer, i, materials[ i ] ) );
+				}
+			}
+		}
+
+		return slots;
+	}
+
+	// the colour a renderer draws one of its materials with: its property block's for that material, or the material's own without one (null if neither has it)
+	static Color? StationDrawnColour( Renderer stationRenderer, int index, Material material, string property )
+	{
+		var block = new MaterialPropertyBlock();
+
+		stationRenderer.GetPropertyBlock( block, index );
+
+		if ( !block.isEmpty && block.HasColor( property ) )
+		{
+			return block.GetColor( property );
+		}
+
+		return material.HasProperty( property ) ? material.GetColor( property ) : (Color?) null;
+	}
+
+	// adds to the list what the station is drawn with that is not the theme's colour (the albedo and glow of each material, the floor's palette and its glow);
+	// a colour may be a step of 1/255 off in a channel, since a property block keeps a colour in linear space and a glow's colour is not a whole step
+	static void StationColourFailures( List<(Renderer renderer, int index, Material material)> slots, string label, UIKitTheme theme, List<string> failures, bool original = false )
+	{
+		Action<string, Color?, Color> compare = ( what, drawn, expected ) =>
+		{
+			if ( drawn == null )
+			{
+				failures.Add( label + ": " + what + " has no colour" );
+			}
+			else if ( ( Mathf.Abs( drawn.Value.r - expected.r ) > 1.5f / 255.0f ) || ( Mathf.Abs( drawn.Value.g - expected.g ) > 1.5f / 255.0f ) || ( Mathf.Abs( drawn.Value.b - expected.b ) > 1.5f / 255.0f ) )
+			{
+				failures.Add( label + ": " + what + " " + ColorUtility.ToHtmlStringRGB( drawn.Value ) + " not " + ColorUtility.ToHtmlStringRGB( expected ) );
+			}
+		};
+
+		foreach ( var slot in slots )
+		{
+			if ( slot.material.name == "Starport Floor" )
+			{
+				for ( var p = 0; p < c_stationFloorPalette.Length; p++ )
+				{
+					compare( slot.renderer.name + " floor palette " + p, StationDrawnColour( slot.renderer, slot.index, slot.material, "SF_PaletteColor" + p ), original ? StationHex( c_stationOriginalFloorPalette[ p ] ) : theme.GetColor( c_stationFloorPalette[ p ] ) );
+				}
+
+				compare( slot.renderer.name + " floor glow", StationDrawnColour( slot.renderer, slot.index, slot.material, "SF_EmissiveTint" ), original ? Color.black : theme.m_accentPrimary * 0.9f );
+
+				continue;
+			}
+
+			var colours = Array.Find( c_stationMaterials, m => m.name == slot.material.name );
+			var albedo = original ? StationHex( colours.original ) : theme.GetColor( colours.albedo );
+			var glow = original ? ( colours.originalGlows ? albedo : Color.black ) : ( colours.glow == UIKitTheme.ColorRole.Keep ) ? Color.black : theme.GetColor( colours.glow ) * colours.strength;
+
+			compare( slot.renderer.name + " " + colours.name, StationDrawnColour( slot.renderer, slot.index, slot.material, "SF_AlbedoColor" ), albedo );
+			compare( slot.renderer.name + " " + colours.name + " glow", StationDrawnColour( slot.renderer, slot.index, slot.material, "SF_EmissiveColor" ), glow );
+		}
+	}
+
+	// the Starport's hall (the 3D concourse the astronaut walks in) takes the colours of the UI kit's scheme in use, in its dark mode: the hull, the wall, the
+	// doors and the transporter pad their roles' colours and glows, the floor its palette (the weights of five of the theme's colours) and the glow of its band,
+	// when the scene opens, when another scheme is picked and in the light mode, with the material assets left as they are (pictures with -Graphics)
+	IEnumerator ScenarioStarportHallColors()
+	{
+		var folder = ScreenPictureFolder( "starport-hall-colors" );
+		var pictures = new List<string>();
+
+		yield return Frames( 60 );
+
+		// the scene's fade in has to be over, or the pictures of two runs differ in brightness (it turns its black image off when it is done)
+		for ( var frame = 0; ( frame < 600 ) && ( SceneFadeController.m_instance != null ) && ( SceneFadeController.m_instance.m_fadeImage != null ) && SceneFadeController.m_instance.m_fadeImage.gameObject.activeInHierarchy; frame++ )
+		{
+			yield return null;
+		}
+
+		var slots = StationMaterialSlots();
+		var names = new HashSet<string>();
+
+		foreach ( var slot in slots )
+		{
+			names.Add( slot.material.name );
+		}
+
+		Log( "starport-hallcolors: " + slots.Count + " material slots of " + names.Count + " materials: " + string.Join( ", ", names ) );
+
+		Check( "starport-hallcolors: the hall draws all ten of the station's materials that take the scheme's colours", names.Count == 10, names.Count.ToString() );
+
+		Action<string> take = name =>
+		{
+			if ( folder != "" )
+			{
+				RenderScreenPicture( System.IO.Path.Combine( folder, ( pictures.Count + 1 ).ToString( "00" ) + "_" + name + ".png" ) );
+				pictures.Add( name );
+			}
+		};
+
+		var failures = new List<string>();
+
+		// ---- the classic scheme, then every other one, picked while the hall is open
+		UIKitTheme.SetScheme( 0, false );
+		UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+		yield return Frames( 3 );
+
+		StationColourFailures( slots, "Classic", UIKitTheme.LoadScheme( 0, UIKitTheme.Mode.Dark ), failures );
+		take( "Classic" );
+
+		var classicFailures = failures.Count;
+
+		// (the original games' schemes give the hall the 1986 Starport's colours, and are checked on their own)
+		var originalFailures = new List<string>();
+
+		for ( var scheme = 1; scheme < UIKitTheme.c_schemes.Length; scheme++ )
+		{
+			UIKitTheme.SetScheme( scheme, false );
+
+			yield return Frames( 3 );
+
+			var schemeName = UIKitTheme.c_schemes[ scheme ].m_name;
+			var original = ( schemeName == "Starflight" ) || ( schemeName == "Starflight 2" );
+
+			StationColourFailures( slots, schemeName, UIKitTheme.LoadScheme( scheme, UIKitTheme.Mode.Dark ), original ? originalFailures : failures, original );
+			take( schemeName.Replace( ' ', '_' ) );
+		}
+
+		var schemeFailures = failures.Count - classicFailures;
+
+		// ---- a light mode: the hall keeps the scheme's dark colours
+		UIKitTheme.SetScheme( 13, false );
+		UIKitTheme.SetMode( UIKitTheme.Mode.Light, false );
+
+		yield return Frames( 3 );
+
+		StationColourFailures( slots, UIKitTheme.c_schemes[ 13 ].m_name + " in the light mode", UIKitTheme.LoadScheme( 13, UIKitTheme.Mode.Dark ), failures );
+		take( "Night_Ops_light_mode" );
+
+		var lightFailures = failures.Count - classicFailures - schemeFailures;
+
+		// the first few failures of each part
+		Action<string, int, int> logFailures = ( what, first, count ) =>
+		{
+			if ( count > 0 )
+			{
+				Log( "starport-hallcolors: " + what + " " + count + " failures: " + string.Join( " | ", failures.GetRange( first, Mathf.Min( 6, count ) ) ) );
+			}
+		};
+
+		logFailures( "classic", 0, classicFailures );
+		logFailures( "other schemes", classicFailures, schemeFailures );
+		logFailures( "light mode", classicFailures + schemeFailures, lightFailures );
+
+		if ( originalFailures.Count > 0 )
+		{
+			Log( "starport-hallcolors: original games' schemes " + originalFailures.Count + " failures: " + string.Join( " | ", originalFailures.GetRange( 0, Mathf.Min( 6, originalFailures.Count ) ) ) );
+		}
+
+		Check( "starport-hallcolors: in the classic scheme the hall has the classic dark theme's colours, its floor the classic palette", classicFailures == 0, classicFailures + " failures" );
+		Check( "starport-hallcolors: the hall takes the colours of each of the twelve other schemes when it is picked", schemeFailures == 0, schemeFailures + " failures" );
+		Check( "starport-hallcolors: in the Starflight and Starflight 2 schemes the hall has the 1986 Starport's colours (a light cyan floor and light blue star, a blue wall, red doors, grey hull and pad, the pad's brown edge glowing)", originalFailures.Count == 0, originalFailures.Count + " failures" );
+		Check( "starport-hallcolors: in a light mode the hall keeps the scheme's dark colours", lightFailures == 0, lightFailures + " failures" );
+
+		// the material assets keep the classic dark theme's colours
+		var classic = UIKitTheme.LoadScheme( 0, UIKitTheme.Mode.Dark );
+		var assetsChanged = new List<string>();
+
+		foreach ( var colours in c_stationMaterials )
+		{
+			var asset = AssetDatabase.LoadAssetAtPath<Material>( "Assets/Game Objects/Starport/" + colours.name + ".mat" );
+
+			if ( ( asset == null ) || ( ColorUtility.ToHtmlStringRGB( asset.GetColor( "SF_AlbedoColor" ) ) != ColorUtility.ToHtmlStringRGB( classic.GetColor( colours.albedo ) ) ) )
+			{
+				assetsChanged.Add( colours.name );
+			}
+		}
+
+		Check( "starport-hallcolors: the station's material assets keep the classic dark theme's colours", assetsChanged.Count == 0, ( assetsChanged.Count == 0 ) ? "all" : string.Join( ", ", assetsChanged ) );
+
+		UIKitTheme.SetScheme( 0, false );
+		UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+		yield return Frames( 3 );
+
+		Log( "starport-hallcolors: " + pictures.Count + " pictures" + ( ( folder != "" ) ? " in " + folder : "" ) );
+
+		Finish( "scenario=starport-hallcolors checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the station the ship launches from in the Spaceflight scene is the same model as the Starport's hall, and takes the scheme's colours there too
+	IEnumerator ScenarioStationColors()
+	{
+		yield return Frames( 30 );
+
+		var slots = StationMaterialSlots();
+		var names = new HashSet<string>();
+
+		foreach ( var slot in slots )
+		{
+			names.Add( slot.material.name );
+		}
+
+		Log( "stationcolors: " + slots.Count + " material slots of " + names.Count + " materials: " + string.Join( ", ", names ) );
+
+		Check( "stationcolors: the Spaceflight scene holds the station's materials", names.Count > 0, names.Count.ToString() );
+
+		var failures = new List<string>();
+
+		// Endurium, then Starflight (the 1986 Starport's colours), then Endurium in the light mode
+		foreach ( var scheme in new[] { 3, 1 } )
+		{
+			UIKitTheme.SetScheme( scheme, false );
+			UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+			yield return Frames( 3 );
+
+			StationColourFailures( slots, UIKitTheme.c_schemes[ scheme ].m_name, UIKitTheme.LoadScheme( scheme, UIKitTheme.Mode.Dark ), failures, scheme == 1 );
+		}
+
+		UIKitTheme.SetScheme( 3, false );
+		UIKitTheme.SetMode( UIKitTheme.Mode.Light, false );
+
+		yield return Frames( 3 );
+
+		StationColourFailures( slots, UIKitTheme.c_schemes[ 3 ].m_name + " in the light mode", UIKitTheme.LoadScheme( 3, UIKitTheme.Mode.Dark ), failures );
+
+		Log( "stationcolors: " + failures.Count + " failures" + ( ( failures.Count > 0 ) ? ": " + string.Join( " | ", failures.GetRange( 0, Mathf.Min( 6, failures.Count ) ) ) : "" ) );
+
+		Check( "stationcolors: the station takes the colours of the scheme picked, in its dark mode in the light mode too", ( slots.Count > 0 ) && ( failures.Count == 0 ), failures.Count + " failures" );
+
+		UIKitTheme.SetScheme( 0, false );
+		UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+		yield return Frames( 3 );
+
+		Finish( "scenario=stationcolors checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// what is drawn over the 3D views keeps the dark colours of the scheme in use in the light mode too (the light mode's dark accents and texts were hard
