@@ -458,16 +458,19 @@ def export_fbx(obj, path):
 
 # ------------------------------------------------------------------------------------------ preview
 
-def _render_view(obj, path, view, resolution):
+def _render_view(obj, path, view, resolution, engine="BLENDER_WORKBENCH"):
     scene = bpy.context.scene
-    scene.render.engine = "BLENDER_WORKBENCH"
+    scene.render.engine = engine
     scene.render.resolution_x = resolution[0]
     scene.render.resolution_y = resolution[1]
     scene.render.film_transparent = True
-    scene.display.shading.light = "STUDIO"
-    scene.display.shading.color_type = "MATERIAL"
-    scene.display.shading.show_cavity = True
-    scene.display.shading.show_object_outline = True
+
+    # the workbench shows each material's flat colour; any other engine renders the scene's lights and materials as they are
+    if engine == "BLENDER_WORKBENCH":
+        scene.display.shading.light = "STUDIO"
+        scene.display.shading.color_type = "MATERIAL"
+        scene.display.shading.show_cavity = True
+        scene.display.shading.show_object_outline = True
 
     corners = [obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
     center = sum(corners, Vector()) / 8.0
@@ -523,10 +526,11 @@ def _fit(pixels, width, height):
     return pixels[rows][:, columns]
 
 
-def preview_sheet(entries, path, tile=(420, 315)):
+def preview_sheet(entries, path, tile=(420, 315), engine="BLENDER_WORKBENCH"):
     """One row per vessel: the original's screenshot, then top, side and three-quarter views.
 
-    entries: (object, screenshot file name or None). Rendered with the workbench engine.
+    entries: (object, screenshot file name or None). Rendered with the workbench engine unless another is given
+    (import_meshy.py renders its textured models with Cycles and lights of its own).
     """
     scratch = tempfile.mkdtemp(prefix="ship-preview-")
     columns = 4
@@ -549,7 +553,7 @@ def preview_sheet(entries, path, tile=(420, 315)):
 
         for view in ("top", "side", "quarter"):
             tile_path = os.path.join(scratch, "%s-%s.png" % (obj.name, view))
-            _render_view(obj, tile_path, view, tile)
+            _render_view(obj, tile_path, view, tile, engine)
             tiles.append(_load_pixels(tile_path))
 
         # blender images are stored bottom row first

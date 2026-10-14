@@ -167,6 +167,10 @@ public class ManeuverButton : ShipButton
 					// yep - remember the planet
 					playerData.m_general.m_currentPlanetId = SpaceflightController.m_instance.m_starSystem.m_planetToOrbitId;
 
+					// the ship holds still for the maneuver (with the engines off it would coast on during the fade, out of the planet's range, and the star
+					// system would report "Outside orbital range." between the orbit's lines)
+					playerData.m_general.m_currentSpeed = 0.0f;
+
 					// fade the map to black
 					SpaceflightController.m_instance.m_viewport.StartFade( 0.0f, 2.0f );
 
