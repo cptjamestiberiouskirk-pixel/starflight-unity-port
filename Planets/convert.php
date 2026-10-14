@@ -1,5 +1,28 @@
 <?php
 
+require __DIR__ . '/admin-session.php';
+
+// only the logged in admin converts, with a POST that carries the session's token
+AdminStartSession( false );
+
+if ( !AdminIsLoggedIn() )
+{
+	http_response_code( 403 );
+	
+	echo 'Please <a href="index.php?login=1">log in</a> as the admin first.';
+	
+	exit;
+}
+
+if ( ( $_SERVER[ 'REQUEST_METHOD' ] !== 'POST' ) || !AdminTokenIsValid() )
+{
+	$token = htmlspecialchars( AdminToken() );
+	
+	echo "<form method=\"post\"><input type=\"hidden\" name=\"token\" value=\"{$token}\"><button type=\"submit\">Convert the planet screenshots</button></form>";
+	
+	exit;
+}
+
 ob_end_flush();
 
 ob_implicit_flush();

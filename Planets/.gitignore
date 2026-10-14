@@ -2,3 +2,7 @@
 # phpstorm
 
 .idea/*
+
+# the admin password's hash (see admin-config.example.php)
+
+admin-config.php
