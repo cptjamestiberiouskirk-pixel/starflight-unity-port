@@ -120,46 +120,10 @@ public static class UIKitBuilder
 	// (fill 0 is an outline 3 pixels wide, 1 is filled, 2 is filled with a glow around it)
 	static Sprite MakeBullet( string fileName, Color color, float fill, System.Text.StringBuilder report )
 	{
-		const int size = 48;
-		const float centre = size / 2.0f;
-		const float radius = 15.0f;
-		var pixels = new Color32[ size * size ];
+		const int size = UIKitTheme.c_bulletSize;
 
-		for ( var y = 0; y < size; y++ )
-		{
-			for ( var x = 0; x < size; x++ )
-			{
-				var coverage = 0.0f;
-				var glow = 0.0f;
-
-				// 4 x 4 samples per pixel
-				for ( var sy = 0; sy < 4; sy++ )
-				{
-					for ( var sx = 0; sx < 4; sx++ )
-					{
-						var distance = Mathf.Abs( x + ( sx + 0.5f ) / 4.0f - centre ) + Mathf.Abs( y + ( sy + 0.5f ) / 4.0f - centre );
-						var inside = ( fill > 0.0f ) ? ( distance <= radius ) : ( ( distance <= radius ) && ( distance > radius - 3.0f ) );
-
-						coverage += inside ? 1.0f : 0.0f;
-
-						if ( ( fill > 1.0f ) && ( distance > radius ) )
-						{
-							glow += Mathf.Pow( Mathf.Clamp01( 1.0f - ( distance - radius ) / 8.0f ), 2.0f ) * 0.55f;
-						}
-					}
-				}
-
-				coverage /= 16.0f;
-				glow /= 16.0f;
-
-				// the running bullet is brighter at the centre
-				var c = ( fill > 1.0f ) ? Color.Lerp( color, Color.white, 0.35f ) : color;
-
-				c.a = Mathf.Clamp01( coverage + glow * ( 1.0f - coverage ) );
-
-				pixels[ y * size + x ] = c;
-			}
-		}
+		// drawn as the other schemes' bullets are drawn at run time
+		var pixels = UIKitTheme.DrawBullet( color, fill );
 
 		var texture = new Texture2D( size, size, TextureFormat.RGBA32, false );
 

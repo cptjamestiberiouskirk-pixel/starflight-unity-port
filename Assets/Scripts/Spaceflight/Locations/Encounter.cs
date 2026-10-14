@@ -436,6 +436,12 @@ public class Encounter : MonoBehaviour
 		// calculate the normalized exit direction vector
 		var exitDirection = Vector3.Normalize( playerData.m_general.m_coordinates );
 
+		// an encounter met in flight is followed by a minute without one (the original's WF022 gives none to an encounter that began in orbit)
+		if ( playerData.m_general.m_lastLocation != PD_General.Location.InOrbit )
+		{
+			SpaceflightController.m_instance.HoldOffEncounters();
+		}
+
 		// where did the encounter begin?
 		switch ( playerData.m_general.m_lastLocation )
 		{

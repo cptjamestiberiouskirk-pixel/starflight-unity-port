@@ -439,6 +439,27 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
+		// PROBE_UI_SCHEME=<name> runs the scenario in one of the UI kit's colour schemes (with PROBE_UI_MODE for its light mode), without keeping it in the
+		// player's settings (looked up so that a tree without the schemes compiles)
+		var schemeName = Environment.GetEnvironmentVariable( "PROBE_UI_SCHEME" );
+
+		if ( !string.IsNullOrEmpty( schemeName ) )
+		{
+			var schemesField = typeof( UIKitTheme ).GetField( "c_schemes" );
+			var setScheme = typeof( UIKitTheme ).GetMethod( "SetScheme" );
+			var schemes = ( schemesField != null ) ? schemesField.GetValue( null ) as Array : null;
+
+			for ( var i = 0; ( schemes != null ) && ( setScheme != null ) && ( i < schemes.Length ); i++ )
+			{
+				if ( ( GetField( schemes.GetValue( i ), "m_name" ) as string ) == schemeName )
+				{
+					setScheme.Invoke( null, new object[] { i, false } );
+
+					Log( "the UI kit's colour scheme " + schemeName + " is in use (PROBE_UI_SCHEME)" );
+				}
+			}
+		}
+
 		Log( "scenario=" + scenario + " frame=" + Time.frameCount + " location=" + DataController.m_instance.m_playerData.m_general.m_location + " exceptionsSoFar=" + s_exceptionCount );
 
 		switch ( scenario )
@@ -1251,6 +1272,14 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLightMode();
 				break;
 
+			case "colorschemes":
+				yield return ScenarioColorSchemes();
+				break;
+
+			case "starmapcolors":
+				yield return ScenarioStarmapColors();
+				break;
+
 			case "sensorlines":
 				yield return ScenarioSensorLines();
 				break;
@@ -1369,6 +1398,22 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "firedonsilent":
 				yield return ScenarioFiredOnSilent();
+				break;
+
+			case "encountergrace":
+				yield return ScenarioEncounterGrace();
+				break;
+
+			case "landinggravity":
+				yield return ScenarioLandingGravity();
+				break;
+
+			case "landingwarning":
+				yield return ScenarioLandingWarning();
+				break;
+
+			case "fuelwarnings":
+				yield return ScenarioFuelWarnings();
 				break;
 
 			case "starport-tradeclamp":
@@ -18581,6 +18626,36 @@ public class ClaudeProbe : MonoBehaviour
 
 		bank.m_currentBalance = 100000;
 
+		// damaged systems, as the original prices them (CONFIG-OV WF226): a class 3 laser cannon at 40% (540 x 63 = 34,020 M.U.) and the sensors at 50%
+		// (5,000 M.U.), with the armor whole
+		ship.m_armorClass = 1;
+		ship.m_armorPoints = ship.GetMaximumArmorPoints();
+		ship.m_laserCannonClass = 3;
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Lasers, 40 );
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Sensors, 50 );
+
+		var costSystems = PressRepair( panel, message );
+		var lasersAfter = ship.GetSystemHealth( PD_PlayerShip.ShipSystem.Lasers );
+		var sensorsAfter = ship.GetSystemHealth( PD_PlayerShip.ShipSystem.Sensors );
+
+		// what the Starport pays for a part in the condition it is in (CONFIG-OV WECB0): a class 5 missile launcher whole (190,400 M.U.) and at 50% (95,200)
+		var launcher = DataController.m_instance.m_gameData.m_missileLauncherList[ 5 ];
+		var resale = typeof( PD_PlayerShip ).GetMethod( "GetPartResaleValue" );
+		var resaleWhole = -1;
+		var resaleHalf = -1;
+
+		if ( resale != null )
+		{
+			ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Missiles, 100 );
+			resaleWhole = (int) resale.Invoke( ship, new object[] { 4, launcher } );
+			ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Missiles, 50 );
+			resaleHalf = (int) resale.Invoke( ship, new object[] { 4, launcher } );
+			ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Missiles, 100 );
+		}
+
+		ship.m_laserCannonClass = 0;
+		bank.m_currentBalance = 100000;
+
 		var ledgerBefore = bank.m_transactionList.Count;
 
 		yield return ClosePanel( panel, "ship configuration" );
@@ -18590,11 +18665,16 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "starport-repair: a whole ship: " + costWhole + " (" + messageWhole + ") | class 1 armor at 200 of 500, shields empty: " + costClass1 + " M.U. (" + messageClass1 + "), armor " + armorAfterClass1 + ", shields " + shieldsAfterClass1 + " of " + ship.GetMaximumShieldPoints() + " | a bare hull at 100 of 250: " + costBareHull + " M.U., armor " + armorAfterBareHull + " | with 10 M.U.: " + costTooPoor + " (" + messageTooPoor + "), armor " + armorTooPoor + " | the ledger on closing: " + ledgerEntry );
 
 		Check( "starport-repair: a whole ship needs no repairs and pays nothing", ( costWhole == 0 ) && messageWhole.Contains( "no repairs" ), costWhole + " | " + messageWhole );
-		Check( "starport-repair: the missing armor is paid at the price of the ship's armor class, and the ship is whole again with full shields", ( costClass1 == 900 ) && ( armorAfterClass1 == 500 ) && ( shieldsAfterClass1 == ship.GetMaximumShieldPoints() ), costClass1 + ", " + armorAfterClass1 + ", " + shieldsAfterClass1 );
-		Check( "starport-repair: a bare hull is repaired at the price of class 1 armor", ( costBareHull == 450 ) && ( armorAfterBareHull == 250 ), costBareHull + ", " + armorAfterBareHull );
+		Check( "starport-repair: the missing armor is paid at 4 M.U. a point, as the original's, and the ship is whole again with full shields", ( costClass1 == 1200 ) && ( armorAfterClass1 == 500 ) && ( shieldsAfterClass1 == ship.GetMaximumShieldPoints() ), costClass1 + ", " + armorAfterClass1 + ", " + shieldsAfterClass1 );
+		Check( "starport-repair: a bare hull is repaired at 4 M.U. a point too", ( costBareHull == 600 ) && ( armorAfterBareHull == 250 ), costBareHull + ", " + armorAfterBareHull );
 		Check( "starport-repair: without the money the repair is refused and nothing changes", ( costTooPoor == 0 ) && ( armorTooPoor == 100 ) && messageTooPoor.Contains( "insufficient funds" ), costTooPoor + ", " + armorTooPoor + " | " + messageTooPoor );
 
-		Finish( "scenario=starport-repair whole=" + costWhole + " class1=" + costClass1 + " bareHull=" + costBareHull + " tooPoor=" + costTooPoor, 0 );
+		Log( "starport-repair: a class 3 laser cannon at 40% and the sensors at 50%: " + costSystems + " M.U., then lasers " + lasersAfter + "%, sensors " + sensorsAfter + "% | a class 5 missile launcher sells for " + resaleWhole + " whole and " + resaleHalf + " at 50%" );
+
+		Check( "starport-repair: damaged systems are paid for as the original's (the laser cannon by its price and damage, the sensors 100 M.U. a point), and are whole again", ( costSystems == 34020 + 5000 ) && ( lasersAfter == 100 ) && ( sensorsAfter == 100 ), costSystems + ", lasers " + lasersAfter + ", sensors " + sensorsAfter );
+		Check( "starport-repair: a part sells for what it is worth in its condition (a class 5 missile launcher 190,400 whole, 95,200 at 50%)", ( resaleWhole == 190400 ) && ( resaleHalf == 95200 ), resaleWhole + ", " + resaleHalf );
+
+		Finish( "scenario=starport-repair whole=" + costWhole + " class1=" + costClass1 + " bareHull=" + costBareHull + " tooPoor=" + costTooPoor + " systems=" + costSystems + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 1: distress
@@ -30359,33 +30439,47 @@ public class ClaudeProbe : MonoBehaviour
 
 		take( "light_science_menu" );
 
-		// ---- the save panel, with the button for the mode
+		// ---- the save panel, and its Colors screen with the two modes
 		PressEscape();
 
 		yield return new WaitForSecondsRealtime( 1.5f );
 
 		var savePanel = PanelController.m_instance.m_saveGamePanel;
-		// (looked up so that the old code, which has no such button, is checked the same way)
-		var modeButtonField = savePanel.GetType().GetField( "m_modeButton", c_any );
-		var modeButton = ( modeButtonField != null ) ? modeButtonField.GetValue( savePanel ) as UnityEngine.UI.Button : null;
-		var modeLabelInLight = ( modeButton != null ) ? modeButton.GetComponentInChildren<TMPro.TMP_Text>( true ).text : "(none)";
+		// (looked up so that the old code, which has no such screen, is checked the same way)
+		var colorsButton = FieldOrNull( savePanel, "m_colorsButton" ) as UnityEngine.UI.Button;
 
 		take( "light_save_panel" );
 
-		// the button switches back to the dark mode
-		if ( modeButton != null )
+		if ( colorsButton != null )
 		{
-			Call( savePanel, "ModeClicked" );
+			Call( savePanel, "ColorsClicked" );
+		}
+
+		yield return Frames( 10 );
+
+		var modeButtons = FieldOrNull( savePanel, "m_modeButtons" ) as UnityEngine.UI.Button[];
+		var modeMarkers = FieldOrNull( savePanel, "m_modeMarkers" ) as UnityEngine.UI.Image[];
+		var modeLabels = ( modeButtons != null ) ? string.Join( "/", System.Array.ConvertAll( modeButtons, button => button.GetComponentInChildren<TMPro.TMP_Text>( true ).text ) ) : "(none)";
+		var lightMarkedInLight = ( modeMarkers != null ) && ( modeMarkers.Length == 2 ) && !modeMarkers[ 0 ].enabled && modeMarkers[ 1 ].enabled;
+
+		take( "light_colors_screen" );
+
+		// the Dark button switches back to the dark mode
+		if ( modeButtons != null )
+		{
+			Call( savePanel, "ModeClicked", UIKitTheme.Mode.Dark );
 		}
 
 		yield return Frames( 10 );
 
 		var themeAfterClick = UIKitTheme.Get();
-		var modeLabelInDark = ( modeButton != null ) ? modeButton.GetComponentInChildren<TMPro.TMP_Text>( true ).text : "(none)";
+		var darkMarkedInDark = ( modeMarkers != null ) && ( modeMarkers.Length == 2 ) && modeMarkers[ 0 ].enabled && !modeMarkers[ 1 ].enabled;
 		var styledColourAfterClick = ( styledText != null ) ? styledText.GetComponent<TMPro.TMP_Text>().color : Color.magenta;
 		var panelButtonColourAfterClick = panelButton.colors.normalColor;
 
-		take( "dark_save_panel" );
+		take( "dark_colors_screen" );
+
+		Call( savePanel, "CancelClicked" );
 
 		// the player's own setting back as it was
 		if ( savedSetting < 0 )
@@ -30403,14 +30497,407 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return new WaitForSecondsRealtime( 1.5f );
 
-		Log( "lightmode: theme in use \"" + ( ( themeInUse != null ) ? themeInUse.name : "none" ) + "\" | styled text " + ( ( styledText != null ) ? styledText.name : "none" ) + " " + ColorUtility.ToHtmlStringRGB( styledColour ) + " | resume button " + ColorUtility.ToHtmlStringRGB( panelButtonColour ) + " | mode button \"" + modeLabelInLight + "\" then \"" + modeLabelInDark + "\" | after the click \"" + ( ( themeAfterClick != null ) ? themeAfterClick.name : "none" ) + "\" " + ColorUtility.ToHtmlStringRGB( styledColourAfterClick ) + " | pictures " + string.Join( ", ", pictures ) );
+		Log( "lightmode: theme in use \"" + ( ( themeInUse != null ) ? themeInUse.name : "none" ) + "\" | styled text " + ( ( styledText != null ) ? styledText.name : "none" ) + " " + ColorUtility.ToHtmlStringRGB( styledColour ) + " | resume button " + ColorUtility.ToHtmlStringRGB( panelButtonColour ) + " | mode buttons " + modeLabels + " marked light " + lightMarkedInLight + " then dark " + darkMarkedInDark + " | after the click \"" + ( ( themeAfterClick != null ) ? themeAfterClick.name : "none" ) + "\" " + ColorUtility.ToHtmlStringRGB( styledColourAfterClick ) + " | pictures " + string.Join( ", ", pictures ) );
 
 		Check( "lightmode: the light mode's theme is in use, and a text the kit styles takes its primary text colour", ( lightTheme != null ) && ( themeInUse == lightTheme ) && ( styledText != null ) && ( ColorUtility.ToHtmlStringRGB( styledColour ) == ColorUtility.ToHtmlStringRGB( lightTheme.m_textPrimary ) ), ColorUtility.ToHtmlStringRGB( styledColour ) );
 		Check( "lightmode: the buttons the kit's tool tinted take the light mode's tints, and the messages its colours", ( lightTheme != null ) && ( ColorUtility.ToHtmlStringRGB( panelButtonColour ) == ColorUtility.ToHtmlStringRGB( lightTheme.m_backgroundRaised ) ) && messagesText.Contains( ColorUtility.ToHtmlStringRGB( lightTheme.m_textPrimary ) ), ColorUtility.ToHtmlStringRGB( panelButtonColour ) + " / " + messagesText );
-		Check( "lightmode: the save panel has a button for the mode, which offers the other mode and switches back to the dark one", ( modeLabelInLight == "Dark Mode" ) && ( modeLabelInDark == "Light Mode" ) && ( themeAfterClick == darkTheme ) && ( ColorUtility.ToHtmlStringRGB( styledColourAfterClick ) == ColorUtility.ToHtmlStringRGB( darkTheme.m_textPrimary ) ), modeLabelInLight + " / " + modeLabelInDark );
+		Check( "lightmode: the save panel's Colors screen has a Dark and a Light button, marks the mode in use, and Dark switches back to the dark mode", ( modeLabels == "Dark/Light" ) && lightMarkedInLight && darkMarkedInDark && ( themeAfterClick == darkTheme ) && ( ColorUtility.ToHtmlStringRGB( styledColourAfterClick ) == ColorUtility.ToHtmlStringRGB( darkTheme.m_textPrimary ) ), modeLabels + " / " + lightMarkedInLight + " / " + darkMarkedInDark );
 		Check( "lightmode: back in the dark mode the buttons have the dark mode's tints again (the light mode gives several roles one colour)", ColorUtility.ToHtmlStringRGB( panelButtonColourAfterClick ) == ColorUtility.ToHtmlStringRGB( darkTheme.m_backgroundRaised ), ColorUtility.ToHtmlStringRGB( panelButtonColourAfterClick ) );
 
 		Finish( "scenario=lightmode checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the UI kit's colour schemes (the owner's request of 2026-10-14): every scheme has a dark and a light theme of its own; the save panel's Colors
+	// screen has a button for each scheme, with swatches of its colours, and one for each mode; picking a scheme there gives the whole game its theme at
+	// once (a text the kit styles, the buttons its tool tinted, the console's bullets, the messages' colour tags), in either mode; the swatches keep
+	// their own colours whatever the theme; the choice is kept in the player's settings; and escape leaves the screen (the player's own settings are put
+	// back afterwards; pictures of the screen in every theme with -Graphics)
+	IEnumerator ScenarioColorSchemes()
+	{
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+		var folder = ScreenPictureFolder( "color-schemes" );
+		var pictures = new List<string>();
+
+		EnsureCrew();
+
+		controller.m_encounterRange = 0.0f;
+
+		// the player's own settings, put back at the end (the probe runs in the editor, whose settings are the player's)
+		var schemeKey = "UI Kit Scheme";
+		var modeKey = "UI Kit Mode";
+		var savedScheme = PlayerPrefs.HasKey( schemeKey ) ? PlayerPrefs.GetString( schemeKey ) : null;
+		var savedMode = PlayerPrefs.HasKey( modeKey ) ? PlayerPrefs.GetInt( modeKey ) : -1;
+
+		// every scheme's two themes (looked up so that the old code, which has no schemes, is checked the same way)
+		var schemesField = typeof( UIKitTheme ).GetField( "c_schemes" );
+		var schemes = ( schemesField != null ) ? schemesField.GetValue( null ) as Array : null;
+		var schemeCount = ( schemes != null ) ? schemes.Length : 0;
+		var loadScheme = typeof( UIKitTheme ).GetMethod( "LoadScheme" );
+		var modes = new[] { UIKitTheme.Mode.Dark, UIKitTheme.Mode.Light };
+		var themeNames = new HashSet<string>();
+		var themesFound = 0;
+
+		Func<int, UIKitTheme.Mode, UIKitTheme> themeOf = ( scheme, mode ) => ( loadScheme != null ) ? loadScheme.Invoke( null, new object[] { scheme, mode } ) as UIKitTheme : null;
+		Func<int, string> nameOf = scheme => ( schemes != null ) ? GetField( schemes.GetValue( scheme ), "m_name" ) as string : "";
+
+		for ( var i = 0; i < schemeCount; i++ )
+		{
+			foreach ( var mode in modes )
+			{
+				var theme = themeOf( i, mode );
+
+				if ( theme != null )
+				{
+					themesFound++;
+					themeNames.Add( theme.name );
+				}
+			}
+		}
+
+		Check( "colorschemes: fifteen schemes (the classic one, the two original games' and the owner's twelve), each with a dark and a light theme of its own", ( schemeCount == 15 ) && ( themesFound == 30 ) && ( themeNames.Count == 30 ), schemeCount + " schemes, " + themesFound + " themes, " + themeNames.Count + " names" );
+
+		// a message in white and one in yellow, and the bridge's buttons with one selected
+		controller.m_messages.Clear();
+		controller.m_messages.AddText( "<color=white>Entering the Arth system.</color>" );
+		controller.m_messages.AddText( "<color=yellow>Shields are down.</color>" );
+
+		buttonController.ChangeButtonSet( ButtonController.ButtonSet.Bridge );
+		buttonController.SetSelectedButton( 2 );
+
+		// a text the kit styles with its primary text colour
+		TMPro.TMP_Text styledText = null;
+
+		foreach ( var style in UnityEngine.Object.FindObjectsByType<UIKitStyle>( FindObjectsInactive.Exclude, FindObjectsSortMode.None ) )
+		{
+			if ( ( style.m_color == UIKitTheme.ColorRole.TextPrimary ) && style.TryGetComponent<TMPro.TMP_Text>( out var text ) && ( style.gameObject.scene.name == "Spaceflight" ) )
+			{
+				styledText = text;
+				break;
+			}
+		}
+
+		// ---- the save panel and its Colors screen
+		PressEscape();
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var savePanel = PanelController.m_instance.m_saveGamePanel;
+		var colorsButton = FieldOrNull( savePanel, "m_colorsButton" ) as UnityEngine.UI.Button;
+		var colorsLabel = ( colorsButton != null ) ? colorsButton.GetComponentInChildren<TMPro.TMP_Text>( true ).text : "(none)";
+
+		if ( colorsButton != null )
+		{
+			Call( savePanel, "ColorsClicked" );
+		}
+
+		yield return Frames( 10 );
+
+		var colorsPanel = FieldOrNull( savePanel, "m_colorsPanel" ) as GameObject;
+		var schemeButtons = FieldOrNull( savePanel, "m_schemeButtons" ) as UnityEngine.UI.Button[];
+		var schemeMarkers = FieldOrNull( savePanel, "m_schemeMarkers" ) as UnityEngine.UI.Image[];
+		var swatches = FieldOrNull( savePanel, "m_schemeSwatches" ) as UnityEngine.UI.Image[][];
+		var modeButtons = FieldOrNull( savePanel, "m_modeButtons" ) as UnityEngine.UI.Button[];
+		var schemeLabels = ( schemeButtons != null ) ? string.Join( ", ", Array.ConvertAll( schemeButtons, button => button.GetComponentInChildren<TMPro.TMP_Text>( true ).text ) ) : "(none)";
+		var selectedOnOpen = ( EventSystem.current != null ) ? EventSystem.current.currentSelectedGameObject : null;
+		var getScheme = typeof( UIKitTheme ).GetMethod( "GetScheme" );
+		var schemeOnOpen = ( getScheme != null ) ? (int) getScheme.Invoke( null, null ) : 0;
+
+		Log( "colorschemes: Colors button \"" + colorsLabel + "\", screen " + ( ( colorsPanel != null ) && colorsPanel.activeInHierarchy ) + ", schemes " + schemeLabels + ", selected " + ( ( selectedOnOpen != null ) ? selectedOnOpen.name : "none" ) );
+
+		Check( "colorschemes: the save panel has a Colors button, whose screen has a button for every scheme, named after it, and one for each mode, and opens on the scheme in use", ( colorsLabel == "Colors" ) && ( colorsPanel != null ) && colorsPanel.activeInHierarchy && ( schemeButtons != null ) && ( schemeButtons.Length == schemeCount ) && ( schemeCount > 0 ) && schemeLabels.StartsWith( nameOf( 0 ) ) && ( modeButtons != null ) && ( modeButtons.Length == 2 ) && ( selectedOnOpen != null ) && ( schemeOnOpen < schemeButtons.Length ) && ( selectedOnOpen == schemeButtons[ schemeOnOpen ].gameObject ), colorsLabel + " / " + schemeLabels );
+
+		// ---- every scheme picked on the screen, in the dark mode and in the light
+		var failures = new List<string>();
+		var resumeButton = savePanel.m_resumeButton;
+		var getBullet = typeof( UIKitTheme ).GetMethod( "GetBullet" );
+		var bulletType = typeof( UIKitTheme ).GetNestedType( "Bullet" );
+
+		foreach ( var mode in modes )
+		{
+			if ( modeButtons == null )
+			{
+				break;
+			}
+
+			Call( savePanel, "ModeClicked", mode );
+
+			for ( var i = 0; i < schemeCount; i++ )
+			{
+				Call( savePanel, "SchemeClicked", i );
+
+				yield return Frames( 3 );
+
+				var expected = themeOf( i, mode );
+				var theme = UIKitTheme.Get();
+				var label = nameOf( i ) + " " + mode;
+				var messagesText = ( GetField( controller.m_messages, "m_messagesUI" ) as TMPro.TMP_Text ).text;
+				var offBullet = ( ( getBullet != null ) && ( theme != null ) ) ? getBullet.Invoke( theme, new object[] { Enum.Parse( bulletType, "Off" ) } ) as Sprite : null;
+
+				if ( ( expected == null ) || ( theme != expected ) )
+				{
+					failures.Add( label + ": theme " + ( ( theme != null ) ? theme.name : "none" ) );
+					continue;
+				}
+
+				if ( ( styledText == null ) || ( ColorUtility.ToHtmlStringRGB( styledText.color ) != ColorUtility.ToHtmlStringRGB( theme.m_textPrimary ) ) )
+				{
+					failures.Add( label + ": styled text " + ( ( styledText != null ) ? ColorUtility.ToHtmlStringRGB( styledText.color ) : "none" ) );
+				}
+
+				if ( ColorUtility.ToHtmlStringRGB( resumeButton.colors.normalColor ) != ColorUtility.ToHtmlStringRGB( theme.m_backgroundRaised ) )
+				{
+					failures.Add( label + ": button tint " + ColorUtility.ToHtmlStringRGB( resumeButton.colors.normalColor ) );
+				}
+
+				if ( ( offBullet == null ) || ( buttonController.m_buttonOffSprite != offBullet ) )
+				{
+					failures.Add( label + ": bullets " + ( ( buttonController.m_buttonOffSprite != null ) ? buttonController.m_buttonOffSprite.name : "none" ) );
+				}
+
+				if ( !messagesText.Contains( ColorUtility.ToHtmlStringRGB( theme.m_textWarning ) ) )
+				{
+					failures.Add( label + ": messages " + messagesText );
+				}
+
+				if ( ( swatches == null ) || ( ColorUtility.ToHtmlStringRGB( swatches[ i ][ 3 ].color ) != ColorUtility.ToHtmlStringRGB( theme.m_accentPrimary ) ) )
+				{
+					failures.Add( label + ": swatch" );
+				}
+
+				for ( var j = 0; ( schemeMarkers != null ) && ( j < schemeMarkers.Length ); j++ )
+				{
+					if ( schemeMarkers[ j ].enabled != ( j == i ) )
+					{
+						failures.Add( label + ": marker " + j );
+					}
+				}
+
+				if ( folder != "" )
+				{
+					var path = System.IO.Path.Combine( folder, ( pictures.Count + 1 ).ToString( "00" ) + "_" + nameOf( i ).Replace( ' ', '_' ) + "_" + mode + ".png" );
+
+					RenderScreenPicture( path );
+					pictures.Add( nameOf( i ) + " " + mode );
+				}
+			}
+		}
+
+		Log( "colorschemes: " + failures.Count + " failures" + ( ( failures.Count > 0 ) ? ": " + string.Join( " | ", failures.GetRange( 0, Mathf.Min( 8, failures.Count ) ) ) : "" ) );
+
+		Check( "colorschemes: each scheme picked on the screen, in either mode, gives the game its theme at once: a text the kit styles, the buttons its tool tinted, the console's bullets and the messages' colours, with its swatches and its marker on the screen", ( modeButtons != null ) && ( schemeCount > 0 ) && ( failures.Count == 0 ), failures.Count + " failures" );
+
+		// ---- the swatches keep their own colours whatever the theme (the classic scheme's, in the light mode, while the last scheme is in use)
+		var classicLight = themeOf( 0, UIKitTheme.Mode.Light );
+		var keptSwatch = ( swatches != null ) && ( classicLight != null ) && ( ColorUtility.ToHtmlStringRGB( swatches[ 0 ][ 3 ].color ) == ColorUtility.ToHtmlStringRGB( classicLight.m_accentPrimary ) ) && ( ColorUtility.ToHtmlStringRGB( swatches[ 0 ][ 0 ].color ) == ColorUtility.ToHtmlStringRGB( classicLight.m_backgroundApp ) );
+
+		Check( "colorschemes: a scheme's swatches keep its own colours while another scheme is in use", keptSwatch, ( swatches != null ) ? ColorUtility.ToHtmlStringRGB( swatches[ 0 ][ 3 ].color ) : "none" );
+
+		// ---- the choice is kept in the player's settings, by the scheme's name
+		var lastName = ( schemeCount > 0 ) ? nameOf( schemeCount - 1 ) : "";
+
+		Check( "colorschemes: the scheme and the mode picked are kept in the player's settings", ( PlayerPrefs.GetString( schemeKey, "" ) == lastName ) && ( PlayerPrefs.GetInt( modeKey, -1 ) == (int) UIKitTheme.Mode.Light ), PlayerPrefs.GetString( schemeKey, "" ) + " / " + PlayerPrefs.GetInt( modeKey, -1 ) );
+
+		// ---- escape leaves the Colors screen, and the save panel stays open
+		SetInput( "m_cancel", true );
+		savePanel.Tick();
+		SetInput( "m_cancel", false );
+
+		yield return Frames( 5 );
+
+		Check( "colorschemes: escape leaves the Colors screen, back to the save panel", ( colorsPanel != null ) && !colorsPanel.activeSelf && savePanel.gameObject.activeInHierarchy && PanelController.m_instance.HasActivePanel(), ( ( colorsPanel != null ) ? colorsPanel.activeSelf.ToString() : "none" ) );
+
+		// the classic dark theme again, and the player's own settings back as they were
+		var setScheme = typeof( UIKitTheme ).GetMethod( "SetScheme" );
+
+		if ( setScheme != null )
+		{
+			setScheme.Invoke( null, new object[] { 0, false } );
+		}
+
+		UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+		if ( savedScheme == null )
+		{
+			PlayerPrefs.DeleteKey( schemeKey );
+		}
+		else
+		{
+			PlayerPrefs.SetString( schemeKey, savedScheme );
+		}
+
+		if ( savedMode < 0 )
+		{
+			PlayerPrefs.DeleteKey( modeKey );
+		}
+		else
+		{
+			PlayerPrefs.SetInt( modeKey, savedMode );
+		}
+
+		PlayerPrefs.Save();
+
+		yield return CloseTheSavePanel();
+
+		Log( "colorschemes: " + pictures.Count + " pictures" + ( ( folder != "" ) ? " in " + folder : "" ) );
+
+		Finish( "scenario=colorschemes checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the starmap in the colours of the kit's scheme (it was purple and magenta, which the owner dislikes): its background, grid, ship marker and crosshair
+	// take the scheme's dark colours when it opens, again when the player picks another scheme while it is open, and in the light mode too (the starmap is a
+	// view of space); the stars and the nebulas keep theirs, and the materials themselves are left as they are (picture with -Graphics)
+	IEnumerator ScenarioStarmapColors()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var folder = ScreenPictureFolder( "starmap-colors" );
+		var pictures = new List<string>();
+
+		controller.m_encounterRange = 0.0f;
+
+		// hyperspace, away from any star
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 118.0f, 0.0f, 96.0f ) );
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 30 );
+
+		var starmap = controller.m_starmap;
+		var parts = new[] { "Starmap - Background", "Starmap - Grid", "Starmap - Player Ship", "Starmap - Crosshair" };
+
+		// the images drawn with the starmap's background material, wherever they are in the scene
+		var backgroundImages = new List<UnityEngine.UI.Image>();
+
+		foreach ( var image in Resources.FindObjectsOfTypeAll<UnityEngine.UI.Image>() )
+		{
+			if ( ( image.gameObject.scene == starmap.gameObject.scene ) && ( image.material != null ) && image.material.name.StartsWith( "Starmap - Background" ) )
+			{
+				backgroundImages.Add( image );
+			}
+		}
+
+		Log( "starmapcolors: background images " + string.Join( ", ", backgroundImages.ConvertAll( image => image.transform.parent.name + "/" + image.name ) ) );
+
+		// the colour a part is drawn with (its property block's, or its material's without one; an image's material for the background)
+		Func<string, Color?> drawnColour = name =>
+		{
+			if ( name == "Starmap - Background" )
+			{
+				return ( backgroundImages.Count > 0 ) ? backgroundImages[ 0 ].material.GetColor( "SF_AlbedoColor" ) : (Color?) null;
+			}
+
+			foreach ( var starmapRenderer in starmap.GetComponentsInChildren<Renderer>( true ) )
+			{
+				var materials = starmapRenderer.sharedMaterials;
+
+				for ( var i = 0; i < materials.Length; i++ )
+				{
+					if ( ( materials[ i ] != null ) && ( materials[ i ].name == name ) )
+					{
+						var block = new MaterialPropertyBlock();
+
+						starmapRenderer.GetPropertyBlock( block, i );
+
+						return ( !block.isEmpty && block.HasColor( "SF_AlbedoColor" ) ) ? block.GetColor( "SF_AlbedoColor" ) : materials[ i ].GetColor( "SF_AlbedoColor" );
+					}
+				}
+			}
+
+			return null;
+		};
+
+		Func<UIKitTheme, Color[]> expectedColours = theme => new[] { theme.m_backgroundPanel, theme.m_accentPrimaryDim, theme.m_accentPrimary, theme.m_textPrimary };
+
+		// remembers what differs between the parts' colours and the theme's
+		var failures = new List<string>();
+
+		Action<string, UIKitTheme> compare = ( label, theme ) =>
+		{
+			var expected = expectedColours( theme );
+
+			for ( var i = 0; i < parts.Length; i++ )
+			{
+				var drawn = drawnColour( parts[ i ] );
+
+				if ( drawn == null )
+				{
+					failures.Add( label + ": no " + parts[ i ] );
+				}
+				else if ( ColorUtility.ToHtmlStringRGB( drawn.Value ) != ColorUtility.ToHtmlStringRGB( expected[ i ] ) )
+				{
+					failures.Add( label + ": " + parts[ i ] + " " + ColorUtility.ToHtmlStringRGB( drawn.Value ) + " not " + ColorUtility.ToHtmlStringRGB( expected[ i ] ) );
+				}
+			}
+		};
+
+		Action<string> take = name =>
+		{
+			if ( folder != "" )
+			{
+				RenderScreenPicture( System.IO.Path.Combine( folder, ( pictures.Count + 1 ).ToString( "00" ) + "_" + name + ".png" ) );
+				pictures.Add( name );
+			}
+		};
+
+		// ---- the classic scheme, the starmap opened
+		UIKitTheme.SetScheme( 0, false );
+		UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+		starmap.Show();
+
+		yield return Frames( 5 );
+
+		compare( "classic on opening", UIKitTheme.LoadScheme( 0, UIKitTheme.Mode.Dark ) );
+		take( "classic" );
+
+		// ---- other schemes picked while it is open, and a light mode
+		var picks = new[] { 1, 3, 13 };
+
+		foreach ( var scheme in picks )
+		{
+			UIKitTheme.SetScheme( scheme, false );
+
+			yield return Frames( 3 );
+
+			compare( UIKitTheme.c_schemes[ scheme ].m_name, UIKitTheme.LoadScheme( scheme, UIKitTheme.Mode.Dark ) );
+			take( UIKitTheme.c_schemes[ scheme ].m_name.Replace( ' ', '_' ) );
+		}
+
+		UIKitTheme.SetMode( UIKitTheme.Mode.Light, false );
+
+		yield return Frames( 3 );
+
+		compare( UIKitTheme.c_schemes[ 13 ].m_name + " in the light mode", UIKitTheme.LoadScheme( 13, UIKitTheme.Mode.Dark ) );
+		take( "light_mode" );
+
+		Log( "starmapcolors: " + failures.Count + " failures" + ( ( failures.Count > 0 ) ? ": " + string.Join( " | ", failures.GetRange( 0, Mathf.Min( 6, failures.Count ) ) ) : "" ) );
+
+		Check( "starmapcolors: the starmap's background, grid, ship marker and crosshair take the scheme's dark colours when it opens, when another scheme is picked, and in the light mode", failures.Count == 0, failures.Count + " failures" );
+
+		// the material assets keep the colours they were made with (the purple background and the magenta grid)
+		var backgroundAsset = AssetDatabase.LoadAssetAtPath<Material>( "Assets/Game Objects/UI/Starmap/Starmap - Background.mat" );
+		var gridAsset = AssetDatabase.LoadAssetAtPath<Material>( "Assets/Game Objects/UI/Starmap/Starmap - Grid.mat" );
+		var assetColours = ( ( backgroundAsset != null ) ? ColorUtility.ToHtmlStringRGB( backgroundAsset.GetColor( "SF_AlbedoColor" ) ) : "none" ) + "/" + ( ( gridAsset != null ) ? ColorUtility.ToHtmlStringRGB( gridAsset.GetColor( "SF_AlbedoColor" ) ) : "none" );
+
+		Check( "starmapcolors: the starmap's material assets are left as they are", assetColours == "392D3F/82147F", assetColours );
+
+		// the classic dark theme again, and every background image in it
+		UIKitTheme.SetScheme( 0, false );
+		UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+		yield return Frames( 3 );
+
+		var everyBackground = ( backgroundImages.Count > 0 ) && backgroundImages.TrueForAll( image => ColorUtility.ToHtmlStringRGB( image.material.GetColor( "SF_AlbedoColor" ) ) == ColorUtility.ToHtmlStringRGB( UIKitTheme.LoadScheme( 0, UIKitTheme.Mode.Dark ).m_backgroundPanel ) );
+
+		Check( "starmapcolors: every image drawn with the starmap's background material (" + backgroundImages.Count + ") takes the scheme's colour", everyBackground, backgroundImages.Count.ToString() );
+
+		starmap.Hide();
+
+		yield return Frames( 3 );
+
+		Log( "starmapcolors: " + pictures.Count + " pictures" + ( ( folder != "" ) ? " in " + folder : "" ) );
+
+		Finish( "scenario=starmapcolors checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	IEnumerator ScenarioSensorLines()
@@ -34487,6 +34974,315 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "firedonsilent: aliens that have turned cowardly still answer a hail (control)", cowardly && cowardlyConnected && ( cowardlySaid.Length > 0 ), cowardly + " " + cowardlyConnected + " '" + cowardlySaid + "'" );
 
 		Finish( "scenario=firedonsilent checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// after an encounter in flight ends, no encounter begins for a minute, as the original's (HYPERMSG-OV WF022: ENC-TIME is the time plus 60000 ms, except in
+	// orbit; HYPER-OV >ENCOUNTER begins one only when TIME is past it)
+	IEnumerator ScenarioEncounterGrace()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var encounter = controller.m_encounter;
+
+		EnsureCrew();
+
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// a star system encounter of the Spemin, in its star system
+		var encounterId = -1;
+
+		for ( var atOnce = 1; ( atOnce <= 8 ) && ( encounterId < 0 ); atOnce++ )
+		{
+			encounterId = FindEncounter( 1, 1, atOnce, 0 );
+		}
+
+		if ( encounterId < 0 )
+		{
+			Finish( "scenario=encountergrace abort: no star system encounter of the Spemin", 2 );
+			yield break;
+		}
+
+		EnterStarSystem( playerData.FindEncounter( encounterId ).GetStarId() );
+
+		var start = Time.realtimeSinceStartup;
+
+		while ( controller.m_starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 40.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 10 );
+
+		EnterEncounter( encounterId );
+
+		yield return Frames( 10 );
+
+		// out of it the way the game leaves every encounter (the Crystal Pearl's warp goes through Encounter.LeaveEncounter)
+		encounter.WarpOut();
+
+		yield return Frames( 5 );
+
+		var locationAfterLeaving = playerData.m_general.m_location;
+
+		// the same aliens right beside the ship, for half a second
+		var pdEncounter = playerData.FindEncounter( encounterId );
+
+		pdEncounter.m_currentCoordinates = playerData.m_general.m_coordinates;
+
+		yield return Frames( 30 );
+
+		var locationDuringGrace = playerData.m_general.m_location;
+
+		// the control: with the minute over (set here rather than waited for), they meet the ship again
+		var resumeTime = typeof( SpaceflightController ).GetField( "m_encountersResumeTime", BindingFlags.NonPublic | BindingFlags.Instance );
+
+		if ( resumeTime != null )
+		{
+			resumeTime.SetValue( controller, 0.0f );
+		}
+
+		pdEncounter.m_currentCoordinates = playerData.m_general.m_coordinates;
+
+		yield return Frames( 30 );
+
+		var locationAfterGrace = playerData.m_general.m_location;
+
+		Log( "encountergrace: encounter " + encounterId + "; after leaving " + locationAfterLeaving + ", the aliens beside the ship within the minute: " + locationDuringGrace + ", after it: " + locationAfterGrace );
+
+		Check( "encountergrace: the encounter is left into the star system (the setup is the case)", locationAfterLeaving == PD_General.Location.StarSystem, locationAfterLeaving.ToString() );
+		Check( "encountergrace: within a minute of leaving, the aliens beside the ship begin no encounter", locationDuringGrace == PD_General.Location.StarSystem, locationDuringGrace.ToString() );
+		Check( "encountergrace: after the minute they do (control)", locationAfterGrace == PD_General.Location.Encounter, locationAfterGrace.ToString() );
+
+		ClearMissiles();
+
+		if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+		{
+			LeaveEncounter();
+		}
+
+		yield return Frames( 10 );
+
+		Finish( "scenario=encountergrace checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	static int EnduriumTenths()
+	{
+		var endurium = DataController.m_instance.m_playerData.m_playerShip.m_elementStorage.Find( 5 );
+
+		return ( endurium == null ) ? 0 : endurium.m_volume;
+	}
+
+	// landing and launching as the original's (LAND-OV): each burns the gravity's share of Endurium (the gravity in hundredths of a G over 40, in tenths), a
+	// launch without it is refused, a landing without it crashes, and once the gravity is analysed Land warns of a planet that would crush the hull
+	IEnumerator ScenarioLandingGravity()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// ---- 1. a launch from planet 90 (1.08 G: 2 tenths) with 1 tenth aboard is refused, and with 100 it burns 2
+		var planet90Star = gameData.m_planetList[ 90 ].m_starId;
+
+		yield return GoIntoOrbit( planet90Star, 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		SetEndurium( 1 );
+		controller.m_messages.Clear();
+
+		new LaunchYesButton().Execute();
+
+		yield return Frames( 10 );
+
+		var launchRefusedLocation = playerData.m_general.m_location;
+		var launchRefusedText = MessageList();
+
+		SetEndurium( 100 );
+
+		new LaunchYesButton().Execute();
+
+		var fuelAfterLaunch = EnduriumTenths();
+
+		yield return WaitForLocation( PD_General.Location.InOrbit, 20.0f );
+		yield return Frames( 10 );
+
+		var launchedLocation = playerData.m_general.m_location;
+
+		// ---- 2. a landing on planet 90 with 1 tenth aboard crashes, and the game is over
+		SetEndurium( 1 );
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.CommandB, 0 );
+
+		yield return Frames( 5 );
+
+		PressButton( ButtonController.ButtonSet.Land, 1 );
+
+		var end = Time.realtimeSinceStartup + 60.0f;
+
+		// until the touchdown: a safe landing, or the end of the game (the location is the surface from the start of the descent)
+		while ( ( Time.realtimeSinceStartup < end ) && !CombatController.m_instance.PlayerIsDestroyed() && !MessageList().Contains( "Safe landing" ) )
+		{
+			yield return null;
+		}
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		var crashed = CombatController.m_instance.PlayerIsDestroyed();
+		var crashText = MessageList();
+
+		Log( "landinggravity: planet 90 is " + gameData.m_planetList[ 90 ].m_gravity + " hundredths of a G; launch with 1 tenth: " + launchRefusedLocation + " '" + launchRefusedText + "'; with 100: " + fuelAfterLaunch + " left, then " + launchedLocation + "; landing with 1 tenth: destroyed " + crashed + " '" + crashText + "'" );
+
+		Check( "landinggravity: a launch without the gravity's share of Endurium is refused (1 tenth on planet 90)", ( launchRefusedLocation == PD_General.Location.Planetside ) && launchRefusedText.Contains( "Insufficient fuel for re-launching" ), launchRefusedLocation + " '" + launchRefusedText + "'" );
+		Check( "landinggravity: a launch from planet 90 burns 2 tenths of Endurium (108 hundredths of a G over 40)", ( fuelAfterLaunch == 98 ) && ( launchedLocation == PD_General.Location.InOrbit ), fuelAfterLaunch + ", " + launchedLocation );
+		Check( "landinggravity: a landing without the fuel for it crashes, and the game is over", crashed && crashText.Contains( "crashed on planet" ), crashed + " '" + crashText + "'" );
+
+		// ---- 3. the rules for every planet: what a landing burns, and the planets that crush a hull (more than 7.99 G, 194 of the 811)
+		var crushing = -1;
+		var heaviestFuel = -1;
+		var crushes = typeof( PD_PlayerShip ).GetMethod( "GravityCrushesHull" );
+		var landingFuel = typeof( PD_PlayerShip ).GetMethod( "GetLandingFuel" );
+
+		if ( ( crushes != null ) && ( landingFuel != null ) )
+		{
+			crushing = 0;
+			heaviestFuel = 0;
+
+			foreach ( var planet in gameData.m_planetList )
+			{
+				if ( (bool) crushes.Invoke( null, new object[] { planet } ) )
+				{
+					crushing++;
+				}
+
+				heaviestFuel = Mathf.Max( heaviestFuel, (int) landingFuel.Invoke( null, new object[] { planet } ) );
+			}
+		}
+
+		Log( "landinggravity: " + crushing + " planets crush a hull; the heaviest landing burns " + heaviestFuel + " tenths" );
+
+		Check( "landinggravity: 194 planets crush a landing ship's hull, and the heaviest landing burns at most 32 tenths", ( crushing == 194 ) && ( heaviestFuel > 0 ) && ( heaviestFuel <= 32 ), crushing + ", " + heaviestFuel );
+
+		Finish( "scenario=landinggravity checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// once the gravity has been analysed, Land warns of a landing the ship cannot make, and a second Land goes down anyway (LAND-OV ?LAND and WF45E)
+	IEnumerator ScenarioLandingWarning()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+
+		EnsureCrew();
+
+		yield return GoIntoOrbit( gameData.m_planetList[ 90 ].m_starId, 90 );
+
+		// 1 tenth of Endurium, and the science officer has analysed planet 90's gravity (1.08 G)
+		SetEndurium( 1 );
+
+		var analysed = typeof( SpaceflightController ).GetField( "m_gravityAnalysedPlanetId" );
+
+		if ( analysed != null )
+		{
+			analysed.SetValue( controller, 90 );
+		}
+
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.CommandB, 0 );
+
+		yield return Frames( 5 );
+
+		var firstSet = buttonController.GetCurrentButtonSet();
+		var firstText = MessageList();
+
+		PressButton( ButtonController.ButtonSet.CommandB, 0 );
+
+		yield return Frames( 5 );
+
+		var secondSet = buttonController.GetCurrentButtonSet();
+
+		Log( "landingwarning: first Land: " + firstSet + " '" + firstText + "'; second Land: " + secondSet );
+
+		Check( "landingwarning: with the gravity analysed, the first Land warns of the fuel and stays in orbit", ( firstSet != ButtonController.ButtonSet.Land ) && firstText.Contains( "Insufficient fuel for safe landing" ), firstSet + " '" + firstText + "'" );
+		Check( "landingwarning: a second Land goes on to the landing", secondSet == ButtonController.ButtonSet.Land, secondSet.ToString() );
+
+		Finish( "scenario=landingwarning checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// flies in hyperspace with the engines on until the Endurium is down to the given tenths, or the seconds are up - returns the messages said meanwhile
+	static IEnumerator FlyUntilEndurium( int tenths, float seconds, string[] said )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		controller.m_messages.Clear();
+		controller.m_playerShip.TurnOnEngines();
+
+		var end = Time.realtimeSinceStartup + seconds;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( Endurium() > tenths ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		controller.m_playerShip.TurnOffEngines();
+		playerData.m_general.m_currentSpeed = 0.0f;
+
+		said[ 0 ] = MessageList();
+	}
+
+	// the fuel warnings in hyperspace, as the original's (HYPER-OV (-ENDURIUM)): "Fuel supply low." at 150 steps' worth of Endurium (class 1 engines: 9.0 cubic
+	// meters), "Fuel supply critical." at 75 (4.5) and "Out of fuel." at none
+	IEnumerator ScenarioFuelWarnings()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var low = new string[ 1 ];
+		var critical = new string[ 1 ];
+		var outOfFuel = new string[ 1 ];
+
+		EnsureCrew();
+
+		ship.m_enginesClass = 1;
+
+		// out in hyperspace, in a corner of it, with no encounter able to begin
+		controller.m_encounterRange = 0.0f;
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 4.0f, 0.0f, 4.0f ) );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		SetEndurium( 92 );
+
+		yield return FlyUntilEndurium( 89, 30.0f, low );
+
+		SetEndurium( 47 );
+
+		yield return FlyUntilEndurium( 44, 30.0f, critical );
+
+		SetEndurium( 2 );
+
+		yield return FlyUntilEndurium( 0, 30.0f, outOfFuel );
+
+		Log( "fuelwarnings: from 9.2 to 8.9 cubic meters '" + low[ 0 ] + "'; from 4.7 to 4.4 '" + critical[ 0 ] + "'; from 0.2 to none '" + outOfFuel[ 0 ] + "'" );
+
+		Check( "fuelwarnings: below 150 steps' worth of Endurium (9.0 cubic meters with class 1 engines) the ship says the fuel supply is low", low[ 0 ].Contains( "Fuel supply low." ), low[ 0 ] );
+		Check( "fuelwarnings: below 75 steps' worth (4.5) it says the fuel supply is critical", critical[ 0 ].Contains( "Fuel supply critical." ), critical[ 0 ] );
+		Check( "fuelwarnings: with none left it says it is out of fuel", outOfFuel[ 0 ].Contains( "Out of fuel." ), outOfFuel[ 0 ] );
+
+		Finish( "scenario=fuelwarnings checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// an amount typed at the Trade Depot is cut to the most that can be traded, as the original's (TDEPOT-OV WEACC: the typed volume, ABS, ELEM-AM @ MIN): more

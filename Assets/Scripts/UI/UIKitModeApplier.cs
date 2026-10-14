@@ -3,28 +3,32 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
 
-// gives what the scenes hold the look of the UI kit's mode, where UIKitStyle does not: the tints of the buttons, the colours the kit's tools copied into the
-// scenes without a UIKitStyle, and the colour tags written into texts (the scenes are saved in the dark mode's colours, so in the dark mode only the texts' tags are looked at)
+// gives what the scenes hold the look of the UI kit's theme in use (its colour scheme in its mode), where UIKitStyle does not: the tints of the buttons,
+// the colours the kit's tools copied into the scenes without a UIKitStyle, and the colour tags written into texts (the scenes are saved in the classic
+// dark theme's colours, so in that theme only the texts' tags are looked at)
 public static class UIKitModeApplier
 {
-	// shows the colour tags of a text in the kit's colours, in the light mode (the dark mode shows texts as they are written, as it always has)
+	// shows the colour tags of a text in the kit's colours, in every theme but the classic dark one (which shows texts as they are written, as it always has)
 	class TextColours : ITextPreprocessor
 	{
 		public string PreprocessText( string text )
 		{
-			return ( UIKitTheme.GetMode() == UIKitTheme.Mode.Light ) ? UIKitTheme.KitColors( text ) : text;
+			return UIKitTheme.ShowsTagsAsWritten() ? text : UIKitTheme.KitColors( text );
 		}
 	}
 
 	// the one preprocessor every text shares
 	static readonly TextColours s_textColours = new TextColours();
 
-	// the mode the loaded scenes are in
-	static UIKitTheme.Mode s_appliedMode = UIKitTheme.Mode.Dark;
+	// the theme the loaded scenes are in
+	static UIKitTheme s_appliedTheme;
 
-	// the role of each colour copied into a scene, and the buttons tinted by the kit's tool, found the first time they were given another mode's colours
+	// the role of each colour copied into a scene, and the buttons tinted by the kit's tool, found the first time they were given another theme's colours
 	static readonly System.Collections.Generic.Dictionary<Graphic, UIKitTheme.ColorRole> s_graphicRoles = new System.Collections.Generic.Dictionary<Graphic, UIKitTheme.ColorRole>();
 	static readonly System.Collections.Generic.HashSet<Selectable> s_tintedButtons = new System.Collections.Generic.HashSet<Selectable>();
+
+	// graphics that show colours of their own and are never given the theme's (the colour swatches of the save panel's Colors screen)
+	static readonly System.Collections.Generic.HashSet<Graphic> s_ownColours = new System.Collections.Generic.HashSet<Graphic>();
 
 	// unity: before the first scene loads
 	[RuntimeInitializeOnLoadMethod( RuntimeInitializeLoadType.BeforeSceneLoad )]
@@ -33,10 +37,19 @@ public static class UIKitModeApplier
 		SceneManager.sceneLoaded -= SceneLoaded;
 		SceneManager.sceneLoaded += SceneLoaded;
 
-		UIKitTheme.Changed -= ModeChanged;
-		UIKitTheme.Changed += ModeChanged;
+		UIKitTheme.Changed -= ThemeChanged;
+		UIKitTheme.Changed += ThemeChanged;
 
-		s_appliedMode = UIKitTheme.GetMode();
+		s_appliedTheme = UIKitTheme.Get();
+	}
+
+	// leaves this graphic's colour alone when the theme changes (it shows a colour of its own)
+	public static void KeepColour( Graphic graphic )
+	{
+		if ( graphic != null )
+		{
+			s_ownColours.Add( graphic );
+		}
 	}
 
 	// a scene was loaded: it is in the dark mode's colours (and so are the objects it gave to the scene that is never unloaded, such as the save panel of
@@ -136,12 +149,12 @@ public static class UIKitModeApplier
 		frameStyle.Apply();
 	}
 
-	// the player changed the mode: every loaded scene goes from the old mode's colours to the new
-	static void ModeChanged()
+	// the player changed the scheme or the mode: every loaded scene goes from the old theme's colours to the new
+	static void ThemeChanged()
 	{
-		var from = UIKitTheme.Load( s_appliedMode );
+		var from = ( s_appliedTheme != null ) ? s_appliedTheme : UIKitTheme.Load( UIKitTheme.Mode.Dark );
 
-		s_appliedMode = UIKitTheme.GetMode();
+		s_appliedTheme = UIKitTheme.Get();
 
 		for ( var i = 0; i < SceneManager.sceneCount; i++ )
 		{
@@ -174,7 +187,7 @@ public static class UIKitModeApplier
 		return s_dontDestroyOnLoadMarker.scene;
 	}
 
-	// gives a scene the look of the mode in use, from the colours of the theme it is in now
+	// gives a scene the look of the theme in use, from the colours of the theme it is in now
 	public static void Apply( Scene scene, UIKitTheme from )
 	{
 		var to = UIKitTheme.Get();
@@ -186,10 +199,14 @@ public static class UIKitModeApplier
 
 		var recolour = ( from != null ) && ( from != to );
 
+		// the colours the scenes are saved in: an object made after its scene was given another theme's colours (a row of a list, from its prefab) still has them
+		var saved = UIKitTheme.Load( UIKitTheme.Mode.Dark );
+
 		// forget what has been destroyed since
 		if ( recolour )
 		{
 			s_tintedButtons.RemoveWhere( selectable => selectable == null );
+			s_ownColours.RemoveWhere( graphic => graphic == null );
 
 			var destroyed = new System.Collections.Generic.List<Graphic>();
 
@@ -214,13 +231,13 @@ public static class UIKitModeApplier
 				// the buttons' tints (UIKitSceneTool.TintButton)
 				foreach ( var selectable in rootObject.GetComponentsInChildren<Selectable>( true ) )
 				{
-					Retint( selectable, from, to );
+					Retint( selectable, from, to, saved );
 				}
 
 				// the colours copied into the scene (an element with a UIKitStyle that sets its colour does it itself)
 				foreach ( var graphic in rootObject.GetComponentsInChildren<Graphic>( true ) )
 				{
-					if ( graphic.TryGetComponent<UIKitStyle>( out var style ) && ( style.m_color != UIKitTheme.ColorRole.Keep ) )
+					if ( ( graphic.TryGetComponent<UIKitStyle>( out var style ) && ( style.m_color != UIKitTheme.ColorRole.Keep ) ) || s_ownColours.Contains( graphic ) )
 					{
 						continue;
 					}
@@ -235,6 +252,11 @@ public static class UIKitModeApplier
 					if ( !s_graphicRoles.TryGetValue( graphic, out var role ) )
 					{
 						role = UIKitTheme.FindRole( from, graphic.color );
+
+						if ( ( role == UIKitTheme.ColorRole.Keep ) && ( saved != from ) )
+						{
+							role = UIKitTheme.FindRole( saved, graphic.color );
+						}
 
 						if ( role != UIKitTheme.ColorRole.Keep )
 						{
@@ -269,8 +291,8 @@ public static class UIKitModeApplier
 		}
 	}
 
-	// gives a button the tints of the mode in use, if it has the tints of the other (as the kit's tool tints a button)
-	static void Retint( Selectable selectable, UIKitTheme from, UIKitTheme to )
+	// gives a button the tints of the theme in use, if it has the tints of the one before (as the kit's tool tints a button)
+	static void Retint( Selectable selectable, UIKitTheme from, UIKitTheme to, UIKitTheme saved )
 	{
 		if ( selectable.transition != Selectable.Transition.ColorTint )
 		{
@@ -279,10 +301,11 @@ public static class UIKitModeApplier
 
 		var colours = selectable.colors;
 
-		// a button is known for one of the kit's once, by its tint in the colours it was given (as for the graphics)
+		// a button is known for one of the kit's once, by its tint in the colours it was given (as for the graphics), or in the colours the scenes are
+		// saved in (a button made after its scene was given another theme's colours)
 		if ( !s_tintedButtons.Contains( selectable ) )
 		{
-			if ( UIKitTheme.FindRole( from, colours.normalColor ) != UIKitTheme.ColorRole.BackgroundRaised )
+			if ( !SameColour( colours.normalColor, from.m_backgroundRaised ) && ( ( saved == null ) || !SameColour( colours.normalColor, saved.m_backgroundRaised ) ) )
 			{
 				return;
 			}
@@ -297,5 +320,11 @@ public static class UIKitModeApplier
 		colours.disabledColor = new Color( to.m_backgroundHover.r, to.m_backgroundHover.g, to.m_backgroundHover.b, 0.5f );
 
 		selectable.colors = colours;
+	}
+
+	// whether two colours are the same colour of the kit (as FindRole tells them apart)
+	static bool SameColour( Color a, Color b )
+	{
+		return ( Mathf.Abs( a.r - b.r ) < 0.004f ) && ( Mathf.Abs( a.g - b.g ) < 0.004f ) && ( Mathf.Abs( a.b - b.b ) < 0.004f );
 	}
 }

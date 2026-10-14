@@ -141,8 +141,16 @@ public class PlayerShip : MonoBehaviour
 					// calculate the amount of fuel used up (half of it with the Tesseract aboard)
 					var fuelAmount = ( playerData.m_general.m_currentSpeed * engines.m_fuelUsedPerCoordinate / 256.0f ) * Time.deltaTime * playerData.m_playerShip.GetEngineFuelFactor();
 
+					var enduriumBefore = GetEnduriumTenths();
+
 					// use it up
 					playerData.m_playerShip.UseUpFuel( fuelAmount );
+
+					// the warnings as the fuel goes down (HYPER-OV (-ENDURIUM) and HYPERMSG-OV): at 150 and 75 steps' worth and at none - a step is an eighth of a
+					// coordinate, and its fuel what the engines use
+					var stepTenths = engines.m_fuelUsedPerCoordinate / 8.0f * playerData.m_playerShip.GetEngineFuelFactor() * 10.0f;
+
+					WarnOfFuel( enduriumBefore, GetEnduriumTenths(), stepTenths );
 				}
 			}
 			else
@@ -346,6 +354,46 @@ public class PlayerShip : MonoBehaviour
 	}
 
 	// call this to turn on the engines (accelerate)
+	// the Endurium in the hold, in tenths of a cubic meter
+	static int GetEnduriumTenths()
+	{
+		var endurium = DataController.m_instance.m_playerData.m_playerShip.m_elementStorage.Find( 5 );
+
+		return ( endurium == null ) ? 0 : endurium.m_volume;
+	}
+
+	// says so when the fuel goes down past 150 steps' worth ("Fuel supply low."), 75 ("Fuel supply critical.") or none ("Out of fuel."), in the original's colours
+	// (HYPERMSG-OV WF149, WF163 and WF182: yellow, orange and pink, with a beep)
+	static void WarnOfFuel( int before, int after, float stepTenths )
+	{
+		if ( after >= before )
+		{
+			return;
+		}
+
+		string warning = null;
+
+		if ( ( before > 0 ) && ( after <= 0 ) )
+		{
+			warning = "<color=#FF80FF>Out of fuel.</color>";
+		}
+		else if ( ( before > 75 * stepTenths ) && ( after <= 75 * stepTenths ) )
+		{
+			warning = "<color=#FF8000>Fuel supply critical.</color>";
+		}
+		else if ( ( before > 150 * stepTenths ) && ( after <= 150 * stepTenths ) )
+		{
+			warning = "<color=yellow>Fuel supply low.</color>";
+		}
+
+		if ( warning != null )
+		{
+			SpaceflightController.m_instance.m_messages.AddText( warning );
+
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+		}
+	}
+
 	public void TurnOnEngines()
 	{
 		m_enginesAreOn = true;
