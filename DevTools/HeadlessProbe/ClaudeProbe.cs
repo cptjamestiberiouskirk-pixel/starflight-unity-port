@@ -1059,6 +1059,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCommPicture();
 				break;
 
+			case "commspemin":
+				yield return ScenarioCommSpemin();
+				break;
+
 			case "encounterviewscale":
 				yield return ScenarioEncounterViewScale();
 				break;
@@ -27350,6 +27354,185 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "commpicture: and it stays clean (no bursts of interference later)", largestDisturbance == 0.0f, "largest " + largestDisturbance.ToString( "F2" ) );
 
 		Finish( "scenario=commpicture checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: the Spemin's comm portrait moves as the Genesis version's does (its eyes blink, its discs spin, slime drips, the body wobbles), and pictures of it with -Graphics
+
+	// the largest angle any of the transforms turned between two snapshots of their local rotations, in degrees
+	static float LargestTurn( Transform[] parts, Quaternion[] before )
+	{
+		var largest = 0.0f;
+
+		for ( var i = 0; i < parts.Length; i++ )
+		{
+			if ( parts[ i ] != null )
+			{
+				largest = Mathf.Max( largest, Quaternion.Angle( before[ i ], parts[ i ].localRotation ) );
+			}
+		}
+
+		return largest;
+	}
+
+	// the children of a transform whose names start with the given text, at any depth
+	static Transform[] ChildrenNamed( Transform root, string prefix )
+	{
+		var found = new List<Transform>();
+
+		foreach ( var child in root.GetComponentsInChildren<Transform>( true ) )
+		{
+			if ( child.name.StartsWith( prefix ) )
+			{
+				found.Add( child );
+			}
+		}
+
+		return found.ToArray();
+	}
+
+	IEnumerator ScenarioCommSpemin()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "comm-pictures" ) );
+
+		if ( hasGraphics )
+		{
+			System.IO.Directory.CreateDirectory( folder );
+		}
+
+		EnsureCrew();
+
+		// a skilled officer, whose link comes up with little interference, and a ship that survives whatever it meets
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+		playerData.m_playerShip.m_armorPoints = 100000;
+		controller.m_encounterRange = 0.0f;
+
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+		var said = new List<string>();
+
+		yield return MeetAndConnect( speminId, GD_Comm.Stance.Friendly, said );
+
+		CommScreen commScreen = null;
+
+		for ( var i = 0; ( i < 300 ) && ( commScreen == null ); i++ )
+		{
+			commScreen = FindFirstObjectByType<CommScreen>();
+
+			if ( commScreen == null )
+			{
+				yield return null;
+			}
+		}
+
+		var model = Call( controller.m_encounter, "GetAlienRaceModel" ) as GameObject;
+
+		if ( ( commScreen == null ) || ( model == null ) || !model.activeInHierarchy )
+		{
+			Check( "commspemin: the Spemin's comm portrait comes on", false, "comm screen " + ( commScreen != null ) + ", model " + ( ( model == null ) ? "none" : model.name + " active " + model.activeInHierarchy ) );
+			Finish( "scenario=commspemin abort: no comm portrait", 2 );
+			yield break;
+		}
+
+		// the link settles (the interference fades out over CommScreen.m_duration)
+		yield return new WaitForSecondsRealtime( commScreen.m_duration + 0.5f );
+
+		var camera = commScreen.GetComponent<Camera>();
+		var eyes = ChildrenNamed( model.transform, "Eyeball" );
+		var discs = ChildrenNamed( model.transform, "Disc" );
+		// the body: the mesh named Spemin (the race's group, the model's root and its camera have names that start with Spemin too)
+		Transform body = null;
+
+		foreach ( var renderer in model.GetComponentsInChildren<MeshRenderer>( true ) )
+		{
+			if ( renderer.name == "Spemin" )
+			{
+				body = renderer.transform;
+			}
+		}
+		var discStart = new Quaternion[ discs.Length ];
+
+		for ( var i = 0; i < discs.Length; i++ )
+		{
+			discStart[ i ] = discs[ i ].localRotation;
+		}
+
+		var dripsStart = ChildrenNamed( model.transform, "Drip" );
+		var dripStartY = new float[ dripsStart.Length ];
+
+		for ( var i = 0; i < dripsStart.Length; i++ )
+		{
+			dripStartY[ i ] = dripsStart[ i ].position.y;
+		}
+
+		// watch for 8 s: the smallest an eye gets across (a blink), how far the body's width and height (not only its depth) change, and how far the drips fall
+		var eyeStartScale = new float[ eyes.Length ];
+
+		for ( var i = 0; i < eyes.Length; i++ )
+		{
+			eyeStartScale[ i ] = eyes[ i ].localScale.magnitude;
+		}
+
+		var smallestEye = 1.0f;
+		var bodyStart = ( body != null ) ? body.localScale : Vector3.one;
+		var bodyWidthChange = 0.0f;
+		var bodyHeightChange = 0.0f;
+		var dripFall = 0.0f;
+		var pictures = 0;
+		var watchStart = Time.realtimeSinceStartup;
+		var nextPicture = watchStart;
+
+		while ( Time.realtimeSinceStartup < watchStart + 8.0f )
+		{
+			for ( var i = 0; i < eyes.Length; i++ )
+			{
+				if ( eyeStartScale[ i ] > 0.0f )
+				{
+					smallestEye = Mathf.Min( smallestEye, eyes[ i ].localScale.magnitude / eyeStartScale[ i ] );
+				}
+			}
+
+			if ( body != null )
+			{
+				bodyWidthChange = Mathf.Max( bodyWidthChange, Mathf.Abs( body.localScale.x / bodyStart.x - 1.0f ) );
+				bodyHeightChange = Mathf.Max( bodyHeightChange, Mathf.Abs( body.localScale.y / bodyStart.y - 1.0f ) );
+			}
+
+			for ( var i = 0; i < dripsStart.Length; i++ )
+			{
+				if ( dripsStart[ i ] != null )
+				{
+					dripFall = Mathf.Max( dripFall, dripStartY[ i ] - dripsStart[ i ].position.y );
+				}
+			}
+
+			// a portrait every quarter of a second for the first 3 s: the frames of the animation
+			if ( hasGraphics && ( pictures < 12 ) && ( Time.realtimeSinceStartup >= nextPicture ) )
+			{
+				var rect = camera.rect;
+
+				camera.rect = new Rect( 0.0f, 0.0f, 1.0f, 1.0f );
+				RenderCameraPicture( camera, System.IO.Path.Combine( folder, "spemin_" + pictures.ToString( "00" ) + ".png" ) );
+				camera.rect = rect;
+
+				pictures++;
+				nextPicture += 0.25f;
+			}
+
+			yield return null;
+		}
+
+		var discTurn = LargestTurn( discs, discStart );
+
+		Log( "commspemin: " + eyes.Length + " eyes (smallest " + smallestEye.ToString( "F2" ) + " of their size), " + discs.Length + " discs (largest turn " + discTurn.ToString( "F0" ) + " degrees), body " + ( ( body != null ) ? body.name : "none" ) + " (width change " + bodyWidthChange.ToString( "F3" ) + ", height change " + bodyHeightChange.ToString( "F3" ) + "), " + dripsStart.Length + " drips (fell " + dripFall.ToString( "F2" ) + ")" );
+
+		Check( "commspemin: the Spemin's eyes blink", ( eyes.Length > 0 ) && ( smallestEye < 0.6f ), "smallest eye " + smallestEye.ToString( "F2" ) + " of its size" );
+		Check( "commspemin: its discs spin", ( discs.Length > 0 ) && ( discTurn > 45.0f ), "largest turn " + discTurn.ToString( "F0" ) + " degrees" );
+		Check( "commspemin: its body wobbles in width and height, not only in depth", ( bodyWidthChange > 0.01f ) && ( bodyHeightChange > 0.01f ), "width " + bodyWidthChange.ToString( "F3" ) + ", height " + bodyHeightChange.ToString( "F3" ) );
+		Check( "commspemin: slime drips fall", ( dripsStart.Length > 0 ) && ( dripFall > 0.5f ), dripsStart.Length + " drips, fell " + dripFall.ToString( "F2" ) );
+
+		Finish( "scenario=commspemin pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// the encounter is seen at the original's fixed scale: the camera frames the alien ships out to their fire range and no further, so that it does not climb
