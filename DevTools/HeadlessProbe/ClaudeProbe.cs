@@ -1155,6 +1155,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioReboard();
 				break;
 
+			case "outoffuel":
+				yield return ScenarioOutOfFuel();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -29695,6 +29699,79 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "reboard: Move and Enter 1 km from the ship along the ground take the vehicle back in, however high the ground", location == PD_General.Location.Planetside, location.ToString() );
 
 		Finish( "scenario=reboard checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioOutOfFuel()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+		ProbeKeyboard();
+
+		// down on planet 94, out in the terrain vehicle, with something in its hold
+		yield return LandOnPlanet94At( Tools.LatLongToWorldCoordinates( 4.3f, -16.0f ), done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=outoffuel abort: no landing (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var vehicle = playerData.m_terrainVehicle;
+		var ironId = -1;
+
+		for ( var i = 0; i < gameData.m_elementList.Length; i++ )
+		{
+			if ( gameData.m_elementList[ i ].m_name == "Iron" )
+			{
+				ironId = i;
+			}
+		}
+
+		vehicle.AddElement( ironId, 20 );
+
+		var droppedBefore = ( playerData.m_planetSurfaces != null ) ? playerData.m_planetSurfaces.m_droppedCargoList.Count : 0;
+		var ironReference = playerData.m_playerShip.m_elementStorage.Find( ironId );
+		var ironShipBefore = ( ironReference != null ) ? ironReference.m_volume : 0;
+
+		// the tank runs dry far from the ship (40 km out, along the ground; 2048 units are 225 km)
+		var ship = Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude );
+		var farAway = new Vector3( ship.x + 40.0f * 2048.0f / 225.0f, 0.0f, ship.z );
+
+		playerData.m_general.m_coordinates = farAway;
+		playerData.m_general.m_lastDisembarkedCoordinates = farAway;
+		controller.m_terrainVehicle.transform.localPosition = farAway;
+
+		vehicle.m_fuelRemaining = -0.05f;
+
+		yield return Frames( 5 );
+
+		// Move, as the player drives on
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
+
+		yield return Frames( 10 );
+
+		var messages = System.Text.RegularExpressions.Regex.Replace( string.Join( "\n", playerData.m_general.m_messageList ), "<[^>]*>", "" );
+
+		yield return WaitForLocation( PD_General.Location.Planetside, 10.0f );
+		yield return Frames( 10 );
+
+		var location = playerData.m_general.m_location;
+		var droppedAfter = ( playerData.m_planetSurfaces != null ) ? playerData.m_planetSurfaces.m_droppedCargoList.Count : 0;
+		var ironInShip = playerData.m_playerShip.m_elementStorage.Find( ironId );
+		var ironShipAfter = ( ironInShip != null ) ? ironInShip.m_volume : 0;
+
+		Log( "outoffuel: messages '" + messages.Replace( "\n", " | " ) + "' | location " + location + " | dropped cargo " + droppedBefore + " then " + droppedAfter + " | iron in the ship " + ironShipBefore + " then " + ironShipAfter + " | the vehicle's fuel " + vehicle.GetPercentFuelRemaining() + "%" );
+
+		Check( "outoffuel: an empty tank says so, in the original's words (OUT OF FUEL, RETURNING TO SHIP ON FOOT)", messages.Contains( "Out of fuel." ) && messages.Contains( "Returning to ship on foot." ), messages );
+		Check( "outoffuel: the crew are back in the ship, not stranded on the planet", location == PD_General.Location.Planetside, location.ToString() );
+		Check( "outoffuel: the vehicle's cargo is left on the ground where it stopped (the original's >DEBRIS), not carried into the ship", ( droppedAfter == droppedBefore + 1 ) && ( ironShipAfter == ironShipBefore ), droppedBefore + " / " + droppedAfter + ", iron in the ship " + ironShipBefore + " / " + ironShipAfter );
+		Check( "outoffuel: back in the ship the vehicle is refuelled", vehicle.GetPercentFuelRemaining() == 100, vehicle.GetPercentFuelRemaining().ToString() );
+
+		Finish( "scenario=outoffuel checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

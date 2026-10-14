@@ -135,6 +135,20 @@ public class MoveButton : ShipButton
 					// stop playing the diesel engine sound
 					SoundController.m_instance.StopSound( SoundController.Sound.DieselEngine );
 
+					// the original's (MOVE-OV): the crew leave the vehicle's cargo where it stopped and walk back to the ship, where the vehicle is
+					// refuelled - so no crew is stranded on a planet with an empty tank
+					var dropped = TVCargoButton.DropAllCargo();
+
+					SpaceflightController.m_instance.m_messages.Clear();
+					SpaceflightController.m_instance.m_messages.AddText( "<color=red>Out of fuel.</color>\n<color=white>Returning to ship on foot.</color>" + ( ( dropped > 0 ) ? "\n<color=yellow>The cargo is left where the vehicle stopped.</color>" : "" ) );
+
+					// the walk back: the map fades, and the crew are in the ship
+					SpaceflightController.m_instance.m_planetside.UpdateTerrainGridNow();
+					SpaceflightController.m_instance.m_viewport.StartFade( 0.0f, 2.0f );
+
+					m_nextLocation = PD_General.Location.Planetside;
+					m_isTransitioning = true;
+
 					// remove the "active" dot from the current button
 					SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
 
