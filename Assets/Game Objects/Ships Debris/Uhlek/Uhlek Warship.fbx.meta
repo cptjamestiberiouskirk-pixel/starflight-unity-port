@@ -7,23 +7,13 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Uhlek Engine
-    second: {fileID: 2100000, guid: b008ba6abdc2b7c43a025ac35b768a29, type: 2}
+      name: Uhlek Warship Engine
+    second: {fileID: 2100000, guid: 6d95808c4fb3e7d42a0fe764472a5652, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Uhlek Hull
-    second: {fileID: 2100000, guid: 916d6facf3a3c624ca7531f51d0c496f, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Uhlek Light
-    second: {fileID: 2100000, guid: dc3a39d76e335614a9259022637fcc6c, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Uhlek Trim
-    second: {fileID: 2100000, guid: bcbafccbe941bd44bae0740968e8604c, type: 2}
+      name: Uhlek Warship Hull
+    second: {fileID: 2100000, guid: 0bba821bc6743754c8390bb012e904ac, type: 2}
   materials:
     materialImportMode: 1
     materialName: 0

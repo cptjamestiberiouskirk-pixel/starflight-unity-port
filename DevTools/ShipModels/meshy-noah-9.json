@@ -1,0 +1,25 @@
+{
+	"race": "Noah 9",
+	"textureSize": 1024,
+	"engines": false,
+	"glow": {
+		"hue": [0, 360],
+		"saturation": 2.0,
+		"value": 2.0
+	},
+	"vessels": [
+		{
+			"id": 23,
+			"name": "Noah 9 Derelict Transport",
+			"strinfo": 4.0,
+			"glb": "noah-derelict-10k.glb",
+			"nose": "+X",
+			"screenshot": "Noah Derelict Analysis.png",
+			"meshy": {
+				"concept": "01a138c9-65e3-76b2-803f-f844bb2103d0",
+				"model": "01a138cb-3bee-74cf-9c36-b82da7cdda5a",
+				"remesh": "01a138cd-8708-7745-8e07-ee7155dec2e0"
+			}
+		}
+	]
+}

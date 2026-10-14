@@ -295,6 +295,10 @@ def main():
 
         # to the canonical frame: nose +Y, the middle of the bounds at the origin, the length of the size rule along the nose
         obj.data.transform(Matrix.Rotation(math.radians(NOSE_TURNS[vessel.get("nose", "+X")]), 4, "Z"))
+        # a model that Meshy built lying on its side is rolled about its length (degrees, a right-handed turn about the nose)
+        obj.data.transform(Matrix.Rotation(math.radians(vessel.get("roll", 0.0)), 4, "Y"))
+        # a model that Meshy built wider than the original is narrowed across its nose to the original's proportions
+        obj.data.transform(Matrix.Diagonal((vessel.get("widthScale", 1.0), 1.0, 1.0, 1.0)))
         corners = [Vector(v.co) for v in obj.data.vertices]
         low = Vector((min(c.x for c in corners), min(c.y for c in corners), min(c.z for c in corners)))
         high = Vector((max(c.x for c in corners), max(c.y for c in corners), max(c.z for c in corners)))
@@ -354,13 +358,15 @@ def main():
             obj.data.materials.clear()
             obj.data.materials.append(flat_material(name + " Hull"))
             obj.data.materials.append(flat_material(name + " Engine"))
-            engines = mark_engines(obj, ship_kit.target_length(next(v["strinfo"] for v in race_file_data["vessels"] if v["name"] == name)))
+            # a dead ship (the Noah 9 derelict: STRINFO gives it no energy) has no engines to glow
+            engines = mark_engines(obj, ship_kit.target_length(next(v["strinfo"] for v in race_file_data["vessels"] if v["name"] == name))) if race_file_data.get("engines", True) else 0
             bpy.data.materials.remove(gltf_material)
 
             if engines == 0:
                 obj.data.materials.pop(index=1)
                 manifest_vessel = next(v for v in manifest["vessels"] if v["name"] == name)
                 manifest_vessel["materials"] = manifest_vessel["materials"][:1]
+                manifest["materials"] = [m for m in manifest["materials"] if m["name"] != name + " Engine"]
 
             print("ENGINES %s faces=%d" % (name, engines))
 

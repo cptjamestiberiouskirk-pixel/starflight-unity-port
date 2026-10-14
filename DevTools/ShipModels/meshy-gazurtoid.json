@@ -1,0 +1,38 @@
+{
+	"race": "Gazurtoid",
+	"textureSize": 1024,
+	"glow": {
+		"hue": [[170, 250], [320, 360], [0, 10]],
+		"saturation": 0.4,
+		"value": 0.3
+	},
+	"vessels": [
+		{
+			"id": 14,
+			"name": "Gazurtoid Scout",
+			"strinfo": 60.0,
+			"glb": "gazurtoid-scout-10k.glb",
+			"nose": "+Y",
+			"screenshot": "Gazurtoid Scout Analysis.png",
+			"meshy": {
+				"concept": "01a138c9-5b9f-705b-8bca-736b868ad0e1",
+				"model": "01a138cb-25f5-709d-bd57-13a8656bd34d",
+				"remesh": "01a138cd-2842-7374-8fd7-c92f647aa39e"
+			}
+		},
+		{
+			"id": 15,
+			"name": "Gazurtoid Warship",
+			"strinfo": 90.0,
+			"glb": "gazurtoid-warship-10k.glb",
+			"nose": "-X",
+			"roll": 90.0,
+			"screenshot": "Gazurtoid Warship Analysis.png",
+			"meshy": {
+				"concept": "01a138c9-5e4f-76bb-a2ff-6b1b9931d18e",
+				"model": "01a138cb-2c6f-7016-88a1-eda44f7a4191",
+				"remesh": "01a138cd-68d9-72d9-8242-b690167e84ae"
+			}
+		}
+	]
+}
