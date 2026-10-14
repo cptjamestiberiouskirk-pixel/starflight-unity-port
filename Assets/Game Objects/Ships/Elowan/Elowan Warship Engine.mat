@@ -7,11 +7,16 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Elowan Trim
+  m_Name: Elowan Warship Engine
   m_Shader: {fileID: 4800000, guid: f67073489be24934c9032d00068b6661, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
+  - SF_ALBEDOMAP_ON
+  - SF_EMISSIVEMAP_ON
+  - SF_NORMALMAP_ISCOMPRESSED
+  - SF_NORMALMAP_ON
+  - SF_SPECULARMAP_ON
   - SF_SPECULAR_ON
   m_InvalidKeywords:
   - SF_ZWRITEON_ON
@@ -30,11 +35,11 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - SF_EmissiveMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: c565297637d27c94fb7c067e8b3d29ce, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - SF_NormalMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: 18cd311ca589a614c869b9a0f2855035, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - SF_OcclusionMap:
@@ -46,7 +51,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - SF_SpecularMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: 5e6e423622db2b2498bb7929bde259d9, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
@@ -70,7 +75,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: e03ec19aa8cfca549a3f4b240517f442, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
@@ -98,7 +103,7 @@ Material:
     - SF_NormalMapStrength: 1
     - SF_OcclusionPower: 1
     - SF_OrthonormalizeOn: 0
-    - SF_Smoothness: 0.45
+    - SF_Smoothness: 1
     - SF_ZTest: 4
     - SF_ZWriteOn: 1
     - _BumpScale: 1
@@ -118,11 +123,11 @@ Material:
     - _UVSec: 0
     - _ZWrite: 1
     m_Colors:
-    - SF_AlbedoColor: {r: 0.1, g: 0.17, b: 0.08, a: 1}
-    - SF_EmissiveColor: {r: 0, g: 0, b: 0, a: 1}
+    - SF_AlbedoColor: {r: 1, g: 1, b: 1, a: 1}
+    - SF_EmissiveColor: {r: 0.9, g: 0.35, b: 0.12, a: 1}
     - SF_EmissiveTint: {r: 1, g: 1, b: 1, a: 1}
     - SF_ReflectionColor: {r: 1, g: 1, b: 1, a: 1}
-    - SF_SpecularColor: {r: 0.18, g: 0.22, b: 0.16, a: 1}
+    - SF_SpecularColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
   m_BuildTextureStacks: []
