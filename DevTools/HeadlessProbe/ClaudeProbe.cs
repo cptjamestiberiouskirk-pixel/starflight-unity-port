@@ -1371,6 +1371,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioFiredOnSilent();
 				break;
 
+			case "encountergrace":
+				yield return ScenarioEncounterGrace();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -34482,6 +34486,95 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "firedonsilent: aliens that have turned cowardly still answer a hail (control)", cowardly && cowardlyConnected && ( cowardlySaid.Length > 0 ), cowardly + " " + cowardlyConnected + " '" + cowardlySaid + "'" );
 
 		Finish( "scenario=firedonsilent checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// after an encounter in flight ends, no encounter begins for a minute, as the original's (HYPERMSG-OV WF022: ENC-TIME is the time plus 60000 ms, except in
+	// orbit; HYPER-OV >ENCOUNTER begins one only when TIME is past it)
+	IEnumerator ScenarioEncounterGrace()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var encounter = controller.m_encounter;
+
+		EnsureCrew();
+
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// a star system encounter of the Spemin, in its star system
+		var encounterId = -1;
+
+		for ( var atOnce = 1; ( atOnce <= 8 ) && ( encounterId < 0 ); atOnce++ )
+		{
+			encounterId = FindEncounter( 1, 1, atOnce, 0 );
+		}
+
+		if ( encounterId < 0 )
+		{
+			Finish( "scenario=encountergrace abort: no star system encounter of the Spemin", 2 );
+			yield break;
+		}
+
+		EnterStarSystem( playerData.FindEncounter( encounterId ).GetStarId() );
+
+		var start = Time.realtimeSinceStartup;
+
+		while ( controller.m_starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 40.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 10 );
+
+		EnterEncounter( encounterId );
+
+		yield return Frames( 10 );
+
+		// out of it the way the game leaves every encounter (the Crystal Pearl's warp goes through Encounter.LeaveEncounter)
+		encounter.WarpOut();
+
+		yield return Frames( 5 );
+
+		var locationAfterLeaving = playerData.m_general.m_location;
+
+		// the same aliens right beside the ship, for half a second
+		var pdEncounter = playerData.FindEncounter( encounterId );
+
+		pdEncounter.m_currentCoordinates = playerData.m_general.m_coordinates;
+
+		yield return Frames( 30 );
+
+		var locationDuringGrace = playerData.m_general.m_location;
+
+		// the control: with the minute over (set here rather than waited for), they meet the ship again
+		var resumeTime = typeof( SpaceflightController ).GetField( "m_encountersResumeTime", BindingFlags.NonPublic | BindingFlags.Instance );
+
+		if ( resumeTime != null )
+		{
+			resumeTime.SetValue( controller, 0.0f );
+		}
+
+		pdEncounter.m_currentCoordinates = playerData.m_general.m_coordinates;
+
+		yield return Frames( 30 );
+
+		var locationAfterGrace = playerData.m_general.m_location;
+
+		Log( "encountergrace: encounter " + encounterId + "; after leaving " + locationAfterLeaving + ", the aliens beside the ship within the minute: " + locationDuringGrace + ", after it: " + locationAfterGrace );
+
+		Check( "encountergrace: the encounter is left into the star system (the setup is the case)", locationAfterLeaving == PD_General.Location.StarSystem, locationAfterLeaving.ToString() );
+		Check( "encountergrace: within a minute of leaving, the aliens beside the ship begin no encounter", locationDuringGrace == PD_General.Location.StarSystem, locationDuringGrace.ToString() );
+		Check( "encountergrace: after the minute they do (control)", locationAfterGrace == PD_General.Location.Encounter, locationAfterGrace.ToString() );
+
+		ClearMissiles();
+
+		if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+		{
+			LeaveEncounter();
+		}
+
+		yield return Frames( 10 );
+
+		Finish( "scenario=encountergrace checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

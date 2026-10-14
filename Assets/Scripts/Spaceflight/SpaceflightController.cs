@@ -467,6 +467,19 @@ public class SpaceflightController : MonoBehaviour
 	}
 
 	// updates the encounters (call only from hyperspace or starsystem locations)
+	// after an encounter in flight ends, no encounter begins for a minute (the original's HYPERMSG-OV WF022 sets ENC-TIME to the time plus 60000 ms, and HYPER-OV
+	// >ENCOUNTER begins one only when the time is past it); the aliens go on moving meanwhile
+	const float c_encounterHoldOffSeconds = 60.0f;
+
+	// the time (Time.time) before which no encounter begins
+	float m_encountersResumeTime;
+
+	// call this when an encounter in flight has ended
+	public void HoldOffEncounters()
+	{
+		m_encountersResumeTime = Time.time + c_encounterHoldOffSeconds;
+	}
+
 	public void UpdateEncounters()
 	{
 		// get to the player data
@@ -571,8 +584,8 @@ public class SpaceflightController : MonoBehaviour
 			}
 		}
 
-		// did the player run into an encounter?
-		if ( encounterToBegin != null )
+		// did the player run into an encounter? (not within a minute of the last one)
+		if ( ( encounterToBegin != null ) && ( Time.time >= m_encountersResumeTime ) )
 		{
 			// yes - begin it
 			BeginEncounter( encounterToBegin );
