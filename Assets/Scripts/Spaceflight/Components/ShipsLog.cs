@@ -31,6 +31,37 @@ public class ShipsLog : MonoBehaviour
 
 	float m_ignoreControllerTimer;
 
+	// the copies of the starmap's background material the log's background is given (in the scheme's colour)
+	readonly List<Material> m_backgroundMaterials = new List<Material>();
+
+	// unity on enable
+	void OnEnable()
+	{
+		// the log is drawn on the starmap's background, in the colour of the kit's scheme, also when the player picks another one
+		UIKitTheme.Changed -= UseSchemeBackground;
+		UIKitTheme.Changed += UseSchemeBackground;
+
+		UseSchemeBackground();
+	}
+
+	// unity on disable
+	void OnDisable()
+	{
+		UIKitTheme.Changed -= UseSchemeBackground;
+	}
+
+	// unity on destroy
+	void OnDestroy()
+	{
+		Starmap.DestroyBackgroundCopies( m_backgroundMaterials );
+	}
+
+	// gives the log's background the panel colour of the views' theme
+	void UseSchemeBackground()
+	{
+		Starmap.UseSchemeBackground( transform, m_backgroundMaterials );
+	}
+
 	// unity update
 	void Update()
 	{

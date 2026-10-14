@@ -1280,6 +1280,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarmapColors();
 				break;
 
+			case "viewoverlays":
+				yield return ScenarioViewOverlays();
+				break;
+
 			case "sensorlines":
 				yield return ScenarioSensorLines();
 				break;
@@ -1404,6 +1408,30 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioEncounterGrace();
 				break;
 
+			case "landinggravity":
+				yield return ScenarioLandingGravity();
+				break;
+
+			case "landingwarning":
+				yield return ScenarioLandingWarning();
+				break;
+
+			case "fuelwarnings":
+				yield return ScenarioFuelWarnings();
+				break;
+
+			case "starport-tradeclamp":
+				yield return ScenarioStarportTradeClamp();
+				break;
+
+			case "alienmissiles":
+				yield return ScenarioAlienMissiles();
+				break;
+
+			case "alienshieldhits":
+				yield return ScenarioAlienShieldHits();
+				break;
+
 			case "clockrate":
 				yield return ScenarioClockRate();
 				break;
@@ -1484,7 +1512,18 @@ public class ClaudeProbe : MonoBehaviour
 
 		try
 		{
-			method.Invoke( CombatController.m_instance, new object[] { alienIndex, 100000 } );
+			// raised shields take a whole hit and nothing goes on to the armor (DAMAGE-OV WF162), so it takes a second hit to destroy a shielded ship
+			for ( var hit = 0; hit < 3; hit++ )
+			{
+				var ships = SpaceflightController.m_instance.m_encounter.m_pdEncounter.GetAlienShipList();
+
+				if ( ( alienIndex < 0 ) || ( alienIndex >= ships.Length ) || ships[ alienIndex ].m_isDead )
+				{
+					break;
+				}
+
+				method.Invoke( CombatController.m_instance, new object[] { alienIndex, 100000 } );
+			}
 		}
 		catch ( TargetInvocationException exception )
 		{
@@ -17979,7 +18018,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "roddevice: one laser shot of " + laserVessel.m_name + " (laser class " + laserVessel.m_laserClass + ") takes " + laserWithout + " armor points without the Rod Device, " + laserWith + " with it | a plasma bolt of " + ( ( plasmaVessel == null ) ? "none" : plasmaVessel.m_name ) + " " + plasmaWithout + " without, " + plasmaWith + " with" );
 
 		Check( "roddevice: an alien laser hits the ship (control)", laserWithout > 0, laserWithout.ToString() );
-		Check( "roddevice: with the Rod Device in the hold an alien laser does half the damage", ( laserWithout > 0 ) && ( laserWith == laserWithout / 2 ), laserWithout + " -> " + laserWith );
+		Check( "roddevice: with the Rod Device in the hold an alien laser does a quarter of the damage, as the original's (DAMAGE-OV WED36: ?ROD 4 /)", ( laserWithout > 0 ) && ( laserWith == laserWithout / 4 ), laserWithout + " -> " + laserWith );
 		Check( "roddevice: the Rod Device is a laser shield - a plasma bolt does the same damage (control)", plasmaWith == plasmaWithout, plasmaWithout + " -> " + plasmaWith );
 
 		Finish( "scenario=roddevice laser=" + laserWithout + "/" + laserWith + " plasma=" + plasmaWithout + "/" + plasmaWith, 0 );
@@ -18614,6 +18653,36 @@ public class ClaudeProbe : MonoBehaviour
 
 		bank.m_currentBalance = 100000;
 
+		// damaged systems, as the original prices them (CONFIG-OV WF226): a class 3 laser cannon at 40% (540 x 63 = 34,020 M.U.) and the sensors at 50%
+		// (5,000 M.U.), with the armor whole
+		ship.m_armorClass = 1;
+		ship.m_armorPoints = ship.GetMaximumArmorPoints();
+		ship.m_laserCannonClass = 3;
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Lasers, 40 );
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Sensors, 50 );
+
+		var costSystems = PressRepair( panel, message );
+		var lasersAfter = ship.GetSystemHealth( PD_PlayerShip.ShipSystem.Lasers );
+		var sensorsAfter = ship.GetSystemHealth( PD_PlayerShip.ShipSystem.Sensors );
+
+		// what the Starport pays for a part in the condition it is in (CONFIG-OV WECB0): a class 5 missile launcher whole (190,400 M.U.) and at 50% (95,200)
+		var launcher = DataController.m_instance.m_gameData.m_missileLauncherList[ 5 ];
+		var resale = typeof( PD_PlayerShip ).GetMethod( "GetPartResaleValue" );
+		var resaleWhole = -1;
+		var resaleHalf = -1;
+
+		if ( resale != null )
+		{
+			ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Missiles, 100 );
+			resaleWhole = (int) resale.Invoke( ship, new object[] { 4, launcher } );
+			ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Missiles, 50 );
+			resaleHalf = (int) resale.Invoke( ship, new object[] { 4, launcher } );
+			ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Missiles, 100 );
+		}
+
+		ship.m_laserCannonClass = 0;
+		bank.m_currentBalance = 100000;
+
 		var ledgerBefore = bank.m_transactionList.Count;
 
 		yield return ClosePanel( panel, "ship configuration" );
@@ -18623,11 +18692,16 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "starport-repair: a whole ship: " + costWhole + " (" + messageWhole + ") | class 1 armor at 200 of 500, shields empty: " + costClass1 + " M.U. (" + messageClass1 + "), armor " + armorAfterClass1 + ", shields " + shieldsAfterClass1 + " of " + ship.GetMaximumShieldPoints() + " | a bare hull at 100 of 250: " + costBareHull + " M.U., armor " + armorAfterBareHull + " | with 10 M.U.: " + costTooPoor + " (" + messageTooPoor + "), armor " + armorTooPoor + " | the ledger on closing: " + ledgerEntry );
 
 		Check( "starport-repair: a whole ship needs no repairs and pays nothing", ( costWhole == 0 ) && messageWhole.Contains( "no repairs" ), costWhole + " | " + messageWhole );
-		Check( "starport-repair: the missing armor is paid at the price of the ship's armor class, and the ship is whole again with full shields", ( costClass1 == 900 ) && ( armorAfterClass1 == 500 ) && ( shieldsAfterClass1 == ship.GetMaximumShieldPoints() ), costClass1 + ", " + armorAfterClass1 + ", " + shieldsAfterClass1 );
-		Check( "starport-repair: a bare hull is repaired at the price of class 1 armor", ( costBareHull == 450 ) && ( armorAfterBareHull == 250 ), costBareHull + ", " + armorAfterBareHull );
+		Check( "starport-repair: the missing armor is paid at 4 M.U. a point, as the original's, and the ship is whole again with full shields", ( costClass1 == 1200 ) && ( armorAfterClass1 == 500 ) && ( shieldsAfterClass1 == ship.GetMaximumShieldPoints() ), costClass1 + ", " + armorAfterClass1 + ", " + shieldsAfterClass1 );
+		Check( "starport-repair: a bare hull is repaired at 4 M.U. a point too", ( costBareHull == 600 ) && ( armorAfterBareHull == 250 ), costBareHull + ", " + armorAfterBareHull );
 		Check( "starport-repair: without the money the repair is refused and nothing changes", ( costTooPoor == 0 ) && ( armorTooPoor == 100 ) && messageTooPoor.Contains( "insufficient funds" ), costTooPoor + ", " + armorTooPoor + " | " + messageTooPoor );
 
-		Finish( "scenario=starport-repair whole=" + costWhole + " class1=" + costClass1 + " bareHull=" + costBareHull + " tooPoor=" + costTooPoor, 0 );
+		Log( "starport-repair: a class 3 laser cannon at 40% and the sensors at 50%: " + costSystems + " M.U., then lasers " + lasersAfter + "%, sensors " + sensorsAfter + "% | a class 5 missile launcher sells for " + resaleWhole + " whole and " + resaleHalf + " at 50%" );
+
+		Check( "starport-repair: damaged systems are paid for as the original's (the laser cannon by its price and damage, the sensors 100 M.U. a point), and are whole again", ( costSystems == 34020 + 5000 ) && ( lasersAfter == 100 ) && ( sensorsAfter == 100 ), costSystems + ", lasers " + lasersAfter + ", sensors " + sensorsAfter );
+		Check( "starport-repair: a part sells for what it is worth in its condition (a class 5 missile launcher 190,400 whole, 95,200 at 50%)", ( resaleWhole == 190400 ) && ( resaleHalf == 95200 ), resaleWhole + ", " + resaleHalf );
+
+		Finish( "scenario=starport-repair whole=" + costWhole + " class1=" + costClass1 + " bareHull=" + costBareHull + " tooPoor=" + costTooPoor + " systems=" + costSystems + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 1: distress
@@ -18754,10 +18828,12 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "distress: from star " + farthestStarId + " (" + farthest.ToString( "0" ) + " from Arth): fined " + fineFar + ", now " + whereFar + ", ledger '" + ledgerFar + "' | from Arth's system: fined " + fineNear + " | after the Starport: fined " + fineAfterStarport + ", now " + whereAfterStarport + " (" + textAfterStarport + ") | the evaluation: " + evaluationFar.Replace( '\n', '/' ) );
 
 		Check( "distress: a distress call gets the ship towed back to the Starport's docking bay", whereFar.StartsWith( "DockingBay" ) && whereFar.EndsWith( "star " + arthStarId ), whereFar );
-		Check( "distress: the fine runs from 15000 MU in Arth's system to 80000 MU from the farthest star, in the ledger and in Interstel's evaluation", ( fineNear == 15000 ) && ( fineFar == 80000 ) && ledgerFar.StartsWith( "Fine" ) && evaluationFar.Contains( "TOWING CHARGES" ) && evaluationFar.Contains( fineFar.ToString() ), fineNear + ", " + fineFar + ", '" + ledgerFar + "'" );
+		// the original's fine (COMM-OV WEF6D): the distance from Arth in its coordinates (the farthest star, 167 at 2,206: 123 starmap coordinates north, 984) times
+		// class 1 engines' 6 over 5, times 200 M.U. (a tenth of Endurium, 100, doubled in flight): 236,000; at least 15,000
+		Check( "distress: the fine is the original's, 15000 MU in Arth's system and 236000 MU from the farthest star, in the ledger and in Interstel's evaluation", ( fineNear == 15000 ) && ( fineFar == 236000 ) && ledgerFar.StartsWith( "Fine" ) && evaluationFar.Contains( "TOWING CHARGES" ) && evaluationFar.Contains( fineFar.ToString() ), fineNear + ", " + fineFar + ", '" + ledgerFar + "'" );
 		Log( "distress: booked at once from the farthest star " + bookedAtOnceFar + ", booked when the evaluation is shown " + ( fineFar - bookedAtOnceFar ) );
 
-		Check( "distress: the towing charges are booked when Interstel's evaluation shows them, as the original's, not at the call", ( bookedAtOnceFar == 0 ) && ( fineFar == 80000 ), "at once " + bookedAtOnceFar + ", in all " + fineFar );
+		Check( "distress: the towing charges are booked when Interstel's evaluation shows them, as the original's, not at the call", ( bookedAtOnceFar == 0 ) && ( fineFar > 0 ), "at once " + bookedAtOnceFar + ", in all " + fineFar );
 		Check( "distress: after the Starport has been destroyed there is no response, no fine and no tow (control)", ( fineAfterStarport == 0 ) && !whereAfterStarport.StartsWith( "DockingBay" ) && textAfterStarport.Contains( "NO RESPONSE" ), fineAfterStarport + ", " + whereAfterStarport );
 
 		Finish( "scenario=distress far=" + fineFar + " near=" + fineNear + " afterStarport=" + fineAfterStarport, 0 );
@@ -30221,18 +30297,18 @@ public class ClaudeProbe : MonoBehaviour
 		var buyHeading = ( heading != null ) ? heading.text : "(none)";
 		var depotBalance = depot.m_currentBalanceText.text;
 
-		// ask for 5000 cubic meters of the first element (titanium, 480 each), more than the balance pays for
+		// with no money left, asking to buy says so at once (a bigger amount than the money pays for is cut to what it pays for, as the original's)
+		var balanceBefore = playerData.m_bank.m_currentBalance;
+
+		playerData.m_bank.m_currentBalance = 0;
+
 		Call( depot, "SwitchToBuyAmountState" );
 
 		yield return Frames( 2 );
 
-		depot.m_amountInputField.text = "5000";
-
-		Call( depot, "OnEndEdit" );
-
-		yield return Frames( 2 );
-
 		var errorText = depot.m_errorMessageText.text;
+
+		playerData.m_bank.m_currentBalance = balanceBefore;
 
 		// the sell list, with something in the hold to sell
 		playerData.m_playerShip.m_artifactStorage.m_artifactList.Clear();
@@ -30736,7 +30812,9 @@ public class ClaudeProbe : MonoBehaviour
 		{
 			if ( name == "Starmap - Background" )
 			{
-				return ( backgroundImages.Count > 0 ) ? backgroundImages[ 0 ].material.GetColor( "SF_AlbedoColor" ) : (Color?) null;
+				var starmapBackground = backgroundImages.Find( image => image.transform.IsChildOf( starmap.transform ) );
+
+				return ( starmapBackground != null ) ? starmapBackground.material.GetColor( "SF_AlbedoColor" ) : (Color?) null;
 			}
 
 			foreach ( var starmapRenderer in starmap.GetComponentsInChildren<Renderer>( true ) )
@@ -30834,23 +30912,174 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "starmapcolors: the starmap's material assets are left as they are", assetColours == "392D3F/82147F", assetColours );
 
-		// the classic dark theme again, and every background image in it
+		// the classic dark theme again, and every background image in it, the ship's log's too once it is open
 		UIKitTheme.SetScheme( 0, false );
 		UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+		starmap.Hide();
+		controller.m_shipsLog.Show( new List<PD_ShipsLog.Entry>() );
 
 		yield return Frames( 3 );
 
 		var everyBackground = ( backgroundImages.Count > 0 ) && backgroundImages.TrueForAll( image => ColorUtility.ToHtmlStringRGB( image.material.GetColor( "SF_AlbedoColor" ) ) == ColorUtility.ToHtmlStringRGB( UIKitTheme.LoadScheme( 0, UIKitTheme.Mode.Dark ).m_backgroundPanel ) );
 
-		Check( "starmapcolors: every image drawn with the starmap's background material (" + backgroundImages.Count + ") takes the scheme's colour", everyBackground, backgroundImages.Count.ToString() );
+		Check( "starmapcolors: every image drawn with the starmap's background material (" + backgroundImages.Count + ": the starmap's and, once it is open, the ship's log's) takes the scheme's colour", everyBackground, backgroundImages.Count.ToString() );
 
-		starmap.Hide();
+		controller.m_shipsLog.Hide();
 
 		yield return Frames( 3 );
 
 		Log( "starmapcolors: " + pictures.Count + " pictures" + ( ( folder != "" ) ? " in " + folder : "" ) );
 
 		Finish( "scenario=starmapcolors checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// what is drawn over the 3D views keeps the dark colours of the scheme in use in the light mode too (the light mode's dark accents and texts were hard
+	// to read on space): the viewport frame's location name, status and corner bars and the ship's log take the views' theme (the scheme's dark one), while a
+	// text of the console beside the view keeps the light theme's colour (a control); the views follow the scheme when another is picked in the light mode
+	IEnumerator ScenarioViewOverlays()
+	{
+		var controller = SpaceflightController.m_instance;
+		var folder = ScreenPictureFolder( "view-overlays" );
+		var pictures = new List<string>();
+
+		controller.m_encounterRange = 0.0f;
+
+		yield return Frames( 30 );
+
+		// the viewport fades in for about 5 s after the ship enters a system, and hides what it draws until then
+		yield return new WaitForSecondsRealtime( 6.0f );
+
+		var frame = UnityEngine.Object.FindFirstObjectByType<ViewportFrame>();
+		var frameStyles = ( frame != null ) ? new List<UIKitStyle>( frame.GetComponentsInChildren<UIKitStyle>( true ) ) : new List<UIKitStyle>();
+
+		// a text of the console with the primary text colour, outside the main viewport
+		UIKitStyle consoleText = null;
+
+		foreach ( var style in UnityEngine.Object.FindObjectsByType<UIKitStyle>( FindObjectsInactive.Exclude, FindObjectsSortMode.None ) )
+		{
+			if ( ( style.m_color == UIKitTheme.ColorRole.TextPrimary ) && style.TryGetComponent<TMPro.TMP_Text>( out _ ) && ( style.gameObject.scene.name == "Spaceflight" ) && ( style.GetComponentInParent<Viewport>( true ) == null ) )
+			{
+				consoleText = style;
+				break;
+			}
+		}
+
+		Action<string> take = name =>
+		{
+			if ( folder != "" )
+			{
+				RenderScreenPicture( System.IO.Path.Combine( folder, ( pictures.Count + 1 ).ToString( "00" ) + "_" + name + ".png" ) );
+				pictures.Add( name );
+			}
+		};
+
+		// the colours the frame's elements and the ship's log show, against the colours of their roles in a theme
+		Func<IEnumerable<UIKitStyle>, UIKitTheme, string> differences = ( styles, theme ) =>
+		{
+			var list = new List<string>();
+
+			foreach ( var style in styles )
+			{
+				if ( ( style.m_color == UIKitTheme.ColorRole.Keep ) || !style.TryGetComponent<UnityEngine.UI.Graphic>( out var graphic ) || !style.isActiveAndEnabled )
+				{
+					continue;
+				}
+
+				if ( ColorUtility.ToHtmlStringRGB( graphic.color ) != ColorUtility.ToHtmlStringRGB( theme.GetColor( style.m_color ) ) )
+				{
+					list.Add( style.name + " " + style.m_color + " " + ColorUtility.ToHtmlStringRGB( graphic.color ) );
+				}
+			}
+
+			return string.Join( " | ", list );
+		};
+
+		// ---- the classic scheme in the light mode, in a star system, with the ship's log open
+		UIKitTheme.SetMode( UIKitTheme.Mode.Light, false );
+
+		var darkTheme = UIKitTheme.Load( UIKitTheme.Mode.Dark );
+		var lightTheme = UIKitTheme.Load( UIKitTheme.Mode.Light );
+
+		yield return Frames( 5 );
+
+		var frameDifferences = differences( frameStyles, darkTheme );
+		var frameChecked = 0;
+
+		foreach ( var style in frameStyles )
+		{
+			if ( ( style.m_color != UIKitTheme.ColorRole.Keep ) && style.isActiveAndEnabled )
+			{
+				frameChecked++;
+			}
+		}
+
+		take( "light_star_system" );
+
+		controller.m_shipsLog.Show( new List<PD_ShipsLog.Entry>() );
+
+		yield return Frames( 5 );
+
+		var logStyles = new List<UIKitStyle>( controller.m_shipsLog.GetComponentsInChildren<UIKitStyle>( false ) );
+		var logDifferences = differences( logStyles, darkTheme );
+
+		// the log's background (drawn with the starmap's background material; the starmap has not been opened)
+		var logBackground = "none";
+
+		foreach ( var image in controller.m_shipsLog.GetComponentsInChildren<UnityEngine.UI.Image>( true ) )
+		{
+			if ( ( image.material != null ) && image.material.name.StartsWith( "Starmap - Background" ) )
+			{
+				logBackground = ColorUtility.ToHtmlStringRGB( image.material.GetColor( "SF_AlbedoColor" ) );
+			}
+		}
+
+		take( "light_ships_log" );
+
+		controller.m_shipsLog.Hide();
+
+		var consoleColour = ( consoleText != null ) ? ColorUtility.ToHtmlStringRGB( consoleText.GetComponent<TMPro.TMP_Text>().color ) : "none";
+
+		Log( "viewoverlays: frame elements " + frameChecked + " differences [" + frameDifferences + "] | ship's log elements " + logStyles.Count + " differences [" + logDifferences + "] | console text " + ( ( consoleText != null ) ? consoleText.name : "none" ) + " " + consoleColour );
+
+		Check( "viewoverlays: in the light mode the viewport frame's location, status and bars keep the scheme's dark colours", ( frameChecked > 0 ) && ( frameDifferences == "" ), frameChecked + " / " + frameDifferences );
+		Check( "viewoverlays: in the light mode the ship's log, drawn over the main view, keeps the scheme's dark colours", ( logStyles.Count > 0 ) && ( logDifferences == "" ), logStyles.Count + " / " + logDifferences );
+		Check( "viewoverlays: the ship's log, opened before the starmap ever was, is drawn on the scheme's dark panel colour (it was the starmap's purple)", logBackground == ColorUtility.ToHtmlStringRGB( darkTheme.m_backgroundPanel ), logBackground );
+		Check( "viewoverlays: a text of the console beside the view takes the light mode's colour (a control)", consoleColour == ColorUtility.ToHtmlStringRGB( lightTheme.m_textPrimary ), consoleColour );
+
+		// the terrain scan's count of lifeforms was written in a pink of its own, which no theme gave its colour
+		var lifeformLine = UIKitTheme.KitColors( "<color=#FF80FF>Lifeform: 1</color>" );
+
+		Check( "viewoverlays: the terrain scan's count of lifeforms is shown in the kit's alert colour (it was pink)", lifeformLine.Contains( ColorUtility.ToHtmlStringRGB( lightTheme.m_textAlert ) ), lifeformLine );
+
+		// ---- another scheme picked in the light mode: the views take its dark colours (looked up so that a tree without the schemes compiles)
+		var setScheme = typeof( UIKitTheme ).GetMethod( "SetScheme" );
+		var loadScheme = typeof( UIKitTheme ).GetMethod( "LoadScheme" );
+
+		if ( ( setScheme != null ) && ( loadScheme != null ) )
+		{
+			setScheme.Invoke( null, new object[] { 3, false } );
+
+			yield return Frames( 5 );
+
+			var schemeDark = loadScheme.Invoke( null, new object[] { 3, UIKitTheme.Mode.Dark } ) as UIKitTheme;
+			var schemeDifferences = differences( frameStyles, schemeDark );
+
+			take( "light_scheme_3" );
+
+			Check( "viewoverlays: another scheme picked in the light mode gives the views its dark colours", ( schemeDark != null ) && ( schemeDifferences == "" ), schemeDifferences );
+
+			setScheme.Invoke( null, new object[] { 0, false } );
+		}
+
+		// the classic dark theme again
+		UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+		yield return Frames( 3 );
+
+		Log( "viewoverlays: " + pictures.Count + " pictures" + ( ( folder != "" ) ? " in " + folder : "" ) );
+
+		Finish( "scenario=viewoverlays checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	IEnumerator ScenarioSensorLines()
@@ -35018,6 +35247,447 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=encountergrace checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
+	static int EnduriumTenths()
+	{
+		var endurium = DataController.m_instance.m_playerData.m_playerShip.m_elementStorage.Find( 5 );
+
+		return ( endurium == null ) ? 0 : endurium.m_volume;
+	}
+
+	// landing and launching as the original's (LAND-OV): each burns the gravity's share of Endurium (the gravity in hundredths of a G over 40, in tenths), a
+	// launch without it is refused, a landing without it crashes, and once the gravity is analysed Land warns of a planet that would crush the hull
+	IEnumerator ScenarioLandingGravity()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// ---- 1. a launch from planet 90 (1.08 G: 2 tenths) with 1 tenth aboard is refused, and with 100 it burns 2
+		var planet90Star = gameData.m_planetList[ 90 ].m_starId;
+
+		yield return GoIntoOrbit( planet90Star, 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		SetEndurium( 1 );
+		controller.m_messages.Clear();
+
+		new LaunchYesButton().Execute();
+
+		yield return Frames( 10 );
+
+		var launchRefusedLocation = playerData.m_general.m_location;
+		var launchRefusedText = MessageList();
+
+		SetEndurium( 100 );
+
+		new LaunchYesButton().Execute();
+
+		var fuelAfterLaunch = EnduriumTenths();
+
+		yield return WaitForLocation( PD_General.Location.InOrbit, 20.0f );
+		yield return Frames( 10 );
+
+		var launchedLocation = playerData.m_general.m_location;
+
+		// ---- 2. a landing on planet 90 with 1 tenth aboard crashes, and the game is over
+		SetEndurium( 1 );
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.CommandB, 0 );
+
+		yield return Frames( 5 );
+
+		PressButton( ButtonController.ButtonSet.Land, 1 );
+
+		var end = Time.realtimeSinceStartup + 60.0f;
+
+		// until the touchdown: a safe landing, or the end of the game (the location is the surface from the start of the descent)
+		while ( ( Time.realtimeSinceStartup < end ) && !CombatController.m_instance.PlayerIsDestroyed() && !MessageList().Contains( "Safe landing" ) )
+		{
+			yield return null;
+		}
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		var crashed = CombatController.m_instance.PlayerIsDestroyed();
+		var crashText = MessageList();
+
+		Log( "landinggravity: planet 90 is " + gameData.m_planetList[ 90 ].m_gravity + " hundredths of a G; launch with 1 tenth: " + launchRefusedLocation + " '" + launchRefusedText + "'; with 100: " + fuelAfterLaunch + " left, then " + launchedLocation + "; landing with 1 tenth: destroyed " + crashed + " '" + crashText + "'" );
+
+		Check( "landinggravity: a launch without the gravity's share of Endurium is refused (1 tenth on planet 90)", ( launchRefusedLocation == PD_General.Location.Planetside ) && launchRefusedText.Contains( "Insufficient fuel for re-launching" ), launchRefusedLocation + " '" + launchRefusedText + "'" );
+		Check( "landinggravity: a launch from planet 90 burns 2 tenths of Endurium (108 hundredths of a G over 40)", ( fuelAfterLaunch == 98 ) && ( launchedLocation == PD_General.Location.InOrbit ), fuelAfterLaunch + ", " + launchedLocation );
+		Check( "landinggravity: a landing without the fuel for it crashes, and the game is over", crashed && crashText.Contains( "crashed on planet" ), crashed + " '" + crashText + "'" );
+
+		// ---- 3. the rules for every planet: what a landing burns, and the planets that crush a hull (more than 7.99 G, 194 of the 811)
+		var crushing = -1;
+		var heaviestFuel = -1;
+		var crushes = typeof( PD_PlayerShip ).GetMethod( "GravityCrushesHull" );
+		var landingFuel = typeof( PD_PlayerShip ).GetMethod( "GetLandingFuel" );
+
+		if ( ( crushes != null ) && ( landingFuel != null ) )
+		{
+			crushing = 0;
+			heaviestFuel = 0;
+
+			foreach ( var planet in gameData.m_planetList )
+			{
+				if ( (bool) crushes.Invoke( null, new object[] { planet } ) )
+				{
+					crushing++;
+				}
+
+				heaviestFuel = Mathf.Max( heaviestFuel, (int) landingFuel.Invoke( null, new object[] { planet } ) );
+			}
+		}
+
+		Log( "landinggravity: " + crushing + " planets crush a hull; the heaviest landing burns " + heaviestFuel + " tenths" );
+
+		Check( "landinggravity: 194 planets crush a landing ship's hull, and the heaviest landing burns at most 32 tenths", ( crushing == 194 ) && ( heaviestFuel > 0 ) && ( heaviestFuel <= 32 ), crushing + ", " + heaviestFuel );
+
+		Finish( "scenario=landinggravity checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// once the gravity has been analysed, Land warns of a landing the ship cannot make, and a second Land goes down anyway (LAND-OV ?LAND and WF45E)
+	IEnumerator ScenarioLandingWarning()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+
+		EnsureCrew();
+
+		yield return GoIntoOrbit( gameData.m_planetList[ 90 ].m_starId, 90 );
+
+		// 1 tenth of Endurium, and the science officer has analysed planet 90's gravity (1.08 G)
+		SetEndurium( 1 );
+
+		var analysed = typeof( SpaceflightController ).GetField( "m_gravityAnalysedPlanetId" );
+
+		if ( analysed != null )
+		{
+			analysed.SetValue( controller, 90 );
+		}
+
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.CommandB, 0 );
+
+		yield return Frames( 5 );
+
+		var firstSet = buttonController.GetCurrentButtonSet();
+		var firstText = MessageList();
+
+		PressButton( ButtonController.ButtonSet.CommandB, 0 );
+
+		yield return Frames( 5 );
+
+		var secondSet = buttonController.GetCurrentButtonSet();
+
+		Log( "landingwarning: first Land: " + firstSet + " '" + firstText + "'; second Land: " + secondSet );
+
+		Check( "landingwarning: with the gravity analysed, the first Land warns of the fuel and stays in orbit", ( firstSet != ButtonController.ButtonSet.Land ) && firstText.Contains( "Insufficient fuel for safe landing" ), firstSet + " '" + firstText + "'" );
+		Check( "landingwarning: a second Land goes on to the landing", secondSet == ButtonController.ButtonSet.Land, secondSet.ToString() );
+
+		Finish( "scenario=landingwarning checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// flies in hyperspace with the engines on until the Endurium is down to the given tenths, or the seconds are up - returns the messages said meanwhile
+	static IEnumerator FlyUntilEndurium( int tenths, float seconds, string[] said )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		controller.m_messages.Clear();
+		controller.m_playerShip.TurnOnEngines();
+
+		var end = Time.realtimeSinceStartup + seconds;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( Endurium() > tenths ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		controller.m_playerShip.TurnOffEngines();
+		playerData.m_general.m_currentSpeed = 0.0f;
+
+		said[ 0 ] = MessageList();
+	}
+
+	// the fuel warnings in hyperspace, as the original's (HYPER-OV (-ENDURIUM)): "Fuel supply low." at 150 steps' worth of Endurium (class 1 engines: 9.0 cubic
+	// meters), "Fuel supply critical." at 75 (4.5) and "Out of fuel." at none
+	IEnumerator ScenarioFuelWarnings()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var low = new string[ 1 ];
+		var critical = new string[ 1 ];
+		var outOfFuel = new string[ 1 ];
+
+		EnsureCrew();
+
+		ship.m_enginesClass = 1;
+
+		// out in hyperspace, in a corner of it, with no encounter able to begin
+		controller.m_encounterRange = 0.0f;
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 4.0f, 0.0f, 4.0f ) );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		SetEndurium( 92 );
+
+		yield return FlyUntilEndurium( 89, 30.0f, low );
+
+		SetEndurium( 47 );
+
+		yield return FlyUntilEndurium( 44, 30.0f, critical );
+
+		SetEndurium( 2 );
+
+		yield return FlyUntilEndurium( 0, 30.0f, outOfFuel );
+
+		Log( "fuelwarnings: from 9.2 to 8.9 cubic meters '" + low[ 0 ] + "'; from 4.7 to 4.4 '" + critical[ 0 ] + "'; from 0.2 to none '" + outOfFuel[ 0 ] + "'" );
+
+		Check( "fuelwarnings: below 150 steps' worth of Endurium (9.0 cubic meters with class 1 engines) the ship says the fuel supply is low", low[ 0 ].Contains( "Fuel supply low." ), low[ 0 ] );
+		Check( "fuelwarnings: below 75 steps' worth (4.5) it says the fuel supply is critical", critical[ 0 ].Contains( "Fuel supply critical." ), critical[ 0 ] );
+		Check( "fuelwarnings: with none left it says it is out of fuel", outOfFuel[ 0 ].Contains( "Out of fuel." ), outOfFuel[ 0 ] );
+
+		Finish( "scenario=fuelwarnings checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// an amount typed at the Trade Depot is cut to the most that can be traded, as the original's (TDEPOT-OV WEACC: the typed volume, ABS, ELEM-AM @ MIN): more
+	// than the hold takes buys what the hold takes, and more than the hold has sells all of it
+	IEnumerator ScenarioStarportTradeClamp()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var depot = FindPanel<TradeDepotPanel>();
+		var ship = playerData.m_playerShip;
+
+		// plenty of money, an empty hold with no cargo pods
+		playerData.m_bank.m_currentBalance = 1000000;
+
+		ship.m_elementStorage.m_elementList.Clear();
+		ship.m_artifactStorage.m_artifactList.Clear();
+		ship.m_numCargoPods = 0;
+		ship.RecalculateVolume();
+		ship.RecalculateVolumeUsed();
+
+		var room = ship.GetRemainingVolume();
+
+		// buy 5000 cubic meters of the first element on the list
+		Call( depot, "SwitchToBuyItemState", true );
+
+		yield return Frames( 2 );
+
+		Call( depot, "SwitchToBuyAmountState" );
+
+		yield return Frames( 2 );
+
+		depot.m_amountInputField.text = "5000";
+
+		Call( depot, "OnEndEdit" );
+
+		yield return Frames( 2 );
+
+		var bought = room - ship.GetRemainingVolume();
+		var boughtState = GetField( depot, "m_currentState" ).ToString();
+
+		Call( depot, "SwitchToMenuBarState" );
+
+		yield return Frames( 2 );
+
+		// sell 5000 cubic meters of it
+		Call( depot, "SwitchToSellItemState", true );
+
+		yield return Frames( 2 );
+
+		Call( depot, "SwitchToSellAmountState" );
+
+		yield return Frames( 2 );
+
+		depot.m_amountInputField.text = "5000";
+
+		Call( depot, "OnEndEdit" );
+
+		yield return Frames( 2 );
+
+		var left = room - ship.GetRemainingVolume();
+		var soldState = GetField( depot, "m_currentState" ).ToString();
+
+		Log( "starport-tradeclamp: room " + room + " tenths; 5000 cubic meters asked: " + bought + " tenths bought (" + boughtState + "); 5000 sold: " + left + " tenths left (" + soldState + ")" );
+
+		Check( "starport-tradeclamp: buying more than the hold takes buys what it takes, as the original's", ( room > 0 ) && ( bought == room ), room + " room, " + bought + " bought, " + boughtState );
+		Check( "starport-tradeclamp: selling more than the hold has sells all of it", ( bought > 0 ) && ( left == 0 ), left + " left, " + soldState );
+
+		Finish( "scenario=starport-tradeclamp checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the aliens' weapons, as the original's (COMBAT-OV): a ship with a laser and a missile launcher fires both, and its missile flies to where the player's ship
+	// was when it was launched (only the plasma bolt follows the ship, WE929), so a ship that has moved away is missed
+	IEnumerator ScenarioAlienMissiles()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// a Spemin encounter, its first ship made a Spemin Warship (a class 2 laser and a class 1 missile launcher), 300 units from the player
+		var encounterId = FindEncounter( 1, 6, 3, 0 );
+
+		EnterEncounter( encounterId );
+
+		yield return Frames( 10 );
+
+		var alienShip = controller.m_encounter.m_pdEncounter.GetAlienShipList()[ FirstLivingAlien() ];
+		var warship = gameData.m_vesselList[ 3 ];
+
+		alienShip.m_vesselId = 3;
+		alienShip.m_coordinates = playerData.m_general.m_coordinates + Vector3.right * 300.0f;
+
+		controller.m_messages.Clear();
+
+		CombatController.m_instance.AlienFiresAtPlayer( alienShip, warship );
+
+		yield return Frames( 2 );
+
+		var laserSaid = MessageList().Contains( "Laser class" );
+		var missilesLaunched = MissilesInFlight();
+
+		// the player's ship moves 600 units away at once
+		var away = controller.m_playerShip.transform.position + Vector3.forward * 600.0f;
+
+		controller.m_playerShip.transform.position = away;
+		playerData.m_general.m_coordinates = away;
+
+		var pointsBefore = playerData.m_playerShip.m_armorPoints + playerData.m_playerShip.m_shieldPoints;
+		var end = Time.realtimeSinceStartup + 10.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( MissilesInFlight() > 0 ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		var pointsAfter = playerData.m_playerShip.m_armorPoints + playerData.m_playerShip.m_shieldPoints;
+		var missileHit = MessageList().Contains( "Missile class" );
+
+		// the control: fired again at a ship that stays where it is, the missile hits
+		alienShip.m_coordinates = playerData.m_general.m_coordinates + Vector3.right * 300.0f;
+		controller.m_messages.Clear();
+
+		CombatController.m_instance.AlienFiresAtPlayer( alienShip, warship );
+
+		end = Time.realtimeSinceStartup + 10.0f;
+
+		yield return Frames( 2 );
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( MissilesInFlight() > 0 ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		var missileHitStill = MessageList().Contains( "Missile class" );
+
+		ClearMissiles();
+		LeaveEncounter();
+
+		yield return Frames( 10 );
+
+		Log( "alienmissiles: the warship fired: laser " + laserSaid + ", missiles in the air " + missilesLaunched + "; after the ship moved 600 units away the missile hit " + missileHit + ", armor and shields " + pointsBefore + " -> " + pointsAfter );
+
+		Check( "alienmissiles: a ship with a laser and a missile launcher fires both", laserSaid && ( missilesLaunched >= 1 ), laserSaid + ", " + missilesLaunched );
+		Check( "alienmissiles: a ship that stays where it is is hit by the missile (control)", missileHitStill, missileHitStill.ToString() );
+		Check( "alienmissiles: its missile flies to where the ship was, and misses a ship that has moved away", ( missilesLaunched >= 1 ) && !missileHit && ( pointsAfter == pointsBefore ), missileHit + ", " + pointsBefore + " -> " + pointsAfter );
+
+		Finish( "scenario=alienmissiles checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// what an alien ship's shields take of a hit, as the original's (DAMAGE-OV WF162): the whole hit if they have points left, are up and the fight is not in a
+	// nebula, and nothing over goes on to the armor; otherwise the armor takes it all
+	IEnumerator ScenarioAlienShieldHits()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var applyDamage = typeof( CombatController ).GetMethod( "ApplyDamageToAlien", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance );
+		var results = new string[ 2 ];
+		var armorTaken = new int[ 2 ];
+		var shieldsLeft = new int[ 2 ];
+		var shieldsUp = new bool[ 2 ];
+		var races = new GameData.Race[] { GameData.Race.Uhlek, GameData.Race.Spemin };
+
+		EnsureCrew();
+
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		for ( var i = 0; i < races.Length; i++ )
+		{
+			var encounterId = FindEncounterOfRace( races[ i ] );
+
+			EnterEncounter( encounterId );
+			yield return Frames( 10 );
+
+			// the first living ship, with 30 shield points and plenty of armor, takes a hit of 50
+			var ships = encounter.m_pdEncounter.GetAlienShipList();
+			var index = -1;
+
+			for ( var s = 0; s < ships.Length; s++ )
+			{
+				if ( ships[ s ].m_addedToEncounter && !ships[ s ].m_isDead )
+				{
+					index = s;
+					break;
+				}
+			}
+
+			if ( index < 0 )
+			{
+				results[ i ] = "no living ship in encounter " + encounterId;
+				continue;
+			}
+
+			ships[ index ].EnsureHitPoints( DataController.m_instance.m_gameData.m_vesselList[ ships[ index ].m_vesselId ] );
+			ships[ index ].m_shieldPoints = 30;
+			ships[ index ].m_armorPoints = 500;
+
+			shieldsUp[ i ] = encounter.AliensHaveShieldsUp();
+
+			applyDamage.Invoke( CombatController.m_instance, new object[] { index, 50 } );
+
+			armorTaken[ i ] = 500 - ships[ index ].m_armorPoints;
+			shieldsLeft[ i ] = ships[ index ].m_shieldPoints;
+			results[ i ] = races[ i ] + " (encounter " + encounterId + "): shields up " + shieldsUp[ i ] + ", shields 30 -> " + shieldsLeft[ i ] + ", armor took " + armorTaken[ i ];
+
+			ClearMissiles();
+			LeaveEncounter();
+			yield return Frames( 10 );
+		}
+
+		Log( "alienshieldhits: " + results[ 0 ] + " | " + results[ 1 ] );
+
+		Check( "alienshieldhits: an Uhlek ship's raised shields take the whole hit of 50 with 30 points left, and nothing goes on to the armor", shieldsUp[ 0 ] && ( shieldsLeft[ 0 ] == 0 ) && ( armorTaken[ 0 ] == 0 ), results[ 0 ] );
+		Check( "alienshieldhits: the Spemin never raise their shields, so the armor takes the whole hit and the shields keep their points", !shieldsUp[ 1 ] && ( shieldsLeft[ 1 ] == 30 ) && ( armorTaken[ 1 ] == 50 ), results[ 1 ] );
+
+		Finish( "scenario=alienshieldhits checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
 	// the game clock's rate, as the original's kernel keeps it (?NEW-HO: a star hour every REAL-MS, 10,000 ms of play): 30 game minutes in 5 seconds of flight
 	IEnumerator ScenarioClockRate()
 	{
@@ -35192,11 +35862,6 @@ public class ClaudeProbe : MonoBehaviour
 		var value = ElementSaleValue( 5 );
 
 		var baseline = TrySell( tradeDepotPanel, "abc" );
-		var tooMuch = TrySell( tradeDepotPanel, "25" );
-
-		Check( "H4 cannot sell more than the hold contains", ( tooMuch.m_state == "ErrorMessage" ) && ( tooMuch.m_volume == baseline.m_volume ) && ( tooMuch.m_balance == baseline.m_balance ) && ( tooMuch.m_thrown == "none" ),
-			"hold has " + baseline.m_volume + " tenths, typed 25: " + tooMuch );
-
 		var minus = TrySell( tradeDepotPanel, "-" );
 
 		Check( "M3 a lone minus sign is ignored", ( minus.m_thrown == "none" ) && ( minus.m_volume == baseline.m_volume ) && ( minus.m_balance == baseline.m_balance ), "typed '-': " + minus );
@@ -35210,6 +35875,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "M3 a comma works as the decimal point", ( comma.m_thrown == "none" ) && ( comma.m_volume == fraction.m_volume - 55 ) && ( comma.m_balance == fraction.m_balance + value * 55 / 10 ),
 			"typed 5,5: " + comma + " (expected endurium " + ( fraction.m_volume - 55 ) + ")" );
+
+		// more than the hold has sells what it has and no more, as the original cuts a typed amount to the most (TDEPOT-OV WEACC)
+		var tooMuch = TrySell( tradeDepotPanel, "25" );
+
+		Check( "H4 selling more than the hold contains sells what it has, never more", ( tooMuch.m_volume == 0 ) && ( tooMuch.m_balance == comma.m_balance + value * comma.m_volume / 10 ) && ( tooMuch.m_thrown == "none" ),
+			"hold has " + comma.m_volume + " tenths, typed 25: " + tooMuch );
 
 		Call( tradeDepotPanel, "SwitchToMenuBarState" );
 
