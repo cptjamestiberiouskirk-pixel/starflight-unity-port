@@ -298,6 +298,12 @@ public class Radar : MonoBehaviour
 	// whether the science officer is skilled enough to report the motion the radar has found
 	static bool ScienceOfficerReportsMotion( PlayerData playerData )
 	{
+		// no science officer, no report (a ship started in the Editor's Spaceflight scene has no crew)
+		if ( !playerData.m_crewAssignment.IsAssigned( PD_CrewAssignment.Role.ScienceOfficer ) )
+		{
+			return false;
+		}
+
 		var scienceOfficer = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer );
 
 		return ( scienceOfficer != null ) && ( scienceOfficer.m_science > c_motionReportSkill );
