@@ -406,7 +406,7 @@ The game is lost when:
 
 ## 13. This port and the 1986 original
 
-This is a remake of *Starflight* (Binary Systems, Electronic Arts, 1986) in Unity 6. The 270 stars, their planets, the prices, the aliens' words and the game's rules come from the original game and its code. The port adds:
+This is a faithful remake of *Starflight* (Binary Systems, Electronic Arts, 1986), rebuilt in Unity 6. The 270 stars and their planets, the prices, the aliens' words and the game's rules all come straight from the original game and its code. What the port adds:
 
 - 3D views: real planets and stars, a 3D Starport and terrain;
 - a new console and Starport design, in 15 color schemes;
