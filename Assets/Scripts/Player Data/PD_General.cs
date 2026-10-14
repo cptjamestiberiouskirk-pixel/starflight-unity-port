@@ -631,8 +631,9 @@ public class PD_General
 		}
 	}
 
-	// 175.2 game hours pass in an hour of play (365 days in 50 hours - the sources do not give the original's rate, so the rate stays as it was when the calendar became the original's)
-	public const float c_gameSecondsPerSecond = ( 365.0f * 24.0f ) / 50.0f;
+	// a star hour passes in 10 seconds of play, as the original's kernel keeps it (?NEW-HO starts a new star hour every REAL-MS, 10,000 ms): 360 game hours in an
+	// hour of play, a year of the original's calendar in 20 hours
+	public const float c_gameSecondsPerSecond = 3600.0f / 10.0f;
 
 	public void UpdateGameTime( float deltaTime )
 	{

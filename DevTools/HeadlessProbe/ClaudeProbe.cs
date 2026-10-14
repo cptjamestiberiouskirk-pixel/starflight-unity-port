@@ -1404,6 +1404,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioEncounterGrace();
 				break;
 
+			case "clockrate":
+				yield return ScenarioClockRate();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -35012,6 +35016,39 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 10 );
 
 		Finish( "scenario=encountergrace checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the game clock's rate, as the original's kernel keeps it (?NEW-HO: a star hour every REAL-MS, 10,000 ms of play): 30 game minutes in 5 seconds of flight
+	IEnumerator ScenarioClockRate()
+	{
+		var general = DataController.m_instance.m_playerData.m_general;
+
+		EnsureCrew();
+
+		// in the star system, where the clock runs
+		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 10 );
+
+		var minutesBefore = ( general.m_day * 24 + general.m_hour ) * 60 + general.m_minute + general.m_second / 60.0f;
+		var end = Time.realtimeSinceStartup + 5.0f;
+		var scaledBefore = Time.time;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			yield return null;
+		}
+
+		// what passed in game time, over what passed in the game's own seconds (the frame pacing of a headless run is not the clock's business)
+		var played = Time.time - scaledBefore;
+		var minutesAfter = ( general.m_day * 24 + general.m_hour ) * 60 + general.m_minute + general.m_second / 60.0f;
+		var minutesPerTenSeconds = ( played > 0.0f ) ? ( minutesAfter - minutesBefore ) / played * 10.0f : 0.0f;
+
+		Log( "clockrate: " + ( minutesAfter - minutesBefore ).ToString( "F1" ) + " game minutes in " + played.ToString( "F2" ) + " s of play: " + minutesPerTenSeconds.ToString( "F1" ) + " a 10 s" );
+
+		Check( "clockrate: a star hour passes in 10 seconds of play, as the original's (REAL-MS 10000)", Mathf.Abs( minutesPerTenSeconds - 60.0f ) < 3.0f, minutesPerTenSeconds.ToString( "F1" ) + " game minutes per 10 s" );
+
+		Finish( "scenario=clockrate checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
