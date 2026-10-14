@@ -1359,6 +1359,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioPlaythrough21();
 				break;
 
+			case "firedonsilent":
+				yield return ScenarioFiredOnSilent();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -33962,6 +33966,100 @@ public class ClaudeProbe : MonoBehaviour
 		PlaythroughSave( "the end: location=" + DataController.m_instance.m_playerData.m_general.m_location + " balance=" + DataController.m_instance.m_playerData.m_bank.m_currentBalance );
 
 		Finish( "scenario=playthrough-21 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// aliens that fight do not talk, as the original's (COMM-OV <TALK>: a fight leaves no chance to talk): fired on, they do not answer a hail, and a comm link that is
+	// up when the player fires ends; aliens that have turned cowardly still talk
+	IEnumerator ScenarioFiredOnSilent()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		EnsureCrew();
+
+		// an officer who understands every word, and a ship that survives the fight
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// three Spemin ships at once, in a star system
+		var encounterId = FindEncounter( 1, 6, 3, 0 );
+		var said = new List<string>();
+
+		// ---- 1. fired on, then hailed: no answer, and no comm link
+		EnterEncounter( encounterId );
+		yield return Frames( 10 );
+
+		// (the scan's message is not the aliens talking)
+		encounter.m_pdEncounter.m_alreadyScanned = true;
+
+		encounter.PlayerAttacked();
+		playerData.m_playerShip.RestoreSystems();
+		encounter.Hail( GD_Comm.Stance.Friendly, false );
+
+		yield return LetAliensSpeak( 3, said );
+
+		var firedOnConnected = encounter.IsConnected();
+		var firedOnSaid = string.Join( " | ", said ).Trim( ' ', '|' );
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 2. hailed without a shot (the link comes up), then fired on: the aliens end the link
+		EnterEncounter( encounterId );
+		yield return Frames( 10 );
+
+		encounter.Hail( GD_Comm.Stance.Friendly, false );
+
+		said.Clear();
+
+		yield return LetAliensSpeak( 2, said );
+
+		var linkedBeforeShot = encounter.IsConnected();
+
+		encounter.PlayerAttacked();
+
+		yield return Frames( 5 );
+
+		var linkedAfterShot = encounter.IsConnected();
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 3. the control: two of the three destroyed, the last turns cowardly, and a hail is answered
+		EnterEncounter( encounterId );
+		yield return Frames( 10 );
+
+		encounter.PlayerAttacked();
+
+		Kill( FirstLivingAlien() );
+		Kill( FirstLivingAlien() );
+
+		yield return Frames( 3 );
+
+		playerData.m_playerShip.RestoreSystems();
+		encounter.Hail( GD_Comm.Stance.Friendly, false );
+
+		said.Clear();
+
+		yield return LetAliensSpeak( 1, said );
+
+		var cowardlyConnected = encounter.IsConnected();
+		var cowardlySaid = string.Join( " | ", said ).Trim( ' ', '|' );
+		var cowardly = encounter.m_pdEncounter.m_aliensAreCowardly;
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		Log( "firedonsilent: encounter " + encounterId + "; fired on and hailed: connected " + firedOnConnected + ", said '" + firedOnSaid + "'; linked before the shot " + linkedBeforeShot + ", after it " + linkedAfterShot + "; cowardly " + cowardly + ", connected " + cowardlyConnected + ", said '" + cowardlySaid + "'" );
+
+		Check( "firedonsilent: aliens that have been fired on do not answer a hail (no comm link, nothing received from them)", !firedOnConnected && !firedOnSaid.Contains( "Receiving:" ), firedOnConnected + " '" + firedOnSaid + "'" );
+		Check( "firedonsilent: a comm link that is up when the player fires ends (the setup: it was up)", linkedBeforeShot && !linkedAfterShot, linkedBeforeShot + " -> " + linkedAfterShot );
+		Check( "firedonsilent: aliens that have turned cowardly still answer a hail (control)", cowardly && cowardlyConnected && ( cowardlySaid.Length > 0 ), cowardly + " " + cowardlyConnected + " '" + cowardlySaid + "'" );
+
+		Finish( "scenario=firedonsilent checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
