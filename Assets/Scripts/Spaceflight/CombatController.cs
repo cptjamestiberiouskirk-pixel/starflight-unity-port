@@ -543,13 +543,18 @@ public class CombatController : MonoBehaviour
 		// make sure the ship has its hit points (ships from save files made before alien ships had hit points don't)
 		targetShip.EnsureHitPoints( vessel );
 
-		// the shields absorb what they can first
-		int shieldAbsorb = Mathf.Min( damage, targetShip.m_shieldPoints );
+		// the shields take the whole hit if they have points left, are up and the fight is not in a nebula, and the armor takes it otherwise: never both, and the
+		// shields do not go below 0 (DAMAGE-OV WF162: WEB40 @ 0= ?A-SHIELDS-UP 0= OR ?NEB @ OR)
+		var shieldsTakeTheHit = ( targetShip.m_shieldPoints > 0 ) && encounter.AliensHaveShieldsUp() && !SpaceflightController.m_instance.ShipIsInsideANebula();
 
-		targetShip.m_shieldPoints -= shieldAbsorb;
-
-		// whatever gets through the shields comes off the armor
-		targetShip.m_armorPoints -= ( damage - shieldAbsorb );
+		if ( shieldsTakeTheHit )
+		{
+			targetShip.m_shieldPoints = Mathf.Max( 0, targetShip.m_shieldPoints - damage );
+		}
+		else
+		{
+			targetShip.m_armorPoints -= damage;
+		}
 
 		// show hit effect
 		if ( targetShip.m_armorPoints > 0 )
@@ -895,11 +900,11 @@ public class CombatController : MonoBehaviour
 			// apply damage
 			int damage = c_laserDamage[ Mathf.Clamp( vessel.m_laserClass, 0, c_laserDamage.Length - 1 ) ];
 
-			// the Rod Device "projects an enhanced laser shield around a spaceship" (the Starport's analysis; the original's combat code keeps whether the ship has it,
-			// disys.txt ?ROD) - how much it takes off is the port's choice: half of every laser hit
+			// the Rod Device "projects an enhanced laser shield around a spaceship" (the Starport's analysis): an alien laser does a quarter of its damage with it
+			// aboard (DAMAGE-OV WED36: ?ROD @ IF 4 /)
 			if ( playerData.m_playerShip.HasArtifact( "Rod Device" ) )
 			{
-				damage /= 2;
+				damage /= 4;
 			}
 
 			// what hit the ship, in the original's words (COMBAT-OV WECEA: LASER CLASS n, or LASER PARTIALLY DEFLECTED with the Rod Device)
