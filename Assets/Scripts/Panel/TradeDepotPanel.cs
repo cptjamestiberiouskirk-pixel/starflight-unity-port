@@ -614,7 +614,9 @@ public class TradeDepotPanel : Panel
 						maximumAmount = elementReference.m_volume;
 					}
 
-					// update the amount label
+					// update the amount label (and remember the most, which a bigger amount is cut to)
+					m_maximumAmount = maximumAmount;
+
 					m_amountLabelText.text = "Transfer how many cubic meters? (0.0 to " + ( maximumAmount / 10 ) + "." + ( maximumAmount % 10 ) + ")";
 				}
 				else
@@ -1005,6 +1007,9 @@ public class TradeDepotPanel : Panel
 	}
 
 	// this is called when we hit enter in the amount input field
+	// the most the amount being asked for can be (the funds and the hold's room when buying, what the hold has when selling), in tenths of a cubic meter
+	int m_maximumAmount;
+
 	public void OnEndEdit()
 	{
 		InputController.m_instance.Debounce();
@@ -1019,6 +1024,12 @@ public class TradeDepotPanel : Panel
 		{
 			// convert to tenths of a cubic meter (anything past the first decimal place is dropped)
 			desiredAmount = (int) Math.Min( Math.Floor( amount * 10 ), int.MaxValue );
+
+			// more than can be traded is cut to the most that can, as the original's (TDEPOT-OV WEACC: ABS ELEM-AM @ MIN)
+			if ( desiredAmount > m_maximumAmount )
+			{
+				desiredAmount = m_maximumAmount;
+			}
 		}
 
 		// if the desired amount was zero then that's the same as hitting escape
