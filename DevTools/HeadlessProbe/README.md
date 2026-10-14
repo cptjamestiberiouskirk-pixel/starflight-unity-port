@@ -177,6 +177,7 @@ What the probe does:
 | `shieldmessages` | the shields' and weapons' messages in the original's words, through the console's buttons: up and down, arming the weapons that work (missiles and lasers, then lasers only), Disarm disarming and saying so, and no fuel (about 25 s) |
 | `starport-repair` | Repair in ship configuration: a whole ship (no repairs, nothing paid), class 1 armor at 200 of 500 with the shields empty (900 M.U., whole again with full shields), a bare hull at 100 of 250 (450 M.U. at the class 1 price) and with 10 M.U. in the bank (refused, nothing changes) (about 20 s) |
 | `distressconfirm` | the distress call asks first, as the original: Distress puts the question and No and Yes on the console; Yes in the docking bay says We're already home!, No in the star system puts the communications buttons back, Yes there tows the ship home with Initiating cryogenic stasis and Retrieval complete, crew revived, and Yes in an encounter says Transmission is being jammed (about 25 s) |
+| `towbonus` | a tow home after the win, with the bonus still to be paid: the tow's lines (cryogenic stasis, crew revived, towing charges) come before the docking bay's and the bonus (about 30 s) |
 | `disembarklines` | the disembark's lines in the original's words and order: a real disembark on planet 94 says Standby...scanning planet., Auto sampling devices activated., Initiating hull integrity check., Hull check complete. and Activating terrain vehicle., and out on the surface the weather is then the only line in the text window, as the original's "IT IS CLEAR." (about 35 s) |
 | `distress` | Distress: from the star farthest from Arth (towed to the docking bay, fined 80000 M.U., the ledger's towing charges and Interstel's supplemental evaluation with the amount), from Arth's own system (15000 M.U.) and, as the control, after the Starport has been destroyed (no response, no fine, no tow) (about 50 s) |
 | `vesselstats` | alien vessels with their own armor, shields and speed: the armor and shield points of every ship of a Spemin and an Elowan encounter against their vessels in the game data, and how far the first ship of each travels per second of game time, against the move delays of those two ships' vessels (a Spemin ship, 1500, is 2200 / 1500 times as fast as an Elowan transport or scout, 2200, and 2700 / 1500 times as fast as an Elowan warship, 2700) (about 25 s) |
@@ -249,7 +250,7 @@ What the probe does:
 | `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 | `combatmessages` | the combat messages are the original's: WEAPONS NOT ARMED, NO TARGET PRESENT, WEAPON NOT AVAILABLE and OUT OF FUEL! when a weapon cannot fire, nothing of the port's own when the player's shot hits, and LASER CLASS n (LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (202 scenarios, about 164 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (203 scenarios, about 165 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### Before and after
 

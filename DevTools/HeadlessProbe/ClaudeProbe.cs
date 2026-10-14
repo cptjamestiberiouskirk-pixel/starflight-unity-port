@@ -1167,6 +1167,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioOrbitEntry();
 				break;
 
+			case "towbonus":
+				yield return ScenarioTowBonus();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -29971,6 +29975,51 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "orbitentry: no Outside orbital range. between Initiating orbital maneuver... and ...Orbit established. (the ship holds still for the maneuver)", !orbitLines.Contains( "Outside orbital range." ), orbitLines );
 
 		Finish( "scenario=orbitentry checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioTowBonus()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var fine = new int[ 1 ];
+		var where = new string[ 1 ];
+		var evaluation = new string[ 1 ];
+
+		EnsureCrew();
+
+		// the game is won and its bonus is still to be paid, and the ship calls for a tow from a star near Arth
+		playerData.m_general.m_gameWon = true;
+		playerData.m_general.m_winBonusPending = true;
+
+		var arthStar = gameData.m_starList[ gameData.m_misc.m_arthStarId ];
+		var nearStarId = -1;
+		var nearest = float.MaxValue;
+
+		for ( var starId = 0; starId < gameData.m_starList.Length; starId++ )
+		{
+			var star = gameData.m_starList[ starId ];
+			var distance = Vector2.Distance( new Vector2( star.m_xCoordinate, star.m_yCoordinate ), new Vector2( arthStar.m_xCoordinate, arthStar.m_yCoordinate ) );
+
+			if ( ( starId != gameData.m_misc.m_arthStarId ) && ( distance < nearest ) )
+			{
+				nearest = distance;
+				nearStarId = starId;
+			}
+		}
+
+		yield return DistressFrom( nearStarId, fine, where, evaluation );
+
+		var messages = System.Text.RegularExpressions.Regex.Replace( string.Join( "\n", playerData.m_general.m_messageList ), "<[^>]*>", "" );
+		var stasis = messages.IndexOf( "Initiating cryogenic stasis." );
+		var towed = messages.IndexOf( "towed the ship back to Starport" );
+		var bonus = messages.IndexOf( "paid the bonus" );
+
+		Log( "towbonus: " + playerData.m_general.m_location + ", messages '" + messages.Replace( "\n", " | " ) + "'" );
+
+		Check( "towbonus: the tow brings the ship to the docking bay and pays the win's bonus (the setup is the case)", ( playerData.m_general.m_location == PD_General.Location.DockingBay ) && ( towed >= 0 ) && ( bonus >= 0 ), playerData.m_general.m_location + ": " + messages );
+		Check( "towbonus: the tow's lines come first, the bonus after them (the crew wake before Interstel pays)", ( stasis >= 0 ) && ( stasis < towed ) && ( towed < bonus ), messages );
+
+		Finish( "scenario=towbonus checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
