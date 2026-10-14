@@ -420,10 +420,11 @@ public class PlayerData
 		return heading + "EVALUATION:\n";
 	}
 
-	// the fine for being towed back to the Starport after a distress call: "fines vary directly with the distance from Arth and range from 15000 to 80000 MU"
-	// (STRINFO 1.2) - in proportion to the distance from Arth against the farthest star from it (that scale is the port's choice)
+	// the fine for being towed back to the Starport after a distress call, as the original works it out (COMM-OV WEF2D and WEF6D): the distance from Arth (the larger
+	// of the two, in the original's coordinates, eight to a coordinate of the starmap) times the engines' fuel per step (7 less their class, halved with the
+	// Tesseract aboard) over 5, times what a tenth of Endurium is worth in flight (twice its Starport price: SHIPBUTTONS >FLT), and at least 15,000 M.U. STRINFO
+	// 1.2's "range from 15000 to 80000 MU" is the evaluation's words; the code has no upper limit
 	public const int c_smallestTowingFine = 15000;
-	public const int c_largestTowingFine = 80000;
 
 	public int GetTowingFine()
 	{
@@ -449,17 +450,23 @@ public class PlayerData
 			here = new Vector2( star.m_xCoordinate, star.m_yCoordinate );
 		}
 
-		// the farthest star from Arth
-		var farthest = 1.0f;
+		// the distance from Arth, in the original's coordinates
+		var distance = (long) Mathf.FloorToInt( Mathf.Max( Mathf.Abs( here.x - arth.x ), Mathf.Abs( here.y - arth.y ) ) * 8.0f );
 
-		foreach ( var star in gameData.m_starList )
+		// the engines' fuel per step, in hundredths of a cubic meter of Endurium (none installed counts as the most)
+		var fuelPerStep = (long) Mathf.Max( 1, Mathf.FloorToInt( ( 7 - Mathf.Clamp( m_playerShip.m_enginesClass, 0, 6 ) ) * m_playerShip.GetEngineFuelFactor() ) );
+
+		// a tenth of Endurium in flight
+		var tenthValue = (long) gameData.m_elementList[ gameData.m_misc.m_enduriumElementId ].GetStarportPrice() / 10 * 2;
+
+		var fine = distance * fuelPerStep / 5 * tenthValue;
+
+		if ( fine < c_smallestTowingFine )
 		{
-			farthest = Mathf.Max( farthest, Vector2.Distance( arth, new Vector2( star.m_xCoordinate, star.m_yCoordinate ) ) );
+			fine = c_smallestTowingFine;
 		}
 
-		var share = Mathf.Clamp01( Vector2.Distance( arth, here ) / farthest );
-
-		return c_smallestTowingFine + Mathf.RoundToInt( share * ( c_largestTowingFine - c_smallestTowingFine ) );
+		return (int) System.Math.Min( fine, int.MaxValue );
 	}
 
 	// returns true if the player data version is current

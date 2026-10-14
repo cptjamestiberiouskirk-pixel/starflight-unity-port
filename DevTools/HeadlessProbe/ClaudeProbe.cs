@@ -1432,6 +1432,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAlienShieldHits();
 				break;
 
+			case "clockrate":
+				yield return ScenarioClockRate();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -18824,10 +18828,12 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "distress: from star " + farthestStarId + " (" + farthest.ToString( "0" ) + " from Arth): fined " + fineFar + ", now " + whereFar + ", ledger '" + ledgerFar + "' | from Arth's system: fined " + fineNear + " | after the Starport: fined " + fineAfterStarport + ", now " + whereAfterStarport + " (" + textAfterStarport + ") | the evaluation: " + evaluationFar.Replace( '\n', '/' ) );
 
 		Check( "distress: a distress call gets the ship towed back to the Starport's docking bay", whereFar.StartsWith( "DockingBay" ) && whereFar.EndsWith( "star " + arthStarId ), whereFar );
-		Check( "distress: the fine runs from 15000 MU in Arth's system to 80000 MU from the farthest star, in the ledger and in Interstel's evaluation", ( fineNear == 15000 ) && ( fineFar == 80000 ) && ledgerFar.StartsWith( "Fine" ) && evaluationFar.Contains( "TOWING CHARGES" ) && evaluationFar.Contains( fineFar.ToString() ), fineNear + ", " + fineFar + ", '" + ledgerFar + "'" );
+		// the original's fine (COMM-OV WEF6D): the distance from Arth in its coordinates (the farthest star, 167 at 2,206: 123 starmap coordinates north, 984) times
+		// class 1 engines' 6 over 5, times 200 M.U. (a tenth of Endurium, 100, doubled in flight): 236,000; at least 15,000
+		Check( "distress: the fine is the original's, 15000 MU in Arth's system and 236000 MU from the farthest star, in the ledger and in Interstel's evaluation", ( fineNear == 15000 ) && ( fineFar == 236000 ) && ledgerFar.StartsWith( "Fine" ) && evaluationFar.Contains( "TOWING CHARGES" ) && evaluationFar.Contains( fineFar.ToString() ), fineNear + ", " + fineFar + ", '" + ledgerFar + "'" );
 		Log( "distress: booked at once from the farthest star " + bookedAtOnceFar + ", booked when the evaluation is shown " + ( fineFar - bookedAtOnceFar ) );
 
-		Check( "distress: the towing charges are booked when Interstel's evaluation shows them, as the original's, not at the call", ( bookedAtOnceFar == 0 ) && ( fineFar == 80000 ), "at once " + bookedAtOnceFar + ", in all " + fineFar );
+		Check( "distress: the towing charges are booked when Interstel's evaluation shows them, as the original's, not at the call", ( bookedAtOnceFar == 0 ) && ( fineFar > 0 ), "at once " + bookedAtOnceFar + ", in all " + fineFar );
 		Check( "distress: after the Starport has been destroyed there is no response, no fine and no tow (control)", ( fineAfterStarport == 0 ) && !whereAfterStarport.StartsWith( "DockingBay" ) && textAfterStarport.Contains( "NO RESPONSE" ), fineAfterStarport + ", " + whereAfterStarport );
 
 		Finish( "scenario=distress far=" + fineFar + " near=" + fineNear + " afterStarport=" + fineAfterStarport, 0 );
@@ -35713,6 +35719,39 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "alienshieldhits: the Spemin never raise their shields, so the armor takes the whole hit and the shields keep their points", !shieldsUp[ 1 ] && ( shieldsLeft[ 1 ] == 30 ) && ( armorTaken[ 1 ] == 50 ), results[ 1 ] );
 
 		Finish( "scenario=alienshieldhits checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the game clock's rate, as the original's kernel keeps it (?NEW-HO: a star hour every REAL-MS, 10,000 ms of play): 30 game minutes in 5 seconds of flight
+	IEnumerator ScenarioClockRate()
+	{
+		var general = DataController.m_instance.m_playerData.m_general;
+
+		EnsureCrew();
+
+		// in the star system, where the clock runs
+		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 10 );
+
+		var minutesBefore = ( general.m_day * 24 + general.m_hour ) * 60 + general.m_minute + general.m_second / 60.0f;
+		var end = Time.realtimeSinceStartup + 5.0f;
+		var scaledBefore = Time.time;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			yield return null;
+		}
+
+		// what passed in game time, over what passed in the game's own seconds (the frame pacing of a headless run is not the clock's business)
+		var played = Time.time - scaledBefore;
+		var minutesAfter = ( general.m_day * 24 + general.m_hour ) * 60 + general.m_minute + general.m_second / 60.0f;
+		var minutesPerTenSeconds = ( played > 0.0f ) ? ( minutesAfter - minutesBefore ) / played * 10.0f : 0.0f;
+
+		Log( "clockrate: " + ( minutesAfter - minutesBefore ).ToString( "F1" ) + " game minutes in " + played.ToString( "F2" ) + " s of play: " + minutesPerTenSeconds.ToString( "F1" ) + " a 10 s" );
+
+		Check( "clockrate: a star hour passes in 10 seconds of play, as the original's (REAL-MS 10000)", Mathf.Abs( minutesPerTenSeconds - 60.0f ) < 3.0f, minutesPerTenSeconds.ToString( "F1" ) + " game minutes per 10 s" );
+
+		Finish( "scenario=clockrate checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
