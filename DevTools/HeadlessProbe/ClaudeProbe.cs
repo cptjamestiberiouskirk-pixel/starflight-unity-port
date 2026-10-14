@@ -28408,6 +28408,29 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "motiondetected: a science officer of science 100 reports no motion, as the original's (above 150 only)", !unskilled.Contains( "Motion detected" ), "'" + unskilled + "'" );
 		Check( "motiondetected: a science officer of science 200 reports the motion", skilled.Contains( "Motion detected" ), "'" + skilled + "'" );
 
+		// with no science officer assigned (a ship started in the Editor's Spaceflight scene has no crew), nobody reports the motion, and nothing throws
+		{
+			var crew = DataController.m_instance.m_playerData.m_crewAssignment;
+			var scienceFileId = crew.GetFileId( PD_CrewAssignment.Role.ScienceOfficer );
+			var reportsMotion = typeof( Radar ).GetMethod( "ScienceOfficerReportsMotion", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static );
+			var outcome = "";
+
+			crew.Assign( PD_CrewAssignment.Role.ScienceOfficer, -1 );
+
+			try
+			{
+				outcome = reportsMotion.Invoke( null, new object[] { DataController.m_instance.m_playerData } ).ToString();
+			}
+			catch ( System.Exception exception )
+			{
+				outcome = ( ( exception.InnerException != null ) ? exception.InnerException : exception ).GetType().Name;
+			}
+
+			crew.Assign( PD_CrewAssignment.Role.ScienceOfficer, scienceFileId );
+
+			Check( "motiondetected: with no science officer assigned, nobody reports the motion and nothing throws", outcome == "False", outcome );
+		}
+
 		Finish( "scenario=motiondetected checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
