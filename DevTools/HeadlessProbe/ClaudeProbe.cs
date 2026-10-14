@@ -1188,6 +1188,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCommSpemin();
 				break;
 
+			case "commelowan":
+				yield return ScenarioCommElowan();
+				break;
+
 			case "encounterviewscale":
 				yield return ScenarioEncounterViewScale();
 				break;
@@ -28270,6 +28274,253 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "commspemin: the drips change shape without a jump (no frame's change stands out from its neighbours' by more than 0.3 of a drip's size)", ( dripsStart.Length > 0 ) && ( largestJump < 0.3f ), "largest " + largestJump.ToString( "F2" ) + " of a drip's size, " + largestJumpAt );
 
 		Finish( "scenario=commspemin pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: the Elowan's comm portrait moves as the Genesis version's does (its vines wave, its stalk sways, its leaves flutter, its eyes blink), without a jump from one frame to the next, and pictures of it with -Graphics
+
+	IEnumerator ScenarioCommElowan()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "comm-pictures" ) );
+
+		if ( hasGraphics )
+		{
+			System.IO.Directory.CreateDirectory( folder );
+		}
+
+		EnsureCrew();
+
+		// a skilled officer, whose link comes up with little interference, and a ship that survives whatever it meets
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+		playerData.m_playerShip.m_armorPoints = 100000;
+		controller.m_encounterRange = 0.0f;
+
+		var said = new List<string>();
+
+		yield return MeetAndConnect( FindEncounter( 0, 1, 1, 0, GameData.Race.Elowan ), GD_Comm.Stance.Friendly, said );
+
+		CommScreen commScreen = null;
+
+		for ( var i = 0; ( i < 300 ) && ( commScreen == null ); i++ )
+		{
+			commScreen = FindFirstObjectByType<CommScreen>();
+
+			if ( commScreen == null )
+			{
+				yield return null;
+			}
+		}
+
+		var model = Call( controller.m_encounter, "GetAlienRaceModel" ) as GameObject;
+
+		if ( ( commScreen == null ) || ( model == null ) || !model.activeInHierarchy )
+		{
+			Check( "commelowan: the Elowan's comm portrait comes on", false, "comm screen " + ( commScreen != null ) + ", model " + ( ( model == null ) ? "none" : model.name + " active " + model.activeInHierarchy ) );
+			Finish( "scenario=commelowan abort: no comm portrait", 2 );
+			yield break;
+		}
+
+		// the link settles (the interference fades out over CommScreen.m_duration)
+		yield return new WaitForSecondsRealtime( commScreen.m_duration + 0.5f );
+
+		var camera = commScreen.GetComponent<Camera>();
+
+		// the parts: the vines' bones (every bone off the stalk), the two stalk bones below the head that sway, the leaves and the eyes
+		var stalk = new HashSet<string> { "Bone001", "Bone002", "Bone003", "Bone004", "Bone005", "Bone006", "Bone007" };
+		var vines = new List<Transform>();
+		var sway = new List<Transform>();
+		var eyes = new List<Transform>();
+
+		foreach ( var part in model.GetComponentsInChildren<Transform>( true ) )
+		{
+			if ( ( part.name == "Bone002" ) || ( part.name == "Bone003" ) )
+			{
+				sway.Add( part );
+			}
+			else if ( part.name.StartsWith( "Bone" ) && !stalk.Contains( part.name ) )
+			{
+				vines.Add( part );
+			}
+			else if ( part.name.EndsWith( " Eye" ) )
+			{
+				eyes.Add( part );
+			}
+		}
+
+		var leaves = ChildrenNamed( model.transform, "Leaf" );
+		var moving = new List<Transform>( vines );
+
+		moving.AddRange( sway );
+		moving.AddRange( leaves );
+
+		var startRotations = new Quaternion[ moving.Count ];
+
+		for ( var i = 0; i < moving.Count; i++ )
+		{
+			startRotations[ i ] = moving[ i ].localRotation;
+		}
+
+		var eyeStartScales = new Vector3[ eyes.Count ];
+
+		for ( var i = 0; i < eyes.Count; i++ )
+		{
+			eyeStartScales[ i ] = eyes[ i ].localScale;
+		}
+
+		// watch for 8 s: the largest turn each moving part makes from where it started, and the smallest an eye gets along any of its axes
+		var largestTurns = new float[ moving.Count ];
+		var smallestEye = 1.0f;
+		var pictures = 0;
+		var watchStart = Time.realtimeSinceStartup;
+		var nextPicture = watchStart;
+
+		while ( Time.realtimeSinceStartup < watchStart + 8.0f )
+		{
+			for ( var i = 0; i < moving.Count; i++ )
+			{
+				if ( moving[ i ] != null )
+				{
+					largestTurns[ i ] = Mathf.Max( largestTurns[ i ], Quaternion.Angle( startRotations[ i ], moving[ i ].localRotation ) );
+				}
+			}
+
+			for ( var i = 0; i < eyes.Count; i++ )
+			{
+				smallestEye = Mathf.Min( smallestEye, SmallestScaleRatio( eyes[ i ].localScale, eyeStartScales[ i ] ) );
+			}
+
+			// a portrait every quarter of a second for the first 3 s: the frames of the animation
+			if ( hasGraphics && ( pictures < 12 ) && ( Time.realtimeSinceStartup >= nextPicture ) )
+			{
+				var rect = camera.rect;
+
+				camera.rect = new Rect( 0.0f, 0.0f, 1.0f, 1.0f );
+				RenderCameraPicture( camera, System.IO.Path.Combine( folder, "elowan_" + pictures.ToString( "00" ) + ".png" ) );
+				camera.rect = rect;
+
+				pictures++;
+				nextPicture += 0.25f;
+			}
+
+			yield return null;
+		}
+
+		// then 5 s at a steady 30 frames a second: how far each moving part turns in each frame, and each eye's smallest axis; a jump is a
+		// frame whose change stands out from the changes of the frames on either side of it (steady motion changes about as much from one
+		// frame to the next, however fast it is)
+		const int c_steadyFrames = 150;
+		var turnsPerFrame = new float[ c_steadyFrames, moving.Count ];
+		var eyeRatios = new float[ c_steadyFrames, eyes.Count ];
+		var previous = new Quaternion[ moving.Count ];
+
+		Time.captureDeltaTime = 1.0f / 30.0f;
+		yield return null;
+
+		for ( var i = 0; i < moving.Count; i++ )
+		{
+			previous[ i ] = moving[ i ].localRotation;
+		}
+
+		for ( var frame = 0; frame < c_steadyFrames; frame++ )
+		{
+			yield return null;
+
+			for ( var i = 0; i < moving.Count; i++ )
+			{
+				turnsPerFrame[ frame, i ] = Quaternion.Angle( previous[ i ], moving[ i ].localRotation );
+				previous[ i ] = moving[ i ].localRotation;
+			}
+
+			for ( var i = 0; i < eyes.Count; i++ )
+			{
+				eyeRatios[ frame, i ] = SmallestScaleRatio( eyes[ i ].localScale, eyeStartScales[ i ] );
+			}
+
+		}
+
+		Time.captureDeltaTime = 0.0f;
+
+		var largestJump = 0.0f;
+		var largestJumpAt = "none";
+
+		for ( var i = 0; i < moving.Count; i++ )
+		{
+			for ( var frame = 1; frame < c_steadyFrames - 1; frame++ )
+			{
+				var jump = turnsPerFrame[ frame, i ] - Mathf.Max( turnsPerFrame[ frame - 1, i ], turnsPerFrame[ frame + 1, i ] );
+
+				if ( jump > largestJump )
+				{
+					largestJump = jump;
+					largestJumpAt = moving[ i ].name + " frame " + frame + " (" + turnsPerFrame[ frame - 1, i ].ToString( "F2" ) + ", " + turnsPerFrame[ frame, i ].ToString( "F2" ) + ", " + turnsPerFrame[ frame + 1, i ].ToString( "F2" ) + " degrees)";
+				}
+			}
+		}
+
+		var largestEyeJump = 0.0f;
+
+		for ( var i = 0; i < eyes.Count; i++ )
+		{
+			for ( var frame = 2; frame < c_steadyFrames - 1; frame++ )
+			{
+				var change = Mathf.Abs( eyeRatios[ frame, i ] - eyeRatios[ frame - 1, i ] );
+				var before = Mathf.Abs( eyeRatios[ frame - 1, i ] - eyeRatios[ frame - 2, i ] );
+				var after = Mathf.Abs( eyeRatios[ frame + 1, i ] - eyeRatios[ frame, i ] );
+
+				largestEyeJump = Mathf.Max( largestEyeJump, change - Mathf.Max( before, after ) );
+			}
+		}
+
+		// the smallest turn among the vines' bones, the stalk's and the leaves': every one of them has to move
+		var smallestVine = SmallestOf( largestTurns, 0, vines.Count );
+		var smallestSway = SmallestOf( largestTurns, vines.Count, sway.Count );
+		var smallestLeaf = SmallestOf( largestTurns, vines.Count + sway.Count, leaves.Length );
+
+		Log( "commelowan: " + vines.Count + " vine bones (smallest turn " + smallestVine.ToString( "F1" ) + " degrees), " + sway.Count + " stalk bones (" + smallestSway.ToString( "F1" ) + "), " + leaves.Length + " leaves (" + smallestLeaf.ToString( "F1" ) + "), " + eyes.Count + " eyes (smallest " + smallestEye.ToString( "F2" ) + " of their size), largest jump " + largestJump.ToString( "F2" ) + " degrees at " + largestJumpAt + ", eyes " + largestEyeJump.ToString( "F2" ) );
+
+		Check( "commelowan: every bone of its vines moves, the curl running along each vine", ( vines.Count > 0 ) && ( smallestVine > 2.0f ), vines.Count + " bones, the least moved " + smallestVine.ToString( "F1" ) + " degrees" );
+		Check( "commelowan: its stalk sways", ( sway.Count == 2 ) && ( smallestSway > 1.5f ), sway.Count + " bones, the least moved " + smallestSway.ToString( "F1" ) + " degrees" );
+		Check( "commelowan: its leaves flutter", ( leaves.Length > 0 ) && ( smallestLeaf > 3.0f ), leaves.Length + " leaves, the least turned " + smallestLeaf.ToString( "F1" ) + " degrees" );
+		Check( "commelowan: its eyes blink", ( eyes.Count == 2 ) && ( smallestEye < 0.5f ), eyes.Count + " eyes, the smallest " + smallestEye.ToString( "F2" ) + " of its size" );
+		Check( "commelowan: nothing jumps from one frame to the next (no frame's turn stands out from its neighbours' by 2 degrees, no blink step by 0.3)", ( largestJump < 2.0f ) && ( largestEyeJump < 0.3f ), "largest turn jump " + largestJump.ToString( "F2" ) + " degrees at " + largestJumpAt + ", eye " + largestEyeJump.ToString( "F2" ) );
+
+		Finish( "scenario=commelowan pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the smallest ratio of a scale to the scale it started at, along any axis (the axes a blink squashes)
+	static float SmallestScaleRatio( Vector3 scale, Vector3 start )
+	{
+		var smallest = 1.0f;
+
+		for ( var axis = 0; axis < 3; axis++ )
+		{
+			if ( Mathf.Abs( start[ axis ] ) > 1e-6f )
+			{
+				smallest = Mathf.Min( smallest, scale[ axis ] / start[ axis ] );
+			}
+		}
+
+		return smallest;
+	}
+
+	// the smallest of count values from first on (0 when there are none)
+	static float SmallestOf( float[] values, int first, int count )
+	{
+		if ( count <= 0 )
+		{
+			return 0.0f;
+		}
+
+		var smallest = float.MaxValue;
+
+		for ( var i = first; i < first + count; i++ )
+		{
+			smallest = Mathf.Min( smallest, values[ i ] );
+		}
+
+		return smallest;
 	}
 
 	// the encounter is seen at the original's fixed scale: the camera frames the alien ships out to their fire range and no further, so that it does not climb
