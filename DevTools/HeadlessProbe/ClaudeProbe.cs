@@ -1151,6 +1151,18 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSciFiButtons();
 				break;
 
+			case "reboard":
+				yield return ScenarioReboard();
+				break;
+
+			case "outoffuel":
+				yield return ScenarioOutOfFuel();
+				break;
+
+			case "orbitpermission":
+				yield return ScenarioOrbitPermission();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -29712,6 +29724,185 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "scifibuttons: a button's frame takes the light mode's accent colour", ( lightFrameColour == lightAccent ) && ( lightFrameColour != "(none)" ), lightFrameColour + " / " + lightAccent );
 
 		Finish( "scenario=scifibuttons checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioReboard()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+		ProbeKeyboard();
+
+		// down on planet 94 at a site on raised ground, and out in the terrain vehicle
+		yield return LandOnPlanet94At( Tools.LatLongToWorldCoordinates( 4.3f, -16.0f ), done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=reboard abort: no landing (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var ship = controller.m_disembarked.ApplyElevation( Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude ), false );
+
+		// the control: 5 km from the ship along the ground, Move and Enter leave the crew outside (2048 units are 225 km)
+		var far = new Vector3( ship.x + 5.0f * 2048.0f / 225.0f, 0.0f, ship.z );
+
+		playerData.m_general.m_coordinates = far;
+		playerData.m_general.m_lastDisembarkedCoordinates = far;
+		controller.m_terrainVehicle.transform.localPosition = far;
+
+		yield return Frames( 5 );
+
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
+
+		yield return Frames( 5 );
+		yield return Tap( Key.Enter );
+		yield return Frames( 30 );
+
+		var locationWhenFar = playerData.m_general.m_location;
+
+		// the vehicle 1 km from the ship along the ground, kept as driving keeps it (flat: the ground's height is only drawn)
+		var near = new Vector3( ship.x + 2048.0f / 225.0f, 0.0f, ship.z );
+
+		playerData.m_general.m_coordinates = near;
+		playerData.m_general.m_lastDisembarkedCoordinates = near;
+		controller.m_terrainVehicle.transform.localPosition = near;
+
+		yield return Frames( 5 );
+
+		// Move, then Enter beside the ship, as the player goes back in
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
+
+		yield return Frames( 5 );
+		yield return Tap( Key.Enter );
+		yield return WaitForLocation( PD_General.Location.Planetside, 10.0f );
+		yield return Frames( 10 );
+
+		var location = playerData.m_general.m_location;
+
+		Log( "reboard: the ship stands at height " + ship.y.ToString( "F1" ) + ", the vehicle 1 km from it at height 0; after Move and Enter the location is " + location );
+
+		Check( "reboard: the ship stands on raised ground (the setup is the case)", ship.y > 10.0f, ship.y.ToString( "F1" ) );
+		Check( "reboard: Move and Enter 5 km from the ship leave the crew outside (control)", locationWhenFar == PD_General.Location.Disembarked, locationWhenFar.ToString() );
+		Check( "reboard: Move and Enter 1 km from the ship along the ground take the vehicle back in, however high the ground", location == PD_General.Location.Planetside, location.ToString() );
+
+		Finish( "scenario=reboard checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioOutOfFuel()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+		ProbeKeyboard();
+
+		// down on planet 94, out in the terrain vehicle, with something in its hold
+		yield return LandOnPlanet94At( Tools.LatLongToWorldCoordinates( 4.3f, -16.0f ), done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=outoffuel abort: no landing (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var vehicle = playerData.m_terrainVehicle;
+		var ironId = -1;
+
+		for ( var i = 0; i < gameData.m_elementList.Length; i++ )
+		{
+			if ( gameData.m_elementList[ i ].m_name == "Iron" )
+			{
+				ironId = i;
+			}
+		}
+
+		vehicle.AddElement( ironId, 20 );
+
+		var droppedBefore = ( playerData.m_planetSurfaces != null ) ? playerData.m_planetSurfaces.m_droppedCargoList.Count : 0;
+		var ironReference = playerData.m_playerShip.m_elementStorage.Find( ironId );
+		var ironShipBefore = ( ironReference != null ) ? ironReference.m_volume : 0;
+
+		// the tank runs dry far from the ship (40 km out, along the ground; 2048 units are 225 km)
+		var ship = Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude );
+		var farAway = new Vector3( ship.x + 40.0f * 2048.0f / 225.0f, 0.0f, ship.z );
+
+		playerData.m_general.m_coordinates = farAway;
+		playerData.m_general.m_lastDisembarkedCoordinates = farAway;
+		controller.m_terrainVehicle.transform.localPosition = farAway;
+
+		vehicle.m_fuelRemaining = -0.05f;
+
+		yield return Frames( 5 );
+
+		// Move, as the player drives on
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
+
+		yield return Frames( 10 );
+
+		var messages = System.Text.RegularExpressions.Regex.Replace( string.Join( "\n", playerData.m_general.m_messageList ), "<[^>]*>", "" );
+
+		yield return WaitForLocation( PD_General.Location.Planetside, 10.0f );
+		yield return Frames( 10 );
+
+		var location = playerData.m_general.m_location;
+		var droppedAfter = ( playerData.m_planetSurfaces != null ) ? playerData.m_planetSurfaces.m_droppedCargoList.Count : 0;
+		var ironInShip = playerData.m_playerShip.m_elementStorage.Find( ironId );
+		var ironShipAfter = ( ironInShip != null ) ? ironInShip.m_volume : 0;
+
+		Log( "outoffuel: messages '" + messages.Replace( "\n", " | " ) + "' | location " + location + " | dropped cargo " + droppedBefore + " then " + droppedAfter + " | iron in the ship " + ironShipBefore + " then " + ironShipAfter + " | the vehicle's fuel " + vehicle.GetPercentFuelRemaining() + "%" );
+
+		Check( "outoffuel: an empty tank says so, in the original's words (OUT OF FUEL, RETURNING TO SHIP ON FOOT)", messages.Contains( "Out of fuel." ) && messages.Contains( "Returning to ship on foot." ), messages );
+		Check( "outoffuel: the crew are back in the ship, not stranded on the planet", location == PD_General.Location.Planetside, location.ToString() );
+		Check( "outoffuel: the vehicle's cargo is left on the ground where it stopped (the original's >DEBRIS), not carried into the ship", ( droppedAfter == droppedBefore + 1 ) && ( ironShipAfter == ironShipBefore ), droppedBefore + " / " + droppedAfter + ", iron in the ship " + ironShipBefore + " / " + ironShipAfter );
+		Check( "outoffuel: back in the ship the vehicle is refuelled", vehicle.GetPercentFuelRemaining() == 100, vehicle.GetPercentFuelRemaining().ToString() );
+
+		Finish( "scenario=outoffuel checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioOrbitPermission()
+	{
+		var dataController = DataController.m_instance;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// the Veloxi drones in orbit around Sphexi (encounter 305) let the ship into orbit
+		controller.GrantOrbitPermission( 305 );
+
+		// the game is saved and loaded again, as the player does
+		dataController.SaveActiveGame();
+		dataController.ReloadActiveGame();
+
+		// (a game loaded starts a new spaceflight scene, which has no permissions of its own: the old code kept them only there)
+		var sceneList = controller.GetType().GetField( "m_orbitPermissions", c_any );
+
+		if ( sceneList != null )
+		{
+			( sceneList.GetValue( controller ) as List<int> ).Clear();
+		}
+
+		yield return Frames( 5 );
+
+		var afterLoading = controller.HasOrbitPermission( 305 );
+
+		// the control: leaving the star system ends the permission, as before
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		var afterHyperspace = controller.HasOrbitPermission( 305 );
+
+		Log( "orbitpermission: after saving and loading " + afterLoading + ", after hyperspace " + afterHyperspace );
+
+		Check( "orbitpermission: the drones' permission to orbit is kept in the save, so they do not ask again after loading", afterLoading, afterLoading.ToString() );
+		Check( "orbitpermission: going to hyperspace still ends it (control)", !afterHyperspace, afterHyperspace.ToString() );
+
+		Finish( "scenario=orbitpermission checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
