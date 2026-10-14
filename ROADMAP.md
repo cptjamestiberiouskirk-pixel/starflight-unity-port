@@ -47,7 +47,7 @@ This is the plan of record. Pick work from it, and when a PR for an item merges,
 | Artifact effects (15 special artifacts) | DONE | the Black Box, Hypercube and Ellipsoid have none beyond their roles (D5) |
 | Main story and endgame | DONE | Phase 5 |
 
-Counting the items of Phases 0 to 7 below (59), all 59 are done or decided (2026-10-13): the owner's play test (0.6) was closed on 2026-10-12 and the comparison of every screen with the original's on 2026-10-13. What is left against the original is the UI kit's work on labels, layout and look (`Research/Screen comparison.md`). The headless probe plays all its scenarios, but no one has yet played the port through to the win by hand.
+Counting the items of Phases 0 to 7 below (59), all 59 are done or decided (2026-10-13): the owner's play test (0.6) was closed on 2026-10-12 and the comparison of every screen with the original's on 2026-10-13. The comparison's UI kit items were fixed or decided on 2026-10-13 too (`Research/Screen comparison.md`). The headless probe plays all its scenarios, but no one has yet played the port through to the win by hand.
 
 ## Decisions
 

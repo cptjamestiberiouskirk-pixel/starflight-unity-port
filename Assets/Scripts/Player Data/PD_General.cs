@@ -149,6 +149,21 @@ public class PD_General
 	// every planet recommended in the game, evaluated or not: the original marks a planet as logged when it is recommended and never again lets it be
 	// (CAPTAIN WF3D3: "THIS PLANET HAS ALREADY BEEN LOGGED.") - save files from before this list have the planets still waiting in m_colonyRecommendationList
 	public List<int> m_loggedPlanetList;
+
+	// the encounters in orbit that have let the ship into orbit (a veloxi drone that was answered correctly), until the ship leaves the star system - saved,
+	// so that the drones do not ask again after the game is loaded (older saves have none: see GetOrbitPermissions)
+	public List<int> m_orbitPermissionList;
+
+	// returns the encounters in orbit that have let the ship into orbit (never null)
+	public List<int> GetOrbitPermissions()
+	{
+		if ( m_orbitPermissionList == null )
+		{
+			m_orbitPermissionList = new List<int>();
+		}
+
+		return m_orbitPermissionList;
+	}
 	public int m_unsuitableRecommendationCount;
 
 	// what the original keeps of a recommendation for its evaluation screen (CAPTAIN overlay, (/LOG-PLAN) in the decompiled original): its number, counted over

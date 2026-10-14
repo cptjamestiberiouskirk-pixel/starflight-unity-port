@@ -118,7 +118,7 @@ The project features a **deterministic visualization system** that renders plane
 ---
 
 ## 👽 Alien Asset Status
-- **Alien ship models**: the Spemin ships, the Mechan Scout and the Mysterion are hand-made models. Every other vessel (the Veloxi, Thrynn, Elowan, Uhlek and Gazurtoid ships, the Noah 9 derelict and the Enterprise) is a procedural low-poly stand-in built by the Blender scripts in `DevTools/ShipModels` (see its [README](DevTools/ShipModels/README.md)), shaped after the original's sensor pictures and sized after STRINFO. The Nomad probe and the Minstrel use their comm-screen models.
+- **Alien ship models**: the Spemin ships, the Mechan Scout and the Mysterion are hand-made models. The Thrynn transport, scout and warship are textured models made with Meshy from the original's sensor pictures and brought in by `DevTools/ShipModels/import_meshy.py`; the other races are to follow the same way. Every other vessel (the Veloxi, Elowan, Uhlek and Gazurtoid ships, the Noah 9 derelict and the Enterprise) is a procedural low-poly stand-in built by the Blender scripts in `DevTools/ShipModels` (see its [README](DevTools/ShipModels/README.md)), shaped after the original's sensor pictures. All are sized after STRINFO. The Nomad probe and the Minstrel use their comm-screen models.
 - **Thrynn.fbx**: Currently ~74MB. Requires manual extraction of materials and potential polygon reduction to optimize performance.
 - **Sensor pictures**: the sensor window shows a picture for the Spemin ships, the Mechan Scout, the Velox drone, the Mysterion and the Minstrel (drawn by hand) and for the Elowan, Thrynn, Veloxi, Gazurtoid and Uhlek ships, the Nomad probe, the Enterprise and the Noah 9 derelict (traced from the original's screenshots by `DevTools/SensorPictures`, see its [README](DevTools/SensorPictures/README.md)): every vessel of the game data. An unknown object leaves the window black inside its magenta border with no readout, and the science officer reports an unidentified object, as in the original; every wreck shows the debris of its own vessel (made from its picture by `DevTools/SensorPictures/make-debris.ps1`). A scanned planet shows its own surface, from the maps the planet generator made for it, on a lit sphere that turns slowly; the scan starts as the original's noise and clears into it.
 - **Lifeform models**: one model for each body plan of the 1984 design notes and two for each plant size, in the game since the lifeforms are placed as their models, tinted with their species colour, 17 in all, in `Assets/Game Objects/Lifeforms/`, built by the Blender scripts in `DevTools/LifeformModels` (see its [README](DevTools/LifeformModels/README.md) and the review renders in its `previews/`). Each fits a 1 unit cube and has a skin material to tint with the species colour.
@@ -178,7 +178,7 @@ The project features a **deterministic visualization system** that renders plane
 - The Minstrels sing, the Nomad probes send their planetary data, and the Noah 9 derelict sends its distress beacon and recorded message
 - Complete combat system with lasers, missiles, shields, armor
 - Ship destruction with debris spawning
-- A model with debris for every alien vessel of the game data (hand-made or procedural stand-ins)
+- A model with debris for every alien vessel of the game data (hand-made, made with Meshy, or procedural stand-ins)
 - Game over and restart functionality
 - Save/load system with JSON persistence
 
@@ -187,7 +187,7 @@ The project features a **deterministic visualization system** that renders plane
 
 ### 📊 Completion: 59 of the 59 items of the roadmap to parity
 
-Every item of [ROADMAP.md](ROADMAP.md) is done or decided. What is left against the original game is the UI kit's work on labels, layout and look (`Research/Screen comparison.md`, whose gameplay items are all closed). The headless probe plays every scenario of it (190), but no one has yet played the port through to the win by hand.
+Every item of [ROADMAP.md](ROADMAP.md) is done or decided. Every item of the comparison of the screens with the original's (`Research/Screen comparison.md`) is fixed or decided as well, the UI kit's included. The headless probe plays every scenario of it, but no one has yet played the port through to the win by hand.
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 

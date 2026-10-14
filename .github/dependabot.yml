@@ -1,0 +1,18 @@
+# Keeps the workflows' actions current. They are pinned to commits (a tag
+# can be moved), so Dependabot opens a pull request that moves each pin to the
+# newest release's commit and updates its "# vX.Y.Z" comment.
+# Unity packages are left out: they are updated by hand, one per branch.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # one pull request for all the actions' updates
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: ci
+    open-pull-requests-limit: 5

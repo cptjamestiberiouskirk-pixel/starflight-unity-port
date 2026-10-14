@@ -66,10 +66,12 @@ jobs:
             echo "::add-mask::${UNITY_SERIAL%-*}"
           fi
 
-      - uses: actions/checkout@v4
+      # every action is pinned to a release's commit, since a tag can be moved;
+      # to update one, look up the new release's commit and change the comment
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Library holds the imported asset cache, so later runs skip the full import
-      - uses: actions/cache@v4
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: Library
           key: Library-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
@@ -78,7 +80,7 @@ jobs:
 
       # Unity version comes from ProjectSettings/ProjectVersion.txt
       - name: Compile (EditMode test run)
-        uses: game-ci/unity-test-runner@v4
+        uses: game-ci/unity-test-runner@32e57712352b500e17974b245a6dce9e11a73213 # v4.4.0
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
