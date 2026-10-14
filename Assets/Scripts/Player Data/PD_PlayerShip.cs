@@ -1056,6 +1056,82 @@ public class PD_PlayerShip
 		}
 	}
 
+	// the planet's gravity as the landing computer counts it, in hundredths of a G: above 8 G it grows by the square root (LAND-OV WF147: SQRT(G - 800) * 10 + 800)
+	public static int GetLandingGravity( GD_Planet planet )
+	{
+		var gravity = Mathf.Max( 0, planet.m_gravity );
+
+		if ( gravity > c_landingGravityKnee )
+		{
+			gravity = Mathf.FloorToInt( Mathf.Sqrt( gravity - c_landingGravityKnee ) ) * 10 + c_landingGravityKnee;
+		}
+
+		return gravity;
+	}
+
+	const int c_landingGravityKnee = 800;
+
+	// how much Endurium a landing or a launch burns, in tenths of a cubic meter: the gravity over 40 (LAND-OV WF177)
+	public static int GetLandingFuel( GD_Planet planet )
+	{
+		return GetLandingGravity( planet ) / 40;
+	}
+
+	// whether the planet's gravity crushes the hull of a ship that lands (LAND-OV WF3D6: more than 7.99 G)
+	public static bool GravityCrushesHull( GD_Planet planet )
+	{
+		return GetLandingGravity( planet ) > 799;
+	}
+
+	// the Endurium on board in tenths of a cubic meter, counted as the landing computer counts it (at most 320, LAND-OV WF32C and WF37B)
+	int GetLandingFuelOnBoard()
+	{
+		var endurium = ( m_elementStorage != null ) ? m_elementStorage.Find( 5 ) : null;
+
+		return ( endurium == null ) ? 0 : Mathf.Min( endurium.m_volume, 320 );
+	}
+
+	// whether there is too little Endurium to land safely (LAND-OV WF32C: the fuel times 40 below the gravity) - a ship that goes down anyway crashes
+	public bool HasTooLittleFuelToLand( GD_Planet planet )
+	{
+		return GetLandingFuelOnBoard() * 40 < GetLandingGravity( planet );
+	}
+
+	// whether there is too little Endurium to launch again (LAND-OV WF37B): on the surface for the launch, in orbit for a landing and the launch after it
+	public bool HasTooLittleFuelToRelaunch( GD_Planet planet, bool onTheSurface )
+	{
+		var fuel = GetLandingFuelOnBoard();
+
+		return ( fuel + ( onTheSurface ? fuel : 0 ) ) * 20 < GetLandingGravity( planet );
+	}
+
+	// burns the Endurium of a landing or a launch (LAND-OV WF177: the gravity over 40, in tenths, never below none)
+	public void BurnLandingFuel( GD_Planet planet )
+	{
+		var endurium = ( m_elementStorage != null ) ? m_elementStorage.Find( 5 ) : null;
+
+		if ( endurium == null )
+		{
+			return;
+		}
+
+		var tenths = Mathf.Min( GetLandingFuel( planet ), endurium.m_volume );
+
+		if ( tenths <= 0 )
+		{
+			return;
+		}
+
+		m_elementStorage.Remove( 5, tenths );
+
+		RecalculateVolumeUsed();
+
+		if ( m_elementStorage.Find( 5 ) == null )
+		{
+			DropShields();
+		}
+	}
+
 	// returns true if there is any endurium on board (the engines, the shields and the weapons all run on it)
 	public bool HasFuel()
 	{

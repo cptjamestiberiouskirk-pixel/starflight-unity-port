@@ -480,6 +480,15 @@ public class SpaceflightController : MonoBehaviour
 		m_encountersResumeTime = Time.time + c_encounterHoldOffSeconds;
 	}
 
+	// the planet whose gravity the science officer has analysed (the original's ?G-AWARE: only then does Land warn), and the planet Land has warned about once
+	// (the original's GWF: a second Land goes down anyway) - neither is saved
+	public int m_gravityAnalysedPlanetId = -1;
+	public int m_landingWarnedPlanetId = -1;
+
+	// what the landing that is under way will end in (LAND-OV WF430): a crash for want of fuel, or the hull crushed by the gravity
+	public bool m_landingCrashes;
+	public bool m_landingCrushes;
+
 	public void UpdateEncounters()
 	{
 		// get to the player data

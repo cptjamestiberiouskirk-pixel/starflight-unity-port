@@ -43,6 +43,39 @@ public class LandButton : ShipButton
 					break;
 				}
 
+				// the gravity has been analysed: the landing computer warns once of a landing the ship would not survive or launch from, and a second Land goes down
+				// anyway (LAND-OV ?LAND and WF45E)
+				var planet = DataController.m_instance.m_gameData.m_planetList[ playerData.m_general.m_currentPlanetId ];
+
+				if ( ( SpaceflightController.m_instance.m_gravityAnalysedPlanetId == planet.m_id ) && ( SpaceflightController.m_instance.m_landingWarnedPlanetId != planet.m_id ) )
+				{
+					string warning = null;
+
+					if ( PD_PlayerShip.GravityCrushesHull( planet ) )
+					{
+						warning = "This planet's gravity will crush the ship's hull.";
+					}
+					else if ( playerData.m_playerShip.HasTooLittleFuelToLand( planet ) )
+					{
+						warning = "Insufficient fuel for safe landing.";
+					}
+					else if ( playerData.m_playerShip.HasTooLittleFuelToRelaunch( planet, false ) )
+					{
+						warning = "Insufficient fuel for re-launching.";
+					}
+
+					if ( warning != null )
+					{
+						SpaceflightController.m_instance.m_landingWarnedPlanetId = planet.m_id;
+
+						SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+						SpaceflightController.m_instance.m_messages.Clear();
+						SpaceflightController.m_instance.m_messages.AddText( "<color=white>" + warning + "</color>" );
+						SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+						break;
+					}
+				}
+
 				// show the terrian map display
 				SpaceflightController.m_instance.m_displayController.ChangeDisplay( SpaceflightController.m_instance.m_displayController.m_terrainMapDisplay );
 

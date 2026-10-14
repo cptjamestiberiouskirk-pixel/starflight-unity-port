@@ -18,6 +18,15 @@ public class DescendButton : ShipButton
 
 		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Computing descent profile...</color>" );
 
+		// the landing burns the gravity's share of Endurium, and with too little of it the ship crashes, on a planet of more than 7.99 G its hull is crushed
+		// (LAND-OV WF430: ?FUEL-DIE is decided before the fuel burns) - the touchdown tells (PlayerCamera.PlayerHasLanded)
+		var planet = DataController.m_instance.m_gameData.m_planetList[ playerData.m_general.m_currentPlanetId ];
+
+		SpaceflightController.m_instance.m_landingCrashes = playerData.m_playerShip.HasTooLittleFuelToLand( planet );
+		SpaceflightController.m_instance.m_landingCrushes = PD_PlayerShip.GravityCrushesHull( planet );
+
+		playerData.m_playerShip.BurnLandingFuel( planet );
+
 		// set the landing coordinates
 		SpaceflightController.m_instance.m_planetside.UpdateTerrainGridNow();
 
