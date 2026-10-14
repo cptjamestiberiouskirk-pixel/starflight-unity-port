@@ -14220,6 +14220,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var locationAfterGrant = playerData.m_general.m_location;
 		var planetAfterGrant = playerData.m_general.m_currentPlanetId;
+		var linesAfterGrant = System.Text.RegularExpressions.Regex.Replace( string.Join( "\n", playerData.m_general.m_messageList ), "<[^>]*>", "" );
 
 		yield return Frames( 30 );
 
@@ -14230,6 +14231,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "drones: the drone asks three numbers from 1 to 99", begun && ( numbersAsked == 3 ) && numbersInRange, "begun " + begun + ", numbers " + numbers.Trim() );
 		Check( "drones: three right answers get permission to orbit", grantedShown == 1, "granted shown " + grantedShown );
 		Check( "drones: after permission the ship is back in orbit around the planet, and the drone does not begin again", ( locationAfterGrant == PD_General.Location.InOrbit ) && ( planetAfterGrant == planetId ) && ( locationLater == PD_General.Location.InOrbit ), locationAfterGrant + " at " + planetAfterGrant + ", later " + locationLater );
+		Check( "drones: the encounter ends before the orbit is established again (Leaving encounter... and ...Encounter terminated. before ...Orbit established.)", ( linesAfterGrant.IndexOf( "Leaving encounter..." ) >= 0 ) && ( linesAfterGrant.IndexOf( "...Orbit established." ) > linesAfterGrant.IndexOf( "...Encounter terminated." ) ), linesAfterGrant.Replace( "\n", " | " ) );
 
 		// ---- 3. out to the level of the star system and into orbit again: the permission holds while the ship stays in the star system
 		controller.SwitchLocation( PD_General.Location.StarSystem );
