@@ -37,7 +37,7 @@ surfaces = data["m_surfaceList"]
 atmospheres = data["m_atmosphereList"]
 planets = {p["m_orbitPosition"]: p for p in data["m_planetList"] if p["m_starId"] == STAR_ID}
 
-# SystemDisplay.GetStarColor (blackbody, as the owner ruled for the map)
+# SystemDisplay.GetStarColor (blackbody, as decided for the map)
 STAR_RGB = {"M": (1, .52, .32), "K": (1, .70, .42), "G": (1, .88, .60), "F": (1, .97, .90), "A": (.80, .85, 1), "B": (.68, .76, 1), "O": (.61, .69, 1)}
 star_rgb = STAR_RGB.get(star["m_class"], (1, 1, 1))
 

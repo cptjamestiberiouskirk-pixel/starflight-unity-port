@@ -1,6 +1,6 @@
 """Writes the UI kit's colour schemes as theme assets: Assets/Resources/UI Kit Themes/<Scheme> Dark.asset and <Scheme> Light.asset.
 
-Each scheme of palettes_spec.py (the owner's palette options of 2026-10-13, all twelve kept) gets every one of UIKitTheme's 24 colour roles
+Each scheme of palettes_spec.py (the palette options of 2026-10-13, all twelve kept) gets every one of UIKitTheme's 24 colour roles
 for each mode from derive.py; the original games' schemes (ORIGINALS) give theirs as they are. The assets are copies of the classic dark
 theme (Resources/UI Kit Theme.asset: the fonts, text styles and sprites are the kit's) with the colours and the name replaced, and their
 .meta files get GUIDs made from the asset names, so running the script again gives the same GUIDs. The schemes' names must match
