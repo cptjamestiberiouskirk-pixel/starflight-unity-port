@@ -159,8 +159,15 @@ public class AnalysisButton : ShipButton
 					// surface
 					text += "Predominant Surface: <color=white>" + Known( planet.GetSurfaceText(), skill ) + "</color>\n";
 
-					// gravity
-					text += "Gravity: <color=white>" + Known( planet.GetGravityText(), skill ) + "</color>\n";
+					// gravity (once it is known, Land warns of a gravity the ship cannot land in or launch from: the original's ?G-AWARE)
+					var gravityText = Known( planet.GetGravityText(), skill );
+
+					if ( gravityText != "Unknown" )
+					{
+						SpaceflightController.m_instance.m_gravityAnalysedPlanetId = planet.m_id;
+					}
+
+					text += "Gravity: <color=white>" + gravityText + "</color>\n";
 
 					// atmospheric density
 					text += "Atmospheric Density: <color=white>" + Known( planet.GetAtmosphericDensityText(), skill ) + "</color>\n";

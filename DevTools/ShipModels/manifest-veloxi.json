@@ -9,11 +9,14 @@
 			"model": "Assets/Game Objects/Ships/Veloxi/Veloxi Transport.fbx",
 			"debris": "Assets/Game Objects/Ships Debris/Veloxi/Veloxi Transport.fbx",
 			"materials": [
-				"Veloxi Trim",
-				"Veloxi Hull",
-				"Veloxi Light",
-				"Veloxi Engine"
-			]
+				"Veloxi Transport Hull",
+				"Veloxi Transport Engine"
+			],
+			"meshy": {
+				"concept": "01a138bd-b074-769d-89f5-f6d08f52b3cd",
+				"model": "01a138c5-5282-71e6-9385-256edc9a4d41",
+				"remesh": "01a138c7-1a62-7759-8865-6f18c1c78d9a"
+			}
 		},
 		{
 			"id": 12,
@@ -23,11 +26,14 @@
 			"model": "Assets/Game Objects/Ships/Veloxi/Veloxi Scout.fbx",
 			"debris": "Assets/Game Objects/Ships Debris/Veloxi/Veloxi Scout.fbx",
 			"materials": [
-				"Veloxi Trim",
-				"Veloxi Hull",
-				"Veloxi Light",
-				"Veloxi Engine"
-			]
+				"Veloxi Scout Hull",
+				"Veloxi Scout Engine"
+			],
+			"meshy": {
+				"concept": "01a138be-ad6d-7330-bb86-6826d3f7a740",
+				"model": "01a138c5-5701-768a-b6ee-12c1a2b42904",
+				"remesh": "01a138c7-20fc-705a-90f3-f00c1e846f0c"
+			}
 		},
 		{
 			"id": 13,
@@ -37,11 +43,15 @@
 			"model": "Assets/Game Objects/Ships/Veloxi/Veloxi Warship.fbx",
 			"debris": "Assets/Game Objects/Ships Debris/Veloxi/Veloxi Warship.fbx",
 			"materials": [
-				"Veloxi Trim",
-				"Veloxi Hull",
-				"Veloxi Light",
-				"Veloxi Engine"
-			]
+				"Veloxi Warship Hull",
+				"Veloxi Warship Engine"
+			],
+			"meshy": {
+				"concept": "01a138be-afef-766d-aded-ca88353c37db",
+				"conceptEdit": "01a138c5-4e22-740f-8103-fd9569915503",
+				"model": "01a138c7-1361-70b0-8b6b-384d0f7e9e74",
+				"remesh": "01a138c8-68a9-718f-902e-d79939faa298"
+			}
 		},
 		{
 			"id": 18,
@@ -51,112 +61,208 @@
 			"model": "Assets/Game Objects/Ships/Veloxi/Veloxi Drone.fbx",
 			"debris": "Assets/Game Objects/Ships Debris/Veloxi/Veloxi Drone.fbx",
 			"materials": [
-				"Veloxi Hull",
-				"Veloxi Drone Eye",
-				"Veloxi Trim"
-			]
+				"Veloxi Drone Hull",
+				"Veloxi Drone Engine"
+			],
+			"meshy": {
+				"concept": "01a138be-b244-74d5-93a9-93fb41fc268c",
+				"model": "01a138c5-5b29-7742-b2ba-b110f58ae1c6",
+				"remesh": "01a138c7-26c1-71f8-9be1-1d06dfcda75f"
+			}
 		}
 	],
 	"materials": [
 		{
-			"name": "Veloxi Trim",
+			"name": "Veloxi Transport Hull",
 			"albedo": [
-				0.08,
-				0.07,
-				0.06
-			],
-			"specular": [
-				0.2,
-				0.2,
-				0.2
-			],
-			"smoothness": 0.4,
-			"emissive": [
-				0.0,
-				0.0,
-				0.0
-			],
-			"folder": "Assets/Game Objects/Ships/Veloxi"
-		},
-		{
-			"name": "Veloxi Hull",
-			"albedo": [
-				0.24,
-				0.21,
-				0.13
-			],
-			"specular": [
-				0.32,
-				0.29,
-				0.2
-			],
-			"smoothness": 0.55,
-			"emissive": [
-				0.0,
-				0.0,
-				0.0
-			],
-			"folder": "Assets/Game Objects/Ships/Veloxi"
-		},
-		{
-			"name": "Veloxi Light",
-			"albedo": [
-				0.1,
-				0.25,
-				0.5
-			],
-			"specular": [
-				0.5,
-				0.5,
-				0.5
-			],
-			"smoothness": 0.8,
-			"emissive": [
-				0.25,
-				0.6,
+				1.0,
+				1.0,
 				1.0
 			],
-			"folder": "Assets/Game Objects/Ships/Veloxi"
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Veloxi",
+			"albedoMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Transport - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Transport - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Transport - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Transport - Emissive.jpg"
 		},
 		{
-			"name": "Veloxi Engine",
+			"name": "Veloxi Transport Engine",
 			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.9,
 				0.35,
-				0.05,
-				0.03
+				0.12
 			],
-			"specular": [
-				0.4,
-				0.2,
-				0.2
-			],
-			"smoothness": 0.6,
-			"emissive": [
-				0.55,
-				0.1,
-				0.05
-			],
-			"folder": "Assets/Game Objects/Ships/Veloxi"
+			"folder": "Assets/Game Objects/Ships/Veloxi",
+			"albedoMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Transport - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Transport - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Transport - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Transport - Emissive.jpg"
 		},
 		{
-			"name": "Veloxi Drone Eye",
+			"name": "Veloxi Scout Hull",
 			"albedo": [
-				0.4,
-				0.03,
-				0.02
+				1.0,
+				1.0,
+				1.0
 			],
 			"specular": [
-				0.5,
-				0.3,
-				0.3
+				1.0,
+				1.0,
+				1.0
 			],
-			"smoothness": 0.8,
+			"smoothness": 1.0,
 			"emissive": [
-				0.95,
-				0.12,
-				0.05
+				0.0,
+				0.0,
+				0.0
 			],
-			"folder": "Assets/Game Objects/Ships/Veloxi"
+			"folder": "Assets/Game Objects/Ships/Veloxi",
+			"albedoMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Scout - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Scout - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Scout - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Scout - Emissive.jpg"
+		},
+		{
+			"name": "Veloxi Scout Engine",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.9,
+				0.35,
+				0.12
+			],
+			"folder": "Assets/Game Objects/Ships/Veloxi",
+			"albedoMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Scout - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Scout - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Scout - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Scout - Emissive.jpg"
+		},
+		{
+			"name": "Veloxi Warship Hull",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Veloxi",
+			"albedoMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Warship - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Warship - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Warship - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Warship - Emissive.jpg"
+		},
+		{
+			"name": "Veloxi Warship Engine",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.9,
+				0.35,
+				0.12
+			],
+			"folder": "Assets/Game Objects/Ships/Veloxi",
+			"albedoMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Warship - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Warship - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Warship - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Warship - Emissive.jpg"
+		},
+		{
+			"name": "Veloxi Drone Hull",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Veloxi",
+			"albedoMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Drone - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Drone - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Drone - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Drone - Emissive.jpg"
+		},
+		{
+			"name": "Veloxi Drone Engine",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.9,
+				0.35,
+				0.12
+			],
+			"folder": "Assets/Game Objects/Ships/Veloxi",
+			"albedoMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Drone - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Drone - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Drone - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Veloxi/Textures/Veloxi Drone - Emissive.jpg"
 		}
 	]
 }

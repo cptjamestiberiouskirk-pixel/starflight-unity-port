@@ -214,7 +214,8 @@ public class TargetBracket : MonoBehaviour
 			return;
 		}
 
-		var theme = UIKitTheme.Get();
+		// (drawn over the main view, so in the theme of the 3D views: dark in either mode)
+		var theme = UIKitTheme.GetViewTheme();
 
 		if ( theme == null )
 		{
@@ -275,6 +276,26 @@ public class TargetBracket : MonoBehaviour
 
 			m_label.SetText( m_rangeFormat, range );
 		}
+	}
+
+	// unity on enable
+	void OnEnable()
+	{
+		// the colours are set again when the player picks another colour scheme or mode
+		UIKitTheme.Changed -= ThemeChanged;
+		UIKitTheme.Changed += ThemeChanged;
+	}
+
+	// unity on disable
+	void OnDisable()
+	{
+		UIKitTheme.Changed -= ThemeChanged;
+	}
+
+	// the kit's theme changed: the bracket's colours are set again on the next frame
+	void ThemeChanged()
+	{
+		m_coloured = false;
 	}
 
 	// shows or hides the bracket (and forgets its colours when hidden, so that they are set again on the next target)

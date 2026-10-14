@@ -15,9 +15,158 @@ public class Starmap : MonoBehaviour
 	// what the viewport label shows while the starmap is open
 	string m_label;
 
+	// the colours given to the starmap's own parts (set per renderer, so that the materials themselves are left as they are)
+	MaterialPropertyBlock m_propertyBlock;
+
+	// the copies of the background material the starmap's background is given
+	readonly System.Collections.Generic.List<Material> m_backgroundMaterials = new System.Collections.Generic.List<Material>();
+
+	// the name of the starmap's background material (the ship's log is drawn on it too), and the name of the copies given in the scheme's colour
+	const string c_backgroundMaterialName = "Starmap - Background";
+	const string c_backgroundCopyName = c_backgroundMaterialName + " (Scheme)";
+
+	// the colour of the starmap's materials (the SF - Standard shader's albedo colour)
+	const string c_colourProperty = "SF_AlbedoColor";
+
 	// unity start
 	void Start()
 	{
+	}
+
+	// unity on enable
+	void OnEnable()
+	{
+		// the starmap takes the colours of the kit's scheme, also when the player picks another one
+		UIKitTheme.Changed -= UseSchemeColours;
+		UIKitTheme.Changed += UseSchemeColours;
+
+		UseSchemeColours();
+	}
+
+	// unity on disable
+	void OnDisable()
+	{
+		UIKitTheme.Changed -= UseSchemeColours;
+	}
+
+	// unity on destroy
+	void OnDestroy()
+	{
+		// the copies of the background material go with the scene
+		DestroyBackgroundCopies( m_backgroundMaterials );
+	}
+
+	// gives the starmap's background, grid, ship marker and crosshair the colours of the kit's scheme in use, in its dark mode (the starmap is a view of
+	// space, dark in either mode); the stars, the nebulas and the rest keep their own colours
+	void UseSchemeColours()
+	{
+		var theme = UIKitTheme.GetViewTheme();
+
+		if ( theme == null )
+		{
+			return;
+		}
+
+		if ( m_propertyBlock == null )
+		{
+			m_propertyBlock = new MaterialPropertyBlock();
+		}
+
+		foreach ( var starmapRenderer in GetComponentsInChildren<Renderer>( true ) )
+		{
+			var materials = starmapRenderer.sharedMaterials;
+
+			for ( var i = 0; i < materials.Length; i++ )
+			{
+				if ( ( materials[ i ] == null ) || !materials[ i ].HasProperty( c_colourProperty ) )
+				{
+					continue;
+				}
+
+				Color colour;
+
+				switch ( materials[ i ].name )
+				{
+					case c_backgroundMaterialName: colour = theme.m_backgroundPanel; break;
+					case "Starmap - Grid": colour = theme.m_accentPrimaryDim; break;
+					case "Starmap - Player Ship": colour = theme.m_accentPrimary; break;
+					case "Starmap - Crosshair": colour = theme.m_textPrimary; break;
+					default: continue;
+				}
+
+				// (the material's own opacity stays)
+				colour.a = materials[ i ].GetColor( c_colourProperty ).a;
+
+				starmapRenderer.GetPropertyBlock( m_propertyBlock, i );
+				m_propertyBlock.SetColor( c_colourProperty, colour );
+				starmapRenderer.SetPropertyBlock( m_propertyBlock, i );
+			}
+		}
+
+		// the background image
+		UseSchemeBackground( transform, m_backgroundMaterials );
+	}
+
+	// gives the images under a transform that are drawn with the starmap's background material (the starmap's and the ship's log's backgrounds) the
+	// panel colour of the views' theme: an image takes no property block, so each is given a copy of the material the first time, kept in the list
+	public static void UseSchemeBackground( Transform root, System.Collections.Generic.List<Material> copies )
+	{
+		var theme = UIKitTheme.GetViewTheme();
+
+		if ( ( root == null ) || ( copies == null ) || ( theme == null ) )
+		{
+			return;
+		}
+
+		foreach ( var image in root.GetComponentsInChildren<UnityEngine.UI.Image>( true ) )
+		{
+			var material = image.material;
+
+			if ( ( material == null ) || !material.HasProperty( c_colourProperty ) )
+			{
+				continue;
+			}
+
+			if ( material.name == c_backgroundMaterialName )
+			{
+				material = new Material( material );
+				material.name = c_backgroundCopyName;
+
+				copies.Add( material );
+
+				image.material = material;
+			}
+			else if ( material.name != c_backgroundCopyName )
+			{
+				continue;
+			}
+
+			// (the material's own opacity stays)
+			var colour = theme.m_backgroundPanel;
+
+			colour.a = material.GetColor( c_colourProperty ).a;
+
+			material.SetColor( c_colourProperty, colour );
+		}
+	}
+
+	// destroys the copies of the background material (when their owner goes with the scene)
+	public static void DestroyBackgroundCopies( System.Collections.Generic.List<Material> copies )
+	{
+		if ( copies == null )
+		{
+			return;
+		}
+
+		foreach ( var material in copies )
+		{
+			if ( material != null )
+			{
+				Destroy( material );
+			}
+		}
+
+		copies.Clear();
 	}
 
 	// unity update

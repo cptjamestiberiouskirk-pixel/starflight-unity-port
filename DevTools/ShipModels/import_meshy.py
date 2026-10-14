@@ -153,11 +153,13 @@ def save_image(pixels, path):
 def glow_mask(base, glow=None):
     """Where the base colour (sRGB) is the crystal's blue or cyan: 1 there, 0 elsewhere, with a soft edge.
 
-    glow: a race file's "glow" settings (hue, saturation, value) in place of the defaults above."""
+    glow: a race file's "glow" settings (hue, saturation, value) in place of the defaults above. Its hue is one range
+    [from, to] or a list of them (the Veloxi's blue crystal and their red engine pods, whose red wraps round 0)."""
     glow = glow or {}
     glow_hue = glow.get("hue", GLOW_HUE)
     glow_saturation = glow.get("saturation", GLOW_SATURATION)
     glow_value = glow.get("value", GLOW_VALUE)
+    hue_ranges = glow_hue if isinstance(glow_hue[0], (list, tuple)) else [glow_hue]
     r, g, b = base[..., 0], base[..., 1], base[..., 2]
     high = numpy.maximum(numpy.maximum(r, g), b)
     low = numpy.minimum(numpy.minimum(r, g), b)
@@ -165,7 +167,10 @@ def glow_mask(base, glow=None):
     saturation = numpy.where(high > 0.0, (high - low) / numpy.maximum(high, 1e-6), 0.0)
 
     hue = numpy.where(high == r, (g - b) / spread % 6.0, numpy.where(high == g, (b - r) / spread + 2.0, (r - g) / spread + 4.0)) * 60.0
-    in_hue = (hue >= glow_hue[0]) & (hue <= glow_hue[1])
+    in_hue = numpy.zeros(hue.shape, dtype=bool)
+
+    for hue_range in hue_ranges:
+        in_hue |= (hue >= hue_range[0]) & (hue <= hue_range[1])
 
     return in_hue * numpy.clip((saturation - glow_saturation) / 0.2, 0.0, 1.0) * numpy.clip((high - glow_value) / 0.2, 0.0, 1.0)
 
@@ -290,6 +295,10 @@ def main():
 
         # to the canonical frame: nose +Y, the middle of the bounds at the origin, the length of the size rule along the nose
         obj.data.transform(Matrix.Rotation(math.radians(NOSE_TURNS[vessel.get("nose", "+X")]), 4, "Z"))
+        # a model that Meshy built lying on its side is rolled about its length (degrees, a right-handed turn about the nose)
+        obj.data.transform(Matrix.Rotation(math.radians(vessel.get("roll", 0.0)), 4, "Y"))
+        # a model that Meshy built wider than the original is narrowed across its nose to the original's proportions
+        obj.data.transform(Matrix.Diagonal((vessel.get("widthScale", 1.0), 1.0, 1.0, 1.0)))
         corners = [Vector(v.co) for v in obj.data.vertices]
         low = Vector((min(c.x for c in corners), min(c.y for c in corners), min(c.z for c in corners)))
         high = Vector((max(c.x for c in corners), max(c.y for c in corners), max(c.z for c in corners)))
@@ -349,13 +358,15 @@ def main():
             obj.data.materials.clear()
             obj.data.materials.append(flat_material(name + " Hull"))
             obj.data.materials.append(flat_material(name + " Engine"))
-            engines = mark_engines(obj, ship_kit.target_length(next(v["strinfo"] for v in race_file_data["vessels"] if v["name"] == name)))
+            # a dead ship (the Noah 9 derelict: STRINFO gives it no energy) has no engines to glow
+            engines = mark_engines(obj, ship_kit.target_length(next(v["strinfo"] for v in race_file_data["vessels"] if v["name"] == name))) if race_file_data.get("engines", True) else 0
             bpy.data.materials.remove(gltf_material)
 
             if engines == 0:
                 obj.data.materials.pop(index=1)
                 manifest_vessel = next(v for v in manifest["vessels"] if v["name"] == name)
                 manifest_vessel["materials"] = manifest_vessel["materials"][:1]
+                manifest["materials"] = [m for m in manifest["materials"] if m["name"] != name + " Engine"]
 
             print("ENGINES %s faces=%d" % (name, engines))
 

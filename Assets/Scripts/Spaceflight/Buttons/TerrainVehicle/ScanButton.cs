@@ -301,7 +301,8 @@ public class ScanButton : ShipButton
 	// ruins and artifacts in its primary text colour, lifeforms in its alert colour), or the original colour without the theme
 	static Color LabelColour( UIKitTheme.ColorRole role, Color original )
 	{
-		var theme = UIKitTheme.Get();
+		// (the labels stand over the terrain, so they take the theme of the 3D views: dark in either mode)
+		var theme = UIKitTheme.GetViewTheme();
 
 		return ( theme != null ) ? theme.GetColor( role ) : original;
 	}
