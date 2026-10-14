@@ -9,11 +9,14 @@
 			"model": "Assets/Game Objects/Ships/Uhlek/Uhlek Scout.fbx",
 			"debris": "Assets/Game Objects/Ships Debris/Uhlek/Uhlek Scout.fbx",
 			"materials": [
-				"Uhlek Hull",
-				"Uhlek Trim",
-				"Uhlek Light",
-				"Uhlek Engine"
-			]
+				"Uhlek Scout Hull",
+				"Uhlek Scout Engine"
+			],
+			"meshy": {
+				"concept": "01a138c9-60f7-771a-abec-7d2fa048d404",
+				"model": "01a138cb-31bf-7475-897c-23257836f17e",
+				"remesh": "01a138cd-6eb3-766e-8ad6-547127c04f05"
+			}
 		},
 		{
 			"id": 17,
@@ -23,93 +26,112 @@
 			"model": "Assets/Game Objects/Ships/Uhlek/Uhlek Warship.fbx",
 			"debris": "Assets/Game Objects/Ships Debris/Uhlek/Uhlek Warship.fbx",
 			"materials": [
-				"Uhlek Hull",
-				"Uhlek Trim",
-				"Uhlek Light",
-				"Uhlek Engine"
-			]
+				"Uhlek Warship Hull",
+				"Uhlek Warship Engine"
+			],
+			"meshy": {
+				"concept": "01a138c9-6369-73a2-a58e-fe7dbfa9b304",
+				"model": "01a138cb-36a4-73f7-ac68-ba14409d800c",
+				"remesh": "01a138cd-743f-76da-8aa6-b6d58b0f4e20"
+			}
 		}
 	],
 	"materials": [
 		{
-			"name": "Uhlek Hull",
+			"name": "Uhlek Scout Hull",
 			"albedo": [
-				0.17,
-				0.11,
-				0.19
-			],
-			"specular": [
-				0.3,
-				0.25,
-				0.32
-			],
-			"smoothness": 0.6,
-			"emissive": [
-				0.0,
-				0.0,
-				0.0
-			],
-			"folder": "Assets/Game Objects/Ships/Uhlek"
-		},
-		{
-			"name": "Uhlek Trim",
-			"albedo": [
-				0.08,
-				0.05,
-				0.09
-			],
-			"specular": [
-				0.2,
-				0.18,
-				0.22
-			],
-			"smoothness": 0.45,
-			"emissive": [
-				0.0,
-				0.0,
-				0.0
-			],
-			"folder": "Assets/Game Objects/Ships/Uhlek"
-		},
-		{
-			"name": "Uhlek Light",
-			"albedo": [
-				0.12,
-				0.2,
-				0.5
-			],
-			"specular": [
-				0.5,
-				0.5,
-				0.5
-			],
-			"smoothness": 0.8,
-			"emissive": [
-				0.3,
-				0.5,
+				1.0,
+				1.0,
 				1.0
 			],
-			"folder": "Assets/Game Objects/Ships/Uhlek"
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Uhlek",
+			"albedoMap": "Assets/Game Objects/Ships/Uhlek/Textures/Uhlek Scout - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Uhlek/Textures/Uhlek Scout - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Uhlek/Textures/Uhlek Scout - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Uhlek/Textures/Uhlek Scout - Emissive.jpg"
 		},
 		{
-			"name": "Uhlek Engine",
+			"name": "Uhlek Scout Engine",
 			"albedo": [
-				0.4,
-				0.05,
-				0.08
+				1.0,
+				1.0,
+				1.0
 			],
 			"specular": [
-				0.45,
-				0.25,
-				0.25
+				1.0,
+				1.0,
+				1.0
 			],
-			"smoothness": 0.7,
+			"smoothness": 1.0,
 			"emissive": [
-				0.85,
-				0.1,
-				0.25
+				0.9,
+				0.35,
+				0.12
 			],
-			"folder": "Assets/Game Objects/Ships/Uhlek"
+			"folder": "Assets/Game Objects/Ships/Uhlek",
+			"albedoMap": "Assets/Game Objects/Ships/Uhlek/Textures/Uhlek Scout - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Uhlek/Textures/Uhlek Scout - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Uhlek/Textures/Uhlek Scout - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Uhlek/Textures/Uhlek Scout - Emissive.jpg"
+		},
+		{
+			"name": "Uhlek Warship Hull",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Uhlek",
+			"albedoMap": "Assets/Game Objects/Ships/Uhlek/Textures/Uhlek Warship - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Uhlek/Textures/Uhlek Warship - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Uhlek/Textures/Uhlek Warship - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Uhlek/Textures/Uhlek Warship - Emissive.jpg"
+		},
+		{
+			"name": "Uhlek Warship Engine",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.9,
+				0.35,
+				0.12
+			],
+			"folder": "Assets/Game Objects/Ships/Uhlek",
+			"albedoMap": "Assets/Game Objects/Ships/Uhlek/Textures/Uhlek Warship - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Uhlek/Textures/Uhlek Warship - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Uhlek/Textures/Uhlek Warship - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Uhlek/Textures/Uhlek Warship - Emissive.jpg"
 		}
 	]
 }
