@@ -1371,6 +1371,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioFiredOnSilent();
 				break;
 
+			case "starport-tradeclamp":
+				yield return ScenarioStarportTradeClamp();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -30184,18 +30188,18 @@ public class ClaudeProbe : MonoBehaviour
 		var buyHeading = ( heading != null ) ? heading.text : "(none)";
 		var depotBalance = depot.m_currentBalanceText.text;
 
-		// ask for 5000 cubic meters of the first element (titanium, 480 each), more than the balance pays for
+		// with no money left, asking to buy says so at once (a bigger amount than the money pays for is cut to what it pays for, as the original's)
+		var balanceBefore = playerData.m_bank.m_currentBalance;
+
+		playerData.m_bank.m_currentBalance = 0;
+
 		Call( depot, "SwitchToBuyAmountState" );
 
 		yield return Frames( 2 );
 
-		depot.m_amountInputField.text = "5000";
-
-		Call( depot, "OnEndEdit" );
-
-		yield return Frames( 2 );
-
 		var errorText = depot.m_errorMessageText.text;
+
+		playerData.m_bank.m_currentBalance = balanceBefore;
 
 		// the sell list, with something in the hold to sell
 		playerData.m_playerShip.m_artifactStorage.m_artifactList.Clear();
@@ -34485,6 +34489,73 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=firedonsilent checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
+	// an amount typed at the Trade Depot is cut to the most that can be traded, as the original's (TDEPOT-OV WEACC: the typed volume, ABS, ELEM-AM @ MIN): more
+	// than the hold takes buys what the hold takes, and more than the hold has sells all of it
+	IEnumerator ScenarioStarportTradeClamp()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var depot = FindPanel<TradeDepotPanel>();
+		var ship = playerData.m_playerShip;
+
+		// plenty of money, an empty hold with no cargo pods
+		playerData.m_bank.m_currentBalance = 1000000;
+
+		ship.m_elementStorage.m_elementList.Clear();
+		ship.m_artifactStorage.m_artifactList.Clear();
+		ship.m_numCargoPods = 0;
+		ship.RecalculateVolume();
+		ship.RecalculateVolumeUsed();
+
+		var room = ship.GetRemainingVolume();
+
+		// buy 5000 cubic meters of the first element on the list
+		Call( depot, "SwitchToBuyItemState", true );
+
+		yield return Frames( 2 );
+
+		Call( depot, "SwitchToBuyAmountState" );
+
+		yield return Frames( 2 );
+
+		depot.m_amountInputField.text = "5000";
+
+		Call( depot, "OnEndEdit" );
+
+		yield return Frames( 2 );
+
+		var bought = room - ship.GetRemainingVolume();
+		var boughtState = GetField( depot, "m_currentState" ).ToString();
+
+		Call( depot, "SwitchToMenuBarState" );
+
+		yield return Frames( 2 );
+
+		// sell 5000 cubic meters of it
+		Call( depot, "SwitchToSellItemState", true );
+
+		yield return Frames( 2 );
+
+		Call( depot, "SwitchToSellAmountState" );
+
+		yield return Frames( 2 );
+
+		depot.m_amountInputField.text = "5000";
+
+		Call( depot, "OnEndEdit" );
+
+		yield return Frames( 2 );
+
+		var left = room - ship.GetRemainingVolume();
+		var soldState = GetField( depot, "m_currentState" ).ToString();
+
+		Log( "starport-tradeclamp: room " + room + " tenths; 5000 cubic meters asked: " + bought + " tenths bought (" + boughtState + "); 5000 sold: " + left + " tenths left (" + soldState + ")" );
+
+		Check( "starport-tradeclamp: buying more than the hold takes buys what it takes, as the original's", ( room > 0 ) && ( bought == room ), room + " room, " + bought + " bought, " + boughtState );
+		Check( "starport-tradeclamp: selling more than the hold has sells all of it", ( bought > 0 ) && ( left == 0 ), left + " left, " + soldState );
+
+		Finish( "scenario=starport-tradeclamp checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
 	// ---------------------------------------------------------------- batch 1 (starport side)
 
 	struct SellResult
@@ -34626,11 +34697,6 @@ public class ClaudeProbe : MonoBehaviour
 		var value = ElementSaleValue( 5 );
 
 		var baseline = TrySell( tradeDepotPanel, "abc" );
-		var tooMuch = TrySell( tradeDepotPanel, "25" );
-
-		Check( "H4 cannot sell more than the hold contains", ( tooMuch.m_state == "ErrorMessage" ) && ( tooMuch.m_volume == baseline.m_volume ) && ( tooMuch.m_balance == baseline.m_balance ) && ( tooMuch.m_thrown == "none" ),
-			"hold has " + baseline.m_volume + " tenths, typed 25: " + tooMuch );
-
 		var minus = TrySell( tradeDepotPanel, "-" );
 
 		Check( "M3 a lone minus sign is ignored", ( minus.m_thrown == "none" ) && ( minus.m_volume == baseline.m_volume ) && ( minus.m_balance == baseline.m_balance ), "typed '-': " + minus );
@@ -34644,6 +34710,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "M3 a comma works as the decimal point", ( comma.m_thrown == "none" ) && ( comma.m_volume == fraction.m_volume - 55 ) && ( comma.m_balance == fraction.m_balance + value * 55 / 10 ),
 			"typed 5,5: " + comma + " (expected endurium " + ( fraction.m_volume - 55 ) + ")" );
+
+		// more than the hold has sells what it has and no more, as the original cuts a typed amount to the most (TDEPOT-OV WEACC)
+		var tooMuch = TrySell( tradeDepotPanel, "25" );
+
+		Check( "H4 selling more than the hold contains sells what it has, never more", ( tooMuch.m_volume == 0 ) && ( tooMuch.m_balance == comma.m_balance + value * comma.m_volume / 10 ) && ( tooMuch.m_thrown == "none" ),
+			"hold has " + comma.m_volume + " tenths, typed 25: " + tooMuch );
 
 		Call( tradeDepotPanel, "SwitchToMenuBarState" );
 
