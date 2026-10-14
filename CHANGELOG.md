@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+
+- **The Playthrough Could Not Fight On After Loading**: stage 12 fights the Uhlek of encounter 261 and saves the game in the middle of the fight, and stage 13 loads it, fires on them and flies out. Since alien ships fire their laser and missile each (PR 372), stage 12's 55 s took all 1,500 shield points and left the hull at 575 of 1,000, and from there stage 13 failed one way or another: an Uhlek scout's class 5 missile (200 points) landed before the first press of the weapons and the fight loop at once broke the fight off as lost ("0 presses of the weapons", seen on master 58f728fc, and again from the same save), or, given the time to fire, three missiles in 9 s destroyed the ship on the way out. Stage 12 now ends the first part of the fight with the shields down to half, stage 13 breaks off once its weapons have hit and the shields are gone, and the fight loop (`PtFight`, which takes the condition a stage has had enough of the fight at) never breaks off before the weapons have been tried (the aliens hit, or three presses) unless the hull is down to a quarter. Probe only. Checked: from the same stage 11 save, `run-playthrough.ps1 -From 12` passed stages 12 to 21 in three runs of three (42 checks each); stage 12 saved with 715 to 730 shield points and the hull whole, and stage 13 broke off with the hull at 960 or more and came out with about 775.
 
 ### Added
 
