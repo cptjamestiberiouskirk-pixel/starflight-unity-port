@@ -8,20 +8,35 @@ using TMPro;
 // dark theme's colours, so in that theme only the texts' tags are looked at)
 public static class UIKitModeApplier
 {
-	// shows the colour tags of a text in the kit's colours, in every theme but the classic dark one (which shows texts as they are written, as it always has)
+	// shows the colour tags of a text in the kit's colours, in every theme but the classic dark one (which shows texts as they are written, as it always has);
+	// a text drawn over a 3D view takes the colours of the views' theme
 	class TextColours : ITextPreprocessor
 	{
+		readonly bool m_overView;
+
+		public TextColours( bool overView )
+		{
+			m_overView = overView;
+		}
+
 		public string PreprocessText( string text )
 		{
+			if ( m_overView )
+			{
+				return ( UIKitTheme.GetViewTheme() == UIKitTheme.Load( UIKitTheme.Mode.Dark ) ) ? text : UIKitTheme.KitColors( text, true );
+			}
+
 			return UIKitTheme.ShowsTagsAsWritten() ? text : UIKitTheme.KitColors( text );
 		}
 	}
 
-	// the one preprocessor every text shares
-	static readonly TextColours s_textColours = new TextColours();
+	// the preprocessor every text shares, and the one of the texts drawn over a 3D view
+	static readonly TextColours s_textColours = new TextColours( false );
+	static readonly TextColours s_viewTextColours = new TextColours( true );
 
-	// the theme the loaded scenes are in
+	// the theme the loaded scenes are in, and the theme of what they draw over the 3D views
 	static UIKitTheme s_appliedTheme;
+	static UIKitTheme s_appliedViewTheme;
 
 	// the role of each colour copied into a scene, and the buttons tinted by the kit's tool, found the first time they were given another theme's colours
 	static readonly System.Collections.Generic.Dictionary<Graphic, UIKitTheme.ColorRole> s_graphicRoles = new System.Collections.Generic.Dictionary<Graphic, UIKitTheme.ColorRole>();
@@ -41,6 +56,7 @@ public static class UIKitModeApplier
 		UIKitTheme.Changed += ThemeChanged;
 
 		s_appliedTheme = UIKitTheme.Get();
+		s_appliedViewTheme = UIKitTheme.GetViewTheme();
 	}
 
 	// leaves this graphic's colour alone when the theme changes (it shows a colour of its own)
@@ -153,8 +169,10 @@ public static class UIKitModeApplier
 	static void ThemeChanged()
 	{
 		var from = ( s_appliedTheme != null ) ? s_appliedTheme : UIKitTheme.Load( UIKitTheme.Mode.Dark );
+		var fromView = ( s_appliedViewTheme != null ) ? s_appliedViewTheme : UIKitTheme.Load( UIKitTheme.Mode.Dark );
 
 		s_appliedTheme = UIKitTheme.Get();
+		s_appliedViewTheme = UIKitTheme.GetViewTheme();
 
 		for ( var i = 0; i < SceneManager.sceneCount; i++ )
 		{
@@ -162,12 +180,12 @@ public static class UIKitModeApplier
 
 			if ( scene.isLoaded )
 			{
-				Apply( scene, from );
+				Apply( scene, from, fromView );
 			}
 		}
 
 		// the scene that is never unloaded is not in the scene manager's list
-		Apply( GetDontDestroyOnLoadScene(), from );
+		Apply( GetDontDestroyOnLoadScene(), from, fromView );
 	}
 
 	// an object kept in the scene that is never unloaded, to find that scene by
@@ -187,17 +205,24 @@ public static class UIKitModeApplier
 		return s_dontDestroyOnLoadMarker.scene;
 	}
 
-	// gives a scene the look of the theme in use, from the colours of the theme it is in now
-	public static void Apply( Scene scene, UIKitTheme from )
+	// gives a scene the look of the theme in use, from the colours of the theme it is in now (and what it draws over the 3D views the look of the views'
+	// theme, from the colours of the views' theme before; the same as the other unless said)
+	public static void Apply( Scene scene, UIKitTheme from, UIKitTheme fromView = null )
 	{
 		var to = UIKitTheme.Get();
+		var toView = UIKitTheme.GetViewTheme();
 
-		if ( ( to == null ) || !scene.IsValid() )
+		if ( ( to == null ) || ( toView == null ) || !scene.IsValid() )
 		{
 			return;
 		}
 
-		var recolour = ( from != null ) && ( from != to );
+		if ( fromView == null )
+		{
+			fromView = from;
+		}
+
+		var recolour = ( ( from != null ) && ( from != to ) ) || ( ( fromView != null ) && ( fromView != toView ) );
 
 		// the colours the scenes are saved in: an object made after its scene was given another theme's colours (a row of a list, from its prefab) still has them
 		var saved = UIKitTheme.Load( UIKitTheme.Mode.Dark );
@@ -231,7 +256,14 @@ public static class UIKitModeApplier
 				// the buttons' tints (UIKitSceneTool.TintButton)
 				foreach ( var selectable in rootObject.GetComponentsInChildren<Selectable>( true ) )
 				{
-					Retint( selectable, from, to, saved );
+					if ( UIKitTheme.IsOverView( selectable ) )
+					{
+						Retint( selectable, fromView, toView, saved );
+					}
+					else
+					{
+						Retint( selectable, from, to, saved );
+					}
 				}
 
 				// the colours copied into the scene (an element with a UIKitStyle that sets its colour does it itself)
@@ -248,12 +280,17 @@ public static class UIKitModeApplier
 						continue;
 					}
 
+					// a graphic over a 3D view goes from and to the views' theme
+					var overView = UIKitTheme.IsOverView( graphic );
+					var graphicFrom = overView ? fromView : from;
+					var graphicTo = overView ? toView : to;
+
 					// the role is found once, in the colours it was given (the light mode gives several roles one colour, so its colours cannot tell them apart)
 					if ( !s_graphicRoles.TryGetValue( graphic, out var role ) )
 					{
-						role = UIKitTheme.FindRole( from, graphic.color );
+						role = UIKitTheme.FindRole( graphicFrom, graphic.color );
 
-						if ( ( role == UIKitTheme.ColorRole.Keep ) && ( saved != from ) )
+						if ( ( role == UIKitTheme.ColorRole.Keep ) && ( saved != graphicFrom ) )
 						{
 							role = UIKitTheme.FindRole( saved, graphic.color );
 						}
@@ -266,7 +303,7 @@ public static class UIKitModeApplier
 
 					if ( role != UIKitTheme.ColorRole.Keep )
 					{
-						var color = to.GetColor( role );
+						var color = graphicTo.GetColor( role );
 
 						color.a = graphic.color.a;
 
@@ -278,9 +315,9 @@ public static class UIKitModeApplier
 			// the texts' colour tags, and the texts shown again with them
 			foreach ( var text in rootObject.GetComponentsInChildren<TMP_Text>( true ) )
 			{
-				if ( ( text.textPreprocessor == null ) || ( text.textPreprocessor == s_textColours ) )
+				if ( ( text.textPreprocessor == null ) || ( text.textPreprocessor == s_textColours ) || ( text.textPreprocessor == s_viewTextColours ) )
 				{
-					text.textPreprocessor = s_textColours;
+					text.textPreprocessor = UIKitTheme.IsOverView( text ) ? s_viewTextColours : s_textColours;
 
 					if ( text.isActiveAndEnabled )
 					{

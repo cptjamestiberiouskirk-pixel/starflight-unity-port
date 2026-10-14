@@ -1280,6 +1280,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarmapColors();
 				break;
 
+			case "viewoverlays":
+				yield return ScenarioViewOverlays();
+				break;
+
 			case "sensorlines":
 				yield return ScenarioSensorLines();
 				break;
@@ -30787,7 +30791,9 @@ public class ClaudeProbe : MonoBehaviour
 		{
 			if ( name == "Starmap - Background" )
 			{
-				return ( backgroundImages.Count > 0 ) ? backgroundImages[ 0 ].material.GetColor( "SF_AlbedoColor" ) : (Color?) null;
+				var starmapBackground = backgroundImages.Find( image => image.transform.IsChildOf( starmap.transform ) );
+
+				return ( starmapBackground != null ) ? starmapBackground.material.GetColor( "SF_AlbedoColor" ) : (Color?) null;
 			}
 
 			foreach ( var starmapRenderer in starmap.GetComponentsInChildren<Renderer>( true ) )
@@ -30885,23 +30891,174 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "starmapcolors: the starmap's material assets are left as they are", assetColours == "392D3F/82147F", assetColours );
 
-		// the classic dark theme again, and every background image in it
+		// the classic dark theme again, and every background image in it, the ship's log's too once it is open
 		UIKitTheme.SetScheme( 0, false );
 		UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+		starmap.Hide();
+		controller.m_shipsLog.Show( new List<PD_ShipsLog.Entry>() );
 
 		yield return Frames( 3 );
 
 		var everyBackground = ( backgroundImages.Count > 0 ) && backgroundImages.TrueForAll( image => ColorUtility.ToHtmlStringRGB( image.material.GetColor( "SF_AlbedoColor" ) ) == ColorUtility.ToHtmlStringRGB( UIKitTheme.LoadScheme( 0, UIKitTheme.Mode.Dark ).m_backgroundPanel ) );
 
-		Check( "starmapcolors: every image drawn with the starmap's background material (" + backgroundImages.Count + ") takes the scheme's colour", everyBackground, backgroundImages.Count.ToString() );
+		Check( "starmapcolors: every image drawn with the starmap's background material (" + backgroundImages.Count + ": the starmap's and, once it is open, the ship's log's) takes the scheme's colour", everyBackground, backgroundImages.Count.ToString() );
 
-		starmap.Hide();
+		controller.m_shipsLog.Hide();
 
 		yield return Frames( 3 );
 
 		Log( "starmapcolors: " + pictures.Count + " pictures" + ( ( folder != "" ) ? " in " + folder : "" ) );
 
 		Finish( "scenario=starmapcolors checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// what is drawn over the 3D views keeps the dark colours of the scheme in use in the light mode too (the light mode's dark accents and texts were hard
+	// to read on space): the viewport frame's location name, status and corner bars and the ship's log take the views' theme (the scheme's dark one), while a
+	// text of the console beside the view keeps the light theme's colour (a control); the views follow the scheme when another is picked in the light mode
+	IEnumerator ScenarioViewOverlays()
+	{
+		var controller = SpaceflightController.m_instance;
+		var folder = ScreenPictureFolder( "view-overlays" );
+		var pictures = new List<string>();
+
+		controller.m_encounterRange = 0.0f;
+
+		yield return Frames( 30 );
+
+		// the viewport fades in for about 5 s after the ship enters a system, and hides what it draws until then
+		yield return new WaitForSecondsRealtime( 6.0f );
+
+		var frame = UnityEngine.Object.FindFirstObjectByType<ViewportFrame>();
+		var frameStyles = ( frame != null ) ? new List<UIKitStyle>( frame.GetComponentsInChildren<UIKitStyle>( true ) ) : new List<UIKitStyle>();
+
+		// a text of the console with the primary text colour, outside the main viewport
+		UIKitStyle consoleText = null;
+
+		foreach ( var style in UnityEngine.Object.FindObjectsByType<UIKitStyle>( FindObjectsInactive.Exclude, FindObjectsSortMode.None ) )
+		{
+			if ( ( style.m_color == UIKitTheme.ColorRole.TextPrimary ) && style.TryGetComponent<TMPro.TMP_Text>( out _ ) && ( style.gameObject.scene.name == "Spaceflight" ) && ( style.GetComponentInParent<Viewport>( true ) == null ) )
+			{
+				consoleText = style;
+				break;
+			}
+		}
+
+		Action<string> take = name =>
+		{
+			if ( folder != "" )
+			{
+				RenderScreenPicture( System.IO.Path.Combine( folder, ( pictures.Count + 1 ).ToString( "00" ) + "_" + name + ".png" ) );
+				pictures.Add( name );
+			}
+		};
+
+		// the colours the frame's elements and the ship's log show, against the colours of their roles in a theme
+		Func<IEnumerable<UIKitStyle>, UIKitTheme, string> differences = ( styles, theme ) =>
+		{
+			var list = new List<string>();
+
+			foreach ( var style in styles )
+			{
+				if ( ( style.m_color == UIKitTheme.ColorRole.Keep ) || !style.TryGetComponent<UnityEngine.UI.Graphic>( out var graphic ) || !style.isActiveAndEnabled )
+				{
+					continue;
+				}
+
+				if ( ColorUtility.ToHtmlStringRGB( graphic.color ) != ColorUtility.ToHtmlStringRGB( theme.GetColor( style.m_color ) ) )
+				{
+					list.Add( style.name + " " + style.m_color + " " + ColorUtility.ToHtmlStringRGB( graphic.color ) );
+				}
+			}
+
+			return string.Join( " | ", list );
+		};
+
+		// ---- the classic scheme in the light mode, in a star system, with the ship's log open
+		UIKitTheme.SetMode( UIKitTheme.Mode.Light, false );
+
+		var darkTheme = UIKitTheme.Load( UIKitTheme.Mode.Dark );
+		var lightTheme = UIKitTheme.Load( UIKitTheme.Mode.Light );
+
+		yield return Frames( 5 );
+
+		var frameDifferences = differences( frameStyles, darkTheme );
+		var frameChecked = 0;
+
+		foreach ( var style in frameStyles )
+		{
+			if ( ( style.m_color != UIKitTheme.ColorRole.Keep ) && style.isActiveAndEnabled )
+			{
+				frameChecked++;
+			}
+		}
+
+		take( "light_star_system" );
+
+		controller.m_shipsLog.Show( new List<PD_ShipsLog.Entry>() );
+
+		yield return Frames( 5 );
+
+		var logStyles = new List<UIKitStyle>( controller.m_shipsLog.GetComponentsInChildren<UIKitStyle>( false ) );
+		var logDifferences = differences( logStyles, darkTheme );
+
+		// the log's background (drawn with the starmap's background material; the starmap has not been opened)
+		var logBackground = "none";
+
+		foreach ( var image in controller.m_shipsLog.GetComponentsInChildren<UnityEngine.UI.Image>( true ) )
+		{
+			if ( ( image.material != null ) && image.material.name.StartsWith( "Starmap - Background" ) )
+			{
+				logBackground = ColorUtility.ToHtmlStringRGB( image.material.GetColor( "SF_AlbedoColor" ) );
+			}
+		}
+
+		take( "light_ships_log" );
+
+		controller.m_shipsLog.Hide();
+
+		var consoleColour = ( consoleText != null ) ? ColorUtility.ToHtmlStringRGB( consoleText.GetComponent<TMPro.TMP_Text>().color ) : "none";
+
+		Log( "viewoverlays: frame elements " + frameChecked + " differences [" + frameDifferences + "] | ship's log elements " + logStyles.Count + " differences [" + logDifferences + "] | console text " + ( ( consoleText != null ) ? consoleText.name : "none" ) + " " + consoleColour );
+
+		Check( "viewoverlays: in the light mode the viewport frame's location, status and bars keep the scheme's dark colours", ( frameChecked > 0 ) && ( frameDifferences == "" ), frameChecked + " / " + frameDifferences );
+		Check( "viewoverlays: in the light mode the ship's log, drawn over the main view, keeps the scheme's dark colours", ( logStyles.Count > 0 ) && ( logDifferences == "" ), logStyles.Count + " / " + logDifferences );
+		Check( "viewoverlays: the ship's log, opened before the starmap ever was, is drawn on the scheme's dark panel colour (it was the starmap's purple)", logBackground == ColorUtility.ToHtmlStringRGB( darkTheme.m_backgroundPanel ), logBackground );
+		Check( "viewoverlays: a text of the console beside the view takes the light mode's colour (a control)", consoleColour == ColorUtility.ToHtmlStringRGB( lightTheme.m_textPrimary ), consoleColour );
+
+		// the terrain scan's count of lifeforms was written in a pink of its own, which no theme gave its colour
+		var lifeformLine = UIKitTheme.KitColors( "<color=#FF80FF>Lifeform: 1</color>" );
+
+		Check( "viewoverlays: the terrain scan's count of lifeforms is shown in the kit's alert colour (it was pink)", lifeformLine.Contains( ColorUtility.ToHtmlStringRGB( lightTheme.m_textAlert ) ), lifeformLine );
+
+		// ---- another scheme picked in the light mode: the views take its dark colours (looked up so that a tree without the schemes compiles)
+		var setScheme = typeof( UIKitTheme ).GetMethod( "SetScheme" );
+		var loadScheme = typeof( UIKitTheme ).GetMethod( "LoadScheme" );
+
+		if ( ( setScheme != null ) && ( loadScheme != null ) )
+		{
+			setScheme.Invoke( null, new object[] { 3, false } );
+
+			yield return Frames( 5 );
+
+			var schemeDark = loadScheme.Invoke( null, new object[] { 3, UIKitTheme.Mode.Dark } ) as UIKitTheme;
+			var schemeDifferences = differences( frameStyles, schemeDark );
+
+			take( "light_scheme_3" );
+
+			Check( "viewoverlays: another scheme picked in the light mode gives the views its dark colours", ( schemeDark != null ) && ( schemeDifferences == "" ), schemeDifferences );
+
+			setScheme.Invoke( null, new object[] { 0, false } );
+		}
+
+		// the classic dark theme again
+		UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+		yield return Frames( 3 );
+
+		Log( "viewoverlays: " + pictures.Count + " pictures" + ( ( folder != "" ) ? " in " + folder : "" ) );
+
+		Finish( "scenario=viewoverlays checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	IEnumerator ScenarioSensorLines()
