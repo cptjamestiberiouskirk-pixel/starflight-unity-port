@@ -147,6 +147,9 @@ public class ButtonController : MonoBehaviour
 		// the rows as the kit's sci-fi buttons
 		MakeRowButtons();
 
+		// the bullets in the colours of the theme in use
+		UseThemeBullets();
+
 		ShowButtonStates( m_currentButton != null );
 	}
 
@@ -624,12 +627,36 @@ public class ButtonController : MonoBehaviour
 		UIKitTheme.Changed -= ModeChanged;
 	}
 
-	// the kit's mode changed: show the buttons' states in its colours
+	// the kit's scheme or mode changed: show the buttons' states in its colours
 	void ModeChanged()
 	{
+		UseThemeBullets();
+
 		if ( m_buttonImageList != null )
 		{
 			ShowButtonStates( m_currentButton != null );
+		}
+	}
+
+	// takes the bullets of the kit's theme in use (the scene has the classic dark theme's)
+	void UseThemeBullets()
+	{
+		var theme = UIKitTheme.Get();
+
+		if ( theme == null )
+		{
+			return;
+		}
+
+		var offSprite = theme.GetBullet( UIKitTheme.Bullet.Off );
+		var onSprite = theme.GetBullet( UIKitTheme.Bullet.On );
+		var activeSprite = theme.GetBullet( UIKitTheme.Bullet.Active );
+
+		if ( ( offSprite != null ) && ( onSprite != null ) && ( activeSprite != null ) )
+		{
+			m_buttonOffSprite = offSprite;
+			m_buttonOnSprite = onSprite;
+			m_buttonActiveSprite = activeSprite;
 		}
 	}
 
