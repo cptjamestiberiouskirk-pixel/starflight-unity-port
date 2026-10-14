@@ -1,0 +1,26 @@
+{
+	"race": "Arth",
+	"textureSize": 1024,
+	"glow": {
+		"hue": [170, 250],
+		"saturation": 0.4,
+		"value": 0.42
+	},
+	"hull": {
+		"glb": "arth-hull-10k.glb",
+		"meshy": {
+			"concept": "01a137c5-9495-7405-8bd6-4d117d20ba3d",
+			"conceptEdit": "01a137c6-dbf3-747e-bd2d-9ec3705fdc22",
+			"model": "01a137c9-920c-74ff-8254-c6530875860b",
+			"remesh": "01a137ca-d637-720f-b8d5-78e627c034ad"
+		}
+	},
+	"parts": {
+		"glb": "arth-parts-6k.glb",
+		"meshy": {
+			"concept": "01a137c9-9229-75ff-bef9-6105d1049105",
+			"model": "01a137cc-81e7-7230-a807-49de1d0bf4ad",
+			"remesh": "01a137cd-c570-72ff-9581-12ea881c4893"
+		}
+	}
+}

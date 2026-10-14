@@ -70,8 +70,11 @@ public class MoveButton : ShipButton
 
 			shipCoordinates = SpaceflightController.m_instance.m_disembarked.ApplyElevation( shipCoordinates, false );
 
-			// calculate vector from TV to ship coordinates
+			// calculate vector from TV to ship coordinates, along the ground: the vehicle's saved place is flat (the ground's height is only drawn) while the
+			// ship's has the ground's height, so measured with the height a ship on raised ground was never near enough to go back in
 			var vectorToShip = shipCoordinates - playerData.m_general.m_lastDisembarkedCoordinates;
+
+			vectorToShip.y = 0.0f;
 
 			// how far is it in kilometers?
 			var distanceInKm = vectorToShip.magnitude * 225.0f / 2048.0f - 2.0f;
@@ -131,6 +134,20 @@ public class MoveButton : ShipButton
 
 					// stop playing the diesel engine sound
 					SoundController.m_instance.StopSound( SoundController.Sound.DieselEngine );
+
+					// the original's (MOVE-OV): the crew leave the vehicle's cargo where it stopped and walk back to the ship, where the vehicle is
+					// refuelled - so no crew is stranded on a planet with an empty tank
+					var dropped = TVCargoButton.DropAllCargo();
+
+					SpaceflightController.m_instance.m_messages.Clear();
+					SpaceflightController.m_instance.m_messages.AddText( "<color=red>Out of fuel.</color>\n<color=white>Returning to ship on foot.</color>" + ( ( dropped > 0 ) ? "\n<color=yellow>The cargo is left where the vehicle stopped.</color>" : "" ) );
+
+					// the walk back: the map fades, and the crew are in the ship
+					SpaceflightController.m_instance.m_planetside.UpdateTerrainGridNow();
+					SpaceflightController.m_instance.m_viewport.StartFade( 0.0f, 2.0f );
+
+					m_nextLocation = PD_General.Location.Planetside;
+					m_isTransitioning = true;
 
 					// remove the "active" dot from the current button
 					SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();

@@ -9,11 +9,14 @@
 			"model": "Assets/Game Objects/Ships/Thrynn/Thrynn Transport.fbx",
 			"debris": "Assets/Game Objects/Ships Debris/Thrynn/Thrynn Transport.fbx",
 			"materials": [
-				"Thrynn Hull",
-				"Thrynn Light",
-				"Thrynn Trim",
-				"Thrynn Engine"
-			]
+				"Thrynn Transport Hull",
+				"Thrynn Transport Engine"
+			],
+			"meshy": {
+				"concept": "01a1373c-9b86-7208-88be-7d6e8e6aa641",
+				"model": "01a1373e-3c43-74b8-9ffc-203a8089d1c9",
+				"remesh": "01a13740-557b-745f-bec8-435c76ee0657"
+			}
 		},
 		{
 			"id": 9,
@@ -23,11 +26,14 @@
 			"model": "Assets/Game Objects/Ships/Thrynn/Thrynn Scout.fbx",
 			"debris": "Assets/Game Objects/Ships Debris/Thrynn/Thrynn Scout.fbx",
 			"materials": [
-				"Thrynn Hull",
-				"Thrynn Light",
-				"Thrynn Trim",
-				"Thrynn Engine"
-			]
+				"Thrynn Scout Hull",
+				"Thrynn Scout Engine"
+			],
+			"meshy": {
+				"concept": "01a13744-00db-75b6-9e14-9c5cb037139f",
+				"model": "01a1374d-be27-7515-8200-9f379bd0467e",
+				"remesh": "01a1374f-9f04-7486-92f1-2304c17d5716"
+			}
 		},
 		{
 			"id": 10,
@@ -37,93 +43,160 @@
 			"model": "Assets/Game Objects/Ships/Thrynn/Thrynn Warship.fbx",
 			"debris": "Assets/Game Objects/Ships Debris/Thrynn/Thrynn Warship.fbx",
 			"materials": [
-				"Thrynn Hull",
-				"Thrynn Light",
-				"Thrynn Trim",
-				"Thrynn Engine"
-			]
+				"Thrynn Warship Hull",
+				"Thrynn Warship Engine"
+			],
+			"meshy": {
+				"concept": "01a1372f-23a1-73c6-bbad-ee45d296758d",
+				"model": "01a13732-6056-76a9-8a30-3ba665a336bc",
+				"remesh": "01a13737-0436-75eb-bf4b-bd1f00aec131"
+			}
 		}
 	],
 	"materials": [
 		{
-			"name": "Thrynn Hull",
+			"name": "Thrynn Transport Hull",
 			"albedo": [
-				0.26,
-				0.31,
-				0.25
+				1.0,
+				1.0,
+				1.0
 			],
 			"specular": [
-				0.3,
-				0.32,
-				0.3
+				1.0,
+				1.0,
+				1.0
 			],
-			"smoothness": 0.5,
+			"smoothness": 1.0,
 			"emissive": [
 				0.0,
 				0.0,
 				0.0
 			],
-			"folder": "Assets/Game Objects/Ships/Thrynn"
+			"folder": "Assets/Game Objects/Ships/Thrynn",
+			"albedoMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Transport - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Transport - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Transport - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Transport - Emissive.jpg"
 		},
 		{
-			"name": "Thrynn Light",
+			"name": "Thrynn Transport Engine",
 			"albedo": [
-				0.1,
-				0.3,
-				0.4
+				1.0,
+				1.0,
+				1.0
 			],
 			"specular": [
-				0.5,
-				0.5,
-				0.5
+				1.0,
+				1.0,
+				1.0
 			],
-			"smoothness": 0.8,
+			"smoothness": 1.0,
 			"emissive": [
-				0.2,
-				0.75,
-				0.9
-			],
-			"folder": "Assets/Game Objects/Ships/Thrynn"
-		},
-		{
-			"name": "Thrynn Trim",
-			"albedo": [
-				0.12,
-				0.13,
+				0.9,
+				0.35,
 				0.12
 			],
-			"specular": [
-				0.2,
-				0.2,
-				0.2
+			"folder": "Assets/Game Objects/Ships/Thrynn",
+			"albedoMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Transport - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Transport - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Transport - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Transport - Emissive.jpg"
+		},
+		{
+			"name": "Thrynn Scout Hull",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
 			],
-			"smoothness": 0.4,
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
 			"emissive": [
 				0.0,
 				0.0,
 				0.0
 			],
-			"folder": "Assets/Game Objects/Ships/Thrynn"
+			"folder": "Assets/Game Objects/Ships/Thrynn",
+			"albedoMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Scout - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Scout - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Scout - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Scout - Emissive.jpg"
 		},
 		{
-			"name": "Thrynn Engine",
+			"name": "Thrynn Scout Engine",
 			"albedo": [
-				0.35,
-				0.06,
-				0.03
+				1.0,
+				1.0,
+				1.0
 			],
 			"specular": [
-				0.4,
-				0.2,
-				0.2
+				1.0,
+				1.0,
+				1.0
 			],
-			"smoothness": 0.6,
+			"smoothness": 1.0,
 			"emissive": [
-				0.6,
-				0.14,
-				0.05
+				0.9,
+				0.35,
+				0.12
 			],
-			"folder": "Assets/Game Objects/Ships/Thrynn"
+			"folder": "Assets/Game Objects/Ships/Thrynn",
+			"albedoMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Scout - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Scout - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Scout - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Scout - Emissive.jpg"
+		},
+		{
+			"name": "Thrynn Warship Hull",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Thrynn",
+			"albedoMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Warship - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Warship - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Warship - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Warship - Emissive.jpg"
+		},
+		{
+			"name": "Thrynn Warship Engine",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.9,
+				0.35,
+				0.12
+			],
+			"folder": "Assets/Game Objects/Ships/Thrynn",
+			"albedoMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Warship - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Warship - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Warship - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Thrynn/Textures/Thrynn Warship - Emissive.jpg"
 		}
 	]
 }

@@ -57,9 +57,6 @@ public class SpaceflightController : MonoBehaviour
 	// remember whether or not we have faded in the scene already
 	bool m_alreadyFadedIn;
 
-	// the encounters in orbit that have let the ship into orbit (a veloxi drone that was answered correctly) - this lasts until the ship leaves the star system, and is not saved
-	readonly System.Collections.Generic.List<int> m_orbitPermissions = new System.Collections.Generic.List<int>();
-
 	// static instance to this spaceflight controller
 	public static SpaceflightController m_instance;
 
@@ -333,7 +330,7 @@ public class SpaceflightController : MonoBehaviour
 		// leaving the star system ends every permission to orbit that was granted in it
 		if ( newLocation == PD_General.Location.Hyperspace )
 		{
-			m_orbitPermissions.Clear();
+			playerData.m_general.GetOrbitPermissions().Clear();
 		}
 
 		// a ship in the star system or in hyperspace has left any orbit, and the next planet's landing site starts at LAT 0 LONG 0: the original's DEPART sets PLHI to
@@ -648,16 +645,18 @@ public class SpaceflightController : MonoBehaviour
 	// call this when an encounter in orbit lets the ship into orbit (a veloxi drone that was answered correctly) - it does not begin again until the ship leaves the star system
 	public void GrantOrbitPermission( int encounterId )
 	{
-		if ( !m_orbitPermissions.Contains( encounterId ) )
+		var permissions = DataController.m_instance.m_playerData.m_general.GetOrbitPermissions();
+
+		if ( !permissions.Contains( encounterId ) )
 		{
-			m_orbitPermissions.Add( encounterId );
+			permissions.Add( encounterId );
 		}
 	}
 
-	// returns true if this encounter in orbit has let the ship into orbit during this visit to the star system
+	// returns true if this encounter in orbit has let the ship into orbit during this visit to the star system (kept in the save)
 	public bool HasOrbitPermission( int encounterId )
 	{
-		return m_orbitPermissions.Contains( encounterId );
+		return DataController.m_instance.m_playerData.m_general.GetOrbitPermissions().Contains( encounterId );
 	}
 
 	// begins the encounter that waits in orbit around the planet the ship is orbiting, if there is one with living ships (the in orbit location calls this once every time the ship goes into orbit)
