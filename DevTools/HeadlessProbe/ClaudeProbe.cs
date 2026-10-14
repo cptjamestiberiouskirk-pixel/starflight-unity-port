@@ -31133,26 +31133,32 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "playthrough: before Enter: running " + ( ( current == null ) ? "nothing" : current.GetType().Name ) + ", the Move button's distance to the ship " + kmToShip.ToString( "F2" ) + " km (last disembarked coordinates " + playerData.m_general.m_lastDisembarkedCoordinates + ", vehicle " + controller.m_terrainVehicle.transform.position + ", ship " + shipPlace() + "), activating " + GetField( controller.m_buttonController, "m_activatingButton" ) );
 
-		// the game's bug: the Move button measures to the ship in three dimensions, from the vehicle's saved place (which has no height since PR 207) to the
-		// ship on the ground, so on high ground the vehicle is never close enough to go in. The workaround gives the saved place the ship's height, so that the
-		// real Move button and its Enter can be used
-		var flatKm = new Vector3( shipPlace().x - playerData.m_general.m_lastDisembarkedCoordinates.x, 0.0f, shipPlace().z - playerData.m_general.m_lastDisembarkedCoordinates.z ).magnitude * 225.0f / 2048.0f - 0.5f;
+		// Move stopped on the ship's cell takes the vehicle in (going in fades for 2 s first)
+		var flatKm = new Vector3( shipPlace().x - playerData.m_general.m_lastDisembarkedCoordinates.x, 0.0f, shipPlace().z - playerData.m_general.m_lastDisembarkedCoordinates.z ).magnitude * 225.0f / 2048.0f;
 
-		s_ptMoveDistanceBug = ( kmToShip > 0.0f ) && ( flatKm <= 0.0f );
+		yield return Tap( Key.Enter );
+		yield return WaitForLocation( PD_General.Location.Planetside, 5.0f );
+
+		// the game's old bug (fixed by PR 339): the Move button measured to the ship in three dimensions, from the vehicle's saved place (which has no height) to
+		// the ship on the ground, so on high ground the vehicle was never close enough to go in. Seen when the vehicle is on the ship's cell and stays out; the
+		// workaround gives the saved place the ship's height, and Move and Enter again
+		s_ptMoveDistanceBug = ( playerData.m_general.m_location == PD_General.Location.Disembarked ) && ( flatKm <= 0.5f );
 
 		if ( s_ptMoveDistanceBug )
 		{
-			Log( "playthrough: GAME BUG the vehicle is " + ( flatKm + 0.5f ).ToString( "F2" ) + " km from the ship along the ground but the Move button counts " + ( kmToShip + 0.5f ).ToString( "F2" ) + " km with the height; WORKAROUND the saved place is given the ship's height" );
+			Log( "playthrough: GAME BUG the vehicle is " + flatKm.ToString( "F2" ) + " km from the ship along the ground and Move and Enter left it outside; WORKAROUND the saved place is given the ship's height" );
 
 			var coordinates = playerData.m_general.m_lastDisembarkedCoordinates;
 
 			coordinates.y = shipPlace().y;
 
 			playerData.m_general.m_lastDisembarkedCoordinates = coordinates;
+
+			yield return PtPress( "Move" );
+			yield return Tap( Key.Enter );
+			yield return WaitForLocation( PD_General.Location.Planetside, 10.0f );
 		}
 
-		yield return Tap( Key.Enter );
-		yield return WaitForLocation( PD_General.Location.Planetside, 10.0f );
 		yield return Frames( 20 );
 
 		done[ 0 ] = playerData.m_general.m_location == PD_General.Location.Planetside;
