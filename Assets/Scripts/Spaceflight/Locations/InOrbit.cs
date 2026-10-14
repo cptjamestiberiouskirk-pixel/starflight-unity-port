@@ -66,11 +66,15 @@ public class InOrbit : MonoBehaviour
 		}
 
 		// the Crystal Cone reports the control nexus of the Crystal Planet once the ship is in orbit around it (not while the launch from the surface is still bringing it up)
+		// (not while a Black Egg counts down in this star system: its numbers follow its first line, and the planet is about to go)
 		if ( m_reportNexus && !SpaceflightController.m_instance.m_playerCamera.IsLaunchingOrLanding() )
 		{
 			m_reportNexus = false;
 
-			CrystalCone.ReportNexus();
+			if ( !BlackEgg.IsArmedEggInStarSystem( DataController.m_instance.m_playerData.m_general.m_currentStarId ) )
+			{
+				CrystalCone.ReportNexus();
+			}
 		}
 
 		// the field of the Crystal Planet damages a ship that orbits it without the Crystal Orb
