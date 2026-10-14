@@ -1,5 +1,7 @@
 <?php
 
+require __DIR__ . '/admin-session.php';
+
 class Planet
 {
 	public $index;
@@ -67,7 +69,9 @@ foreach ( $planetList as $planet )
 }
 
 $viewList = filter_input( INPUT_GET, 'viewList', FILTER_VALIDATE_BOOLEAN ) ?? false;
-$remove = filter_input( INPUT_GET, 'remove', FILTER_VALIDATE_INT ) ?? false;
+$showLogin = filter_input( INPUT_GET, 'login', FILTER_VALIDATE_BOOLEAN ) ?? false;
+$action = filter_input( INPUT_POST, 'action' ) ?? '';
+$remove = filter_input( INPUT_POST, 'remove', FILTER_VALIDATE_INT ) ?? false;
 $submit = filter_input( INPUT_POST, 'submit', FILTER_VALIDATE_BOOLEAN ) ?? false;
 
 $yourName = '';
@@ -191,11 +195,43 @@ if ( $submit )
 	}
 }
 
-$admin = ( $_SERVER[ "REMOTE_ADDR" ] == '72.208.133.228' );
+// the admin's actions (log in, log out, remove a screenshot) are POSTs that carry the session's token
+AdminStartSession( $action === 'login' );
 
-if ( $admin )
+$adminMessages = [];
+
+if ( $action !== '' )
 {
-	if ( $remove !== false )
+	if ( !AdminTokenIsValid() )
+	{
+		$adminMessages[] = 'The form has expired. Please try again.';
+		
+		$showLogin = ( $action === 'login' );
+	}
+	else if ( $action === 'login' )
+	{
+		$password = filter_input( INPUT_POST, 'password' );
+		
+		if ( is_string( $password ) && AdminLogIn( $password ) )
+		{
+			header( 'Location: index.php?viewList=1' );
+			
+			exit;
+		}
+		
+		$adminMessages[] = ( AdminPasswordHash() === null ) ? 'The admin login is not set up: see admin-config.example.php.' : 'Wrong password.';
+		
+		$showLogin = true;
+	}
+	else if ( $action === 'logout' )
+	{
+		AdminLogOut();
+		
+		header( 'Location: index.php' );
+		
+		exit;
+	}
+	else if ( ( $action === 'remove' ) && AdminIsLoggedIn() && ( $remove !== false ) )
 	{
 		foreach ( $planetList as $planet )
 		{
@@ -211,8 +247,17 @@ if ( $admin )
 				break;
 			}
 		}
+		
+		header( 'Location: index.php?viewList=1' );
+		
+		exit;
 	}
 }
+
+$admin = AdminIsLoggedIn();
+
+// the admin forms carry the session's token, and the session has to start before the page is written
+$token = ( $showLogin || $admin ) ? htmlspecialchars( AdminToken() ) : '';
 
 ?>
 <!doctype html>
@@ -232,7 +277,33 @@ if ( $admin )
 			<p>The goal of this project is to collect all of the texture maps for planets to be used in the
 				<a href="http://bravearmy.com/starflight/">Starflight 1 Remake Project</a>.
 			</p>
-			<?php if ( $viewList ) { ?>
+			<?php if ( !empty( $adminMessages ) ) { ?>
+				<div class="alert alert-danger">
+					<?php echo implode( '<br>', $adminMessages ); ?>
+				</div>
+			<?php } ?>
+			<?php if ( $admin ) { ?>
+				<form method="post" action="index.php" class="mb-3">
+					<input type="hidden" name="token" value="<?php echo $token; ?>">
+					Logged in as the admin.
+					<a href="convert.php">Convert the screenshots</a>
+					<button type="submit" name="action" value="logout" class="btn btn-sm btn-secondary">Log out</button>
+				</form>
+			<?php } ?>
+			<?php if ( $showLogin && !$admin ) { ?>
+				<div class="card">
+					<div class="card-body">
+						<form method="post" action="index.php?login=1">
+							<input type="hidden" name="token" value="<?php echo $token; ?>">
+							<div class="form-group">
+								<label for="password">Admin password</label>
+								<input type="password" class="form-control" name="password" id="password" autocomplete="current-password" required>
+							</div>
+							<button type="submit" name="action" value="login" class="btn btn-primary">Log in</button>
+						</form>
+					</div>
+				</div>
+			<?php } else if ( $viewList ) { ?>
 				<p>Click
 					<a href="index.php">here</a> to upload a screenshot.
 				</p>
@@ -264,11 +335,15 @@ if ( $admin )
 								<td><?php echo $planet->planetNumber; ?></td>
 								<td><?php echo $planet->type; ?></td>
 								<td><?php echo $planet->captured ? 'Yes' : 'No'; ?></td>
-								<td><?php echo $planet->yourName; ?></td>
+								<td><?php echo htmlspecialchars( $planet->yourName, ENT_QUOTES, 'UTF-8', false ); ?></td>
 								<td><?php echo $planet->captured ? "<img src=\"images/{$planet->index}.png\">" : 'None'; ?></td>
 								<?php if ( $admin ) { ?>
 									<td>
-										<a href="index.php?remove=<?php echo $planet->index; ?>">REMOVE</a>
+										<form method="post" action="index.php?viewList=1">
+											<input type="hidden" name="token" value="<?php echo $token; ?>">
+											<input type="hidden" name="remove" value="<?php echo $planet->index; ?>">
+											<button type="submit" name="action" value="remove" class="btn btn-sm btn-danger">REMOVE</button>
+										</form>
 									</td>
 								<?php } ?>
 							</tr>
