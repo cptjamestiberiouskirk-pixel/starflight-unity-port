@@ -7,23 +7,13 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Gazurtoid Engine
-    second: {fileID: 2100000, guid: e370da8fe2b9b024085c683f83878669, type: 2}
+      name: Gazurtoid Scout Engine
+    second: {fileID: 2100000, guid: 656991d354c3f2b4791655f9084f572a, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Gazurtoid Hull
-    second: {fileID: 2100000, guid: c73b1693c93a94546841b650d5e0c43c, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Gazurtoid Light
-    second: {fileID: 2100000, guid: 878357d9ed3149b44a627cc3732d9e2a, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Gazurtoid Trim
-    second: {fileID: 2100000, guid: e9cc0d1a1878fa24bb593a9debcd04c3, type: 2}
+      name: Gazurtoid Scout Hull
+    second: {fileID: 2100000, guid: 98f88a77679aba146a3000a004bd6277, type: 2}
   materials:
     materialImportMode: 1
     materialName: 0

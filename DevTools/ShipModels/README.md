@@ -1,6 +1,6 @@
 # Alien ship models
 
-The original game's ship pictures exist only as sensor silhouettes, and the project's hand-made models cover the Spemin, the Mechan Scout and the Mysterion. The Thrynn, Elowan and Veloxi ships and the player's Arth ship are textured models made with Meshy (see "Meshy models" below). The other vessels of the game data are built here by Blender Python scripts: low-poly stand-ins shaped after the sensor pictures in `Research/Screenshots/Ships`, not hand-made art. Nothing is random at build time (the few lumps and spines come from fixed seeds), so a rebuild gives the same meshes.
+The original game's ship pictures exist only as sensor silhouettes, and the project's hand-made models cover the Spemin, the Mechan Scout and the Mysterion. The Thrynn, Elowan, Veloxi and Gazurtoid ships and the player's Arth ship are textured models made with Meshy (see "Meshy models" below). The other vessels of the game data are built here by Blender Python scripts: low-poly stand-ins shaped after the sensor pictures in `Research/Screenshots/Ships`, not hand-made art. Nothing is random at build time (the few lumps and spines come from fixed seeds), so a rebuild gives the same meshes.
 
 Rulings of the project owner (2026-10-09):
 - **Size**: STRINFO section 7 gives each vessel's size against an Interstel ship (it is the vessel's mass over 500 tons; the Thrynn Transport, missing from STRINFO, is 1.2 by that rule). A size up to 4 is used as it is, with a floor of 0.3 so that the smallest ships stay visible; above 4 it is compressed to `4 + 0.77 * log2(size / 4)`, which reproduces the existing Mysterion (124, shown at about 7.8). One size is the player's Arth Ship, 51.06 units long (3.404 in its FBX, scale 15).
@@ -23,12 +23,12 @@ Rulings of the project owner (2026-10-09):
 From the project root (a worktree; the Unity project must not be open in an Editor for the last step):
 
 ```bash
-blender --background --factory-startup --python DevTools/ShipModels/build_gazurtoid.py -- --preview DevTools/ShipModels/previews/gazurtoid.png
-blender --background --factory-startup --python process_ship_debris.py -- -s 1986 --suffix "" --batch "Assets/Game Objects/Ships/Gazurtoid" "Assets/Game Objects/Ships Debris/Gazurtoid"
+blender --background --factory-startup --python DevTools/ShipModels/build_uhlek.py -- --preview DevTools/ShipModels/previews/uhlek.png
+blender --background --factory-startup --python process_ship_debris.py -- -s 1986 --suffix "" --batch "Assets/Game Objects/Ships/Uhlek" "Assets/Game Objects/Ships Debris/Uhlek"
 ```
 
 ```powershell
-& "DevTools\ShipModels\wire.ps1" -Manifest "DevTools\ShipModels\manifest-gazurtoid.json"
+& "DevTools\ShipModels\wire.ps1" -Manifest "DevTools\ShipModels\manifest-uhlek.json"
 ```
 
 The build writes `Assets/Game Objects/Ships/<Race>/<Vessel>.fbx` (nose along Unity +Z, final size, scale 1) and the manifest; `--no-export` renders the sheet only. The debris script writes a damaged copy of every model with the same file name. `wire.ps1` makes an SF - Standard material per manifest material (a copy of the Spemin hull material with the maps switched off), remaps the FBX materials to them, puts an inactive instance of each model under the other model templates of the Encounter location (layer Encounter), and points the vessel's slots of `m_alienShipModelTemplate` and `m_alienShipDebrisTemplate` at the instance and the debris model. Running it again replaces what an earlier run made; it refuses to replace a hand-made object of the same name.
@@ -37,7 +37,7 @@ Then add the vessel lengths of the manifest to `c_shipModelLengths` in `DevTools
 
 ## Meshy models
 
-The owner's direction of 2026-10-13 is to remake the game's models with Meshy (meshy.ai, a paid plan: its API creates no task for a free account) wherever it fits. The Thrynn ships were the first race done this way, then the Elowan and the Veloxi. For each vessel:
+The owner's direction of 2026-10-13 is to remake the game's models with Meshy (meshy.ai, a paid plan: its API creates no task for a free account) wherever it fits. The Thrynn ships were the first race done this way, then the Elowan, the Veloxi and the Gazurtoid. For each vessel:
 
 1. **Concept picture**: Meshy image-to-image (`nano-banana-pro`, 9 credits) from the original's sensor picture (cropped from `previews/<race>.png` or `Research/Screenshots/Ships`) and its silhouette (`Assets/Game Objects/UI/Sensors`), for the owner to approve. A third reference picture of another ship of the race keeps the materials alike, but it also brings its layout along (the Thrynn scout kept the warship's four pylons twice); an image edit of a near miss is the cheaper fix.
 2. **Model**: image-to-3d from the approved picture (standard, textured, 4K PBR maps, 30 credits), then a remesh to about 10,000 triangles (5 credits). The remesh keeps the textures: it bakes them, the normal map too, from the full model of about 1.5 million triangles.
@@ -49,7 +49,7 @@ The owner's direction of 2026-10-13 is to remake the game's models with Meshy (m
 blender --background --factory-startup --python DevTools/ShipModels/import_meshy.py -- DevTools/ShipModels/meshy-thrynn.json --source <folder with the GLB files> --preview DevTools/ShipModels/previews/thrynn.png
 ```
 
-A race file can set `"glow": {"hue": [..], "saturation": .., "value": ..}` for its emissive map (the Arth ship's blue is paint, so only its brighter missile caps glow); its hue can be a list of ranges (the Veloxi light their blue crystal and their red and pink engine pods, `[[170, 250], [320, 360], [0, 10]]`, since red wraps round 0). A vessel whose concept picture was edited records the edit's task as `conceptEdit`, and `nose` is set per vessel from the preview sheet (Meshy turned the Veloxi scout to +X and laid the drone along Y).
+A race file can set `"glow": {"hue": [..], "saturation": .., "value": ..}` for its emissive map (the Arth ship's blue is paint, so only its brighter missile caps glow); its hue can be a list of ranges (the Veloxi light their blue crystal and their red and pink engine pods, `[[170, 250], [320, 360], [0, 10]]`, since red wraps round 0). A vessel whose concept picture was edited records the edit's task as `conceptEdit`, and `nose` is set per vessel from the preview sheet (Meshy turned the Veloxi scout to +X and laid the drone along Y), and `roll` turns a model that Meshy built lying on its side about its length (degrees, a right-handed turn about the nose: the Gazurtoid warship's core faced the side, `90`).
 
 ### The player's Arth ship
 
