@@ -9,11 +9,14 @@
 			"model": "Assets/Game Objects/Ships/Gazurtoid/Gazurtoid Scout.fbx",
 			"debris": "Assets/Game Objects/Ships Debris/Gazurtoid/Gazurtoid Scout.fbx",
 			"materials": [
-				"Gazurtoid Hull",
-				"Gazurtoid Trim",
-				"Gazurtoid Light",
-				"Gazurtoid Engine"
-			]
+				"Gazurtoid Scout Hull",
+				"Gazurtoid Scout Engine"
+			],
+			"meshy": {
+				"concept": "01a138c9-5b9f-705b-8bca-736b868ad0e1",
+				"model": "01a138cb-25f5-709d-bd57-13a8656bd34d",
+				"remesh": "01a138cd-2842-7374-8fd7-c92f647aa39e"
+			}
 		},
 		{
 			"id": 15,
@@ -23,93 +26,112 @@
 			"model": "Assets/Game Objects/Ships/Gazurtoid/Gazurtoid Warship.fbx",
 			"debris": "Assets/Game Objects/Ships Debris/Gazurtoid/Gazurtoid Warship.fbx",
 			"materials": [
-				"Gazurtoid Hull",
-				"Gazurtoid Trim",
-				"Gazurtoid Light",
-				"Gazurtoid Engine"
-			]
+				"Gazurtoid Warship Hull",
+				"Gazurtoid Warship Engine"
+			],
+			"meshy": {
+				"concept": "01a138c9-5e4f-76bb-a2ff-6b1b9931d18e",
+				"model": "01a138cb-2c6f-7016-88a1-eda44f7a4191",
+				"remesh": "01a138cd-68d9-72d9-8242-b690167e84ae"
+			}
 		}
 	],
 	"materials": [
 		{
-			"name": "Gazurtoid Hull",
+			"name": "Gazurtoid Scout Hull",
 			"albedo": [
-				0.2,
-				0.19,
-				0.17
+				1.0,
+				1.0,
+				1.0
 			],
 			"specular": [
-				0.35,
-				0.35,
-				0.33
+				1.0,
+				1.0,
+				1.0
 			],
-			"smoothness": 0.65,
+			"smoothness": 1.0,
 			"emissive": [
 				0.0,
 				0.0,
 				0.0
 			],
-			"folder": "Assets/Game Objects/Ships/Gazurtoid"
+			"folder": "Assets/Game Objects/Ships/Gazurtoid",
+			"albedoMap": "Assets/Game Objects/Ships/Gazurtoid/Textures/Gazurtoid Scout - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Gazurtoid/Textures/Gazurtoid Scout - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Gazurtoid/Textures/Gazurtoid Scout - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Gazurtoid/Textures/Gazurtoid Scout - Emissive.jpg"
 		},
 		{
-			"name": "Gazurtoid Trim",
+			"name": "Gazurtoid Scout Engine",
 			"albedo": [
-				0.11,
-				0.1,
-				0.09
+				1.0,
+				1.0,
+				1.0
 			],
 			"specular": [
-				0.22,
-				0.22,
-				0.2
+				1.0,
+				1.0,
+				1.0
 			],
-			"smoothness": 0.5,
-			"emissive": [
-				0.0,
-				0.0,
-				0.0
-			],
-			"folder": "Assets/Game Objects/Ships/Gazurtoid"
-		},
-		{
-			"name": "Gazurtoid Light",
-			"albedo": [
-				0.1,
-				0.3,
-				0.4
-			],
-			"specular": [
-				0.5,
-				0.5,
-				0.5
-			],
-			"smoothness": 0.8,
-			"emissive": [
-				0.2,
-				0.7,
-				0.9
-			],
-			"folder": "Assets/Game Objects/Ships/Gazurtoid"
-		},
-		{
-			"name": "Gazurtoid Engine",
-			"albedo": [
-				0.4,
-				0.05,
-				0.15
-			],
-			"specular": [
-				0.45,
-				0.25,
-				0.3
-			],
-			"smoothness": 0.7,
+			"smoothness": 1.0,
 			"emissive": [
 				0.9,
-				0.15,
-				0.45
+				0.35,
+				0.12
 			],
-			"folder": "Assets/Game Objects/Ships/Gazurtoid"
+			"folder": "Assets/Game Objects/Ships/Gazurtoid",
+			"albedoMap": "Assets/Game Objects/Ships/Gazurtoid/Textures/Gazurtoid Scout - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Gazurtoid/Textures/Gazurtoid Scout - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Gazurtoid/Textures/Gazurtoid Scout - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Gazurtoid/Textures/Gazurtoid Scout - Emissive.jpg"
+		},
+		{
+			"name": "Gazurtoid Warship Hull",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Gazurtoid",
+			"albedoMap": "Assets/Game Objects/Ships/Gazurtoid/Textures/Gazurtoid Warship - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Gazurtoid/Textures/Gazurtoid Warship - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Gazurtoid/Textures/Gazurtoid Warship - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Gazurtoid/Textures/Gazurtoid Warship - Emissive.jpg"
+		},
+		{
+			"name": "Gazurtoid Warship Engine",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.9,
+				0.35,
+				0.12
+			],
+			"folder": "Assets/Game Objects/Ships/Gazurtoid",
+			"albedoMap": "Assets/Game Objects/Ships/Gazurtoid/Textures/Gazurtoid Warship - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Gazurtoid/Textures/Gazurtoid Warship - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Gazurtoid/Textures/Gazurtoid Warship - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Gazurtoid/Textures/Gazurtoid Warship - Emissive.jpg"
 		}
 	]
 }

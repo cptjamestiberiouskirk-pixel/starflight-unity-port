@@ -9,72 +9,39 @@
 			"model": "Assets/Game Objects/Ships/Noah 9/Noah 9 Derelict Transport.fbx",
 			"debris": "Assets/Game Objects/Ships Debris/Noah 9/Noah 9 Derelict Transport.fbx",
 			"materials": [
-				"Noah 9 Trim",
-				"Noah 9 Hull",
-				"Noah 9 Scorch"
-			]
+				"Noah 9 Derelict Transport Hull"
+			],
+			"meshy": {
+				"concept": "01a138c9-65e3-76b2-803f-f844bb2103d0",
+				"model": "01a138cb-3bee-74cf-9c36-b82da7cdda5a",
+				"remesh": "01a138cd-8708-7745-8e07-ee7155dec2e0"
+			}
 		}
 	],
 	"materials": [
 		{
-			"name": "Noah 9 Trim",
+			"name": "Noah 9 Derelict Transport Hull",
 			"albedo": [
-				0.12,
-				0.1,
-				0.09
+				1.0,
+				1.0,
+				1.0
 			],
 			"specular": [
-				0.12,
-				0.12,
-				0.12
+				1.0,
+				1.0,
+				1.0
 			],
-			"smoothness": 0.25,
+			"smoothness": 1.0,
 			"emissive": [
 				0.0,
 				0.0,
 				0.0
 			],
-			"folder": "Assets/Game Objects/Ships/Noah 9"
-		},
-		{
-			"name": "Noah 9 Hull",
-			"albedo": [
-				0.27,
-				0.23,
-				0.19
-			],
-			"specular": [
-				0.18,
-				0.17,
-				0.15
-			],
-			"smoothness": 0.3,
-			"emissive": [
-				0.0,
-				0.0,
-				0.0
-			],
-			"folder": "Assets/Game Objects/Ships/Noah 9"
-		},
-		{
-			"name": "Noah 9 Scorch",
-			"albedo": [
-				0.05,
-				0.05,
-				0.05
-			],
-			"specular": [
-				0.05,
-				0.05,
-				0.05
-			],
-			"smoothness": 0.1,
-			"emissive": [
-				0.0,
-				0.0,
-				0.0
-			],
-			"folder": "Assets/Game Objects/Ships/Noah 9"
+			"folder": "Assets/Game Objects/Ships/Noah 9",
+			"albedoMap": "Assets/Game Objects/Ships/Noah 9/Textures/Noah 9 Derelict Transport - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Noah 9/Textures/Noah 9 Derelict Transport - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Noah 9/Textures/Noah 9 Derelict Transport - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Noah 9/Textures/Noah 9 Derelict Transport - Emissive.jpg"
 		}
 	]
 }

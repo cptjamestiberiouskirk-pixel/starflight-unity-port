@@ -1,0 +1,38 @@
+{
+	"race": "Uhlek",
+	"textureSize": 1024,
+	"glow": {
+		"hue": [[170, 250], [335, 360], [0, 12]],
+		"saturation": 0.4,
+		"value": 0.3
+	},
+	"vessels": [
+		{
+			"id": 16,
+			"name": "Uhlek Scout",
+			"strinfo": 2.0,
+			"glb": "uhlek-scout-10k.glb",
+			"nose": "-Y",
+			"widthScale": 0.85,
+			"screenshot": "Uhlek Scout Analysis.png",
+			"meshy": {
+				"concept": "01a138c9-60f7-771a-abec-7d2fa048d404",
+				"model": "01a138cb-31bf-7475-897c-23257836f17e",
+				"remesh": "01a138cd-6eb3-766e-8ad6-547127c04f05"
+			}
+		},
+		{
+			"id": 17,
+			"name": "Uhlek Warship",
+			"strinfo": 10.0,
+			"glb": "uhlek-warship-10k.glb",
+			"nose": "-X",
+			"screenshot": "Uhlek Warship Analysis.png",
+			"meshy": {
+				"concept": "01a138c9-6369-73a2-a58e-fe7dbfa9b304",
+				"model": "01a138cb-36a4-73f7-ac68-ba14409d800c",
+				"remesh": "01a138cd-743f-76da-8aa6-b6d58b0f4e20"
+			}
+		}
+	]
+}

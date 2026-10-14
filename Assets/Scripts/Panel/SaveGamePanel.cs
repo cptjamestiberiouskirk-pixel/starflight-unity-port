@@ -51,8 +51,36 @@ public class SaveGamePanel : Panel
 	// the callback object
 	object m_callbackObject;
 
-	// the button that switches the UI kit between its dark and light modes (made from the resume button the first time the panel opens, so the scene needs no new objects)
-	Button m_modeButton;
+	// the button that opens the Colors screen (made from the resume button the first time the panel opens, so the scene needs no new objects)
+	Button m_colorsButton;
+
+	// the Colors screen: the UI kit's colour schemes and its dark and light modes (made from the switch panel the first time it opens)
+	GameObject m_colorsPanel;
+
+	// the screen's button for each scheme, the diamond that marks the scheme in use, and the scheme's colour swatches
+	Button[] m_schemeButtons;
+	Image[] m_schemeMarkers;
+	Image[][] m_schemeSwatches;
+
+	// the screen's buttons for the two modes, and the diamonds that mark the mode in use
+	Button[] m_modeButtons;
+	Image[] m_modeMarkers;
+
+	// the screen's heading, the schemes' names on their buttons, the line about the scheme in use, and the button that closes the screen
+	TextMeshProUGUI m_colorsHeadingText;
+	TMP_Text[] m_schemeLabels;
+	TextMeshProUGUI m_schemeDescriptionText;
+	Button m_colorsDoneButton;
+
+	// the theme roles a scheme's swatches show, left to right: its screen, its panels, its text, its two accents, and its fuel and danger colours
+	static readonly UIKitTheme.ColorRole[] c_swatchRoles =
+	{
+		UIKitTheme.ColorRole.BackgroundApp, UIKitTheme.ColorRole.BackgroundRaised, UIKitTheme.ColorRole.TextPrimary, UIKitTheme.ColorRole.AccentPrimary,
+		UIKitTheme.ColorRole.AccentSecondary, UIKitTheme.ColorRole.StatusFuel, UIKitTheme.ColorRole.StatusDanger
+	};
+
+	// how many schemes the Colors screen shows in a row
+	const int c_schemeColumns = 5;
 
 	// call this to open this panel
 	public override bool Open()
@@ -66,8 +94,13 @@ public class SaveGamePanel : Panel
 		m_copyPanel.SetActive( false );
 		m_resetPanel.SetActive( false );
 
-		// the button for the kit's mode
-		MakeModeButton();
+		if ( m_colorsPanel != null )
+		{
+			m_colorsPanel.SetActive( false );
+		}
+
+		// the button for the Colors screen
+		MakeColorsButton();
 
 		// enable the main menu buttons
 		EnableMenuButtons( true );
@@ -190,54 +223,105 @@ public class SaveGamePanel : Panel
 		PanelController.m_instance.Close();
 	}
 
-	// called when the player clicks on the button for the kit's mode: the light mode in steel grey, or back to the dark one
-	public void ModeClicked()
+	// called when the player clicks on colors: the screen of the UI kit's colour schemes and modes
+	public void ColorsClicked()
 	{
 		InputController.m_instance.Debounce();
 
-		var mode = ( UIKitTheme.GetMode() == UIKitTheme.Mode.Dark ) ? UIKitTheme.Mode.Light : UIKitTheme.Mode.Dark;
+		MakeColorsPanel();
 
-		UIKitTheme.SetMode( mode );
+		if ( m_colorsPanel == null )
+		{
+			return;
+		}
 
-		// the button now offers the other mode, and the descriptions are written in the new colours
-		UpdateModeButtonLabel();
-		UpdateDescriptions();
+		// deselect all the buttons
+		EventSystem.current.SetSelectedGameObject( null );
 
-		// play a ui sound
+		// disable the menu buttons
+		EnableMenuButtons( false );
+
+		// activate the overlay and the colors panel
+		m_overlayPanel.SetActive( true );
+		m_colorsPanel.SetActive( true );
+
+		UpdateColorsPanel();
+
+		// select the scheme in use
+		var scheme = UIKitTheme.GetScheme();
+
+		if ( ( scheme >= 0 ) && ( scheme < m_schemeButtons.Length ) && ( m_schemeButtons[ scheme ] != null ) )
+		{
+			m_schemeButtons[ scheme ].Select();
+		}
+
+		// play the activate sound
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 	}
 
-	// makes the button for the kit's mode: a copy of the resume button, in front of it
-	void MakeModeButton()
+	// called when the player picks a colour scheme on the Colors screen: the whole game takes it at once
+	public void SchemeClicked( int scheme )
 	{
-		if ( ( m_modeButton != null ) || ( m_resumeButton == null ) )
-		{
-			return;
-		}
+		InputController.m_instance.Debounce();
 
-		m_modeButton = Instantiate( m_resumeButton, m_resumeButton.transform.parent );
+		UIKitTheme.SetScheme( scheme );
 
-		m_modeButton.name = "Mode Button";
-		m_modeButton.transform.SetSiblingIndex( m_resumeButton.transform.GetSiblingIndex() );
+		// the descriptions are written in the new colours
+		UpdateDescriptions();
+		UpdateColorsPanel();
 
-		// the copy has the resume button's click: it gets its own instead
-		m_modeButton.onClick = new Button.ButtonClickedEvent();
-		m_modeButton.onClick.AddListener( ModeClicked );
-
-		UpdateModeButtonLabel();
+		// play the update sound
+		SoundController.m_instance.PlaySound( SoundController.Sound.Update );
 	}
 
-	// the button for the kit's mode offers the mode that is not in use
-	void UpdateModeButtonLabel()
+	// called when the player picks the dark or the light mode on the Colors screen
+	public void ModeClicked( UIKitTheme.Mode mode )
 	{
-		if ( m_modeButton == null )
+		InputController.m_instance.Debounce();
+
+		UIKitTheme.SetMode( mode );
+
+		// the descriptions are written in the new colours
+		UpdateDescriptions();
+		UpdateColorsPanel();
+
+		// play the update sound
+		SoundController.m_instance.PlaySound( SoundController.Sound.Update );
+	}
+
+	// panel tick: the cancel key (escape) leaves the Colors screen
+	public override void Tick()
+	{
+		if ( ( m_colorsPanel != null ) && m_colorsPanel.activeSelf && InputController.m_instance.m_cancel )
+		{
+			CancelClicked();
+		}
+	}
+
+	// makes the button for the Colors screen: a copy of the resume button, in front of it
+	void MakeColorsButton()
+	{
+		if ( ( m_colorsButton != null ) || ( m_resumeButton == null ) )
 		{
 			return;
 		}
 
-		var label = ( UIKitTheme.GetMode() == UIKitTheme.Mode.Dark ) ? "Light Mode" : "Dark Mode";
+		m_colorsButton = CopyButton( m_resumeButton, m_resumeButton.transform.parent, "Colors Button", "Colors", ColorsClicked );
 
-		var text = m_modeButton.GetComponentInChildren<TMPro.TMP_Text>( true );
+		m_colorsButton.transform.SetSiblingIndex( m_resumeButton.transform.GetSiblingIndex() );
+	}
+
+	// makes a copy of a button with its own label and its own click (the copy would have the original's), which the arrow keys reach by themselves
+	Button CopyButton( Button original, Transform parent, string name, string label, UnityEngine.Events.UnityAction onClick )
+	{
+		var button = Instantiate( original, parent );
+
+		button.name = name;
+		button.onClick = new Button.ButtonClickedEvent();
+		button.onClick.AddListener( onClick );
+		button.navigation = new Navigation { mode = Navigation.Mode.Automatic };
+
+		var text = button.GetComponentInChildren<TMP_Text>( true );
 
 		if ( text != null )
 		{
@@ -245,12 +329,351 @@ public class SaveGamePanel : Panel
 		}
 		else
 		{
-			var legacyText = m_modeButton.GetComponentInChildren<Text>( true );
+			var legacyText = button.GetComponentInChildren<Text>( true );
 
 			if ( legacyText != null )
 			{
 				legacyText.text = label;
 			}
+		}
+
+		return button;
+	}
+
+	// makes the Colors screen the first time it is needed: a copy of the switch panel (the kit's popup with its frame and a heading), made as large as
+	// the slots, with a button for each colour scheme (its name and swatches of its colours), the two modes at the top and a done button at the bottom
+	void MakeColorsPanel()
+	{
+		if ( ( m_colorsPanel != null ) || ( m_switchPanel == null ) || ( m_switchCancelButton == null ) )
+		{
+			return;
+		}
+
+		m_colorsPanel = Instantiate( m_switchPanel, m_switchPanel.transform.parent );
+		m_colorsPanel.name = "Colors Panel";
+		m_colorsPanel.SetActive( false );
+
+		var panelTransform = (RectTransform) m_colorsPanel.transform;
+
+		panelTransform.anchorMin = new Vector2( 0.02f, 0.02f );
+		panelTransform.anchorMax = new Vector2( 0.98f, 0.98f );
+		panelTransform.offsetMin = Vector2.zero;
+		panelTransform.offsetMax = Vector2.zero;
+
+		// the copy's contents are laid out here by hand: its layout group goes, and so does everything in it but its heading
+		var layout = m_colorsPanel.GetComponentInChildren<VerticalLayoutGroup>( true );
+
+		if ( layout == null )
+		{
+			Destroy( m_colorsPanel );
+			m_colorsPanel = null;
+
+			return;
+		}
+
+		var content = (RectTransform) layout.transform;
+		var heading = content.GetComponentInChildren<TextMeshProUGUI>( true );
+
+		DestroyImmediate( layout );
+
+		for ( var i = content.childCount - 1; i >= 0; i-- )
+		{
+			var child = content.GetChild( i );
+
+			if ( ( heading == null ) || ( child != heading.transform ) )
+			{
+				DestroyImmediate( child.gameObject );
+			}
+		}
+
+		// the heading, at the top left
+		if ( heading != null )
+		{
+			heading.text = "Color Scheme";
+
+			m_colorsHeadingText = heading;
+
+			PlaceAt( heading.rectTransform, new Vector2( 0.0f, 1.0f ), new Vector2( 0.6f, 1.0f ), new Vector2( 0.0f, -56.0f ), Vector2.zero );
+
+			// the line about the scheme in use, under it, in the kit's body text
+			m_schemeDescriptionText = Instantiate( heading, content );
+			m_schemeDescriptionText.name = "Scheme Description";
+
+			PlaceAt( m_schemeDescriptionText.rectTransform, new Vector2( 0.0f, 1.0f ), new Vector2( 1.0f, 1.0f ), new Vector2( 0.0f, -100.0f ), new Vector2( 0.0f, -60.0f ) );
+
+			if ( m_schemeDescriptionText.TryGetComponent<UIKitStyle>( out var descriptionStyle ) )
+			{
+				descriptionStyle.m_textStyle = UIKitTheme.TextStyleRole.BodyM;
+				descriptionStyle.m_color = UIKitTheme.ColorRole.TextSecondary;
+				descriptionStyle.m_fontSize = 22.0f;
+				descriptionStyle.Apply();
+			}
+		}
+
+		// the two modes, at the top right
+		m_modeButtons = new Button[ 2 ];
+		m_modeMarkers = new Image[ 2 ];
+
+		for ( var i = 0; i < 2; i++ )
+		{
+			var mode = ( i == 0 ) ? UIKitTheme.Mode.Dark : UIKitTheme.Mode.Light;
+			var button = CopyButton( m_switchCancelButton, content, mode + " Mode Button", mode.ToString(), () => ModeClicked( mode ) );
+
+			PlaceAt( (RectTransform) button.transform, new Vector2( 1.0f, 1.0f ), new Vector2( 1.0f, 1.0f ), new Vector2( -432.0f + i * 216.0f, -56.0f ), new Vector2( -232.0f + i * 216.0f, 0.0f ) );
+			CenterLabel( button );
+
+			m_modeButtons[ i ] = button;
+			m_modeMarkers[ i ] = MakeMarker( button.transform );
+		}
+
+		// the done button, at the bottom right
+		m_colorsDoneButton = CopyButton( m_switchCancelButton, content, "Done Button", "Done", CancelClicked );
+
+		PlaceAt( (RectTransform) m_colorsDoneButton.transform, new Vector2( 1.0f, 0.0f ), new Vector2( 1.0f, 0.0f ), new Vector2( -240.0f, 0.0f ), new Vector2( 0.0f, 64.0f ) );
+		CenterLabel( m_colorsDoneButton );
+
+		// the schemes, in rows between them (the rows and their buttons share out the space, whatever the size of the screen)
+		var listObject = new GameObject( "Schemes", typeof( RectTransform ), typeof( VerticalLayoutGroup ) );
+		var listTransform = (RectTransform) listObject.transform;
+
+		listTransform.SetParent( content, false );
+
+		PlaceAt( listTransform, Vector2.zero, Vector2.one, new Vector2( 0.0f, 88.0f ), new Vector2( 0.0f, -120.0f ) );
+
+		var list = listObject.GetComponent<VerticalLayoutGroup>();
+
+		list.spacing = 16.0f;
+		list.childAlignment = TextAnchor.UpperLeft;
+		list.childControlWidth = true;
+		list.childControlHeight = true;
+		list.childForceExpandWidth = true;
+		list.childForceExpandHeight = false;
+
+		var schemes = UIKitTheme.c_schemes;
+
+		m_schemeButtons = new Button[ schemes.Length ];
+		m_schemeLabels = new TMP_Text[ schemes.Length ];
+		m_schemeMarkers = new Image[ schemes.Length ];
+		m_schemeSwatches = new Image[ schemes.Length ][];
+
+		Transform row = null;
+
+		for ( var i = 0; i < schemes.Length; i++ )
+		{
+			if ( ( i % c_schemeColumns ) == 0 )
+			{
+				row = MakeSchemeRow( listTransform );
+			}
+
+			var scheme = i;
+			var button = CopyButton( m_switchCancelButton, row, schemes[ i ].m_name + " Button", schemes[ i ].m_name, () => SchemeClicked( scheme ) );
+
+			// as wide as the other buttons of its row
+			if ( !button.TryGetComponent<LayoutElement>( out var layoutElement ) )
+			{
+				layoutElement = button.gameObject.AddComponent<LayoutElement>();
+			}
+
+			layoutElement.ignoreLayout = false;
+			layoutElement.minWidth = 0.0f;
+			layoutElement.preferredWidth = 0.0f;
+			layoutElement.flexibleWidth = 1.0f;
+
+			var label = button.GetComponentInChildren<TMP_Text>( true );
+
+			if ( label != null )
+			{
+				label.margin = new Vector4( 18.0f, 14.0f, 40.0f, 0.0f );
+				label.textWrappingMode = TextWrappingModes.Normal;
+			}
+
+			m_schemeButtons[ i ] = button;
+			m_schemeLabels[ i ] = label;
+			m_schemeMarkers[ i ] = MakeMarker( button.transform );
+			m_schemeSwatches[ i ] = MakeSwatches( button.transform );
+		}
+
+		// the last row filled up with empty cells, so that its buttons are as wide as the others
+		for ( var i = schemes.Length; ( row != null ) && ( ( i % c_schemeColumns ) != 0 ); i++ )
+		{
+			var cell = new GameObject( "Empty", typeof( RectTransform ), typeof( LayoutElement ) );
+
+			cell.transform.SetParent( row, false );
+			cell.GetComponent<LayoutElement>().flexibleWidth = 1.0f;
+		}
+	}
+
+	// makes a row of the Colors screen's scheme buttons
+	static Transform MakeSchemeRow( Transform parent )
+	{
+		var rowObject = new GameObject( "Row", typeof( RectTransform ), typeof( HorizontalLayoutGroup ), typeof( LayoutElement ) );
+
+		rowObject.transform.SetParent( parent, false );
+
+		var layout = rowObject.GetComponent<HorizontalLayoutGroup>();
+
+		layout.spacing = 16.0f;
+		layout.childControlWidth = true;
+		layout.childControlHeight = true;
+		layout.childForceExpandWidth = true;
+		layout.childForceExpandHeight = true;
+
+		rowObject.GetComponent<LayoutElement>().preferredHeight = 136.0f;
+
+		return rowObject.transform;
+	}
+
+	// places a rectangle by its anchors and the offsets of its corners from them
+	static void PlaceAt( RectTransform rectTransform, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax )
+	{
+		rectTransform.anchorMin = anchorMin;
+		rectTransform.anchorMax = anchorMax;
+		rectTransform.pivot = new Vector2( 0.5f, 0.5f );
+		rectTransform.offsetMin = offsetMin;
+		rectTransform.offsetMax = offsetMax;
+
+		// a layout element would ask a layout group for another size
+		if ( rectTransform.TryGetComponent<LayoutElement>( out var layoutElement ) )
+		{
+			layoutElement.ignoreLayout = true;
+		}
+	}
+
+	// puts a button's label in its middle
+	static void CenterLabel( Button button )
+	{
+		SetAlignment( button.GetComponentInChildren<TMP_Text>( true ), HorizontalAlignmentOptions.Center, VerticalAlignmentOptions.Middle );
+	}
+
+	// aligns a text (TextMesh Pro draws by these two, not by the older alignment that combines them)
+	static void SetAlignment( TMP_Text text, HorizontalAlignmentOptions horizontal, VerticalAlignmentOptions vertical )
+	{
+		if ( text != null )
+		{
+			text.horizontalAlignment = horizontal;
+			text.verticalAlignment = vertical;
+		}
+	}
+
+	// makes the diamond that marks the scheme or the mode in use, at the top right of its button, in the kit's accent colour
+	static Image MakeMarker( Transform button )
+	{
+		var markerObject = new GameObject( "In Use", typeof( RectTransform ), typeof( CanvasRenderer ), typeof( Image ) );
+		var markerTransform = (RectTransform) markerObject.transform;
+
+		markerTransform.SetParent( button, false );
+		markerTransform.anchorMin = new Vector2( 1.0f, 1.0f );
+		markerTransform.anchorMax = new Vector2( 1.0f, 1.0f );
+		markerTransform.pivot = new Vector2( 1.0f, 1.0f );
+		markerTransform.sizeDelta = new Vector2( 18.0f, 18.0f );
+		markerTransform.anchoredPosition = new Vector2( -14.0f, -14.0f );
+
+		var marker = markerObject.GetComponent<Image>();
+
+		marker.raycastTarget = false;
+
+		var style = markerObject.AddComponent<UIKitStyle>();
+
+		style.m_sprite = UIKitTheme.SpriteRole.Diamond;
+		style.m_color = UIKitTheme.ColorRole.AccentPrimary;
+		style.Apply();
+
+		return marker;
+	}
+
+	// makes a row of swatches along the bottom of a scheme's button, which show the scheme's own colours whatever the theme in use
+	static Image[] MakeSwatches( Transform button )
+	{
+		var rowObject = new GameObject( "Swatches", typeof( RectTransform ), typeof( HorizontalLayoutGroup ) );
+		var rowTransform = (RectTransform) rowObject.transform;
+
+		rowTransform.SetParent( button, false );
+		rowTransform.anchorMin = new Vector2( 0.0f, 0.0f );
+		rowTransform.anchorMax = new Vector2( 1.0f, 0.0f );
+		rowTransform.pivot = new Vector2( 0.5f, 0.0f );
+		rowTransform.offsetMin = new Vector2( 18.0f, 16.0f );
+		rowTransform.offsetMax = new Vector2( -18.0f, 40.0f );
+
+		var row = rowObject.GetComponent<HorizontalLayoutGroup>();
+
+		row.spacing = 3.0f;
+		row.childControlWidth = true;
+		row.childControlHeight = true;
+		row.childForceExpandWidth = true;
+		row.childForceExpandHeight = true;
+
+		var swatches = new Image[ c_swatchRoles.Length ];
+
+		for ( var i = 0; i < swatches.Length; i++ )
+		{
+			var swatchObject = new GameObject( "Swatch", typeof( RectTransform ), typeof( CanvasRenderer ), typeof( Image ) );
+
+			swatchObject.transform.SetParent( rowTransform, false );
+
+			swatches[ i ] = swatchObject.GetComponent<Image>();
+			swatches[ i ].raycastTarget = false;
+
+			// a thin grey line round it, so that a swatch of the button's own colour still shows (on a dark button or a light one)
+			var outline = swatchObject.AddComponent<Outline>();
+
+			outline.effectColor = new Color( 0.5f, 0.5f, 0.5f, 0.6f );
+			outline.effectDistance = new Vector2( 1.0f, -1.0f );
+
+			UIKitModeApplier.KeepColour( swatches[ i ] );
+		}
+
+		return swatches;
+	}
+
+	// shows the scheme and the mode in use on the Colors screen, and each scheme's colours in the mode in use
+	void UpdateColorsPanel()
+	{
+		if ( m_colorsPanel == null )
+		{
+			return;
+		}
+
+		var schemeInUse = UIKitTheme.GetScheme();
+		var modeInUse = UIKitTheme.GetMode();
+
+		// the texts' alignments (TextMesh Pro gives a copied text its own back when the text first wakes, so they are set whenever the screen is shown)
+		SetAlignment( m_colorsHeadingText, HorizontalAlignmentOptions.Left, VerticalAlignmentOptions.Middle );
+		SetAlignment( m_schemeDescriptionText, HorizontalAlignmentOptions.Left, VerticalAlignmentOptions.Middle );
+
+		foreach ( var label in m_schemeLabels )
+		{
+			SetAlignment( label, HorizontalAlignmentOptions.Left, VerticalAlignmentOptions.Top );
+		}
+
+		for ( var i = 0; i < m_schemeButtons.Length; i++ )
+		{
+			if ( m_schemeMarkers[ i ] != null )
+			{
+				m_schemeMarkers[ i ].enabled = ( i == schemeInUse );
+			}
+
+			var theme = UIKitTheme.LoadScheme( i, modeInUse );
+
+			for ( var j = 0; j < m_schemeSwatches[ i ].Length; j++ )
+			{
+				if ( m_schemeSwatches[ i ][ j ] != null )
+				{
+					m_schemeSwatches[ i ][ j ].color = ( theme != null ) ? theme.GetColor( c_swatchRoles[ j ] ) : Color.clear;
+				}
+			}
+		}
+
+		for ( var i = 0; i < m_modeButtons.Length; i++ )
+		{
+			if ( m_modeMarkers[ i ] != null )
+			{
+				m_modeMarkers[ i ].enabled = ( ( i == 0 ) ? UIKitTheme.Mode.Dark : UIKitTheme.Mode.Light ) == modeInUse;
+			}
+		}
+
+		if ( m_schemeDescriptionText != null )
+		{
+			m_schemeDescriptionText.text = UIKitTheme.c_schemes[ schemeInUse ].m_name + ": " + UIKitTheme.c_schemes[ schemeInUse ].m_description;
 		}
 	}
 
@@ -353,6 +776,11 @@ public class SaveGamePanel : Panel
 		m_switchPanel.SetActive( false );
 		m_copyPanel.SetActive( false );
 		m_resetPanel.SetActive( false );
+
+		if ( m_colorsPanel != null )
+		{
+			m_colorsPanel.SetActive( false );
+		}
 
 		// select the resume button by default
 		m_resumeButton.Select();
@@ -460,9 +888,9 @@ public class SaveGamePanel : Panel
 		m_resetButton.interactable = enable;
 		m_resumeButton.interactable = enable;
 
-		if ( m_modeButton != null )
+		if ( m_colorsButton != null )
 		{
-			m_modeButton.interactable = enable;
+			m_colorsButton.interactable = enable;
 		}
 	}
 }

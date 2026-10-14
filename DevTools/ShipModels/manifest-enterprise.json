@@ -9,114 +9,64 @@
 			"model": "Assets/Game Objects/Ships/Enterprise/The Enterprise.fbx",
 			"debris": "Assets/Game Objects/Ships Debris/Enterprise/The Enterprise.fbx",
 			"materials": [
-				"Enterprise Hull",
-				"Enterprise Trim",
-				"Enterprise Light",
-				"Enterprise Deflector",
-				"Enterprise Bussard"
-			]
+				"The Enterprise Hull",
+				"The Enterprise Engine"
+			],
+			"meshy": {
+				"concept": "01a138c9-6852-761f-89bd-5fe9afbe80a6",
+				"model": "01a138cb-40e3-7716-9949-18532dbb1b5e",
+				"remesh": "01a138cd-8e75-74e9-8a98-294dab5ce09b"
+			}
 		}
 	],
 	"materials": [
 		{
-			"name": "Enterprise Hull",
+			"name": "The Enterprise Hull",
 			"albedo": [
-				0.72,
-				0.73,
-				0.75
-			],
-			"specular": [
-				0.4,
-				0.4,
-				0.42
-			],
-			"smoothness": 0.55,
-			"emissive": [
-				0.0,
-				0.0,
-				0.0
-			],
-			"folder": "Assets/Game Objects/Ships/Enterprise"
-		},
-		{
-			"name": "Enterprise Trim",
-			"albedo": [
-				0.45,
-				0.46,
-				0.48
-			],
-			"specular": [
-				0.3,
-				0.3,
-				0.32
-			],
-			"smoothness": 0.45,
-			"emissive": [
-				0.0,
-				0.0,
-				0.0
-			],
-			"folder": "Assets/Game Objects/Ships/Enterprise"
-		},
-		{
-			"name": "Enterprise Light",
-			"albedo": [
-				0.12,
-				0.25,
-				0.45
-			],
-			"specular": [
-				0.5,
-				0.5,
-				0.5
-			],
-			"smoothness": 0.8,
-			"emissive": [
-				0.3,
-				0.6,
+				1.0,
+				1.0,
 				1.0
 			],
-			"folder": "Assets/Game Objects/Ships/Enterprise"
-		},
-		{
-			"name": "Enterprise Deflector",
-			"albedo": [
-				0.45,
-				0.3,
-				0.1
-			],
 			"specular": [
-				0.5,
-				0.4,
-				0.3
-			],
-			"smoothness": 0.8,
-			"emissive": [
 				1.0,
-				0.6,
-				0.2
+				1.0,
+				1.0
 			],
-			"folder": "Assets/Game Objects/Ships/Enterprise"
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Enterprise",
+			"albedoMap": "Assets/Game Objects/Ships/Enterprise/Textures/The Enterprise - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Enterprise/Textures/The Enterprise - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Enterprise/Textures/The Enterprise - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Enterprise/Textures/The Enterprise - Emissive.jpg"
 		},
 		{
-			"name": "Enterprise Bussard",
+			"name": "The Enterprise Engine",
 			"albedo": [
-				0.4,
-				0.05,
-				0.04
+				1.0,
+				1.0,
+				1.0
 			],
 			"specular": [
-				0.45,
-				0.25,
-				0.25
+				1.0,
+				1.0,
+				1.0
 			],
-			"smoothness": 0.7,
+			"smoothness": 1.0,
 			"emissive": [
-				0.95,
-				0.15,
-				0.08
+				0.9,
+				0.35,
+				0.12
 			],
-			"folder": "Assets/Game Objects/Ships/Enterprise"
+			"folder": "Assets/Game Objects/Ships/Enterprise",
+			"albedoMap": "Assets/Game Objects/Ships/Enterprise/Textures/The Enterprise - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Enterprise/Textures/The Enterprise - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Enterprise/Textures/The Enterprise - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Enterprise/Textures/The Enterprise - Emissive.jpg"
 		}
 	]
 }
