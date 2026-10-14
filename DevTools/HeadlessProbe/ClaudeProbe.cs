@@ -1011,6 +1011,14 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSystemViewPictures();
 				break;
 
+			case "shieldoutline":
+				yield return ScenarioShieldOutline();
+				break;
+
+			case "starport-shieldoutline":
+				yield return ScenarioStarportShieldOutline();
+				break;
+
 			case "starport-screenpictures":
 				yield return ScenarioStarportScreenPictures();
 				break;
@@ -24204,6 +24212,351 @@ public class ClaudeProbe : MonoBehaviour
 	// the screens of the Starport's rooms after the first, as the original's screenshots show them: the notices and the evaluation, a new crew member
 	// (race, name, file, training, deleting), the crew assignment with a crew member on file, a full ledger, an equipped ship with the buy and sell lists
 	// and the naming, and the trade depot's lists
+	// the root of the ship model a display shows: the highest of the model's own transforms above one of its parts (the model sits in a UI object, which has a RectTransform)
+	static Transform ShipModelRoot( GameObject part )
+	{
+		var root = part.transform;
+
+		for ( var i = 0; ( i < 32 ) && ( root.parent != null ) && !( root.parent is RectTransform ); i++ )
+		{
+			root = root.parent;
+		}
+
+		return root;
+	}
+
+	// renders one camera alone into a picture of the screen's size and returns its pixels (row 0 at the bottom)
+	static Color32[] RenderCameraPixels( Camera camera, RenderTexture renderTexture )
+	{
+		var picture = new Texture2D( renderTexture.width, renderTexture.height, TextureFormat.RGBA32, false );
+		var active = RenderTexture.active;
+
+		RenderTexture.active = renderTexture;
+		GL.Clear( true, true, Color.black );
+
+		camera.targetTexture = renderTexture;
+		camera.Render();
+
+		RenderTexture.active = renderTexture;
+		picture.ReadPixels( new Rect( 0, 0, renderTexture.width, renderTexture.height ), 0, 0 );
+		picture.Apply();
+		RenderTexture.active = active;
+
+		var pixels = picture.GetPixels32();
+
+		UnityEngine.Object.Destroy( picture );
+
+		return pixels;
+	}
+
+	// how many of the ship's pixels on screen fall outside the shield outline drawn around it, or on its line (-1 without a graphics device): the camera that
+	// draws the display is rendered with the ship's parts shown and with them hidden, the outline hidden both times, and every pixel that differs is the
+	// ship's. Each is taken to the outline sprite's pixels through the image's rectangle (an image that keeps the sprite's aspect draws it in the middle of
+	// its rectangle); the sprite is read from its file and its outside found by a flood fill from the picture's edges over the transparent pixels. With
+	// PROBE_SHIELD_DUMP set to a folder, the ship's silhouette is written there in the sprite's pixels (DevTools/ShieldOutline/make_outline.py draws the
+	// outline from it).
+	static int ShieldOutlineMisses( UnityEngine.UI.Image outline, Transform ship, string label, out int shipPixels, out string extent )
+	{
+		shipPixels = 0;
+		extent = "";
+
+		var canvas = outline.canvas.rootCanvas;
+		var camera = canvas.worldCamera;
+
+		if ( ( SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null ) || ( camera == null ) )
+		{
+			return -1;
+		}
+
+		var bytes = System.IO.File.ReadAllBytes( "Assets/Game Objects/UI/Shields/Shields Outline.png" );
+		var spritePicture = new Texture2D( 2, 2 );
+
+		spritePicture.LoadImage( bytes );
+
+		var width = spritePicture.width;
+		var height = spritePicture.height;
+		var spritePixels = spritePicture.GetPixels32();
+
+		UnityEngine.Object.Destroy( spritePicture );
+
+		// 0 inside, 1 on the line, 2 outside (reached from the edges over transparent pixels)
+		var region = new byte[ width * height ];
+		var queue = new Queue<int>();
+
+		for ( var i = 0; i < region.Length; i++ )
+		{
+			region[ i ] = (byte) ( ( spritePixels[ i ].a >= 128 ) ? 1 : 0 );
+		}
+
+		System.Action<int> reach = index =>
+		{
+			if ( region[ index ] == 0 )
+			{
+				region[ index ] = 2;
+				queue.Enqueue( index );
+			}
+		};
+
+		for ( var x = 0; x < width; x++ )
+		{
+			reach( x );
+			reach( ( height - 1 ) * width + x );
+		}
+
+		for ( var y = 0; y < height; y++ )
+		{
+			reach( y * width );
+			reach( y * width + width - 1 );
+		}
+
+		for ( var steps = 0; ( queue.Count > 0 ) && ( steps < region.Length + 1 ); steps++ )
+		{
+			var index = queue.Dequeue();
+			var x = index % width;
+			var y = index / width;
+
+			if ( x > 0 ) reach( index - 1 );
+			if ( x < width - 1 ) reach( index + 1 );
+			if ( y > 0 ) reach( index - width );
+			if ( y < height - 1 ) reach( index + width );
+		}
+
+		// where the image draws the sprite in its own rectangle
+		var rect = outline.rectTransform.rect;
+		var drawn = rect;
+		var spriteAspect = ( outline.sprite != null ) ? ( outline.sprite.rect.width / outline.sprite.rect.height ) : 1.0f;
+
+		if ( outline.preserveAspect && ( rect.height > 0.0f ) && ( spriteAspect > 0.0f ) )
+		{
+			if ( rect.width / rect.height > spriteAspect )
+			{
+				drawn.width = rect.height * spriteAspect;
+				drawn.x = rect.center.x - drawn.width / 2.0f;
+			}
+			else
+			{
+				drawn.height = rect.width / spriteAspect;
+				drawn.y = rect.center.y - drawn.height / 2.0f;
+			}
+		}
+
+		// the ship with its parts, then without them (the outline hidden both times)
+		var renderers = new List<Renderer>();
+
+		foreach ( var shipRenderer in ship.GetComponentsInChildren<Renderer>( false ) )
+		{
+			if ( shipRenderer.enabled )
+			{
+				renderers.Add( shipRenderer );
+			}
+		}
+
+		var keptTarget = camera.targetTexture;
+		var renderTexture = new RenderTexture( 1920, 1080, 24, RenderTextureFormat.ARGB32 );
+		var outlineWasEnabled = outline.enabled;
+
+		outline.enabled = false;
+
+		var withShip = RenderCameraPixels( camera, renderTexture );
+
+		foreach ( var shipRenderer in renderers )
+		{
+			shipRenderer.enabled = false;
+		}
+
+		var withoutShip = RenderCameraPixels( camera, renderTexture );
+
+		foreach ( var shipRenderer in renderers )
+		{
+			shipRenderer.enabled = true;
+		}
+
+		outline.enabled = outlineWasEnabled;
+
+		// the ship's pixels on screen, taken to the sprite (the camera still draws into the picture, so the screen's coordinates are the picture's)
+		var screenWidth = renderTexture.width;
+		var screenHeight = renderTexture.height;
+		var isShip = new bool[ screenWidth * screenHeight ];
+		var misses = 0;
+		var min = new Vector2( float.MaxValue, float.MaxValue );
+		var max = new Vector2( float.MinValue, float.MinValue );
+
+		for ( var i = 0; i < isShip.Length; i++ )
+		{
+			var a = withShip[ i ];
+			var b = withoutShip[ i ];
+
+			if ( ( Mathf.Abs( a.r - b.r ) + Mathf.Abs( a.g - b.g ) + Mathf.Abs( a.b - b.b ) ) <= 12 )
+			{
+				continue;
+			}
+
+			isShip[ i ] = true;
+			shipPixels++;
+
+			RectTransformUtility.ScreenPointToLocalPointInRectangle( outline.rectTransform, new Vector2( i % screenWidth + 0.5f, i / screenWidth + 0.5f ), camera, out var local );
+
+			var point = new Vector2( ( local.x - drawn.x ) / drawn.width * width, ( local.y - drawn.y ) / drawn.height * height );
+			var px = Mathf.FloorToInt( point.x );
+			var py = Mathf.FloorToInt( point.y );
+
+			min = Vector2.Min( min, point );
+			max = Vector2.Max( max, point );
+
+			if ( ( px < 0 ) || ( py < 0 ) || ( px >= width ) || ( py >= height ) || ( region[ py * width + px ] != 0 ) )
+			{
+				misses++;
+			}
+		}
+
+		// the silhouette in the sprite's own pixels, each sprite pixel looked up on screen
+		var dumpFolder = Environment.GetEnvironmentVariable( "PROBE_SHIELD_DUMP" );
+
+		if ( !string.IsNullOrEmpty( dumpFolder ) )
+		{
+			var mask = new Texture2D( width, height, TextureFormat.RGBA32, false );
+			var maskPixels = new Color32[ width * height ];
+
+			for ( var y = 0; y < height; y++ )
+			{
+				for ( var x = 0; x < width; x++ )
+				{
+					var local = new Vector2( drawn.x + ( x + 0.5f ) / width * drawn.width, drawn.y + ( y + 0.5f ) / height * drawn.height );
+					var screen = RectTransformUtility.WorldToScreenPoint( camera, outline.rectTransform.TransformPoint( local ) );
+					var sx = Mathf.FloorToInt( screen.x );
+					var sy = Mathf.FloorToInt( screen.y );
+					var on = ( sx >= 0 ) && ( sy >= 0 ) && ( sx < screenWidth ) && ( sy < screenHeight ) && isShip[ sy * screenWidth + sx ];
+
+					maskPixels[ y * width + x ] = on ? new Color32( 255, 255, 255, 255 ) : new Color32( 0, 0, 0, 255 );
+				}
+			}
+
+			mask.SetPixels32( maskPixels );
+			mask.Apply();
+
+			System.IO.Directory.CreateDirectory( dumpFolder );
+			System.IO.File.WriteAllBytes( System.IO.Path.Combine( dumpFolder, label + ".png" ), mask.EncodeToPNG() );
+
+			UnityEngine.Object.Destroy( mask );
+		}
+
+		camera.targetTexture = keptTarget;
+		renderTexture.Release();
+		UnityEngine.Object.Destroy( renderTexture );
+
+		extent = "the ship spans x " + min.x.ToString( "F0" ) + " to " + max.x.ToString( "F0" ) + ", y " + min.y.ToString( "F0" ) + " to " + max.y.ToString( "F0" ) + " of the outline's " + width + " x " + height + " pixels, drawn " + drawn.width.ToString( "F0" ) + " x " + drawn.height.ToString( "F0" ) + " in its rectangle";
+
+		return misses;
+	}
+
+	// the shield outline of the status display around the ship with every part it can have: the outline goes round all of them (the model made with Meshy
+	// has larger weapon mounts than the old one, and they stuck out of the outline drawn for the old one)
+	IEnumerator ScenarioShieldOutline()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var displays = controller.m_displayController;
+		var ship = playerData.m_playerShip;
+		var status = displays.m_statusDisplay;
+
+		controller.m_encounterRange = 0.0f;
+
+		ship.m_shieldingClass = 5;
+		ship.m_missileLauncherClass = 5;
+		ship.m_laserCannonClass = 5;
+		ship.m_numCargoPods = 16;
+		ship.m_shieldPoints = ship.GetMaximumShieldPoints();
+		ship.m_shieldsAreUp = true;
+
+		// the display shows the parts the ship has when it starts
+		status.Start();
+		displays.ChangeDisplay( status );
+
+		yield return Frames( 10 );
+
+		var outlineImage = status.m_shieldOutline.GetComponent<UnityEngine.UI.Image>();
+		var misses = ShieldOutlineMisses( outlineImage, ShipModelRoot( status.m_missileLauncher ), "status", out var shipPixels, out var extent );
+
+		if ( misses < 0 )
+		{
+			Log( "shieldoutline: no graphics device, so the ship cannot be drawn; run probe.ps1 with -Graphics" );
+
+			Finish( "scenario=shieldoutline pixels=0", 0 );
+			yield break;
+		}
+
+		Log( "shieldoutline: " + misses + " of " + shipPixels + " pixels of the ship outside the outline or on its line; " + extent );
+
+		Check( "shieldoutline: the shield outline is shown around the fully equipped ship", status.m_shieldOutline.activeInHierarchy && status.m_missileLauncher.activeInHierarchy && status.m_laserCannon.activeInHierarchy, status.m_shieldOutline.activeInHierarchy + "/" + status.m_missileLauncher.activeInHierarchy + "/" + status.m_laserCannon.activeInHierarchy );
+		Check( "shieldoutline: every part of the ship is inside the shield outline, clear of its line", ( shipPixels > 0 ) && ( misses == 0 ), misses + " of " + shipPixels );
+
+		var folder = ScreenPictureFolder( "shield-outline" );
+
+		if ( folder != "" )
+		{
+			RenderScreenPicture( System.IO.Path.Combine( folder, "status_display.png" ) );
+		}
+
+		ship.m_shieldsAreUp = false;
+
+		Finish( "scenario=shieldoutline misses=" + misses + " pixels=" + shipPixels, 0 );
+	}
+
+	// the same in the Starport's Ship Configuration, with every part bought
+	IEnumerator ScenarioStarportShieldOutline()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var shipConfiguration = FindPanel<ShipConfigurationPanel>();
+
+		playerData.m_bank.m_currentBalance = 5000000;
+
+		yield return Frames( 60 );
+		yield return OpenPanel( shipConfiguration, "ship configuration" );
+
+		for ( var part = 1; part < 6; part++ )
+		{
+			SetField( shipConfiguration, "m_currentPartIndex", part );
+			SetField( shipConfiguration, "m_currentClassIndex", 4 );
+			Call( shipConfiguration, "BuySelectedClass" );
+		}
+
+		for ( var pod = 0; pod < 16; pod++ )
+		{
+			SetField( shipConfiguration, "m_currentPartIndex", 0 );
+			Call( shipConfiguration, "BuyCargoPod" );
+		}
+
+		Call( shipConfiguration, "SwitchToMenuBarState" );
+
+		yield return Frames( 10 );
+
+		var misses = ShieldOutlineMisses( shipConfiguration.m_shieldImage, ShipModelRoot( shipConfiguration.m_missileLauncher ), "starport", out var shipPixels, out var extent );
+
+		if ( misses < 0 )
+		{
+			Log( "starport-shieldoutline: no graphics device, so the ship cannot be drawn; run probe.ps1 with -Graphics" );
+
+			Finish( "scenario=starport-shieldoutline pixels=0", 0 );
+			yield break;
+		}
+
+		Log( "starport-shieldoutline: " + misses + " of " + shipPixels + " pixels of the ship outside the outline or on its line; " + extent + " | pods " + playerData.m_playerShip.m_numCargoPods + " shielding " + playerData.m_playerShip.m_shieldingClass + " missiles " + playerData.m_playerShip.m_missileLauncherClass + " lasers " + playerData.m_playerShip.m_laserCannonClass );
+
+		Check( "starport-shieldoutline: the shield outline is shown around the fully equipped ship", shipConfiguration.m_shieldImage.gameObject.activeInHierarchy && shipConfiguration.m_missileLauncher.activeInHierarchy && shipConfiguration.m_laserCannon.activeInHierarchy, shipConfiguration.m_shieldImage.gameObject.activeInHierarchy + "/" + shipConfiguration.m_missileLauncher.activeInHierarchy + "/" + shipConfiguration.m_laserCannon.activeInHierarchy );
+		Check( "starport-shieldoutline: every part of the ship is inside the shield outline, clear of its line", ( shipPixels > 0 ) && ( misses == 0 ), misses + " of " + shipPixels );
+
+		var folder = ScreenPictureFolder( "shield-outline-starport" );
+
+		if ( folder != "" )
+		{
+			RenderScreenPicture( System.IO.Path.Combine( folder, "ship_configuration.png" ) );
+		}
+
+		yield return ClosePanel( shipConfiguration, "ship configuration" );
+
+		Finish( "scenario=starport-shieldoutline misses=" + misses + " pixels=" + shipPixels, 0 );
+	}
+
 	IEnumerator StarportRoomScreens( System.Action<string> take )
 	{
 		var playerData = DataController.m_instance.m_playerData;
