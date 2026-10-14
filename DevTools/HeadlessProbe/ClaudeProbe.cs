@@ -1412,6 +1412,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLandingWarning();
 				break;
 
+			case "fuelwarnings":
+				yield return ScenarioFuelWarnings();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -35207,6 +35211,74 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "landingwarning: a second Land goes on to the landing", secondSet == ButtonController.ButtonSet.Land, secondSet.ToString() );
 
 		Finish( "scenario=landingwarning checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// flies in hyperspace with the engines on until the Endurium is down to the given tenths, or the seconds are up - returns the messages said meanwhile
+	static IEnumerator FlyUntilEndurium( int tenths, float seconds, string[] said )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		controller.m_messages.Clear();
+		controller.m_playerShip.TurnOnEngines();
+
+		var end = Time.realtimeSinceStartup + seconds;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( Endurium() > tenths ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		controller.m_playerShip.TurnOffEngines();
+		playerData.m_general.m_currentSpeed = 0.0f;
+
+		said[ 0 ] = MessageList();
+	}
+
+	// the fuel warnings in hyperspace, as the original's (HYPER-OV (-ENDURIUM)): "Fuel supply low." at 150 steps' worth of Endurium (class 1 engines: 9.0 cubic
+	// meters), "Fuel supply critical." at 75 (4.5) and "Out of fuel." at none
+	IEnumerator ScenarioFuelWarnings()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var low = new string[ 1 ];
+		var critical = new string[ 1 ];
+		var outOfFuel = new string[ 1 ];
+
+		EnsureCrew();
+
+		ship.m_enginesClass = 1;
+
+		// out in hyperspace, in a corner of it, with no encounter able to begin
+		controller.m_encounterRange = 0.0f;
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 4.0f, 0.0f, 4.0f ) );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		SetEndurium( 92 );
+
+		yield return FlyUntilEndurium( 89, 30.0f, low );
+
+		SetEndurium( 47 );
+
+		yield return FlyUntilEndurium( 44, 30.0f, critical );
+
+		SetEndurium( 2 );
+
+		yield return FlyUntilEndurium( 0, 30.0f, outOfFuel );
+
+		Log( "fuelwarnings: from 9.2 to 8.9 cubic meters '" + low[ 0 ] + "'; from 4.7 to 4.4 '" + critical[ 0 ] + "'; from 0.2 to none '" + outOfFuel[ 0 ] + "'" );
+
+		Check( "fuelwarnings: below 150 steps' worth of Endurium (9.0 cubic meters with class 1 engines) the ship says the fuel supply is low", low[ 0 ].Contains( "Fuel supply low." ), low[ 0 ] );
+		Check( "fuelwarnings: below 75 steps' worth (4.5) it says the fuel supply is critical", critical[ 0 ].Contains( "Fuel supply critical." ), critical[ 0 ] );
+		Check( "fuelwarnings: with none left it says it is out of fuel", outOfFuel[ 0 ].Contains( "Out of fuel." ), outOfFuel[ 0 ] );
+
+		Finish( "scenario=fuelwarnings checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
