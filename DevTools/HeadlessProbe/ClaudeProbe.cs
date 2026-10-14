@@ -32489,6 +32489,37 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 5 );
 	}
 
+	// the last stretch to a place: short pushes of the stick with stops between, so that the vehicle does not circle the place it turns toward
+	IEnumerator PtCreep( Func<Vector3> target, float reach, float seconds )
+	{
+		var vehicle = SpaceflightController.m_instance.m_terrainVehicle.transform;
+		var end = Time.realtimeSinceStartup + seconds;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			var delta = target() - vehicle.position;
+
+			delta.y = 0.0f;
+
+			if ( delta.magnitude <= reach )
+			{
+				break;
+			}
+
+			HoldKeys( PtKeysToward( delta ) );
+
+			yield return Frames( 2 );
+
+			HoldKeys();
+
+			yield return Frames( 6 );
+		}
+
+		HoldKeys();
+
+		yield return Frames( 5 );
+	}
+
 	// the terrain vehicle's hold in words
 	static string PtVehicleHold()
 	{
@@ -32670,8 +32701,10 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		// within 2 km of the ship (2048 units are 225 km)
-		// onto the ship's map cell: Move stopped there takes the vehicle in (0.5 km, 4.5 units)
-		yield return PtDrive( shipPlace, 2.5f, 25.0f, driven );
+		// onto the ship's map cell: Move stopped there takes the vehicle in (0.5 km, 4.5 units) - most of the way with the stick held, the last stretch in short
+		// pushes, as the vehicle turns too slowly to come to a point it drives straight at (it circles it)
+		yield return PtDrive( shipPlace, 12.0f, 25.0f, driven );
+		yield return PtCreep( shipPlace, 2.5f, 25.0f );
 
 		Log( "playthrough: drove " + driven[ 0 ].ToString( "F0" ) + " units back toward the ship, " + Vector3.Distance( controller.m_terrainVehicle.transform.position, shipPlace() ).ToString( "F0" ) + " from it" );
 
