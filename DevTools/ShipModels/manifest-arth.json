@@ -1,0 +1,84 @@
+{
+	"race": "Arth",
+	"vessels": [],
+	"materials": [
+		{
+			"name": "Arth Ship Meshy Hull",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Arth",
+			"albedoMap": "Assets/Game Objects/Ships/Arth/Textures/Arth Ship Hull - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Arth/Textures/Arth Ship Hull - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Arth/Textures/Arth Ship Hull - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Arth/Textures/Arth Ship Hull - Emissive.jpg"
+		},
+		{
+			"name": "Arth Ship Meshy Parts",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Arth",
+			"albedoMap": "Assets/Game Objects/Ships/Arth/Textures/Arth Ship Parts - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Arth/Textures/Arth Ship Parts - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Arth/Textures/Arth Ship Parts - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Arth/Textures/Arth Ship Parts - Emissive.jpg"
+		}
+	],
+	"playerShip": {
+		"model": "Assets/Game Objects/Ships/Arth/Arth Ship.FBX",
+		"debris": "Assets/Game Objects/Ships Debris/Arth/Arth Ship.FBX",
+		"materials": [
+			"Arth Ship Meshy Hull",
+			"Arth Ship Meshy Parts"
+		],
+		"contrails": [
+			0.416,
+			0.864,
+			-0.029,
+			-0.426,
+			0.864,
+			-0.025
+		],
+		"debrisScale": 15.0,
+		"meshy": {
+			"hull": {
+				"concept": "01a137c5-9495-7405-8bd6-4d117d20ba3d",
+				"conceptEdit": "01a137c6-dbf3-747e-bd2d-9ec3705fdc22",
+				"model": "01a137c9-920c-74ff-8254-c6530875860b",
+				"remesh": "01a137ca-d637-720f-b8d5-78e627c034ad"
+			},
+			"parts": {
+				"concept": "01a137c9-9229-75ff-bef9-6105d1049105",
+				"model": "01a137cc-81e7-7230-a807-49de1d0bf4ad",
+				"remesh": "01a137cd-c570-72ff-9581-12ea881c4893"
+			}
+		}
+	}
+}

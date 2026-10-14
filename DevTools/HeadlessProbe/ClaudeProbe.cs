@@ -10503,7 +10503,7 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=debrispictures alienBlank=" + alienBlank.Count + " playerBlank=" + playerBlank.Count + " errors=" + errorsDuring + " pictures=" + ( hasGraphics ? 7 : 0 ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
-	// ---------------------------------------------------------------- Low: ship pictures (the alien ship models made with Meshy are drawn with their maps, and pictures of them when the run has a graphics device: probe.ps1 -Graphics)
+	// ---------------------------------------------------------------- Low: ship pictures (the ship models made with Meshy, the aliens' and the player's Arth ship, are drawn with their maps, and pictures of them when the run has a graphics device: probe.ps1 -Graphics)
 
 	// the vessels whose models were made with Meshy (DevTools/ShipModels/import_meshy.py, meshy-<race>.json): the Thrynn transport, scout and warship
 	static readonly int[] c_meshyVessels = { 8, 9, 10 };
@@ -10525,6 +10525,36 @@ public class ClaudeProbe : MonoBehaviour
 				if ( ( material == null ) || !material.HasProperty( "_MainTex" ) || ( material.GetTexture( "_MainTex" ) == null ) || !material.IsKeywordEnabled( "SF_ALBEDOMAP_ON" ) )
 				{
 					unmapped.Add( ( material == null ) ? renderer.name + ":none" : material.name );
+				}
+			}
+		}
+
+		return unmapped;
+	}
+
+	// the materials of the player ship's model drawn without an albedo map: its meshes only, every equipment part too (the
+	// contrails, the exhaust and the engine glow quad under it have effects of their own)
+	static List<string> UnmappedShipMeshes( Transform ship )
+	{
+		var unmapped = new List<string>();
+
+		if ( ship == null )
+		{
+			return unmapped;
+		}
+
+		foreach ( var renderer in ship.GetComponentsInChildren<MeshRenderer>( true ) )
+		{
+			if ( renderer.GetComponentInParent<ParticleSystem>( true ) != null )
+			{
+				continue;
+			}
+
+			foreach ( var material in renderer.sharedMaterials )
+			{
+				if ( ( material == null ) || !material.HasProperty( "_MainTex" ) || ( material.GetTexture( "_MainTex" ) == null ) || !material.IsKeywordEnabled( "SF_ALBEDOMAP_ON" ) )
+				{
+					unmapped.Add( renderer.name + ":" + ( ( material == null ) ? "none" : material.name ) );
 				}
 			}
 		}
@@ -10660,6 +10690,62 @@ public class ClaudeProbe : MonoBehaviour
 			LeaveEncounter();
 
 			yield return Frames( 5 );
+		}
+
+		// the player's Arth ship (DevTools/ShipModels/import_meshy_arth.py): every mesh drawn with its maps, the 16 cargo pods and the
+		// weapons too, and a picture of it with all of them shown
+		yield return Frames( 5 );
+
+		var playerShip = controller.m_playerShip;
+		var arth = ( playerShip != null ) ? playerShip.m_ship : null;
+		var arthMeshes = ( arth != null ) ? arth.GetComponentsInChildren<MeshRenderer>( true ).Length : 0;
+		var arthUnmapped = UnmappedShipMeshes( arth );
+
+		Log( "shippictures: the player ship: " + ( ( arth != null ) ? DescribeRenderers( arth.gameObject ) : "none" ) );
+
+		Check( "shippictures: the player ship is drawn with its maps, every equipment part too", ( arthMeshes >= 19 ) && ( arthUnmapped.Count == 0 ), ( arth == null ) ? "no ship" : ( arthUnmapped.Count == 0 ) ? arthMeshes + " mesh renderers, every material mapped" : arthUnmapped.Count + " without maps: " + string.Join( ", ", arthUnmapped ) );
+
+		if ( hasGraphics && ( arth != null ) && ( playerShip.m_cargoPods != null ) )
+		{
+			var podsShown = new bool[ playerShip.m_cargoPods.Length ];
+
+			for ( var i = 0; i < podsShown.Length; i++ )
+			{
+				podsShown[ i ] = playerShip.m_cargoPods[ i ].activeSelf;
+				playerShip.m_cargoPods[ i ].SetActive( true );
+			}
+
+			var laserShown = playerShip.m_laserCannon.activeSelf;
+			var launcherShown = playerShip.m_missileLauncher.activeSelf;
+
+			playerShip.m_laserCannon.SetActive( true );
+			playerShip.m_missileLauncher.SetActive( true );
+
+			var arthBounds = new Bounds( arth.position, Vector3.zero );
+
+			foreach ( var renderer in arth.GetComponentsInChildren<MeshRenderer>() )
+			{
+				if ( renderer.GetComponentInParent<ParticleSystem>( true ) == null )
+				{
+					arthBounds.Encapsulate( renderer.bounds );
+				}
+			}
+
+			var arthSize = Mathf.Max( arthBounds.size.x, arthBounds.size.z, 1.0f );
+
+			RenderFromAbove( arthBounds.center, arthSize * 2.0f, System.IO.Path.Combine( folder, "arth_ship_above.png" ) );
+			RenderFromDirection( arthBounds.center, new Vector3( -0.8f, 0.9f, -0.7f ), arthSize * 1.5f, System.IO.Path.Combine( folder, "arth_ship_quarter.png" ) );
+			RenderFromDirection( arthBounds.center, new Vector3( 0.9f, 0.6f, 0.8f ), arthSize * 1.5f, System.IO.Path.Combine( folder, "arth_ship_rear.png" ) );
+
+			pictures += 3;
+
+			for ( var i = 0; i < podsShown.Length; i++ )
+			{
+				playerShip.m_cargoPods[ i ].SetActive( podsShown[ i ] );
+			}
+
+			playerShip.m_laserCannon.SetActive( laserShown );
+			playerShip.m_missileLauncher.SetActive( launcherShown );
 		}
 
 		Finish( "scenario=shippictures vessels=" + c_meshyVessels.Length + " pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );

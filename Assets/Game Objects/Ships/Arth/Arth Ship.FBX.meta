@@ -1,369 +1,1095 @@
 fileFormatVersion: 2
 guid: e26148b8b7a13b64d93bc449d062d5a3
 ModelImporter:
-  serializedVersion: 23
-  fileIDToRecycleName:
-    100000: //RootNode
-    100002: Arth Ship
-    100004: Cargo Pods - Left
-    100006: Cargo Pods - Right
-    100008: Laser Barrel - Left
-    100010: Laser Barrel - Right
-    100012: Laser Cannon
-    100014: Laser Turret
-    100016: Laser Turret Base
-    100018: Laser Turret Swivel
-    100020: Missile Launcher
-    100022: Missile Launcher - Left
-    100024: Missile Launcher - Right
-    100026: Missile Launcher Barrel - Left
-    100028: Missile Launcher Barrel - Right
-    100030: Missile Launcher Turret - Left
-    100032: Missile Launcher Turret - Right
-    100034: Pod 01
-    100036: Pod 02
-    100038: Pod 03
-    100040: Pod 04
-    100042: Pod 05
-    100044: Pod 06
-    100046: Pod 07
-    100048: Pod 08
-    100050: Pod 09
-    100052: Pod 10
-    100054: Pod 11
-    100056: Pod 12
-    100058: Pod 13
-    100060: Pod 14
-    100062: Pod 15
-    100064: Pod 16
-    100066: Pod Cube 01
-    100068: Pod Cube 02
-    100070: Pod Cube 03
-    100072: Pod Cube 04
-    100074: Pod Cube 05
-    100076: Pod Cube 06
-    100078: Pod Cube 07
-    100080: Pod Cube 08
-    100082: Pod Cube 09
-    100084: Pod Cube 10
-    100086: Pod Cube 11
-    100088: Pod Cube 12
-    100090: Pod Cube 13
-    100092: Pod Cube 14
-    100094: Pod Cube 15
-    100096: Pod Cube 16
-    100098: Pod Socket 01
-    100100: Pod Socket 02
-    100102: Pod Socket 03
-    100104: Pod Socket 04
-    100106: Pod Socket 05
-    100108: Pod Socket 06
-    100110: Pod Socket 07
-    100112: Pod Socket 08
-    100114: Pod Socket 09
-    100116: Pod Socket 10
-    100118: Pod Socket 11
-    100120: Pod Socket 12
-    100122: Pod Socket 13
-    100124: Pod Socket 14
-    100126: Pod Socket 15
-    100128: Pod Socket 16
-    100130: Skylight
-    100132: Laser
-    100134: Laser Base
-    100136: Missile Launchers
-    100138: Light
-    100140: Exhaust
-    100142: Exhaust Dome
-    100144: Exhaust Inner Cone
-    100146: Exhaust Outer Cone
-    100148: Hull
-    400000: //RootNode
-    400002: Arth Ship
-    400004: Cargo Pods - Left
-    400006: Cargo Pods - Right
-    400008: Laser Barrel - Left
-    400010: Laser Barrel - Right
-    400012: Laser Cannon
-    400014: Laser Turret
-    400016: Laser Turret Base
-    400018: Laser Turret Swivel
-    400020: Missile Launcher
-    400022: Missile Launcher - Left
-    400024: Missile Launcher - Right
-    400026: Missile Launcher Barrel - Left
-    400028: Missile Launcher Barrel - Right
-    400030: Missile Launcher Turret - Left
-    400032: Missile Launcher Turret - Right
-    400034: Pod 01
-    400036: Pod 02
-    400038: Pod 03
-    400040: Pod 04
-    400042: Pod 05
-    400044: Pod 06
-    400046: Pod 07
-    400048: Pod 08
-    400050: Pod 09
-    400052: Pod 10
-    400054: Pod 11
-    400056: Pod 12
-    400058: Pod 13
-    400060: Pod 14
-    400062: Pod 15
-    400064: Pod 16
-    400066: Pod Cube 01
-    400068: Pod Cube 02
-    400070: Pod Cube 03
-    400072: Pod Cube 04
-    400074: Pod Cube 05
-    400076: Pod Cube 06
-    400078: Pod Cube 07
-    400080: Pod Cube 08
-    400082: Pod Cube 09
-    400084: Pod Cube 10
-    400086: Pod Cube 11
-    400088: Pod Cube 12
-    400090: Pod Cube 13
-    400092: Pod Cube 14
-    400094: Pod Cube 15
-    400096: Pod Cube 16
-    400098: Pod Socket 01
-    400100: Pod Socket 02
-    400102: Pod Socket 03
-    400104: Pod Socket 04
-    400106: Pod Socket 05
-    400108: Pod Socket 06
-    400110: Pod Socket 07
-    400112: Pod Socket 08
-    400114: Pod Socket 09
-    400116: Pod Socket 10
-    400118: Pod Socket 11
-    400120: Pod Socket 12
-    400122: Pod Socket 13
-    400124: Pod Socket 14
-    400126: Pod Socket 15
-    400128: Pod Socket 16
-    400130: Skylight
-    400132: Laser
-    400134: Laser Base
-    400136: Missile Launchers
-    400138: Light
-    400140: Exhaust
-    400142: Exhaust Dome
-    400144: Exhaust Inner Cone
-    400146: Exhaust Outer Cone
-    400148: Hull
-    2100000: Hull
-    2100002: Cockpit Top
-    2100004: Trim
-    2100006: Exhaust C
-    2100008: Exhaust A
-    2100010: Windows
-    2100012: Engine Glow
-    2100014: Exhaust B
-    2100016: Barrel A
-    2100018: Barrel B
-    2300000: Arth Ship
-    2300002: Laser Barrel - Left
-    2300004: Laser Barrel - Right
-    2300006: Laser Turret
-    2300008: Laser Turret Base
-    2300010: Laser Turret Swivel
-    2300012: Missile Launcher Barrel - Left
-    2300014: Missile Launcher Barrel - Right
-    2300016: Missile Launcher Turret - Left
-    2300018: Missile Launcher Turret - Right
-    2300020: Pod Cube 01
-    2300022: Pod Cube 02
-    2300024: Pod Cube 03
-    2300026: Pod Cube 04
-    2300028: Pod Cube 05
-    2300030: Pod Cube 06
-    2300032: Pod Cube 07
-    2300034: Pod Cube 08
-    2300036: Pod Cube 09
-    2300038: Pod Cube 10
-    2300040: Pod Cube 11
-    2300042: Pod Cube 12
-    2300044: Pod Cube 13
-    2300046: Pod Cube 14
-    2300048: Pod Cube 15
-    2300050: Pod Cube 16
-    2300052: Pod Socket 01
-    2300054: Pod Socket 02
-    2300056: Pod Socket 03
-    2300058: Pod Socket 04
-    2300060: Pod Socket 05
-    2300062: Pod Socket 06
-    2300064: Pod Socket 07
-    2300066: Pod Socket 08
-    2300068: Pod Socket 09
-    2300070: Pod Socket 10
-    2300072: Pod Socket 11
-    2300074: Pod Socket 12
-    2300076: Pod Socket 13
-    2300078: Pod Socket 14
-    2300080: Pod Socket 15
-    2300082: Pod Socket 16
-    2300084: Pod 01
-    2300086: Pod 02
-    2300088: Pod 03
-    2300090: Pod 04
-    2300092: Pod 05
-    2300094: Pod 06
-    2300096: Pod 07
-    2300098: Pod 08
-    2300100: Pod 09
-    2300102: Pod 10
-    2300104: Pod 11
-    2300106: Pod 12
-    2300108: Pod 13
-    2300110: Pod 14
-    2300112: Pod 15
-    2300114: Pod 16
-    2300116: Laser
-    2300118: Laser Base
-    2300120: Missile Launcher - Left
-    2300122: Missile Launcher - Right
-    2300124: Exhaust Dome
-    2300126: Exhaust Inner Cone
-    2300128: Exhaust Outer Cone
-    2300130: Hull
-    3300000: Arth Ship
-    3300002: Laser Barrel - Left
-    3300004: Laser Barrel - Right
-    3300006: Laser Turret
-    3300008: Laser Turret Base
-    3300010: Laser Turret Swivel
-    3300012: Missile Launcher Barrel - Left
-    3300014: Missile Launcher Barrel - Right
-    3300016: Missile Launcher Turret - Left
-    3300018: Missile Launcher Turret - Right
-    3300020: Pod Cube 01
-    3300022: Pod Cube 02
-    3300024: Pod Cube 03
-    3300026: Pod Cube 04
-    3300028: Pod Cube 05
-    3300030: Pod Cube 06
-    3300032: Pod Cube 07
-    3300034: Pod Cube 08
-    3300036: Pod Cube 09
-    3300038: Pod Cube 10
-    3300040: Pod Cube 11
-    3300042: Pod Cube 12
-    3300044: Pod Cube 13
-    3300046: Pod Cube 14
-    3300048: Pod Cube 15
-    3300050: Pod Cube 16
-    3300052: Pod Socket 01
-    3300054: Pod Socket 02
-    3300056: Pod Socket 03
-    3300058: Pod Socket 04
-    3300060: Pod Socket 05
-    3300062: Pod Socket 06
-    3300064: Pod Socket 07
-    3300066: Pod Socket 08
-    3300068: Pod Socket 09
-    3300070: Pod Socket 10
-    3300072: Pod Socket 11
-    3300074: Pod Socket 12
-    3300076: Pod Socket 13
-    3300078: Pod Socket 14
-    3300080: Pod Socket 15
-    3300082: Pod Socket 16
-    3300084: Pod 01
-    3300086: Pod 02
-    3300088: Pod 03
-    3300090: Pod 04
-    3300092: Pod 05
-    3300094: Pod 06
-    3300096: Pod 07
-    3300098: Pod 08
-    3300100: Pod 09
-    3300102: Pod 10
-    3300104: Pod 11
-    3300106: Pod 12
-    3300108: Pod 13
-    3300110: Pod 14
-    3300112: Pod 15
-    3300114: Pod 16
-    3300116: Laser
-    3300118: Laser Base
-    3300120: Missile Launcher - Left
-    3300122: Missile Launcher - Right
-    3300124: Exhaust Dome
-    3300126: Exhaust Inner Cone
-    3300128: Exhaust Outer Cone
-    3300130: Hull
-    4300000: Arth Ship
-    4300002: Pod Cube 02
-    4300004: Pod Socket 02
-    4300006: Pod Socket 04
-    4300008: Pod Cube 04
-    4300010: Pod Socket 06
-    4300012: Pod Cube 06
-    4300014: Pod Socket 08
-    4300016: Pod Cube 08
-    4300018: Pod Socket 10
-    4300020: Pod Cube 10
-    4300022: Pod Socket 12
-    4300024: Pod Cube 12
-    4300026: Pod Socket 14
-    4300028: Pod Cube 14
-    4300030: Pod Socket 16
-    4300032: Pod Cube 16
-    4300034: Pod Cube 01
-    4300036: Pod Socket 01
-    4300038: Pod Cube 03
-    4300040: Pod Socket 03
-    4300042: Pod Cube 05
-    4300044: Pod Socket 05
-    4300046: Pod Cube 07
-    4300048: Pod Socket 07
-    4300050: Pod Cube 09
-    4300052: Pod Socket 09
-    4300054: Pod Cube 11
-    4300056: Pod Socket 11
-    4300058: Pod Cube 13
-    4300060: Pod Socket 13
-    4300062: Pod Cube 15
-    4300064: Pod Socket 15
-    4300066: Laser Barrel - Left
-    4300068: Laser Barrel - Right
-    4300070: Laser Turret
-    4300072: Laser Turret Base
-    4300074: Laser Turret Swivel
-    4300076: Missile Launcher Turret - Left
-    4300078: Missile Launcher Barrel - Left
-    4300080: Missile Launcher Turret - Right
-    4300082: Missile Launcher Barrel - Right
-    4300084: Pod 02
-    4300086: Pod 04
-    4300088: Pod 06
-    4300090: Pod 08
-    4300092: Pod 10
-    4300094: Pod 12
-    4300096: Pod 14
-    4300098: Pod 16
-    4300100: Pod 01
-    4300102: Pod 03
-    4300104: Pod 05
-    4300106: Pod 07
-    4300108: Pod 09
-    4300110: Pod 11
-    4300112: Pod 13
-    4300114: Pod 15
-    4300116: Laser
-    4300118: Laser Base
-    4300120: Missile Launcher - Left
-    4300122: Missile Launcher - Right
-    4300124: Hull
-    4300126: Exhaust Dome
-    4300128: Exhaust Inner Cone
-    4300130: Exhaust Outer Cone
-  externalObjects: {}
+  serializedVersion: 24200
+  internalIDToNameTable:
+  - first:
+      1: 100000
+    second: //RootNode
+  - first:
+      1: 100002
+    second: Arth Ship
+  - first:
+      1: 100004
+    second: Cargo Pods - Left
+  - first:
+      1: 100006
+    second: Cargo Pods - Right
+  - first:
+      1: 100008
+    second: Laser Barrel - Left
+  - first:
+      1: 100010
+    second: Laser Barrel - Right
+  - first:
+      1: 100012
+    second: Laser Cannon
+  - first:
+      1: 100014
+    second: Laser Turret
+  - first:
+      1: 100016
+    second: Laser Turret Base
+  - first:
+      1: 100018
+    second: Laser Turret Swivel
+  - first:
+      1: 100020
+    second: Missile Launcher
+  - first:
+      1: 100022
+    second: Missile Launcher - Left
+  - first:
+      1: 100024
+    second: Missile Launcher - Right
+  - first:
+      1: 100026
+    second: Missile Launcher Barrel - Left
+  - first:
+      1: 100028
+    second: Missile Launcher Barrel - Right
+  - first:
+      1: 100030
+    second: Missile Launcher Turret - Left
+  - first:
+      1: 100032
+    second: Missile Launcher Turret - Right
+  - first:
+      1: 100034
+    second: Pod 01
+  - first:
+      1: 100036
+    second: Pod 02
+  - first:
+      1: 100038
+    second: Pod 03
+  - first:
+      1: 100040
+    second: Pod 04
+  - first:
+      1: 100042
+    second: Pod 05
+  - first:
+      1: 100044
+    second: Pod 06
+  - first:
+      1: 100046
+    second: Pod 07
+  - first:
+      1: 100048
+    second: Pod 08
+  - first:
+      1: 100050
+    second: Pod 09
+  - first:
+      1: 100052
+    second: Pod 10
+  - first:
+      1: 100054
+    second: Pod 11
+  - first:
+      1: 100056
+    second: Pod 12
+  - first:
+      1: 100058
+    second: Pod 13
+  - first:
+      1: 100060
+    second: Pod 14
+  - first:
+      1: 100062
+    second: Pod 15
+  - first:
+      1: 100064
+    second: Pod 16
+  - first:
+      1: 100066
+    second: Pod Cube 01
+  - first:
+      1: 100068
+    second: Pod Cube 02
+  - first:
+      1: 100070
+    second: Pod Cube 03
+  - first:
+      1: 100072
+    second: Pod Cube 04
+  - first:
+      1: 100074
+    second: Pod Cube 05
+  - first:
+      1: 100076
+    second: Pod Cube 06
+  - first:
+      1: 100078
+    second: Pod Cube 07
+  - first:
+      1: 100080
+    second: Pod Cube 08
+  - first:
+      1: 100082
+    second: Pod Cube 09
+  - first:
+      1: 100084
+    second: Pod Cube 10
+  - first:
+      1: 100086
+    second: Pod Cube 11
+  - first:
+      1: 100088
+    second: Pod Cube 12
+  - first:
+      1: 100090
+    second: Pod Cube 13
+  - first:
+      1: 100092
+    second: Pod Cube 14
+  - first:
+      1: 100094
+    second: Pod Cube 15
+  - first:
+      1: 100096
+    second: Pod Cube 16
+  - first:
+      1: 100098
+    second: Pod Socket 01
+  - first:
+      1: 100100
+    second: Pod Socket 02
+  - first:
+      1: 100102
+    second: Pod Socket 03
+  - first:
+      1: 100104
+    second: Pod Socket 04
+  - first:
+      1: 100106
+    second: Pod Socket 05
+  - first:
+      1: 100108
+    second: Pod Socket 06
+  - first:
+      1: 100110
+    second: Pod Socket 07
+  - first:
+      1: 100112
+    second: Pod Socket 08
+  - first:
+      1: 100114
+    second: Pod Socket 09
+  - first:
+      1: 100116
+    second: Pod Socket 10
+  - first:
+      1: 100118
+    second: Pod Socket 11
+  - first:
+      1: 100120
+    second: Pod Socket 12
+  - first:
+      1: 100122
+    second: Pod Socket 13
+  - first:
+      1: 100124
+    second: Pod Socket 14
+  - first:
+      1: 100126
+    second: Pod Socket 15
+  - first:
+      1: 100128
+    second: Pod Socket 16
+  - first:
+      1: 100130
+    second: Skylight
+  - first:
+      1: 100132
+    second: Laser
+  - first:
+      1: 100134
+    second: Laser Base
+  - first:
+      1: 100136
+    second: Missile Launchers
+  - first:
+      1: 100138
+    second: Light
+  - first:
+      1: 100140
+    second: Exhaust
+  - first:
+      1: 100142
+    second: Exhaust Dome
+  - first:
+      1: 100144
+    second: Exhaust Inner Cone
+  - first:
+      1: 100146
+    second: Exhaust Outer Cone
+  - first:
+      1: 100148
+    second: Hull
+  - first:
+      4: 400000
+    second: //RootNode
+  - first:
+      4: 400002
+    second: Arth Ship
+  - first:
+      4: 400004
+    second: Cargo Pods - Left
+  - first:
+      4: 400006
+    second: Cargo Pods - Right
+  - first:
+      4: 400008
+    second: Laser Barrel - Left
+  - first:
+      4: 400010
+    second: Laser Barrel - Right
+  - first:
+      4: 400012
+    second: Laser Cannon
+  - first:
+      4: 400014
+    second: Laser Turret
+  - first:
+      4: 400016
+    second: Laser Turret Base
+  - first:
+      4: 400018
+    second: Laser Turret Swivel
+  - first:
+      4: 400020
+    second: Missile Launcher
+  - first:
+      4: 400022
+    second: Missile Launcher - Left
+  - first:
+      4: 400024
+    second: Missile Launcher - Right
+  - first:
+      4: 400026
+    second: Missile Launcher Barrel - Left
+  - first:
+      4: 400028
+    second: Missile Launcher Barrel - Right
+  - first:
+      4: 400030
+    second: Missile Launcher Turret - Left
+  - first:
+      4: 400032
+    second: Missile Launcher Turret - Right
+  - first:
+      4: 400034
+    second: Pod 01
+  - first:
+      4: 400036
+    second: Pod 02
+  - first:
+      4: 400038
+    second: Pod 03
+  - first:
+      4: 400040
+    second: Pod 04
+  - first:
+      4: 400042
+    second: Pod 05
+  - first:
+      4: 400044
+    second: Pod 06
+  - first:
+      4: 400046
+    second: Pod 07
+  - first:
+      4: 400048
+    second: Pod 08
+  - first:
+      4: 400050
+    second: Pod 09
+  - first:
+      4: 400052
+    second: Pod 10
+  - first:
+      4: 400054
+    second: Pod 11
+  - first:
+      4: 400056
+    second: Pod 12
+  - first:
+      4: 400058
+    second: Pod 13
+  - first:
+      4: 400060
+    second: Pod 14
+  - first:
+      4: 400062
+    second: Pod 15
+  - first:
+      4: 400064
+    second: Pod 16
+  - first:
+      4: 400066
+    second: Pod Cube 01
+  - first:
+      4: 400068
+    second: Pod Cube 02
+  - first:
+      4: 400070
+    second: Pod Cube 03
+  - first:
+      4: 400072
+    second: Pod Cube 04
+  - first:
+      4: 400074
+    second: Pod Cube 05
+  - first:
+      4: 400076
+    second: Pod Cube 06
+  - first:
+      4: 400078
+    second: Pod Cube 07
+  - first:
+      4: 400080
+    second: Pod Cube 08
+  - first:
+      4: 400082
+    second: Pod Cube 09
+  - first:
+      4: 400084
+    second: Pod Cube 10
+  - first:
+      4: 400086
+    second: Pod Cube 11
+  - first:
+      4: 400088
+    second: Pod Cube 12
+  - first:
+      4: 400090
+    second: Pod Cube 13
+  - first:
+      4: 400092
+    second: Pod Cube 14
+  - first:
+      4: 400094
+    second: Pod Cube 15
+  - first:
+      4: 400096
+    second: Pod Cube 16
+  - first:
+      4: 400098
+    second: Pod Socket 01
+  - first:
+      4: 400100
+    second: Pod Socket 02
+  - first:
+      4: 400102
+    second: Pod Socket 03
+  - first:
+      4: 400104
+    second: Pod Socket 04
+  - first:
+      4: 400106
+    second: Pod Socket 05
+  - first:
+      4: 400108
+    second: Pod Socket 06
+  - first:
+      4: 400110
+    second: Pod Socket 07
+  - first:
+      4: 400112
+    second: Pod Socket 08
+  - first:
+      4: 400114
+    second: Pod Socket 09
+  - first:
+      4: 400116
+    second: Pod Socket 10
+  - first:
+      4: 400118
+    second: Pod Socket 11
+  - first:
+      4: 400120
+    second: Pod Socket 12
+  - first:
+      4: 400122
+    second: Pod Socket 13
+  - first:
+      4: 400124
+    second: Pod Socket 14
+  - first:
+      4: 400126
+    second: Pod Socket 15
+  - first:
+      4: 400128
+    second: Pod Socket 16
+  - first:
+      4: 400130
+    second: Skylight
+  - first:
+      4: 400132
+    second: Laser
+  - first:
+      4: 400134
+    second: Laser Base
+  - first:
+      4: 400136
+    second: Missile Launchers
+  - first:
+      4: 400138
+    second: Light
+  - first:
+      4: 400140
+    second: Exhaust
+  - first:
+      4: 400142
+    second: Exhaust Dome
+  - first:
+      4: 400144
+    second: Exhaust Inner Cone
+  - first:
+      4: 400146
+    second: Exhaust Outer Cone
+  - first:
+      4: 400148
+    second: Hull
+  - first:
+      21: 2100000
+    second: Hull
+  - first:
+      21: 2100002
+    second: Cockpit Top
+  - first:
+      21: 2100004
+    second: Trim
+  - first:
+      21: 2100006
+    second: Exhaust C
+  - first:
+      21: 2100008
+    second: Exhaust A
+  - first:
+      21: 2100010
+    second: Windows
+  - first:
+      21: 2100012
+    second: Engine Glow
+  - first:
+      21: 2100014
+    second: Exhaust B
+  - first:
+      21: 2100016
+    second: Barrel A
+  - first:
+      21: 2100018
+    second: Barrel B
+  - first:
+      23: 2300000
+    second: Arth Ship
+  - first:
+      23: 2300002
+    second: Laser Barrel - Left
+  - first:
+      23: 2300004
+    second: Laser Barrel - Right
+  - first:
+      23: 2300006
+    second: Laser Turret
+  - first:
+      23: 2300008
+    second: Laser Turret Base
+  - first:
+      23: 2300010
+    second: Laser Turret Swivel
+  - first:
+      23: 2300012
+    second: Missile Launcher Barrel - Left
+  - first:
+      23: 2300014
+    second: Missile Launcher Barrel - Right
+  - first:
+      23: 2300016
+    second: Missile Launcher Turret - Left
+  - first:
+      23: 2300018
+    second: Missile Launcher Turret - Right
+  - first:
+      23: 2300020
+    second: Pod Cube 01
+  - first:
+      23: 2300022
+    second: Pod Cube 02
+  - first:
+      23: 2300024
+    second: Pod Cube 03
+  - first:
+      23: 2300026
+    second: Pod Cube 04
+  - first:
+      23: 2300028
+    second: Pod Cube 05
+  - first:
+      23: 2300030
+    second: Pod Cube 06
+  - first:
+      23: 2300032
+    second: Pod Cube 07
+  - first:
+      23: 2300034
+    second: Pod Cube 08
+  - first:
+      23: 2300036
+    second: Pod Cube 09
+  - first:
+      23: 2300038
+    second: Pod Cube 10
+  - first:
+      23: 2300040
+    second: Pod Cube 11
+  - first:
+      23: 2300042
+    second: Pod Cube 12
+  - first:
+      23: 2300044
+    second: Pod Cube 13
+  - first:
+      23: 2300046
+    second: Pod Cube 14
+  - first:
+      23: 2300048
+    second: Pod Cube 15
+  - first:
+      23: 2300050
+    second: Pod Cube 16
+  - first:
+      23: 2300052
+    second: Pod Socket 01
+  - first:
+      23: 2300054
+    second: Pod Socket 02
+  - first:
+      23: 2300056
+    second: Pod Socket 03
+  - first:
+      23: 2300058
+    second: Pod Socket 04
+  - first:
+      23: 2300060
+    second: Pod Socket 05
+  - first:
+      23: 2300062
+    second: Pod Socket 06
+  - first:
+      23: 2300064
+    second: Pod Socket 07
+  - first:
+      23: 2300066
+    second: Pod Socket 08
+  - first:
+      23: 2300068
+    second: Pod Socket 09
+  - first:
+      23: 2300070
+    second: Pod Socket 10
+  - first:
+      23: 2300072
+    second: Pod Socket 11
+  - first:
+      23: 2300074
+    second: Pod Socket 12
+  - first:
+      23: 2300076
+    second: Pod Socket 13
+  - first:
+      23: 2300078
+    second: Pod Socket 14
+  - first:
+      23: 2300080
+    second: Pod Socket 15
+  - first:
+      23: 2300082
+    second: Pod Socket 16
+  - first:
+      23: 2300084
+    second: Pod 01
+  - first:
+      23: 2300086
+    second: Pod 02
+  - first:
+      23: 2300088
+    second: Pod 03
+  - first:
+      23: 2300090
+    second: Pod 04
+  - first:
+      23: 2300092
+    second: Pod 05
+  - first:
+      23: 2300094
+    second: Pod 06
+  - first:
+      23: 2300096
+    second: Pod 07
+  - first:
+      23: 2300098
+    second: Pod 08
+  - first:
+      23: 2300100
+    second: Pod 09
+  - first:
+      23: 2300102
+    second: Pod 10
+  - first:
+      23: 2300104
+    second: Pod 11
+  - first:
+      23: 2300106
+    second: Pod 12
+  - first:
+      23: 2300108
+    second: Pod 13
+  - first:
+      23: 2300110
+    second: Pod 14
+  - first:
+      23: 2300112
+    second: Pod 15
+  - first:
+      23: 2300114
+    second: Pod 16
+  - first:
+      23: 2300116
+    second: Laser
+  - first:
+      23: 2300118
+    second: Laser Base
+  - first:
+      23: 2300120
+    second: Missile Launcher - Left
+  - first:
+      23: 2300122
+    second: Missile Launcher - Right
+  - first:
+      23: 2300124
+    second: Exhaust Dome
+  - first:
+      23: 2300126
+    second: Exhaust Inner Cone
+  - first:
+      23: 2300128
+    second: Exhaust Outer Cone
+  - first:
+      23: 2300130
+    second: Hull
+  - first:
+      33: 3300000
+    second: Arth Ship
+  - first:
+      33: 3300002
+    second: Laser Barrel - Left
+  - first:
+      33: 3300004
+    second: Laser Barrel - Right
+  - first:
+      33: 3300006
+    second: Laser Turret
+  - first:
+      33: 3300008
+    second: Laser Turret Base
+  - first:
+      33: 3300010
+    second: Laser Turret Swivel
+  - first:
+      33: 3300012
+    second: Missile Launcher Barrel - Left
+  - first:
+      33: 3300014
+    second: Missile Launcher Barrel - Right
+  - first:
+      33: 3300016
+    second: Missile Launcher Turret - Left
+  - first:
+      33: 3300018
+    second: Missile Launcher Turret - Right
+  - first:
+      33: 3300020
+    second: Pod Cube 01
+  - first:
+      33: 3300022
+    second: Pod Cube 02
+  - first:
+      33: 3300024
+    second: Pod Cube 03
+  - first:
+      33: 3300026
+    second: Pod Cube 04
+  - first:
+      33: 3300028
+    second: Pod Cube 05
+  - first:
+      33: 3300030
+    second: Pod Cube 06
+  - first:
+      33: 3300032
+    second: Pod Cube 07
+  - first:
+      33: 3300034
+    second: Pod Cube 08
+  - first:
+      33: 3300036
+    second: Pod Cube 09
+  - first:
+      33: 3300038
+    second: Pod Cube 10
+  - first:
+      33: 3300040
+    second: Pod Cube 11
+  - first:
+      33: 3300042
+    second: Pod Cube 12
+  - first:
+      33: 3300044
+    second: Pod Cube 13
+  - first:
+      33: 3300046
+    second: Pod Cube 14
+  - first:
+      33: 3300048
+    second: Pod Cube 15
+  - first:
+      33: 3300050
+    second: Pod Cube 16
+  - first:
+      33: 3300052
+    second: Pod Socket 01
+  - first:
+      33: 3300054
+    second: Pod Socket 02
+  - first:
+      33: 3300056
+    second: Pod Socket 03
+  - first:
+      33: 3300058
+    second: Pod Socket 04
+  - first:
+      33: 3300060
+    second: Pod Socket 05
+  - first:
+      33: 3300062
+    second: Pod Socket 06
+  - first:
+      33: 3300064
+    second: Pod Socket 07
+  - first:
+      33: 3300066
+    second: Pod Socket 08
+  - first:
+      33: 3300068
+    second: Pod Socket 09
+  - first:
+      33: 3300070
+    second: Pod Socket 10
+  - first:
+      33: 3300072
+    second: Pod Socket 11
+  - first:
+      33: 3300074
+    second: Pod Socket 12
+  - first:
+      33: 3300076
+    second: Pod Socket 13
+  - first:
+      33: 3300078
+    second: Pod Socket 14
+  - first:
+      33: 3300080
+    second: Pod Socket 15
+  - first:
+      33: 3300082
+    second: Pod Socket 16
+  - first:
+      33: 3300084
+    second: Pod 01
+  - first:
+      33: 3300086
+    second: Pod 02
+  - first:
+      33: 3300088
+    second: Pod 03
+  - first:
+      33: 3300090
+    second: Pod 04
+  - first:
+      33: 3300092
+    second: Pod 05
+  - first:
+      33: 3300094
+    second: Pod 06
+  - first:
+      33: 3300096
+    second: Pod 07
+  - first:
+      33: 3300098
+    second: Pod 08
+  - first:
+      33: 3300100
+    second: Pod 09
+  - first:
+      33: 3300102
+    second: Pod 10
+  - first:
+      33: 3300104
+    second: Pod 11
+  - first:
+      33: 3300106
+    second: Pod 12
+  - first:
+      33: 3300108
+    second: Pod 13
+  - first:
+      33: 3300110
+    second: Pod 14
+  - first:
+      33: 3300112
+    second: Pod 15
+  - first:
+      33: 3300114
+    second: Pod 16
+  - first:
+      33: 3300116
+    second: Laser
+  - first:
+      33: 3300118
+    second: Laser Base
+  - first:
+      33: 3300120
+    second: Missile Launcher - Left
+  - first:
+      33: 3300122
+    second: Missile Launcher - Right
+  - first:
+      33: 3300124
+    second: Exhaust Dome
+  - first:
+      33: 3300126
+    second: Exhaust Inner Cone
+  - first:
+      33: 3300128
+    second: Exhaust Outer Cone
+  - first:
+      33: 3300130
+    second: Hull
+  - first:
+      43: 4300000
+    second: Arth Ship
+  - first:
+      43: 4300002
+    second: Pod Cube 02
+  - first:
+      43: 4300004
+    second: Pod Socket 02
+  - first:
+      43: 4300006
+    second: Pod Socket 04
+  - first:
+      43: 4300008
+    second: Pod Cube 04
+  - first:
+      43: 4300010
+    second: Pod Socket 06
+  - first:
+      43: 4300012
+    second: Pod Cube 06
+  - first:
+      43: 4300014
+    second: Pod Socket 08
+  - first:
+      43: 4300016
+    second: Pod Cube 08
+  - first:
+      43: 4300018
+    second: Pod Socket 10
+  - first:
+      43: 4300020
+    second: Pod Cube 10
+  - first:
+      43: 4300022
+    second: Pod Socket 12
+  - first:
+      43: 4300024
+    second: Pod Cube 12
+  - first:
+      43: 4300026
+    second: Pod Socket 14
+  - first:
+      43: 4300028
+    second: Pod Cube 14
+  - first:
+      43: 4300030
+    second: Pod Socket 16
+  - first:
+      43: 4300032
+    second: Pod Cube 16
+  - first:
+      43: 4300034
+    second: Pod Cube 01
+  - first:
+      43: 4300036
+    second: Pod Socket 01
+  - first:
+      43: 4300038
+    second: Pod Cube 03
+  - first:
+      43: 4300040
+    second: Pod Socket 03
+  - first:
+      43: 4300042
+    second: Pod Cube 05
+  - first:
+      43: 4300044
+    second: Pod Socket 05
+  - first:
+      43: 4300046
+    second: Pod Cube 07
+  - first:
+      43: 4300048
+    second: Pod Socket 07
+  - first:
+      43: 4300050
+    second: Pod Cube 09
+  - first:
+      43: 4300052
+    second: Pod Socket 09
+  - first:
+      43: 4300054
+    second: Pod Cube 11
+  - first:
+      43: 4300056
+    second: Pod Socket 11
+  - first:
+      43: 4300058
+    second: Pod Cube 13
+  - first:
+      43: 4300060
+    second: Pod Socket 13
+  - first:
+      43: 4300062
+    second: Pod Cube 15
+  - first:
+      43: 4300064
+    second: Pod Socket 15
+  - first:
+      43: 4300066
+    second: Laser Barrel - Left
+  - first:
+      43: 4300068
+    second: Laser Barrel - Right
+  - first:
+      43: 4300070
+    second: Laser Turret
+  - first:
+      43: 4300072
+    second: Laser Turret Base
+  - first:
+      43: 4300074
+    second: Laser Turret Swivel
+  - first:
+      43: 4300076
+    second: Missile Launcher Turret - Left
+  - first:
+      43: 4300078
+    second: Missile Launcher Barrel - Left
+  - first:
+      43: 4300080
+    second: Missile Launcher Turret - Right
+  - first:
+      43: 4300082
+    second: Missile Launcher Barrel - Right
+  - first:
+      43: 4300084
+    second: Pod 02
+  - first:
+      43: 4300086
+    second: Pod 04
+  - first:
+      43: 4300088
+    second: Pod 06
+  - first:
+      43: 4300090
+    second: Pod 08
+  - first:
+      43: 4300092
+    second: Pod 10
+  - first:
+      43: 4300094
+    second: Pod 12
+  - first:
+      43: 4300096
+    second: Pod 14
+  - first:
+      43: 4300098
+    second: Pod 16
+  - first:
+      43: 4300100
+    second: Pod 01
+  - first:
+      43: 4300102
+    second: Pod 03
+  - first:
+      43: 4300104
+    second: Pod 05
+  - first:
+      43: 4300106
+    second: Pod 07
+  - first:
+      43: 4300108
+    second: Pod 09
+  - first:
+      43: 4300110
+    second: Pod 11
+  - first:
+      43: 4300112
+    second: Pod 13
+  - first:
+      43: 4300114
+    second: Pod 15
+  - first:
+      43: 4300116
+    second: Laser
+  - first:
+      43: 4300118
+    second: Laser Base
+  - first:
+      43: 4300120
+    second: Missile Launcher - Left
+  - first:
+      43: 4300122
+    second: Missile Launcher - Right
+  - first:
+      43: 4300124
+    second: Hull
+  - first:
+      43: 4300126
+    second: Exhaust Dome
+  - first:
+      43: 4300128
+    second: Exhaust Inner Cone
+  - first:
+      43: 4300130
+    second: Exhaust Outer Cone
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Arth Ship Meshy Hull
+    second: {fileID: 2100000, guid: a4784c23b4488c5458fd3b71f277af4c, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Arth Ship Meshy Parts
+    second: {fileID: 2100000, guid: 40f1fba3770aa0c4f9c95d117aa583a1, type: 2}
   materials:
-    importMaterials: 0
+    materialImportMode: 1
     materialName: 0
     materialSearch: 1
     materialLocation: 1
@@ -372,9 +1098,8 @@ ModelImporter:
     bakeSimulation: 0
     resampleCurves: 1
     optimizeGameObjects: 0
+    removeConstantScaleCurves: 0
     motionNodeName: 
-    rigImportErrors: 
-    rigImportWarnings: 
     animationImportErrors: 
     animationImportWarnings: 
     animationRetargetingWarnings: 
@@ -396,25 +1121,39 @@ ModelImporter:
     meshCompression: 0
     addColliders: 0
     useSRGBMaterialColor: 1
+    sortHierarchyByName: 1
+    importPhysicalCameras: 1
     importVisibility: 1
-    importBlendShapes: 1
-    importCameras: 1
-    importLights: 1
+    importBlendShapes: 0
+    importCameras: 0
+    importLights: 0
+    nodeNameCollisionStrategy: 0
+    fileIdsGeneration: 1
     swapUVChannels: 0
     generateSecondaryUV: 0
     useFileUnits: 1
-    optimizeMeshForGPU: 1
     keepQuads: 0
     weldVertices: 1
+    bakeAxisConversion: 0
     preserveHierarchy: 0
+    skinWeightsMode: 0
+    maxBonesPerVertex: 4
+    minBoneWeight: 0.001
+    optimizeBones: 1
+    generateMeshLods: 0
+    meshLodGenerationFlags: 0
+    maximumMeshLod: -1
+    meshOptimizationFlags: -1
     indexFormat: 0
     secondaryUVAngleDistortion: 8
     secondaryUVAreaDistortion: 15.000001
     secondaryUVHardAngle: 88
+    secondaryUVMarginMethod: 0
+    secondaryUVMinLightmapResolution: 40
+    secondaryUVMinObjectScale: 1
     secondaryUVPackMargin: 4
     useFileScale: 1
-    previousCalculatedGlobalScale: 1
-    hasPreviousCalculatedGlobalScale: 0
+    strictVertexDataChecks: 0
   tangentSpace:
     normalSmoothAngle: 60
     normalImportMode: 0
@@ -423,10 +1162,10 @@ ModelImporter:
     legacyComputeAllNormalsFromSmoothingGroupsWhenMeshHasBlendShapes: 0
     blendShapeNormalImportMode: 1
     normalSmoothingSource: 0
+  referencedClips: []
   importAnimation: 0
-  copyAvatar: 0
   humanDescription:
-    serializedVersion: 2
+    serializedVersion: 3
     human: []
     skeleton: []
     armTwist: 0.5
@@ -436,13 +1175,19 @@ ModelImporter:
     armStretch: 0.05
     legStretch: 0.05
     feetSpacing: 0
+    globalScale: 1
     rootMotionBoneName: 
     hasTranslationDoF: 0
     hasExtraRoot: 0
     skeletonHasParents: 1
   lastHumanDescriptionAvatarSource: {instanceID: 0}
+  autoGenerateAvatarMappingIfUnspecified: 1
   animationType: 0
   humanoidOversampling: 1
+  avatarSetup: 0
+  addHumanoidExtraRootOnlyWhenUsingAvatar: 0
+  importBlendShapeDeformPercent: 0
+  remapMaterialsIfMaterialImportModeIsNone: 1
   additionalBone: 0
   userData: 
   assetBundleName: 

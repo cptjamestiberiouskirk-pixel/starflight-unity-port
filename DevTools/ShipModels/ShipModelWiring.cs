@@ -45,13 +45,33 @@ public static class ShipModelWiring
 		public string[] materials;
 	}
 
+	// the player's ship (import_meshy_arth.py): its model keeps the old node names the scenes reference, so only its materials,
+	// the scene copies' material overrides and the contrails' places change
+	[Serializable]
+	public class PlayerShipEntry
+	{
+		public string model;
+		public string debris;
+		public string[] materials;
+
+		// the two engine nozzles in the model's frame, x, y, z, x, y, z
+		public float[] contrails;
+
+		// the debris model's import scale: CombatController spawns the wreck at its own scale, not the ship's instance scale
+		public float debrisScale;
+	}
+
 	[Serializable]
 	public class Manifest
 	{
 		public string race;
 		public VesselEntry[] vessels;
 		public MaterialEntry[] materials;
+		public PlayerShipEntry playerShip;
 	}
+
+	// the scenes with copies of the player ship's model
+	static readonly string[] c_playerShipScenes = { "Assets/Scenes/Spaceflight.unity", "Assets/Scenes/Starport.unity", "Assets/Scenes/Test.unity" };
 
 	const string c_scenePath = "Assets/Scenes/Spaceflight.unity";
 
@@ -80,23 +100,31 @@ public static class ShipModelWiring
 
 			var manifest = JsonUtility.FromJson<Manifest>( File.ReadAllText( manifestPath ) );
 
-			Log( "manifest " + manifestPath + " race=" + manifest.race + " vessels=" + manifest.vessels.Length );
+			Log( "manifest " + manifestPath + " race=" + manifest.race + " vessels=" + ( ( manifest.vessels != null ) ? manifest.vessels.Length : 0 ) );
 
 			AssetDatabase.Refresh();
 
 			var materials = MakeMaterials( manifest );
 
-			foreach ( var vessel in manifest.vessels )
+			foreach ( var vessel in manifest.vessels ?? new VesselEntry[ 0 ] )
 			{
-				SetUpImport( vessel.model, vessel, materials );
+				SetUpImport( vessel.model, vessel, materials, 1.0f );
 
 				if ( !string.IsNullOrEmpty( vessel.debris ) )
 				{
-					SetUpImport( vessel.debris, vessel, materials );
+					SetUpImport( vessel.debris, vessel, materials, 1.0f );
 				}
 			}
 
-			WireScene( manifest );
+			if ( ( manifest.vessels != null ) && ( manifest.vessels.Length > 0 ) )
+			{
+				WireScene( manifest );
+			}
+
+			if ( ( manifest.playerShip != null ) && !string.IsNullOrEmpty( manifest.playerShip.model ) )
+			{
+				WirePlayerShip( manifest.playerShip, materials );
+			}
 		}
 		catch ( Exception exception )
 		{
@@ -258,7 +286,8 @@ public static class ShipModelWiring
 		material.EnableKeyword( keyword );
 	}
 
-	static void SetUpImport( string assetPath, VesselEntry vessel, Dictionary<string, Material> materials )
+	// scale: the importer's global scale (1 for the models build_<race>.py and import_meshy.py write)
+	static void SetUpImport( string assetPath, VesselEntry vessel, Dictionary<string, Material> materials, float scale )
 	{
 		var importer = AssetImporter.GetAtPath( assetPath ) as ModelImporter;
 
@@ -274,7 +303,7 @@ public static class ShipModelWiring
 			return;
 		}
 
-		importer.globalScale = 1.0f;
+		importer.globalScale = scale;
 		importer.useFileScale = true;
 		importer.importCameras = false;
 		importer.importLights = false;
@@ -422,5 +451,110 @@ public static class ShipModelWiring
 		}
 
 		Log( "saved " + c_scenePath );
+	}
+
+	// the player ship: its import, then in every scene with a copy of it the copy's material overrides go (each copy set the old
+	// model's materials by hand) and, under the flying ship, the contrails move to the new engine nozzles
+	static void WirePlayerShip( PlayerShipEntry playerShip, Dictionary<string, Material> materials )
+	{
+		var entry = new VesselEntry { name = "Arth Ship", materials = playerShip.materials };
+
+		SetUpImport( playerShip.model, entry, materials, 1.0f );
+
+		if ( !string.IsNullOrEmpty( playerShip.debris ) )
+		{
+			SetUpImport( playerShip.debris, entry, materials, ( playerShip.debrisScale > 0.0f ) ? playerShip.debrisScale : 1.0f );
+		}
+
+		var modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>( playerShip.model );
+
+		if ( modelAsset == null )
+		{
+			throw new Exception( "model missing: " + playerShip.model );
+		}
+
+		foreach ( var scenePath in c_playerShipScenes )
+		{
+			if ( !File.Exists( scenePath ) )
+			{
+				continue;
+			}
+
+			var scene = EditorSceneManager.OpenScene( scenePath, OpenSceneMode.Single );
+			var copies = 0;
+			var removed = 0;
+
+			foreach ( var root in scene.GetRootGameObjects() )
+			{
+				foreach ( var node in root.GetComponentsInChildren<Transform>( true ) )
+				{
+					var gameObject = node.gameObject;
+
+					if ( !PrefabUtility.IsAnyPrefabInstanceRoot( gameObject ) || ( PrefabUtility.GetCorrespondingObjectFromSource( gameObject ) != modelAsset ) )
+					{
+						continue;
+					}
+
+					var modifications = PrefabUtility.GetPropertyModifications( gameObject );
+					var kept = new List<PropertyModification>();
+
+					foreach ( var modification in modifications )
+					{
+						if ( modification.propertyPath.StartsWith( "m_Materials" ) )
+						{
+							removed++;
+						}
+						else
+						{
+							kept.Add( modification );
+						}
+					}
+
+					PrefabUtility.SetPropertyModifications( gameObject, kept.ToArray() );
+					copies++;
+
+					Log( scenePath + ": copy " + gameObject.name + " under " + ( ( node.parent != null ) ? node.parent.name : "the scene" ) + ", " + ( modifications.Length - kept.Count ) + " material overrides removed" );
+				}
+			}
+
+			// the contrails of the flying ship, each to the nozzle on its own side
+			var player = UnityEngine.Object.FindFirstObjectByType<PlayerShip>( FindObjectsInactive.Include );
+
+			if ( ( player != null ) && ( player.m_contrailParticleSystem != null ) && ( playerShip.contrails != null ) && ( playerShip.contrails.Length >= 6 ) )
+			{
+				foreach ( var contrail in player.m_contrailParticleSystem )
+				{
+					if ( contrail == null )
+					{
+						continue;
+					}
+
+					var side = ( contrail.transform.localPosition.x >= 0.0f ) ? 0 : 3;
+
+					if ( Mathf.Sign( playerShip.contrails[ side ] ) != Mathf.Sign( contrail.transform.localPosition.x ) )
+					{
+						side = 3 - side;
+					}
+
+					var before = contrail.transform.localPosition;
+
+					contrail.transform.localPosition = new Vector3( playerShip.contrails[ side ], playerShip.contrails[ side + 1 ], playerShip.contrails[ side + 2 ] );
+
+					Log( scenePath + ": contrail " + contrail.name + " moved from " + before + " to " + contrail.transform.localPosition );
+				}
+			}
+
+			if ( copies > 0 )
+			{
+				EditorSceneManager.MarkSceneDirty( scene );
+
+				if ( !EditorSceneManager.SaveScene( scene ) )
+				{
+					throw new Exception( "the scene could not be saved: " + scenePath );
+				}
+			}
+
+			Log( scenePath + ": " + copies + " copies of the player ship, " + removed + " material overrides removed" );
+		}
 	}
 }
