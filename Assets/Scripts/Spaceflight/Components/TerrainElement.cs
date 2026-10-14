@@ -24,14 +24,10 @@ public class TerrainElement : MonoBehaviour
 	// the pickup distance threshold
 	const float c_pickupDistance = 10.0f;
 
-	// minimum volume per deposit, in cubic meters
-	const int c_minVolume = 1;
-
-	// maximum volume per deposit, in cubic meters
-	const int c_maxVolume = 5;
-
-	// the cargo holds count in tenths of a cubic meter
-	const int c_tenthsPerCubicMeter = 10;
+	// the smallest and the largest volume of a deposit, in tenths of a cubic meter like everything in the cargo holds: 1.0 to 9.9 cubic meters, as the original's
+	// (SEED-OV WF163: a mineral's INST-QTY is RRND 10 to 100)
+	const int c_minVolume = 10;
+	const int c_maxVolume = 99;
 
 	// initialize this element
 	public void Initialize( int elementId, TerrainVehicle terrainVehicle, int planetId, int depositIndex )
@@ -41,9 +37,9 @@ public class TerrainElement : MonoBehaviour
 		m_planetId = planetId;
 		m_depositIndex = depositIndex;
 
-		// random volume for this deposit - 1 to 5 cubic meters, kept in tenths like everything in the cargo holds
+		// random volume for this deposit - 1.0 to 9.9 cubic meters, in tenths
 		// (still one random number per deposit - the objects of a planet are placed with random numbers seeded from the planet, and a second number here would move everything placed after it)
-		m_volume = Random.Range( c_minVolume, c_maxVolume + 1 ) * c_tenthsPerCubicMeter;
+		m_volume = Random.Range( c_minVolume, c_maxVolume + 1 );
 
 		// has something been taken from this deposit before? (this comes after the random number, so that nothing placed after it moves)
 		var playerData = ( DataController.m_instance != null ) ? DataController.m_instance.m_playerData : null;

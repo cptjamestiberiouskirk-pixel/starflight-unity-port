@@ -12939,7 +12939,7 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=commlink spemin=" + damageBeforeLink + "/" + damageDuringLink + "/" + damageAfterLink + " uhlek=" + uhlekDamageWithLink + "/" + uhlekDamageWithoutLink + " playerMissile=hit" + damageOfAHit + "/timeout" + damageOfATimeOut + "/explosions" + explosionsAfterTimeOut + " alienMissile=explosions" + alienExplosionsAfter + "/damage" + playerDamage + " deadMethod=" + ( deadMethod != null ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
-	// ---------------------------------------------------------------- ruling of 2026-10-05: a mineral deposit holds 1 to 5 cubic meters
+	// ---------------------------------------------------------------- a mineral deposit holds 1.0 to 9.9 cubic meters, as the original's (SEED-OV WF163: INST-QTY RRND 10 to 100, in tenths)
 
 	IEnumerator ScenarioDeposits()
 	{
@@ -12982,8 +12982,8 @@ public class ClaudeProbe : MonoBehaviour
 		var smallest = int.MaxValue;
 		var largest = int.MinValue;
 		var total = 0;
+		var outside = 0;
 		var notWholeCubicMeters = 0;
-		var sizes = new int[ 6 ];
 		long placement = 0;
 
 		for ( var i = 0; i < deposits.Length; i++ )
@@ -12994,13 +12994,14 @@ public class ClaudeProbe : MonoBehaviour
 			largest = Mathf.Max( largest, volume );
 			total += volume;
 
-			if ( ( volume % 10 != 0 ) || ( volume < 10 ) || ( volume > 50 ) )
+			if ( ( volume < 10 ) || ( volume > 99 ) )
+			{
+				outside++;
+			}
+
+			if ( volume % 10 != 0 )
 			{
 				notWholeCubicMeters++;
-			}
-			else
-			{
-				sizes[ volume / 10 ]++;
 			}
 
 			var position = deposits[ i ].transform.position;
@@ -13008,9 +13009,11 @@ public class ClaudeProbe : MonoBehaviour
 			placement = ( placement * 31 + Mathf.RoundToInt( position.x ) * 7 + Mathf.RoundToInt( position.z ) * 3 + deposits[ i ].m_elementId ) % 1000000007L;
 		}
 
-		Log( "deposits: planet 90 has " + deposits.Length + " deposits, from " + Tools.VolumeToText( smallest ) + " to " + Tools.VolumeToText( largest ) + " cubic meters, " + Tools.VolumeToText( total ) + " in all; " + notWholeCubicMeters + " are not 1, 2, 3, 4 or 5 cubic meters; of each size: " + sizes[ 1 ] + "/" + sizes[ 2 ] + "/" + sizes[ 3 ] + "/" + sizes[ 4 ] + "/" + sizes[ 5 ] + "; placement checksum " + placement );
+		Log( "deposits: planet 90 has " + deposits.Length + " deposits, from " + Tools.VolumeToText( smallest ) + " to " + Tools.VolumeToText( largest ) + " cubic meters, " + Tools.VolumeToText( total ) + " in all; " + outside + " outside 1.0 to 9.9, " + notWholeCubicMeters + " not whole cubic meters; placement checksum " + placement );
 
-		Check( "deposits: every deposit holds 1 to 5 cubic meters", ( notWholeCubicMeters == 0 ) && ( smallest == 10 ) && ( largest == 50 ), "from " + Tools.VolumeToText( smallest ) + " to " + Tools.VolumeToText( largest ) + " cubic meters, " + notWholeCubicMeters + " of " + deposits.Length + " outside 1 to 5" );
+		// the size is still one random draw per deposit, so the deposits (and everything placed after them) are where they were with 1 to 5 cubic meters
+		Check( "deposits: the deposits are where they were (the placement checksum of the deposits of 1 to 5 cubic meters)", placement == 789127093L, placement.ToString() );
+		Check( "deposits: every deposit holds 1.0 to 9.9 cubic meters in tenths, as the original's", ( outside == 0 ) && ( largest > 50 ) && ( notWholeCubicMeters > 0 ), "from " + Tools.VolumeToText( smallest ) + " to " + Tools.VolumeToText( largest ) + " cubic meters, " + outside + " of " + deposits.Length + " outside 1.0 to 9.9, " + notWholeCubicMeters + " not whole cubic meters" );
 
 		// ---- 2. pick one up with the real button: what the message says and what arrives in the hold
 		foreach ( var other in deposits )
@@ -13033,7 +13036,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "deposits: picking up a deposit of " + firstVolume + " tenths: " + pickupMessage + " (in the hold now: " + cargoAfterFirst + " tenths)" );
 
-		Check( "deposits: the pickup message and the hold agree on a whole number of cubic meters", ( firstVolume >= 10 ) && ( cargoAfterFirst == firstVolume ) && pickupMessage.Contains( "Picked up " + ( firstVolume / 10 ) + ".0 cubic meters of " ), "deposit " + firstVolume + " tenths, hold " + cargoAfterFirst + " tenths | " + pickupMessage );
+		Check( "deposits: the pickup message and the hold agree on the deposit's volume", ( firstVolume >= 10 ) && ( cargoAfterFirst == firstVolume ) && pickupMessage.Contains( "Picked up " + Tools.VolumeToText( firstVolume ) + " cubic meters of " ), "deposit " + firstVolume + " tenths, hold " + cargoAfterFirst + " tenths | " + pickupMessage );
 
 		// ---- 3. how many deposits it takes to fill the terrain vehicle's hold (one deposit after the other next to the vehicle, real button)
 		var holdSize = gameData.m_misc.m_terrainVehicleVolume;
@@ -13068,7 +13071,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "deposits: the hold of " + Tools.VolumeToText( holdSize ) + " cubic meters was full after " + pickups + " deposits (in it: " + Tools.VolumeToText( holdUsed ) + ") | last pickup: " + lastMessage + " | one more press: " + fullMessage );
 
-		Check( "deposits: the terrain vehicle's hold is full after 10 to 50 deposits, and never over full", ( holdUsed == holdSize ) && ( holdUsedAfterFull == holdSize ) && ( pickups >= 10 ) && ( pickups <= 50 ) && fullMessage.Contains( "full" ), pickups + " deposits, " + Tools.VolumeToText( holdUsed ) + " of " + Tools.VolumeToText( holdSize ) + " cubic meters, after one more press " + Tools.VolumeToText( holdUsedAfterFull ) );
+		Check( "deposits: the terrain vehicle's hold is full after 5 to 50 deposits, and never over full", ( holdUsed == holdSize ) && ( holdUsedAfterFull == holdSize ) && ( pickups >= 5 ) && ( pickups <= 50 ) && fullMessage.Contains( "full" ), pickups + " deposits, " + Tools.VolumeToText( holdUsed ) + " of " + Tools.VolumeToText( holdSize ) + " cubic meters, after one more press " + Tools.VolumeToText( holdUsedAfterFull ) );
 
 		// ---- 4. the cargo display that is not in any scene yet shows the hold in cubic meters too (made here from its class)
 		var displayObject = new GameObject( "probe cargo display" );
@@ -27547,7 +27550,7 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=commpicture checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
-	// ---------------------------------------------------------------- Low: the Spemin's comm portrait moves as the Genesis version's does (its eyes blink, its discs spin, slime drips, the body wobbles), and pictures of it with -Graphics
+	// ---------------------------------------------------------------- Low: the Spemin's comm portrait moves as the Genesis version's does (its eyes blink, its discs spin, slime drips, the body wobbles), the drips without a jump from one frame to the next, and pictures of it with -Graphics
 
 	// the largest angle any of the transforms turned between two snapshots of their local rotations, in degrees
 	static float LargestTurn( Transform[] parts, Quaternion[] before )
@@ -27714,6 +27717,52 @@ public class ClaudeProbe : MonoBehaviour
 			yield return null;
 		}
 
+		// then 5 s at a steady 30 frames a second, the drips' heights and widths every frame: a jump is a frame whose change stands out from
+		// the changes of the frames on either side of it (steady motion, fast or slow, changes about as much from one frame to the next)
+		const int c_steadyFrames = 150;
+		var animation = model.GetComponentInChildren<SpeminCommAnimation>( true );
+		var dripSize = ( ( animation != null ) && ( animation.m_dripSize > 0.0f ) ) ? animation.m_dripSize : 1.0f;
+		var dripWidths = new float[ c_steadyFrames, dripsStart.Length ];
+		var dripHeights = new float[ c_steadyFrames, dripsStart.Length ];
+
+		Time.captureDeltaTime = 1.0f / 30.0f;
+		yield return null;
+
+		for ( var frame = 0; frame < c_steadyFrames; frame++ )
+		{
+			for ( var i = 0; i < dripsStart.Length; i++ )
+			{
+				if ( dripsStart[ i ] != null )
+				{
+					dripWidths[ frame, i ] = dripsStart[ i ].localScale.x;
+					dripHeights[ frame, i ] = dripsStart[ i ].localScale.y;
+				}
+			}
+
+			yield return null;
+		}
+
+		Time.captureDeltaTime = 0.0f;
+
+		var largestJump = 0.0f;
+		var largestJumpAt = "none";
+
+		for ( var i = 0; i < dripsStart.Length; i++ )
+		{
+			for ( var frame = 2; frame < c_steadyFrames - 1; frame++ )
+			{
+				var widthJump = Mathf.Abs( dripWidths[ frame, i ] - dripWidths[ frame - 1, i ] ) - Mathf.Max( Mathf.Abs( dripWidths[ frame - 1, i ] - dripWidths[ frame - 2, i ] ), Mathf.Abs( dripWidths[ frame + 1, i ] - dripWidths[ frame, i ] ) );
+				var heightJump = Mathf.Abs( dripHeights[ frame, i ] - dripHeights[ frame - 1, i ] ) - Mathf.Max( Mathf.Abs( dripHeights[ frame - 1, i ] - dripHeights[ frame - 2, i ] ), Mathf.Abs( dripHeights[ frame + 1, i ] - dripHeights[ frame, i ] ) );
+				var jump = Mathf.Max( widthJump, heightJump ) / dripSize;
+
+				if ( jump > largestJump )
+				{
+					largestJump = jump;
+					largestJumpAt = "drip " + ( i + 1 ) + " frame " + frame + " (height " + dripHeights[ frame - 1, i ].ToString( "F2" ) + " to " + dripHeights[ frame, i ].ToString( "F2" ) + ", width " + dripWidths[ frame - 1, i ].ToString( "F2" ) + " to " + dripWidths[ frame, i ].ToString( "F2" ) + ")";
+				}
+			}
+		}
+
 		var discTurn = LargestTurn( discs, discStart );
 
 		Log( "commspemin: " + eyes.Length + " eyes (smallest " + smallestEye.ToString( "F2" ) + " of their size), " + discs.Length + " discs (largest turn " + discTurn.ToString( "F0" ) + " degrees), body " + ( ( body != null ) ? body.name : "none" ) + " (width change " + bodyWidthChange.ToString( "F3" ) + ", height change " + bodyHeightChange.ToString( "F3" ) + "), " + dripsStart.Length + " drips (fell " + dripFall.ToString( "F2" ) + ")" );
@@ -27722,6 +27771,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "commspemin: its discs spin", ( discs.Length > 0 ) && ( discTurn > 45.0f ), "largest turn " + discTurn.ToString( "F0" ) + " degrees" );
 		Check( "commspemin: its body wobbles in width and height, not only in depth", ( bodyWidthChange > 0.01f ) && ( bodyHeightChange > 0.01f ), "width " + bodyWidthChange.ToString( "F3" ) + ", height " + bodyHeightChange.ToString( "F3" ) );
 		Check( "commspemin: slime drips fall", ( dripsStart.Length > 0 ) && ( dripFall > 0.5f ), dripsStart.Length + " drips, fell " + dripFall.ToString( "F2" ) );
+		Check( "commspemin: the drips change shape without a jump (no frame's change stands out from its neighbours' by more than 0.3 of a drip's size)", ( dripsStart.Length > 0 ) && ( largestJump < 0.3f ), "largest " + largestJump.ToString( "F2" ) + " of a drip's size, " + largestJumpAt );
 
 		Finish( "scenario=commspemin pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
