@@ -1276,6 +1276,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioColorSchemes();
 				break;
 
+			case "starmapcolors":
+				yield return ScenarioStarmapColors();
+				break;
+
 			case "sensorlines":
 				yield return ScenarioSensorLines();
 				break;
@@ -30683,6 +30687,162 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "colorschemes: " + pictures.Count + " pictures" + ( ( folder != "" ) ? " in " + folder : "" ) );
 
 		Finish( "scenario=colorschemes checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the starmap in the colours of the kit's scheme (it was purple and magenta, which the owner dislikes): its background, grid, ship marker and crosshair
+	// take the scheme's dark colours when it opens, again when the player picks another scheme while it is open, and in the light mode too (the starmap is a
+	// view of space); the stars and the nebulas keep theirs, and the materials themselves are left as they are (picture with -Graphics)
+	IEnumerator ScenarioStarmapColors()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var folder = ScreenPictureFolder( "starmap-colors" );
+		var pictures = new List<string>();
+
+		controller.m_encounterRange = 0.0f;
+
+		// hyperspace, away from any star
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 118.0f, 0.0f, 96.0f ) );
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 30 );
+
+		var starmap = controller.m_starmap;
+		var parts = new[] { "Starmap - Background", "Starmap - Grid", "Starmap - Player Ship", "Starmap - Crosshair" };
+
+		// the images drawn with the starmap's background material, wherever they are in the scene
+		var backgroundImages = new List<UnityEngine.UI.Image>();
+
+		foreach ( var image in Resources.FindObjectsOfTypeAll<UnityEngine.UI.Image>() )
+		{
+			if ( ( image.gameObject.scene == starmap.gameObject.scene ) && ( image.material != null ) && image.material.name.StartsWith( "Starmap - Background" ) )
+			{
+				backgroundImages.Add( image );
+			}
+		}
+
+		Log( "starmapcolors: background images " + string.Join( ", ", backgroundImages.ConvertAll( image => image.transform.parent.name + "/" + image.name ) ) );
+
+		// the colour a part is drawn with (its property block's, or its material's without one; an image's material for the background)
+		Func<string, Color?> drawnColour = name =>
+		{
+			if ( name == "Starmap - Background" )
+			{
+				return ( backgroundImages.Count > 0 ) ? backgroundImages[ 0 ].material.GetColor( "SF_AlbedoColor" ) : (Color?) null;
+			}
+
+			foreach ( var starmapRenderer in starmap.GetComponentsInChildren<Renderer>( true ) )
+			{
+				var materials = starmapRenderer.sharedMaterials;
+
+				for ( var i = 0; i < materials.Length; i++ )
+				{
+					if ( ( materials[ i ] != null ) && ( materials[ i ].name == name ) )
+					{
+						var block = new MaterialPropertyBlock();
+
+						starmapRenderer.GetPropertyBlock( block, i );
+
+						return ( !block.isEmpty && block.HasColor( "SF_AlbedoColor" ) ) ? block.GetColor( "SF_AlbedoColor" ) : materials[ i ].GetColor( "SF_AlbedoColor" );
+					}
+				}
+			}
+
+			return null;
+		};
+
+		Func<UIKitTheme, Color[]> expectedColours = theme => new[] { theme.m_backgroundPanel, theme.m_accentPrimaryDim, theme.m_accentPrimary, theme.m_textPrimary };
+
+		// remembers what differs between the parts' colours and the theme's
+		var failures = new List<string>();
+
+		Action<string, UIKitTheme> compare = ( label, theme ) =>
+		{
+			var expected = expectedColours( theme );
+
+			for ( var i = 0; i < parts.Length; i++ )
+			{
+				var drawn = drawnColour( parts[ i ] );
+
+				if ( drawn == null )
+				{
+					failures.Add( label + ": no " + parts[ i ] );
+				}
+				else if ( ColorUtility.ToHtmlStringRGB( drawn.Value ) != ColorUtility.ToHtmlStringRGB( expected[ i ] ) )
+				{
+					failures.Add( label + ": " + parts[ i ] + " " + ColorUtility.ToHtmlStringRGB( drawn.Value ) + " not " + ColorUtility.ToHtmlStringRGB( expected[ i ] ) );
+				}
+			}
+		};
+
+		Action<string> take = name =>
+		{
+			if ( folder != "" )
+			{
+				RenderScreenPicture( System.IO.Path.Combine( folder, ( pictures.Count + 1 ).ToString( "00" ) + "_" + name + ".png" ) );
+				pictures.Add( name );
+			}
+		};
+
+		// ---- the classic scheme, the starmap opened
+		UIKitTheme.SetScheme( 0, false );
+		UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+		starmap.Show();
+
+		yield return Frames( 5 );
+
+		compare( "classic on opening", UIKitTheme.LoadScheme( 0, UIKitTheme.Mode.Dark ) );
+		take( "classic" );
+
+		// ---- other schemes picked while it is open, and a light mode
+		var picks = new[] { 1, 3, 13 };
+
+		foreach ( var scheme in picks )
+		{
+			UIKitTheme.SetScheme( scheme, false );
+
+			yield return Frames( 3 );
+
+			compare( UIKitTheme.c_schemes[ scheme ].m_name, UIKitTheme.LoadScheme( scheme, UIKitTheme.Mode.Dark ) );
+			take( UIKitTheme.c_schemes[ scheme ].m_name.Replace( ' ', '_' ) );
+		}
+
+		UIKitTheme.SetMode( UIKitTheme.Mode.Light, false );
+
+		yield return Frames( 3 );
+
+		compare( UIKitTheme.c_schemes[ 13 ].m_name + " in the light mode", UIKitTheme.LoadScheme( 13, UIKitTheme.Mode.Dark ) );
+		take( "light_mode" );
+
+		Log( "starmapcolors: " + failures.Count + " failures" + ( ( failures.Count > 0 ) ? ": " + string.Join( " | ", failures.GetRange( 0, Mathf.Min( 6, failures.Count ) ) ) : "" ) );
+
+		Check( "starmapcolors: the starmap's background, grid, ship marker and crosshair take the scheme's dark colours when it opens, when another scheme is picked, and in the light mode", failures.Count == 0, failures.Count + " failures" );
+
+		// the material assets keep the colours they were made with (the purple background and the magenta grid)
+		var backgroundAsset = AssetDatabase.LoadAssetAtPath<Material>( "Assets/Game Objects/UI/Starmap/Starmap - Background.mat" );
+		var gridAsset = AssetDatabase.LoadAssetAtPath<Material>( "Assets/Game Objects/UI/Starmap/Starmap - Grid.mat" );
+		var assetColours = ( ( backgroundAsset != null ) ? ColorUtility.ToHtmlStringRGB( backgroundAsset.GetColor( "SF_AlbedoColor" ) ) : "none" ) + "/" + ( ( gridAsset != null ) ? ColorUtility.ToHtmlStringRGB( gridAsset.GetColor( "SF_AlbedoColor" ) ) : "none" );
+
+		Check( "starmapcolors: the starmap's material assets are left as they are", assetColours == "392D3F/82147F", assetColours );
+
+		// the classic dark theme again, and every background image in it
+		UIKitTheme.SetScheme( 0, false );
+		UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+		yield return Frames( 3 );
+
+		var everyBackground = ( backgroundImages.Count > 0 ) && backgroundImages.TrueForAll( image => ColorUtility.ToHtmlStringRGB( image.material.GetColor( "SF_AlbedoColor" ) ) == ColorUtility.ToHtmlStringRGB( UIKitTheme.LoadScheme( 0, UIKitTheme.Mode.Dark ).m_backgroundPanel ) );
+
+		Check( "starmapcolors: every image drawn with the starmap's background material (" + backgroundImages.Count + ") takes the scheme's colour", everyBackground, backgroundImages.Count.ToString() );
+
+		starmap.Hide();
+
+		yield return Frames( 3 );
+
+		Log( "starmapcolors: " + pictures.Count + " pictures" + ( ( folder != "" ) ? " in " + folder : "" ) );
+
+		Finish( "scenario=starmapcolors checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	IEnumerator ScenarioSensorLines()
