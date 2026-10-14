@@ -3,6 +3,9 @@ using UnityEngine;
 
 public class MoveButton : ShipButton
 {
+	// how near the ship (in kilometers along the ground) Move must stop for the vehicle to go back in: on the ship's own map cell, as the original's (a move is 1 km)
+	const float c_boardingDistanceKm = 0.5f;
+
 	// if this is true we are transitioning to disembarked
 	bool m_isTransitioning;
 
@@ -77,10 +80,11 @@ public class MoveButton : ShipButton
 			vectorToShip.y = 0.0f;
 
 			// how far is it in kilometers?
-			var distanceInKm = vectorToShip.magnitude * 225.0f / 2048.0f - 2.0f;
+			var distanceInKm = vectorToShip.magnitude * 225.0f / 2048.0f;
 
-			// are we near the ship?
-			if ( distanceInKm <= 0.0f )
+			// is the vehicle on the ship's map cell? the original takes it in only there (BEHAV-OV ?EMBARK: the vehicle's grid position equal to the ship's, the
+			// console's "0 KM."), and a move is 1 km, so within half a move
+			if ( distanceInKm <= c_boardingDistanceKm )
 			{
 				// yes - make sure the planetside terrain grid has been updated
 				SpaceflightController.m_instance.m_planetside.UpdateTerrainGridNow();

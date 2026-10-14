@@ -1175,6 +1175,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioTowBonus();
 				break;
 
+			case "nexusegg":
+				yield return ScenarioNexusEgg();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -14220,6 +14224,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var locationAfterGrant = playerData.m_general.m_location;
 		var planetAfterGrant = playerData.m_general.m_currentPlanetId;
+		var linesAfterGrant = System.Text.RegularExpressions.Regex.Replace( string.Join( "\n", playerData.m_general.m_messageList ), "<[^>]*>", "" );
 
 		yield return Frames( 30 );
 
@@ -14230,6 +14235,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "drones: the drone asks three numbers from 1 to 99", begun && ( numbersAsked == 3 ) && numbersInRange, "begun " + begun + ", numbers " + numbers.Trim() );
 		Check( "drones: three right answers get permission to orbit", grantedShown == 1, "granted shown " + grantedShown );
 		Check( "drones: after permission the ship is back in orbit around the planet, and the drone does not begin again", ( locationAfterGrant == PD_General.Location.InOrbit ) && ( planetAfterGrant == planetId ) && ( locationLater == PD_General.Location.InOrbit ), locationAfterGrant + " at " + planetAfterGrant + ", later " + locationLater );
+		Check( "drones: the encounter ends before the orbit is established again (Leaving encounter... and ...Encounter terminated. before ...Orbit established.)", ( linesAfterGrant.IndexOf( "Leaving encounter..." ) >= 0 ) && ( linesAfterGrant.IndexOf( "...Orbit established." ) > linesAfterGrant.IndexOf( "...Encounter terminated." ) ), linesAfterGrant.Replace( "\n", " | " ) );
 
 		// ---- 3. out to the level of the star system and into orbit again: the permission holds while the ship stays in the star system
 		controller.SwitchLocation( PD_General.Location.StarSystem );
@@ -29998,12 +30004,33 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 5 );
 		yield return Tap( Key.Enter );
-		yield return Frames( 30 );
+
+		// going back in fades for 2 s before the location changes: wait long enough to see it if it comes
+		yield return WaitForLocation( PD_General.Location.Planetside, 4.0f );
 
 		var locationWhenFar = playerData.m_general.m_location;
 
-		// the vehicle 1 km from the ship along the ground, kept as driving keeps it (flat: the ground's height is only drawn)
-		var near = new Vector3( ship.x + 2048.0f / 225.0f, 0.0f, ship.z );
+		// 1 km from the ship, the next map cell: the original takes the vehicle in only on the ship's own cell (BEHAV-OV ?EMBARK), so the crew stay outside
+		var oneCell = new Vector3( ship.x + 2048.0f / 225.0f, 0.0f, ship.z );
+
+		playerData.m_general.m_coordinates = oneCell;
+		playerData.m_general.m_lastDisembarkedCoordinates = oneCell;
+		controller.m_terrainVehicle.transform.localPosition = oneCell;
+
+		yield return Frames( 5 );
+
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
+
+		yield return Frames( 5 );
+		yield return Tap( Key.Enter );
+
+		// going back in fades for 2 s before the location changes: wait long enough to see it if it comes
+		yield return WaitForLocation( PD_General.Location.Planetside, 4.0f );
+
+		var locationWhenOneCell = playerData.m_general.m_location;
+
+		// the vehicle on the ship's cell, 0.3 km from it along the ground, kept as driving keeps it (flat: the ground's height is only drawn)
+		var near = new Vector3( ship.x + 0.3f * 2048.0f / 225.0f, 0.0f, ship.z );
 
 		playerData.m_general.m_coordinates = near;
 		playerData.m_general.m_lastDisembarkedCoordinates = near;
@@ -30021,11 +30048,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		var location = playerData.m_general.m_location;
 
-		Log( "reboard: the ship stands at height " + ship.y.ToString( "F1" ) + ", the vehicle 1 km from it at height 0; after Move and Enter the location is " + location );
+		Log( "reboard: the ship stands at height " + ship.y.ToString( "F1" ) + "; after Move and Enter 5 km away " + locationWhenFar + ", 1 km away " + locationWhenOneCell + ", 0.3 km away " + location );
 
 		Check( "reboard: the ship stands on raised ground (the setup is the case)", ship.y > 10.0f, ship.y.ToString( "F1" ) );
 		Check( "reboard: Move and Enter 5 km from the ship leave the crew outside (control)", locationWhenFar == PD_General.Location.Disembarked, locationWhenFar.ToString() );
-		Check( "reboard: Move and Enter 1 km from the ship along the ground take the vehicle back in, however high the ground", location == PD_General.Location.Planetside, location.ToString() );
+		Check( "reboard: Move and Enter 1 km from the ship (the next map cell) leave the crew outside, as the original's", locationWhenOneCell == PD_General.Location.Disembarked, locationWhenOneCell.ToString() );
+		Check( "reboard: Move and Enter on the ship's cell (0.3 km along the ground) take the vehicle back in, however high the ground", location == PD_General.Location.Planetside, location.ToString() );
 
 		Finish( "scenario=reboard checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
@@ -30250,6 +30278,60 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "towbonus: the tow's lines come first, the bonus after them (the crew wake before Interstel pays)", ( stasis >= 0 ) && ( stasis < towed ) && ( towed < bonus ), messages );
 
 		Finish( "scenario=towbonus checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioNexusEgg()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var ship = playerData.m_playerShip;
+		var crystalStarId = gameData.m_planetList[ 33 ].m_starId;
+		var messages = new string[ 1 ];
+
+		EnsureCrew();
+
+		// the Orb against the field, the Cone that finds the nexus, and an armed Black Egg lying on the Crystal Planet away from the nexus
+		ship.AddArtifact( gameData.FindArtifactId( "Crystal Orb" ) );
+		ship.AddArtifact( gameData.FindArtifactId( "Crystal Cone" ) );
+
+		var controller = SpaceflightController.m_instance;
+
+		// down on the Crystal Planet (the egg does not count down there), where the egg is left armed away from the nexus
+		yield return GoIntoOrbit( crystalStarId, 33 );
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+
+		var eggPlace = Tools.LatLongToWorldCoordinates( 0.0f, 0.0f );
+
+		playerData.m_planetSurfaces.AddDroppedCargo( 33, eggPlace.x, eggPlace.y, eggPlace.z, -1, 0, gameData.FindArtifactId( "Black Egg" ) );
+
+		controller.m_messages.Clear();
+
+		// back up into orbit, as the ship comes up after leaving the egg (both the egg's countdown and the Cone's report begin on this entry into orbit)
+		controller.SwitchLocation( PD_General.Location.InOrbit );
+
+		var end = Time.realtimeSinceStartup + 2.5f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( playerData.m_general.m_location == PD_General.Location.InOrbit ) )
+		{
+			yield return null;
+		}
+
+		messages[ 0 ] = MessageList();
+
+		var lines = messages[ 0 ];
+		var countdown = lines.IndexOf( "countdown", System.StringComparison.OrdinalIgnoreCase );
+		var nexus = lines.IndexOf( "control nexus", System.StringComparison.OrdinalIgnoreCase );
+
+		Log( "nexusegg: the orbit's lines '" + lines.Replace( "\n", " | " ) + "'" );
+
+		Check( "nexusegg: the egg's countdown begins in orbit (the setup is the case)", countdown >= 0, lines );
+		Check( "nexusegg: the Cone's report of the nexus does not come between the egg's countdown and its numbers (the planet is about to go)", ( nexus < 0 ) || ( nexus < countdown ), lines );
+
+		Finish( "scenario=nexusegg checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
