@@ -358,13 +358,15 @@ def main():
             obj.data.materials.clear()
             obj.data.materials.append(flat_material(name + " Hull"))
             obj.data.materials.append(flat_material(name + " Engine"))
-            engines = mark_engines(obj, ship_kit.target_length(next(v["strinfo"] for v in race_file_data["vessels"] if v["name"] == name)))
+            # a dead ship (the Noah 9 derelict: STRINFO gives it no energy) has no engines to glow
+            engines = mark_engines(obj, ship_kit.target_length(next(v["strinfo"] for v in race_file_data["vessels"] if v["name"] == name))) if race_file_data.get("engines", True) else 0
             bpy.data.materials.remove(gltf_material)
 
             if engines == 0:
                 obj.data.materials.pop(index=1)
                 manifest_vessel = next(v for v in manifest["vessels"] if v["name"] == name)
                 manifest_vessel["materials"] = manifest_vessel["materials"][:1]
+                manifest["materials"] = [m for m in manifest["materials"] if m["name"] != name + " Engine"]
 
             print("ENGINES %s faces=%d" % (name, engines))
 
