@@ -59,10 +59,10 @@ public class DistressYesButton : ShipButton
 		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.DockingBay );
 
 		// the crew sleeps through the tow (TOW-US: "INITIATING CRYOGENIC STASIS", then "RETRIEVAL COMPLETE, CREW REVIVED") - said after the switch, since the docking
-		// bay's bridge clears the text window
-		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Initiating cryogenic stasis.</color>" );
-		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Retrieval complete, crew revived.</color>" );
-		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Interstel has towed the ship back to Starport. Towing charges: " + fine + " M.U.</color>" );
+		// bay's bridge clears the text window, and put before what the docking bay has said (the crew wake before Interstel pays a bonus): inserted last first
+		SpaceflightController.m_instance.m_messages.InsertText( "<color=white>Interstel has towed the ship back to Starport. Towing charges: " + fine + " M.U.</color>" );
+		SpaceflightController.m_instance.m_messages.InsertText( "<color=white>Retrieval complete, crew revived.</color>" );
+		SpaceflightController.m_instance.m_messages.InsertText( "<color=white>Initiating cryogenic stasis.</color>" );
 
 		return false;
 	}
