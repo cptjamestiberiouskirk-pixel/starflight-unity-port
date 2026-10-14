@@ -547,6 +547,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioDebrisPictures();
 				break;
 
+			case "shippictures":
+				yield return ScenarioShipPictures();
+				break;
+
 			case "atmospherepictures":
 				yield return ScenarioAtmospherePictures();
 				break;
@@ -1145,6 +1149,14 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "scifibuttons":
 				yield return ScenarioSciFiButtons();
+				break;
+
+			case "reboard":
+				yield return ScenarioReboard();
+				break;
+
+			case "outoffuel":
+				yield return ScenarioOutOfFuel();
 				break;
 
 			case "orbitpermission":
@@ -10501,6 +10513,168 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "debrispictures: no error is logged while the wrecks are made and cool", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=debrispictures alienBlank=" + alienBlank.Count + " playerBlank=" + playerBlank.Count + " errors=" + errorsDuring + " pictures=" + ( hasGraphics ? 7 : 0 ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: ship pictures (the alien ship models made with Meshy are drawn with their maps, and pictures of them when the run has a graphics device: probe.ps1 -Graphics)
+
+	// the vessels whose models were made with Meshy (DevTools/ShipModels/import_meshy.py, meshy-<race>.json): the Thrynn transport, scout and warship
+	static readonly int[] c_meshyVessels = { 8, 9, 10 };
+
+	// the materials of a model that are drawn without an albedo map (a flat colour, as the procedural stand-ins are)
+	static List<string> UnmappedMaterials( GameObject root )
+	{
+		var unmapped = new List<string>();
+
+		if ( root == null )
+		{
+			return unmapped;
+		}
+
+		foreach ( var renderer in root.GetComponentsInChildren<Renderer>( true ) )
+		{
+			foreach ( var material in renderer.sharedMaterials )
+			{
+				if ( ( material == null ) || !material.HasProperty( "_MainTex" ) || ( material.GetTexture( "_MainTex" ) == null ) || !material.IsKeywordEnabled( "SF_ALBEDOMAP_ON" ) )
+				{
+					unmapped.Add( ( material == null ) ? renderer.name + ":none" : material.name );
+				}
+			}
+		}
+
+		return unmapped;
+	}
+
+	// render a picture of a point from a camera of its own, looking at it from the given direction and distance (a three-quarter view)
+	static void RenderFromDirection( Vector3 target, Vector3 direction, float distance, string path )
+	{
+		var cameraObject = new GameObject( "Probe Camera" );
+		var camera = cameraObject.AddComponent<Camera>();
+
+		camera.CopyFrom( Camera.main );
+		camera.rect = new Rect( 0.0f, 0.0f, 1.0f, 1.0f );
+		camera.enabled = false;
+		camera.transform.position = target + direction.normalized * distance;
+		camera.transform.LookAt( target );
+
+		RenderCameraPicture( camera, path );
+
+		UnityEngine.Object.Destroy( cameraObject );
+	}
+
+	IEnumerator ScenarioShipPictures()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+
+		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "ship-pictures" ) );
+		var camera = Camera.main;
+
+		if ( hasGraphics )
+		{
+			System.IO.Directory.CreateDirectory( folder );
+		}
+
+		// a hyperspace encounter, as the shipmodels scenario takes
+		var encounterId = -1;
+
+		for ( var i = 0; i < gameData.m_encounterList.Length; i++ )
+		{
+			if ( ( gameData.m_encounterList[ i ].m_location == 0 ) && ( gameData.m_encounterList[ i ].m_maxNumShips >= 1 ) )
+			{
+				encounterId = i;
+				break;
+			}
+		}
+
+		if ( encounterId < 0 )
+		{
+			Finish( "scenario=shippictures abort: no hyperspace encounter", 2 );
+			yield break;
+		}
+
+		var pictures = 0;
+
+		foreach ( var vesselId in c_meshyVessels )
+		{
+			var vesselName = gameData.m_vesselList[ vesselId ].m_name;
+
+			// a fresh encounter with this vessel only, and a ship that survives what they fire
+			playerData.FindEncounter( encounterId ).Reset( encounterId );
+			ForceVessel( encounterId, vesselId );
+			playerData.m_playerShip.m_armorPoints = 100000;
+
+			EnterEncounter( encounterId );
+
+			yield return Frames( 10 );
+
+			var target = FirstLivingAlien();
+
+			if ( target < 0 )
+			{
+				Check( "shippictures: an alien ship of vessel " + vesselId + " (" + vesselName + ") in the encounter", false, "none" );
+				LeaveEncounter();
+
+				yield return Frames( 5 );
+
+				continue;
+			}
+
+			// the ship up the screen from the player ship, every other one far away
+			var alienShips = controller.m_encounter.m_pdEncounter.GetAlienShipList();
+			var targetShip = alienShips[ target ];
+			var screenUp = camera.transform.up;
+			var upTheScreen = new Vector3( screenUp.x, 0.0f, screenUp.z ).normalized;
+			var shipPosition = playerData.m_general.m_coordinates + upTheScreen * 150.0f;
+
+			for ( var i = 0; i < 30; i++ )
+			{
+				foreach ( var alienShip in alienShips )
+				{
+					if ( alienShip.m_addedToEncounter && !alienShip.m_isDead )
+					{
+						alienShip.m_coordinates = ( alienShip == targetShip ) ? shipPosition : playerData.m_general.m_coordinates + Vector3.right * 3000.0f;
+						alienShip.m_targetCoordinates = alienShip.m_coordinates;
+					}
+				}
+
+				yield return null;
+			}
+
+			var model = Call( controller.m_encounter, "GetAlienShipModel", target ) as GameObject;
+			var renderers = ( model != null ) ? model.GetComponentsInChildren<Renderer>( true ).Length : 0;
+			var unmapped = UnmappedMaterials( model );
+
+			Log( "shippictures: vessel " + vesselId + " " + vesselName + ": " + DescribeRenderers( model ) );
+
+			Check( "shippictures: vessel " + vesselId + " (" + vesselName + ") is drawn with its maps", ( renderers > 0 ) && ( unmapped.Count == 0 ), ( renderers == 0 ) ? "no renderer" : ( unmapped.Count == 0 ) ? renderers + " renderers, every material mapped" : unmapped.Count + " without maps: " + string.Join( ", ", unmapped ) );
+
+			if ( hasGraphics && ( model != null ) )
+			{
+				var bounds = new Bounds( model.transform.position, Vector3.zero );
+
+				foreach ( var renderer in model.GetComponentsInChildren<Renderer>() )
+				{
+					bounds.Encapsulate( renderer.bounds );
+				}
+
+				var size = Mathf.Max( bounds.size.x, bounds.size.z, 1.0f );
+				var file = vesselName.ToLowerInvariant().Replace( ' ', '_' );
+
+				RenderFromAbove( bounds.center, size * 2.0f, System.IO.Path.Combine( folder, file + "_above.png" ) );
+				RenderFromDirection( bounds.center, new Vector3( -0.8f, 0.9f, -0.7f ), size * 1.6f, System.IO.Path.Combine( folder, file + "_quarter.png" ) );
+				RenderCameraPicture( camera, System.IO.Path.Combine( folder, file + "_game_view.png" ) );
+
+				pictures += 3;
+			}
+
+			LeaveEncounter();
+
+			yield return Frames( 5 );
+		}
+
+		Finish( "scenario=shippictures vessels=" + c_meshyVessels.Length + " pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- Low: atmosphere pictures (what a planet's atmosphere is drawn with, in the star system and in orbit, and pictures of it with -Graphics)
@@ -29464,6 +29638,144 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "scifibuttons: a button's frame takes the light mode's accent colour", ( lightFrameColour == lightAccent ) && ( lightFrameColour != "(none)" ), lightFrameColour + " / " + lightAccent );
 
 		Finish( "scenario=scifibuttons checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioReboard()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+		ProbeKeyboard();
+
+		// down on planet 94 at a site on raised ground, and out in the terrain vehicle
+		yield return LandOnPlanet94At( Tools.LatLongToWorldCoordinates( 4.3f, -16.0f ), done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=reboard abort: no landing (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var ship = controller.m_disembarked.ApplyElevation( Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude ), false );
+
+		// the control: 5 km from the ship along the ground, Move and Enter leave the crew outside (2048 units are 225 km)
+		var far = new Vector3( ship.x + 5.0f * 2048.0f / 225.0f, 0.0f, ship.z );
+
+		playerData.m_general.m_coordinates = far;
+		playerData.m_general.m_lastDisembarkedCoordinates = far;
+		controller.m_terrainVehicle.transform.localPosition = far;
+
+		yield return Frames( 5 );
+
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
+
+		yield return Frames( 5 );
+		yield return Tap( Key.Enter );
+		yield return Frames( 30 );
+
+		var locationWhenFar = playerData.m_general.m_location;
+
+		// the vehicle 1 km from the ship along the ground, kept as driving keeps it (flat: the ground's height is only drawn)
+		var near = new Vector3( ship.x + 2048.0f / 225.0f, 0.0f, ship.z );
+
+		playerData.m_general.m_coordinates = near;
+		playerData.m_general.m_lastDisembarkedCoordinates = near;
+		controller.m_terrainVehicle.transform.localPosition = near;
+
+		yield return Frames( 5 );
+
+		// Move, then Enter beside the ship, as the player goes back in
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
+
+		yield return Frames( 5 );
+		yield return Tap( Key.Enter );
+		yield return WaitForLocation( PD_General.Location.Planetside, 10.0f );
+		yield return Frames( 10 );
+
+		var location = playerData.m_general.m_location;
+
+		Log( "reboard: the ship stands at height " + ship.y.ToString( "F1" ) + ", the vehicle 1 km from it at height 0; after Move and Enter the location is " + location );
+
+		Check( "reboard: the ship stands on raised ground (the setup is the case)", ship.y > 10.0f, ship.y.ToString( "F1" ) );
+		Check( "reboard: Move and Enter 5 km from the ship leave the crew outside (control)", locationWhenFar == PD_General.Location.Disembarked, locationWhenFar.ToString() );
+		Check( "reboard: Move and Enter 1 km from the ship along the ground take the vehicle back in, however high the ground", location == PD_General.Location.Planetside, location.ToString() );
+
+		Finish( "scenario=reboard checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioOutOfFuel()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+		ProbeKeyboard();
+
+		// down on planet 94, out in the terrain vehicle, with something in its hold
+		yield return LandOnPlanet94At( Tools.LatLongToWorldCoordinates( 4.3f, -16.0f ), done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=outoffuel abort: no landing (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var vehicle = playerData.m_terrainVehicle;
+		var ironId = -1;
+
+		for ( var i = 0; i < gameData.m_elementList.Length; i++ )
+		{
+			if ( gameData.m_elementList[ i ].m_name == "Iron" )
+			{
+				ironId = i;
+			}
+		}
+
+		vehicle.AddElement( ironId, 20 );
+
+		var droppedBefore = ( playerData.m_planetSurfaces != null ) ? playerData.m_planetSurfaces.m_droppedCargoList.Count : 0;
+		var ironReference = playerData.m_playerShip.m_elementStorage.Find( ironId );
+		var ironShipBefore = ( ironReference != null ) ? ironReference.m_volume : 0;
+
+		// the tank runs dry far from the ship (40 km out, along the ground; 2048 units are 225 km)
+		var ship = Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude );
+		var farAway = new Vector3( ship.x + 40.0f * 2048.0f / 225.0f, 0.0f, ship.z );
+
+		playerData.m_general.m_coordinates = farAway;
+		playerData.m_general.m_lastDisembarkedCoordinates = farAway;
+		controller.m_terrainVehicle.transform.localPosition = farAway;
+
+		vehicle.m_fuelRemaining = -0.05f;
+
+		yield return Frames( 5 );
+
+		// Move, as the player drives on
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
+
+		yield return Frames( 10 );
+
+		var messages = System.Text.RegularExpressions.Regex.Replace( string.Join( "\n", playerData.m_general.m_messageList ), "<[^>]*>", "" );
+
+		yield return WaitForLocation( PD_General.Location.Planetside, 10.0f );
+		yield return Frames( 10 );
+
+		var location = playerData.m_general.m_location;
+		var droppedAfter = ( playerData.m_planetSurfaces != null ) ? playerData.m_planetSurfaces.m_droppedCargoList.Count : 0;
+		var ironInShip = playerData.m_playerShip.m_elementStorage.Find( ironId );
+		var ironShipAfter = ( ironInShip != null ) ? ironInShip.m_volume : 0;
+
+		Log( "outoffuel: messages '" + messages.Replace( "\n", " | " ) + "' | location " + location + " | dropped cargo " + droppedBefore + " then " + droppedAfter + " | iron in the ship " + ironShipBefore + " then " + ironShipAfter + " | the vehicle's fuel " + vehicle.GetPercentFuelRemaining() + "%" );
+
+		Check( "outoffuel: an empty tank says so, in the original's words (OUT OF FUEL, RETURNING TO SHIP ON FOOT)", messages.Contains( "Out of fuel." ) && messages.Contains( "Returning to ship on foot." ), messages );
+		Check( "outoffuel: the crew are back in the ship, not stranded on the planet", location == PD_General.Location.Planetside, location.ToString() );
+		Check( "outoffuel: the vehicle's cargo is left on the ground where it stopped (the original's >DEBRIS), not carried into the ship", ( droppedAfter == droppedBefore + 1 ) && ( ironShipAfter == ironShipBefore ), droppedBefore + " / " + droppedAfter + ", iron in the ship " + ironShipBefore + " / " + ironShipAfter );
+		Check( "outoffuel: back in the ship the vehicle is refuelled", vehicle.GetPercentFuelRemaining() == 100, vehicle.GetPercentFuelRemaining().ToString() );
+
+		Finish( "scenario=outoffuel checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	IEnumerator ScenarioOrbitPermission()

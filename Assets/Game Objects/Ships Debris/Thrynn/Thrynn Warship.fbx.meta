@@ -7,23 +7,13 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Thrynn Engine
-    second: {fileID: 2100000, guid: 9d9452677f5c5c04cbc19b0707f5c8d5, type: 2}
+      name: Thrynn Warship Engine
+    second: {fileID: 2100000, guid: d1937270f1e66114cb8b8ef2a86b70bd, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Thrynn Hull
-    second: {fileID: 2100000, guid: f546829f8a523584d8e747c27fe1548f, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Thrynn Light
-    second: {fileID: 2100000, guid: 31f8a478388b70a4d88e045d6b870a2c, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Thrynn Trim
-    second: {fileID: 2100000, guid: 315a2463bce135f4db214f33b81b8edc, type: 2}
+      name: Thrynn Warship Hull
+    second: {fileID: 2100000, guid: 39de8bec7abc032478293deafc3a70e5, type: 2}
   materials:
     materialImportMode: 1
     materialName: 0
