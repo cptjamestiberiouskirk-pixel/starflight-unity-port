@@ -857,8 +857,8 @@ public class ShipConfigurationPanel : Panel
 					case 5: shipPartList = gameData.m_laserCannonList; break;
 				}
 
-				// add the funds to the players bank balance
-				playerData.m_bank.m_currentBalance += shipPartList[ currentClass ].m_sellPrice;
+				// add the funds to the players bank balance - what the part is worth in the condition it is in (CONFIG-OV WECB0)
+				playerData.m_bank.m_currentBalance += playerData.m_playerShip.GetPartResaleValue( m_currentPartIndex, shipPartList[ currentClass ] );
 
 				// remove the part from the ship
 				switch ( m_currentPartIndex )
@@ -932,6 +932,9 @@ public class ShipConfigurationPanel : Panel
 				case 4: playerData.m_playerShip.m_missileLauncherClass = classIndex; break;
 				case 5: playerData.m_playerShip.m_laserCannonClass = classIndex; break;
 			}
+
+			// a part just bought is whole, whatever the damage of the one it replaces
+			playerData.m_playerShip.InstallNewPart( m_currentPartIndex );
 
 			// recalculate the ship mass and acceleration
 			playerData.m_playerShip.RecalculateMass();
@@ -1019,7 +1022,7 @@ public class ShipConfigurationPanel : Panel
 					// yep - show the sell price only for the class we have installed
 					if ( classIndex == currentClass )
 					{
-						m_componentValuesText.text += shipPartList[ classIndex ].m_sellPrice.ToString() + Environment.NewLine;
+						m_componentValuesText.text += DataController.m_instance.m_playerData.m_playerShip.GetPartResaleValue( m_currentPartIndex, shipPartList[ classIndex ] ).ToString() + Environment.NewLine;
 					}
 					else
 					{

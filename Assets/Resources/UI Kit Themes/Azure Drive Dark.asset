@@ -1,0 +1,106 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e439c44b85afe10448b9101044f673c4, type: 3}
+  m_Name: Azure Drive Dark
+  m_EditorClassIdentifier: Assembly-CSharp::UIKitTheme
+  m_backgroundApp: {r: 0.0196078, g: 0.0588235, b: 0.1098039, a: 1}
+  m_backgroundPanel: {r: 0.0470588, g: 0.0901961, b: 0.1411765, a: 1}
+  m_backgroundRaised: {r: 0.0784314, g: 0.1294118, b: 0.1960784, a: 1}
+  m_backgroundHover: {r: 0.1176471, g: 0.172549, b: 0.2470588, a: 1}
+  m_borderSubtle: {r: 0.1254902, g: 0.1921569, b: 0.2784314, a: 1}
+  m_borderDefault: {r: 0.1960784, g: 0.2784314, b: 0.3882353, a: 1}
+  m_borderAccent: {r: 0.2392157, g: 0.6078431, b: 1, a: 1}
+  m_borderAlert: {r: 1, g: 0.3294118, b: 0.4078431, a: 1}
+  m_textPrimary: {r: 0.9137255, g: 0.945098, b: 0.9803922, a: 1}
+  m_textSecondary: {r: 0.6745098, g: 0.7529412, b: 0.8392157, a: 1}
+  m_textMuted: {r: 0.4235294, g: 0.5137255, b: 0.6078431, a: 1}
+  m_textAccent: {r: 0.3882353, g: 0.6745098, b: 1, a: 1}
+  m_textOnAccent: {r: 0.0235294, g: 0.0470588, b: 0.0745098, a: 1}
+  m_textAlert: {r: 1, g: 0.3294118, b: 0.4078431, a: 1}
+  m_textWarning: {r: 1, g: 0.7843137, b: 0.3803922, a: 1}
+  m_accentPrimary: {r: 0.2392157, g: 0.6078431, b: 1, a: 1}
+  m_accentPrimaryStrong: {r: 0.054902, g: 0.5058824, b: 0.9098039, a: 1}
+  m_accentPrimaryDim: {r: 0.0392157, g: 0.3254902, b: 0.5921569, a: 1}
+  m_accentSecondary: {r: 1, g: 0.6431373, b: 0.4784314, a: 1}
+  m_statusShield: {r: 0.2392157, g: 0.6078431, b: 1, a: 1}
+  m_statusArmor: {r: 1, g: 0.7215686, b: 0.4196078, a: 1}
+  m_statusFuel: {r: 0.3098039, g: 0.8784314, b: 0.627451, a: 1}
+  m_statusDanger: {r: 1, g: 0.3294118, b: 0.4078431, a: 1}
+  m_sensorWindow: {r: 0.2235294, g: 0.3568627, b: 0.5254902, a: 1}
+  m_displayXL:
+    m_font: {fileID: 11400000, guid: 837e87a8e408c8c4b8a61880af427289, type: 2}
+    m_size: 48
+    m_characterSpacing: 4
+    m_uppercase: 0
+  m_headingL:
+    m_font: {fileID: 11400000, guid: 837e87a8e408c8c4b8a61880af427289, type: 2}
+    m_size: 24
+    m_characterSpacing: 6
+    m_uppercase: 1
+  m_headingM:
+    m_font: {fileID: 11400000, guid: ff21c03b35804614090d6d8f1260009f, type: 2}
+    m_size: 15
+    m_characterSpacing: 12
+    m_uppercase: 1
+  m_labelM:
+    m_font: {fileID: 11400000, guid: 5bfddd1310b2f2f4693c8125215b123d, type: 2}
+    m_size: 17
+    m_characterSpacing: 8
+    m_uppercase: 1
+  m_labelS:
+    m_font: {fileID: 11400000, guid: 5bfddd1310b2f2f4693c8125215b123d, type: 2}
+    m_size: 13
+    m_characterSpacing: 10
+    m_uppercase: 1
+  m_bodyM:
+    m_font: {fileID: 11400000, guid: d07afbe253219e34cb642386b1a33ff5, type: 2}
+    m_size: 18
+    m_characterSpacing: 1
+    m_uppercase: 0
+  m_readoutL:
+    m_font: {fileID: 11400000, guid: c1fd05997846d5446898bb4097419771, type: 2}
+    m_size: 30
+    m_characterSpacing: 2
+    m_uppercase: 0
+  m_readoutM:
+    m_font: {fileID: 11400000, guid: c1fd05997846d5446898bb4097419771, type: 2}
+    m_size: 18
+    m_characterSpacing: 2
+    m_uppercase: 0
+  m_panelSprite: {fileID: 21300000, guid: 9bb7e22d04d243f41857f0eb555757f9, type: 3}
+  m_panelOutlineSprite: {fileID: 21300000, guid: e5f0ae92da607404f86392757674d4a1,
+    type: 3}
+  m_glowSprite: {fileID: 21300000, guid: 7f79c74ebc3e4954487332118112f59e, type: 3}
+  m_barSprite: {fileID: 21300000, guid: 7c298629d81d8fd49bc7b39bd2e30646, type: 3}
+  m_diamondSprite: {fileID: 21300000, guid: 17b616fe62522e346b19ecc26908ca25, type: 3}
+  m_diamondOutlineSprite: {fileID: 21300000, guid: 75f104f17c8d1bc41b4621f0c4473b5e,
+    type: 3}
+  m_buttonSprite: {fileID: 21300000, guid: 275c10ce1850423bbbc2647bbeed5295, type: 3}
+  m_buttonFrameSprite: {fileID: 21300000, guid: 370d8230e2a245279f6329e7bafe39df, type: 3}
+  m_bulletOffSprite: {fileID: 21300000, guid: 2605642f58192a44fa3c0cf00e28ff68, type: 3}
+  m_bulletOnSprite: {fileID: 21300000, guid: 8e76a2acd528ddd4985a1fd39d4db4e0, type: 3}
+  m_bulletActiveSprite: {fileID: 21300000, guid: 6b2869550aafa3a4986ace9ed640484a,
+    type: 3}
+  m_officerCaptainSprite: {fileID: 21300000, guid: 2379898eb0356064abe20ee6461dc70e,
+    type: 3}
+  m_officerScienceSprite: {fileID: 21300000, guid: a3fdd67dd2944e346a37395dfc4bca3e,
+    type: 3}
+  m_officerNavigatorSprite: {fileID: 21300000, guid: 6bc45df5cfa733149ae07f79b166eebc,
+    type: 3}
+  m_officerEngineerSprite: {fileID: 21300000, guid: 23089778acc401e4897f60d01b26415e,
+    type: 3}
+  m_officerCommunicationsSprite: {fileID: 21300000, guid: c41d17886ef42584e8405a6626553314,
+    type: 3}
+  m_officerDoctorSprite: {fileID: 21300000, guid: 9b2b06fab0bf5a8488e3e13f172e0080,
+    type: 3}
+  m_officerTerrainVehicleSprite: {fileID: 21300000, guid: 88f5a2490662ce848a6c93b669363058,
+    type: 3}

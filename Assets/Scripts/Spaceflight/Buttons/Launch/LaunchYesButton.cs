@@ -25,6 +25,21 @@ public class LaunchYesButton : ShipButton
 		}
 		else
 		{
+			// a launch from the surface burns the gravity's share of Endurium, and without it the ship stays down (LAND-OV ?LAUNCH and WF39D)
+			var planet = DataController.m_instance.m_gameData.m_planetList[ playerData.m_general.m_currentPlanetId ];
+
+			if ( playerData.m_playerShip.HasTooLittleFuelToRelaunch( planet, true ) )
+			{
+				SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+				SpaceflightController.m_instance.m_messages.Clear();
+				SpaceflightController.m_instance.m_messages.AddText( "<color=white>Insufficient fuel for re-launching.</color>" );
+				SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.CommandA );
+
+				return false;
+			}
+
+			playerData.m_playerShip.BurnLandingFuel( planet );
+
 			// update the messages log
 			SpaceflightController.m_instance.m_messages.Clear();
 
