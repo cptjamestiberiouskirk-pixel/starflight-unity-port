@@ -1371,6 +1371,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioFiredOnSilent();
 				break;
 
+			case "alienshieldhits":
+				yield return ScenarioAlienShieldHits();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -1447,7 +1451,18 @@ public class ClaudeProbe : MonoBehaviour
 
 		try
 		{
-			method.Invoke( CombatController.m_instance, new object[] { alienIndex, 100000 } );
+			// raised shields take a whole hit and nothing goes on to the armor (DAMAGE-OV WF162), so it takes a second hit to destroy a shielded ship
+			for ( var hit = 0; hit < 3; hit++ )
+			{
+				var ships = SpaceflightController.m_instance.m_encounter.m_pdEncounter.GetAlienShipList();
+
+				if ( ( alienIndex < 0 ) || ( alienIndex >= ships.Length ) || ships[ alienIndex ].m_isDead )
+				{
+					break;
+				}
+
+				method.Invoke( CombatController.m_instance, new object[] { alienIndex, 100000 } );
+			}
 		}
 		catch ( TargetInvocationException exception )
 		{
@@ -17941,7 +17956,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "roddevice: one laser shot of " + laserVessel.m_name + " (laser class " + laserVessel.m_laserClass + ") takes " + laserWithout + " armor points without the Rod Device, " + laserWith + " with it | a plasma bolt of " + ( ( plasmaVessel == null ) ? "none" : plasmaVessel.m_name ) + " " + plasmaWithout + " without, " + plasmaWith + " with" );
 
 		Check( "roddevice: an alien laser hits the ship (control)", laserWithout > 0, laserWithout.ToString() );
-		Check( "roddevice: with the Rod Device in the hold an alien laser does half the damage", ( laserWithout > 0 ) && ( laserWith == laserWithout / 2 ), laserWithout + " -> " + laserWith );
+		Check( "roddevice: with the Rod Device in the hold an alien laser does a quarter of the damage, as the original's (DAMAGE-OV WED36: ?ROD 4 /)", ( laserWithout > 0 ) && ( laserWith == laserWithout / 4 ), laserWithout + " -> " + laserWith );
 		Check( "roddevice: the Rod Device is a laser shield - a plasma bolt does the same damage (control)", plasmaWith == plasmaWithout, plasmaWithout + " -> " + plasmaWith );
 
 		Finish( "scenario=roddevice laser=" + laserWithout + "/" + laserWith + " plasma=" + plasmaWithout + "/" + plasmaWith, 0 );
@@ -34482,6 +34497,74 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "firedonsilent: aliens that have turned cowardly still answer a hail (control)", cowardly && cowardlyConnected && ( cowardlySaid.Length > 0 ), cowardly + " " + cowardlyConnected + " '" + cowardlySaid + "'" );
 
 		Finish( "scenario=firedonsilent checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// what an alien ship's shields take of a hit, as the original's (DAMAGE-OV WF162): the whole hit if they have points left, are up and the fight is not in a
+	// nebula, and nothing over goes on to the armor; otherwise the armor takes it all
+	IEnumerator ScenarioAlienShieldHits()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var applyDamage = typeof( CombatController ).GetMethod( "ApplyDamageToAlien", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance );
+		var results = new string[ 2 ];
+		var armorTaken = new int[ 2 ];
+		var shieldsLeft = new int[ 2 ];
+		var shieldsUp = new bool[ 2 ];
+		var races = new GameData.Race[] { GameData.Race.Uhlek, GameData.Race.Spemin };
+
+		EnsureCrew();
+
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		for ( var i = 0; i < races.Length; i++ )
+		{
+			var encounterId = FindEncounterOfRace( races[ i ] );
+
+			EnterEncounter( encounterId );
+			yield return Frames( 10 );
+
+			// the first living ship, with 30 shield points and plenty of armor, takes a hit of 50
+			var ships = encounter.m_pdEncounter.GetAlienShipList();
+			var index = -1;
+
+			for ( var s = 0; s < ships.Length; s++ )
+			{
+				if ( ships[ s ].m_addedToEncounter && !ships[ s ].m_isDead )
+				{
+					index = s;
+					break;
+				}
+			}
+
+			if ( index < 0 )
+			{
+				results[ i ] = "no living ship in encounter " + encounterId;
+				continue;
+			}
+
+			ships[ index ].EnsureHitPoints( DataController.m_instance.m_gameData.m_vesselList[ ships[ index ].m_vesselId ] );
+			ships[ index ].m_shieldPoints = 30;
+			ships[ index ].m_armorPoints = 500;
+
+			shieldsUp[ i ] = encounter.AliensHaveShieldsUp();
+
+			applyDamage.Invoke( CombatController.m_instance, new object[] { index, 50 } );
+
+			armorTaken[ i ] = 500 - ships[ index ].m_armorPoints;
+			shieldsLeft[ i ] = ships[ index ].m_shieldPoints;
+			results[ i ] = races[ i ] + " (encounter " + encounterId + "): shields up " + shieldsUp[ i ] + ", shields 30 -> " + shieldsLeft[ i ] + ", armor took " + armorTaken[ i ];
+
+			ClearMissiles();
+			LeaveEncounter();
+			yield return Frames( 10 );
+		}
+
+		Log( "alienshieldhits: " + results[ 0 ] + " | " + results[ 1 ] );
+
+		Check( "alienshieldhits: an Uhlek ship's raised shields take the whole hit of 50 with 30 points left, and nothing goes on to the armor", shieldsUp[ 0 ] && ( shieldsLeft[ 0 ] == 0 ) && ( armorTaken[ 0 ] == 0 ), results[ 0 ] );
+		Check( "alienshieldhits: the Spemin never raise their shields, so the armor takes the whole hit and the shields keep their points", !shieldsUp[ 1 ] && ( shieldsLeft[ 1 ] == 30 ) && ( armorTaken[ 1 ] == 50 ), results[ 1 ] );
+
+		Finish( "scenario=alienshieldhits checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
