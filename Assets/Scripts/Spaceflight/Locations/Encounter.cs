@@ -654,6 +654,24 @@ public class Encounter : MonoBehaviour
 
 		// the aliens are hostile now
 		m_pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+
+		// aliens that fight do not talk, so a comm link that is up ends (the console stays on the menu the player fired from)
+		if ( m_pdEncounter.m_connected && AliensAreFighting() )
+		{
+			var buttonController = SpaceflightController.m_instance.m_buttonController;
+			var buttonSet = buttonController.GetCurrentButtonSet();
+
+			Disconnect();
+
+			buttonController.ChangeButtonSet( buttonSet );
+		}
+	}
+
+	// whether the aliens fight, and so do not talk: the original's aliens never talk once they fight (COMM-OV <TALK>: ?FIGHT leaves no chance to talk, and the
+	// player's fire outside a comm link turns them to fight); in the port, those the player has fired on, unless they have turned cowardly
+	bool AliensAreFighting()
+	{
+		return m_pdEncounter.m_attackedByPlayer && !m_pdEncounter.m_aliensAreCowardly;
 	}
 
 	// call this to let us know we have just entered an encounter
@@ -2261,8 +2279,13 @@ public class Encounter : MonoBehaviour
 					// reset the conversation timer
 					m_pdEncounter.m_conversationTimer = Random.Range( 10.0f, 30.0f );
 
+					// do the aliens fight? then they say nothing: no hail, no answer to the player's hail, no statement
+					if ( AliensAreFighting() )
+					{
+						aliensSaidSomething = false;
+					}
 					// have aliens with a personality said all the phrases they will? then they are tired of talking (compart.txt 11)
-					if ( m_pdEncounter.m_connected && IsTiredOfTalking() )
+					else if ( m_pdEncounter.m_connected && IsTiredOfTalking() )
 					{
 						AddComm( GD_Comm.Subject.Terminate, false );
 					}
