@@ -31276,12 +31276,28 @@ public class ClaudeProbe : MonoBehaviour
 		{
 			var deposits = PtDeposits( vehicle.transform.position );
 
-			if ( deposits.Count == 0 )
+			// the nearest deposit more than 2.5 km from the ship (along the ground): stopping Move within 2 km of the ship takes the vehicle back aboard
+			var shipAt = Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude );
+			TerrainElement deposit = null;
+
+			foreach ( var candidate in deposits )
+			{
+				var fromShip = candidate.transform.position - shipAt;
+
+				fromShip.y = 0.0f;
+
+				if ( fromShip.magnitude * 225.0f / 2048.0f > 2.5f )
+				{
+					deposit = candidate;
+
+					break;
+				}
+			}
+
+			if ( deposit == null )
 			{
 				break;
 			}
-
-			var deposit = deposits[ 0 ];
 
 			if ( !( GetField( controller.m_buttonController, "m_currentButton" ) is MoveButton ) )
 			{
