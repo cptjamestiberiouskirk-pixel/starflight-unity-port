@@ -1159,6 +1159,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioOutOfFuel();
 				break;
 
+			case "orbitpermission":
+				yield return ScenarioOrbitPermission();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -29772,6 +29776,47 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "outoffuel: back in the ship the vehicle is refuelled", vehicle.GetPercentFuelRemaining() == 100, vehicle.GetPercentFuelRemaining().ToString() );
 
 		Finish( "scenario=outoffuel checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioOrbitPermission()
+	{
+		var dataController = DataController.m_instance;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// the Veloxi drones in orbit around Sphexi (encounter 305) let the ship into orbit
+		controller.GrantOrbitPermission( 305 );
+
+		// the game is saved and loaded again, as the player does
+		dataController.SaveActiveGame();
+		dataController.ReloadActiveGame();
+
+		// (a game loaded starts a new spaceflight scene, which has no permissions of its own: the old code kept them only there)
+		var sceneList = controller.GetType().GetField( "m_orbitPermissions", c_any );
+
+		if ( sceneList != null )
+		{
+			( sceneList.GetValue( controller ) as List<int> ).Clear();
+		}
+
+		yield return Frames( 5 );
+
+		var afterLoading = controller.HasOrbitPermission( 305 );
+
+		// the control: leaving the star system ends the permission, as before
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		var afterHyperspace = controller.HasOrbitPermission( 305 );
+
+		Log( "orbitpermission: after saving and loading " + afterLoading + ", after hyperspace " + afterHyperspace );
+
+		Check( "orbitpermission: the drones' permission to orbit is kept in the save, so they do not ask again after loading", afterLoading, afterLoading.ToString() );
+		Check( "orbitpermission: going to hyperspace still ends it (control)", !afterHyperspace, afterHyperspace.ToString() );
+
+		Finish( "scenario=orbitpermission checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
