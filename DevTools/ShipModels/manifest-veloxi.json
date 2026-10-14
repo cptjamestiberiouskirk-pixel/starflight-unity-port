@@ -12,7 +12,7 @@
 				"Veloxi Transport Hull",
 				"Veloxi Transport Engine"
 			],
-			"meshy": {
+			"sources": {
 				"concept": "01a138bd-b074-769d-89f5-f6d08f52b3cd",
 				"model": "01a138c5-5282-71e6-9385-256edc9a4d41",
 				"remesh": "01a138c7-1a62-7759-8865-6f18c1c78d9a"
@@ -29,7 +29,7 @@
 				"Veloxi Scout Hull",
 				"Veloxi Scout Engine"
 			],
-			"meshy": {
+			"sources": {
 				"concept": "01a138be-ad6d-7330-bb86-6826d3f7a740",
 				"model": "01a138c5-5701-768a-b6ee-12c1a2b42904",
 				"remesh": "01a138c7-20fc-705a-90f3-f00c1e846f0c"
@@ -46,7 +46,7 @@
 				"Veloxi Warship Hull",
 				"Veloxi Warship Engine"
 			],
-			"meshy": {
+			"sources": {
 				"concept": "01a138be-afef-766d-aded-ca88353c37db",
 				"conceptEdit": "01a138c5-4e22-740f-8103-fd9569915503",
 				"model": "01a138c7-1361-70b0-8b6b-384d0f7e9e74",
@@ -64,7 +64,7 @@
 				"Veloxi Drone Hull",
 				"Veloxi Drone Engine"
 			],
-			"meshy": {
+			"sources": {
 				"concept": "01a138be-b244-74d5-93a9-93fb41fc268c",
 				"model": "01a138c5-5b29-7742-b2ba-b110f58ae1c6",
 				"remesh": "01a138c7-26c1-71f8-9be1-1d06dfcda75f"

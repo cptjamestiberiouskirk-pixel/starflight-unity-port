@@ -79,8 +79,8 @@ AGENTS.md
 *.slnx
 
 # The headless probe copies itself here for one run (see DevTools/HeadlessProbe)
-/Assets/ClaudeProbe.cs
-/Assets/ClaudeProbe.cs.meta
+/Assets/HeadlessProbe.cs
+/Assets/HeadlessProbe.cs.meta
 # the ship model wiring tool, copied into Assets/ for a run by DevTools/ShipModels/wire.ps1
 /Assets/ShipModelWiring.cs
 /Assets/ShipModelWiring.cs.meta

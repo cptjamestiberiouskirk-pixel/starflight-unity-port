@@ -1,11 +1,11 @@
-"""The player's Arth ship made with Meshy (Blender 5.2, background mode).
+"""The player's textured Arth ship (Blender 5.2, background mode).
 
-blender --background --factory-startup --python DevTools/ShipModels/import_meshy_arth.py -- DevTools/ShipModels/meshy-arth.json --source <folder> [--preview <png>] [--no-export]
+blender --background --factory-startup --python DevTools/ShipModels/import_arth_ship.py -- DevTools/ShipModels/source-arth.json --source <folder> [--preview <png>] [--no-export]
 
 The game shows the ship's equipment: four scripts (PlayerShip, StatusDisplay, Disembarked, ShipConfigurationPanel) switch the
 16 cargo pods, the laser cannon and the missile launchers on and off, through the nodes of Arth Ship.FBX that the scenes
 reference by their names. So the new ship keeps the old file's tree: this script makes that tree anew (never from the file,
-which it overwrites), puts the Meshy hull (one GLB) where the old hull was, splits the Meshy sheet of parts (a second GLB: a
+which it overwrites), puts the new hull (one GLB) where the old hull was, splits the new sheet of parts (a second GLB: a
 cargo pod, a laser turret and a missile launcher) and puts them where the hull has room for them, and writes the FBX with
 the same names, the same root and the same units. The old file is in inches; Blender writes centimetres, so the parts go out in centimetres under a root of
 0.01 (a round trip of the old model through these settings gives the same transforms and bounds in Unity).
@@ -25,7 +25,7 @@ from mathutils import Matrix, Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import import_meshy  # noqa: E402
+import import_ship_models  # noqa: E402
 import ship_kit  # noqa: E402
 
 ARTH_FBX = "Assets/Game Objects/Ships/Arth/Arth Ship.FBX"
@@ -105,7 +105,7 @@ def build_nodes():
     nodes["Laser Cannon"] = node("Laser Cannon", root, False)
     nodes["Laser"] = node("Laser", nodes["Laser Cannon"], True)
 
-    # the old cannon had a separate base; the Meshy turret is one piece, so its base node stays as an empty node
+    # the old cannon had a separate base; the new turret is one piece, so its base node stays as an empty node
     nodes["Laser Base"] = node("Laser Base", nodes["Laser Cannon"], False)
     nodes["Missile Launchers"] = node("Missile Launchers", root, False)
     nodes["Missile Launcher - Left"] = node("Missile Launcher - Left", nodes["Missile Launchers"], True)
@@ -118,7 +118,7 @@ def build_nodes():
 
 
 def place_hull(hull_obj, glb_obj):
-    """Put the Meshy hull where the old hull was, in the root's frame (inches), and give the old Hull node its mesh."""
+    """Put the new hull where the old hull was, in the root's frame (inches), and give the old Hull node its mesh."""
     mesh = glb_obj.data
     points = vertices_of(mesh)
     low, high = bounds(points)
@@ -237,7 +237,7 @@ def blue_direction(mesh, image):
         return None
 
     width, height = image.size
-    pixels = import_meshy.image_pixels(image)
+    pixels = import_ship_models.image_pixels(image)
     uv = mesh.uv_layers.active
 
     if uv is None:
@@ -323,7 +323,7 @@ def scaled_copy(mesh, factor, name):
 def assemble(nodes, hull, pod, turret, launcher, parts_image):
     length = HULL_BACK - HULL_FRONT
 
-    # ---- cargo pods: the Meshy spine is thicker and shorter than the old one, so the 16 pods go in rings of four, an upper and
+    # ---- cargo pods: the new spine is thicker and shorter than the old one, so the 16 pods go in rings of four, an upper and
     # a lower pod on each side (from above still two rows along the spine, as in the original's picture), each pod's top
     # facing out; ring 1 is nearest the fork, and in each ring the upper pods come first: pod 4r+1 upper -X, 4r+2 upper +X,
     # 4r+3 lower -X, 4r+4 lower +X
@@ -403,14 +403,14 @@ def assemble(nodes, hull, pod, turret, launcher, parts_image):
 
 
 def glow_faces(obj, maps, faces, strength, glass=None):
-    """Light the bright texels of the given faces in the emissive map (the cockpit's windows, the engines' nozzles: Meshy
+    """Light the bright texels of the given faces in the emissive map (the cockpit's windows, the engines' nozzles: the model
     paints them near white, so their colour alone cannot find them, but where they are on the hull can). With glass (a
-    colour), the faces' dark grey texels glow that colour instead: the cockpit's canopy, which Meshy paints as dark glass."""
+    colour), the faces' dark grey texels glow that colour instead: the cockpit's canopy, which the model paints as dark glass."""
     albedo_image = bpy.data.images.load(os.path.join(ship_kit.PROJECT_ROOT, maps["Albedo"]))
     emissive_path = os.path.join(ship_kit.PROJECT_ROOT, maps["Emissive"])
     emissive_image = bpy.data.images.load(emissive_path)
-    albedo = import_meshy.image_pixels(albedo_image)
-    emissive = import_meshy.image_pixels(emissive_image).copy()
+    albedo = import_ship_models.image_pixels(albedo_image)
+    emissive = import_ship_models.image_pixels(emissive_image).copy()
     height, width = albedo.shape[:2]
     inside = numpy.zeros((height, width), dtype=bool)
     uv = obj.data.uv_layers.active.data
@@ -443,7 +443,7 @@ def glow_faces(obj, maps, faces, strength, glass=None):
         emissive[bright, :3] = numpy.maximum(emissive[bright, :3], numpy.array(glass) * strength)
     bpy.data.images.remove(albedo_image)
     bpy.data.images.remove(emissive_image)
-    import_meshy.save_image(emissive, emissive_path)
+    import_ship_models.save_image(emissive, emissive_path)
 
     return int(bright.sum())
 
@@ -499,7 +499,7 @@ def main():
     arguments = ship_kit.script_arguments()
 
     if not arguments or "--source" not in arguments:
-        raise SystemExit("usage: import_meshy_arth.py -- <meshy-arth.json> --source <folder with the GLB files> [--preview <png>] [--no-export]")
+        raise SystemExit("usage: import_arth_ship.py -- <source-arth.json> --source <folder with the GLB files> [--preview <png>] [--no-export]")
 
     with open(os.path.abspath(arguments[0]), encoding="utf-8") as config_file:
         config = json.load(config_file)
@@ -513,15 +513,15 @@ def main():
     nodes = build_nodes()
     root = nodes["Arth Ship"]
 
-    hull_glb = import_meshy.import_glb(os.path.join(source, config["hull"]["glb"]), "Hull GLB")
-    hull_glb.data.materials[0].name = "Arth Ship Meshy Hull"
+    hull_glb = import_ship_models.import_glb(os.path.join(source, config["hull"]["glb"]), "Hull GLB")
+    hull_glb.data.materials[0].name = "Arth Ship Model Hull"
     hull = HullShape(place_hull(nodes["Hull"], hull_glb))
 
-    parts_glb = import_meshy.import_glb(os.path.join(source, config["parts"]["glb"]), "Parts GLB")
+    parts_glb = import_ship_models.import_glb(os.path.join(source, config["parts"]["glb"]), "Parts GLB")
     parts_material = parts_glb.data.materials[0]
-    parts_material.name = "Arth Ship Meshy Parts"
+    parts_material.name = "Arth Ship Model Parts"
     bsdf = next(n for n in parts_material.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
-    parts_image = import_meshy.upstream_image(bsdf.inputs["Base Color"])
+    parts_image = import_ship_models.upstream_image(bsdf.inputs["Base Color"])
     pod, turret, launcher = split_parts(parts_glb)
     bpy.data.objects.remove(parts_glb)
 
@@ -535,8 +535,8 @@ def main():
     maps = {}
 
     if do_export:
-        maps["Arth Ship Meshy Hull"] = import_meshy.convert_maps(nodes["Hull"], TEXTURES, "Arth Ship Hull", size, config.get("glow"))
-        maps["Arth Ship Meshy Parts"] = import_meshy.convert_maps(nodes["Pod 01"], TEXTURES, "Arth Ship Parts", size, config.get("glow"))
+        maps["Arth Ship Model Hull"] = import_ship_models.convert_maps(nodes["Hull"], TEXTURES, "Arth Ship Hull", size, config.get("glow"))
+        maps["Arth Ship Model Parts"] = import_ship_models.convert_maps(nodes["Pod 01"], TEXTURES, "Arth Ship Parts", size, config.get("glow"))
 
         # the ship's lights, as the old model's window glow: the cockpit's upright faces (its band of windows) and the faces at
         # the stern that face backwards (the nozzles)
@@ -544,16 +544,16 @@ def main():
         windows = [p for p in hull_mesh.polygons if p.center.y < hull.spine_front and abs(p.normal.z) < 0.4]
         nozzles = [p for p in hull_mesh.polygons if p.center.y > HULL_BACK - 3.0 and p.normal.y > 0.6]
         canopy = [p for p in hull_mesh.polygons if p.center.y < hull.spine_front and p.normal.z > 0.5]
-        lit = glow_faces(nodes["Hull"], maps["Arth Ship Meshy Hull"], windows, 0.9)
-        lit += glow_faces(nodes["Hull"], maps["Arth Ship Meshy Hull"], nozzles, 0.7)
-        lit += glow_faces(nodes["Hull"], maps["Arth Ship Meshy Hull"], canopy, 0.8, glass=(0.45, 0.75, 1.0))
+        lit = glow_faces(nodes["Hull"], maps["Arth Ship Model Hull"], windows, 0.9)
+        lit += glow_faces(nodes["Hull"], maps["Arth Ship Model Hull"], nozzles, 0.7)
+        lit += glow_faces(nodes["Hull"], maps["Arth Ship Model Hull"], canopy, 0.8, glass=(0.45, 0.75, 1.0))
         print("LIGHTS windows=%d nozzles=%d canopy=%d texels=%d" % (len(windows), len(nozzles), len(canopy), lit))
 
     if preview:
         # the review sheet shows the nose to the left (+Y): turn the whole ship for it, and back
         root.rotation_euler = (0.0, 0.0, math.pi)
         bpy.context.view_layer.update()
-        import_meshy.add_preview_lights()
+        import_ship_models.add_preview_lights()
         ship_kit.preview_sheet([(nodes["Hull"], os.path.join("..", "Ship Configuration", "starflt_077.png"))], os.path.abspath(preview), tile=(800, 600), engine="CYCLES")
         root.rotation_euler = (0.0, 0.0, 0.0)
         bpy.context.view_layer.update()
@@ -578,7 +578,7 @@ def main():
             # CombatController spawns the wreck at its own scale, not the ship's 15: this import scale makes it the ship's
             # 51 units long (the debris script writes the wreck of this file 0.034 long at a scale of 0.01)
             "debrisScale": 15.0,
-            "meshy": {"hull": config["hull"].get("meshy", {}), "parts": config["parts"].get("meshy", {})},
+            "sources": {"hull": config["hull"].get("sources", {}), "parts": config["parts"].get("sources", {})},
         },
     }
 

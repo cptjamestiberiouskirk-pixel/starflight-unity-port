@@ -23,7 +23,7 @@ foreach ($scenario in $Scenarios) {
 
 	foreach ($line in $errors | Select-Object -First 5) { "    COMPILE: $line" }
 	foreach ($line in $fails) { "    $line" }
-	foreach ($line in ($output | Where-Object { $_ -match '^\[ClaudeProbe\]\s+x\d+ ' })) { "    $line" }
+	foreach ($line in ($output | Where-Object { $_ -match '^\[HeadlessProbe\]\s+x\d+ ' })) { "    $line" }
 }
 
 git status --short

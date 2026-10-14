@@ -1,11 +1,11 @@
-"""Alien ship models made with Meshy: GLB files in, the project's FBX, maps and manifest out (Blender 5.2, background mode).
+"""Textured alien ship models: GLB files in, the project's FBX, maps and manifest out (Blender 5.2, background mode).
 
-blender --background --factory-startup --python DevTools/ShipModels/import_meshy.py -- DevTools/ShipModels/meshy-thrynn.json --source <folder> [--preview <png>] [--no-export]
+blender --background --factory-startup --python DevTools/ShipModels/import_ship_models.py -- DevTools/ShipModels/source-thrynn.json --source <folder> [--preview <png>] [--no-export]
 
-The race file (meshy-<race>.json) lists each vessel's GLB (a Meshy remesh with its baked maps, kept outside the repository in
-the folder given with --source), which way its nose points, and the Meshy tasks it came from. For every vessel this script
+The race file (source-<race>.json) lists each vessel's GLB (a remeshed model with its baked maps, kept outside the repository in
+the folder given with --source), which way its nose points, and the sources it came from. For every vessel this script
 turns the model to the frame of the procedural ships (nose +Y), scales it with the size rule of ship_kit, gives the faces at
-the back that face backwards an engine material, converts Meshy's metallic/roughness maps to the albedo and specular/smoothness
+the back that face backwards an engine material, converts the models' metallic/roughness maps to the albedo and specular/smoothness
 maps of SF - Standard (with an emissive map for the blue and cyan crystal), and exports the FBX and the manifest that wire.ps1
 reads. See README.md in this folder.
 """
@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import ship_kit  # noqa: E402
 
-# the turn that brings a GLB's nose to the canonical +Y (Meshy's models face -X after the glTF import: check the review sheet,
+# the turn that brings a GLB's nose to the canonical +Y (the textured models face -X after the glTF import: check the review sheet,
 # which shows every nose to the left)
 NOSE_TURNS = {"+X": 90.0, "-X": -90.0, "+Y": 0.0, "-Y": 180.0}
 
@@ -122,7 +122,7 @@ def image_pixels(image):
 
 
 def shrink(pixels, size):
-    """Average blocks of pixels down to size x size (Meshy's maps are square, 4096 or 2048)."""
+    """Average blocks of pixels down to size x size (the source maps are square, 4096 or 2048)."""
     height, width = pixels.shape[:2]
     factor = width // size
 
@@ -270,7 +270,7 @@ def main():
     arguments = ship_kit.script_arguments()
 
     if not arguments or "--source" not in arguments:
-        raise SystemExit("usage: import_meshy.py -- <meshy-race.json> --source <folder with the GLB files> [--preview <png>] [--no-export]")
+        raise SystemExit("usage: import_ship_models.py -- <source-race.json> --source <folder with the GLB files> [--preview <png>] [--no-export]")
 
     race_path = os.path.abspath(arguments[0])
     source = arguments[arguments.index("--source") + 1]
@@ -291,13 +291,13 @@ def main():
     for vessel in race_file_data["vessels"]:
         name = vessel["name"]
         obj = import_glb(os.path.join(source, vessel["glb"]), name)
-        obj.data.materials[0].name = name + " Meshy"
+        obj.data.materials[0].name = name + " Source"
 
         # to the canonical frame: nose +Y, the middle of the bounds at the origin, the length of the size rule along the nose
         obj.data.transform(Matrix.Rotation(math.radians(NOSE_TURNS[vessel.get("nose", "+X")]), 4, "Z"))
-        # a model that Meshy built lying on its side is rolled about its length (degrees, a right-handed turn about the nose)
+        # a model that came out lying on its side is rolled about its length (degrees, a right-handed turn about the nose)
         obj.data.transform(Matrix.Rotation(math.radians(vessel.get("roll", 0.0)), 4, "Y"))
-        # a model that Meshy built wider than the original is narrowed across its nose to the original's proportions
+        # a model that came out wider than the original is narrowed across its nose to the original's proportions
         obj.data.transform(Matrix.Diagonal((vessel.get("widthScale", 1.0), 1.0, 1.0, 1.0)))
         corners = [Vector(v.co) for v in obj.data.vertices]
         low = Vector((min(c.x for c in corners), min(c.y for c in corners), min(c.z for c in corners)))
@@ -314,7 +314,7 @@ def main():
 
         maps = convert_maps(obj, folder, name, size, race_file_data.get("glow")) if export else {}
 
-        # the preview shows the glTF material as Meshy made it; the export gets the materials the Unity side makes
+        # the preview shows the glTF material as it came; the export gets the materials the Unity side makes
         built.append((obj, vessel.get("screenshot")))
         hull = name + " Hull"
         engine = name + " Engine"
@@ -326,7 +326,7 @@ def main():
             "model": "Assets/Game Objects/Ships/%s/%s.fbx" % (race, name),
             "debris": "Assets/Game Objects/Ships Debris/%s/%s.fbx" % (race, name),
             "materials": [hull, engine],
-            "meshy": vessel.get("meshy", {}),
+            "sources": vessel.get("sources", {}),
         })
 
         for material_name, emissive in ((hull, [0.0, 0.0, 0.0]), (engine, ENGINE_GLOW)):
@@ -382,6 +382,6 @@ def main():
         print("MANIFEST " + manifest_path)
 
 
-# import_meshy_arth.py imports this module for its helpers
+# import_arth_ship.py imports this module for its helpers
 if __name__ == "__main__":
     main()

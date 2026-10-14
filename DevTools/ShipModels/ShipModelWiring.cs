@@ -3,7 +3,7 @@
 // wire.ps1 copies this file into Assets/, runs Unity in batch mode with
 //   -executeMethod ShipModelWiring.Run -shipManifest <manifest.json>
 // and removes it again. For every material of the manifest it makes (or updates) an SF - Standard material next to
-// the models, of flat colours or with the maps the manifest names (a Meshy model, import_meshy.py); for every vessel it sets up the import of its model and debris FBX (scale 1, materials remapped to those
+// the models, of flat colours or with the maps the manifest names (a textured model, import_ship_models.py); for every vessel it sets up the import of its model and debris FBX (scale 1, materials remapped to those
 // materials), puts an inactive instance of the model under the other model templates of the Encounter location
 // (layer Encounter), and points the vessel's slots of Encounter.m_alienShipModelTemplate and m_alienShipDebrisTemplate
 // at the instance and the debris model. Running it again replaces what an earlier run made.
@@ -27,7 +27,7 @@ public static class ShipModelWiring
 		public float smoothness;
 		public float[] emissive;
 
-		// asset paths of maps (import_meshy.py writes them for a textured model); empty for a material of flat colours
+		// asset paths of maps (import_ship_models.py writes them for a textured model); empty for a material of flat colours
 		public string albedoMap;
 		public string specularMap;
 		public string normalMap;
@@ -45,7 +45,7 @@ public static class ShipModelWiring
 		public string[] materials;
 	}
 
-	// the player's ship (import_meshy_arth.py): its model keeps the old node names the scenes reference, so only its materials,
+	// the player's ship (import_arth_ship.py): its model keeps the old node names the scenes reference, so only its materials,
 	// the scene copies' material overrides and the contrails' places change
 	[Serializable]
 	public class PlayerShipEntry
@@ -286,7 +286,7 @@ public static class ShipModelWiring
 		material.EnableKeyword( keyword );
 	}
 
-	// scale: the importer's global scale (1 for the models build_<race>.py and import_meshy.py write)
+	// scale: the importer's global scale (1 for the models build_<race>.py and import_ship_models.py write)
 	static void SetUpImport( string assetPath, VesselEntry vessel, Dictionary<string, Material> materials, float scale )
 	{
 		var importer = AssetImporter.GetAtPath( assetPath ) as ModelImporter;
@@ -315,7 +315,7 @@ public static class ShipModelWiring
 		importer.materialImportMode = ModelImporterMaterialImportMode.ImportStandard;
 		importer.materialLocation = ModelImporterMaterialLocation.InPrefab;
 
-		// a model made again with other materials (a Meshy model in place of a procedural one) drops the remaps of the old ones
+		// a model made again with other materials (a textured model in place of a procedural one) drops the remaps of the old ones
 		var remaps = new List<AssetImporter.SourceAssetIdentifier>( importer.GetExternalObjectMap().Keys );
 
 		foreach ( var remap in remaps )

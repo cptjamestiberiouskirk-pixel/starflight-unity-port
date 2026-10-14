@@ -3,7 +3,7 @@
 	"vessels": [],
 	"materials": [
 		{
-			"name": "Arth Ship Meshy Hull",
+			"name": "Arth Ship Model Hull",
 			"albedo": [
 				1.0,
 				1.0,
@@ -27,7 +27,7 @@
 			"emissiveMap": "Assets/Game Objects/Ships/Arth/Textures/Arth Ship Hull - Emissive.jpg"
 		},
 		{
-			"name": "Arth Ship Meshy Parts",
+			"name": "Arth Ship Model Parts",
 			"albedo": [
 				1.0,
 				1.0,
@@ -55,8 +55,8 @@
 		"model": "Assets/Game Objects/Ships/Arth/Arth Ship.FBX",
 		"debris": "Assets/Game Objects/Ships Debris/Arth/Arth Ship.FBX",
 		"materials": [
-			"Arth Ship Meshy Hull",
-			"Arth Ship Meshy Parts"
+			"Arth Ship Model Hull",
+			"Arth Ship Model Parts"
 		],
 		"contrails": [
 			0.416,
@@ -67,7 +67,7 @@
 			-0.025
 		],
 		"debrisScale": 15.0,
-		"meshy": {
+		"sources": {
 			"hull": {
 				"concept": "01a137c5-9495-7405-8bd6-4d117d20ba3d",
 				"conceptEdit": "01a137c6-dbf3-747e-bd2d-9ec3705fdc22",

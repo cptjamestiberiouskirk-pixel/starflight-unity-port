@@ -15,7 +15,7 @@
 			"glb": "noah-derelict-10k.glb",
 			"nose": "+X",
 			"screenshot": "Noah Derelict Analysis.png",
-			"meshy": {
+			"sources": {
 				"concept": "01a138c9-65e3-76b2-803f-f844bb2103d0",
 				"model": "01a138cb-3bee-74cf-9c36-b82da7cdda5a",
 				"remesh": "01a138cd-8708-7745-8e07-ee7155dec2e0"

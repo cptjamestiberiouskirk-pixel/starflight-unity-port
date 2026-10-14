@@ -3,7 +3,7 @@
 #
 #   & "<this folder>\probe.ps1" -Scenario h6
 #
-# It copies ClaudeProbe.cs into Assets/, runs Unity in batch mode, prints the probe's log lines and removes
+# It copies HeadlessProbe.cs into Assets/, runs Unity in batch mode, prints the probe's log lines and removes
 # the probe again. The probe never touches the real save files. Logs go to %TEMP%\starflight-probe.
 param(
 	[string]$Scenario = 'h6',
@@ -36,8 +36,8 @@ New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 if (-not $Name) { $Name = "probe-$Scenario" }
 
 $log = Join-Path $logDir "$Name.log"
-$probeSource = Join-Path $PSScriptRoot 'ClaudeProbe.cs'
-$probeTarget = Join-Path $proj 'Assets\ClaudeProbe.cs'
+$probeSource = Join-Path $PSScriptRoot 'HeadlessProbe.cs'
+$probeTarget = Join-Path $proj 'Assets\HeadlessProbe.cs'
 
 Copy-Item -LiteralPath $probeSource -Destination $probeTarget -Force
 
@@ -45,7 +45,7 @@ try {
 	$sw = [Diagnostics.Stopwatch]::StartNew()
 	$unityArgs = @('-batchmode')
 	if (-not $Graphics) { $unityArgs += '-nographics' }
-	$unityArgs += '-projectPath', "`"$proj`"", '-logFile', "`"$log`"", '-executeMethod', 'ClaudeProbe.Run', '-probeScenario', $Scenario
+	$unityArgs += '-projectPath', "`"$proj`"", '-logFile', "`"$log`"", '-executeMethod', 'HeadlessProbe.Run', '-probeScenario', $Scenario
 	$p = Start-Process -FilePath $unity -ArgumentList $unityArgs -PassThru
 
 	# the probe has its own 120 s watchdog; this is the outer limit
@@ -67,7 +67,7 @@ $errs = Select-String -LiteralPath $log -Pattern 'error CS\d+|Scripts have compi
 if ($errs) { $errs | Select-Object -First 20 | ForEach-Object { $_.Line } } else { 'none' }
 
 "--- probe ---"
-Select-String -LiteralPath $log -Pattern '^\[ClaudeProbe\]' | ForEach-Object { if ($_.Line.Length -gt 600) { $_.Line.Substring(0, 600) } else { $_.Line } }
+Select-String -LiteralPath $log -Pattern '^\[HeadlessProbe\]' | ForEach-Object { if ($_.Line.Length -gt 600) { $_.Line.Substring(0, 600) } else { $_.Line } }
 
 "--- git status ---"
 git status --short

@@ -14,7 +14,7 @@
 			"glb": "enterprise-10k.glb",
 			"nose": "+X",
 			"screenshot": "Enterprise Analysis.png",
-			"meshy": {
+			"sources": {
 				"concept": "01a138c9-6852-761f-89bd-5fe9afbe80a6",
 				"model": "01a138cb-40e3-7716-9949-18532dbb1b5e",
 				"remesh": "01a138cd-8e75-74e9-8a98-294dab5ce09b"

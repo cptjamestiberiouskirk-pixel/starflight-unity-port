@@ -1081,12 +1081,12 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Arth Ship Meshy Hull
+      name: Arth Ship Model Hull
     second: {fileID: 2100000, guid: a4784c23b4488c5458fd3b71f277af4c, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Arth Ship Meshy Parts
+      name: Arth Ship Model Parts
     second: {fileID: 2100000, guid: 40f1fba3770aa0c4f9c95d117aa583a1, type: 2}
   materials:
     materialImportMode: 1

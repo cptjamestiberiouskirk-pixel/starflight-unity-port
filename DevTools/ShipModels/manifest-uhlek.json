@@ -12,7 +12,7 @@
 				"Uhlek Scout Hull",
 				"Uhlek Scout Engine"
 			],
-			"meshy": {
+			"sources": {
 				"concept": "01a138c9-60f7-771a-abec-7d2fa048d404",
 				"model": "01a138cb-31bf-7475-897c-23257836f17e",
 				"remesh": "01a138cd-6eb3-766e-8ad6-547127c04f05"
@@ -29,7 +29,7 @@
 				"Uhlek Warship Hull",
 				"Uhlek Warship Engine"
 			],
-			"meshy": {
+			"sources": {
 				"concept": "01a138c9-6369-73a2-a58e-fe7dbfa9b304",
 				"model": "01a138cb-36a4-73f7-ac68-ba14409d800c",
 				"remesh": "01a138cd-743f-76da-8aa6-b6d58b0f4e20"

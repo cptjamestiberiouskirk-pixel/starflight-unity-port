@@ -530,7 +530,7 @@ def preview_sheet(entries, path, tile=(420, 315), engine="BLENDER_WORKBENCH"):
     """One row per vessel: the original's screenshot, then top, side and three-quarter views.
 
     entries: (object, screenshot file name or None). Rendered with the workbench engine unless another is given
-    (import_meshy.py renders its textured models with Cycles and lights of its own).
+    (import_ship_models.py renders its textured models with Cycles and lights of its own).
     """
     scratch = tempfile.mkdtemp(prefix="ship-preview-")
     columns = 4

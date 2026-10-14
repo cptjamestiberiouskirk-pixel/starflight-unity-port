@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Arth Ship Meshy Hull
+  m_Name: Arth Ship Model Parts
   m_Shader: {fileID: 4800000, guid: f67073489be24934c9032d00068b6661, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -35,11 +35,11 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - SF_EmissiveMap:
-        m_Texture: {fileID: 2800000, guid: 0de6ed42b14534f48ad269e9d5b60e95, type: 3}
+        m_Texture: {fileID: 2800000, guid: f7e66438f27b95c4992d0e16c328f2b2, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - SF_NormalMap:
-        m_Texture: {fileID: 2800000, guid: 00ed0446597287c40acd7133c00d89c1, type: 3}
+        m_Texture: {fileID: 2800000, guid: 82c0d6ea5ae1a8d449c3a6fd668d6002, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - SF_OcclusionMap:
@@ -51,7 +51,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - SF_SpecularMap:
-        m_Texture: {fileID: 2800000, guid: 2fd39c4a1cb8cd243bec6979de2d2fc2, type: 3}
+        m_Texture: {fileID: 2800000, guid: fa3fa20661b09c14e9c3216fa365135f, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
@@ -75,7 +75,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: 66a6bf144e96c2f4b8bb1315a78e9612, type: 3}
+        m_Texture: {fileID: 2800000, guid: 556336d156a948e4fb309bb8db818965, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
@@ -125,6 +125,7 @@ Material:
     m_Colors:
     - SF_AlbedoColor: {r: 1, g: 1, b: 1, a: 1}
     - SF_EmissiveColor: {r: 0, g: 0, b: 0, a: 1}
+    - SF_EmissiveTint: {r: 1, g: 1, b: 1, a: 1}
     - SF_ReflectionColor: {r: 1, g: 1, b: 1, a: 1}
     - SF_SpecularColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}

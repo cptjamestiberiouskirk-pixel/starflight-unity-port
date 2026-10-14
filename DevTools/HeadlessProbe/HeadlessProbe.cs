@@ -3,10 +3,10 @@
 // Headless play mode probe. It lives in DevTools/HeadlessProbe, outside Assets, so it is not part of the project.
 // probe.ps1 copies it into Assets/ for one run and deletes it again. Never commit the copy in Assets/ (.gitignore keeps it out).
 //
-// Launch: Unity.exe -batchmode -nographics -projectPath <project> -logFile <log> -executeMethod ClaudeProbe.Run -probeScenario <name>
+// Launch: Unity.exe -batchmode -nographics -projectPath <project> -logFile <log> -executeMethod HeadlessProbe.Run -probeScenario <name>
 //
 // It opens the Spaceflight scene, enters play mode, swaps DataController's save system for an in-memory one
-// (so the real save files are never read or written), drives a scenario, logs "[ClaudeProbe] ..." lines and exits.
+// (so the real save files are never read or written), drives a scenario, logs "[HeadlessProbe] ..." lines and exits.
 
 using System;
 using System.Collections;
@@ -20,11 +20,11 @@ using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.SceneManagement;
 
-public class ClaudeProbe : MonoBehaviour
+public class HeadlessProbe : MonoBehaviour
 {
-	const string c_activeKey = "ClaudeProbe.Active";
-	const string c_startKey = "ClaudeProbe.Start";
-	const string c_tag = "[ClaudeProbe] ";
+	const string c_activeKey = "HeadlessProbe.Active";
+	const string c_startKey = "HeadlessProbe.Start";
+	const string c_tag = "[HeadlessProbe] ";
 
 	static int s_exceptionCount;
 
@@ -136,9 +136,9 @@ public class ClaudeProbe : MonoBehaviour
 		Application.logMessageReceived += OnLog;
 		SceneManager.sceneLoaded += OnSceneLoaded;
 
-		var probeObject = new GameObject( "ClaudeProbe" );
+		var probeObject = new GameObject( "HeadlessProbe" );
 		DontDestroyOnLoad( probeObject );
-		probeObject.AddComponent<ClaudeProbe>();
+		probeObject.AddComponent<HeadlessProbe>();
 
 		Debug.Log( c_tag + "runtime init" );
 	}
@@ -3041,7 +3041,7 @@ public class ClaudeProbe : MonoBehaviour
 	IEnumerator ScenarioM8()
 	{
 		// a scratch directory - never the real save directory
-		var directory = System.IO.Path.Combine( Application.temporaryCachePath, "claude-probe-saves" );
+		var directory = System.IO.Path.Combine( Application.temporaryCachePath, "headless-probe-saves" );
 
 		if ( directory.StartsWith( Application.persistentDataPath ) )
 		{
@@ -7619,7 +7619,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "pushback: " + largest.GetElementName() + " and " + other.GetElementName() + " 2 in front, one frame of " + Time.maximumDeltaTime.ToString( "F3" ) + " s: the drawn vehicle moved " + hitchJump.ToString( "F3" ) + " in that frame from where it stood, the saved place " + hitchSaved.ToString( "F3" ) + " (largest push-back after a physics step " + s_largestPushBack.ToString( "F3" ) + ")" );
 
-		// ---- 8. driving into the Lead deposit from 12 units clear of it, at 60 frames a second: the port's vehicle stops at a deposit (keep that, or not: the owner's call)
+		// ---- 8. driving into the Lead deposit from 12 units clear of it, at 60 frames a second: the port's vehicle stops at a deposit (kept or not by design decision)
 		other.transform.position += Vector3.right * 1000.0f;
 		largest.transform.position = from + forward * ( edge + 12.0f );
 
@@ -10811,12 +10811,12 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=debrispictures alienBlank=" + alienBlank.Count + " playerBlank=" + playerBlank.Count + " errors=" + errorsDuring + " pictures=" + ( hasGraphics ? 7 : 0 ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
-	// ---------------------------------------------------------------- Low: ship pictures (the ship models made with Meshy, the aliens' and the player's Arth ship, are drawn with their maps, and pictures of them when the run has a graphics device: probe.ps1 -Graphics)
+	// ---------------------------------------------------------------- Low: ship pictures (the textured ship models, the aliens' and the player's Arth ship, are drawn with their maps, and pictures of them when the run has a graphics device: probe.ps1 -Graphics)
 
-	// the vessels whose models were made with Meshy (DevTools/ShipModels/import_meshy.py, meshy-<race>.json): the Elowan and the Thrynn
+	// the vessels with textured models (DevTools/ShipModels/import_ship_models.py, source-<race>.json): the Elowan and the Thrynn
 	// transport, scout and warship, the four Veloxi vessels, the Gazurtoid and Uhlek scouts and warships, the Enterprise and the
 	// Noah 9 derelict
-	static readonly int[] c_meshyVessels = { 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21, 23 };
+	static readonly int[] c_texturedVessels = { 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21, 23 };
 
 	// the materials of a model that are drawn without an albedo map (a flat colour, as the procedural stand-ins are)
 	static List<string> UnmappedMaterials( GameObject root )
@@ -10924,7 +10924,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var pictures = 0;
 
-		foreach ( var vesselId in c_meshyVessels )
+		foreach ( var vesselId in c_texturedVessels )
 		{
 			var vesselName = gameData.m_vesselList[ vesselId ].m_name;
 
@@ -11002,7 +11002,7 @@ public class ClaudeProbe : MonoBehaviour
 			yield return Frames( 5 );
 		}
 
-		// the player's Arth ship (DevTools/ShipModels/import_meshy_arth.py): every mesh drawn with its maps, the 16 cargo pods and the
+		// the player's Arth ship (DevTools/ShipModels/import_arth_ship.py): every mesh drawn with its maps, the 16 cargo pods and the
 		// weapons too, and a picture of it with all of them shown
 		yield return Frames( 5 );
 
@@ -11058,7 +11058,7 @@ public class ClaudeProbe : MonoBehaviour
 			playerShip.m_missileLauncher.SetActive( launcherShown );
 		}
 
-		Finish( "scenario=shippictures vessels=" + c_meshyVessels.Length + " pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+		Finish( "scenario=shippictures vessels=" + c_texturedVessels.Length + " pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- Low: atmosphere pictures (what a planet's atmosphere is drawn with, in the star system and in orbit, and pictures of it with -Graphics)
@@ -12437,7 +12437,7 @@ public class ClaudeProbe : MonoBehaviour
 	{
 		// ---- 1. the four save functions of the planet generator tool each make a texture for the picture they save
 		var tools = Type.GetType( "PG_Tools, Assembly-CSharp-Editor" );
-		var folder = System.IO.Path.Combine( Application.temporaryCachePath, "ClaudeProbeEditorTools" );
+		var folder = System.IO.Path.Combine( Application.temporaryCachePath, "HeadlessProbeEditorTools" );
 		var floats = new float[ 16, 16 ];
 		var colors = new Color[ 16, 16 ];
 
@@ -15324,7 +15324,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "recovereddata: the original game data is unchanged (control)", sizes == "811/51/558", sizes );
 
 		// ---- the game data's notices and Starport analyses were typed from STRINFO, and six of their words are STRINFO's slips: they read as the shipped game
-		// has them (its notice records in the decompiled original's instance.txt, its analyses in data.h; the owner's ruling of 2026-10-12)
+		// has them (its notice records in the decompiled original's instance.txt, its analyses in data.h; decided 2026-10-12)
 		var noticeText = "";
 
 		foreach ( var notice in gameData.m_noticeList )
@@ -16063,7 +16063,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
-		// ---- 1. the owner's rulings of 2026-10-09 on two of STRINFO's conflicts: the Rod Device at 54N x 13E, and Koann 3 the third planet of 112, 200 (orbit 5, planet 58)
+		// ---- 1. the decisions of 2026-10-09 on two of STRINFO's conflicts: the Rod Device at 54N x 13E, and Koann 3 the third planet of 112, 200 (orbit 5, planet 58)
 		var rodDevice = "missing";
 		var redCylinderPlanet = -1;
 
@@ -19655,7 +19655,7 @@ public class ClaudeProbe : MonoBehaviour
 		var underWayAfterYes = ship.m_repairsAreUnderWay;
 		var startText = MessageList();
 
-		// ---- 4. once the engines are whole he says so and waits to be told what to repair next (REPAIR-OV: "REPAIR COMPLETED", the owner's ruling of 2026-10-12)
+		// ---- 4. once the engines are whole he says so and waits to be told what to repair next (REPAIR-OV: "REPAIR COMPLETED", decided 2026-10-12)
 		controller.m_messages.Clear();
 
 		ship.UpdateRepairs( 10000.0f );
@@ -19696,7 +19696,7 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=systemrepairs molybdenum=" + molybdenumAfterNo + "/" + molybdenumAfterYes + " engines=" + enginesAfter, 0 );
 	}
 
-	// ---------------------------------------------------------------- the screens' Step 2: Repair's choice of system (the owner's ruling of 2026-10-12)
+	// ---------------------------------------------------------------- the screens' Step 2: Repair's choice of system (decided 2026-10-12)
 
 	// Repair, the stick to a row and the text the engineer gives about it, as the player sees it before choosing (the button stays Repair's)
 	static string RepairRowText( int row )
@@ -24575,7 +24575,7 @@ public class ClaudeProbe : MonoBehaviour
 		return misses;
 	}
 
-	// the shield outline of the status display around the ship with every part it can have: the outline goes round all of them (the model made with Meshy
+	// the shield outline of the status display around the ship with every part it can have: the outline goes round all of them (the textured model
 	// has larger weapon mounts than the old one, and they stuck out of the outline drawn for the old one)
 	IEnumerator ScenarioShieldOutline()
 	{
@@ -30795,7 +30795,7 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=lightmode checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
-	// the UI kit's colour schemes (the owner's request of 2026-10-14): every scheme has a dark and a light theme of its own; the save panel's Colors
+	// the UI kit's colour schemes (added 2026-10-14): every scheme has a dark and a light theme of its own; the save panel's Colors
 	// screen has a button for each scheme, with swatches of its colours, and one for each mode; picking a scheme there gives the whole game its theme at
 	// once (a text the kit styles, the buttons its tool tinted, the console's bullets, the messages' colour tags), in either mode; the swatches keep
 	// their own colours whatever the theme; the choice is kept in the player's settings; and escape leaves the screen (the player's own settings are put
@@ -30843,7 +30843,7 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		Check( "colorschemes: fifteen schemes (the classic one, the two original games' and the owner's twelve), each with a dark and a light theme of its own", ( schemeCount == 15 ) && ( themesFound == 30 ) && ( themeNames.Count == 30 ), schemeCount + " schemes, " + themesFound + " themes, " + themeNames.Count + " names" );
+		Check( "colorschemes: fifteen schemes (the classic one, the two original games' and twelve palettes), each with a dark and a light theme of its own", ( schemeCount == 15 ) && ( themesFound == 30 ) && ( themeNames.Count == 30 ), schemeCount + " schemes, " + themesFound + " themes, " + themeNames.Count + " names" );
 
 		// a message in white and one in yellow, and the bridge's buttons with one selected
 		controller.m_messages.Clear();
@@ -31032,7 +31032,7 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=colorschemes checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
-	// the starmap in the colours of the kit's scheme (it was purple and magenta, which the owner dislikes): its background, grid, ship marker and crosshair
+	// the starmap in the colours of the kit's scheme (it was purple and magenta, which clashed with every scheme): its background, grid, ship marker and crosshair
 	// take the scheme's dark colours when it opens, again when the player picks another scheme while it is open, and in the light mode too (the starmap is a
 	// view of space); the stars and the nebulas keep theirs, and the materials themselves are left as they are (picture with -Graphics)
 	IEnumerator ScenarioStarmapColors()

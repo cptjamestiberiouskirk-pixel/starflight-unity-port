@@ -23,7 +23,7 @@ It compiles when Unity's exit code is 0 and the log shows `Tundra build success`
 & "DevTools\HeadlessProbe\probe.ps1" -Scenario h6
 ```
 
-The scenario names are in the README's "Scenarios that exist" table. Read the `[ClaudeProbe]` lines: the `RESULT` line, every failed `Check`, and the exception count. `-TimeoutSeconds 100` shortens the wait for a scenario that is expected to hang on the old code.
+The scenario names are in the README's "Scenarios that exist" table. Read the `[HeadlessProbe]` lines: the `RESULT` line, every failed `Check`, and the exception count. `-TimeoutSeconds 100` shortens the wait for a scenario that is expected to hang on the old code.
 
 ## All scenarios
 
@@ -37,7 +37,7 @@ One summary block per scenario. The README gives the count and the duration.
 
 1. Run the scenario on the old code and see it fail. A check that cannot fail proves nothing.
 2. Run it on the new code and see it pass.
-3. Add the scenario to `DevTools/HeadlessProbe/ClaudeProbe.cs` and its row to the README table in the same pull request.
+3. Add the scenario to `DevTools/HeadlessProbe/HeadlessProbe.cs` and its row to the README table in the same pull request.
 
 ## After a run
 

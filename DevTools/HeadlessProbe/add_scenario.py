@@ -1,6 +1,6 @@
-"""Adds a scenario to ClaudeProbe.cs.
+"""Adds a scenario to HeadlessProbe.cs.
 
-usage: python add_scenario.py <path to ClaudeProbe.cs> <scenario name> <method name> <snippet file>
+usage: python add_scenario.py <path to HeadlessProbe.cs> <scenario name> <method name> <snippet file>
 
 The case goes in front of the default case of the scenario switch and the snippet in front of the
 "batch 1 (starport side)" section. Running it again for the same scenario replaces nothing and fails.
