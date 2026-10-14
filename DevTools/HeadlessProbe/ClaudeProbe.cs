@@ -31123,25 +31123,26 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		// within 2 km of the ship (2048 units are 225 km)
-		yield return PtDrive( shipPlace, 12.0f, 25.0f, driven );
+		// onto the ship's map cell: Move stopped there takes the vehicle in (0.5 km, 4.5 units)
+		yield return PtDrive( shipPlace, 2.5f, 25.0f, driven );
 
 		Log( "playthrough: drove " + driven[ 0 ].ToString( "F0" ) + " units back toward the ship, " + Vector3.Distance( controller.m_terrainVehicle.transform.position, shipPlace() ).ToString( "F0" ) + " from it" );
 
 		var current = GetField( controller.m_buttonController, "m_currentButton" );
-		var kmToShip = ( shipPlace() - playerData.m_general.m_lastDisembarkedCoordinates ).magnitude * 225.0f / 2048.0f - 2.0f;
+		var kmToShip = ( shipPlace() - playerData.m_general.m_lastDisembarkedCoordinates ).magnitude * 225.0f / 2048.0f - 0.5f;
 
 		Log( "playthrough: before Enter: running " + ( ( current == null ) ? "nothing" : current.GetType().Name ) + ", the Move button's distance to the ship " + kmToShip.ToString( "F2" ) + " km (last disembarked coordinates " + playerData.m_general.m_lastDisembarkedCoordinates + ", vehicle " + controller.m_terrainVehicle.transform.position + ", ship " + shipPlace() + "), activating " + GetField( controller.m_buttonController, "m_activatingButton" ) );
 
 		// the game's bug: the Move button measures to the ship in three dimensions, from the vehicle's saved place (which has no height since PR 207) to the
 		// ship on the ground, so on high ground the vehicle is never close enough to go in. The workaround gives the saved place the ship's height, so that the
 		// real Move button and its Enter can be used
-		var flatKm = new Vector3( shipPlace().x - playerData.m_general.m_lastDisembarkedCoordinates.x, 0.0f, shipPlace().z - playerData.m_general.m_lastDisembarkedCoordinates.z ).magnitude * 225.0f / 2048.0f - 2.0f;
+		var flatKm = new Vector3( shipPlace().x - playerData.m_general.m_lastDisembarkedCoordinates.x, 0.0f, shipPlace().z - playerData.m_general.m_lastDisembarkedCoordinates.z ).magnitude * 225.0f / 2048.0f - 0.5f;
 
 		s_ptMoveDistanceBug = ( kmToShip > 0.0f ) && ( flatKm <= 0.0f );
 
 		if ( s_ptMoveDistanceBug )
 		{
-			Log( "playthrough: GAME BUG the vehicle is " + ( flatKm + 2.0f ).ToString( "F2" ) + " km from the ship along the ground but the Move button counts " + ( kmToShip + 2.0f ).ToString( "F2" ) + " km with the height; WORKAROUND the saved place is given the ship's height" );
+			Log( "playthrough: GAME BUG the vehicle is " + ( flatKm + 0.5f ).ToString( "F2" ) + " km from the ship along the ground but the Move button counts " + ( kmToShip + 0.5f ).ToString( "F2" ) + " km with the height; WORKAROUND the saved place is given the ship's height" );
 
 			var coordinates = playerData.m_general.m_lastDisembarkedCoordinates;
 
@@ -31276,7 +31277,7 @@ public class ClaudeProbe : MonoBehaviour
 		{
 			var deposits = PtDeposits( vehicle.transform.position );
 
-			// the nearest deposit more than 2.5 km from the ship (along the ground): stopping Move within 2 km of the ship takes the vehicle back aboard
+			// the nearest deposit more than 1 km from the ship (along the ground): stopping Move on the ship's map cell takes the vehicle back aboard
 			var shipAt = Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude );
 			TerrainElement deposit = null;
 
@@ -31286,7 +31287,7 @@ public class ClaudeProbe : MonoBehaviour
 
 				fromShip.y = 0.0f;
 
-				if ( fromShip.magnitude * 225.0f / 2048.0f > 2.5f )
+				if ( fromShip.magnitude * 225.0f / 2048.0f > 1.0f )
 				{
 					deposit = candidate;
 
