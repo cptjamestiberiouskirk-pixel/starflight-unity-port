@@ -3,7 +3,7 @@
 // wire.ps1 copies this file into Assets/, runs Unity in batch mode with
 //   -executeMethod ShipModelWiring.Run -shipManifest <manifest.json>
 // and removes it again. For every material of the manifest it makes (or updates) an SF - Standard material next to
-// the models; for every vessel it sets up the import of its model and debris FBX (scale 1, materials remapped to those
+// the models, of flat colours or with the maps the manifest names (a Meshy model, import_meshy.py); for every vessel it sets up the import of its model and debris FBX (scale 1, materials remapped to those
 // materials), puts an inactive instance of the model under the other model templates of the Encounter location
 // (layer Encounter), and points the vessel's slots of Encounter.m_alienShipModelTemplate and m_alienShipDebrisTemplate
 // at the instance and the debris model. Running it again replaces what an earlier run made.
@@ -26,6 +26,12 @@ public static class ShipModelWiring
 		public float[] specular;
 		public float smoothness;
 		public float[] emissive;
+
+		// asset paths of maps (import_meshy.py writes them for a textured model); empty for a material of flat colours
+		public string albedoMap;
+		public string specularMap;
+		public string normalMap;
+		public string emissiveMap;
 	}
 
 	[Serializable]
@@ -159,7 +165,7 @@ public static class ShipModelWiring
 
 			material.name = entry.name;
 
-			// no maps: flat colours only
+			// start from no maps (flat colours); the maps of a textured model are put on below
 			foreach ( var textureName in material.GetTexturePropertyNames() )
 			{
 				material.SetTexture( textureName, null );
@@ -177,6 +183,21 @@ public static class ShipModelWiring
 			material.SetColor( "SF_SpecularColor", ToColor( entry.specular ) );
 			material.SetFloat( "SF_Smoothness", entry.smoothness );
 			material.SetColor( "SF_EmissiveColor", ToColor( entry.emissive ) );
+
+			// the maps of a textured model, each with its keyword (the colours above multiply them)
+			SetMap( material, "_MainTex", "SF_ALBEDOMAP_ON", LoadMap( entry.albedoMap, false ) );
+			SetMap( material, "SF_SpecularMap", "SF_SPECULARMAP_ON", LoadMap( entry.specularMap, false ) );
+			SetMap( material, "SF_EmissiveMap", "SF_EMISSIVEMAP_ON", LoadMap( entry.emissiveMap, false ) );
+
+			// a map imported as a normal map is stored compressed, which the shader has to be told
+			var normalMap = LoadMap( entry.normalMap, true );
+
+			SetMap( material, "SF_NormalMap", "SF_NORMALMAP_ON", normalMap );
+
+			if ( normalMap != null )
+			{
+				material.EnableKeyword( "SF_NORMALMAP_ISCOMPRESSED" );
+			}
 
 			if ( isNew )
 			{
@@ -196,6 +217,45 @@ public static class ShipModelWiring
 		AssetDatabase.SaveAssets();
 
 		return materials;
+	}
+
+	// a map of the manifest with its import set up (a normal map as a normal map, any other in sRGB) - null for none
+	static Texture2D LoadMap( string assetPath, bool isNormalMap )
+	{
+		if ( string.IsNullOrEmpty( assetPath ) )
+		{
+			return null;
+		}
+
+		var importer = AssetImporter.GetAtPath( assetPath ) as TextureImporter;
+
+		if ( importer == null )
+		{
+			throw new Exception( "not a texture: " + assetPath );
+		}
+
+		var textureType = isNormalMap ? TextureImporterType.NormalMap : TextureImporterType.Default;
+
+		if ( ( importer.textureType != textureType ) || ( importer.sRGBTexture == isNormalMap ) )
+		{
+			importer.textureType = textureType;
+			importer.sRGBTexture = !isNormalMap;
+			importer.SaveAndReimport();
+		}
+
+		return AssetDatabase.LoadAssetAtPath<Texture2D>( assetPath );
+	}
+
+	// put a map on a material and switch its keyword on (or leave both off for no map)
+	static void SetMap( Material material, string textureName, string keyword, Texture2D map )
+	{
+		if ( map == null )
+		{
+			return;
+		}
+
+		material.SetTexture( textureName, map );
+		material.EnableKeyword( keyword );
 	}
 
 	static void SetUpImport( string assetPath, VesselEntry vessel, Dictionary<string, Material> materials )
@@ -225,6 +285,17 @@ public static class ShipModelWiring
 		importer.importNormals = ModelImporterNormals.Import;
 		importer.materialImportMode = ModelImporterMaterialImportMode.ImportStandard;
 		importer.materialLocation = ModelImporterMaterialLocation.InPrefab;
+
+		// a model made again with other materials (a Meshy model in place of a procedural one) drops the remaps of the old ones
+		var remaps = new List<AssetImporter.SourceAssetIdentifier>( importer.GetExternalObjectMap().Keys );
+
+		foreach ( var remap in remaps )
+		{
+			if ( ( remap.type == typeof( Material ) ) && ( Array.IndexOf( vessel.materials, remap.name ) < 0 ) )
+			{
+				importer.RemoveRemap( remap );
+			}
+		}
 
 		foreach ( var name in vessel.materials )
 		{

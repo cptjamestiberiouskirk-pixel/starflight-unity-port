@@ -751,6 +751,45 @@ public class TVCargoButton : ShipButton
 		ShowCargoList( droppedText );
 	}
 
+	// drops everything in the terrain vehicle's cargo hold on the ground where it is, as the Drop button does one item (the original's >DEBRIS, when the
+	// vehicle runs out of fuel and the crew go back to the ship on foot) - returns how many items were dropped
+	public static int DropAllCargo()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		if ( playerData.m_planetSurfaces == null )
+		{
+			return 0;
+		}
+
+		var position = SpaceflightController.m_instance.m_terrainVehicle.transform.position;
+		var terrainRuins = SpaceflightController.m_instance.m_disembarked.m_terrainGrid.m_terrainRuins;
+		var dropped = 0;
+
+		foreach ( var item in BuildCargoItems() )
+		{
+			if ( item.m_artifactId >= 0 )
+			{
+				playerData.m_terrainVehicle.RemoveArtifact( item.m_artifactId );
+			}
+			else
+			{
+				playerData.m_terrainVehicle.RemoveElement( item.m_elementId, item.m_volume );
+			}
+
+			var droppedCargo = playerData.m_planetSurfaces.AddDroppedCargo( playerData.m_general.m_currentPlanetId, position.x, position.y, position.z, item.m_elementId, item.m_volume, item.m_artifactId );
+
+			if ( terrainRuins != null )
+			{
+				terrainRuins.PlaceDroppedCargo( droppedCargo );
+			}
+
+			dropped++;
+		}
+
+		return dropped;
+	}
+
 	// back to the terrain vehicle's buttons
 	public static void BackToTerrainVehicle()
 	{
