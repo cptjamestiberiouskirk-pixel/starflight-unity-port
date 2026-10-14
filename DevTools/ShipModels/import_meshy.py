@@ -150,8 +150,14 @@ def save_image(pixels, path):
     bpy.data.images.remove(image)
 
 
-def glow_mask(base):
-    """Where the base colour (sRGB) is the crystal's blue or cyan: 1 there, 0 elsewhere, with a soft edge."""
+def glow_mask(base, glow=None):
+    """Where the base colour (sRGB) is the crystal's blue or cyan: 1 there, 0 elsewhere, with a soft edge.
+
+    glow: a race file's "glow" settings (hue, saturation, value) in place of the defaults above."""
+    glow = glow or {}
+    glow_hue = glow.get("hue", GLOW_HUE)
+    glow_saturation = glow.get("saturation", GLOW_SATURATION)
+    glow_value = glow.get("value", GLOW_VALUE)
     r, g, b = base[..., 0], base[..., 1], base[..., 2]
     high = numpy.maximum(numpy.maximum(r, g), b)
     low = numpy.minimum(numpy.minimum(r, g), b)
@@ -159,12 +165,12 @@ def glow_mask(base):
     saturation = numpy.where(high > 0.0, (high - low) / numpy.maximum(high, 1e-6), 0.0)
 
     hue = numpy.where(high == r, (g - b) / spread % 6.0, numpy.where(high == g, (b - r) / spread + 2.0, (r - g) / spread + 4.0)) * 60.0
-    in_hue = (hue >= GLOW_HUE[0]) & (hue <= GLOW_HUE[1])
+    in_hue = (hue >= glow_hue[0]) & (hue <= glow_hue[1])
 
-    return in_hue * numpy.clip((saturation - GLOW_SATURATION) / 0.2, 0.0, 1.0) * numpy.clip((high - GLOW_VALUE) / 0.2, 0.0, 1.0)
+    return in_hue * numpy.clip((saturation - glow_saturation) / 0.2, 0.0, 1.0) * numpy.clip((high - glow_value) / 0.2, 0.0, 1.0)
 
 
-def convert_maps(obj, folder, prefix, size):
+def convert_maps(obj, folder, prefix, size, glow=None):
     """Write the SF - Standard maps of the model's glTF material; returns their asset paths (relative to the project)."""
     material = obj.data.materials[0]
     bsdf = next(n for n in material.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
@@ -190,7 +196,7 @@ def convert_maps(obj, folder, prefix, size):
     base_linear = srgb_to_linear(base[..., :3])
     albedo = linear_to_srgb(base_linear * (1.0 - metal))
     specular = linear_to_srgb(0.04 * (1.0 - metal) + base_linear * metal)
-    glow = glow_mask(base[..., :3])[..., None]
+    glow = glow_mask(base[..., :3], glow)[..., None]
 
     maps = {}
     stem = os.path.join(folder, prefix)
@@ -297,7 +303,7 @@ def main():
         if extent.y < max(extent.x, extent.z):
             print("WARNING %s is not longest along its nose: %s" % (name, tuple(round(e * scale, 1) for e in extent)))
 
-        maps = convert_maps(obj, folder, name, size) if export else {}
+        maps = convert_maps(obj, folder, name, size, race_file_data.get("glow")) if export else {}
 
         # the preview shows the glTF material as Meshy made it; the export gets the materials the Unity side makes
         built.append((obj, vessel.get("screenshot")))
@@ -365,4 +371,6 @@ def main():
         print("MANIFEST " + manifest_path)
 
 
-main()
+# import_meshy_arth.py imports this module for its helpers
+if __name__ == "__main__":
+    main()

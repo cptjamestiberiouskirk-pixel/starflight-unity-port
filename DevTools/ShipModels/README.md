@@ -1,6 +1,6 @@
 # Alien ship models
 
-The original game's ship pictures exist only as sensor silhouettes, and the project's hand-made models cover the Spemin, the Mechan Scout and the Mysterion. The Thrynn ships are textured models made with Meshy (see "Meshy models" below). The other vessels of the game data are built here by Blender Python scripts: low-poly stand-ins shaped after the sensor pictures in `Research/Screenshots/Ships`, not hand-made art. Nothing is random at build time (the few lumps and spines come from fixed seeds), so a rebuild gives the same meshes.
+The original game's ship pictures exist only as sensor silhouettes, and the project's hand-made models cover the Spemin, the Mechan Scout and the Mysterion. The Thrynn and Elowan ships and the player's Arth ship are textured models made with Meshy (see "Meshy models" below). The other vessels of the game data are built here by Blender Python scripts: low-poly stand-ins shaped after the sensor pictures in `Research/Screenshots/Ships`, not hand-made art. Nothing is random at build time (the few lumps and spines come from fixed seeds), so a rebuild gives the same meshes.
 
 Rulings of the project owner (2026-10-09):
 - **Size**: STRINFO section 7 gives each vessel's size against an Interstel ship (it is the vessel's mass over 500 tons; the Thrynn Transport, missing from STRINFO, is 1.2 by that rule). A size up to 4 is used as it is, with a floor of 0.3 so that the smallest ships stay visible; above 4 it is compressed to `4 + 0.77 * log2(size / 4)`, which reproduces the existing Mysterion (124, shown at about 7.8). One size is the player's Arth Ship, 51.06 units long (3.404 in its FBX, scale 15).
@@ -16,6 +16,7 @@ Rulings of the project owner (2026-10-09):
 | `ShipModelWiring.cs`, `wire.ps1` | The Unity side, run headless: materials, imports and the scene's template slots, from a manifest |
 | `previews/<race>.png` | The review sheets: the original's screenshot, then top, side and three-quarter views (nose to the left) |
 | `import_meshy.py`, `meshy-<race>.json` | A race made with Meshy instead of a build script: see "Meshy models" below |
+| `import_meshy_arth.py`, `meshy-arth.json` | The player's Arth ship made with Meshy, its equipment parts kept separate: see "The player's Arth ship" below |
 
 ## Building a race
 
@@ -36,7 +37,7 @@ Then add the vessel lengths of the manifest to `c_shipModelLengths` in `DevTools
 
 ## Meshy models
 
-The owner's direction of 2026-10-13 is to remake the game's models with Meshy (meshy.ai, a paid plan: its API creates no task for a free account) wherever it fits. The Thrynn ships are the first race done this way. For each vessel:
+The owner's direction of 2026-10-13 is to remake the game's models with Meshy (meshy.ai, a paid plan: its API creates no task for a free account) wherever it fits. The Thrynn ships were the first race done this way, then the Elowan. For each vessel:
 
 1. **Concept picture**: Meshy image-to-image (`nano-banana-pro`, 9 credits) from the original's sensor picture (cropped from `previews/<race>.png` or `Research/Screenshots/Ships`) and its silhouette (`Assets/Game Objects/UI/Sensors`), for the owner to approve. A third reference picture of another ship of the race keeps the materials alike, but it also brings its layout along (the Thrynn scout kept the warship's four pylons twice); an image edit of a near miss is the cheaper fix.
 2. **Model**: image-to-3d from the approved picture (standard, textured, 4K PBR maps, 30 credits), then a remesh to about 10,000 triangles (5 credits). The remesh keeps the textures: it bakes them, the normal map too, from the full model of about 1.5 million triangles.
@@ -47,6 +48,30 @@ The owner's direction of 2026-10-13 is to remake the game's models with Meshy (m
 ```bash
 blender --background --factory-startup --python DevTools/ShipModels/import_meshy.py -- DevTools/ShipModels/meshy-thrynn.json --source <folder with the GLB files> --preview DevTools/ShipModels/previews/thrynn.png
 ```
+
+A race file can set `"glow": {"hue": [..], "saturation": .., "value": ..}` for its emissive map (the Arth ship's blue is paint, so only its brighter missile caps glow).
+
+### The player's Arth ship
+
+The player's ship is not one mesh: `PlayerShip`, `StatusDisplay`, `Disembarked` and `ShipConfigurationPanel` switch its 16 cargo pods, its laser cannon and its missile launchers on and off by the equipment, through the nodes of `Assets/Game Objects/Ships/Arth/Arth Ship.FBX` that four scene copies reference by name (the flying ship, the status display, the ship parked on a planet and the Starport's Ship Configuration room). So it was made from two Meshy models, a bare hull and a sheet of parts (a cargo pod, the laser turret, a missile launcher), and `import_meshy_arth.py` (with `meshy-arth.json`) puts them together under the old file's tree:
+
+- it makes that tree anew (never from the file, which it overwrites): the root `Arth Ship`, `Hull`, `Laser Cannon` with `Laser` and `Laser Base` (an empty node now: the turret is one piece), `Missile Launchers` with `Missile Launcher - Left` and `- Right`, and `Pod 01` to `Pod 16`. Unity keeps each node's file id by its name, so the scenes' references stay;
+- the hull takes the old hull's place and length (the nose at -Y, 134 inches from the cockpit to the engine fork, 51 units in play);
+- the sheet of parts is split by where its faces are (a remesh is a thousand loose patches, one per texture island); the turret and the launchers are turned to face forward (the turret by its barrels, found against the middle of its surface by area; the launchers by their tubes' bright blue), and the pods go in four rings of four around the spine (an upper and a lower pod on each side: from above still the original's two rows), since the Meshy spine is thicker and shorter than the old one;
+- the old file is in inches and Blender writes centimetres: the parts go out in centimetres under a root of 0.01 (a round trip of the old model through these settings gives the same transforms and bounds in Unity);
+- the windows and the nozzles, which Meshy paints near white, and the cockpit's canopy, which it paints as dark glass, are lit in the emissive map by where they are on the hull: the ship's only lights in the dark of hyperspace;
+- it writes `manifest-arth.json` with a `playerShip` section. `ShipModelWiring.cs` then sets up the import, removes the scene copies' material overrides (they set the old model's eight materials by hand), moves the flying ship's two contrails to the new nozzles, and gives the wreck its own import scale (15: `CombatController` spawns the wreck at its own scale, not the ship's 15).
+
+```bash
+blender --background --factory-startup --python DevTools/ShipModels/import_meshy_arth.py -- DevTools/ShipModels/meshy-arth.json --source <folder with the GLB files> --preview DevTools/ShipModels/previews/arth.png
+blender --background --factory-startup --python process_ship_debris.py -- -s 1986 --suffix "" --batch "Assets/Game Objects/Ships/Arth" "Assets/Game Objects/Ships Debris/Arth"
+```
+
+```powershell
+& "DevTools\ShipModels\wire.ps1" -Manifest "DevTools\ShipModels\manifest-arth.json"
+```
+
+The probe's `shipmodels`, `debrispictures`, `encounterviewscale`, `systemviewpictures` (the engine glow) and `shippictures` (every mesh of the ship drawn with its maps, pictures under `-Graphics`) cover it. `Arth Ship Barrel.mat` stays: the terrain vehicle's barrel uses it.
 
 ## Conventions
 

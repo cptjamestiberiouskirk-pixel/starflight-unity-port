@@ -1155,6 +1155,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCommPicture();
 				break;
 
+			case "commspemin":
+				yield return ScenarioCommSpemin();
+				break;
+
 			case "encounterviewscale":
 				yield return ScenarioEncounterViewScale();
 				break;
@@ -1261,6 +1265,14 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "orbitentry":
 				yield return ScenarioOrbitEntry();
+				break;
+
+			case "towbonus":
+				yield return ScenarioTowBonus();
+				break;
+
+			case "nexusegg":
+				yield return ScenarioNexusEgg();
 				break;
 
 			case "playthrough-1":
@@ -10699,10 +10711,11 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=debrispictures alienBlank=" + alienBlank.Count + " playerBlank=" + playerBlank.Count + " errors=" + errorsDuring + " pictures=" + ( hasGraphics ? 7 : 0 ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
-	// ---------------------------------------------------------------- Low: ship pictures (the alien ship models made with Meshy are drawn with their maps, and pictures of them when the run has a graphics device: probe.ps1 -Graphics)
+	// ---------------------------------------------------------------- Low: ship pictures (the ship models made with Meshy, the aliens' and the player's Arth ship, are drawn with their maps, and pictures of them when the run has a graphics device: probe.ps1 -Graphics)
 
-	// the vessels whose models were made with Meshy (DevTools/ShipModels/import_meshy.py, meshy-<race>.json): the Thrynn transport, scout and warship
-	static readonly int[] c_meshyVessels = { 8, 9, 10 };
+	// the vessels whose models were made with Meshy (DevTools/ShipModels/import_meshy.py, meshy-<race>.json): the Elowan and the Thrynn
+	// transport, scout and warship
+	static readonly int[] c_meshyVessels = { 5, 6, 7, 8, 9, 10 };
 
 	// the materials of a model that are drawn without an albedo map (a flat colour, as the procedural stand-ins are)
 	static List<string> UnmappedMaterials( GameObject root )
@@ -10721,6 +10734,36 @@ public class ClaudeProbe : MonoBehaviour
 				if ( ( material == null ) || !material.HasProperty( "_MainTex" ) || ( material.GetTexture( "_MainTex" ) == null ) || !material.IsKeywordEnabled( "SF_ALBEDOMAP_ON" ) )
 				{
 					unmapped.Add( ( material == null ) ? renderer.name + ":none" : material.name );
+				}
+			}
+		}
+
+		return unmapped;
+	}
+
+	// the materials of the player ship's model drawn without an albedo map: its meshes only, every equipment part too (the
+	// contrails, the exhaust and the engine glow quad under it have effects of their own)
+	static List<string> UnmappedShipMeshes( Transform ship )
+	{
+		var unmapped = new List<string>();
+
+		if ( ship == null )
+		{
+			return unmapped;
+		}
+
+		foreach ( var renderer in ship.GetComponentsInChildren<MeshRenderer>( true ) )
+		{
+			if ( renderer.GetComponentInParent<ParticleSystem>( true ) != null )
+			{
+				continue;
+			}
+
+			foreach ( var material in renderer.sharedMaterials )
+			{
+				if ( ( material == null ) || !material.HasProperty( "_MainTex" ) || ( material.GetTexture( "_MainTex" ) == null ) || !material.IsKeywordEnabled( "SF_ALBEDOMAP_ON" ) )
+				{
+					unmapped.Add( renderer.name + ":" + ( ( material == null ) ? "none" : material.name ) );
 				}
 			}
 		}
@@ -10856,6 +10899,62 @@ public class ClaudeProbe : MonoBehaviour
 			LeaveEncounter();
 
 			yield return Frames( 5 );
+		}
+
+		// the player's Arth ship (DevTools/ShipModels/import_meshy_arth.py): every mesh drawn with its maps, the 16 cargo pods and the
+		// weapons too, and a picture of it with all of them shown
+		yield return Frames( 5 );
+
+		var playerShip = controller.m_playerShip;
+		var arth = ( playerShip != null ) ? playerShip.m_ship : null;
+		var arthMeshes = ( arth != null ) ? arth.GetComponentsInChildren<MeshRenderer>( true ).Length : 0;
+		var arthUnmapped = UnmappedShipMeshes( arth );
+
+		Log( "shippictures: the player ship: " + ( ( arth != null ) ? DescribeRenderers( arth.gameObject ) : "none" ) );
+
+		Check( "shippictures: the player ship is drawn with its maps, every equipment part too", ( arthMeshes >= 19 ) && ( arthUnmapped.Count == 0 ), ( arth == null ) ? "no ship" : ( arthUnmapped.Count == 0 ) ? arthMeshes + " mesh renderers, every material mapped" : arthUnmapped.Count + " without maps: " + string.Join( ", ", arthUnmapped ) );
+
+		if ( hasGraphics && ( arth != null ) && ( playerShip.m_cargoPods != null ) )
+		{
+			var podsShown = new bool[ playerShip.m_cargoPods.Length ];
+
+			for ( var i = 0; i < podsShown.Length; i++ )
+			{
+				podsShown[ i ] = playerShip.m_cargoPods[ i ].activeSelf;
+				playerShip.m_cargoPods[ i ].SetActive( true );
+			}
+
+			var laserShown = playerShip.m_laserCannon.activeSelf;
+			var launcherShown = playerShip.m_missileLauncher.activeSelf;
+
+			playerShip.m_laserCannon.SetActive( true );
+			playerShip.m_missileLauncher.SetActive( true );
+
+			var arthBounds = new Bounds( arth.position, Vector3.zero );
+
+			foreach ( var renderer in arth.GetComponentsInChildren<MeshRenderer>() )
+			{
+				if ( renderer.GetComponentInParent<ParticleSystem>( true ) == null )
+				{
+					arthBounds.Encapsulate( renderer.bounds );
+				}
+			}
+
+			var arthSize = Mathf.Max( arthBounds.size.x, arthBounds.size.z, 1.0f );
+
+			RenderFromAbove( arthBounds.center, arthSize * 2.0f, System.IO.Path.Combine( folder, "arth_ship_above.png" ) );
+			RenderFromDirection( arthBounds.center, new Vector3( -0.8f, 0.9f, -0.7f ), arthSize * 1.5f, System.IO.Path.Combine( folder, "arth_ship_quarter.png" ) );
+			RenderFromDirection( arthBounds.center, new Vector3( 0.9f, 0.6f, 0.8f ), arthSize * 1.5f, System.IO.Path.Combine( folder, "arth_ship_rear.png" ) );
+
+			pictures += 3;
+
+			for ( var i = 0; i < podsShown.Length; i++ )
+			{
+				playerShip.m_cargoPods[ i ].SetActive( podsShown[ i ] );
+			}
+
+			playerShip.m_laserCannon.SetActive( laserShown );
+			playerShip.m_missileLauncher.SetActive( launcherShown );
 		}
 
 		Finish( "scenario=shippictures vessels=" + c_meshyVessels.Length + " pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
@@ -14305,6 +14404,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var locationAfterGrant = playerData.m_general.m_location;
 		var planetAfterGrant = playerData.m_general.m_currentPlanetId;
+		var linesAfterGrant = System.Text.RegularExpressions.Regex.Replace( string.Join( "\n", playerData.m_general.m_messageList ), "<[^>]*>", "" );
 
 		yield return Frames( 30 );
 
@@ -14315,6 +14415,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "drones: the drone asks three numbers from 1 to 99", begun && ( numbersAsked == 3 ) && numbersInRange, "begun " + begun + ", numbers " + numbers.Trim() );
 		Check( "drones: three right answers get permission to orbit", grantedShown == 1, "granted shown " + grantedShown );
 		Check( "drones: after permission the ship is back in orbit around the planet, and the drone does not begin again", ( locationAfterGrant == PD_General.Location.InOrbit ) && ( planetAfterGrant == planetId ) && ( locationLater == PD_General.Location.InOrbit ), locationAfterGrant + " at " + planetAfterGrant + ", later " + locationLater );
+		Check( "drones: the encounter ends before the orbit is established again (Leaving encounter... and ...Encounter terminated. before ...Orbit established.)", ( linesAfterGrant.IndexOf( "Leaving encounter..." ) >= 0 ) && ( linesAfterGrant.IndexOf( "...Orbit established." ) > linesAfterGrant.IndexOf( "...Encounter terminated." ) ), linesAfterGrant.Replace( "\n", " | " ) );
 
 		// ---- 3. out to the level of the star system and into orbit again: the permission holds while the ship stays in the star system
 		controller.SwitchLocation( PD_General.Location.StarSystem );
@@ -27442,6 +27543,185 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=commpicture checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
+	// ---------------------------------------------------------------- Low: the Spemin's comm portrait moves as the Genesis version's does (its eyes blink, its discs spin, slime drips, the body wobbles), and pictures of it with -Graphics
+
+	// the largest angle any of the transforms turned between two snapshots of their local rotations, in degrees
+	static float LargestTurn( Transform[] parts, Quaternion[] before )
+	{
+		var largest = 0.0f;
+
+		for ( var i = 0; i < parts.Length; i++ )
+		{
+			if ( parts[ i ] != null )
+			{
+				largest = Mathf.Max( largest, Quaternion.Angle( before[ i ], parts[ i ].localRotation ) );
+			}
+		}
+
+		return largest;
+	}
+
+	// the children of a transform whose names start with the given text, at any depth
+	static Transform[] ChildrenNamed( Transform root, string prefix )
+	{
+		var found = new List<Transform>();
+
+		foreach ( var child in root.GetComponentsInChildren<Transform>( true ) )
+		{
+			if ( child.name.StartsWith( prefix ) )
+			{
+				found.Add( child );
+			}
+		}
+
+		return found.ToArray();
+	}
+
+	IEnumerator ScenarioCommSpemin()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "comm-pictures" ) );
+
+		if ( hasGraphics )
+		{
+			System.IO.Directory.CreateDirectory( folder );
+		}
+
+		EnsureCrew();
+
+		// a skilled officer, whose link comes up with little interference, and a ship that survives whatever it meets
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+		playerData.m_playerShip.m_armorPoints = 100000;
+		controller.m_encounterRange = 0.0f;
+
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+		var said = new List<string>();
+
+		yield return MeetAndConnect( speminId, GD_Comm.Stance.Friendly, said );
+
+		CommScreen commScreen = null;
+
+		for ( var i = 0; ( i < 300 ) && ( commScreen == null ); i++ )
+		{
+			commScreen = FindFirstObjectByType<CommScreen>();
+
+			if ( commScreen == null )
+			{
+				yield return null;
+			}
+		}
+
+		var model = Call( controller.m_encounter, "GetAlienRaceModel" ) as GameObject;
+
+		if ( ( commScreen == null ) || ( model == null ) || !model.activeInHierarchy )
+		{
+			Check( "commspemin: the Spemin's comm portrait comes on", false, "comm screen " + ( commScreen != null ) + ", model " + ( ( model == null ) ? "none" : model.name + " active " + model.activeInHierarchy ) );
+			Finish( "scenario=commspemin abort: no comm portrait", 2 );
+			yield break;
+		}
+
+		// the link settles (the interference fades out over CommScreen.m_duration)
+		yield return new WaitForSecondsRealtime( commScreen.m_duration + 0.5f );
+
+		var camera = commScreen.GetComponent<Camera>();
+		var eyes = ChildrenNamed( model.transform, "Eyeball" );
+		var discs = ChildrenNamed( model.transform, "Disc" );
+		// the body: the mesh named Spemin (the race's group, the model's root and its camera have names that start with Spemin too)
+		Transform body = null;
+
+		foreach ( var renderer in model.GetComponentsInChildren<MeshRenderer>( true ) )
+		{
+			if ( renderer.name == "Spemin" )
+			{
+				body = renderer.transform;
+			}
+		}
+		var discStart = new Quaternion[ discs.Length ];
+
+		for ( var i = 0; i < discs.Length; i++ )
+		{
+			discStart[ i ] = discs[ i ].localRotation;
+		}
+
+		var dripsStart = ChildrenNamed( model.transform, "Drip" );
+		var dripStartY = new float[ dripsStart.Length ];
+
+		for ( var i = 0; i < dripsStart.Length; i++ )
+		{
+			dripStartY[ i ] = dripsStart[ i ].position.y;
+		}
+
+		// watch for 8 s: the smallest an eye gets across (a blink), how far the body's width and height (not only its depth) change, and how far the drips fall
+		var eyeStartScale = new float[ eyes.Length ];
+
+		for ( var i = 0; i < eyes.Length; i++ )
+		{
+			eyeStartScale[ i ] = eyes[ i ].localScale.magnitude;
+		}
+
+		var smallestEye = 1.0f;
+		var bodyStart = ( body != null ) ? body.localScale : Vector3.one;
+		var bodyWidthChange = 0.0f;
+		var bodyHeightChange = 0.0f;
+		var dripFall = 0.0f;
+		var pictures = 0;
+		var watchStart = Time.realtimeSinceStartup;
+		var nextPicture = watchStart;
+
+		while ( Time.realtimeSinceStartup < watchStart + 8.0f )
+		{
+			for ( var i = 0; i < eyes.Length; i++ )
+			{
+				if ( eyeStartScale[ i ] > 0.0f )
+				{
+					smallestEye = Mathf.Min( smallestEye, eyes[ i ].localScale.magnitude / eyeStartScale[ i ] );
+				}
+			}
+
+			if ( body != null )
+			{
+				bodyWidthChange = Mathf.Max( bodyWidthChange, Mathf.Abs( body.localScale.x / bodyStart.x - 1.0f ) );
+				bodyHeightChange = Mathf.Max( bodyHeightChange, Mathf.Abs( body.localScale.y / bodyStart.y - 1.0f ) );
+			}
+
+			for ( var i = 0; i < dripsStart.Length; i++ )
+			{
+				if ( dripsStart[ i ] != null )
+				{
+					dripFall = Mathf.Max( dripFall, dripStartY[ i ] - dripsStart[ i ].position.y );
+				}
+			}
+
+			// a portrait every quarter of a second for the first 3 s: the frames of the animation
+			if ( hasGraphics && ( pictures < 12 ) && ( Time.realtimeSinceStartup >= nextPicture ) )
+			{
+				var rect = camera.rect;
+
+				camera.rect = new Rect( 0.0f, 0.0f, 1.0f, 1.0f );
+				RenderCameraPicture( camera, System.IO.Path.Combine( folder, "spemin_" + pictures.ToString( "00" ) + ".png" ) );
+				camera.rect = rect;
+
+				pictures++;
+				nextPicture += 0.25f;
+			}
+
+			yield return null;
+		}
+
+		var discTurn = LargestTurn( discs, discStart );
+
+		Log( "commspemin: " + eyes.Length + " eyes (smallest " + smallestEye.ToString( "F2" ) + " of their size), " + discs.Length + " discs (largest turn " + discTurn.ToString( "F0" ) + " degrees), body " + ( ( body != null ) ? body.name : "none" ) + " (width change " + bodyWidthChange.ToString( "F3" ) + ", height change " + bodyHeightChange.ToString( "F3" ) + "), " + dripsStart.Length + " drips (fell " + dripFall.ToString( "F2" ) + ")" );
+
+		Check( "commspemin: the Spemin's eyes blink", ( eyes.Length > 0 ) && ( smallestEye < 0.6f ), "smallest eye " + smallestEye.ToString( "F2" ) + " of its size" );
+		Check( "commspemin: its discs spin", ( discs.Length > 0 ) && ( discTurn > 45.0f ), "largest turn " + discTurn.ToString( "F0" ) + " degrees" );
+		Check( "commspemin: its body wobbles in width and height, not only in depth", ( bodyWidthChange > 0.01f ) && ( bodyHeightChange > 0.01f ), "width " + bodyWidthChange.ToString( "F3" ) + ", height " + bodyHeightChange.ToString( "F3" ) );
+		Check( "commspemin: slime drips fall", ( dripsStart.Length > 0 ) && ( dripFall > 0.5f ), dripsStart.Length + " drips, fell " + dripFall.ToString( "F2" ) );
+
+		Finish( "scenario=commspemin pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
 	// the encounter is seen at the original's fixed scale: the camera frames the alien ships out to their fire range and no further, so that it does not climb
 	// so high that the ships are specks, and a ship in range is in view
 	IEnumerator ScenarioEncounterViewScale()
@@ -29857,12 +30137,33 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 5 );
 		yield return Tap( Key.Enter );
-		yield return Frames( 30 );
+
+		// going back in fades for 2 s before the location changes: wait long enough to see it if it comes
+		yield return WaitForLocation( PD_General.Location.Planetside, 4.0f );
 
 		var locationWhenFar = playerData.m_general.m_location;
 
-		// the vehicle 1 km from the ship along the ground, kept as driving keeps it (flat: the ground's height is only drawn)
-		var near = new Vector3( ship.x + 2048.0f / 225.0f, 0.0f, ship.z );
+		// 1 km from the ship, the next map cell: the original takes the vehicle in only on the ship's own cell (BEHAV-OV ?EMBARK), so the crew stay outside
+		var oneCell = new Vector3( ship.x + 2048.0f / 225.0f, 0.0f, ship.z );
+
+		playerData.m_general.m_coordinates = oneCell;
+		playerData.m_general.m_lastDisembarkedCoordinates = oneCell;
+		controller.m_terrainVehicle.transform.localPosition = oneCell;
+
+		yield return Frames( 5 );
+
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
+
+		yield return Frames( 5 );
+		yield return Tap( Key.Enter );
+
+		// going back in fades for 2 s before the location changes: wait long enough to see it if it comes
+		yield return WaitForLocation( PD_General.Location.Planetside, 4.0f );
+
+		var locationWhenOneCell = playerData.m_general.m_location;
+
+		// the vehicle on the ship's cell, 0.3 km from it along the ground, kept as driving keeps it (flat: the ground's height is only drawn)
+		var near = new Vector3( ship.x + 0.3f * 2048.0f / 225.0f, 0.0f, ship.z );
 
 		playerData.m_general.m_coordinates = near;
 		playerData.m_general.m_lastDisembarkedCoordinates = near;
@@ -29880,11 +30181,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		var location = playerData.m_general.m_location;
 
-		Log( "reboard: the ship stands at height " + ship.y.ToString( "F1" ) + ", the vehicle 1 km from it at height 0; after Move and Enter the location is " + location );
+		Log( "reboard: the ship stands at height " + ship.y.ToString( "F1" ) + "; after Move and Enter 5 km away " + locationWhenFar + ", 1 km away " + locationWhenOneCell + ", 0.3 km away " + location );
 
 		Check( "reboard: the ship stands on raised ground (the setup is the case)", ship.y > 10.0f, ship.y.ToString( "F1" ) );
 		Check( "reboard: Move and Enter 5 km from the ship leave the crew outside (control)", locationWhenFar == PD_General.Location.Disembarked, locationWhenFar.ToString() );
-		Check( "reboard: Move and Enter 1 km from the ship along the ground take the vehicle back in, however high the ground", location == PD_General.Location.Planetside, location.ToString() );
+		Check( "reboard: Move and Enter 1 km from the ship (the next map cell) leave the crew outside, as the original's", locationWhenOneCell == PD_General.Location.Disembarked, locationWhenOneCell.ToString() );
+		Check( "reboard: Move and Enter on the ship's cell (0.3 km along the ground) take the vehicle back in, however high the ground", location == PD_General.Location.Planetside, location.ToString() );
 
 		Finish( "scenario=reboard checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
@@ -30064,6 +30366,105 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "orbitentry: no Outside orbital range. between Initiating orbital maneuver... and ...Orbit established. (the ship holds still for the maneuver)", !orbitLines.Contains( "Outside orbital range." ), orbitLines );
 
 		Finish( "scenario=orbitentry checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioTowBonus()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var fine = new int[ 1 ];
+		var where = new string[ 1 ];
+		var evaluation = new string[ 1 ];
+
+		EnsureCrew();
+
+		// the game is won and its bonus is still to be paid, and the ship calls for a tow from a star near Arth
+		playerData.m_general.m_gameWon = true;
+		playerData.m_general.m_winBonusPending = true;
+
+		var arthStar = gameData.m_starList[ gameData.m_misc.m_arthStarId ];
+		var nearStarId = -1;
+		var nearest = float.MaxValue;
+
+		for ( var starId = 0; starId < gameData.m_starList.Length; starId++ )
+		{
+			var star = gameData.m_starList[ starId ];
+			var distance = Vector2.Distance( new Vector2( star.m_xCoordinate, star.m_yCoordinate ), new Vector2( arthStar.m_xCoordinate, arthStar.m_yCoordinate ) );
+
+			if ( ( starId != gameData.m_misc.m_arthStarId ) && ( distance < nearest ) )
+			{
+				nearest = distance;
+				nearStarId = starId;
+			}
+		}
+
+		yield return DistressFrom( nearStarId, fine, where, evaluation );
+
+		var messages = System.Text.RegularExpressions.Regex.Replace( string.Join( "\n", playerData.m_general.m_messageList ), "<[^>]*>", "" );
+		var stasis = messages.IndexOf( "Initiating cryogenic stasis." );
+		var towed = messages.IndexOf( "towed the ship back to Starport" );
+		var bonus = messages.IndexOf( "paid the bonus" );
+
+		Log( "towbonus: " + playerData.m_general.m_location + ", messages '" + messages.Replace( "\n", " | " ) + "'" );
+
+		Check( "towbonus: the tow brings the ship to the docking bay and pays the win's bonus (the setup is the case)", ( playerData.m_general.m_location == PD_General.Location.DockingBay ) && ( towed >= 0 ) && ( bonus >= 0 ), playerData.m_general.m_location + ": " + messages );
+		Check( "towbonus: the tow's lines come first, the bonus after them (the crew wake before Interstel pays)", ( stasis >= 0 ) && ( stasis < towed ) && ( towed < bonus ), messages );
+
+		Finish( "scenario=towbonus checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioNexusEgg()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var ship = playerData.m_playerShip;
+		var crystalStarId = gameData.m_planetList[ 33 ].m_starId;
+		var messages = new string[ 1 ];
+
+		EnsureCrew();
+
+		// the Orb against the field, the Cone that finds the nexus, and an armed Black Egg lying on the Crystal Planet away from the nexus
+		ship.AddArtifact( gameData.FindArtifactId( "Crystal Orb" ) );
+		ship.AddArtifact( gameData.FindArtifactId( "Crystal Cone" ) );
+
+		var controller = SpaceflightController.m_instance;
+
+		// down on the Crystal Planet (the egg does not count down there), where the egg is left armed away from the nexus
+		yield return GoIntoOrbit( crystalStarId, 33 );
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+
+		var eggPlace = Tools.LatLongToWorldCoordinates( 0.0f, 0.0f );
+
+		playerData.m_planetSurfaces.AddDroppedCargo( 33, eggPlace.x, eggPlace.y, eggPlace.z, -1, 0, gameData.FindArtifactId( "Black Egg" ) );
+
+		controller.m_messages.Clear();
+
+		// back up into orbit, as the ship comes up after leaving the egg (both the egg's countdown and the Cone's report begin on this entry into orbit)
+		controller.SwitchLocation( PD_General.Location.InOrbit );
+
+		var end = Time.realtimeSinceStartup + 2.5f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( playerData.m_general.m_location == PD_General.Location.InOrbit ) )
+		{
+			yield return null;
+		}
+
+		messages[ 0 ] = MessageList();
+
+		var lines = messages[ 0 ];
+		var countdown = lines.IndexOf( "countdown", System.StringComparison.OrdinalIgnoreCase );
+		var nexus = lines.IndexOf( "control nexus", System.StringComparison.OrdinalIgnoreCase );
+
+		Log( "nexusegg: the orbit's lines '" + lines.Replace( "\n", " | " ) + "'" );
+
+		Check( "nexusegg: the egg's countdown begins in orbit (the setup is the case)", countdown >= 0, lines );
+		Check( "nexusegg: the Cone's report of the nexus does not come between the egg's countdown and its numbers (the planet is about to go)", ( nexus < 0 ) || ( nexus < countdown ), lines );
+
+		Finish( "scenario=nexusegg checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- the playthrough: a new game played to the win, in stages that carry the saved game on

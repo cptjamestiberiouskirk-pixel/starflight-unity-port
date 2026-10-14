@@ -453,8 +453,13 @@ public class Encounter : MonoBehaviour
 				// in orbit around a planet - did the aliens let the ship into orbit (a veloxi drone that was answered correctly)?
 				if ( SpaceflightController.m_instance.HasOrbitPermission( m_pdEncounter.m_encounterId ) )
 				{
-					// yes - back into orbit (the encounter does not begin again while the ship stays in this star system)
+					// yes - the encounter ends first, then the ship is back in orbit, which says "...Orbit established." (the encounter does not begin again
+					// while the ship stays in this star system)
+					SayLeavingEncounter();
+
 					SpaceflightController.m_instance.SwitchLocation( PD_General.Location.InOrbit );
+
+					return;
 				}
 				else
 				{
@@ -475,7 +480,12 @@ public class Encounter : MonoBehaviour
 				break;
 		}
 
-		// say so, as the original does ("LEAVING ENCOUNTER..." and "...ENCOUNTER TERMINATED", made in STARB.COM as "LEAVING STARPORT..." and "...STARPORT CLEAR" are)
+		SayLeavingEncounter();
+	}
+
+	// say so, as the original does ("LEAVING ENCOUNTER..." and "...ENCOUNTER TERMINATED", made in STARB.COM as "LEAVING STARPORT..." and "...STARPORT CLEAR" are)
+	static void SayLeavingEncounter()
+	{
 		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Leaving encounter...</color>" );
 		SpaceflightController.m_instance.m_messages.AddText( "<color=white>...Encounter terminated.</color>" );
 	}

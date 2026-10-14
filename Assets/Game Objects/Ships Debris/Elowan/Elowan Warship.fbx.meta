@@ -7,23 +7,13 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Elowan Engine
-    second: {fileID: 2100000, guid: 46e16db35b2035e4a9486f69dd8a5d42, type: 2}
+      name: Elowan Warship Engine
+    second: {fileID: 2100000, guid: 1887a8164b91a7c478b6c6e67de891ab, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Elowan Hull
-    second: {fileID: 2100000, guid: e4382db5d43fd954b999d1cd30b8a099, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Elowan Light
-    second: {fileID: 2100000, guid: 942cd372d955aa642b7e5a478b3b90a8, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Elowan Trim
-    second: {fileID: 2100000, guid: 80959558261d519478985971e5b67ddd, type: 2}
+      name: Elowan Warship Hull
+    second: {fileID: 2100000, guid: 502abcd8ffa2ab743981dc2bec45e179, type: 2}
   materials:
     materialImportMode: 1
     materialName: 0
