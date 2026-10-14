@@ -9,11 +9,14 @@
 			"model": "Assets/Game Objects/Ships/Elowan/Elowan Transport.fbx",
 			"debris": "Assets/Game Objects/Ships Debris/Elowan/Elowan Transport.fbx",
 			"materials": [
-				"Elowan Hull",
-				"Elowan Trim",
-				"Elowan Light",
-				"Elowan Engine"
-			]
+				"Elowan Transport Hull",
+				"Elowan Transport Engine"
+			],
+			"meshy": {
+				"concept": "01a13802-e9c0-73c0-af84-ffb0acd07c66",
+				"model": "01a13807-2c6e-7044-989a-9cc1d9b2977e",
+				"remesh": "01a13808-78ec-72af-9c10-bd4a706acf08"
+			}
 		},
 		{
 			"id": 6,
@@ -23,11 +26,14 @@
 			"model": "Assets/Game Objects/Ships/Elowan/Elowan Scout.fbx",
 			"debris": "Assets/Game Objects/Ships Debris/Elowan/Elowan Scout.fbx",
 			"materials": [
-				"Elowan Hull",
-				"Elowan Light",
-				"Elowan Trim",
-				"Elowan Engine"
-			]
+				"Elowan Scout Hull",
+				"Elowan Scout Engine"
+			],
+			"meshy": {
+				"concept": "01a13802-ec2b-77af-b350-b8074f3bd9a5",
+				"model": "01a13807-312d-77e4-8e0e-3b69ca766329",
+				"remesh": "01a13808-7d45-71b3-9203-45a742f3dc44"
+			}
 		},
 		{
 			"id": 7,
@@ -37,93 +43,160 @@
 			"model": "Assets/Game Objects/Ships/Elowan/Elowan Warship.fbx",
 			"debris": "Assets/Game Objects/Ships Debris/Elowan/Elowan Warship.fbx",
 			"materials": [
-				"Elowan Hull",
-				"Elowan Trim",
-				"Elowan Light",
-				"Elowan Engine"
-			]
+				"Elowan Warship Hull",
+				"Elowan Warship Engine"
+			],
+			"meshy": {
+				"concept": "01a13802-efba-7346-833f-ee6e3e68ad10",
+				"model": "01a13807-3585-7006-9d34-c9824045cf0f",
+				"remesh": "01a13808-81b7-74e9-875a-60fa35a43a13"
+			}
 		}
 	],
 	"materials": [
 		{
-			"name": "Elowan Hull",
+			"name": "Elowan Transport Hull",
 			"albedo": [
-				0.17,
-				0.33,
-				0.14
-			],
-			"specular": [
-				0.25,
-				0.32,
-				0.22
-			],
-			"smoothness": 0.55,
-			"emissive": [
-				0.0,
-				0.0,
-				0.0
-			],
-			"folder": "Assets/Game Objects/Ships/Elowan"
-		},
-		{
-			"name": "Elowan Trim",
-			"albedo": [
-				0.1,
-				0.17,
-				0.08
-			],
-			"specular": [
-				0.18,
-				0.22,
-				0.16
-			],
-			"smoothness": 0.45,
-			"emissive": [
-				0.0,
-				0.0,
-				0.0
-			],
-			"folder": "Assets/Game Objects/Ships/Elowan"
-		},
-		{
-			"name": "Elowan Light",
-			"albedo": [
-				0.1,
-				0.3,
-				0.45
-			],
-			"specular": [
-				0.5,
-				0.5,
-				0.5
-			],
-			"smoothness": 0.8,
-			"emissive": [
-				0.2,
-				0.65,
+				1.0,
+				1.0,
 				1.0
 			],
-			"folder": "Assets/Game Objects/Ships/Elowan"
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Elowan",
+			"albedoMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Transport - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Transport - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Transport - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Transport - Emissive.jpg"
 		},
 		{
-			"name": "Elowan Engine",
+			"name": "Elowan Transport Engine",
 			"albedo": [
-				0.35,
-				0.06,
-				0.03
+				1.0,
+				1.0,
+				1.0
 			],
 			"specular": [
-				0.4,
-				0.2,
-				0.2
+				1.0,
+				1.0,
+				1.0
 			],
-			"smoothness": 0.6,
+			"smoothness": 1.0,
 			"emissive": [
-				0.62,
-				0.14,
-				0.06
+				0.9,
+				0.35,
+				0.12
 			],
-			"folder": "Assets/Game Objects/Ships/Elowan"
+			"folder": "Assets/Game Objects/Ships/Elowan",
+			"albedoMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Transport - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Transport - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Transport - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Transport - Emissive.jpg"
+		},
+		{
+			"name": "Elowan Scout Hull",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Elowan",
+			"albedoMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Scout - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Scout - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Scout - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Scout - Emissive.jpg"
+		},
+		{
+			"name": "Elowan Scout Engine",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.9,
+				0.35,
+				0.12
+			],
+			"folder": "Assets/Game Objects/Ships/Elowan",
+			"albedoMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Scout - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Scout - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Scout - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Scout - Emissive.jpg"
+		},
+		{
+			"name": "Elowan Warship Hull",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Elowan",
+			"albedoMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Warship - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Warship - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Warship - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Warship - Emissive.jpg"
+		},
+		{
+			"name": "Elowan Warship Engine",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.9,
+				0.35,
+				0.12
+			],
+			"folder": "Assets/Game Objects/Ships/Elowan",
+			"albedoMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Warship - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Warship - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Warship - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Elowan/Textures/Elowan Warship - Emissive.jpg"
 		}
 	]
 }
