@@ -192,29 +192,85 @@ public class PD_PlayerShip
 	}
 
 	// the most armor points this ship can have - those of the armor plating that is installed, or those of the bare hull if there is none (so this is never zero)
-	// what the Starport charges to repair the ship: the missing armor points at the price of the ship's armor class (a bare hull at the price of class 1), the
-	// shields for nothing (the owner's ruling of 2026-10-10 for roadmap 1.1 - no source gives the price)
+	// what the Starport charges to repair the ship, as the original's (CONFIG-OV WF226): 4 M.U. a missing armor point; for the engines, shields, missile launcher
+	// and laser cannon the price of the installed class in hundreds of M.U. times the damage in percent, plus 5% ((100 - health) * 105 / 100); and 100 M.U. a
+	// point of damage to the sensors and the comm. (The original's separate hull integrity, 250 M.U. a point, is the armor points in the port.)
 	public int GetStarportRepairCost()
 	{
 		var gameData = DataController.m_instance.m_gameData;
+		long cost = 0;
+
 		var missingPoints = GetMaximumArmorPoints() - m_armorPoints;
 
-		if ( missingPoints <= 0 )
+		if ( missingPoints > 0 )
+		{
+			cost += (long) missingPoints * c_repairPricePerArmorPoint;
+		}
+
+		cost += GetPartRepairCost( gameData.m_enginesList, m_enginesClass, ShipSystem.Engines );
+		cost += GetPartRepairCost( gameData.m_shieldingList, m_shieldingClass, ShipSystem.Shields );
+		cost += GetPartRepairCost( gameData.m_missileLauncherList, m_missileLauncherClass, ShipSystem.Missiles );
+		cost += GetPartRepairCost( gameData.m_laserCannonList, m_laserCannonClass, ShipSystem.Lasers );
+
+		cost += (long) ( 200 - GetSystemHealth( ShipSystem.Sensors ) - GetSystemHealth( ShipSystem.Comm ) ) * c_repairPricePerSensorAndCommPoint;
+
+		return (int) Mathf.Min( cost, int.MaxValue );
+	}
+
+	// what the Starport charges for one armor point, and for one point of damage to the sensors or the comm (CONFIG-OV WF226)
+	const int c_repairPricePerArmorPoint = 4;
+	const int c_repairPricePerSensorAndCommPoint = 100;
+
+	// the repair of an installed part: its class's price in hundreds of M.U. times its damage in percent plus 5% (CONFIG-OV WF1D6), nothing for a part that is not installed
+	long GetPartRepairCost( GD_ShipPart[] partList, int partClass, ShipSystem system )
+	{
+		if ( ( partList == null ) || ( partClass < 1 ) || ( partClass >= partList.Length ) )
 		{
 			return 0;
 		}
 
-		var armorClass = HasArmorPlating() ? m_armorClass : 1;
+		var damage = 100 - Mathf.Clamp( GetSystemHealth( system ), 0, 100 );
 
-		if ( ( armorClass < 1 ) || ( armorClass >= gameData.m_armorList.Length ) || ( gameData.m_armorList[ armorClass ].m_points <= 0 ) )
+		return (long) ( partList[ partClass ].m_buyPrice / 100 ) * ( damage * 105 / 100 );
+	}
+
+	// what the Starport pays for an installed part, as the original's (CONFIG-OV WECB0): its class's price in hundreds of M.U. times its condition over 105, in
+	// hundreds of M.U. again, at least 5 - the game data's sell price when the part is whole. The armor has no condition of its own (its damage is the armor
+	// points), so it sells whole. The parts are numbered as the ship configuration numbers them: 1 engines, 2 shields, 3 armor, 4 missiles, 5 lasers
+	public int GetPartResaleValue( int partIndex, GD_ShipPart part )
+	{
+		if ( part == null )
 		{
 			return 0;
 		}
 
-		var armor = gameData.m_armorList[ armorClass ];
+		var condition = 100;
 
-		// rounded up, so that a repair is never free
-		return (int) ( ( (long) missingPoints * armor.m_buyPrice + armor.m_points - 1 ) / armor.m_points );
+		switch ( partIndex )
+		{
+			case 1: condition = GetSystemHealth( ShipSystem.Engines ); break;
+			case 2: condition = GetSystemHealth( ShipSystem.Shields ); break;
+			case 4: condition = GetSystemHealth( ShipSystem.Missiles ); break;
+			case 5: condition = GetSystemHealth( ShipSystem.Lasers ); break;
+		}
+
+		condition = Mathf.Clamp( condition, 0, 100 );
+
+		var value = (long) ( part.m_buyPrice / 100 ) * condition / 105 * 100;
+
+		return (int) Mathf.Max( value, 5 );
+	}
+
+	// a part just bought is whole (the parts are numbered as the ship configuration numbers them; the armor has no condition of its own)
+	public void InstallNewPart( int partIndex )
+	{
+		switch ( partIndex )
+		{
+			case 1: SetSystemHealth( ShipSystem.Engines, 100 ); break;
+			case 2: SetSystemHealth( ShipSystem.Shields, 100 ); break;
+			case 4: SetSystemHealth( ShipSystem.Missiles, 100 ); break;
+			case 5: SetSystemHealth( ShipSystem.Lasers, 100 ); break;
+		}
 	}
 
 	// make sure there is a health for every system (save files from before the systems could be damaged have none: their systems are whole)

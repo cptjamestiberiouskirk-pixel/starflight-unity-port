@@ -18576,6 +18576,36 @@ public class ClaudeProbe : MonoBehaviour
 
 		bank.m_currentBalance = 100000;
 
+		// damaged systems, as the original prices them (CONFIG-OV WF226): a class 3 laser cannon at 40% (540 x 63 = 34,020 M.U.) and the sensors at 50%
+		// (5,000 M.U.), with the armor whole
+		ship.m_armorClass = 1;
+		ship.m_armorPoints = ship.GetMaximumArmorPoints();
+		ship.m_laserCannonClass = 3;
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Lasers, 40 );
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Sensors, 50 );
+
+		var costSystems = PressRepair( panel, message );
+		var lasersAfter = ship.GetSystemHealth( PD_PlayerShip.ShipSystem.Lasers );
+		var sensorsAfter = ship.GetSystemHealth( PD_PlayerShip.ShipSystem.Sensors );
+
+		// what the Starport pays for a part in the condition it is in (CONFIG-OV WECB0): a class 5 missile launcher whole (190,400 M.U.) and at 50% (95,200)
+		var launcher = DataController.m_instance.m_gameData.m_missileLauncherList[ 5 ];
+		var resale = typeof( PD_PlayerShip ).GetMethod( "GetPartResaleValue" );
+		var resaleWhole = -1;
+		var resaleHalf = -1;
+
+		if ( resale != null )
+		{
+			ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Missiles, 100 );
+			resaleWhole = (int) resale.Invoke( ship, new object[] { 4, launcher } );
+			ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Missiles, 50 );
+			resaleHalf = (int) resale.Invoke( ship, new object[] { 4, launcher } );
+			ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Missiles, 100 );
+		}
+
+		ship.m_laserCannonClass = 0;
+		bank.m_currentBalance = 100000;
+
 		var ledgerBefore = bank.m_transactionList.Count;
 
 		yield return ClosePanel( panel, "ship configuration" );
@@ -18585,11 +18615,16 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "starport-repair: a whole ship: " + costWhole + " (" + messageWhole + ") | class 1 armor at 200 of 500, shields empty: " + costClass1 + " M.U. (" + messageClass1 + "), armor " + armorAfterClass1 + ", shields " + shieldsAfterClass1 + " of " + ship.GetMaximumShieldPoints() + " | a bare hull at 100 of 250: " + costBareHull + " M.U., armor " + armorAfterBareHull + " | with 10 M.U.: " + costTooPoor + " (" + messageTooPoor + "), armor " + armorTooPoor + " | the ledger on closing: " + ledgerEntry );
 
 		Check( "starport-repair: a whole ship needs no repairs and pays nothing", ( costWhole == 0 ) && messageWhole.Contains( "no repairs" ), costWhole + " | " + messageWhole );
-		Check( "starport-repair: the missing armor is paid at the price of the ship's armor class, and the ship is whole again with full shields", ( costClass1 == 900 ) && ( armorAfterClass1 == 500 ) && ( shieldsAfterClass1 == ship.GetMaximumShieldPoints() ), costClass1 + ", " + armorAfterClass1 + ", " + shieldsAfterClass1 );
-		Check( "starport-repair: a bare hull is repaired at the price of class 1 armor", ( costBareHull == 450 ) && ( armorAfterBareHull == 250 ), costBareHull + ", " + armorAfterBareHull );
+		Check( "starport-repair: the missing armor is paid at 4 M.U. a point, as the original's, and the ship is whole again with full shields", ( costClass1 == 1200 ) && ( armorAfterClass1 == 500 ) && ( shieldsAfterClass1 == ship.GetMaximumShieldPoints() ), costClass1 + ", " + armorAfterClass1 + ", " + shieldsAfterClass1 );
+		Check( "starport-repair: a bare hull is repaired at 4 M.U. a point too", ( costBareHull == 600 ) && ( armorAfterBareHull == 250 ), costBareHull + ", " + armorAfterBareHull );
 		Check( "starport-repair: without the money the repair is refused and nothing changes", ( costTooPoor == 0 ) && ( armorTooPoor == 100 ) && messageTooPoor.Contains( "insufficient funds" ), costTooPoor + ", " + armorTooPoor + " | " + messageTooPoor );
 
-		Finish( "scenario=starport-repair whole=" + costWhole + " class1=" + costClass1 + " bareHull=" + costBareHull + " tooPoor=" + costTooPoor, 0 );
+		Log( "starport-repair: a class 3 laser cannon at 40% and the sensors at 50%: " + costSystems + " M.U., then lasers " + lasersAfter + "%, sensors " + sensorsAfter + "% | a class 5 missile launcher sells for " + resaleWhole + " whole and " + resaleHalf + " at 50%" );
+
+		Check( "starport-repair: damaged systems are paid for as the original's (the laser cannon by its price and damage, the sensors 100 M.U. a point), and are whole again", ( costSystems == 34020 + 5000 ) && ( lasersAfter == 100 ) && ( sensorsAfter == 100 ), costSystems + ", lasers " + lasersAfter + ", sensors " + sensorsAfter );
+		Check( "starport-repair: a part sells for what it is worth in its condition (a class 5 missile launcher 190,400 whole, 95,200 at 50%)", ( resaleWhole == 190400 ) && ( resaleHalf == 95200 ), resaleWhole + ", " + resaleHalf );
+
+		Finish( "scenario=starport-repair whole=" + costWhole + " class1=" + costClass1 + " bareHull=" + costBareHull + " tooPoor=" + costTooPoor + " systems=" + costSystems + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 1: distress
