@@ -1163,6 +1163,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioOrbitPermission();
 				break;
 
+			case "orbitentry":
+				yield return ScenarioOrbitEntry();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -29817,6 +29821,69 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "orbitpermission: going to hyperspace still ends it (control)", !afterHyperspace, afterHyperspace.ToString() );
 
 		Finish( "scenario=orbitpermission checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioOrbitEntry()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+		ProbeKeyboard();
+
+		controller.m_encounterRange = 0.0f;
+
+		// Arth's system, with Maneuver running
+		EnterStarSystem( gameData.m_misc.m_arthStarId );
+
+		var start = Time.realtimeSinceStartup;
+
+		while ( controller.m_starSystem.GeneratingPlanets() && ( Time.realtimeSinceStartup - start < 40.0f ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 10 );
+
+		PressButton( ButtonController.ButtonSet.NavigationA, 0 );
+
+		yield return Frames( 5 );
+
+		// just inside planet 94's orbital range (the planet model's scale), moving out at full speed, as a ship that arrives fast and asks for orbit at once
+		var planet94 = controller.m_starSystem.GetPlanetController( 94 );
+		var place = planet94.transform.position + Vector3.back * ( planet94.m_planetModel.transform.localScale.y * 0.9f );
+
+		place.y = 0.0f;
+
+		playerData.m_general.m_coordinates = place;
+		controller.m_playerShip.transform.position = place;
+		playerData.m_general.m_currentDirection = Vector3.back;
+		playerData.m_general.m_currentSpeed = playerData.m_general.m_currentMaximumSpeed;
+
+		var end = Time.realtimeSinceStartup + 5.0f;
+
+		while ( ( controller.m_starSystem.m_planetToOrbitId != 94 ) && ( Time.realtimeSinceStartup < end ) )
+		{
+			yield return null;
+		}
+
+		var standingBy = controller.m_starSystem.m_planetToOrbitId == 94;
+
+		yield return Tap( Key.Enter );
+		yield return WaitForLocation( PD_General.Location.InOrbit, 15.0f );
+		yield return Frames( 20 );
+
+		var messages = System.Text.RegularExpressions.Regex.Replace( string.Join( "\n", playerData.m_general.m_messageList ), "<[^>]*>", "" );
+		var initiating = messages.LastIndexOf( "Initiating orbital maneuver..." );
+		var orbitLines = ( initiating >= 0 ) ? messages.Substring( initiating ) : messages;
+
+		Log( "orbitentry: standing by " + standingBy + ", location " + playerData.m_general.m_location + ", the orbit's lines '" + orbitLines.Replace( "\n", " | " ) + "'" );
+
+		Check( "orbitentry: the ship flying away fast over planet 94 is standing by to orbit, and Enter takes it into orbit (the setup is the case)", standingBy && ( playerData.m_general.m_location == PD_General.Location.InOrbit ) && ( initiating >= 0 ), standingBy + " / " + playerData.m_general.m_location );
+		Check( "orbitentry: no Outside orbital range. between Initiating orbital maneuver... and ...Orbit established. (the ship holds still for the maneuver)", !orbitLines.Contains( "Outside orbital range." ), orbitLines );
+
+		Finish( "scenario=orbitentry checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
