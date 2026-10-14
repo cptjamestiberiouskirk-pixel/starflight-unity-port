@@ -16499,6 +16499,10 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 100006, guid: 2ac4722c5862a8b499b6d9309469795b,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1630892759}
     - targetCorrespondingSourceObject: {fileID: 100014, guid: 2ac4722c5862a8b499b6d9309469795b,
         type: 3}
       insertIndex: -1
@@ -77043,6 +77047,36 @@ MonoBehaviour:
   m_terrainMapDisplay: {fileID: 851218159}
   m_terrainVehicleDisplay: {fileID: 1849078958}
   m_terrainVehicleCargoDisplay: {fileID: 185738453}
+--- !u!1 &1630892758 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 100006, guid: 2ac4722c5862a8b499b6d9309469795b,
+    type: 3}
+  m_PrefabInstance: {fileID: 382947409}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1630892759
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1630892758}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fb91398f1d10917469ed7f3c5746c3e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThrynnCommAnimation
+  m_glanceRange: 14
+  m_minimumGlanceInterval: 1.2
+  m_maximumGlanceInterval: 3.5
+  m_glanceTime: 0.3
+  m_minimumBlinkInterval: 2.5
+  m_maximumBlinkInterval: 6
+  m_blinkDuration: 0.28
+  m_blinkDepth: 0.1
+  m_breathingBone: Back Bone
+  m_breathingAmount: 1.8
+  m_breathingSpeed: 0.28
+  m_armDrift: 2.5
 --- !u!1001 &1633560725
 PrefabInstance:
   m_ObjectHideFlags: 0
