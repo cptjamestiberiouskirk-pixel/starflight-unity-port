@@ -1,12 +1,77 @@
-# Starflight: The Remaking of a Legend (Unity 6 Port)
+# Starflight: The Remaking of a Legend
 
-![Unity 6](https://img.shields.io/badge/Unity-6-blue.svg)
-![Status: Active Development](https://img.shields.io/badge/Status-Active%20Development-green.svg)
-![Platform](https://img.shields.io/badge/Platform-PC%20%7C%20Mac%20%7C%20Linux-blue)
+[![Latest release](https://img.shields.io/github/v/release/cptjamestiberiouskirk-pixel/starflight-unity-port?label=download)](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port/releases/latest)
+![Platform: Windows 64-bit](https://img.shields.io/badge/Platform-Windows%2064--bit-blue)
+![Unity 6](https://img.shields.io/badge/Unity-6000.3-blue.svg)
+[![Compile check](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port/actions/workflows/compile-check.yml/badge.svg)](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port/actions/workflows/compile-check.yml)
+[![License: Unlicense](https://img.shields.io/badge/License-Unlicense-lightgrey.svg)](LICENSE)
 
-A modern port of the 1986 classic space exploration game *Starflight*, built with Unity 6. This project faithfully recreates the features of the CGA and EGA versions while utilizing current technology.
+A complete remake of the 1986 space exploration classic *Starflight*, in Unity 6. Recruit a crew, outfit a starship and explore 270 star systems and 811 planets: mine them, record their lifeforms, meet the races that share the galaxy, talk or fight your way past them, and find out why the stars are flaring before Arth's own sun does.
+
+The galaxy is the original's: every star, planet, price and alien line comes from the 1986 game, and its rules follow the original's own code. The look is new: 3D planets, stars and terrain, and a new ship's console in 15 color schemes.
+
+<p align="center">
+  <img src="docs/images/orbit.jpg" width="49%" alt="A planet seen from orbit, with the System Map and the ship's console">
+  <img src="docs/images/starport.jpg" width="49%" alt="The Starport, where the astronaut walks between the rooms">
+</p>
+<p align="center">
+  <img src="docs/images/ship-configuration.jpg" width="60%" alt="Ship Configuration, where the ship is outfitted">
+</p>
 
 ---
+
+## 🎮 Download and play
+
+1. Download **Starflight-1.0.0-win64.zip** (600 MB) from the [latest release](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port/releases/latest).
+2. Unzip it anywhere, for example into `Documents\Games`. Keep the files together: `Starflight.exe` needs the folders next to it.
+3. Run `Starflight.exe`.
+
+There is no installer. To uninstall, delete the folder, and the saved games in `%USERPROFILE%\AppData\LocalLow\DefaultCompany\Starflight\` if you want them gone too.
+
+**Requirements:** Windows 10 or 11 (64-bit), a graphics card with DirectX 11, and 1.1 GB of disk space.
+
+**If Windows blocks the game.** Version 1.0.0 is not code-signed, so Windows treats it as a program it does not know:
+
+- *"Windows protected your PC"* (Microsoft Defender SmartScreen): choose **More info**, then **Run anyway**.
+- *"An Application Control policy has blocked this file"* (Smart App Control, Windows 11): Smart App Control makes no exception for a single program, so the game cannot start while it is on. You can still play it in the Unity Editor (see [Build from source](#-build-from-source)).
+
+The release page lists the zip's SHA-256 checksum. To check your download, run `Get-FileHash Starflight-1.0.0-win64.zip` in PowerShell and compare.
+
+## 📖 How to play
+
+The **[Player's Manual](docs/MANUAL.md)** explains it all: the story, the controls, the Starport's rooms, every console button, flight, planets, aliens, combat and money. It gives nothing away: what the galaxy holds is yours to discover.
+
+| Action | Keys |
+|---|---|
+| Move and steer (8 directions) | Arrow keys with Home, Page Up, End and Page Down, or the numeric keypad |
+| Pick a console button | Up and Down |
+| Use it, confirm, stop | Enter |
+| Pause: save slots, color schemes, quit | Escape |
+
+The game saves by itself. On the Escape panel, **Copy** keeps a spare copy of your game in another of the five slots.
+
+New captains: read the notices in Operations, create and assign a crew of six, name the ship, buy a few cargo pods, and launch. Your first trips should earn money.
+
+## ✅ Status: version 1.0.0
+
+The whole game can be played, from a new game to its ending. Every item of the [roadmap to parity with the original](ROADMAP.md) is done or decided (59 of 59), and every screen has been compared with the original's.
+
+Every change is compile-checked in CI and tested by a headless probe that plays the real scenes: more than 200 scenarios with over 1,100 checks, all passing on the code of this release, and an automated playthrough that plays a new game through to the ending and Interstel's bonus.
+
+The known differences from the original are listed at the end of the [manual](docs/MANUAL.md#13-this-port-and-the-1986-original). The largest is combat, which is slower than the original's. Found a problem? Please [open an issue](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port/issues).
+
+[CHANGELOG.md](CHANGELOG.md) has the full history.
+
+## 🙏 Credits
+
+- ***Starflight*** (1986) was created by Binary Systems and published by Electronic Arts. This remake is an unofficial fan project, not affiliated with or endorsed by them.
+- **The Unity remake** was begun by Marvin Herbold in 2017, with contributions from Jeffrey Graw, Aaron Franke and Andrew Steeley.
+- **The Unity 6 port** and its completion: @cptjamestiberiouskirk-pixel.
+- **Fonts:** Orbitron, Rajdhani and Share Tech Mono, under the SIL Open Font License (`Assets/Fonts/`).
+
+---
+
+# For developers
 
 ## 🚀 2026 Modernization
 The project has been refactored to a clean, **root-directory architecture** to eliminate legacy "zombie" assets and streamline development.
@@ -43,20 +108,30 @@ The project has been refactored to a clean, **root-directory architecture** to e
 
 ---
 
-## 🛠 Getting Started
+## 🛠 Build from source
 
 ### Prerequisites
-- **Unity 6 (6000.3.13f1 or later)**: This project utilizes Unity 6 features like `Awaitable`.
-- **VS Code**: Recommended Editor with the "C# Dev Kit" installed.
+- **Unity 6 (6000.3.13f1)** with **Windows Build Support**, installed through Unity Hub. The project uses Unity 6 features like `Awaitable`.
+- **VS Code** with the "C# Dev Kit" is the recommended code editor.
 
-### Installation
+### Open and play in the Editor
 1. Clone the repository:
    ```bash
-   git clone [https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port.git](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port.git)
+   git clone https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port.git
    ```
-2. Open **Unity Hub** and click **Add Project from Disk**.
-3. Select the **root folder** of the repository (where this README is located).
-4. Open the `Intro` scene (found in `Assets/Scenes/`) to start.
+2. Open **Unity Hub**, click **Add**, **Add project from disk**, and select the repository's root folder (where this README is). The first import takes a while.
+3. Open any of the four scenes in `Assets/Scenes/` (`Persistent`, `Intro`, `Starport`, `Spaceflight`) and press **Play**: each one loads `Persistent` first.
+
+In the Editor a new game starts with 1,000,000 M.U. for testing (a build starts with the original's 12,000), and two debug keys work: **F9** brings a hostile Spemin encounter and **F10** destroys the ship.
+
+### Make a build
+**File > Build Profiles > Windows > Build**, or from a shell (with no Editor open on the project):
+
+```bash
+"/c/Program Files/Unity/Hub/Editor/6000.3.13f1/Editor/Unity.exe" -batchmode -quit -projectPath . -buildTarget Win64 -buildWindows64Player "Build/Starflight.exe" -logFile -
+```
+
+Leave the `Starflight_BurstDebugInformation_DoNotShip` folder out of anything you share. A build can leave baked lighting files in `Assets/Scenes/Starport/` (`LightingData.asset`, lightmaps, reflection probes): do not commit them.
 
 ### Continuous Integration
 Every pull request and push to `master` runs a headless Unity compile check (`.github/workflows/compile-check.yml`, via [GameCI](https://game.ci)). It needs repo secrets under **Settings > Secrets and variables > Actions**: `UNITY_EMAIL` and `UNITY_PASSWORD`, plus either `UNITY_SERIAL` (Pro or Student plan serial number) or `UNITY_LICENSE` (Personal plan: the contents of `Unity_lic.ulf` after activating in Unity Hub; `UnityEntitlementLicense.xml` is a different format and won't work). See the [GameCI activation guide](https://game.ci/docs/github/activation). To check a different editor before upgrading, run the workflow by hand from the **Actions** tab and enter a `unityVersion`.
@@ -127,9 +202,13 @@ The project features a **deterministic visualization system** that renders plane
 
 ---
 
-## 🎯 Current Development Status (v0.9.0)
+## 🎯 What the port implements (v1.0.0)
 
-### ✅ Completed Features
+**Spoilers.** This list names the game's secrets, its artifacts and its ending. Skip it if you want to discover them in play.
+
+<details>
+<summary>Show the full feature list (spoilers)</summary>
+
 - Full starport operations (Personnel, Ship Config, Trading, Banking)
 - Hyperspace navigation and star system exploration
 - Planetary landing and terrain vehicle exploration
@@ -141,7 +220,7 @@ The project features a **deterministic visualization system** that renders plane
 - The Crystal Cone locates the Crystal Planet's control nexus from orbit
 - The Tesseract halves the fuel the engines use in hyperspace
 - The Whining Orb translates the Spemin
-- The Rod Device halves the damage of alien lasers
+- The Rod Device cuts the damage of alien lasers to a quarter
 - The Crystal Pearl warps a critically wounded ship out of an encounter
 - The Dodecahedron draws alien ships from twice as far
 - The Shimmering Ball cloaks the ship in combat until it fires
@@ -151,7 +230,7 @@ The project features a **deterministic visualization system** that renders plane
 - Continuum fluxes can be seen only with the Ring Device aboard
 - The price of Endurium rises with the notices of 20-02 and 15-05, and the Starport buys it back for what it sells it for
 - Nebulae keep the shields down
-- The Starport repairs the ship at the price of its armor
+- The Starport repairs the hull and damaged systems at the original's prices, and buys parts back by their condition
 - A distress call, once confirmed, gets the ship towed home, for a fine that grows with the distance from Arth
 - Alien ships have the armor, shields and speed of their vessels in the game data
 - The starmap shows the fuel needed to fly to the cursor
@@ -184,12 +263,13 @@ The project features a **deterministic visualization system** that renders plane
 - Game over and restart functionality
 - Save/load system with JSON persistence
 
-### 🔧 In Progress
-- The fidelity pass: every screen against the original's (roadmap Phase 7)
+</details>
 
 ### 📊 Completion: 59 of the 59 items of the roadmap to parity
 
-Every item of [ROADMAP.md](ROADMAP.md) is done or decided. Every item of the comparison of the screens with the original's (`Research/Screen comparison.md`) is fixed or decided as well, the UI kit's included. The headless probe plays every scenario of it, but no one has yet played the port through to the win by hand.
+Every item of [ROADMAP.md](ROADMAP.md) is done or decided. Every item of the comparison of the screens with the original's (`Research/Screen comparison.md`) is fixed or decided as well, the UI kit's included. The headless probe plays every scenario of it, and its playthrough plays a new game through to the win; nobody has yet played 1.0.0 through to the end by hand.
+
+Still open from the comparison with the original's code: the combat damage model (the original's weapons hit about five times harder, and its ship fights on at 0 armor until the hull gives out), and smaller details: alien pursuit through hyperspace, hyperspace speeds and fuel per step, flux jumps and the navigator's skill, the terrain vehicle's fuel by terrain, buying armor, and when the price of Endurium changes.
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
