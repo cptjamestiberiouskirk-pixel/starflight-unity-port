@@ -7,28 +7,13 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Enterprise Bussard
-    second: {fileID: 2100000, guid: 6771aad65b404744f9b98dbb95a8e320, type: 2}
+      name: The Enterprise Engine
+    second: {fileID: 2100000, guid: bd5e4003dc1f65b4085597b140adc81c, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Enterprise Deflector
-    second: {fileID: 2100000, guid: 4dfea9a310b1f4445b4ee6ca5326b462, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Enterprise Hull
-    second: {fileID: 2100000, guid: 6b3eff0879498c3458cf7263a62b7418, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Enterprise Light
-    second: {fileID: 2100000, guid: 6c2b3edd10e8a084faf41b44bffa70df, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Enterprise Trim
-    second: {fileID: 2100000, guid: 5d0deab92f12a304090439a0cbdf144c, type: 2}
+      name: The Enterprise Hull
+    second: {fileID: 2100000, guid: 08bfd53fb4a00424aa8b4f6b9436ee7c, type: 2}
   materials:
     materialImportMode: 1
     materialName: 0
