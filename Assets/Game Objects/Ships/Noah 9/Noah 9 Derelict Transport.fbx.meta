@@ -7,18 +7,8 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Noah 9 Hull
-    second: {fileID: 2100000, guid: e3e043f078c9399458581a133ba44b49, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Noah 9 Scorch
-    second: {fileID: 2100000, guid: f11f9d1671feae24c905ac3e7ce4feff, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Noah 9 Trim
-    second: {fileID: 2100000, guid: 6ad0a2da77bdd664faf00ddc6fa19ea4, type: 2}
+      name: Noah 9 Derelict Transport Hull
+    second: {fileID: 2100000, guid: 691ba252698557145bb38d0c294ebd34, type: 2}
   materials:
     materialImportMode: 1
     materialName: 0
