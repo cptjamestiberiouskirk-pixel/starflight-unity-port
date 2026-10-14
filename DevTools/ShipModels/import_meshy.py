@@ -297,6 +297,8 @@ def main():
         obj.data.transform(Matrix.Rotation(math.radians(NOSE_TURNS[vessel.get("nose", "+X")]), 4, "Z"))
         # a model that Meshy built lying on its side is rolled about its length (degrees, a right-handed turn about the nose)
         obj.data.transform(Matrix.Rotation(math.radians(vessel.get("roll", 0.0)), 4, "Y"))
+        # a model that Meshy built wider than the original is narrowed across its nose to the original's proportions
+        obj.data.transform(Matrix.Diagonal((vessel.get("widthScale", 1.0), 1.0, 1.0, 1.0)))
         corners = [Vector(v.co) for v in obj.data.vertices]
         low = Vector((min(c.x for c in corners), min(c.y for c in corners), min(c.z for c in corners)))
         high = Vector((max(c.x for c in corners), max(c.y for c in corners), max(c.z for c in corners)))

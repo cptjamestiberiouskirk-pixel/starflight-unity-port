@@ -10726,8 +10726,8 @@ public class ClaudeProbe : MonoBehaviour
 	// ---------------------------------------------------------------- Low: ship pictures (the ship models made with Meshy, the aliens' and the player's Arth ship, are drawn with their maps, and pictures of them when the run has a graphics device: probe.ps1 -Graphics)
 
 	// the vessels whose models were made with Meshy (DevTools/ShipModels/import_meshy.py, meshy-<race>.json): the Elowan and the Thrynn
-	// transport, scout and warship, the four Veloxi vessels and the Gazurtoid scout and warship
-	static readonly int[] c_meshyVessels = { 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 18 };
+	// transport, scout and warship, the four Veloxi vessels and the Gazurtoid and Uhlek scouts and warships
+	static readonly int[] c_meshyVessels = { 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18 };
 
 	// the materials of a model that are drawn without an albedo map (a flat colour, as the procedural stand-ins are)
 	static List<string> UnmappedMaterials( GameObject root )
