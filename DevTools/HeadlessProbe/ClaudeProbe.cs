@@ -18746,10 +18746,12 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "distress: from star " + farthestStarId + " (" + farthest.ToString( "0" ) + " from Arth): fined " + fineFar + ", now " + whereFar + ", ledger '" + ledgerFar + "' | from Arth's system: fined " + fineNear + " | after the Starport: fined " + fineAfterStarport + ", now " + whereAfterStarport + " (" + textAfterStarport + ") | the evaluation: " + evaluationFar.Replace( '\n', '/' ) );
 
 		Check( "distress: a distress call gets the ship towed back to the Starport's docking bay", whereFar.StartsWith( "DockingBay" ) && whereFar.EndsWith( "star " + arthStarId ), whereFar );
-		Check( "distress: the fine runs from 15000 MU in Arth's system to 80000 MU from the farthest star, in the ledger and in Interstel's evaluation", ( fineNear == 15000 ) && ( fineFar == 80000 ) && ledgerFar.StartsWith( "Fine" ) && evaluationFar.Contains( "TOWING CHARGES" ) && evaluationFar.Contains( fineFar.ToString() ), fineNear + ", " + fineFar + ", '" + ledgerFar + "'" );
+		// the original's fine (COMM-OV WEF6D): the distance from Arth in its coordinates (the farthest star, 167 at 2,206: 123 starmap coordinates north, 984) times
+		// class 1 engines' 6 over 5, times 200 M.U. (a tenth of Endurium, 100, doubled in flight): 236,000; at least 15,000
+		Check( "distress: the fine is the original's, 15000 MU in Arth's system and 236000 MU from the farthest star, in the ledger and in Interstel's evaluation", ( fineNear == 15000 ) && ( fineFar == 236000 ) && ledgerFar.StartsWith( "Fine" ) && evaluationFar.Contains( "TOWING CHARGES" ) && evaluationFar.Contains( fineFar.ToString() ), fineNear + ", " + fineFar + ", '" + ledgerFar + "'" );
 		Log( "distress: booked at once from the farthest star " + bookedAtOnceFar + ", booked when the evaluation is shown " + ( fineFar - bookedAtOnceFar ) );
 
-		Check( "distress: the towing charges are booked when Interstel's evaluation shows them, as the original's, not at the call", ( bookedAtOnceFar == 0 ) && ( fineFar == 80000 ), "at once " + bookedAtOnceFar + ", in all " + fineFar );
+		Check( "distress: the towing charges are booked when Interstel's evaluation shows them, as the original's, not at the call", ( bookedAtOnceFar == 0 ) && ( fineFar > 0 ), "at once " + bookedAtOnceFar + ", in all " + fineFar );
 		Check( "distress: after the Starport has been destroyed there is no response, no fine and no tow (control)", ( fineAfterStarport == 0 ) && !whereAfterStarport.StartsWith( "DockingBay" ) && textAfterStarport.Contains( "NO RESPONSE" ), fineAfterStarport + ", " + whereAfterStarport );
 
 		Finish( "scenario=distress far=" + fineFar + " near=" + fineNear + " afterStarport=" + fineAfterStarport, 0 );
