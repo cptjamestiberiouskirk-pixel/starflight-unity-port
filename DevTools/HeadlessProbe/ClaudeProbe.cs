@@ -1359,6 +1359,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioPlaythrough21();
 				break;
 
+			case "firedonsilent":
+				yield return ScenarioFiredOnSilent();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -12935,7 +12939,7 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=commlink spemin=" + damageBeforeLink + "/" + damageDuringLink + "/" + damageAfterLink + " uhlek=" + uhlekDamageWithLink + "/" + uhlekDamageWithoutLink + " playerMissile=hit" + damageOfAHit + "/timeout" + damageOfATimeOut + "/explosions" + explosionsAfterTimeOut + " alienMissile=explosions" + alienExplosionsAfter + "/damage" + playerDamage + " deadMethod=" + ( deadMethod != null ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
-	// ---------------------------------------------------------------- ruling of 2026-10-05: a mineral deposit holds 1 to 5 cubic meters
+	// ---------------------------------------------------------------- a mineral deposit holds 1.0 to 9.9 cubic meters, as the original's (SEED-OV WF163: INST-QTY RRND 10 to 100, in tenths)
 
 	IEnumerator ScenarioDeposits()
 	{
@@ -12978,8 +12982,8 @@ public class ClaudeProbe : MonoBehaviour
 		var smallest = int.MaxValue;
 		var largest = int.MinValue;
 		var total = 0;
+		var outside = 0;
 		var notWholeCubicMeters = 0;
-		var sizes = new int[ 6 ];
 		long placement = 0;
 
 		for ( var i = 0; i < deposits.Length; i++ )
@@ -12990,13 +12994,14 @@ public class ClaudeProbe : MonoBehaviour
 			largest = Mathf.Max( largest, volume );
 			total += volume;
 
-			if ( ( volume % 10 != 0 ) || ( volume < 10 ) || ( volume > 50 ) )
+			if ( ( volume < 10 ) || ( volume > 99 ) )
+			{
+				outside++;
+			}
+
+			if ( volume % 10 != 0 )
 			{
 				notWholeCubicMeters++;
-			}
-			else
-			{
-				sizes[ volume / 10 ]++;
 			}
 
 			var position = deposits[ i ].transform.position;
@@ -13004,9 +13009,11 @@ public class ClaudeProbe : MonoBehaviour
 			placement = ( placement * 31 + Mathf.RoundToInt( position.x ) * 7 + Mathf.RoundToInt( position.z ) * 3 + deposits[ i ].m_elementId ) % 1000000007L;
 		}
 
-		Log( "deposits: planet 90 has " + deposits.Length + " deposits, from " + Tools.VolumeToText( smallest ) + " to " + Tools.VolumeToText( largest ) + " cubic meters, " + Tools.VolumeToText( total ) + " in all; " + notWholeCubicMeters + " are not 1, 2, 3, 4 or 5 cubic meters; of each size: " + sizes[ 1 ] + "/" + sizes[ 2 ] + "/" + sizes[ 3 ] + "/" + sizes[ 4 ] + "/" + sizes[ 5 ] + "; placement checksum " + placement );
+		Log( "deposits: planet 90 has " + deposits.Length + " deposits, from " + Tools.VolumeToText( smallest ) + " to " + Tools.VolumeToText( largest ) + " cubic meters, " + Tools.VolumeToText( total ) + " in all; " + outside + " outside 1.0 to 9.9, " + notWholeCubicMeters + " not whole cubic meters; placement checksum " + placement );
 
-		Check( "deposits: every deposit holds 1 to 5 cubic meters", ( notWholeCubicMeters == 0 ) && ( smallest == 10 ) && ( largest == 50 ), "from " + Tools.VolumeToText( smallest ) + " to " + Tools.VolumeToText( largest ) + " cubic meters, " + notWholeCubicMeters + " of " + deposits.Length + " outside 1 to 5" );
+		// the size is still one random draw per deposit, so the deposits (and everything placed after them) are where they were with 1 to 5 cubic meters
+		Check( "deposits: the deposits are where they were (the placement checksum of the deposits of 1 to 5 cubic meters)", placement == 789127093L, placement.ToString() );
+		Check( "deposits: every deposit holds 1.0 to 9.9 cubic meters in tenths, as the original's", ( outside == 0 ) && ( largest > 50 ) && ( notWholeCubicMeters > 0 ), "from " + Tools.VolumeToText( smallest ) + " to " + Tools.VolumeToText( largest ) + " cubic meters, " + outside + " of " + deposits.Length + " outside 1.0 to 9.9, " + notWholeCubicMeters + " not whole cubic meters" );
 
 		// ---- 2. pick one up with the real button: what the message says and what arrives in the hold
 		foreach ( var other in deposits )
@@ -13029,7 +13036,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "deposits: picking up a deposit of " + firstVolume + " tenths: " + pickupMessage + " (in the hold now: " + cargoAfterFirst + " tenths)" );
 
-		Check( "deposits: the pickup message and the hold agree on a whole number of cubic meters", ( firstVolume >= 10 ) && ( cargoAfterFirst == firstVolume ) && pickupMessage.Contains( "Picked up " + ( firstVolume / 10 ) + ".0 cubic meters of " ), "deposit " + firstVolume + " tenths, hold " + cargoAfterFirst + " tenths | " + pickupMessage );
+		Check( "deposits: the pickup message and the hold agree on the deposit's volume", ( firstVolume >= 10 ) && ( cargoAfterFirst == firstVolume ) && pickupMessage.Contains( "Picked up " + Tools.VolumeToText( firstVolume ) + " cubic meters of " ), "deposit " + firstVolume + " tenths, hold " + cargoAfterFirst + " tenths | " + pickupMessage );
 
 		// ---- 3. how many deposits it takes to fill the terrain vehicle's hold (one deposit after the other next to the vehicle, real button)
 		var holdSize = gameData.m_misc.m_terrainVehicleVolume;
@@ -13064,7 +13071,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "deposits: the hold of " + Tools.VolumeToText( holdSize ) + " cubic meters was full after " + pickups + " deposits (in it: " + Tools.VolumeToText( holdUsed ) + ") | last pickup: " + lastMessage + " | one more press: " + fullMessage );
 
-		Check( "deposits: the terrain vehicle's hold is full after 10 to 50 deposits, and never over full", ( holdUsed == holdSize ) && ( holdUsedAfterFull == holdSize ) && ( pickups >= 10 ) && ( pickups <= 50 ) && fullMessage.Contains( "full" ), pickups + " deposits, " + Tools.VolumeToText( holdUsed ) + " of " + Tools.VolumeToText( holdSize ) + " cubic meters, after one more press " + Tools.VolumeToText( holdUsedAfterFull ) );
+		Check( "deposits: the terrain vehicle's hold is full after 5 to 50 deposits, and never over full", ( holdUsed == holdSize ) && ( holdUsedAfterFull == holdSize ) && ( pickups >= 5 ) && ( pickups <= 50 ) && fullMessage.Contains( "full" ), pickups + " deposits, " + Tools.VolumeToText( holdUsed ) + " of " + Tools.VolumeToText( holdSize ) + " cubic meters, after one more press " + Tools.VolumeToText( holdUsedAfterFull ) );
 
 		// ---- 4. the cargo display that is not in any scene yet shows the hold in cubic meters too (made here from its class)
 		var displayObject = new GameObject( "probe cargo display" );
@@ -33982,6 +33989,100 @@ public class ClaudeProbe : MonoBehaviour
 		PlaythroughSave( "the end: location=" + DataController.m_instance.m_playerData.m_general.m_location + " balance=" + DataController.m_instance.m_playerData.m_bank.m_currentBalance );
 
 		Finish( "scenario=playthrough-21 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// aliens that fight do not talk, as the original's (COMM-OV <TALK>: a fight leaves no chance to talk): fired on, they do not answer a hail, and a comm link that is
+	// up when the player fires ends; aliens that have turned cowardly still talk
+	IEnumerator ScenarioFiredOnSilent()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		EnsureCrew();
+
+		// an officer who understands every word, and a ship that survives the fight
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// three Spemin ships at once, in a star system
+		var encounterId = FindEncounter( 1, 6, 3, 0 );
+		var said = new List<string>();
+
+		// ---- 1. fired on, then hailed: no answer, and no comm link
+		EnterEncounter( encounterId );
+		yield return Frames( 10 );
+
+		// (the scan's message is not the aliens talking)
+		encounter.m_pdEncounter.m_alreadyScanned = true;
+
+		encounter.PlayerAttacked();
+		playerData.m_playerShip.RestoreSystems();
+		encounter.Hail( GD_Comm.Stance.Friendly, false );
+
+		yield return LetAliensSpeak( 3, said );
+
+		var firedOnConnected = encounter.IsConnected();
+		var firedOnSaid = string.Join( " | ", said ).Trim( ' ', '|' );
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 2. hailed without a shot (the link comes up), then fired on: the aliens end the link
+		EnterEncounter( encounterId );
+		yield return Frames( 10 );
+
+		encounter.Hail( GD_Comm.Stance.Friendly, false );
+
+		said.Clear();
+
+		yield return LetAliensSpeak( 2, said );
+
+		var linkedBeforeShot = encounter.IsConnected();
+
+		encounter.PlayerAttacked();
+
+		yield return Frames( 5 );
+
+		var linkedAfterShot = encounter.IsConnected();
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 3. the control: two of the three destroyed, the last turns cowardly, and a hail is answered
+		EnterEncounter( encounterId );
+		yield return Frames( 10 );
+
+		encounter.PlayerAttacked();
+
+		Kill( FirstLivingAlien() );
+		Kill( FirstLivingAlien() );
+
+		yield return Frames( 3 );
+
+		playerData.m_playerShip.RestoreSystems();
+		encounter.Hail( GD_Comm.Stance.Friendly, false );
+
+		said.Clear();
+
+		yield return LetAliensSpeak( 1, said );
+
+		var cowardlyConnected = encounter.IsConnected();
+		var cowardlySaid = string.Join( " | ", said ).Trim( ' ', '|' );
+		var cowardly = encounter.m_pdEncounter.m_aliensAreCowardly;
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		Log( "firedonsilent: encounter " + encounterId + "; fired on and hailed: connected " + firedOnConnected + ", said '" + firedOnSaid + "'; linked before the shot " + linkedBeforeShot + ", after it " + linkedAfterShot + "; cowardly " + cowardly + ", connected " + cowardlyConnected + ", said '" + cowardlySaid + "'" );
+
+		Check( "firedonsilent: aliens that have been fired on do not answer a hail (no comm link, nothing received from them)", !firedOnConnected && !firedOnSaid.Contains( "Receiving:" ), firedOnConnected + " '" + firedOnSaid + "'" );
+		Check( "firedonsilent: a comm link that is up when the player fires ends (the setup: it was up)", linkedBeforeShot && !linkedAfterShot, linkedBeforeShot + " -> " + linkedAfterShot );
+		Check( "firedonsilent: aliens that have turned cowardly still answer a hail (control)", cowardly && cowardlyConnected && ( cowardlySaid.Length > 0 ), cowardly + " " + cowardlyConnected + " '" + cowardlySaid + "'" );
+
+		Finish( "scenario=firedonsilent checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
