@@ -16,6 +16,7 @@ Rulings of the project owner (2026-10-09):
 | `ShipModelWiring.cs`, `wire.ps1` | The Unity side, run headless: materials, imports and the scene's template slots, from a manifest |
 | `previews/<race>.png` | The review sheets: the original's screenshot, then top, side and three-quarter views (nose to the left) |
 | `import_meshy.py`, `meshy-<race>.json` | A race made with Meshy instead of a build script: see "Meshy models" below |
+| `import_meshy_arth.py`, `meshy-arth.json` | The player's Arth ship made with Meshy, its equipment parts kept separate: see "The player's Arth ship" below |
 
 ## Building a race
 
@@ -47,6 +48,30 @@ The owner's direction of 2026-10-13 is to remake the game's models with Meshy (m
 ```bash
 blender --background --factory-startup --python DevTools/ShipModels/import_meshy.py -- DevTools/ShipModels/meshy-thrynn.json --source <folder with the GLB files> --preview DevTools/ShipModels/previews/thrynn.png
 ```
+
+A race file can set `"glow": {"hue": [..], "saturation": .., "value": ..}` for its emissive map (the Arth ship's blue is paint, so only its brighter missile caps glow).
+
+### The player's Arth ship
+
+The player's ship is not one mesh: `PlayerShip`, `StatusDisplay`, `Disembarked` and `ShipConfigurationPanel` switch its 16 cargo pods, its laser cannon and its missile launchers on and off by the equipment, through the nodes of `Assets/Game Objects/Ships/Arth/Arth Ship.FBX` that four scene copies reference by name (the flying ship, the status display, the ship parked on a planet and the Starport's Ship Configuration room). So it was made from two Meshy models, a bare hull and a sheet of parts (a cargo pod, the laser turret, a missile launcher), and `import_meshy_arth.py` (with `meshy-arth.json`) puts them together under the old file's tree:
+
+- it makes that tree anew (never from the file, which it overwrites): the root `Arth Ship`, `Hull`, `Laser Cannon` with `Laser` and `Laser Base` (an empty node now: the turret is one piece), `Missile Launchers` with `Missile Launcher - Left` and `- Right`, and `Pod 01` to `Pod 16`. Unity keeps each node's file id by its name, so the scenes' references stay;
+- the hull takes the old hull's place and length (the nose at -Y, 134 inches from the cockpit to the engine fork, 51 units in play);
+- the sheet of parts is split by where its faces are (a remesh is a thousand loose patches, one per texture island); the turret and the launchers are turned to face forward (the turret by its barrels, found against the middle of its surface by area; the launchers by their tubes' bright blue), and the pods go in four rings of four around the spine (an upper and a lower pod on each side: from above still the original's two rows), since the Meshy spine is thicker and shorter than the old one;
+- the old file is in inches and Blender writes centimetres: the parts go out in centimetres under a root of 0.01 (a round trip of the old model through these settings gives the same transforms and bounds in Unity);
+- the windows and the nozzles, which Meshy paints near white, and the cockpit's canopy, which it paints as dark glass, are lit in the emissive map by where they are on the hull: the ship's only lights in the dark of hyperspace;
+- it writes `manifest-arth.json` with a `playerShip` section. `ShipModelWiring.cs` then sets up the import, removes the scene copies' material overrides (they set the old model's eight materials by hand), moves the flying ship's two contrails to the new nozzles, and gives the wreck its own import scale (15: `CombatController` spawns the wreck at its own scale, not the ship's 15).
+
+```bash
+blender --background --factory-startup --python DevTools/ShipModels/import_meshy_arth.py -- DevTools/ShipModels/meshy-arth.json --source <folder with the GLB files> --preview DevTools/ShipModels/previews/arth.png
+blender --background --factory-startup --python process_ship_debris.py -- -s 1986 --suffix "" --batch "Assets/Game Objects/Ships/Arth" "Assets/Game Objects/Ships Debris/Arth"
+```
+
+```powershell
+& "DevTools\ShipModels\wire.ps1" -Manifest "DevTools\ShipModels\manifest-arth.json"
+```
+
+The probe's `shipmodels`, `debrispictures`, `encounterviewscale`, `systemviewpictures` (the engine glow) and `shippictures` (every mesh of the ship drawn with its maps, pictures under `-Graphics`) cover it. `Arth Ship Barrel.mat` stays: the terrain vehicle's barrel uses it.
 
 ## Conventions
 
