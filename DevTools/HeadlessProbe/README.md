@@ -67,6 +67,7 @@ What the probe does:
 | `m10` | a deposit can only be picked up once (orbit, surface, terrain vehicle through the real Disembark button) |
 | `m23` | the console is locked during the 35 s landing, and the landing prints each message once and in order (about 55 s) |
 | `missiles` | a missile in the air when the player leaves an encounter does not arrive in the next one (alien and player missiles), and missiles still hit inside their own encounter |
+| `alienmissiles` | the aliens' weapons, as the original's: a Spemin Warship (a class 2 laser and a class 1 missile launcher) fires both; its missile misses a ship that has moved 600 units away, as it flies to where the ship was, and hits one that stayed (the control) (about 35 s) |
 | `m11` | the maximum armor and shield points come from the ship: the damage line and the gauges of the status display, the hull bar of the DAMAGE display, the repair of a bare hull, the hull breach warning below a quarter of the maximum |
 | `m18` | generating the planet maps does not hold up the main thread: the frames and the positions of the progress bar while a planet is processed in the background. It also logs the long frames that remain and the garbage collections around them |
 | `m17` | a planet file that cannot be read aborts that planet and nothing else: eight kinds of bad file made in memory from a real one (garbage, another version, cut off, wrong checksum, one flipped bit, too long, empty), a star system with one such planet, and all 811 planet files of the project through the reader (about 35 s on the code before the fix, which throws every frame for 12 s) |
@@ -262,7 +263,7 @@ What the probe does:
 | `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 | `combatmessages` | the combat messages are the original's: WEAPONS NOT ARMED, NO TARGET PRESENT, WEAPON NOT AVAILABLE and OUT OF FUEL! when a weapon cannot fire, nothing of the port's own when the player's shot hits, and LASER CLASS n (LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (215 scenarios, about 176 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (216 scenarios, about 177 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### The playthrough
 

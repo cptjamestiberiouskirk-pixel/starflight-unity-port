@@ -1420,6 +1420,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportTradeClamp();
 				break;
 
+			case "alienmissiles":
+				yield return ScenarioAlienMissiles();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -35350,6 +35354,92 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-tradeclamp: selling more than the hold has sells all of it", ( bought > 0 ) && ( left == 0 ), left + " left, " + soldState );
 
 		Finish( "scenario=starport-tradeclamp checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the aliens' weapons, as the original's (COMBAT-OV): a ship with a laser and a missile launcher fires both, and its missile flies to where the player's ship
+	// was when it was launched (only the plasma bolt follows the ship, WE929), so a ship that has moved away is missed
+	IEnumerator ScenarioAlienMissiles()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// a Spemin encounter, its first ship made a Spemin Warship (a class 2 laser and a class 1 missile launcher), 300 units from the player
+		var encounterId = FindEncounter( 1, 6, 3, 0 );
+
+		EnterEncounter( encounterId );
+
+		yield return Frames( 10 );
+
+		var alienShip = controller.m_encounter.m_pdEncounter.GetAlienShipList()[ FirstLivingAlien() ];
+		var warship = gameData.m_vesselList[ 3 ];
+
+		alienShip.m_vesselId = 3;
+		alienShip.m_coordinates = playerData.m_general.m_coordinates + Vector3.right * 300.0f;
+
+		controller.m_messages.Clear();
+
+		CombatController.m_instance.AlienFiresAtPlayer( alienShip, warship );
+
+		yield return Frames( 2 );
+
+		var laserSaid = MessageList().Contains( "Laser class" );
+		var missilesLaunched = MissilesInFlight();
+
+		// the player's ship moves 600 units away at once
+		var away = controller.m_playerShip.transform.position + Vector3.forward * 600.0f;
+
+		controller.m_playerShip.transform.position = away;
+		playerData.m_general.m_coordinates = away;
+
+		var pointsBefore = playerData.m_playerShip.m_armorPoints + playerData.m_playerShip.m_shieldPoints;
+		var end = Time.realtimeSinceStartup + 10.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( MissilesInFlight() > 0 ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		var pointsAfter = playerData.m_playerShip.m_armorPoints + playerData.m_playerShip.m_shieldPoints;
+		var missileHit = MessageList().Contains( "Missile class" );
+
+		// the control: fired again at a ship that stays where it is, the missile hits
+		alienShip.m_coordinates = playerData.m_general.m_coordinates + Vector3.right * 300.0f;
+		controller.m_messages.Clear();
+
+		CombatController.m_instance.AlienFiresAtPlayer( alienShip, warship );
+
+		end = Time.realtimeSinceStartup + 10.0f;
+
+		yield return Frames( 2 );
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( MissilesInFlight() > 0 ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		var missileHitStill = MessageList().Contains( "Missile class" );
+
+		ClearMissiles();
+		LeaveEncounter();
+
+		yield return Frames( 10 );
+
+		Log( "alienmissiles: the warship fired: laser " + laserSaid + ", missiles in the air " + missilesLaunched + "; after the ship moved 600 units away the missile hit " + missileHit + ", armor and shields " + pointsBefore + " -> " + pointsAfter );
+
+		Check( "alienmissiles: a ship with a laser and a missile launcher fires both", laserSaid && ( missilesLaunched >= 1 ), laserSaid + ", " + missilesLaunched );
+		Check( "alienmissiles: a ship that stays where it is is hit by the missile (control)", missileHitStill, missileHitStill.ToString() );
+		Check( "alienmissiles: its missile flies to where the ship was, and misses a ship that has moved away", ( missilesLaunched >= 1 ) && !missileHit && ( pointsAfter == pointsBefore ), missileHit + ", " + pointsBefore + " -> " + pointsAfter );
+
+		Finish( "scenario=alienmissiles checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
