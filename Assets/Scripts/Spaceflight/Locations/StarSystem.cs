@@ -550,6 +550,12 @@ public class StarSystem : MonoBehaviour
 			{
 				// if we are currently planetside then go ahead and update the terraing grid now
 				SpaceflightController.m_instance.m_planetside.UpdateTerrainGridNow();
+
+				// the game was loaded on the surface of a planet whose maps could not be generated - the ship can launch, but Disembark refuses, so say why
+				if ( currentPlanetCouldNotBeMapped )
+				{
+					SpaceflightController.m_instance.m_messages.AddText( Planet.c_couldNotBeMappedMessage );
+				}
 			}
 			else if ( playerData.m_general.m_location == PD_General.Location.Disembarked )
 			{
