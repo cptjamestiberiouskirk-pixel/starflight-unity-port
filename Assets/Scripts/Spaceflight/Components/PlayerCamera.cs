@@ -234,6 +234,36 @@ public class PlayerCamera : MonoBehaviour
 
 	public void PlayerHasLanded()
 	{
+		var spaceflightController = SpaceflightController.m_instance;
+
+		// a landing without the fuel for it is a crash, and a planet of more than 7.99 G crushes the hull: the game is over (LAND-OV WF258 and WF1F1)
+		if ( spaceflightController.m_landingCrashes || spaceflightController.m_landingCrushes )
+		{
+			var playerData = DataController.m_instance.m_playerData;
+			var gameData = DataController.m_instance.m_gameData;
+			var planet = gameData.m_planetList[ playerData.m_general.m_currentPlanetId ];
+			var star = gameData.m_starList[ planet.m_starId ];
+			string cause;
+
+			if ( spaceflightController.m_landingCrashes )
+			{
+				var shipName = string.IsNullOrEmpty( playerData.m_playerShip.m_name ) ? "" : playerData.m_playerShip.m_name.Trim() + " ";
+
+				cause = "Emergency locator transmission: starship ISS " + shipName + "crashed on planet " + planet.m_orbitPosition + " in system " + star.m_xCoordinate + "," + star.m_yCoordinate + ". No survivors.";
+			}
+			else
+			{
+				cause = "Captain, the ship is being crushed by extreme gravity. The ...";
+			}
+
+			spaceflightController.m_landingCrashes = false;
+			spaceflightController.m_landingCrushes = false;
+
+			spaceflightController.m_combatController.EndGame( cause );
+
+			return;
+		}
+
 		SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.CommandA );
 
 		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Safe landing, captain.</color>" );

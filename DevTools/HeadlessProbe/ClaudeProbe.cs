@@ -1371,6 +1371,14 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioFiredOnSilent();
 				break;
 
+			case "landinggravity":
+				yield return ScenarioLandingGravity();
+				break;
+
+			case "landingwarning":
+				yield return ScenarioLandingWarning();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -34482,6 +34490,158 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "firedonsilent: aliens that have turned cowardly still answer a hail (control)", cowardly && cowardlyConnected && ( cowardlySaid.Length > 0 ), cowardly + " " + cowardlyConnected + " '" + cowardlySaid + "'" );
 
 		Finish( "scenario=firedonsilent checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	static int EnduriumTenths()
+	{
+		var endurium = DataController.m_instance.m_playerData.m_playerShip.m_elementStorage.Find( 5 );
+
+		return ( endurium == null ) ? 0 : endurium.m_volume;
+	}
+
+	// landing and launching as the original's (LAND-OV): each burns the gravity's share of Endurium (the gravity in hundredths of a G over 40, in tenths), a
+	// launch without it is refused, a landing without it crashes, and once the gravity is analysed Land warns of a planet that would crush the hull
+	IEnumerator ScenarioLandingGravity()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+
+		// ---- 1. a launch from planet 90 (1.08 G: 2 tenths) with 1 tenth aboard is refused, and with 100 it burns 2
+		var planet90Star = gameData.m_planetList[ 90 ].m_starId;
+
+		yield return GoIntoOrbit( planet90Star, 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		SetEndurium( 1 );
+		controller.m_messages.Clear();
+
+		new LaunchYesButton().Execute();
+
+		yield return Frames( 10 );
+
+		var launchRefusedLocation = playerData.m_general.m_location;
+		var launchRefusedText = MessageList();
+
+		SetEndurium( 100 );
+
+		new LaunchYesButton().Execute();
+
+		var fuelAfterLaunch = EnduriumTenths();
+
+		yield return WaitForLocation( PD_General.Location.InOrbit, 20.0f );
+		yield return Frames( 10 );
+
+		var launchedLocation = playerData.m_general.m_location;
+
+		// ---- 2. a landing on planet 90 with 1 tenth aboard crashes, and the game is over
+		SetEndurium( 1 );
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.CommandB, 0 );
+
+		yield return Frames( 5 );
+
+		PressButton( ButtonController.ButtonSet.Land, 1 );
+
+		var end = Time.realtimeSinceStartup + 60.0f;
+
+		// until the touchdown: a safe landing, or the end of the game (the location is the surface from the start of the descent)
+		while ( ( Time.realtimeSinceStartup < end ) && !CombatController.m_instance.PlayerIsDestroyed() && !MessageList().Contains( "Safe landing" ) )
+		{
+			yield return null;
+		}
+
+		yield return new WaitForSecondsRealtime( 1.0f );
+
+		var crashed = CombatController.m_instance.PlayerIsDestroyed();
+		var crashText = MessageList();
+
+		Log( "landinggravity: planet 90 is " + gameData.m_planetList[ 90 ].m_gravity + " hundredths of a G; launch with 1 tenth: " + launchRefusedLocation + " '" + launchRefusedText + "'; with 100: " + fuelAfterLaunch + " left, then " + launchedLocation + "; landing with 1 tenth: destroyed " + crashed + " '" + crashText + "'" );
+
+		Check( "landinggravity: a launch without the gravity's share of Endurium is refused (1 tenth on planet 90)", ( launchRefusedLocation == PD_General.Location.Planetside ) && launchRefusedText.Contains( "Insufficient fuel for re-launching" ), launchRefusedLocation + " '" + launchRefusedText + "'" );
+		Check( "landinggravity: a launch from planet 90 burns 2 tenths of Endurium (108 hundredths of a G over 40)", ( fuelAfterLaunch == 98 ) && ( launchedLocation == PD_General.Location.InOrbit ), fuelAfterLaunch + ", " + launchedLocation );
+		Check( "landinggravity: a landing without the fuel for it crashes, and the game is over", crashed && crashText.Contains( "crashed on planet" ), crashed + " '" + crashText + "'" );
+
+		// ---- 3. the rules for every planet: what a landing burns, and the planets that crush a hull (more than 7.99 G, 194 of the 811)
+		var crushing = -1;
+		var heaviestFuel = -1;
+		var crushes = typeof( PD_PlayerShip ).GetMethod( "GravityCrushesHull" );
+		var landingFuel = typeof( PD_PlayerShip ).GetMethod( "GetLandingFuel" );
+
+		if ( ( crushes != null ) && ( landingFuel != null ) )
+		{
+			crushing = 0;
+			heaviestFuel = 0;
+
+			foreach ( var planet in gameData.m_planetList )
+			{
+				if ( (bool) crushes.Invoke( null, new object[] { planet } ) )
+				{
+					crushing++;
+				}
+
+				heaviestFuel = Mathf.Max( heaviestFuel, (int) landingFuel.Invoke( null, new object[] { planet } ) );
+			}
+		}
+
+		Log( "landinggravity: " + crushing + " planets crush a hull; the heaviest landing burns " + heaviestFuel + " tenths" );
+
+		Check( "landinggravity: 194 planets crush a landing ship's hull, and the heaviest landing burns at most 32 tenths", ( crushing == 194 ) && ( heaviestFuel > 0 ) && ( heaviestFuel <= 32 ), crushing + ", " + heaviestFuel );
+
+		Finish( "scenario=landinggravity checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// once the gravity has been analysed, Land warns of a landing the ship cannot make, and a second Land goes down anyway (LAND-OV ?LAND and WF45E)
+	IEnumerator ScenarioLandingWarning()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+
+		EnsureCrew();
+
+		yield return GoIntoOrbit( gameData.m_planetList[ 90 ].m_starId, 90 );
+
+		// 1 tenth of Endurium, and the science officer has analysed planet 90's gravity (1.08 G)
+		SetEndurium( 1 );
+
+		var analysed = typeof( SpaceflightController ).GetField( "m_gravityAnalysedPlanetId" );
+
+		if ( analysed != null )
+		{
+			analysed.SetValue( controller, 90 );
+		}
+
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.CommandB, 0 );
+
+		yield return Frames( 5 );
+
+		var firstSet = buttonController.GetCurrentButtonSet();
+		var firstText = MessageList();
+
+		PressButton( ButtonController.ButtonSet.CommandB, 0 );
+
+		yield return Frames( 5 );
+
+		var secondSet = buttonController.GetCurrentButtonSet();
+
+		Log( "landingwarning: first Land: " + firstSet + " '" + firstText + "'; second Land: " + secondSet );
+
+		Check( "landingwarning: with the gravity analysed, the first Land warns of the fuel and stays in orbit", ( firstSet != ButtonController.ButtonSet.Land ) && firstText.Contains( "Insufficient fuel for safe landing" ), firstSet + " '" + firstText + "'" );
+		Check( "landingwarning: a second Land goes on to the landing", secondSet == ButtonController.ButtonSet.Land, secondSet.ToString() );
+
+		Finish( "scenario=landingwarning checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
