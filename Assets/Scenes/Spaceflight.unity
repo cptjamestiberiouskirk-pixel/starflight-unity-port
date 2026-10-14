@@ -53159,6 +53159,10 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 100002, guid: 368f941246150404ab92c85da9436139,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1712470247}
     - targetCorrespondingSourceObject: {fileID: 100088, guid: 368f941246150404ab92c85da9436139,
         type: 3}
       insertIndex: -1
@@ -81621,6 +81625,30 @@ Transform:
     type: 3}
   m_PrefabInstance: {fileID: 180423051}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1712470246 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 100002, guid: 368f941246150404ab92c85da9436139,
+    type: 3}
+  m_PrefabInstance: {fileID: 1214456185}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1712470247
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1712470246}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a3268b2bf0c45d14ca731c02cf0ecf27, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GazurtoidCommAnimation
+  m_breathingAmount: 0.035
+  m_breathingSpeed: 0.3
+  m_minimumBlinkInterval: 2.5
+  m_maximumBlinkInterval: 6.5
+  m_blinkDuration: 0.32
+  m_blinkDepth: 0.12
 --- !u!1 &1714062999
 GameObject:
   m_ObjectHideFlags: 0

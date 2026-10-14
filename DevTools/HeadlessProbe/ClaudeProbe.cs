@@ -1196,6 +1196,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCommThrynn();
 				break;
 
+			case "commgazurtoid":
+				yield return ScenarioCommGazurtoid();
+				break;
+
 			case "encounterviewscale":
 				yield return ScenarioEncounterViewScale();
 				break;
@@ -28726,6 +28730,227 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "commthrynn: nothing jumps from one frame to the next (no frame's turn stands out from its neighbours' by 2 degrees, no blink step by 0.3)", ( largestJump < 2.0f ) && ( largestEyeJump < 0.3f ), "largest turn jump " + largestJump.ToString( "F2" ) + " degrees at " + largestJumpAt + ", eye " + largestEyeJump.ToString( "F2" ) );
 
 		Finish( "scenario=commthrynn pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- Low: the Gazurtoid's comm portrait moves as the Genesis version's does (its tentacles writhe, its eyes glance and blink, its body pulses as it breathes), without a jump from one frame to the next, and pictures of it with -Graphics
+
+	IEnumerator ScenarioCommGazurtoid()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "comm-pictures" ) );
+
+		if ( hasGraphics )
+		{
+			System.IO.Directory.CreateDirectory( folder );
+		}
+
+		EnsureCrew();
+
+		// a skilled officer, whose link comes up with little interference, and a ship that survives whatever it meets
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+		playerData.m_playerShip.m_armorPoints = 100000;
+		controller.m_encounterRange = 0.0f;
+
+		var said = new List<string>();
+
+		yield return MeetAndConnect( FindEncounter( 0, 1, 1, 0, GameData.Race.Gazurtoid ), GD_Comm.Stance.Friendly, said );
+
+		CommScreen commScreen = null;
+
+		for ( var i = 0; ( i < 300 ) && ( commScreen == null ); i++ )
+		{
+			commScreen = FindFirstObjectByType<CommScreen>();
+
+			if ( commScreen == null )
+			{
+				yield return null;
+			}
+		}
+
+		var model = Call( controller.m_encounter, "GetAlienRaceModel" ) as GameObject;
+
+		if ( ( commScreen == null ) || ( model == null ) || !model.activeInHierarchy )
+		{
+			Check( "commgazurtoid: the Gazurtoid's comm portrait comes on", false, "comm screen " + ( commScreen != null ) + ", model " + ( ( model == null ) ? "none" : model.name + " active " + model.activeInHierarchy ) );
+			Finish( "scenario=commgazurtoid abort: no comm portrait", 2 );
+			yield break;
+		}
+
+		// the link settles (the interference fades out over CommScreen.m_duration)
+		yield return new WaitForSecondsRealtime( commScreen.m_duration + 0.5f );
+
+		var camera = commScreen.GetComponent<Camera>();
+
+		// the parts: the tentacles' bones, the eye stalks and eyeballs, the mouth, and the body that pulses
+		var moving = new List<Transform>();
+		var tentacleCount = 0;
+		var eyes = new List<Transform>();
+		Transform body = null;
+
+		foreach ( var part in model.GetComponentsInChildren<Transform>( true ) )
+		{
+			if ( part.name.StartsWith( "Arm " ) && part.name.Contains( " Bone " ) )
+			{
+				moving.Add( part );
+				tentacleCount++;
+			}
+		}
+
+		foreach ( var part in model.GetComponentsInChildren<Transform>( true ) )
+		{
+			if ( part.name.EndsWith( "Eyeball" ) )
+			{
+				eyes.Add( part );
+				moving.Add( part );
+			}
+			else if ( part.name.EndsWith( "Eye Stalk" ) || ( part.name == "Mouth Bone" ) )
+			{
+				moving.Add( part );
+			}
+			else if ( ( part.name == "Body" ) && ( part.GetComponent<SkinnedMeshRenderer>() != null ) )
+			{
+				body = part;
+			}
+		}
+
+		if ( ( tentacleCount == 0 ) || ( eyes.Count != 2 ) || ( body == null ) )
+		{
+			Check( "commgazurtoid: the Gazurtoid model has its tentacles, eyes and body", false, tentacleCount + " tentacle bones, " + eyes.Count + " eyes, body " + ( body != null ) );
+			Finish( "scenario=commgazurtoid abort: parts missing", 2 );
+			yield break;
+		}
+
+		var startRotations = new Quaternion[ moving.Count ];
+
+		for ( var i = 0; i < moving.Count; i++ )
+		{
+			startRotations[ i ] = moving[ i ].localRotation;
+		}
+
+		var eyeStartScales = new[] { eyes[ 0 ].localScale, eyes[ 1 ].localScale };
+		// the body's size in the world: the breathing scales the whole model, so that the parts hanging from the body move with its skin
+		var bodyStartScale = body.lossyScale;
+
+		// watch for 8 s and then 5 s at a steady 30 frames a second: how far each part turns from where it started, the smallest an eye gets
+		// along any axis, how far the body's width and height change, and each part's turn in each steady frame; a jump is a frame whose
+		// change stands out from the changes of the frames on either side of it
+		var largestTurns = new float[ moving.Count ];
+		var smallestEye = 1.0f;
+		var bodyChange = 0.0f;
+		var pictures = 0;
+		var watchStart = Time.realtimeSinceStartup;
+		var nextPicture = watchStart;
+		const int c_steadyFrames = 150;
+		var turnsPerFrame = new float[ c_steadyFrames, moving.Count ];
+		var eyeRatios = new float[ c_steadyFrames, 2 ];
+		var previous = new Quaternion[ moving.Count ];
+
+		// how far each part has turned, how small an eye has got and how far the body has pulsed, since the start
+		void Measure()
+		{
+			for ( var i = 0; i < moving.Count; i++ )
+			{
+				largestTurns[ i ] = Mathf.Max( largestTurns[ i ], Quaternion.Angle( startRotations[ i ], moving[ i ].localRotation ) );
+			}
+
+			smallestEye = Mathf.Min( smallestEye, Mathf.Min( SmallestScaleRatio( eyes[ 0 ].localScale, eyeStartScales[ 0 ] ), SmallestScaleRatio( eyes[ 1 ].localScale, eyeStartScales[ 1 ] ) ) );
+			bodyChange = Mathf.Max( bodyChange, Mathf.Max( Mathf.Abs( body.lossyScale.x / bodyStartScale.x - 1.0f ), Mathf.Abs( body.lossyScale.y / bodyStartScale.y - 1.0f ) ) );
+		}
+
+		while ( Time.realtimeSinceStartup < watchStart + 8.0f )
+		{
+			Measure();
+
+			// a portrait every quarter of a second for the first 3 s: the frames of the animation
+			if ( hasGraphics && ( pictures < 12 ) && ( Time.realtimeSinceStartup >= nextPicture ) )
+			{
+				var rect = camera.rect;
+
+				camera.rect = new Rect( 0.0f, 0.0f, 1.0f, 1.0f );
+				RenderCameraPicture( camera, System.IO.Path.Combine( folder, "gazurtoid_" + pictures.ToString( "00" ) + ".png" ) );
+				camera.rect = rect;
+
+				pictures++;
+				nextPicture += 0.25f;
+			}
+
+			yield return null;
+		}
+
+		Time.captureDeltaTime = 1.0f / 30.0f;
+		yield return null;
+
+		for ( var i = 0; i < moving.Count; i++ )
+		{
+			previous[ i ] = moving[ i ].localRotation;
+		}
+
+		for ( var frame = 0; frame < c_steadyFrames; frame++ )
+		{
+			yield return null;
+
+			Measure();
+
+			for ( var i = 0; i < moving.Count; i++ )
+			{
+				turnsPerFrame[ frame, i ] = Quaternion.Angle( previous[ i ], moving[ i ].localRotation );
+				previous[ i ] = moving[ i ].localRotation;
+			}
+
+			eyeRatios[ frame, 0 ] = SmallestScaleRatio( eyes[ 0 ].localScale, eyeStartScales[ 0 ] );
+			eyeRatios[ frame, 1 ] = SmallestScaleRatio( eyes[ 1 ].localScale, eyeStartScales[ 1 ] );
+
+		}
+
+		Time.captureDeltaTime = 0.0f;
+
+		var largestJump = 0.0f;
+		var largestJumpAt = "none";
+
+		for ( var i = 0; i < moving.Count; i++ )
+		{
+			for ( var frame = 1; frame < c_steadyFrames - 1; frame++ )
+			{
+				var jump = turnsPerFrame[ frame, i ] - Mathf.Max( turnsPerFrame[ frame - 1, i ], turnsPerFrame[ frame + 1, i ] );
+
+				if ( jump > largestJump )
+				{
+					largestJump = jump;
+					largestJumpAt = moving[ i ].name + " frame " + frame + " (" + turnsPerFrame[ frame - 1, i ].ToString( "F2" ) + ", " + turnsPerFrame[ frame, i ].ToString( "F2" ) + ", " + turnsPerFrame[ frame + 1, i ].ToString( "F2" ) + " degrees)";
+				}
+			}
+		}
+
+		var largestEyeJump = 0.0f;
+
+		for ( var eye = 0; eye < 2; eye++ )
+		{
+			for ( var frame = 2; frame < c_steadyFrames - 1; frame++ )
+			{
+				var change = Mathf.Abs( eyeRatios[ frame, eye ] - eyeRatios[ frame - 1, eye ] );
+				var before = Mathf.Abs( eyeRatios[ frame - 1, eye ] - eyeRatios[ frame - 2, eye ] );
+				var after = Mathf.Abs( eyeRatios[ frame + 1, eye ] - eyeRatios[ frame, eye ] );
+
+				largestEyeJump = Mathf.Max( largestEyeJump, change - Mathf.Max( before, after ) );
+			}
+		}
+
+		var leastTentacleTurn = SmallestOf( largestTurns, 0, tentacleCount );
+		var firstEye = moving.IndexOf( eyes[ 0 ] );
+		var secondEye = moving.IndexOf( eyes[ 1 ] );
+		var leastEyeTurn = Mathf.Min( largestTurns[ firstEye ], largestTurns[ secondEye ] );
+
+		Log( "commgazurtoid: " + tentacleCount + " tentacle bones (least turn " + leastTentacleTurn.ToString( "F1" ) + " degrees), eyes turned " + largestTurns[ firstEye ].ToString( "F1" ) + " and " + largestTurns[ secondEye ].ToString( "F1" ) + ", smallest eye " + smallestEye.ToString( "F2" ) + ", body pulse " + bodyChange.ToString( "F3" ) + ", largest jump " + largestJump.ToString( "F2" ) + " degrees at " + largestJumpAt + ", eyes " + largestEyeJump.ToString( "F2" ) );
+
+		Check( "commgazurtoid: every bone of its tentacles keeps moving (each turns more than 3 degrees)", leastTentacleTurn > 3.0f, tentacleCount + " bones, the least turned " + leastTentacleTurn.ToString( "F1" ) + " degrees" );
+		Check( "commgazurtoid: its eyes glance about (each turns more than 2 degrees; their RandomRotation picks its turns at random, so a small one is chance)", leastEyeTurn > 2.0f, "turned " + largestTurns[ firstEye ].ToString( "F1" ) + " and " + largestTurns[ secondEye ].ToString( "F1" ) );
+		Check( "commgazurtoid: its eyes blink", smallestEye < 0.5f, "the smallest eye " + smallestEye.ToString( "F2" ) + " of its size" );
+		Check( "commgazurtoid: its body pulses as it breathes (its width or height changes more than 2 percent)", bodyChange > 0.02f, "body changed " + ( bodyChange * 100.0f ).ToString( "F1" ) + " percent" );
+		Check( "commgazurtoid: nothing jumps from one frame to the next (no frame's turn stands out from its neighbours' by 2 degrees, no blink step by 0.3)", ( largestJump < 2.0f ) && ( largestEyeJump < 0.3f ), "largest turn jump " + largestJump.ToString( "F2" ) + " degrees at " + largestJumpAt + ", eye " + largestEyeJump.ToString( "F2" ) );
+
+		Finish( "scenario=commgazurtoid pictures=" + pictures + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// the encounter is seen at the original's fixed scale: the camera frames the alien ships out to their fire range and no further, so that it does not climb
