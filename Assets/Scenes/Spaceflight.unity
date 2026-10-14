@@ -30392,6 +30392,35 @@ Transform:
     type: 3}
   m_PrefabInstance: {fileID: 842326563}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &843238655
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1612370172}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: db9515b670997fc49b94bd6c9b9e41b7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpeminCommAnimation
+  m_minimumBlinkInterval: 1.2
+  m_maximumBlinkInterval: 4.5
+  m_blinkDuration: 0.2
+  m_blinkDepth: 0.2
+  m_minimumDiscSpeed: 40
+  m_maximumDiscSpeed: 160
+  m_wobbleAmount: 0.08
+  m_wobbleSpeed: 1.6
+  m_breatheAmount: 0.03
+  m_breatheSpeed: 1
+  m_dripCount: 10
+  m_dripSpread: 14
+  m_dripHeight: 26
+  m_minimumSwellTime: 1
+  m_maximumSwellTime: 3
+  m_dripGravity: 30
+  m_dripSize: 1.6
 --- !u!1 &845916767
 GameObject:
   m_ObjectHideFlags: 0
@@ -76458,6 +76487,12 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: -6}
   m_SizeDelta: {x: 0, y: 56}
   m_Pivot: {x: 0.5, y: 1}
+--- !u!1 &1612370172 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 100036, guid: e5b49797278804244b86ec15984ffaba,
+    type: 3}
+  m_PrefabInstance: {fileID: 2142119954}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1612775129
 GameObject:
   m_ObjectHideFlags: 0
@@ -97320,6 +97355,10 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 100036, guid: e5b49797278804244b86ec15984ffaba,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 843238655}
     - targetCorrespondingSourceObject: {fileID: 100034, guid: e5b49797278804244b86ec15984ffaba,
         type: 3}
       insertIndex: -1
