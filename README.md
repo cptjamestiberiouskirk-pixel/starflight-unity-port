@@ -56,7 +56,7 @@ New captains: read the notices in Operations, create and assign a crew of six, n
 
 The whole game can be played, from a new game to its ending. Every item of the [roadmap to parity with the original](ROADMAP.md) is done or decided (59 of 59), and every screen has been compared with the original's.
 
-Every change is compile-checked in CI and tested by a headless probe that plays the real scenes: more than 200 scenarios with over 1,100 checks, and an automated playthrough from a new game to the ending with 122 checks, all passing on the code of this release.
+Every change is compile-checked in CI and tested by a headless probe that plays the real scenes: more than 200 scenarios with over 1,100 checks, all passing on the code of this release, and an automated playthrough that plays a new game through to the ending and Interstel's bonus.
 
 The known differences from the original are listed at the end of the [manual](docs/MANUAL.md#13-this-port-and-the-1986-original). The largest is combat, which is slower than the original's. Found a problem? Please [open an issue](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port/issues).
 

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2026-10-14
 
-The first complete release. The whole game can be played, from a new game to its ending, in a Windows build (`Starflight-1.0.0-win64.zip` on the GitHub release page). Every item of the roadmap to parity with the original is done or decided (59 of 59), the rules follow the original's decompiled code wherever it is known, and every screen has been compared with the original's. On the release's code the headless probe passes every one of its scenarios (more than 200, with over 1,100 checks) and the automated playthrough to the ending (122 checks).
+The first complete release. The whole game can be played, from a new game to its ending, in a Windows build (`Starflight-1.0.0-win64.zip` on the GitHub release page). Every item of the roadmap to parity with the original is done or decided (59 of 59), the rules follow the original's decompiled code wherever it is known, and every screen has been compared with the original's. On the release's code the headless probe passes every one of its scenarios (more than 200, with over 1,100 checks), and its automated playthrough plays a new game through to the ending and Interstel's bonus.
 
 ### Added
 
