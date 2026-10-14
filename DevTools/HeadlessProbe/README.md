@@ -251,6 +251,10 @@ What the probe does:
 
 Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (202 scenarios, about 164 minutes; one summary block per scenario with the failed checks and exceptions).
 
+### The playthrough
+
+`playthrough-1` to `playthrough-21` play the game from a new game to the win and Interstel's bonus, each stage from the save the one before left (in `$env:TEMP\starflight-probe\playthrough`), through the real console buttons, with real flight and real driving: the Starport (crew, training, ship configuration, the bank), Arth's system and planet 94 (sensors, analysis, landing, mining, back to the ship), selling the minerals, Sphexi (the Crystal Orb's and the Black Egg's ruins), the Crystal Cone, the Crystal Planet (the Orb against its field, the nexus, the egg armed, the explosion) and the bonus at the Starport. Run them in order with `& "DevTools\HeadlessProbe\run-playthrough.ps1"` (about 25 minutes; `-From n` goes on from the save of stage n - 1). They are not in `run-all-scenarios.ps1`, since each needs the save of the stage before. Where the game has a bug that would stop it, a stage logs `GAME BUG`, works round it so the later stages still run, and fails a check that names it.
+
 ### Before and after
 
 A check that cannot fail proves nothing, so run the scenario on the old code as well:
