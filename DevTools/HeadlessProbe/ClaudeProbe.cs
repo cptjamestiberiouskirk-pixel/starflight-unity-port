@@ -29957,12 +29957,33 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 5 );
 		yield return Tap( Key.Enter );
-		yield return Frames( 30 );
+
+		// going back in fades for 2 s before the location changes: wait long enough to see it if it comes
+		yield return WaitForLocation( PD_General.Location.Planetside, 4.0f );
 
 		var locationWhenFar = playerData.m_general.m_location;
 
-		// the vehicle 1 km from the ship along the ground, kept as driving keeps it (flat: the ground's height is only drawn)
-		var near = new Vector3( ship.x + 2048.0f / 225.0f, 0.0f, ship.z );
+		// 1 km from the ship, the next map cell: the original takes the vehicle in only on the ship's own cell (BEHAV-OV ?EMBARK), so the crew stay outside
+		var oneCell = new Vector3( ship.x + 2048.0f / 225.0f, 0.0f, ship.z );
+
+		playerData.m_general.m_coordinates = oneCell;
+		playerData.m_general.m_lastDisembarkedCoordinates = oneCell;
+		controller.m_terrainVehicle.transform.localPosition = oneCell;
+
+		yield return Frames( 5 );
+
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
+
+		yield return Frames( 5 );
+		yield return Tap( Key.Enter );
+
+		// going back in fades for 2 s before the location changes: wait long enough to see it if it comes
+		yield return WaitForLocation( PD_General.Location.Planetside, 4.0f );
+
+		var locationWhenOneCell = playerData.m_general.m_location;
+
+		// the vehicle on the ship's cell, 0.3 km from it along the ground, kept as driving keeps it (flat: the ground's height is only drawn)
+		var near = new Vector3( ship.x + 0.3f * 2048.0f / 225.0f, 0.0f, ship.z );
 
 		playerData.m_general.m_coordinates = near;
 		playerData.m_general.m_lastDisembarkedCoordinates = near;
@@ -29980,11 +30001,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		var location = playerData.m_general.m_location;
 
-		Log( "reboard: the ship stands at height " + ship.y.ToString( "F1" ) + ", the vehicle 1 km from it at height 0; after Move and Enter the location is " + location );
+		Log( "reboard: the ship stands at height " + ship.y.ToString( "F1" ) + "; after Move and Enter 5 km away " + locationWhenFar + ", 1 km away " + locationWhenOneCell + ", 0.3 km away " + location );
 
 		Check( "reboard: the ship stands on raised ground (the setup is the case)", ship.y > 10.0f, ship.y.ToString( "F1" ) );
 		Check( "reboard: Move and Enter 5 km from the ship leave the crew outside (control)", locationWhenFar == PD_General.Location.Disembarked, locationWhenFar.ToString() );
-		Check( "reboard: Move and Enter 1 km from the ship along the ground take the vehicle back in, however high the ground", location == PD_General.Location.Planetside, location.ToString() );
+		Check( "reboard: Move and Enter 1 km from the ship (the next map cell) leave the crew outside, as the original's", locationWhenOneCell == PD_General.Location.Disembarked, locationWhenOneCell.ToString() );
+		Check( "reboard: Move and Enter on the ship's cell (0.3 km along the ground) take the vehicle back in, however high the ground", location == PD_General.Location.Planetside, location.ToString() );
 
 		Finish( "scenario=reboard checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
