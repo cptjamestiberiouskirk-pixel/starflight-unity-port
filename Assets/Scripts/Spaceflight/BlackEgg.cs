@@ -136,6 +136,12 @@ public class BlackEgg
 	}
 
 	// the dropped Black Egg on a planet of this star (null if there is none)
+	// returns true if an armed egg lies on a planet of this star system (its countdown runs while the ship is above them)
+	public static bool IsArmedEggInStarSystem( int starId )
+	{
+		return FindArmedEgg( starId ) != null;
+	}
+
 	static PD_PlanetSurfaces.DroppedCargo FindArmedEgg( int starId )
 	{
 		var gameData = DataController.m_instance.m_gameData;

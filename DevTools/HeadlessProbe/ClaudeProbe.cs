@@ -1147,6 +1147,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSciFiButtons();
 				break;
 
+			case "nexusegg":
+				yield return ScenarioNexusEgg();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -29460,6 +29464,60 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "scifibuttons: a button's frame takes the light mode's accent colour", ( lightFrameColour == lightAccent ) && ( lightFrameColour != "(none)" ), lightFrameColour + " / " + lightAccent );
 
 		Finish( "scenario=scifibuttons checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioNexusEgg()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var ship = playerData.m_playerShip;
+		var crystalStarId = gameData.m_planetList[ 33 ].m_starId;
+		var messages = new string[ 1 ];
+
+		EnsureCrew();
+
+		// the Orb against the field, the Cone that finds the nexus, and an armed Black Egg lying on the Crystal Planet away from the nexus
+		ship.AddArtifact( gameData.FindArtifactId( "Crystal Orb" ) );
+		ship.AddArtifact( gameData.FindArtifactId( "Crystal Cone" ) );
+
+		var controller = SpaceflightController.m_instance;
+
+		// down on the Crystal Planet (the egg does not count down there), where the egg is left armed away from the nexus
+		yield return GoIntoOrbit( crystalStarId, 33 );
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+
+		var eggPlace = Tools.LatLongToWorldCoordinates( 0.0f, 0.0f );
+
+		playerData.m_planetSurfaces.AddDroppedCargo( 33, eggPlace.x, eggPlace.y, eggPlace.z, -1, 0, gameData.FindArtifactId( "Black Egg" ) );
+
+		controller.m_messages.Clear();
+
+		// back up into orbit, as the ship comes up after leaving the egg (both the egg's countdown and the Cone's report begin on this entry into orbit)
+		controller.SwitchLocation( PD_General.Location.InOrbit );
+
+		var end = Time.realtimeSinceStartup + 2.5f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( playerData.m_general.m_location == PD_General.Location.InOrbit ) )
+		{
+			yield return null;
+		}
+
+		messages[ 0 ] = MessageList();
+
+		var lines = messages[ 0 ];
+		var countdown = lines.IndexOf( "countdown", System.StringComparison.OrdinalIgnoreCase );
+		var nexus = lines.IndexOf( "control nexus", System.StringComparison.OrdinalIgnoreCase );
+
+		Log( "nexusegg: the orbit's lines '" + lines.Replace( "\n", " | " ) + "'" );
+
+		Check( "nexusegg: the egg's countdown begins in orbit (the setup is the case)", countdown >= 0, lines );
+		Check( "nexusegg: the Cone's report of the nexus does not come between the egg's countdown and its numbers (the planet is about to go)", ( nexus < 0 ) || ( nexus < countdown ), lines );
+
+		Finish( "scenario=nexusegg checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
