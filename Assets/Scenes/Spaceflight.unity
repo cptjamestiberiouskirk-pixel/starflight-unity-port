@@ -6516,6 +6516,42 @@ LensFlare:
     serializedVersion: 2
     m_Bits: 6
   m_Directional: 0
+--- !u!114 &65266849
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1141796429}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8a0c6720451624429f1f4be0e8d9586, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ElowanCommAnimation
+  m_stalkBones:
+  - Bone001
+  - Bone002
+  - Bone003
+  - Bone004
+  - Bone005
+  - Bone006
+  - Bone007
+  m_swayBones:
+  - Bone002
+  - Bone003
+  m_swayAmount: 3
+  m_swaySpeed: 0.7
+  m_vineCurl: 5
+  m_vineTwist: 2.5
+  m_vineSpeed: 1.2
+  m_vineWaveLength: 5
+  m_leafAmount: 9
+  m_minimumLeafSpeed: 1.6
+  m_maximumLeafSpeed: 3.2
+  m_minimumBlinkInterval: 2
+  m_maximumBlinkInterval: 6
+  m_blinkDuration: 0.3
+  m_blinkDepth: 0.12
 --- !u!23 &70432732 stripped
 MeshRenderer:
   m_CorrespondingSourceObject: {fileID: 2300000, guid: 0b7c772b5e064d746a02130191893d4b,
@@ -12712,6 +12748,10 @@ MonoBehaviour:
   m_starportRotationSpeedMultiplier: 2
   m_gameIsPaused: 0
   m_gameOver: 0
+  m_gravityAnalysedPlanetId: -1
+  m_landingWarnedPlanetId: -1
+  m_landingCrashes: 0
+  m_landingCrushes: 0
 --- !u!114 &280970584
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -44584,6 +44624,12 @@ MeshRenderer:
   m_CorrespondingSourceObject: {fileID: 2300000, guid: 0b7c772b5e064d746a02130191893d4b,
     type: 3}
   m_PrefabInstance: {fileID: 1141407240}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1141796429 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 100092, guid: 1a9d8f7e8dc9b0a4984379a5d5336eb7,
+    type: 3}
+  m_PrefabInstance: {fileID: 1707497345}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &1142541244
 GameObject:
@@ -80729,6 +80775,10 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 100092, guid: 1a9d8f7e8dc9b0a4984379a5d5336eb7,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 65266849}
     - targetCorrespondingSourceObject: {fileID: 100008, guid: 1a9d8f7e8dc9b0a4984379a5d5336eb7,
         type: 3}
       insertIndex: -1
