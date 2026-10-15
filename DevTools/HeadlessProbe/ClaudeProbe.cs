@@ -35066,6 +35066,25 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=playthrough-8 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
+	// skips what is left of the minute without encounters after one in flight (SpaceflightController.HoldOffEncounters, the original's ENC-TIME) - gives back the
+	// seconds skipped
+	static float PtSkipEncounterHoldOff()
+	{
+		var field = typeof( SpaceflightController ).GetField( "m_encountersResumeTime", BindingFlags.NonPublic | BindingFlags.Instance );
+		var controller = SpaceflightController.m_instance;
+
+		if ( ( field == null ) || ( controller == null ) )
+		{
+			return 0.0f;
+		}
+
+		var left = Mathf.Max( 0.0f, (float) field.GetValue( controller ) - Time.time );
+
+		field.SetValue( controller, 0.0f );
+
+		return left;
+	}
+
 	// in hyperspace: goes to meet an encounter (the travel to it skipped with its fuel taken), and lets it come - gives back whether it began
 	IEnumerator PtSeekEncounter( int encounterId, bool[] met )
 	{
@@ -35103,12 +35122,22 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "playthrough: SHORTCUT " + ( skipped / 256.0f ).ToString( "F1" ) + " coordinates of hyperspace skipped toward encounter " + encounterId + " (" + fuelOfTheWay.ToString( "F1" ) + " cubic meters of fuel taken)" );
 
+		// an encounter met a moment ago (a Velox group in Sphexi's system on the way out of stage 9) holds this one off for a minute, longer than the flight to it
+		// and half of the probe's time: the wait is skipped like the travel
+		var holdOff = PtSkipEncounterHoldOff();
+
+		if ( holdOff > 0.0f )
+		{
+			Log( "playthrough: SHORTCUT " + holdOff.ToString( "F1" ) + " s of the minute without encounters skipped before encounter " + encounterId );
+		}
+
 		yield return PtManeuver();
 		yield return PtFly( () => pdEncounter.m_currentCoordinates, () => playerData.m_general.m_location != PD_General.Location.Hyperspace, 20.0f, flown );
 
-		met[ 0 ] = playerData.m_general.m_location == PD_General.Location.Encounter;
+		// this encounter, not another group that came first
+		met[ 0 ] = ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == encounterId );
 
-		Log( "playthrough: flew " + flown[ 0 ].ToString( "F0" ) + " toward encounter " + encounterId + ": " + playerData.m_general.m_location + ( met[ 0 ] ? " " + PtEncounterText() : "" ) );
+		Log( "playthrough: flew " + flown[ 0 ].ToString( "F0" ) + " toward encounter " + encounterId + ": " + playerData.m_general.m_location + ( ( playerData.m_general.m_location == PD_General.Location.Encounter ) ? " " + PtEncounterText() : "" ) );
 	}
 
 	// stage 9: in the star system of Sphexi with the Crystal Orb. Out into hyperspace, a meeting with the Velox (hail, statement, question), then on to the star of
