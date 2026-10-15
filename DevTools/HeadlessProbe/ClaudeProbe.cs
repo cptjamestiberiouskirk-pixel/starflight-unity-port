@@ -1460,6 +1460,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioWeaponDamage();
 				break;
 
+			case "aimandfuel":
+				yield return ScenarioAimAndFuel();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -1787,6 +1791,9 @@ public class ClaudeProbe : MonoBehaviour
 		file.m_crewRaceId = 0;
 		file.m_vitality = 100.0f;
 		file.m_science = file.m_navigation = file.m_engineering = file.m_communications = file.m_medicine = 100;
+
+		// a navigator who always aims true (the original's aim is off target below skill 200), so that the scenarios that fire to hit do hit
+		file.m_navigation = 250;
 
 		playerData.m_personnel.m_personnelList.Add( file );
 
@@ -4367,25 +4374,25 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "H8 a ship with a missile launcher can launch missiles", buttonLaunched && !label.Contains( "(" ), "label \"" + label + "\", launched " + buttonLaunched + ", message: " + buttonMessage );
 
-		// ---- fuel: 50 missiles and 100 laser shots
+		// ---- fuel: 10 missiles and 40 laser shots (half a cubic meter a missile and a tenth a laser shot, COMBAT-OV WF1B6 and WF1DC)
 		ship.m_fuelUsed = 0.0f;
 
 		BringAliensClose();
 
 		var enduriumBeforeMissiles = Endurium();
-		var missilesFired = FireRepeatedly( true, 50 );
+		var missilesFired = FireRepeatedly( true, 10 );
 		var usedByMissiles = enduriumBeforeMissiles - Endurium();
 
 		BringAliensClose();
 
 		var enduriumBeforeLasers = Endurium();
-		var lasersFired = FireRepeatedly( false, 100 );
+		var lasersFired = FireRepeatedly( false, 40 );
 		var usedByLasers = enduriumBeforeLasers - Endurium();
 
 		Log( "H8 fuel: " + missilesFired + " missiles used " + usedByMissiles + " tenths of a cubic meter, " + lasersFired + " laser shots used " + usedByLasers + " (endurium left " + Endurium() + ")" );
 
-		Check( "H8 50 missiles use about 1.0 cubic meter of endurium", ( missilesFired == 50 ) && ( usedByMissiles >= 9 ) && ( usedByMissiles <= 10 ), missilesFired + " fired, " + usedByMissiles + " tenths used" );
-		Check( "H8 100 laser shots use about 1.0 cubic meter of endurium", ( lasersFired == 100 ) && ( usedByLasers >= 9 ) && ( usedByLasers <= 10 ), lasersFired + " fired, " + usedByLasers + " tenths used" );
+		Check( "H8 10 missiles use 5.0 cubic meters of endurium (half a cubic meter each)", ( missilesFired == 10 ) && ( usedByMissiles == 50 ), missilesFired + " fired, " + usedByMissiles + " tenths used" );
+		Check( "H8 40 laser shots use 4.0 cubic meters of endurium (a tenth each)", ( lasersFired == 40 ) && ( usedByLasers == 40 ), lasersFired + " fired, " + usedByLasers + " tenths used" );
 
 		// ---- no endurium, no weapons
 		ship.RemoveElement( 5, Endurium() );
@@ -8253,7 +8260,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "combat: launch with " + inTheAirBeforeLaunch + " of " + missiles.Count + " missiles in the air: launched " + launchedWithNoMissileFree + ", fuel used " + fuelUsed.ToString( "F3" ) + ", aliens attacked " + attackedBefore + " -> " + attacked + ", message: " + messageWithNoMissileFree + " | with missiles free: launched " + launchedWithMissilesFree + ", fuel used " + fuelUsedBySecond.ToString( "F3" ) + ", in the air " + inTheAirAfterLaunch + ", aliens attacked " + pdEncounter.m_attackedByPlayer );
 
 		Check( "combat: a launch with no missile free does nothing and costs nothing", ( inTheAirBeforeLaunch == missiles.Count ) && !attackedBefore && !launchedWithNoMissileFree && ( Mathf.Abs( fuelUsed ) < 0.0001f ) && !attacked && !messageWithNoMissileFree.Contains( "Missile launched" ), "launched " + launchedWithNoMissileFree + ", fuel used " + fuelUsed.ToString( "F3" ) + ", aliens attacked " + attacked + ", message: " + messageWithNoMissileFree );
-		Check( "combat: a launch with a missile free still works", launchedWithMissilesFree && ( Mathf.Abs( fuelUsedBySecond - 0.02f ) < 0.0001f ) && ( inTheAirAfterLaunch == 1 ) && pdEncounter.m_attackedByPlayer, "launched " + launchedWithMissilesFree + ", fuel used " + fuelUsedBySecond.ToString( "F3" ) + ", in the air " + inTheAirAfterLaunch + ", aliens attacked " + pdEncounter.m_attackedByPlayer );
+		Check( "combat: a launch with a missile free still works", launchedWithMissilesFree && ( Mathf.Abs( fuelUsedBySecond - 0.5f ) < 0.0001f ) && ( inTheAirAfterLaunch == 1 ) && pdEncounter.m_attackedByPlayer, "launched " + launchedWithMissilesFree + ", fuel used " + fuelUsedBySecond.ToString( "F3" ) + ", in the air " + inTheAirAfterLaunch + ", aliens attacked " + pdEncounter.m_attackedByPlayer );
 
 		// ---- 4. the ship is destroyed, and hit again while it explodes: it is only destroyed once, and nothing fires at it or from it afterwards
 		foreach ( var pooled in missiles )
@@ -37098,6 +37105,155 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "weapondamage: end to end a Thrynn scout's laser from 3 cells takes 924, 230 with the Rod Device, and an Uhlek warship's plasma bolt, a missile that follows the ship, 4000 when it arrives", ( laserLoss >= 924 ) && ( laserLoss <= 933 ) && ( rodLoss >= 230 ) && ( rodLoss <= 239 ) && ( plasmaRightAway == 0 ) && ( plasmaLoss >= 4000 ) && ( plasmaLoss <= 4009 ), laserLoss + "/" + rodLoss + "/" + plasmaRightAway + "/" + plasmaLoss );
 
 		Finish( "scenario=weapondamage checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the navigator's aim and the Endurium a shot uses (COMBAT-OV)
+
+	// how many of these rolls of the navigator's aim are on target, and the most cells any of them is off (-1 on the code without the aim)
+	static int AimOnTarget( int skill, int rolls, out int widest )
+	{
+		widest = 0;
+
+		var roll = typeof( CombatController ).GetMethod( "RollAimOffset", BindingFlags.Public | BindingFlags.Static );
+
+		if ( roll == null )
+		{
+			return -1;
+		}
+
+		var onTarget = 0;
+
+		for ( var i = 0; i < rolls; i++ )
+		{
+			var offset = (Vector2Int) roll.Invoke( null, new object[] { skill } );
+
+			if ( offset == Vector2Int.zero )
+			{
+				onTarget++;
+			}
+
+			widest = Mathf.Max( widest, Mathf.Max( Mathf.Abs( offset.x ), Mathf.Abs( offset.y ) ) );
+		}
+
+		return onTarget;
+	}
+
+	IEnumerator ScenarioAimAndFuel()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var combat = CombatController.m_instance;
+
+		EnsureCrew();
+
+		yield return Frames( 5 );
+
+		// ---- 1 to 3. the aim, rolled 2000 times at each skill (WF0D8: on target with (50 / (250 - skill)) squared, always from 200)
+		var at250 = AimOnTarget( 250, 2000, out _ );
+		var at200 = AimOnTarget( 200, 2000, out _ );
+		var at150 = AimOnTarget( 150, 2000, out var widest150 );
+		var at0 = AimOnTarget( 0, 2000, out var widest0 );
+
+		// ---- 4. end to end: a navigator of skill 0 fires the laser 20 times at a Spemin scout, then one of skill 250 five times
+		ship.m_laserCannonClass = 1;
+		ship.m_missileLauncherClass = 1;
+		ship.m_armorPoints = 100000;
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = true;
+
+		if ( EnduriumTenths() < 200 )
+		{
+			ship.AddElement( 5, 500 );
+		}
+
+		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		ForceVessel( speminId, 2 );
+		EnterEncounter( speminId );
+
+		yield return Frames( 10 );
+
+		var targetIndex = FirstLivingAlien();
+		var alien = SpaceflightController.m_instance.m_encounter.m_pdEncounter.GetAlienShipList()[ targetIndex ];
+
+		alien.m_armorPoints = 100000;
+		alien.m_shieldPoints = 0;
+
+		combat.SetTarget( targetIndex );
+
+		var navigator = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Navigator );
+		var laserCooldown = typeof( CombatController ).GetField( "m_playerLaserCooldown", BindingFlags.NonPublic | BindingFlags.Instance );
+		var missileCooldown = typeof( CombatController ).GetField( "m_playerMissileCooldown", BindingFlags.NonPublic | BindingFlags.Instance );
+		var hitsAt0 = 0;
+		var hitsAt250 = 0;
+		var shotsAt0 = 0;
+		var shotsAt250 = 0;
+
+		navigator.m_navigation = 0;
+
+		for ( var shot = 0; shot < 20; shot++ )
+		{
+			laserCooldown.SetValue( combat, 0.0f );
+			BringAliensClose();
+
+			var before = alien.m_armorPoints;
+
+			if ( combat.FirePlayerLaser() )
+			{
+				shotsAt0++;
+			}
+
+			if ( alien.m_armorPoints < before )
+			{
+				hitsAt0++;
+			}
+		}
+
+		navigator.m_navigation = 250;
+
+		for ( var shot = 0; shot < 5; shot++ )
+		{
+			laserCooldown.SetValue( combat, 0.0f );
+			BringAliensClose();
+
+			var before = alien.m_armorPoints;
+
+			if ( combat.FirePlayerLaser() )
+			{
+				shotsAt250++;
+			}
+
+			if ( alien.m_armorPoints < before )
+			{
+				hitsAt250++;
+			}
+		}
+
+		// ---- 5. the Endurium a shot uses: a tenth of a cubic meter for the laser, half for a missile (WF1DC, WF1B6)
+		laserCooldown.SetValue( combat, 0.0f );
+		BringAliensClose();
+
+		var beforeLaser = EnduriumTenths();
+		var laserFired = combat.FirePlayerLaser();
+		var laserUsed = beforeLaser - EnduriumTenths();
+
+		missileCooldown.SetValue( combat, 0.0f );
+
+		var beforeMissile = EnduriumTenths();
+		var missileFired = combat.FirePlayerMissile();
+		var missileUsed = beforeMissile - EnduriumTenths();
+
+		yield return Frames( 5 );
+
+		Log( "aimandfuel: on target of 2000 at skill 250/200/150/0: " + at250 + "/" + at200 + "/" + at150 + "/" + at0 + ", widest at 150 " + widest150 + " and at 0 " + widest0 + " | lasers that hit: skill 0 " + hitsAt0 + " of " + shotsAt0 + ", skill 250 " + hitsAt250 + " of " + shotsAt250 + " | Endurium a shot uses, in tenths: laser " + laserUsed + " (fired " + laserFired + "), missile " + missileUsed + " (fired " + missileFired + ")" );
+
+		Check( "aimandfuel: a navigator of skill 200 or more always aims on target", ( at250 == 2000 ) && ( at200 == 2000 ), at250 + "/" + at200 );
+		Check( "aimandfuel: a weaker navigator is on target with the chance (50 / (250 - skill)) squared: a quarter at 150, one in 25 at 0", ( at150 >= 400 ) && ( at150 <= 600 ) && ( at0 >= 35 ) && ( at0 <= 125 ), at150 + " and " + at0 + " of 2000" );
+		Check( "aimandfuel: a shot off target is off by whole cells, at most 1 at skill 150 and 4 at skill 0", ( widest150 == 1 ) && ( widest0 == 4 ), widest150 + " / " + widest0 );
+		Check( "aimandfuel: end to end, a navigator of skill 0 mostly misses (no damage), one of skill 250 always hits", ( shotsAt0 == 20 ) && ( hitsAt0 <= 6 ) && ( shotsAt250 == 5 ) && ( hitsAt250 == 5 ), hitsAt0 + " of " + shotsAt0 + " / " + hitsAt250 + " of " + shotsAt250 );
+		Check( "aimandfuel: a laser shot uses a tenth of a cubic meter of Endurium, a missile half a cubic meter", laserFired && missileFired && ( laserUsed == 1 ) && ( missileUsed == 5 ), laserUsed + " / " + missileUsed );
+
+		Finish( "scenario=aimandfuel checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

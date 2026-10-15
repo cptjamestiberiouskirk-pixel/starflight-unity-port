@@ -1107,15 +1107,19 @@ public class PD_PlayerShip
 		return ( m_elementStorage != null ) && ( m_elementStorage.Find( 5 ) != null );
 	}
 
+	// what a float may fall short of a tenth of a cubic meter and still count as one
+	const float c_fuelAllowance = 0.0001f;
+
 	public void UseUpFuel( float amount )
 	{
 		// add to the running amount of fuel used up
 		m_fuelUsed += amount;
 
-		// have we used up more than 0.1 units?
-		if ( m_fuelUsed >= 0.1f )
+		// deduct every 0.1 unit used up (a missile uses up five at once; the little allowance keeps a float's 0.0999... from holding one back, and the count is a
+		// guard)
+		for ( var tenths = 0; ( m_fuelUsed >= 0.1f - c_fuelAllowance ) && ( tenths < 10000 ); tenths++ )
 		{
-			// yes - deduct 0.1 unit from storage (if there is any left)
+			// deduct 0.1 unit from storage (if there is any left)
 			if ( m_elementStorage.Find( 5 ) != null )
 			{
 				m_elementStorage.Remove( 5, 1 );
