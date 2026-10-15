@@ -12,6 +12,7 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
+  - SF_EMISSIVECOLORTINT_ON
   - SF_ORTHONORMALIZE_ON
   - SF_SPECULAR_ON
   m_InvalidKeywords:
@@ -135,8 +136,14 @@ Material:
     - SF_AlbedoColor: {r: 1, g: 0.721569, b: 0.301961, a: 1}
     - SF_BaseScaleOffset: {r: 1, g: 1, b: 0, a: 0}
     - SF_DetailScaleOffset: {r: 1, g: 1, b: 0, a: 0}
-    - SF_EmissiveColor: {r: 1, g: 0.721569, b: 0.301961, a: 1}
+    - SF_EmissiveColor: {r: 1, g: 1, b: 1, a: 1}
+    - SF_EmissiveColorTint: {r: 1, g: 0.721569, b: 0.301961, a: 1}
     - SF_EmissiveTint: {r: 1, g: 1, b: 1, a: 1}
+    - SF_PaletteColor0: {r: 1, g: 1, b: 1, a: 1}
+    - SF_PaletteColor1: {r: 1, g: 1, b: 1, a: 1}
+    - SF_PaletteColor2: {r: 1, g: 1, b: 1, a: 1}
+    - SF_PaletteColor3: {r: 1, g: 1, b: 1, a: 1}
+    - SF_PaletteColor4: {r: 1, g: 1, b: 1, a: 1}
     - SF_ReflectionColor: {r: 1, g: 1, b: 1, a: 1}
     - SF_SpecularColor: {r: 1, g: 0.58431375, b: 0, a: 1}
     - _Color: {r: 1, g: 0.721569, b: 0.301961, a: 1}

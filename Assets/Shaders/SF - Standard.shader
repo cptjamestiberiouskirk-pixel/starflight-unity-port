@@ -30,6 +30,7 @@ Shader "Starflight/Standard"
 		SF_EmissiveMap( "Emissive Map", 2D ) = "black" {}
 		SF_EmissiveTint( "Emissive Tint", Color ) = ( 1, 1, 1, 1 )
 		SF_EmissiveColor( "Emissive Color", Color ) = ( 0, 0, 0, 1 )
+		SF_EmissiveColorTint( "Emissive Color Tint (SF_EMISSIVECOLORTINT_ON)", Color ) = ( 1, 1, 1, 1 )
 
 		SF_ReflectionMap( "Reflection Map", 2D ) = "black" {}
 		SF_ReflectionColor( "Reflection Color", Color ) = ( 1, 1, 1, 1 )
@@ -117,6 +118,7 @@ Shader "Starflight/Standard"
 				#pragma shader_feature SF_ALBEDOMAP_ON
 				#pragma shader_feature SF_DETAILALBEDOMAP_ON
 				#pragma shader_feature SF_PALETTEMAP_ON
+				#pragma shader_feature SF_EMISSIVECOLORTINT_ON
 				#pragma shader_feature SF_ALPHA_ON
 				#pragma shader_feature SF_ALPHATEST_ON
 				#pragma shader_feature SF_SPECULARMAP_ON
@@ -162,6 +164,7 @@ Shader "Starflight/Standard"
 				#pragma shader_feature SF_ALBEDOMAP_ON
 				#pragma shader_feature SF_DETAILALBEDOMAP_ON
 				#pragma shader_feature SF_PALETTEMAP_ON
+				#pragma shader_feature SF_EMISSIVECOLORTINT_ON
 				#pragma shader_feature SF_ALPHA_ON
 				#pragma shader_feature SF_ALPHATEST_ON
 				#pragma shader_feature SF_SPECULARMAP_ON

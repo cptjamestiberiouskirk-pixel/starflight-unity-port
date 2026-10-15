@@ -35,18 +35,25 @@ public static class UIKitConcourseTool
 			return "missing the UI kit theme";
 		}
 
-		// the hull, the wall, the doors and the transporter pad
+		// the hull, the wall, the doors and the transporter pad (the table also holds the docking bay's, which UIKitDockingBayTool sets)
 		foreach ( var colours in StarportColours.c_materials )
 		{
-			StarportColours.GetColours( colours, theme, out var albedo, out var emissive );
+			if ( !colours.m_name.StartsWith( "Starport" ) )
+			{
+				continue;
+			}
+
+			StarportColours.GetColours( colours, theme, false, out var albedo, out var emissive );
 
 			SetColours( colours.m_name, albedo, emissive, report );
 		}
 
 		// the floor
+		var palette = StarportColours.c_palettes[ StarportColours.FindPalette( "Starport Floor" ) ];
+
 		if ( MakeFloorTextures( report ) )
 		{
-			var floor = AssetDatabase.LoadAssetAtPath<Material>( c_folder + StarportColours.c_floorMaterial + ".mat" );
+			var floor = AssetDatabase.LoadAssetAtPath<Material>( c_folder + palette.m_name + ".mat" );
 			var weights = AssetDatabase.LoadAssetAtPath<Texture2D>( c_floorWeights );
 			var emissive = AssetDatabase.LoadAssetAtPath<Texture2D>( c_floorEmissive );
 
@@ -58,13 +65,13 @@ public static class UIKitConcourseTool
 				floor.SetTexture( "_MainTex", weights );
 				floor.EnableKeyword( StarportColours.c_paletteKeyword );
 
-				for ( var p = 0; p < StarportColours.c_floorPalette.Length; p++ )
+				for ( var p = 0; p < palette.m_roles.Length; p++ )
 				{
-					floor.SetColor( StarportColours.c_paletteColour + p, theme.GetColor( StarportColours.c_floorPalette[ p ] ) );
+					floor.SetColor( StarportColours.c_paletteColour + p, StarportColours.GetPaletteColour( palette, p, theme, false ) );
 				}
 
 				floor.SetTexture( "SF_EmissiveMap", emissive );
-				floor.SetColor( StarportColours.c_emissiveTint, theme.GetColor( StarportColours.c_floorGlow ) * StarportColours.c_floorGlowStrength );
+				floor.SetColor( StarportColours.c_emissiveTint, StarportColours.GetPaletteGlow( palette, theme, false ) );
 				floor.SetColor( StarportColours.c_emissiveColour, Color.black );
 				floor.EnableKeyword( "SF_EMISSIVEMAP_ON" );
 
@@ -107,7 +114,7 @@ public static class UIKitConcourseTool
 
 	// makes the kit's floor textures from the original: its teal floor becomes the theme's hover navy, its blue star the panel navy, the teal band around the
 	// star (the teal that is not joined to the floor) the accent, glowing, and the grey door mats the kit's border colour on the app's background; the edges
-	// between them keep their blend. The albedo map holds the weights of those five colours (StarportColours.c_floorPalette: red the floor, green the band,
+	// between them keep their blend. The albedo map holds the weights of those five colours (StarportColours' floor palette: red the floor, green the band,
 	// blue the background, alpha the border, and the star what is left), so that the floor can be drawn in any scheme's colours
 	static bool MakeFloorTextures( System.Text.StringBuilder report )
 	{

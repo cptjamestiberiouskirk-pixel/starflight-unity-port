@@ -4,23 +4,21 @@ using UnityEditor;
 using UnityEngine;
 
 // gives the docking bay (the hangar the ship waits in before launch, in the Spaceflight scene) the colours of the UI kit, as the Starport concourse has them
-// (chosen 2026-10-12 for the concourse: the kit's colours with a soft glow, the same geometry): blue grey metal instead of grey,
-// Interstel's logo on the doors in the kit's amber and glowing, and amber sirens
+// (the kit's colours with a soft glow on the same geometry, chosen on 2026-10-12): blue grey metal instead of grey, Interstel's logo on the doors in the
+// kit's amber and glowing, and amber sirens; the materials are given the classic dark theme's colours, which the scenes are saved in, and StarportColours
+// gives the bay the colours of the scheme in use at run time (its table of which colour goes where is the one used here)
 public static class UIKitDockingBayTool
 {
 	const string c_folder = "Assets/Game Objects/Docking Bay/";
 
-	// the original door texture (kept: the kit's textures are made from it) and the two the kit's doors use
+	// the original door texture (kept: the kit's textures are made from it) and the two the kit's doors use: the weights of the palette's metal and logo
+	// (their lightness, as the original texture has it) and the glow of the logo
 	const string c_doorsSource = c_folder + "Docking Bay Doors - Albedo.png";
-	const string c_doorsAlbedo = c_folder + "Docking Bay Doors - Kit Albedo.png";
+	const string c_doorsWeights = c_folder + "Docking Bay Doors - Kit Weights.png";
 	const string c_doorsEmissive = c_folder + "Docking Bay Doors - Kit Emissive.png";
 
-	// how bright the glows are (the emissive colour is the kit's colour times this)
-	const float c_logoGlow = 0.6f;
-	const float c_sirenGlow = 1.0f;
-
-	// how much the door metal is lifted after its grey is multiplied by the kit's blue grey (which takes about a quarter of its light)
-	const float c_metalLift = 1.35f;
+	// the animations that light the sirens up
+	static readonly string[] c_sirenClips = { "Docking Bay Prelaunch", "Docking Bay Launch", "Docking Bay Landing" };
 
 	[MenuItem( "Starflight Remake/UI Kit/Apply to the Docking Bay" )]
 	public static void Apply()
@@ -28,48 +26,67 @@ public static class UIKitDockingBayTool
 		Debug.Log( ApplyToDockingBay() );
 	}
 
-	// gives the docking bay's materials the kit's colours and makes the kit's door textures, and returns a report
+	// gives the docking bay's materials the classic dark theme's colours and makes the kit's door textures, and returns a report
 	public static string ApplyToDockingBay()
 	{
 		var report = new System.Text.StringBuilder( "UI kit applied to the docking bay\n" );
-		var theme = UIKitTheme.Get();
+		var theme = UIKitTheme.Load( UIKitTheme.Mode.Dark );
 
 		if ( theme == null )
 		{
 			return "missing the UI kit theme";
 		}
 
-		// the walls: white (shaded by their occlusion map) becomes a light blue grey, between the kit's primary and secondary text colours (the secondary alone made the bay much darker than it was)
-		SetColours( "Docking Bay Walls", Color.Lerp( theme.m_textPrimary, theme.m_textSecondary, 0.5f ), Color.black, report );
+		// the walls (white, shaded by their occlusion map, become a light blue grey between the kit's two text colours: the secondary alone made the bay much
+		// darker than it was), and the sirens (an amber dome that glows on a base in the kit's border blue)
+		foreach ( var colours in StarportColours.c_materials )
+		{
+			if ( !colours.m_name.StartsWith( "Docking Bay" ) )
+			{
+				continue;
+			}
 
-		// the sirens: an amber dome that glows on a base in the kit's border blue
-		SetColours( "Docking Bay Siren Dome", theme.m_accentSecondary, theme.m_accentSecondary * c_sirenGlow, report );
-		SetColours( "Docking Bay Siren Base", theme.m_borderDefault, Color.black, report );
+			StarportColours.GetColours( colours, theme, false, out var albedo, out var glow );
 
-		// the launch and the landing light the sirens up in the original's orange: their keys take the kit's amber
-		RetargetSirenKeys( "Docking Bay Launch", theme.m_accentSecondary, report );
-		RetargetSirenKeys( "Docking Bay Landing", theme.m_accentSecondary, report );
+			SetColours( colours, albedo, glow, report );
+		}
+
+		// the launch and the landing light the sirens up: their keys say how lit, and the dome's tint gives the colour
+		foreach ( var clipName in c_sirenClips )
+		{
+			MakeSirenKeysGrey( clipName, report );
+		}
 
 		// the doors
-		if ( MakeDoorTextures( theme, report ) )
+		var palette = StarportColours.c_palettes[ StarportColours.FindPalette( "Docking Bay Doors" ) ];
+
+		if ( MakeDoorTextures( report ) )
 		{
-			var doors = AssetDatabase.LoadAssetAtPath<Material>( c_folder + "Docking Bay Doors.mat" );
-			var albedo = AssetDatabase.LoadAssetAtPath<Texture2D>( c_doorsAlbedo );
+			var doors = AssetDatabase.LoadAssetAtPath<Material>( c_folder + palette.m_name + ".mat" );
+			var weights = AssetDatabase.LoadAssetAtPath<Texture2D>( c_doorsWeights );
 			var emissive = AssetDatabase.LoadAssetAtPath<Texture2D>( c_doorsEmissive );
 
-			if ( ( doors != null ) && ( albedo != null ) && ( emissive != null ) )
+			if ( ( doors != null ) && ( weights != null ) && ( emissive != null ) )
 			{
 				Undo.RecordObject( doors, "UI kit" );
 
-				doors.SetTexture( "_MainTex", albedo );
+				// the albedo map holds the palette's weights, and the palette is the theme's colours
+				doors.SetTexture( "_MainTex", weights );
+				doors.EnableKeyword( StarportColours.c_paletteKeyword );
+
+				for ( var p = 0; p < palette.m_roles.Length; p++ )
+				{
+					doors.SetColor( StarportColours.c_paletteColour + p, StarportColours.GetPaletteColour( palette, p, theme, false ) );
+				}
+
 				doors.SetTexture( "SF_EmissiveMap", emissive );
-				doors.SetColor( "SF_EmissiveTint", theme.m_accentSecondary * c_logoGlow );
-				doors.SetColor( "SF_EmissiveColor", Color.black );
+				doors.SetColor( StarportColours.c_emissiveTint, StarportColours.GetPaletteGlow( palette, theme, false ) );
+				doors.SetColor( StarportColours.c_emissiveColour, Color.black );
 				doors.EnableKeyword( "SF_EMISSIVEMAP_ON" );
 
 				EditorUtility.SetDirty( doors );
 
-				report.AppendLine( "Docking Bay Doors: the kit's textures, the logo glowing" );
+				report.AppendLine( "Docking Bay Doors: the palette's weights and the theme's colours, the logo glowing" );
 			}
 			else
 			{
@@ -82,9 +99,9 @@ public static class UIKitDockingBayTool
 		return report.ToString();
 	}
 
-	// gives the sirens' emissive colour keys in an animation this colour: at each key the red channel tells how lit the siren is (the original's orange is
-	// full red, so 0 is off and 1 is lit), and the green and blue keys become the colour's green and blue that far lit (the red and the alpha stay)
-	static void RetargetSirenKeys( string clipName, Color colour, System.Text.StringBuilder report )
+	// makes the sirens' emissive colour keys in an animation grey: at each key the red channel tells how lit the siren is (0 off, 1 lit), and the green and
+	// blue keys become as lit, so that the dome's emissive colour tint (SF_EMISSIVECOLORTINT_ON) gives the colour (the alpha stays)
+	static void MakeSirenKeysGrey( string clipName, System.Text.StringBuilder report )
 	{
 		var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>( c_folder + clipName + ".anim" );
 
@@ -124,7 +141,7 @@ public static class UIKitDockingBayTool
 
 			for ( var i = 0; i < keys.Length; i++ )
 			{
-				keys[ i ].value = ( green ? colour.g : colour.b ) * Mathf.Clamp01( red.Evaluate( keys[ i ].time ) );
+				keys[ i ].value = Mathf.Clamp01( red.Evaluate( keys[ i ].time ) );
 			}
 
 			curve.keys = keys;
@@ -136,34 +153,46 @@ public static class UIKitDockingBayTool
 
 		EditorUtility.SetDirty( clip );
 
-		report.AppendLine( clipName + ": " + retargeted + " siren colour curves in the kit's amber" );
+		report.AppendLine( clipName + ": " + retargeted + " siren colour curves grey" );
 	}
 
-	// sets a material's albedo (and the standard colour, which the editor shows) and its emissive colour
-	static void SetColours( string name, Color albedo, Color emissive, System.Text.StringBuilder report )
+	// sets a material's albedo (and the standard colour, which the editor shows) and its glow: its emissive colour, or for a material whose glow tints the
+	// emissive colour its animations give it, a lit emissive colour (white) and the glow as its tint
+	static void SetColours( StarportColours.MaterialColours colours, Color albedo, Color glow, System.Text.StringBuilder report )
 	{
-		var material = AssetDatabase.LoadAssetAtPath<Material>( c_folder + name + ".mat" );
+		var material = AssetDatabase.LoadAssetAtPath<Material>( c_folder + colours.m_name + ".mat" );
 
 		if ( material == null )
 		{
-			report.AppendLine( name + ": not found" );
+			report.AppendLine( colours.m_name + ": not found" );
 			return;
 		}
 
 		Undo.RecordObject( material, "UI kit" );
 
-		material.SetColor( "SF_AlbedoColor", albedo );
+		material.SetColor( StarportColours.c_albedoColour, albedo );
 		material.SetColor( "_Color", albedo );
-		material.SetColor( "SF_EmissiveColor", emissive );
+
+		if ( colours.m_glowTints )
+		{
+			material.SetColor( StarportColours.c_emissiveColour, Color.white );
+			material.SetColor( StarportColours.c_emissiveColourTint, glow );
+			material.EnableKeyword( StarportColours.c_emissiveColourTintKeyword );
+		}
+		else
+		{
+			material.SetColor( StarportColours.c_emissiveColour, glow );
+		}
 
 		EditorUtility.SetDirty( material );
 
-		report.AppendLine( name + ": #" + ColorUtility.ToHtmlStringRGB( albedo ) + ( ( emissive.maxColorComponent > 0.0f ) ? ", glowing" : "" ) );
+		report.AppendLine( colours.m_name + ": #" + ColorUtility.ToHtmlStringRGB( albedo ) + ( ( glow.maxColorComponent > 0.0f ) ? ( colours.m_glowTints ? ", glowing as lit" : ", glowing" ) : "" ) );
 	}
 
-	// makes the kit's door textures from the original: the grey metal (and its dark stencils) keeps its shading in the kit's blue grey, and the yellow logo
-	// becomes the kit's amber, which glows; a pixel between the two keeps its blend
-	static bool MakeDoorTextures( UIKitTheme theme, System.Text.StringBuilder report )
+	// makes the kit's door textures from the original: the weights of the palette's metal (the grey metal and its dark stencils, which keep their shading
+	// in the kit's blue grey) and logo (the yellow, which becomes the kit's amber and glows), each as light as the original was, so that a pixel between
+	// the two keeps its blend; the weights are lightnesses as the original texture has them, so the texture is imported as the original is
+	static bool MakeDoorTextures( System.Text.StringBuilder report )
 	{
 		if ( !File.Exists( c_doorsSource ) )
 		{
@@ -186,10 +215,8 @@ public static class UIKitDockingBayTool
 		Object.DestroyImmediate( source );
 
 		var count = width * height;
-		var albedo = new Color32[ count ];
+		var weights = new Color32[ count ];
 		var emissive = new Color32[ count ];
-		var metal = theme.m_textSecondary;
-		var logo = theme.m_accentSecondary;
 		var logoPixels = 0;
 
 		for ( var i = 0; i < count; i++ )
@@ -200,13 +227,8 @@ public static class UIKitDockingBayTool
 			var yellow = Mathf.Clamp01( ( Mathf.Min( c.r, c.g ) - c.b ) / 0.4f );
 			var lightness = Mathf.Max( c.r, Mathf.Max( c.g, c.b ) );
 
-			// the metal: its grey times the kit's blue grey, lifted so that the doors stay about as light as they were
-			var metalColour = new Color( Mathf.Clamp01( c.grayscale * metal.r * c_metalLift ), Mathf.Clamp01( c.grayscale * metal.g * c_metalLift ), Mathf.Clamp01( c.grayscale * metal.b * c_metalLift ), 1.0f );
-
-			// the logo: the kit's amber, as light as the yellow was
-			var logoColour = new Color( logo.r * lightness, logo.g * lightness, logo.b * lightness, 1.0f );
-
-			albedo[ i ] = Color.Lerp( metalColour, logoColour, yellow );
+			// the metal as grey as the original, the logo as light as its yellow (the palette's red and green weights; the others are not used)
+			weights[ i ] = new Color( ( 1.0f - yellow ) * c.grayscale, yellow * lightness, 0.0f, 0.0f );
 			emissive[ i ] = Color.Lerp( Color.black, Color.white, yellow * lightness );
 
 			if ( yellow > 0.5f )
@@ -215,16 +237,17 @@ public static class UIKitDockingBayTool
 			}
 		}
 
-		WriteTexture( c_doorsAlbedo, albedo, width, height );
-		WriteTexture( c_doorsEmissive, emissive, width, height );
+		WriteTexture( c_doorsWeights, weights, width, height, true );
+		WriteTexture( c_doorsEmissive, emissive, width, height, false );
 
 		report.AppendLine( "door textures made: " + width + " x " + height + " (logo " + logoPixels + " pixels)" );
 
 		return true;
 	}
 
-	// writes a texture as a PNG, imports it, and gives it the import settings of the original door texture
-	static void WriteTexture( string path, Color32[] pixels, int width, int height )
+	// writes a texture as a PNG, imports it, and gives it the import settings of the original door texture (a texture of weights is compressed at high
+	// quality, since an error in a weight shows as a colour that is not the scheme's)
+	static void WriteTexture( string path, Color32[] pixels, int width, int height, bool weights )
 	{
 		var texture = new Texture2D( width, height, TextureFormat.RGBA32, false );
 
@@ -248,7 +271,7 @@ public static class UIKitDockingBayTool
 			importer.filterMode = original.filterMode;
 			importer.anisoLevel = original.anisoLevel;
 			importer.maxTextureSize = original.maxTextureSize;
-			importer.textureCompression = original.textureCompression;
+			importer.textureCompression = weights ? TextureImporterCompression.CompressedHQ : original.textureCompression;
 			importer.SaveAndReimport();
 		}
 	}
