@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Playthrough Stage 9 Meets the Velox After Another Encounter**: on the way out of Sphexi's star system the ship can meet a Velox group (encounter 214), and leaving it starts the minute without encounters (#367). Stage 9 then flew toward the Velox of encounter 229 for 20 seconds, within that minute, so the meeting never began and the stage failed by chance. The probe now skips what is left of the minute before that flight, as it skips the travel, and counts the meeting only if the encounter that begins is 229: in one trial a wandering Minstrel group came first and passed for the Velox. Checked by forcing the minute before the flight: stage 9 failed on the old probe and passes on the new one.
+
 ## [1.1.0] - 2026-10-15
 
 Combat as the original's. The player's ship now takes hits the way the original's does: they fall on the shields, then the armor, and only then on the hull, the systems and the crew, and the ship is lost when its hull is, not its armor (#389). The weapons do the original's damage, about five times what they did, falling off with distance, with alien lasers twice as strong and the Uhlek plasma bolt a missile that follows the ship (#390). The navigator's skill decides whether a shot hits, and every shot burns the original's fuel (#391). The Starport's hall, the station and the docking bay now take the colors of the chosen scheme (#382, #388), and the documentation and this changelog were rewritten in one voice. On this release's code the headless probe passes all of its scenarios, and the automated playthrough plays a new game through to the ending and Interstel's bonus.
