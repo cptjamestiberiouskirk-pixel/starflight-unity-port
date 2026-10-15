@@ -428,10 +428,11 @@ public class UIKitTheme : ScriptableObject
 		return ( theme != null ) ? theme : Load( Mode.Dark );
 	}
 
-	// whether this is drawn over a 3D view: it is in the main viewport (under the object that has the Viewport)
+	// whether this is drawn over a 3D view: it is in the main viewport (under the object that has the Viewport), or under an object marked as over a view
+	// (UIKitOverView: the Starport's door name over the hall)
 	public static bool IsOverView( Component component )
 	{
-		return ( component != null ) && ( component.GetComponentInParent<Viewport>( true ) != null );
+		return ( component != null ) && ( ( component.GetComponentInParent<Viewport>( true ) != null ) || ( component.GetComponentInParent<UIKitOverView>( true ) != null ) );
 	}
 
 	// returns the mode in use (the player's setting, dark if there is none or it cannot be read)

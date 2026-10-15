@@ -23473,6 +23473,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1017418670}
   - component: {fileID: 1017418671}
+  - component: {fileID: 1017418672}
   m_Layer: 5
   m_Name: Door Name
   m_TagString: Untagged
@@ -23513,6 +23514,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_doorNameText: {fileID: 1716415534}
+--- !u!114 &1017418672
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1017418669}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 624135e5fa4c4db883ed7a829bfa159e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIKitOverView
 --- !u!1 &1018033829
 GameObject:
   m_ObjectHideFlags: 0
