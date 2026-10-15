@@ -135,20 +135,24 @@ public class PlayerShip : MonoBehaviour
 				// are we in hyperspace?
 				if ( playerData.m_general.m_location == PD_General.Location.Hyperspace )
 				{
-					// get the engines
-					var engines = playerData.m_playerShip.GetEngines();
+					// the original burns the engines' fuel at every step of the ship, an eighth of a coordinate, and a step on the diagonal moves the ship an
+					// eighth of a coordinate along both axes (HYPER-OV FLY, -ENDURIUM): the fuel goes by the longer of the two distances the ship covers along
+					// the axes, not by the straight distance
+					var direction = playerData.m_general.m_currentDirection;
+					var axisShare = ( direction.magnitude > 0.0f ) ? ( Mathf.Max( Mathf.Abs( direction.x ), Mathf.Abs( direction.z ) ) / direction.magnitude ) : 1.0f;
+					var steps = playerData.m_general.m_currentSpeed * Time.deltaTime * axisShare / 256.0f * 8.0f;
+					var stepHundredths = playerData.m_playerShip.GetFuelPerStepHundredths();
 
-					// calculate the amount of fuel used up (half of it with the Tesseract aboard)
-					var fuelAmount = ( playerData.m_general.m_currentSpeed * engines.m_fuelUsedPerCoordinate / 256.0f ) * Time.deltaTime * playerData.m_playerShip.GetEngineFuelFactor();
+					// calculate the amount of fuel used up
+					var fuelAmount = steps * stepHundredths / 100.0f;
 
 					var enduriumBefore = GetEnduriumTenths();
 
 					// use it up
 					playerData.m_playerShip.UseUpFuel( fuelAmount );
 
-					// the warnings as the fuel goes down (HYPER-OV (-ENDURIUM) and HYPERMSG-OV): at 150 and 75 steps' worth and at none - a step is an eighth of a
-					// coordinate, and its fuel what the engines use
-					var stepTenths = engines.m_fuelUsedPerCoordinate / 8.0f * playerData.m_playerShip.GetEngineFuelFactor() * 10.0f;
+					// the warnings as the fuel goes down (HYPER-OV (-ENDURIUM) and HYPERMSG-OV): at 150 and 75 steps' worth and at none
+					var stepTenths = stepHundredths / 10.0f;
 
 					WarnOfFuel( enduriumBefore, GetEnduriumTenths(), stepTenths );
 				}
