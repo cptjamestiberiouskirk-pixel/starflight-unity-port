@@ -9,7 +9,7 @@ public class Encounter : MonoBehaviour
 	// the text of the comm that stands in when the game data has nothing to say for a race, subject and stance
 	const string c_noCommFoundText = "ERROR";
 
-	// how many numbers a veloxi drone asks the player to confirm before it lets the ship into orbit (the original's number is not known - the project owner chose 3)
+	// how many numbers a veloxi drone asks the player to confirm before it lets the ship into orbit (the original's number is not known - 3 was chosen)
 	const int c_droneNumberCount = 3;
 
 	// how long the "permission to orbit granted" message stays up before the ship is back in orbit (in seconds)
@@ -1682,7 +1682,7 @@ public class Encounter : MonoBehaviour
 	}
 
 	// "after some of their ships are destroyed, the Spemin will act cowardly" (STRINFO 2.7), and so do the Thrynn and the Veloxi, the other races the game data
-	// has surrender lines for (the owner's ruling of 2026-10-11): they stop fighting, even if the player goes on firing, they surrender (each surrender line
+	// has surrender lines for (decided 2026-10-11): they stop fighting, even if the player goes on firing, they surrender (each surrender line
 	// first, see FindComm), and they say their obsequious lines (the Spemin's "we lay down our powerful defensive screens" is bluster: their ships have no shields
 	// in the game data) - a home fleet does not, it only warns
 	void UpdateCowardice()
@@ -1770,7 +1770,7 @@ public class Encounter : MonoBehaviour
 		return best;
 	}
 
-	// the plutonium in the hold the Thrynn offer to buy, in whole cubic meters (they pay one cubic meter of Endurium for each: the owner's ruling of 2026-10-11 on
+	// the plutonium in the hold the Thrynn offer to buy, in whole cubic meters (they pay one cubic meter of Endurium for each: decided 2026-10-11 on
 	// "the amount of Endurium offered varies directly with the amount of plutonium available")
 	int FindThrynnPlutonium()
 	{
@@ -1945,7 +1945,7 @@ public class Encounter : MonoBehaviour
 	const int c_veloxTribute = 30;
 
 	// the answer to a Veloxi demand: a yes hands over what they demand, and anything else - a no, or ending the comm link with no answer - "will result in a Veloxi
-	// attack" (STRINFO 2.2 for the Crystal Orb and the Ellipsoid; for the tribute, and for a yes with less than 3 cubic meters of Endurium, the owner's ruling of
+	// attack" (STRINFO 2.2 for the Crystal Orb and the Ellipsoid; for the tribute, and for a yes with less than 3 cubic meters of Endurium, decided
 	// 2026-10-11)
 	void UpdateVeloxDemand()
 	{
@@ -2712,7 +2712,7 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_mood = startingMood + AlienPersonality.GetMeetingMood( DataController.m_instance.m_playerData.m_playerShip );
 			m_pdEncounter.m_moodSet = true;
 
-			// the Elowan and the Thrynn hold the crew's friendship with their rival race against it: they start in their hostile band (the owner's ruling of 2026-10-11),
+			// the Elowan and the Thrynn hold the crew's friendship with their rival race against it: they start in their hostile band (decided 2026-10-11),
 			// which for the Elowan is fight or flight, as the original says the rival lines only to aliens past their neutral posture (COMMSPEC-OV: A-POSTU > 1)
 			if ( IsFriendOfRival() )
 			{
@@ -3778,7 +3778,7 @@ public class Encounter : MonoBehaviour
 			var translated = ( m_gdEncounter.m_race == GameData.Race.Spemin ) && playerData.m_playerShip.HasArtifact( "Whining Orb" );
 
 			// and a crew member of their own race understands every word: "all phrases will be un-scrambled if any member of the player's crew is the same race as
-			// the race of the alien" (compart.txt 13; alpha.txt: the officer's skill and race affect the translation - the owner's ruling of 2026-10-11)
+			// the race of the alien" (compart.txt 13; alpha.txt: the officer's skill and race affect the translation - decided 2026-10-11)
 			translated = translated || playerData.m_crewAssignment.HasCrewOfRace( m_gdEncounter.m_race );
 
 			// did we find any?

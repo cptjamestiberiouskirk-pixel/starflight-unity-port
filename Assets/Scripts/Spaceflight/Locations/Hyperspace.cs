@@ -15,7 +15,7 @@ public class Hyperspace : MonoBehaviour
 
 	// the copies of the flux template, one for each flux, and whether they are shown - they are only with the Ring Device aboard: it "will identify any nearby
 	// continuum flux" (the Starport's analysis) and "causes continuum fluxes to appear on ones ships screens" (the Thrynn, STRINFO 2.5), and Noah 1 failed for want
-	// of one (the owner's ruling of 2026-10-10). A flux that is not shown is still there: a ship that flies into it goes through
+	// of one (decided 2026-10-10). A flux that is not shown is still there: a ship that flies into it goes through
 	readonly List<GameObject> m_fluxObjectList = new List<GameObject>();
 	bool m_fluxesShown;
 

@@ -198,7 +198,7 @@ public class SpaceflightController : MonoBehaviour
 		playerData.m_playerShip.UpdateShields( Time.deltaTime );
 
 		// a nebula keeps the shields down: shields that are up when the ship is in one collapse (the design notes have nebulae act on the shields, priority.txt;
-		// what they do is the owner's ruling of 2026-10-10 for roadmap 1.9)
+		// what they do was decided 2026-10-10 for roadmap 1.9)
 		if ( playerData.m_playerShip.m_shieldsAreUp && ShipIsInsideANebula() )
 		{
 			// in the original's words (NAVIGATR >DOWN-SHIELD in a nebula), and then "Shields are down."

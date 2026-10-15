@@ -24,6 +24,12 @@ sampler2D _DetailAlbedoMap;
 float4 _DetailAlbedoMap_ST;
 float4 SF_AlbedoColor;
 
+float3 SF_PaletteColor0;
+float3 SF_PaletteColor1;
+float3 SF_PaletteColor2;
+float3 SF_PaletteColor3;
+float3 SF_PaletteColor4;
+
 sampler2D SF_SpecularMap;
 float4 SF_SpecularMap_ST;
 float3 SF_SpecularColor;
@@ -137,6 +143,16 @@ float4 ComputeAlbedo( SF_VertexShaderOutput i, float4 albedoColor )
 		float4 albedoMap = 1;
 
 	#endif // SF_ALBEDOMAP_ON
+
+	#if SF_PALETTEMAP_ON
+
+		// the albedo map holds the weights of the first four palette colours (red, green, blue, alpha), and the fifth takes what is left, so that one
+		// texture can be drawn in any colours (the Starport floor in the colours of the UI kit's scheme)
+		float rest = saturate( 1 - dot( albedoMap, 1 ) );
+
+		albedoMap = float4( albedoMap.r * SF_PaletteColor0 + albedoMap.g * SF_PaletteColor1 + albedoMap.b * SF_PaletteColor2 + albedoMap.a * SF_PaletteColor3 + rest * SF_PaletteColor4, 1 );
+
+	#endif // SF_PALETTEMAP_ON
 
 	#if SF_DETAILALBEDOMAP_ON && !SF_FRACTALDETAILS_ON
 

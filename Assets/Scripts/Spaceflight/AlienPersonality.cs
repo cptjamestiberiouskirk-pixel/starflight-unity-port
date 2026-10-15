@@ -1,7 +1,7 @@
 // how a race behaves in conversation, after the conversation module of the shipped game (COMM-OV) and of the 1984 design notes (Research/Notes/compart.txt,
 // sections 4 to 7): the alien's "emotional disposition level" - its mood, from 0 (most calm) to 100 (most agitated), which the original keeps as EDL - is divided
 // into postures by three thresholds, and each of the player's postures moves it by an effect of its own - the numbers are the shipped game's, from each race's
-// record in the original's STARB.COM (its ORIGINATOR: BASE-EDL, AET, BET, CET, OPE, FPE, HPE; DevTools/OriginalRecords), by the owner's ruling of 2026-10-12;
+// record in the original's STARB.COM (its ORIGINATOR: BASE-EDL, AET, BET, CET, OPE, FPE, HPE; DevTools/OriginalRecords), decided 2026-10-12;
 // the strengths that decide between hostile and obsequious are the shipped game's too (Encounter.GetStrengthDifferential)
 public class AlienPersonality
 {

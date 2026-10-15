@@ -981,7 +981,7 @@ public static class UIKitSceneTool
 	const string c_introScenePath = "Assets/Scenes/Intro.unity";
 	const string c_introLogoFolder = "Assets/Game Objects/Intro/";
 
-	// what each element of the intro's pages becomes (the owner's choice of 2026-10-12: all of it in the kit, the logos too; Electronic Arts' logo stays theirs)
+	// what each element of the intro's pages becomes (chosen 2026-10-12: all of it in the kit, the logos too; Electronic Arts' logo stays theirs)
 	static Entry[] GetIntroTable()
 	{
 		var entries = new System.Collections.Generic.List<Entry>

@@ -1,6 +1,6 @@
 # The twelve palette options. Each has a dark and a light mode; bg_h/bg_c/bg_L are the OKLCH hue, chroma and the four
 # background lightnesses (app, panel, raised, hover); the accents are hand-picked sRGB values. No purple anywhere
-# (the owner's dislike, 2026-10-11).
+# (found too strong on 2026-10-11).
 PALETTES = [
     {
         'id': 'endurium', 'num': 1, 'name': 'Endurium',
