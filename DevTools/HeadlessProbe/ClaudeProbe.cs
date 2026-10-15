@@ -31,6 +31,9 @@ public class ClaudeProbe : MonoBehaviour
 	// errors logged with Debug.LogError or by Unity itself (not exceptions), and the last of them
 	static int s_errorCount;
 	static string s_lastError;
+
+	// how many times a scene that was to bake its lighting on load said it cannot in play mode
+	static int s_lightmapMessages;
 	static readonly Dictionary<string, int> s_exceptions = new Dictionary<string, int>();
 	static bool s_saveSystemSwapped;
 	static bool s_spaceflightReady;
@@ -122,6 +125,7 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		s_exceptionCount = 0;
+		s_lightmapMessages = 0;
 		s_exceptions.Clear();
 		s_saveSystemSwapped = false;
 		s_spaceflightReady = false;
@@ -145,6 +149,12 @@ public class ClaudeProbe : MonoBehaviour
 
 	static void OnLog( string condition, string stackTrace, LogType type )
 	{
+		// a scene that has no lighting data and is to bake it on load says this in play mode, where it cannot (starport-lighting)
+		if ( ( condition != null ) && condition.Contains( "Computing lightmaps is not available in play mode" ) )
+		{
+			s_lightmapMessages++;
+		}
+
 		if ( type == LogType.Error )
 		{
 			s_errorCount++;
@@ -1294,6 +1304,10 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "dockingbaycolors":
 				yield return ScenarioDockingBayColors();
+				break;
+
+			case "starport-lighting":
+				yield return ScenarioStarportLighting();
 				break;
 
 			case "viewoverlays":
@@ -31890,6 +31904,24 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "dockingbaycolors: " + pictures.Count + " pictures" + ( ( folder != "" ) ? " in " + folder : "" ) );
 
 		Finish( "scenario=dockingbaycolors checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the Starport scene has its baked lighting data and its lighting settings (the settings asset it pointed at was never committed, and with no data the
+	// scene asked to bake its lighting each time it loaded, which in play mode it cannot: Unity said "Computing lightmaps is not available in play mode")
+	IEnumerator ScenarioStarportLighting()
+	{
+		yield return Frames( 30 );
+
+		var data = Lightmapping.lightingDataAsset;
+		var dataPath = ( data != null ) ? AssetDatabase.GetAssetPath( data ) : "none";
+		var settingsPath = ( Lightmapping.TryGetLightingSettings( out var settings ) && ( settings != null ) ) ? AssetDatabase.GetAssetPath( settings ) : "missing";
+
+		Log( "starport-lighting: scene " + SceneManager.GetActiveScene().name + ", lighting data " + dataPath + ", settings " + settingsPath + ", bake on load " + Lightmapping.bakeOnSceneLoad + ", messages " + s_lightmapMessages );
+
+		Check( "starport-lighting: the Starport scene has its baked lighting data and its lighting settings", ( dataPath == "Assets/Scenes/Starport/LightingData.asset" ) && ( settingsPath == "Assets/Scenes/StarportSettings.lighting" ), dataPath + " | " + settingsPath );
+		Check( "starport-lighting: loading the scene does not try to compute its lighting in play mode (no \"Computing lightmaps is not available in play mode\")", s_lightmapMessages == 0, s_lightmapMessages + " messages" );
+
+		Finish( "scenario=starport-lighting checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// what is drawn over the 3D views keeps the dark colours of the scheme in use in the light mode too (the light mode's dark accents and texts were hard
