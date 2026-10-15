@@ -1292,6 +1292,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStationColors();
 				break;
 
+			case "dockingbaycolors":
+				yield return ScenarioDockingBayColors();
+				break;
+
 			case "viewoverlays":
 				yield return ScenarioViewOverlays();
 				break;
@@ -31248,12 +31252,20 @@ public class ClaudeProbe : MonoBehaviour
 		return slots;
 	}
 
-	// the colour a renderer draws one of its materials with: its property block's for that material, or the material's own without one (null if neither has it)
+	// the colour a renderer draws one of its materials with: its property block's for that material, or the renderer's own block's, or the material's own
+	// without either (null if none has it)
 	static Color? StationDrawnColour( Renderer stationRenderer, int index, Material material, string property )
 	{
 		var block = new MaterialPropertyBlock();
 
 		stationRenderer.GetPropertyBlock( block, index );
+
+		if ( !block.isEmpty && block.HasColor( property ) )
+		{
+			return block.GetColor( property );
+		}
+
+		stationRenderer.GetPropertyBlock( block );
 
 		if ( !block.isEmpty && block.HasColor( property ) )
 		{
@@ -31477,6 +31489,304 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 3 );
 
 		Finish( "scenario=stationcolors checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the docking bay's materials with one colour: the theme's role of the albedo (mixed half and half with a second role, Keep for none), of the glow and
+	// its strength, whether the glow tints the emissive colour the sirens' animations give (SF_EmissiveColorTint) rather than being it, and their colours
+	// and glows from before the kit, which the original games' schemes give the bay (StarportColours' table, written out here so that the probe also runs
+	// on the code before it); and the doors' palette in roles (the metal lifted by 1.35) and from before the kit, and the logo's glow
+	static readonly (string name, UIKitTheme.ColorRole albedo, UIKitTheme.ColorRole mix, UIKitTheme.ColorRole glow, float strength, bool tints, string original, string originalGlow)[] c_bayMaterials =
+	{
+		( "Docking Bay Walls", UIKitTheme.ColorRole.TextPrimary, UIKitTheme.ColorRole.TextSecondary, UIKitTheme.ColorRole.Keep, 0.0f, false, "FFFFFF", "000000" ),
+		( "Docking Bay Siren Dome", UIKitTheme.ColorRole.AccentSecondary, UIKitTheme.ColorRole.Keep, UIKitTheme.ColorRole.AccentSecondary, 1.0f, true, "FF9500", "FF9500" ),
+		( "Docking Bay Siren Base", UIKitTheme.ColorRole.BorderDefault, UIKitTheme.ColorRole.Keep, UIKitTheme.ColorRole.Keep, 0.0f, false, "333333", "000000" )
+	};
+
+	static readonly UIKitTheme.ColorRole[] c_bayDoorPalette = { UIKitTheme.ColorRole.TextSecondary, UIKitTheme.ColorRole.AccentSecondary, UIKitTheme.ColorRole.Keep, UIKitTheme.ColorRole.Keep, UIKitTheme.ColorRole.Keep };
+	static readonly string[] c_bayOriginalDoorPalette = { "FFFFFF", "FFDE00", "000000", "000000", "000000" };
+
+	// the renderers of the docking bay that draw with one of its materials (hidden ones too), each with the index of that material
+	static List<(Renderer renderer, int index, Material material)> BayMaterialSlots()
+	{
+		var slots = new List<(Renderer renderer, int index, Material material)>();
+
+		foreach ( var bayRenderer in Resources.FindObjectsOfTypeAll<Renderer>() )
+		{
+			if ( !bayRenderer.gameObject.scene.IsValid() || !bayRenderer.gameObject.scene.isLoaded )
+			{
+				continue;
+			}
+
+			var materials = bayRenderer.sharedMaterials;
+
+			for ( var i = 0; i < materials.Length; i++ )
+			{
+				if ( ( materials[ i ] != null ) && ( ( materials[ i ].name == "Docking Bay Doors" ) || Array.Exists( c_bayMaterials, m => m.name == materials[ i ].name ) ) )
+				{
+					slots.Add( ( bayRenderer, i, materials[ i ] ) );
+				}
+			}
+		}
+
+		return slots;
+	}
+
+	// adds to the list what the docking bay is drawn with that is not the theme's colour (or the colour from before the kit, in the original games' schemes)
+	static void BayColourFailures( List<(Renderer renderer, int index, Material material)> slots, string label, UIKitTheme theme, List<string> failures, bool original )
+	{
+		Action<string, Color?, Color> compare = ( what, drawn, expected ) =>
+		{
+			if ( drawn == null )
+			{
+				failures.Add( label + ": " + what + " has no colour" );
+			}
+			else if ( ( Mathf.Abs( drawn.Value.r - expected.r ) > 1.5f / 255.0f ) || ( Mathf.Abs( drawn.Value.g - expected.g ) > 1.5f / 255.0f ) || ( Mathf.Abs( drawn.Value.b - expected.b ) > 1.5f / 255.0f ) )
+			{
+				failures.Add( label + ": " + what + " " + ColorUtility.ToHtmlStringRGB( drawn.Value ) + " not " + ColorUtility.ToHtmlStringRGB( expected ) );
+			}
+		};
+
+		foreach ( var slot in slots )
+		{
+			if ( slot.material.name == "Docking Bay Doors" )
+			{
+				for ( var p = 0; p < c_bayDoorPalette.Length; p++ )
+				{
+					var role = c_bayDoorPalette[ p ];
+					var expected = original ? StationHex( c_bayOriginalDoorPalette[ p ] ) : ( role == UIKitTheme.ColorRole.Keep ) ? Color.black : theme.GetColor( role ) * ( ( p == 0 ) ? 1.35f : 1.0f );
+
+					compare( slot.renderer.name + " doors palette " + p, StationDrawnColour( slot.renderer, slot.index, slot.material, "SF_PaletteColor" + p ), expected );
+				}
+
+				compare( slot.renderer.name + " doors glow", StationDrawnColour( slot.renderer, slot.index, slot.material, "SF_EmissiveTint" ), original ? Color.black : theme.m_accentSecondary * 0.6f );
+
+				continue;
+			}
+
+			var colours = Array.Find( c_bayMaterials, m => m.name == slot.material.name );
+			var albedo = original ? StationHex( colours.original ) : ( colours.mix == UIKitTheme.ColorRole.Keep ) ? theme.GetColor( colours.albedo ) : Color.Lerp( theme.GetColor( colours.albedo ), theme.GetColor( colours.mix ), 0.5f );
+			var glow = original ? StationHex( colours.originalGlow ) : ( colours.glow == UIKitTheme.ColorRole.Keep ) ? Color.black : theme.GetColor( colours.glow ) * colours.strength;
+
+			compare( slot.renderer.name + " " + colours.name, StationDrawnColour( slot.renderer, slot.index, slot.material, "SF_AlbedoColor" ), albedo );
+			compare( slot.renderer.name + " " + colours.name + " glow", StationDrawnColour( slot.renderer, slot.index, slot.material, colours.tints ? "SF_EmissiveColorTint" : "SF_EmissiveColor" ), glow );
+
+			// a siren's lights shine in its glow's colour
+			if ( colours.tints )
+			{
+				foreach ( var sirenLight in slot.renderer.GetComponentsInChildren<Light>( true ) )
+				{
+					compare( slot.renderer.transform.parent.name + " " + sirenLight.name, sirenLight.color, glow );
+				}
+			}
+		}
+	}
+
+	// the docking bay (the hangar the ship waits in before launch) takes the colours of the UI kit's scheme in use, in its dark mode: its walls, siren domes
+	// and bases their roles' colours, the doors their palette (the weights of the metal and the logo) and the logo's glow, and the sirens glow in the
+	// scheme's colour while the launch lights them up (the animations give only how lit they are, grey, and the dome's tint the colour); in the Starflight
+	// schemes the bay has its colours from before the kit; the material assets keep the classic dark theme's colours (pictures with -Graphics)
+	IEnumerator ScenarioDockingBayColors()
+	{
+		var controller = SpaceflightController.m_instance;
+		var folder = ScreenPictureFolder( "docking-bay-colors" );
+		var pictures = new List<string>();
+
+		controller.SwitchLocation( PD_General.Location.DockingBay );
+
+		yield return Frames( 30 );
+
+		// the viewport's fade in has to be over before a picture (two seconds of game time)
+		Time.captureDeltaTime = 1.0f / 30.0f;
+
+		yield return Frames( 75 );
+
+		var slots = BayMaterialSlots();
+		var names = new HashSet<string>();
+
+		foreach ( var slot in slots )
+		{
+			names.Add( slot.material.name );
+		}
+
+		Log( "dockingbaycolors: " + slots.Count + " material slots of " + names.Count + " materials: " + string.Join( ", ", names ) );
+
+		Check( "dockingbaycolors: the docking bay draws all four of its materials that take the scheme's colours", names.Count == 4, names.Count.ToString() );
+
+		Action<string> take = name =>
+		{
+			if ( folder != "" )
+			{
+				RenderScreenPicture( System.IO.Path.Combine( folder, ( pictures.Count + 1 ).ToString( "00" ) + "_" + name + ".png" ) );
+				pictures.Add( name );
+			}
+		};
+
+		var failures = new List<string>();
+		var originalFailures = new List<string>();
+
+		// ---- the classic scheme, every other one, and a light mode
+		UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+		for ( var scheme = 0; scheme < UIKitTheme.c_schemes.Length; scheme++ )
+		{
+			UIKitTheme.SetScheme( scheme, false );
+
+			yield return Frames( 3 );
+
+			var schemeName = UIKitTheme.c_schemes[ scheme ].m_name;
+			var original = ( schemeName == "Starflight" ) || ( schemeName == "Starflight 2" );
+
+			BayColourFailures( slots, schemeName, UIKitTheme.LoadScheme( scheme, UIKitTheme.Mode.Dark ), original ? originalFailures : failures, original );
+
+			if ( ( scheme == 0 ) || ( scheme == 1 ) || ( scheme == 3 ) || ( scheme == 5 ) || ( scheme == 13 ) )
+			{
+				take( schemeName.Replace( ' ', '_' ) );
+			}
+		}
+
+		UIKitTheme.SetScheme( 13, false );
+		UIKitTheme.SetMode( UIKitTheme.Mode.Light, false );
+
+		yield return Frames( 3 );
+
+		var lightFailures = failures.Count;
+
+		BayColourFailures( slots, UIKitTheme.c_schemes[ 13 ].m_name + " in the light mode", UIKitTheme.LoadScheme( 13, UIKitTheme.Mode.Dark ), failures, false );
+
+		lightFailures = failures.Count - lightFailures;
+
+		Log( "dockingbaycolors: " + failures.Count + " failures" + ( ( failures.Count > 0 ) ? ": " + string.Join( " | ", failures.GetRange( 0, Mathf.Min( 6, failures.Count ) ) ) : "" ) );
+
+		if ( originalFailures.Count > 0 )
+		{
+			Log( "dockingbaycolors: original games' schemes " + originalFailures.Count + " failures: " + string.Join( " | ", originalFailures.GetRange( 0, Mathf.Min( 6, originalFailures.Count ) ) ) );
+		}
+
+		Check( "dockingbaycolors: the docking bay (its walls, doors, siren domes and their lights, and siren bases) takes the colours of the classic scheme and of each of the twelve other kit schemes when it is picked, and keeps the dark colours in a light mode", failures.Count == 0, failures.Count + " failures (" + lightFailures + " in the light mode)" );
+		Check( "dockingbaycolors: in the Starflight and Starflight 2 schemes the docking bay has its colours from before the kit (white walls, grey doors with a yellow logo that does not glow, orange sirens on grey bases)", originalFailures.Count == 0, originalFailures.Count + " failures" );
+
+		// ---- the launch lights the sirens up in the scheme's colour (Interstel Amber, whose second accent is a cyan, in the dark mode)
+		UIKitTheme.SetScheme( 4, false );
+		UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+		yield return Frames( 3 );
+
+		var amber = UIKitTheme.LoadScheme( 4, UIKitTheme.Mode.Dark );
+
+		// how lit the sirens are before the launch (their property block's emissive colour, which the docking bay's animations set, or the material's)
+		var before = new List<string>();
+		var darkBefore = true;
+
+		foreach ( var slot in slots )
+		{
+			if ( slot.material.name == "Docking Bay Siren Dome" )
+			{
+				var block = new MaterialPropertyBlock();
+
+				slot.renderer.GetPropertyBlock( block );
+
+				var animatedBefore = !block.isEmpty && block.HasColor( "SF_EmissiveColor" );
+
+				before.Add( slot.renderer.transform.parent.name + " " + ( animatedBefore ? "animated " + ColorUtility.ToHtmlStringRGB( block.GetColor( "SF_EmissiveColor" ) ) : "material " + ColorUtility.ToHtmlStringRGB( slot.material.GetColor( "SF_EmissiveColor" ) ) ) );
+
+				darkBefore &= animatedBefore && ( block.GetColor( "SF_EmissiveColor" ).maxColorComponent < 1.0f / 255.0f );
+			}
+		}
+
+		Log( "dockingbaycolors: before the launch " + string.Join( " | ", before ) );
+
+		Check( "dockingbaycolors: before the launch the sirens are dark, as the docking bay's animation leaves them (their emissive colour animated to black)", darkBefore, string.Join( " | ", before ) );
+
+		// the sirens' lights (two spotlights in each dome), which the animations switch on and off by their brightness
+		var sirenLights = new List<Light>();
+
+		foreach ( var slot in slots )
+		{
+			if ( slot.material.name == "Docking Bay Siren Dome" )
+			{
+				sirenLights.AddRange( slot.renderer.GetComponentsInChildren<Light>( true ) );
+			}
+		}
+
+		var lightsBefore = sirenLights.ConvertAll( sirenLight => sirenLight.intensity.ToString( "0.00", System.Globalization.CultureInfo.InvariantCulture ) );
+		var lightsOffBefore = ( sirenLights.Count == 8 ) && sirenLights.TrueForAll( sirenLight => !sirenLight.enabled || ( sirenLight.intensity <= 0.0f ) );
+
+		Log( "dockingbaycolors: the sirens' " + sirenLights.Count + " lights before the launch: " + string.Join( " ", lightsBefore ) );
+
+		controller.m_dockingBay.StartLaunchAnimation();
+
+		// the sirens are lit from 3.3 seconds into the launch
+		yield return Frames( 150 );
+
+		var domes = slots.FindAll( slot => slot.material.name == "Docking Bay Siren Dome" );
+		var sirenReport = new List<string>();
+		var sirensLitInScheme = domes.Count > 0;
+
+		foreach ( var domeSlot in domes )
+		{
+			var lit = StationDrawnColour( domeSlot.renderer, domeSlot.index, domeSlot.material, "SF_EmissiveColor" );
+			var tint = StationDrawnColour( domeSlot.renderer, domeSlot.index, domeSlot.material, "SF_EmissiveColorTint" );
+			var glowing = ( lit != null ) && ( tint != null ) ? new Color( lit.Value.r * tint.Value.r, lit.Value.g * tint.Value.g, lit.Value.b * tint.Value.b ) : (Color?) null;
+
+			var litBlock = new MaterialPropertyBlock();
+
+			domeSlot.renderer.GetPropertyBlock( litBlock );
+
+			var animated = !litBlock.isEmpty && litBlock.HasColor( "SF_EmissiveColor" );
+
+			sirenReport.Add( domeSlot.renderer.transform.parent.name + " lit " + ( ( lit != null ) ? ColorUtility.ToHtmlStringRGB( lit.Value ) : "none" ) + ( animated ? " (animated)" : " (material)" ) + " tint " + ( ( tint != null ) ? ColorUtility.ToHtmlStringRGB( tint.Value ) : "none" ) );
+
+			// the animation gives how lit the siren is, grey, and the tint the scheme's colour
+			sirensLitInScheme &= animated && ( glowing != null ) && ( lit.Value.r > 0.9f ) && ( Mathf.Abs( lit.Value.g - lit.Value.r ) < 2.0f / 255.0f ) && ( Mathf.Abs( lit.Value.b - lit.Value.r ) < 2.0f / 255.0f ) && ( Mathf.Abs( glowing.Value.r - amber.m_accentSecondary.r ) < 2.0f / 255.0f ) && ( Mathf.Abs( glowing.Value.g - amber.m_accentSecondary.g ) < 2.0f / 255.0f ) && ( Mathf.Abs( glowing.Value.b - amber.m_accentSecondary.b ) < 2.0f / 255.0f );
+		}
+
+		Log( "dockingbaycolors: during the launch " + string.Join( " | ", sirenReport ) );
+
+		var lightsDuring = sirenLights.ConvertAll( sirenLight => sirenLight.intensity.ToString( "0.00", System.Globalization.CultureInfo.InvariantCulture ) + " " + ColorUtility.ToHtmlStringRGB( sirenLight.color ) );
+		var lightsOnInScheme = ( sirenLights.Count == 8 ) && sirenLights.TrueForAll( sirenLight => sirenLight.enabled && sirenLight.gameObject.activeInHierarchy && ( sirenLight.intensity > 0.0f ) && ( ColorUtility.ToHtmlStringRGB( sirenLight.color ) == ColorUtility.ToHtmlStringRGB( amber.m_accentSecondary ) ) );
+
+		Log( "dockingbaycolors: the sirens' lights during the launch: " + string.Join( " | ", lightsDuring ) );
+
+		Check( "dockingbaycolors: the sirens' eight lights still work: off before the launch, on during it, in the scheme's colour (Interstel Amber's " + ColorUtility.ToHtmlStringRGB( amber.m_accentSecondary ) + ")", lightsOffBefore && lightsOnInScheme, "before " + string.Join( " ", lightsBefore ) + " | during " + string.Join( " | ", lightsDuring ) );
+
+		take( "Interstel_Amber_launch_sirens_lit" );
+
+		Check( "dockingbaycolors: during the launch the animation lights the sirens (grey, how lit) and they glow in the scheme's colour (Interstel Amber's " + ColorUtility.ToHtmlStringRGB( amber.m_accentSecondary ) + ")", sirensLitInScheme, string.Join( " | ", sirenReport ) );
+
+		Time.captureDeltaTime = 0.0f;
+
+		// the material assets keep the classic dark theme's colours
+		var classic = UIKitTheme.LoadScheme( 0, UIKitTheme.Mode.Dark );
+		var assetsChanged = new List<string>();
+		var walls = AssetDatabase.LoadAssetAtPath<Material>( "Assets/Game Objects/Docking Bay/Docking Bay Walls.mat" );
+		var dome = AssetDatabase.LoadAssetAtPath<Material>( "Assets/Game Objects/Docking Bay/Docking Bay Siren Dome.mat" );
+		var bases = AssetDatabase.LoadAssetAtPath<Material>( "Assets/Game Objects/Docking Bay/Docking Bay Siren Base.mat" );
+
+		if ( ( walls == null ) || ( ColorUtility.ToHtmlStringRGB( walls.GetColor( "SF_AlbedoColor" ) ) != ColorUtility.ToHtmlStringRGB( Color.Lerp( classic.m_textPrimary, classic.m_textSecondary, 0.5f ) ) ) )
+		{
+			assetsChanged.Add( "walls" );
+		}
+
+		if ( ( dome == null ) || ( ColorUtility.ToHtmlStringRGB( dome.GetColor( "SF_AlbedoColor" ) ) != ColorUtility.ToHtmlStringRGB( classic.m_accentSecondary ) ) )
+		{
+			assetsChanged.Add( "dome" );
+		}
+
+		if ( ( bases == null ) || ( ColorUtility.ToHtmlStringRGB( bases.GetColor( "SF_AlbedoColor" ) ) != ColorUtility.ToHtmlStringRGB( classic.m_borderDefault ) ) )
+		{
+			assetsChanged.Add( "base" );
+		}
+
+		Check( "dockingbaycolors: the docking bay's material assets keep the classic dark theme's colours", assetsChanged.Count == 0, ( assetsChanged.Count == 0 ) ? "all" : string.Join( ", ", assetsChanged ) );
+
+		UIKitTheme.SetScheme( 0, false );
+		UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+		yield return Frames( 3 );
+
+		Log( "dockingbaycolors: " + pictures.Count + " pictures" + ( ( folder != "" ) ? " in " + folder : "" ) );
+
+		Finish( "scenario=dockingbaycolors checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// what is drawn over the 3D views keeps the dark colours of the scheme in use in the light mode too (the light mode's dark accents and texts were hard
