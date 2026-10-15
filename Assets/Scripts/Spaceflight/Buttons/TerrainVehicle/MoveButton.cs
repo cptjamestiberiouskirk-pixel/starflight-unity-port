@@ -123,7 +123,7 @@ public class MoveButton : ShipButton
 		else
 		{
 			// check if we are out of fuel
-			if ( playerData.m_terrainVehicle.GetPercentFuelRemaining() <= -3 )
+			if ( playerData.m_terrainVehicle.IsOutOfFuel() )
 			{
 				if ( !m_outOfFuel )
 				{

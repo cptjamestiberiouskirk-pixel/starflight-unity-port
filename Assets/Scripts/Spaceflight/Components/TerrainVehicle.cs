@@ -45,22 +45,23 @@ public class TerrainVehicle : MonoBehaviour
 	// the terrain grid elevation scale
 	public float m_elevationScale = 100.0f;
 
-	// the fuel consumption rate
-	public float m_fuelConsumptionRate = 1.0f;
-
 	// the planet generator
 	PlanetGenerator m_planetGenerator;
 
-	// going uphill is slow (the 1984 notes, planet.txt: "going uphill is very slow and inefficient"; the designers' list of 1985, alpha.txt: "The slope of the
-	// contour map will effect the speed of the Terrain Vehicle"; the 1986 kernel keeps an efficiency "for %eff in move") - the speed falls with the rise ahead of
-	// the vehicle, down to a part of it on the steepest slopes, and downhill is no faster; since the engines burn fuel by the time they run, a slow climb also
-	// takes more fuel for the distance - how far ahead the slope is measured, how much it slows and the slowest are the port's
-	const float c_slopeProbeDistance = 8.0f;
-	const float c_uphillSlowdown = 1.5f;
-	const float c_slowestUphill = 0.25f;
+	// the fuel the engines burn for each step of the original's, a map cell (a kilometer of the display), by the contour of the ground the vehicle is on (MOVE-OV
+	// SET-SPEED sets E/M, and WF29C takes E/M times 100 over %EFF from the tank at every step): 170 in a liquid (contour below 16), else one and a half times the
+	// contour (16 to 127). Neither the slope nor the weather changes the speed (the released game reads only the cell the vehicle is in; the draft notes'
+	// "uphill is very slow" is not in it). The port's heights are the original maps' raised to a sea level of their own, so the contour is taken to rise from 16
+	// at the shore to 127 at the port's highest ground (INFERRED)
+	const float c_liquidEnergyPerStep = 170.0f;
+	const float c_shoreContour = 16.0f;
+	const float c_highestContour = 127.0f;
 
-	// the efficiency of the slope at the last move (1 on level ground and downhill)
-	float m_slopeEfficiency = 1.0f;
+	// the tank, in the original's units: full is 32767 (TV-OV WED9C), and the display's 0% is 2000 of them, the reserve below it
+	public const float c_tankUnits = 30767.0f;
+
+	// the E/M of the ground the vehicle is on
+	float m_energyPerStep = c_liquidEnergyPerStep;
 
 	// whether or not the engine is on or off
 	bool m_enginesAreOn;
@@ -70,9 +71,6 @@ public class TerrainVehicle : MonoBehaviour
 
 	// the amount of wheel slip (reduces effiency)
 	float m_wheelEfficiency;
-
-	// the current fuel efficiency
-	float m_fuelEfficiency;
 
 	// how deep in water are we
 	float m_waterEffectAmount;
@@ -115,10 +113,6 @@ public class TerrainVehicle : MonoBehaviour
 			// increase the current speed
 			playerData.m_general.m_currentSpeed = Mathf.Lerp( playerData.m_general.m_currentSpeed, effectiveMaxSpeed, acceleration );
 
-			// use up fuel
-			var fuelAmount = Time.deltaTime * ( m_fuelConsumptionRate * playerData.m_general.m_currentSpeed / GetFuelEfficiency() );
-
-			playerData.m_terrainVehicle.UseUpFuel( fuelAmount );
 		}
 		else
 		{
@@ -135,11 +129,18 @@ public class TerrainVehicle : MonoBehaviour
 		// check if the ship is moving
 		if ( playerData.m_general.m_currentSpeed >= 0.1f )
 		{
-			// uphill is slow
-			m_slopeEfficiency = GetSlopeEfficiency( playerData.m_general.m_coordinates, playerData.m_general.m_currentDirection );
+			// calculate the new position of the player (from where it is saved, which holds every push-back)
+			var oldPosition = playerData.m_general.m_coordinates;
+			var newPosition = oldPosition + (Vector3) playerData.m_general.m_currentDirection * m_wheelEfficiency * playerData.m_general.m_currentSpeed * Time.deltaTime;
 
-			// calculate the new position of the player (from where it is saved, which holds every push-back; the weather takes its share of the speed)
-			var newPosition = playerData.m_general.m_coordinates + (Vector3) playerData.m_general.m_currentDirection * m_wheelEfficiency * m_slopeEfficiency * PlanetWeather.GetEfficiency() * playerData.m_general.m_currentSpeed * Time.deltaTime;
+			// the fuel for the steps driven: a step on the diagonal is one cell along both axes for the fuel of one, so the steps are the longer of the two
+			// distances, and the weather's efficiency (%EFF) makes each dearer
+			if ( m_enginesAreOn )
+			{
+				var steps = Tools.SurfaceStepsInKm( oldPosition, newPosition );
+
+				playerData.m_terrainVehicle.UseUpFuel( steps * m_energyPerStep / Mathf.Max( 0.01f, PlanetWeather.GetEfficiency() ) / c_tankUnits );
+			}
 
 			// wrap player around the planet
 			var planetWidth = 2048.0f * 4.0f;
@@ -237,17 +238,19 @@ public class TerrainVehicle : MonoBehaviour
 			m_timeInLava = 0.0f;
 		}
 
-		// update the fuel efficiency
+		// the fuel a step takes on the ground the vehicle is on
 		var maximumElevation = 1.25f * m_elevationScale;
 		var waterElevation = m_planetGenerator.m_waterElevation * m_elevationScale;
 
 		if ( tvPosition.y < waterElevation )
 		{
-			m_fuelEfficiency = Mathf.SmoothStep( 1.0f, 0.14f, ( waterElevation - tvPosition.y ) / m_floatDepth );
+			m_energyPerStep = c_liquidEnergyPerStep;
 		}
 		else
 		{
-			m_fuelEfficiency = Mathf.Pow( Mathf.Lerp( 1.0f, 0.5f, ( tvPosition.y - waterElevation ) / ( maximumElevation - waterElevation ) ), 3.0f );
+			var contour = Mathf.Floor( Mathf.Lerp( c_shoreContour, c_highestContour, Mathf.Clamp01( ( tvPosition.y - waterElevation ) / ( maximumElevation - waterElevation ) ) ) );
+
+			m_energyPerStep = Mathf.Floor( contour * 3.0f / 2.0f );
 		}
 
 		// calculate the normal of the terrain between the center and the front wheels
@@ -316,11 +319,19 @@ public class TerrainVehicle : MonoBehaviour
 		m_lastDirection = playerData.m_general.m_currentDirection;
 	}
 
-	// return the current fuel efficiency
+	// the efficiency the display shows, as a fraction: %EFF over 4 times E/M, at most 99% (MOVE-OV's display: 99% at the shore, 14% in a liquid, and the
+	// weather's share on top: a storm halves it)
 	public float GetFuelEfficiency()
 	{
-		// (the weather takes its share: EFF 14% falls to 7% in a storm, as the original shows it)
-		return m_fuelEfficiency * PlanetWeather.GetEfficiency();
+		var percent = Mathf.Floor( PlanetWeather.GetEfficiency() * 100.0f * 100.0f / ( 4.0f * Mathf.Max( 1.0f, m_energyPerStep ) ) );
+
+		return Mathf.Min( 99.0f, percent ) / 100.0f;
+	}
+
+	// the fuel a step takes on the ground the vehicle is on, in the original's units (E/M: for the probe)
+	public float GetEnergyPerStep()
+	{
+		return m_energyPerStep;
 	}
 
 	// an object on the terrain overlaps the terrain vehicle by this much (a negative separation): push the vehicle out of it and slow it down
@@ -356,27 +367,6 @@ public class TerrainVehicle : MonoBehaviour
 
 		// reduce the current speed of the terrain vehicle
 		playerData.m_general.m_currentSpeed = Mathf.Max( 0.0f, playerData.m_general.m_currentSpeed + pushBackAmount * 10.0f );
-	}
-
-	// the efficiency of moving in this direction from this place: 1 on level ground and downhill, less the steeper the way rises
-	float GetSlopeEfficiency( Vector3 worldCoordinates, Vector3 direction )
-	{
-		if ( ( m_planetGenerator == null ) || ( direction.sqrMagnitude < 0.0001f ) )
-		{
-			return 1.0f;
-		}
-
-		var here = ApplyElevation( worldCoordinates, false ).y;
-		var ahead = ApplyElevation( worldCoordinates + direction.normalized * c_slopeProbeDistance, false ).y;
-		var rise = ( ahead - here ) / c_slopeProbeDistance;
-
-		return Mathf.Clamp( 1.0f - Mathf.Max( 0.0f, rise ) * c_uphillSlowdown, c_slowestUphill, 1.0f );
-	}
-
-	// the efficiency of the slope at the last move (for the probe and the displays)
-	public float GetSlopeEfficiency()
-	{
-		return m_slopeEfficiency;
 	}
 
 	Vector3 ApplyElevation( Vector3 worldCoordinates, bool updateWheelEfficiency )

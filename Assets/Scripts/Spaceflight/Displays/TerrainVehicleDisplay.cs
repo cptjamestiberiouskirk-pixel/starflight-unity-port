@@ -163,7 +163,7 @@ public class TerrainVehicleDisplay : ShipDisplay
 			var text = PD_General.GetDisplayStardate( playerData.m_general.m_currentStardateYMD ) + "\n";
 
 			// the fuel that is left
-			if ( percentFuelRemaining <= -3 )
+			if ( playerData.m_terrainVehicle.IsOutOfFuel() )
 			{
 				text += "<color=yellow>None</color>\n";
 			}

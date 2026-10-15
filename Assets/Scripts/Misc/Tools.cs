@@ -75,6 +75,20 @@ class Tools
 		return Mathf.Sqrt( kmEastWest * kmEastWest + kmNorthSouth * kmNorthSouth );
 	}
 
+	// the steps of the original's terrain vehicle between two places on a planet's surface, in the original's kilometers: a step is a map cell along one axis or
+	// along both, so the steps are the longer of the two distances (MOVE-OV moves the vehicle a cell in one of eight directions at every step)
+	public static float SurfaceStepsInKm( Vector3 from, Vector3 to )
+	{
+		WorldToLatLongCoordinates( from, out var fromLongitude, out var fromLatitude );
+		WorldToLatLongCoordinates( to, out var toLongitude, out var toLatitude );
+
+		// the short way around the planet
+		var degreesEastWest = Mathf.Repeat( toLongitude - fromLongitude + 180.0f, 360.0f ) - 180.0f;
+		var degreesNorthSouth = toLatitude - fromLatitude;
+
+		return Mathf.Max( Mathf.Abs( degreesEastWest * c_kmPerDegreeOfLongitude ), Mathf.Abs( degreesNorthSouth * c_kmPerDegreeOfLatitude ) );
+	}
+
 	// convert from world coordinates to map coordinates
 	public static void WorldToMapCoordinates( Vector3 worldCoordinates, out float mapX, out float mapY, int mapWidth, int mapHeight )
 	{
