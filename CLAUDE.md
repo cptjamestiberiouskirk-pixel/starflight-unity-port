@@ -137,7 +137,7 @@ From `.github/copilot-instructions.md` (project rules):
 - `Max/`, `Illustrator/`, `Photoshop/`, `Research/` (incl. the original manual), `Planets/`, `Spacescape-0.5.1/`, `Music/` at the root are source art and reference material outside `Assets/`: Unity does not import them.
 - Under `.claude/` only `settings.json`, `rules/`, `agents/` and `skills/` are tracked; the rest of `.claude/` and `AGENTS.md` are gitignored.
 - `ROADMAP.md` is the plan of record for parity with the original game: phases, items with their sources, and the owner's decisions. Pick feature work from it.
-- `CODE_REVIEW_2026-10-03.md` is the current review (open findings, fixes and how they were checked); re-verify line numbers there. `PROJECT_CONTEXT.md` and `PROJECT_ANALYSIS_REPORT.md` are historical.
+- `CODE_REVIEW_2026-10-03.md` is the current review (open findings, fixes and how they were checked); re-verify line numbers there. The older `PROJECT_CONTEXT.md` and `PROJECT_ANALYSIS_REPORT.md` were removed as superseded.
 
 ## Working rules
 
