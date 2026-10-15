@@ -47,6 +47,7 @@ sampler2D SF_EmissiveMap;
 float4 SF_EmissiveMap_ST;
 float3 SF_EmissiveTint;
 float3 SF_EmissiveColor;
+float3 SF_EmissiveColorTint;
 
 sampler2D SF_ReflectionMap;
 float4 SF_ReflectionMap_ST;
@@ -147,10 +148,11 @@ float4 ComputeAlbedo( SF_VertexShaderOutput i, float4 albedoColor )
 	#if SF_PALETTEMAP_ON
 
 		// the albedo map holds the weights of the first four palette colours (red, green, blue, alpha), and the fifth takes what is left, so that one
-		// texture can be drawn in any colours (the Starport floor in the colours of the UI kit's scheme)
+		// texture can be drawn in any colours (the Starport floor and the docking bay's doors in the colours of the UI kit's scheme); a palette colour may be
+		// brighter than white (the doors' metal is lifted), so the mix is clamped
 		float rest = saturate( 1 - dot( albedoMap, 1 ) );
 
-		albedoMap = float4( albedoMap.r * SF_PaletteColor0 + albedoMap.g * SF_PaletteColor1 + albedoMap.b * SF_PaletteColor2 + albedoMap.a * SF_PaletteColor3 + rest * SF_PaletteColor4, 1 );
+		albedoMap = float4( saturate( albedoMap.r * SF_PaletteColor0 + albedoMap.g * SF_PaletteColor1 + albedoMap.b * SF_PaletteColor2 + albedoMap.a * SF_PaletteColor3 + rest * SF_PaletteColor4 ), 1 );
 
 	#endif // SF_PALETTEMAP_ON
 
@@ -373,7 +375,17 @@ float3 ComputeEmissive( SF_VertexShaderOutput i )
 
 	#endif // SF_EMISSIVEMAP_ON
 
-	return SF_EmissiveColor + emissiveMap * SF_EmissiveTint;
+	#if SF_EMISSIVECOLORTINT_ON
+
+		// the emissive colour is how lit the object is (an animation can change it), and the tint the colour it glows in (the docking bay's sirens in the
+		// colours of the UI kit's scheme)
+		return SF_EmissiveColor * SF_EmissiveColorTint + emissiveMap * SF_EmissiveTint;
+
+	#else // !SF_EMISSIVECOLORTINT_ON
+
+		return SF_EmissiveColor + emissiveMap * SF_EmissiveTint;
+
+	#endif // SF_EMISSIVECOLORTINT_ON
 }
 
 float3 ComputeReflection( SF_VertexShaderOutput i, float3 normal )
