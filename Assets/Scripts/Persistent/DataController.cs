@@ -215,10 +215,12 @@ public class DataController : MonoBehaviour
 		// repair save files where a deleted crewmember was left assigned to a role
 		playerData.m_crewAssignment.UnassignMissingCrew( playerData.m_personnel );
 
-		// repair save files that were written with a destroyed ship (the game over screen used to let that happen) - without this they could never be saved again
+		// repair save files that were written with a destroyed ship (the game over screen used to let that happen) - without this they could never be saved again: the
+		// hull gets 1 point of its integrity back (a ship is destroyed when its hull is, and save files from before the hull had an integrity of its own have a whole
+		// hull, whatever their armor)
 		if ( IsLost( playerData ) )
 		{
-			playerData.m_playerShip.m_armorPoints = 1;
+			playerData.m_playerShip.SetSystemHealth( PD_PlayerShip.ShipSystem.Hull, 1 );
 		}
 
 		// repair save files that hold more armor points than their ship can have (selling the armor used to leave its points behind) - this only ever takes points away
@@ -247,10 +249,11 @@ public class DataController : MonoBehaviour
 		return playerData;
 	}
 
-	// a game is lost once its ship has been destroyed - a lost game is never saved, the save on disk is the one the player goes back to
+	// a game is lost once its ship has been destroyed (its hull's integrity is gone - a ship with no armor left is not destroyed) - a lost game is never saved, the
+	// save on disk is the one the player goes back to
 	static bool IsLost( PlayerData playerData )
 	{
-		return ( playerData.m_playerShip.m_armorPoints <= 0 );
+		return playerData.m_playerShip.IsDestroyed();
 	}
 
 	// call this to throw away the game in memory and go back to the last save of the active slot (after the ship has been lost)

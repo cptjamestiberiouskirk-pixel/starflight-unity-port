@@ -594,27 +594,67 @@ public class CombatController : MonoBehaviour
 		}
 	}
 
-	/// <summary>
-	/// Apply damage to the player ship.
-	/// </summary>
+	// a hit on the player ship, as the original's DAMAGE-OV (WF3A4): it lands in chunks, each a random share of what is left of it and at least 10 points (WF358),
+	// and each chunk on one thing (WF378): on the shields while they are up (raised, charged and outside a nebula, WEC8A), else on the armor while it has points,
+	// and once the armor is gone on one of the ship's working parts, chosen at random (DamageAWorkingPart). Better shields and armor lose less of a chunk, (6 -
+	// class) / 5 of it (WF248, WF26A). The ship is destroyed when its hull's integrity reaches 0 ("!!HULL DESTROYED!!"), not when its armor does
 	public void ApplyDamageToPlayer( int damage, Vector3 hitDirection )
 	{
 		// a ship that has been destroyed cannot be hit again (it would explode once more and call the game over screen a second time)
-		if ( m_playerIsDestroyed )
+		if ( m_playerIsDestroyed || ( damage <= 0 ) )
 		{
 			return;
 		}
 
 		var playerData = DataController.m_instance.m_playerData;
 		var playerPosition = playerData.m_general.m_coordinates;
+		var ship = playerData.m_playerShip;
 
-		// first absorb with shields (lowered shields keep their charge now, so they have to be up to absorb anything)
-		if ( playerData.m_playerShip.m_shieldsAreUp && ( playerData.m_playerShip.m_shieldPoints > 0 ) )
+		var shieldsWereHit = false;
+		var shipWasHit = false;
+
+		// chunk by chunk until the hit is spent, the hull is gone or the game is lost (a chunk takes at least 10 points off what is left, so this ends - the limit is
+		// a guard)
+		var remaining = damage;
+
+		for ( var chunks = 0; ( remaining > 0 ) && !ship.IsDestroyed() && !m_playerIsDestroyed && ( chunks < c_maximumChunksPerHit ); chunks++ )
 		{
-			int shieldAbsorb = Mathf.Min( damage, playerData.m_playerShip.m_shieldPoints );
-			playerData.m_playerShip.m_shieldPoints -= shieldAbsorb;
-			damage -= shieldAbsorb;
+			// a random share of what is left, at least 10 points (WF358: RRND from 1 to all of it, MAX 10)
+			var chunk = Mathf.Max( UnityEngine.Random.Range( 1, remaining + 1 ), c_leastChunk );
 
+			remaining = Mathf.Max( remaining - chunk, 0 );
+
+			if ( ship.m_shieldsAreUp && ( ship.m_shieldPoints > 0 ) && !SpaceflightController.m_instance.ShipIsInsideANebula() )
+			{
+				// the shields take it (lowered shields keep their charge, so they have to be up to take anything)
+				ship.m_shieldPoints = Mathf.Max( ship.m_shieldPoints - chunk * ( 6 - ship.m_shieldingClass ) / 5, 0 );
+
+				shieldsWereHit = true;
+			}
+			else if ( ship.m_armorPoints > 0 )
+			{
+				// the armor takes it (a ship without armor plating has the armor of its bare hull, class 0)
+				ship.m_armorPoints = Mathf.Max( ship.m_armorPoints - chunk * ( 6 - ship.m_armorClass ) / 5, 0 );
+
+				shipWasHit = true;
+			}
+			else
+			{
+				// the armor is gone: the hull, a system or the crew takes it
+				DamageAWorkingPart( chunk );
+
+				shipWasHit = true;
+			}
+		}
+
+		// the whole crew has died (the game is over already, PD_CrewAssignment.InjureCrewMember has ended it)
+		if ( m_playerIsDestroyed )
+		{
+			return;
+		}
+
+		if ( shieldsWereHit )
+		{
 			// show shield effect
 			var shieldHit = GetAvailableShieldHit();
 			if ( shieldHit != null )
@@ -624,57 +664,114 @@ public class CombatController : MonoBehaviour
 
 			// play shield hit sound
 			SoundController.m_instance.PlaySound( SoundController.Sound.ShieldHit );
-
 		}
 
-		// remaining damage to armor
-		if ( damage > 0 )
+		if ( !shipWasHit )
 		{
-			playerData.m_playerShip.m_armorPoints -= damage;
+			return;
+		}
 
-			// and one of the ship's other fields takes its share: one of its systems, or the crew (the original's damage picks one of eight fields for a hit, the
-			// seventh the crew, DAMAGE-OV #>?FIEL and #>DAMAG)
-			if ( UnityEngine.Random.Range( 0, playerData.m_playerShip.GetInstalledSystemCount() + 1 ) == 0 )
+		// show hull hit
+		var hullHit = GetAvailableHullHit();
+		if ( hullHit != null )
+		{
+			hullHit.Play( playerPosition, hitDirection );
+		}
+
+		// play red alert if armor is critically low (below 25% of the most this ship can have)
+		int maxArmor = ship.GetMaximumArmorPoints();
+		if ( ship.m_armorPoints > 0 && ship.m_armorPoints * 4 < maxArmor )
+		{
+			SoundController.m_instance.PlaySound( SoundController.Sound.RedAlert );
+			SpaceflightController.m_instance.m_messages.AddText( "<color=#FFA500>WARNING: Hull breach imminent!</color>" );
+		}
+
+		// a critically wounded ship is warped out of danger by the Crystal Pearl
+		if ( WarpOutWithTheCrystalPearl() )
+		{
+			return;
+		}
+
+		// check for destruction
+		if ( ship.IsDestroyed() )
+		{
+			DestroyPlayer( playerPosition );
+		}
+	}
+
+	// the least a chunk of a hit is, and the most chunks a hit can have (a guard: a chunk is at least 10 points, so even the plasma bolt's 4000 is 400 chunks)
+	const int c_leastChunk = 10;
+	const int c_maximumChunksPerHit = 1000;
+
+	// the parts of the ship a chunk can land on once the armor is gone, in the original's order (DAMAGE-OV #>?FIEL and #>DAMAG: the hull, the engines, the
+	// sensors, the comm, the missile launcher, the laser cannon, the crew - ShipSystem.Count here - and the shield generator)
+	static readonly PD_PlayerShip.ShipSystem[] c_damageableParts =
+	{
+		PD_PlayerShip.ShipSystem.Hull,
+		PD_PlayerShip.ShipSystem.Engines,
+		PD_PlayerShip.ShipSystem.Sensors,
+		PD_PlayerShip.ShipSystem.Comm,
+		PD_PlayerShip.ShipSystem.Missiles,
+		PD_PlayerShip.ShipSystem.Lasers,
+		PD_PlayerShip.ShipSystem.Count,
+		PD_PlayerShip.ShipSystem.Shields
+	};
+
+	// a chunk that got past the shields and the armor lands on one of the ship's working parts, chosen at random from those that still work (DAMAGE-OV WEF3C and
+	// WEF76): the hull or a system loses 10 times the chunk over the hull's integrity (PD_PlayerShip.DamageSystem), and the crew is wounded by as much (WF0E0)
+	void DamageAWorkingPart( int chunk )
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+		var crewIsAlive = GetLivingCrew().Count > 0;
+
+		// which parts still work
+		var working = 0;
+
+		foreach ( var part in c_damageableParts )
+		{
+			if ( ( part == PD_PlayerShip.ShipSystem.Count ) ? crewIsAlive : ship.CanBeDamaged( part ) )
 			{
-				WoundCrew( damage );
+				working++;
+			}
+		}
+
+		if ( working == 0 )
+		{
+			return;
+		}
+
+		// pick one of them
+		var pick = UnityEngine.Random.Range( 0, working );
+
+		foreach ( var part in c_damageableParts )
+		{
+			if ( !( ( part == PD_PlayerShip.ShipSystem.Count ) ? crewIsAlive : ship.CanBeDamaged( part ) ) )
+			{
+				continue;
+			}
+
+			if ( pick-- > 0 )
+			{
+				continue;
+			}
+
+			if ( part == PD_PlayerShip.ShipSystem.Count )
+			{
+				WoundCrew( ship.GetSystemDamage( chunk ) );
 			}
 			else
 			{
-				playerData.m_playerShip.DamageRandomSystem( damage );
+				ship.DamageSystem( part, chunk );
 			}
 
-			// show hull hit
-			var hullHit = GetAvailableHullHit();
-			if ( hullHit != null )
-			{
-				hullHit.Play( playerPosition, hitDirection );
-			}
-
-			// play red alert if armor is critically low (below 25% of the most this ship can have)
-			int maxArmor = playerData.m_playerShip.GetMaximumArmorPoints();
-			if ( playerData.m_playerShip.m_armorPoints > 0 && playerData.m_playerShip.m_armorPoints * 4 < maxArmor )
-			{
-				SoundController.m_instance.PlaySound( SoundController.Sound.RedAlert );
-				SpaceflightController.m_instance.m_messages.AddText( "<color=#FFA500>WARNING: Hull breach imminent!</color>" );
-			}
-
-			// a critically wounded ship is warped out of danger by the Crystal Pearl
-			if ( WarpOutWithTheCrystalPearl() )
-			{
-				return;
-			}
-
-			// check for destruction
-			if ( playerData.m_playerShip.m_armorPoints <= 0 )
-			{
-				DestroyPlayer( playerPosition );
-			}
+			return;
 		}
 	}
 
 	// the Crystal Pearl is "an automatic warp-out device for when a ship is heavily damaged" (the Thrynn; the Spemin: it "automatically warps a critically wounded
-	// ship out of danger") - with it in the hold a ship in an encounter that has less than a tenth of its armor left, or would be destroyed, is warped out of the
-	// encounter with what armor it has (at least 1 point). The tenth is the port's choice - returns true if the ship was warped out
+	// ship out of danger") - with it in the hold a ship in an encounter that has less than a tenth of its armor left, or whose hull would be destroyed, is warped
+	// out of the encounter with what it has left (the hull at least 1 point of its integrity). The tenth is the port's choice - returns true if the ship was warped
+	// out
 	bool WarpOutWithTheCrystalPearl()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -686,13 +783,16 @@ public class CombatController : MonoBehaviour
 		}
 
 		// critically wounded?
-		if ( ship.m_armorPoints * 10 >= ship.GetMaximumArmorPoints() )
+		if ( ( ship.m_armorPoints * 10 >= ship.GetMaximumArmorPoints() ) && !ship.IsDestroyed() )
 		{
 			return false;
 		}
 
 		// the hit that wounded it did not destroy it
-		ship.m_armorPoints = Mathf.Max( ship.m_armorPoints, 1 );
+		if ( ship.IsDestroyed() )
+		{
+			ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Hull, 1 );
+		}
 
 		// nothing that is still in the air follows the ship out
 		ClearMissiles();
@@ -723,7 +823,7 @@ public class CombatController : MonoBehaviour
 		DestroyPlayer( playerData.m_general.m_coordinates );
 	}
 
-	// the game is lost without the ship being destroyed (the whole crew has died): the game over screen with its cause, and the ship's armor at 0, so that the
+	// the game is lost without the ship being destroyed (the whole crew has died): the game over screen with its cause, and the ship's hull at 0, so that the
 	// lost game is never saved (DataController.SavePlayerData refuses a destroyed ship, and the game over reloads the last save)
 	public void EndGame( string cause )
 	{
@@ -735,7 +835,7 @@ public class CombatController : MonoBehaviour
 		m_playerIsDestroyed = true;
 		m_gameOverCause = cause;
 
-		DataController.m_instance.m_playerData.m_playerShip.m_armorPoints = 0;
+		DataController.m_instance.m_playerData.m_playerShip.DestroyHull();
 
 		ClearMissiles();
 
@@ -745,7 +845,7 @@ public class CombatController : MonoBehaviour
 	// the player ship is destroyed: it explodes, and then the game is over
 	void DestroyPlayer( Vector3 playerPosition )
 	{
-		DataController.m_instance.m_playerData.m_playerShip.m_armorPoints = 0;
+		DataController.m_instance.m_playerData.m_playerShip.DestroyHull();
 
 		// this only happens once
 		m_playerIsDestroyed = true;
@@ -828,7 +928,7 @@ public class CombatController : MonoBehaviour
 		// game over! (with what caused it, if it was not the damage the ship took - such a cause says game over itself, as STRINFO's flare text does)
 		if ( string.IsNullOrEmpty( m_gameOverCause ) )
 		{
-			SpaceflightController.m_instance.m_messages.AddText( "<color=#FF0000>Ship destroyed!</color>" );
+			SpaceflightController.m_instance.m_messages.AddText( "<color=#FF0000>Hull destroyed!</color>" );
 			SpaceflightController.m_instance.m_messages.AddText( "<color=#FFFF00>GAME OVER</color>" );
 		}
 		else
@@ -970,27 +1070,10 @@ public class CombatController : MonoBehaviour
 	// window says how badly each is wounded (DAMAGE-OV WF0E0, WED5E, WED6A and WF02E: "<NAME> IS MODERATELY WOUNDED")
 	void WoundCrew( int damage )
 	{
-		var playerData = DataController.m_instance.m_playerData;
 		var gameData = DataController.m_instance.m_gameData;
-		var crewAssignment = playerData.m_crewAssignment;
-		var crew = new List<PD_Personnel.PD_PersonnelFile>();
+		var crewAssignment = DataController.m_instance.m_playerData.m_crewAssignment;
 
-		for ( var role = PD_CrewAssignment.Role.First; role < PD_CrewAssignment.Role.Count; role++ )
-		{
-			if ( !crewAssignment.IsAssigned( role ) )
-			{
-				continue;
-			}
-
-			var file = crewAssignment.GetPersonnelFile( role );
-
-			if ( ( file != null ) && !file.m_isDead && ( file.m_vitality > 0.0f ) && !crew.Contains( file ) )
-			{
-				crew.Add( file );
-			}
-		}
-
-		foreach ( var file in crew )
+		foreach ( var file in GetLivingCrew() )
 		{
 			if ( UnityEngine.Random.Range( 0, 100 ) >= c_woundChance )
 			{
@@ -1016,6 +1099,30 @@ public class CombatController : MonoBehaviour
 
 	// the chance of each crew member to be wounded by a hit on the crew, in 100, and the least wound (DAMAGE-OV WED5E: 70; WED6A: 5)
 	const int c_woundChance = 70;
+
+	// the living crew members at their posts, each once (one can hold several posts)
+	static List<PD_Personnel.PD_PersonnelFile> GetLivingCrew()
+	{
+		var crewAssignment = DataController.m_instance.m_playerData.m_crewAssignment;
+		var crew = new List<PD_Personnel.PD_PersonnelFile>();
+
+		for ( var role = PD_CrewAssignment.Role.First; role < PD_CrewAssignment.Role.Count; role++ )
+		{
+			if ( !crewAssignment.IsAssigned( role ) )
+			{
+				continue;
+			}
+
+			var file = crewAssignment.GetPersonnelFile( role );
+
+			if ( ( file != null ) && !file.m_isDead && ( file.m_vitality > 0.0f ) && !crew.Contains( file ) )
+			{
+				crew.Add( file );
+			}
+		}
+
+		return crew;
+	}
 	const int c_leastWound = 5;
 
 	// get available laser from pool

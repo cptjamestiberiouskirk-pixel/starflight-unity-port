@@ -46,6 +46,7 @@ public class StatusDisplay : ShipDisplay
 
 	// what the text was last built from (building it takes memory, and this runs every frame, so the text is only built again when one of these changes)
 	string m_shownStardate;
+	int m_shownIntegrity = int.MinValue;
 	int m_shownArmorPoints = int.MinValue;
 	int m_shownMaximumArmorPoints;
 	int m_shownVolumeUsed;
@@ -57,11 +58,10 @@ public class StatusDisplay : ShipDisplay
 	bool m_shownWeaponsAreArmed;
 
 	// unity update
-	// the damage in the original's words (STARB.COM, the status display's damage table): what is left of the hull as a percent of its most, NONE at all of it,
-	// MINIMAL from 95, SLIGHT from 80, MODERATE from 50, HEAVY from 20 and CRITICAL below
-	public static string GetDamageText( int armorPoints, int maximumArmorPoints )
+	// the damage in the original's words (STARB.COM, the status display's damage table) for what is left of the ship (PD_PlayerShip.GetOverallIntegrity, in
+	// percent): NONE at all of it, MINIMAL from 95, SLIGHT from 80, MODERATE from 50, HEAVY from 20 and CRITICAL below
+	public static string GetDamageText( int integrity )
 	{
-		var integrity = ( maximumArmorPoints > 0 ) ? Mathf.FloorToInt( 100.0f * armorPoints / maximumArmorPoints ) : 100;
 
 		if ( integrity >= 100 )
 		{
@@ -120,11 +120,15 @@ public class StatusDisplay : ShipDisplay
 		// do we have weapons?
 		bool hasWeapons = ( playerData.m_playerShip.m_missileLauncherClass != 0 ) || ( playerData.m_playerShip.m_laserCannonClass != 0 );
 
+		// what is left of the hull and the systems
+		int integrity = playerData.m_playerShip.GetOverallIntegrity();
+
 		// has anything the text shows changed since we last built it?
-		if ( ( m_shownStardate != playerData.m_general.m_currentStardateDHMY ) || ( m_shownArmorPoints != playerData.m_playerShip.m_armorPoints ) || ( m_shownMaximumArmorPoints != maximumArmorPoints ) || ( m_shownVolumeUsed != playerData.m_playerShip.m_volumeUsed ) || ( m_shownVolume != playerData.m_playerShip.m_volume ) || ( m_shownEndurium != endurium ) || ( m_shownShieldingClass != playerData.m_playerShip.m_shieldingClass ) || ( m_shownShieldsAreUp != playerData.m_playerShip.m_shieldsAreUp ) || ( m_shownHasWeapons != hasWeapons ) || ( m_shownWeaponsAreArmed != playerData.m_playerShip.m_weaponsAreArmed ) )
+		if ( ( m_shownStardate != playerData.m_general.m_currentStardateDHMY ) || ( m_shownIntegrity != integrity ) || ( m_shownArmorPoints != playerData.m_playerShip.m_armorPoints ) || ( m_shownMaximumArmorPoints != maximumArmorPoints ) || ( m_shownVolumeUsed != playerData.m_playerShip.m_volumeUsed ) || ( m_shownVolume != playerData.m_playerShip.m_volume ) || ( m_shownEndurium != endurium ) || ( m_shownShieldingClass != playerData.m_playerShip.m_shieldingClass ) || ( m_shownShieldsAreUp != playerData.m_playerShip.m_shieldsAreUp ) || ( m_shownHasWeapons != hasWeapons ) || ( m_shownWeaponsAreArmed != playerData.m_playerShip.m_weaponsAreArmed ) )
 		{
 			// yes - remember what the text is built from this time
 			m_shownStardate = playerData.m_general.m_currentStardateDHMY;
+			m_shownIntegrity = integrity;
 			m_shownArmorPoints = playerData.m_playerShip.m_armorPoints;
 			m_shownMaximumArmorPoints = maximumArmorPoints;
 			m_shownVolumeUsed = playerData.m_playerShip.m_volumeUsed;
@@ -138,8 +142,8 @@ public class StatusDisplay : ShipDisplay
 			// update the date
 			string text = playerData.m_general.m_currentStardateDHMY + "\n";
 
-			// update the damage text, in the original's words for what is left of the hull
-			text += GetDamageText( playerData.m_playerShip.m_armorPoints, maximumArmorPoints ) + "\n";
+			// update the damage text, in the original's words for what is left of the ship (its hull and its systems, not its armor)
+			text += GetDamageText( m_shownIntegrity ) + "\n";
 
 			// update the cargo usage
 			float cargoUsage = (float) playerData.m_playerShip.m_volumeUsed / (float) playerData.m_playerShip.m_volume * 100.0f;

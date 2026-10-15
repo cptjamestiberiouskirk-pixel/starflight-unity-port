@@ -149,7 +149,7 @@ Buy, sell, repair and name your ship.
 
 - **Buy** and **Sell**: cargo pods, engines, shielding, armor, a missile launcher and a laser cannon. Every part but the pods comes in classes 1 to 5 (prices in [section 14](#ship-equipment)). The ship holds one of each part: sell the old one before buying another class. A part sells back for what it is worth in its condition.
 - **Cargo pods**: 500 M.U. each, up to 16. Each holds 50 cubic meters. **The ship starts with none**, so it can carry no cargo until you buy some.
-- **Repair**: the Starport repairs the hull for 4 M.U. a point of armor, and damaged equipment by the part's price and how badly it is damaged. Shields are refilled free.
+- **Repair**: the Starport restores the armor for 4 M.U. a point and the hull for 250 M.U. a point of its integrity, and repairs damaged equipment by the part's price and how badly it is damaged. Shields are refilled free.
 - **Name**: christen the ship. It cannot launch without a name.
 
 The right side shows what is installed, with the ship's mass, its acceleration and the Endurium aboard.
@@ -209,7 +209,7 @@ The console starts on the **bridge**: one button for each officer. Pick one to s
 
 - **Cargo** lists what is in the hold, with each item's volume and value.
 - **Ship's Log** keeps the Starport's notices, what aliens have told you (by subject) and the messages you have found.
-- **Status** shows the date, damage, cargo, energy, shields and weapons, with the ship's shield and armor gauges.
+- **Status** shows the date, the damage to the hull and the systems, cargo, energy, shields and weapons, with the ship's shield and armor gauges.
 - **Log Planet** records the planet you are orbiting, and offers to recommend it for colonists (see [section 11](#11-making-money)).
 
 ---
@@ -358,7 +358,7 @@ Some things to know:
 | Missile | 1500 | 40, 70, 100, 140, 200 | Homes in on the target |
 
 - Weapons need no ammunition, but every shot burns a little Endurium. Damaged weapons do less damage.
-- Hits on you go to your shields first, then to your armor, and can damage your systems and wound your crew. "Hull breach imminent" means your armor is almost gone. At 0 armor the ship is destroyed.
+- Hits on you go to your shields while they are up, then to your armor. Only once the armor is gone do they reach the ship itself: each part of a hit lands on the hull, one of the systems or the crew. "Hull breach imminent" means your armor is almost gone. **The ship is destroyed when its hull's integrity reaches 0**; without armor it fights on, but every hit hurts.
 - Alien missiles fly to where your ship was when they were launched: keep moving and they miss.
 - Aliens' shields protect them only while raised, and not inside a nebula.
 - Some races give up when the fight goes badly for them.
@@ -368,9 +368,9 @@ Some things to know:
 
 ## 10. Damage, repairs and medicine
 
-**Damage** (Engineering): a bar for the hull and for each system: engines, sensors, communications, shields, missile launcher and laser cannon. A damaged system works only as well as its health.
+**Damage** (Engineering): a bar for the hull's integrity and for each system: engines, sensors, communications, shields, missile launcher and laser cannon. A damaged system works only as well as its health.
 
-**Repair** (Engineering): pick what to repair with Up and Down, and Enter. The engineer asks for the minerals the repair needs, taken from your cargo. Repairs take time, faster with a better engineer. A destroyed system cannot be repaired in space: the Starport's Ship Configuration room can.
+**Repair** (Engineering): pick what to repair with Up and Down, and Enter. The engineer asks for the minerals the repair needs, taken from your cargo. Repairs take time, faster with a better engineer. The engineer repairs the hull and the systems, never the armor: only the Starport restores the armor. A destroyed system cannot be repaired in space: the Starport's Ship Configuration room can.
 
 **Examine** and **Treat** (Medical): pick a crew member with Left and Right, and Enter. Examine shows their wounds and vitality. Treat starts a treatment that takes time, one patient at a time.
 
@@ -414,7 +414,7 @@ This is a remake of *Starflight* (Binary Systems, Electronic Arts, 1986) in Unit
 
 Known differences in version 1.0.0:
 
-- **Combat**: the port's weapons do less damage than the original's, so fights last longer, and the ship is destroyed when its armor is gone (the original fought on with failing systems until the hull gave out).
+- **Combat**: the port's weapons do less damage than the original's, so fights last longer.
 - **The navigator's skill** has no effect yet.
 - Smaller details of hyperspace flight (aliens' pursuit, speeds) are simplified.
 
@@ -450,7 +450,8 @@ Prices in M.U., to buy, class 1 to 5. An undamaged part sells back for a little 
 | Service | Price |
 |---|---|
 | Training | 300 M.U. a session |
-| Hull repair | 4 M.U. a point of armor |
+| Armor repair | 4 M.U. a point |
+| Hull repair | 250 M.U. a point of its integrity |
 | Artifact analysis | 500 M.U., once for each artifact |
 | Endurium | 1,000 M.U. a cubic meter at the start of the game |
 | A new terrain vehicle after one is lost | 10,000 M.U. |

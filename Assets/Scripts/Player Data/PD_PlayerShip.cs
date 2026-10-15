@@ -58,8 +58,9 @@ public class PD_PlayerShip
 	// the part of an armor point that has been repaired so far
 	public float m_repairProgress;
 
-	// the ship's systems other than the hull, whose damage is the armor points (the original's damage screen has a bar for the hull, engines, sensors, comm,
-	// shield, missile and laser - SS Damage) - the order is saved, append and never reorder
+	// the ship's systems (the original's damage screen has a bar for the hull, engines, sensors, comm, shield, missile and laser - SS Damage) - the order is
+	// saved, append and never reorder: the hull came last (its integrity, the original's ship field 0x11, DAMAGE-OV WEB53), so in save files from before it the
+	// hull is whole
 	public enum ShipSystem
 	{
 		Engines,
@@ -68,17 +69,20 @@ public class PD_PlayerShip
 		Shields,
 		Missiles,
 		Lasers,
+		Hull,
 		Count
 	}
 
-	// how whole each system is, from 0 (destroyed) to 100 (undamaged), by ShipSystem (null in save files from before the systems could be damaged)
+	// how whole each system is, from 0 (destroyed) to 100 (undamaged), by ShipSystem (null in save files from before the systems could be damaged, one short in
+	// those from before the hull had an integrity of its own)
 	public int[] m_systemHealth;
 
-	// what the engineer is repairing: the hull (the armor points), or a system by its ShipSystem plus 1 (0, the hull, in save files from before the systems could
-	// be damaged, when the hull was all the engineer repaired)
+	// what the engineer is repairing, in the order of the original's Repair (REPAIR-OV >FIELD): the hull, or a system by its ShipSystem plus 1 (0, the hull, in
+	// save files from before the systems could be damaged). The hull is its integrity: the engineer never repairs the armor, which only the Starport restores, as
+	// in the original (REPAIR-OV has the armor's field and never uses it)
 	public int m_repairItem;
 	public const int c_hullRepairItem = 0;
-	public const int c_repairItemCount = (int) ShipSystem.Count + 1;
+	public const int c_repairItemCount = (int) ShipSystem.Count;
 
 	// the repair mineral of the hull and of each system, by its name in the game data, and how much of it the engineer needs: a cubic meter for every tenth
 	// repaired (the owner's ruling of 2026-10-11 for roadmap 1.2 - the original's engineer asks for "2 cubic meters of Molybdenum", "5 cubic meters of Aluminum",
@@ -194,7 +198,7 @@ public class PD_PlayerShip
 	// the most armor points this ship can have - those of the armor plating that is installed, or those of the bare hull if there is none (so this is never zero)
 	// what the Starport charges to repair the ship, as the original's (CONFIG-OV WF226): 4 M.U. a missing armor point; for the engines, shields, missile launcher
 	// and laser cannon the price of the installed class in hundreds of M.U. times the damage in percent, plus 5% ((100 - health) * 105 / 100); and 100 M.U. a
-	// point of damage to the sensors and the comm. (The original's separate hull integrity, 250 M.U. a point, is the armor points in the port.)
+	// point of damage to the sensors and the comm, and 250 M.U. a point of the hull's integrity
 	public int GetStarportRepairCost()
 	{
 		var gameData = DataController.m_instance.m_gameData;
@@ -207,6 +211,8 @@ public class PD_PlayerShip
 			cost += (long) missingPoints * c_repairPricePerArmorPoint;
 		}
 
+		cost += (long) ( 100 - GetHullIntegrity() ) * c_repairPricePerHullPoint;
+
 		cost += GetPartRepairCost( gameData.m_enginesList, m_enginesClass, ShipSystem.Engines );
 		cost += GetPartRepairCost( gameData.m_shieldingList, m_shieldingClass, ShipSystem.Shields );
 		cost += GetPartRepairCost( gameData.m_missileLauncherList, m_missileLauncherClass, ShipSystem.Missiles );
@@ -217,8 +223,9 @@ public class PD_PlayerShip
 		return (int) Mathf.Min( cost, int.MaxValue );
 	}
 
-	// what the Starport charges for one armor point, and for one point of damage to the sensors or the comm (CONFIG-OV WF226)
+	// what the Starport charges for one armor point, for one point of the hull's integrity, and for one point of damage to the sensors or the comm (CONFIG-OV WF226)
 	const int c_repairPricePerArmorPoint = 4;
+	const int c_repairPricePerHullPoint = 250;
 	const int c_repairPricePerSensorAndCommPoint = 100;
 
 	// the repair of an installed part: its class's price in hundreds of M.U. times its damage in percent plus 5% (CONFIG-OV WF1D6), nothing for a part that is not installed
@@ -313,6 +320,44 @@ public class PD_PlayerShip
 		return GetSystemHealth( system ) / 100.0f;
 	}
 
+	// how whole the hull is, from 0 to 100 (the original's hull integrity) - the ship is destroyed when it reaches 0, whatever is left of its armor (DAMAGE-OV
+	// WF3A4: "!!HULL DESTROYED!!")
+	public int GetHullIntegrity()
+	{
+		return GetSystemHealth( ShipSystem.Hull );
+	}
+
+	// true once the ship has been destroyed (a destroyed ship is never saved, and nothing may make its hull whole again)
+	public bool IsDestroyed()
+	{
+		return GetHullIntegrity() <= 0;
+	}
+
+	// call this when the ship is destroyed (the game is lost and is never saved)
+	public void DestroyHull()
+	{
+		SetSystemHealth( ShipSystem.Hull, 0 );
+	}
+
+	// what is left of the ship as the status display's DAMAGE reads it, in percent (SCIENCE WE760): the average health of the hull and of the systems the ship has,
+	// its armor left out, and nothing at all once the hull's integrity is down to 19 or less
+	public int GetOverallIntegrity()
+	{
+		var total = 0;
+		var counted = 0;
+
+		for ( var system = 0; system < (int) ShipSystem.Count; system++ )
+		{
+			if ( HasSystem( (ShipSystem) system ) )
+			{
+				total += GetSystemHealth( (ShipSystem) system );
+				counted++;
+			}
+		}
+
+		return ( GetHullIntegrity() > 19 ) ? total / Mathf.Max( 1, counted ) : 0;
+	}
+
 	// the health below which the sensors give no readings (the owner's ruling of 2026-10-11)
 	public const int c_sensorsNeedHealth = 25;
 
@@ -340,6 +385,7 @@ public class PD_PlayerShip
 			case ShipSystem.Shields: return "Shield generator";
 			case ShipSystem.Missiles: return "Missile launcher";
 			case ShipSystem.Lasers: return "Laser cannon";
+			case ShipSystem.Hull: return "Hull";
 			default: return "?";
 		}
 	}
@@ -383,55 +429,27 @@ public class PD_PlayerShip
 		}
 	}
 
-	// a hit that has got through the shields damages the hull (the armor points) and one of the ship's other systems, chosen at random, by the same share of it as of
-	// the hull (the owner's ruling of 2026-10-11 for roadmap 1.2; the share is the port's choice) - returns the system it damaged (Count if none)
-	public ShipSystem DamageRandomSystem( int damage )
+	// true if a chunk of damage can land on this system: it is installed and still works (DAMAGE-OV #>?FIEL)
+	public bool CanBeDamaged( ShipSystem system )
 	{
-		var maximumArmor = GetMaximumArmorPoints();
+		return HasSystem( system ) && ( GetSystemHealth( system ) > 0 );
+	}
 
-		if ( ( damage <= 0 ) || ( maximumArmor <= 0 ) )
-		{
-			return ShipSystem.Count;
-		}
+	// a chunk of damage that got past the shields and the armor lands on a system: it loses the chunk times 10 over the hull's integrity, so the weaker the hull
+	// the more it loses (DAMAGE-OV WF378 and WEC46, never below 0) - returns what the system lost
+	public int DamageSystem( ShipSystem system, int chunk )
+	{
+		var before = GetSystemHealth( system );
 
-		// how many systems the ship has
-		var installed = 0;
+		SetSystemHealth( system, before - GetSystemDamage( chunk ) );
 
-		for ( var system = 0; system < (int) ShipSystem.Count; system++ )
-		{
-			if ( HasSystem( (ShipSystem) system ) )
-			{
-				installed++;
-			}
-		}
+		return before - GetSystemHealth( system );
+	}
 
-		if ( installed == 0 )
-		{
-			return ShipSystem.Count;
-		}
-
-		// pick one of them
-		var pick = UnityEngine.Random.Range( 0, installed );
-
-		for ( var system = 0; system < (int) ShipSystem.Count; system++ )
-		{
-			if ( !HasSystem( (ShipSystem) system ) )
-			{
-				continue;
-			}
-
-			if ( pick-- == 0 )
-			{
-				// the same share as of the hull, rounded up so that every hit leaves a mark
-				var share = Mathf.CeilToInt( damage * 100.0f / maximumArmor );
-
-				SetSystemHealth( (ShipSystem) system, GetSystemHealth( (ShipSystem) system ) - share );
-
-				return (ShipSystem) system;
-			}
-		}
-
-		return ShipSystem.Count;
+	// what a chunk of damage takes off a system once the armor is gone (DAMAGE-OV WF378: 10 times the chunk over the hull's integrity)
+	public int GetSystemDamage( int chunk )
+	{
+		return chunk * 10 / Mathf.Max( 1, GetHullIntegrity() );
 	}
 
 	public int GetMaximumArmorPoints()
@@ -451,8 +469,9 @@ public class PD_PlayerShip
 			return;
 		}
 
-		// never more than the most this ship can have (this never adds points, so a destroyed ship stays destroyed)
-		m_armorPoints = Mathf.Min( m_armorPoints, GetMaximumArmorPoints() );
+		// never more than the most this ship can have, and never below 0 (the old damage took armor points below 0, and a ship is destroyed by its hull, not its
+		// armor: this never adds a usable point)
+		m_armorPoints = Mathf.Clamp( m_armorPoints, 0, GetMaximumArmorPoints() );
 	}
 
 	// the most shield points this ship can have - the full charge of the shielding that is installed (zero if there is none)
@@ -794,50 +813,50 @@ public class PD_PlayerShip
 		return Mathf.Max( c_minimumRepairRate, engineer.m_engineering * c_repairRatePerSkillPoint );
 	}
 
-	// the number of seconds it will take to finish repairing the armor (zero if there is nothing to repair or nobody to do it)
+	// the number of seconds it will take to finish the repair that is under way (zero if there is nothing to repair or nobody to do it) - every repair item is
+	// repaired at the same pace, the same share of the whole in the same time as the bare hull's armor at the engineer's rate
 	public float GetRepairTimeRemaining()
 	{
 		var repairRate = GetRepairRate();
-		var pointsToRepair = GetMaximumArmorPoints() - m_armorPoints;
+		var maximumArmor = GetMaximumArmorPoints();
+		var pointsToRepair = 100 - GetRepairItemHealth( m_repairItem );
 
-		if ( ( repairRate <= 0.0f ) || ( pointsToRepair <= 0 ) )
+		if ( ( repairRate <= 0.0f ) || ( maximumArmor <= 0 ) || ( pointsToRepair <= 0 ) )
 		{
 			return 0.0f;
 		}
 
-		return Mathf.Max( 0.0f, pointsToRepair - m_repairProgress ) / repairRate;
+		return Mathf.Max( 0.0f, pointsToRepair - m_repairProgress ) / ( repairRate * 100.0f / maximumArmor );
 	}
 
-	// call this to have the engineer start repairing the armor
-	// how whole a repair item is, from 0 to 100 (the hull by its armor points)
+	// the system a repair item is (the hull first, then the systems in their order)
+	public static ShipSystem GetRepairItemSystem( int item )
+	{
+		return ( item == c_hullRepairItem ) ? ShipSystem.Hull : (ShipSystem) ( item - 1 );
+	}
+
+	// how whole a repair item is, from 0 to 100 (100 for one the ship cannot have)
 	public int GetRepairItemHealth( int item )
 	{
-		if ( item == c_hullRepairItem )
+		if ( ( item < 0 ) || ( item >= c_repairItemCount ) )
 		{
-			var maximum = GetMaximumArmorPoints();
-
-			return ( maximum > 0 ) ? Mathf.Clamp( Mathf.FloorToInt( m_armorPoints * 100.0f / maximum ), 0, 100 ) : 100;
+			return 100;
 		}
 
-		return GetSystemHealth( (ShipSystem) ( item - 1 ) );
+		return GetSystemHealth( GetRepairItemSystem( item ) );
 	}
 
 	// true if a repair item works at all (the original's Repair shows "CURRENT FUNCTIONALITY: OPERATIVE" or "INOPERATIVE"): a system works in proportion to its
-	// health, and not at all at 0, and the sensors give no readings below c_sensorsNeedHealth (the owner's rulings of 2026-10-11); the hull while it has armor
-	// points
+	// health, and not at all at 0, and the sensors give no readings below c_sensorsNeedHealth (the owner's rulings of 2026-10-11); the hull while it has any
+	// integrity
 	public bool IsRepairItemOperative( int item )
 	{
-		if ( item == c_hullRepairItem )
-		{
-			return m_armorPoints > 0;
-		}
-
-		if ( ( item <= 0 ) || ( item >= c_repairItemCount ) )
+		if ( ( item < 0 ) || ( item >= c_repairItemCount ) )
 		{
 			return false;
 		}
 
-		var system = (ShipSystem) ( item - 1 );
+		var system = GetRepairItemSystem( item );
 		var health = GetSystemHealth( system );
 
 		return ( system == ShipSystem.Sensors ) ? ( health >= c_sensorsNeedHealth ) : ( health > 0 );
@@ -853,13 +872,13 @@ public class PD_PlayerShip
 	// true if the ship has this repair item (the hull always)
 	public bool HasRepairItem( int item )
 	{
-		return ( item == c_hullRepairItem ) || ( ( item > 0 ) && ( item < c_repairItemCount ) && HasSystem( (ShipSystem) ( item - 1 ) ) );
+		return ( item >= 0 ) && ( item < c_repairItemCount ) && HasSystem( GetRepairItemSystem( item ) );
 	}
 
 	// the name of a repair item, as the engineer says it
 	public string GetRepairItemName( int item )
 	{
-		return ( item == c_hullRepairItem ) ? GetArmorName() : GetSystemName( (ShipSystem) ( item - 1 ) ).ToLower();
+		return GetSystemName( GetRepairItemSystem( item ) ).ToLower();
 	}
 
 	// the element id of a repair item's mineral (-1 if the game data has no such element)
@@ -905,81 +924,31 @@ public class PD_PlayerShip
 		m_repairProgress = 0.0f;
 	}
 
-	// call this every frame during spaceflight - the engineer repairs the armor a little at a time
+	// call this every frame during spaceflight - the engineer repairs the hull's integrity or a system a little at a time
 	public void UpdateRepairs( float deltaTime )
 	{
-		// nothing to do unless the engineer has been told to repair the armor
+		// nothing to do unless the engineer has been told to repair something
 		if ( !m_repairsAreUnderWay )
 		{
 			return;
 		}
 
-		// a system rather than the hull?
-		if ( ( m_repairItem > c_hullRepairItem ) && ( m_repairItem < c_repairItemCount ) )
-		{
-			UpdateSystemRepairs( deltaTime );
-
-			return;
-		}
-
 		// a destroyed ship is beyond repair (and it has to stay destroyed, a destroyed ship is never saved)
-		if ( m_armorPoints <= 0 )
+		if ( IsDestroyed() || ( m_repairItem < 0 ) || ( m_repairItem >= c_repairItemCount ) )
 		{
 			m_repairsAreUnderWay = false;
 
 			return;
 		}
 
-		// is there anything left to repair? (the armor may have been replaced or sold at starport in the meantime - a ship with no armor plating is repaired up to the points of its bare hull)
-		var maximumPoints = GetMaximumArmorPoints();
-
-		if ( m_armorPoints >= maximumPoints )
-		{
-			// no - the engineer is done
-			m_repairsAreUnderWay = false;
-			m_repairProgress = 0.0f;
-
-			return;
-		}
-
-		// the repairs stop if the engineer is gone or incapacitated
-		var repairRate = GetRepairRate();
-
-		if ( repairRate <= 0.0f )
-		{
-			m_repairsAreUnderWay = false;
-
-			SpaceflightController.m_instance.m_messages.AddText( "<color=red>Repairs have stopped. No engineer is available!</color>" );
-
-			return;
-		}
-
-		// repair a little more
-		m_repairProgress += repairRate * deltaTime;
-
-		// move the whole armor points that have been repaired over to the armor
-		var pointsRepaired = Mathf.FloorToInt( m_repairProgress );
-
-		m_repairProgress -= pointsRepaired;
-
-		m_armorPoints = Mathf.Min( maximumPoints, m_armorPoints + pointsRepaired );
-
-		// is the armor whole again?
-		if ( m_armorPoints >= maximumPoints )
-		{
-			// yes - the engineer is done
-			m_repairsAreUnderWay = false;
-			m_repairProgress = 0.0f;
-
-			// the original's line (REPAIR-OV in the decompiled original: "REPAIR COMPLETED", and the engineer waits to be told what to repair next)
-			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Repair completed.</color>" );
-		}
+		UpdateSystemRepairs( deltaTime );
 	}
 
-	// the engineer repairs a system a little at a time, at the pace the hull is repaired at (the same share of the whole in the same time)
+	// the engineer repairs the hull's integrity or a system a little at a time, at the same pace for each (the same share of the whole in the same time as the
+	// armor points of the ship's armor at the engineer's rate)
 	void UpdateSystemRepairs( float deltaTime )
 	{
-		var system = (ShipSystem) ( m_repairItem - 1 );
+		var system = GetRepairItemSystem( m_repairItem );
 
 		// is there anything left to repair?
 		if ( GetSystemHealth( system ) >= 100 )

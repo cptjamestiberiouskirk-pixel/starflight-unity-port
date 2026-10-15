@@ -246,7 +246,7 @@ public class RepairButton : ShipButton
 		return "Not damaged";
 	}
 
-	// how many seconds of play a complete repair of an item takes (the hull by its armor points, a system at the same pace) - 0 if nobody can do it
+	// how many seconds of play a complete repair of an item takes (the hull's integrity and the systems all at the same pace) - 0 if nobody can do it
 	static float GetRepairSeconds( PD_PlayerShip ship, int item )
 	{
 		var rate = ship.GetRepairRate();
@@ -259,11 +259,6 @@ public class RepairButton : ShipButton
 
 		// the part already done counts for the repair under way
 		var progress = ( ship.m_repairsAreUnderWay && ( ship.m_repairItem == item ) ) ? ship.m_repairProgress : 0.0f;
-
-		if ( item == PD_PlayerShip.c_hullRepairItem )
-		{
-			return Mathf.Max( 0.0f, maximumArmor - ship.m_armorPoints - progress ) / rate;
-		}
 
 		return Mathf.Max( 0.0f, 100 - ship.GetRepairItemHealth( item ) - progress ) / ( rate * 100.0f / maximumArmor );
 	}
