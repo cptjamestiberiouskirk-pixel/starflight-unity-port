@@ -77,9 +77,47 @@ public class CombatController : MonoBehaviour
 	const float c_laserRange = 800.0f;
 	const float c_missileRange = 1500.0f;
 
-	// endurium used up by every shot, in cubic meters
-	const float c_laserFuelPerShot = 0.01f;
-	const float c_missileFuelPerShot = 0.02f;
+	// endurium used up by every shot, in cubic meters: a tenth for a laser and half a cubic meter for a missile (COMBAT-OV WF1DC and WF1B6, WF058)
+	const float c_laserFuelPerShot = 0.1f;
+	const float c_missileFuelPerShot = 0.5f;
+
+	// the navigator's aim (COMBAT-OV WF0D8 and WF0B6): each axis of a shot is off by whole cells of the original's combat map, a roll from 0 to 249 less the
+	// navigator's skill over 50 (either way), so a shot is on target with the chance (50 / (250 - skill)) squared, and always from skill 200 - returns how many
+	// cells it is off across and along
+	public static Vector2Int RollAimOffset( int navigationSkill )
+	{
+		var spread = Mathf.Max( 1, 250 - Mathf.Clamp( navigationSkill, 0, 250 ) );
+
+		var across = UnityEngine.Random.Range( 0, spread ) / 50;
+		var along = UnityEngine.Random.Range( 0, spread ) / 50;
+
+		if ( UnityEngine.Random.Range( 0, 2 ) == 0 )
+		{
+			across = -across;
+		}
+
+		if ( UnityEngine.Random.Range( 0, 2 ) == 0 )
+		{
+			along = -along;
+		}
+
+		return new Vector2Int( across, along );
+	}
+
+	// the skill the aim comes from: the navigator's, none without a navigator who can work
+	static int GetNavigatorSkill()
+	{
+		var crewAssignment = DataController.m_instance.m_playerData.m_crewAssignment;
+
+		if ( !crewAssignment.IsAssigned( PD_CrewAssignment.Role.Navigator ) )
+		{
+			return 0;
+		}
+
+		var navigator = crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Navigator );
+
+		return ( ( navigator != null ) && !navigator.m_isDead && ( navigator.m_vitality > 0.0f ) ) ? navigator.m_navigation : 0;
+	}
 
 	// current target
 	int m_currentTargetIndex = -1;
@@ -409,6 +447,12 @@ public class CombatController : MonoBehaviour
 			// still fire visually but no damage
 		}
 
+		// where the shot goes: the navigator's aim can put it whole cells off the target, and then it misses (the original's laser hits only what is in the cell it is
+		// aimed at)
+		var aim = RollAimOffset( GetNavigatorSkill() );
+		var onTarget = ( aim == Vector2Int.zero );
+		var aimPosition = targetPosition + new Vector3( aim.x, 0.0f, aim.y ) * c_unitsPerCell;
+
 		// fire the laser
 		var laser = GetAvailableLaser();
 		if ( laser != null )
@@ -416,11 +460,11 @@ public class CombatController : MonoBehaviour
 			// set color based on weapon class
 			var laserColor = GetLaserColor( playerData.m_playerShip.m_laserCannonClass );
 			laser.SetColor( laserColor );
-			laser.Fire( playerPosition, targetPosition );
+			laser.Fire( playerPosition, aimPosition );
 		}
 
-		// apply damage if not immune
-		if ( !targetVessel.m_immuneToLasers )
+		// apply damage if on target and not immune
+		if ( onTarget && !targetVessel.m_immuneToLasers )
 		{
 			// the laser's damage falls off with the distance to the target
 			int damage = GetLaserDamage( playerData.m_playerShip.m_laserCannonClass, Vector3.Distance( playerPosition, targetPosition ) );
@@ -503,6 +547,12 @@ public class CombatController : MonoBehaviour
 			SpaceflightController.m_instance.m_messages.AddText( "<color=yellow>Target is immune to missiles!</color>" );
 		}
 
+		// where the missile goes: the navigator's aim can put it whole cells off the target, and then it flies to that place and misses (the original's missile flies
+		// along the line to the place it is aimed at)
+		var aim = RollAimOffset( GetNavigatorSkill() );
+		var onTarget = ( aim == Vector2Int.zero );
+		var aimPosition = targetPosition + new Vector3( aim.x, 0.0f, aim.y ) * c_unitsPerCell;
+
 		// fire the missile - find target model (its model slot is not the same as the target index, so ask the encounter for it)
 		var targetModel = encounter.GetAlienShipModel( m_currentTargetIndex );
 		int targetIndex = m_currentTargetIndex;
@@ -514,7 +564,7 @@ public class CombatController : MonoBehaviour
 		// this is called when the missile reaches the target
 		System.Action<Vector3, bool> onMissileHit = ( hitPosition, didHit ) =>
 		{
-			if ( didHit && !isImmune )
+			if ( didHit && onTarget && !isImmune )
 			{
 				ApplyDamageToAlien( targetIndex, damage );
 			}
@@ -531,7 +581,12 @@ public class CombatController : MonoBehaviour
 			SoundController.m_instance.PlaySound( SoundController.Sound.TorpedoExplosion );
 		};
 
-		if ( targetModel != null )
+		if ( !onTarget )
+		{
+			// off target: it flies to where it was aimed
+			missile.Fire( playerPosition, aimPosition, onMissileHit );
+		}
+		else if ( targetModel != null )
 		{
 			// home in on the target model
 			missile.Fire( playerPosition, targetModel.transform, onMissileHit );
