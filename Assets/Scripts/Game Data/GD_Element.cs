@@ -27,11 +27,24 @@ public class GD_Element
 		return m_id == DataController.m_instance.m_gameData.m_misc.m_enduriumElementId;
 	}
 
-	// the price of Endurium today
+	// the price of Endurium: the one fixed when the ship last left the Starport, as the original sets it only at launch (PORTMENU-OV WEBA2), so a rise
+	// that comes during a flight is paid from the next launch on; before the first launch, and in a save from before the price was kept, the price of the day
 	static int GetEnduriumPrice()
 	{
-		var today = DataController.m_instance.m_playerData.m_general.m_currentStardateYMD;
+		var playerData = DataController.m_instance.m_playerData;
 
+		if ( ( playerData.m_starport != null ) && ( playerData.m_starport.m_enduriumPrice > 0 ) )
+		{
+			return playerData.m_starport.m_enduriumPrice;
+		}
+
+		return GetEnduriumPriceOn( playerData.m_general.m_currentStardateYMD );
+	}
+
+	// the price of Endurium on a stardate (year-month-day): the original's ELEM-VAL of 100 a tenth of a cubic meter, 50 more after day 48 and 50 more after
+	// day 133 (PORTMENU-OV WEBA2), which are 20-02-4620 and 15-05-4620
+	public static int GetEnduriumPriceOn( string today )
+	{
 		if ( string.CompareOrdinal( today, c_secondEnduriumRise ) >= 0 )
 		{
 			return c_secondEnduriumRisePrice;
