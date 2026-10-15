@@ -258,12 +258,10 @@ public class SpaceflightController : MonoBehaviour
 		// DEBUG: Press F10 to instantly destroy player ship (test game over)
 		if ( KeyWentDown( Key.F10 ) )
 		{
-			playerData.m_playerShip.m_shieldPoints = 0;
-			playerData.m_playerShip.m_armorPoints = 0;
 			var combatController = ( m_combatController != null ) ? m_combatController : CombatController.m_instance;
 			if ( combatController != null )
 			{
-				combatController.ApplyDamageToPlayer( 1, Vector3.forward );
+				combatController.DestroyPlayerShip( null );
 			}
 			else
 			{

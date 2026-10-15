@@ -1452,6 +1452,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioClockRate();
 				break;
 
+			case "hullintegrity":
+				yield return ScenarioHullIntegrity();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -2102,15 +2106,16 @@ public class ClaudeProbe : MonoBehaviour
 		quit.Invoke( dataController, null );
 
 		var saves1 = MemorySaveSystem.s_saveCalls;
-		var armor = ship.m_armorPoints;
+		var hull = ship.GetHullIntegrity();
 
-		ship.m_armorPoints = 0;
+		// a destroyed ship (its hull's integrity gone)
+		ship.DestroyHull();
 
 		quit.Invoke( dataController, null );
 
 		var saves2 = MemorySaveSystem.s_saveCalls;
 
-		ship.m_armorPoints = armor;
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Hull, hull );
 
 		Check( "M9 quitting saves unless the ship is destroyed", ( saves1 == saves0 + 1 ) && ( saves2 == saves1 ), "saves on quit with a living ship=" + ( saves1 - saves0 ) + ", with a destroyed ship=" + ( saves2 - saves1 ) );
 
@@ -3599,7 +3604,7 @@ public class ClaudeProbe : MonoBehaviour
 		// ---- first loss: the aliens turn hostile and destroy the ship
 		dataController.m_playerData.FindEncounter( encounterId ).m_alienStance = GD_Comm.Stance.Hostile;
 
-		CombatController.m_instance.ApplyDamageToPlayer( 5000, Vector3.forward );
+		DestroyWithAHit();
 
 		// wait for the explosion to finish and the game over screen to come up
 		for ( var i = 0; ( i < 1800 ) && !SpaceflightController.m_instance.m_gameOver; i++ )
@@ -3652,9 +3657,9 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "H7 continuing puts the player back at the start of the encounter with a living ship", ( continuedIn == "Spaceflight" ) && !pausedAfterContinue && ( stanceAfterContinue == stanceAtStart ) && ( armorAfterLightHit == 390 ), memoryAfterContinue + ", armor after a 10 point hit " + armorAfterLightHit + ", stance when the encounter began " + stanceAtStart );
 
 		// ---- second loss: nothing is saved once the ship is destroyed, not even during the explosion (before the game over screen)
-		if ( dataController.m_playerData.m_playerShip.m_armorPoints > 0 )
+		if ( !dataController.m_playerData.m_playerShip.IsDestroyed() )
 		{
-			CombatController.m_instance.ApplyDamageToPlayer( 5000, Vector3.forward );
+			DestroyWithAHit();
 		}
 
 		// closing the save game panel saves the game
@@ -3701,7 +3706,7 @@ public class ClaudeProbe : MonoBehaviour
 			var active = dataController.m_activeSaveGameSlotNumber;
 			var planted = Stored( active );
 
-			planted.m_playerShip.m_armorPoints = 0;
+			planted.m_playerShip.DestroyHull();
 
 			MemorySaveSystem.s_slots[ active ] = JsonUtility.ToJson( planted, true );
 
@@ -3711,12 +3716,12 @@ public class ClaudeProbe : MonoBehaviour
 
 			dataController.SaveActiveGame();
 
-			var armorLoaded = dataController.m_playerData.m_playerShip.m_armorPoints;
+			var hullLoaded = dataController.m_playerData.m_playerShip.GetHullIntegrity();
 			var savedAgain = MemorySaveSystem.s_saveCalls > savesBefore;
 
-			oldSave = "armor" + armorLoaded + ( savedAgain ? "/saves" : "/doesNotSave" );
+			oldSave = "hull" + hullLoaded + ( savedAgain ? "/saves" : "/doesNotSave" );
 
-			Check( "H7 a save written with a destroyed ship loads and can be saved again", ( armorLoaded == 1 ) && savedAgain, "loaded with armor " + armorLoaded + ", saved again: " + savedAgain );
+			Check( "H7 a save written with a destroyed ship loads and can be saved again", ( hullLoaded == 1 ) && savedAgain, "loaded with the hull at " + hullLoaded + ", saved again: " + savedAgain );
 		}
 
 		Finish( "scenario=h7 gameOverShown=" + gameOverShown + " storedAtStart=[" + storedAtStart + "] memoryAtTitle=[" + memoryAtTitle + "] afterContinue=[" + memoryAfterContinue + "] armorAfter10Hit=" + armorAfterLightHit + " storedAfterPanelSave=[" + storedAfterPanel + "] storedCopy=[" + storedCopy + "] oldSlotAfterSwitch=[" + storedOldSlot + "] oldSave=" + oldSave + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
@@ -4107,11 +4112,12 @@ public class ClaudeProbe : MonoBehaviour
 		crew.Assign( PD_CrewAssignment.Role.CommunicationsOfficer, captain.m_fileId );
 		crew.Assign( PD_CrewAssignment.Role.Doctor, doctor.m_fileId );
 
-		// ---- repair: class 2 armor (750 points) down to 300
-		ship.m_armorClass = 2;
-		ship.m_armorPoints = 300;
-
-		var maxArmor = ship.GetArmor().m_points;
+		// ---- repair: the hull's integrity at 40 on a bare hull (250 armor points, here 100 of them left) - the engineer repairs the hull and the systems, never the
+		// armor (REPAIR-OV), each at the same share of the whole as the armor points at the engineer's rate: at skill 100 (2 armor points a second) 0.8 points of the
+		// hull's integrity a second
+		ship.m_armorClass = 0;
+		ship.m_armorPoints = 100;
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Hull, 40 );
 
 		// the engineer asks for the hull's repair mineral (since roadmap 1.2): aluminum in the hold, and yes
 		ship.AddElement( 0, 200 );
@@ -4120,88 +4126,81 @@ public class ClaudeProbe : MonoBehaviour
 
 		AnswerRepairQuestion( true );
 
-		var armorRightAfter = ship.m_armorPoints;
+		var hullRightAfter = ship.GetHullIntegrity();
 		var repairMessage = MessageList();
 
 		yield return new WaitForSecondsRealtime( 5.0f );
 
-		var armorAfter5s = ship.m_armorPoints;
+		var hullAfter5s = ship.GetHullIntegrity();
 
 		// pressing the button again must not speed anything up
 		RepairThroughTheConsole( 0 );
 
-		var armorAfterSecondPress = ship.m_armorPoints;
+		var hullAfterSecondPress = ship.GetHullIntegrity();
 		var secondPressMessage = MessageList();
 
-		Log( "M20 repair, engineer skill 100, armor 300/" + maxArmor + ": right after the button " + armorRightAfter + ", 5 s later " + armorAfter5s + ", after pressing it again " + armorAfterSecondPress );
+		Log( "M20 repair, engineer skill 100, hull 40 on a bare hull: right after the button " + hullRightAfter + ", 5 s later " + hullAfter5s + ", after pressing it again " + hullAfterSecondPress + ", armor " + ship.m_armorPoints );
 		Log( "M20 repair message: " + repairMessage );
 		Log( "M20 repair message on the second press: " + secondPressMessage );
 
-		Check( "M20 the repair button does not repair anything on the spot", armorRightAfter == 300, "armor right after the button " + armorRightAfter + " (was 300)" );
-		Check( "M20 the engineer repairs about 2 points a second at skill 100", ( armorAfter5s > 302 ) && ( armorAfter5s <= 313 ) && ( armorAfterSecondPress <= armorAfter5s + 1 ), "armor after 5 s " + armorAfter5s + ", after a second press " + armorAfterSecondPress );
+		Check( "M20 the repair button does not repair anything on the spot", hullRightAfter == 40, "hull right after the button " + hullRightAfter + " (was 40)" );
+		Check( "M20 the engineer repairs the hull's integrity about 0.8 points a second at skill 100 on a bare hull", ( hullAfter5s >= 42 ) && ( hullAfter5s <= 45 ) && ( hullAfterSecondPress <= hullAfter5s + 1 ), "hull after 5 s " + hullAfter5s + ", after a second press " + hullAfterSecondPress );
 
 		var repair = "n/a";
 
 		if ( ( updateRepairs != null ) && ( repairsField != null ) )
 		{
-			// a minute at skill 100, then a minute at skill 250
-			ship.m_armorPoints = 300;
+			// 20 s at skill 100, then 20 s at skill 250 (0.8 and 2 points of the hull's integrity a second on a bare hull)
+			ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Hull, 40 );
 			progressField.SetValue( ship, 0.0f );
 
-			updateRepairs.Invoke( ship, new object[] { 60.0f } );
+			updateRepairs.Invoke( ship, new object[] { 20.0f } );
 
-			var gainedAtSkill100 = ship.m_armorPoints - 300;
+			var gainedAtSkill100 = ship.GetHullIntegrity() - 40;
 
 			engineer.m_engineering = 250;
-			ship.m_armorPoints = 300;
+			ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Hull, 40 );
+			progressField.SetValue( ship, 0.0f );
 
-			updateRepairs.Invoke( ship, new object[] { 60.0f } );
+			updateRepairs.Invoke( ship, new object[] { 20.0f } );
 
-			var gainedAtSkill250 = ship.m_armorPoints - 300;
+			var gainedAtSkill250 = ship.GetHullIntegrity() - 40;
 
 			// and to the end
 			updateRepairs.Invoke( ship, new object[] { 10000.0f } );
 
+			var hullWhenDone = ship.GetHullIntegrity();
 			var armorWhenDone = ship.m_armorPoints;
 			var stillUnderWayWhenDone = (bool) repairsField.GetValue( ship );
 			var doneMessage = MessageList();
 
 			// a destroyed ship is not repaired back to life
-			ship.m_armorPoints = 0;
+			ship.DestroyHull();
 			repairsField.SetValue( ship, true );
 
 			updateRepairs.Invoke( ship, new object[] { 60.0f } );
 
-			var destroyedArmor = ship.m_armorPoints;
-
-			// armor sold while the repairs were under way (the ship is back on its bare hull, and 250 is all a bare hull can have)
-			ship.m_armorClass = 0;
-			ship.m_armorPoints = 250;
-			repairsField.SetValue( ship, true );
-
-			updateRepairs.Invoke( ship, new object[] { 60.0f } );
-
-			var bareHullArmor = ship.m_armorPoints;
+			var destroyedHull = ship.GetHullIntegrity();
 
 			// an engineer who is out of action
-			ship.m_armorClass = 2;
-			ship.m_armorPoints = 300;
+			ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Hull, 40 );
 			engineer.m_vitality = 0.0f;
 			repairsField.SetValue( ship, true );
 
 			updateRepairs.Invoke( ship, new object[] { 60.0f } );
 
-			var armorWithoutEngineer = ship.m_armorPoints;
+			var hullWithoutEngineer = ship.GetHullIntegrity();
 
 			engineer.m_vitality = 100.0f;
+			ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Hull, 100 );
 
-			repair = "60s@100=+" + gainedAtSkill100 + " 60s@250=+" + gainedAtSkill250 + " done=" + armorWhenDone + " destroyed=" + destroyedArmor + " bareHull=" + bareHullArmor + " noEngineer=" + armorWithoutEngineer;
+			repair = "20s@100=+" + gainedAtSkill100 + " 20s@250=+" + gainedAtSkill250 + " done=" + hullWhenDone + " armor=" + armorWhenDone + " destroyed=" + destroyedHull + " noEngineer=" + hullWithoutEngineer;
 
 			Log( "M20 repair: " + repair + " | message when done: " + doneMessage );
 
-			Check( "M20 a better engineer repairs faster", ( gainedAtSkill100 == 120 ) && ( gainedAtSkill250 == 300 ), "60 s at skill 100: +" + gainedAtSkill100 + ", at skill 250: +" + gainedAtSkill250 );
-			Check( "M20 repairs stop when the armor is whole", ( armorWhenDone == maxArmor ) && !stillUnderWayWhenDone && doneMessage.Contains( "completed" ), "armor " + armorWhenDone + "/" + maxArmor + ", still under way " + stillUnderWayWhenDone );
-			Check( "M20 repairs never touch a destroyed ship, a ship with no armor, or run without an engineer", ( destroyedArmor == 0 ) && ( bareHullArmor == 250 ) && ( armorWithoutEngineer == 300 ), "destroyed ship " + destroyedArmor + ", bare hull " + bareHullArmor + ", no engineer " + armorWithoutEngineer );
+			Check( "M20 a better engineer repairs faster", ( gainedAtSkill100 == 16 ) && ( gainedAtSkill250 == 40 ), "20 s at skill 100: +" + gainedAtSkill100 + ", at skill 250: +" + gainedAtSkill250 );
+			Check( "M20 repairs stop when the hull is whole, and never touch the armor", ( hullWhenDone == 100 ) && !stillUnderWayWhenDone && doneMessage.Contains( "completed" ) && ( armorWhenDone == 100 ), "hull " + hullWhenDone + ", still under way " + stillUnderWayWhenDone + ", armor " + armorWhenDone );
+			Check( "M20 repairs never touch a destroyed ship, or run without an engineer", ( destroyedHull == 0 ) && ( hullWithoutEngineer == 40 ), "destroyed ship " + destroyedHull + ", no engineer " + hullWithoutEngineer );
 		}
 
 		// ---- treat (the player chooses who: the one hurt the most)
@@ -4269,7 +4268,7 @@ public class ClaudeProbe : MonoBehaviour
 			Check( "M20 a dead crew member is not treated", !treatingTheDead && nobodyMessage.Contains( "beyond help" ), "treatment under way " + treatingTheDead + ", message: " + nobodyMessage );
 		}
 
-		Finish( "scenario=m20 repairOnThePress=" + ( armorRightAfter - 300 ) + " repairIn5s=" + ( armorAfter5s - 300 ) + " repair=[" + repair + "] treatOnThePress=[" + rightAfterTreat + "] treatIn5s=Worse" + worseAfter5s.ToString( "F1" ) + "/Hurt" + hurtAfter5s.ToString( "F1" ) + "/Ashore" + ashoreAfter5s.ToString( "F1" ) + " treat=[" + treat + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+		Finish( "scenario=m20 repairOnThePress=" + ( hullRightAfter - 40 ) + " repairIn5s=" + ( hullAfter5s - 40 ) + " repair=[" + repair + "] treatOnThePress=[" + rightAfterTreat + "] treatIn5s=Worse" + worseAfter5s.ToString( "F1" ) + "/Hurt" + hurtAfter5s.ToString( "F1" ) + "/Ashore" + ashoreAfter5s.ToString( "F1" ) + " treat=[" + treat + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- H8: missiles are not counted, every shot uses a little endurium
@@ -4894,6 +4893,41 @@ public class ClaudeProbe : MonoBehaviour
 		return ( lines.Length > 1 ) ? lines[ 1 ] : "";
 	}
 
+	// one hit that destroys the ship by its hull ("!!HULL DESTROYED!!", the explosion and the game over): the armor gone, the hull at 1 point of its integrity and
+	// every other part out of action for that one hit (the systems at 0, the crew's vitality put aside and given back after), so its first chunk lands on the
+	// hull - a hit lands on a part chosen at random from those that still work (DAMAGE-OV WEF76), so without this even a hit of 5000 may leave the hull standing
+	static void DestroyWithAHit( int damage = 5000 )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var crew = new List<PD_Personnel.PD_PersonnelFile>( playerData.m_personnel.m_personnelList );
+		var vitality = new List<float>();
+
+		foreach ( var file in crew )
+		{
+			vitality.Add( file.m_vitality );
+			file.m_vitality = 0.0f;
+		}
+
+		ship.m_shieldsAreUp = false;
+		ship.m_shieldPoints = 0;
+		ship.m_armorPoints = 0;
+
+		for ( var system = 0; system < (int) PD_PlayerShip.ShipSystem.Count; system++ )
+		{
+			ship.SetSystemHealth( (PD_PlayerShip.ShipSystem) system, 0 );
+		}
+
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Hull, 1 );
+
+		CombatController.m_instance.ApplyDamageToPlayer( damage, Vector3.forward );
+
+		for ( var i = 0; i < crew.Count; i++ )
+		{
+			crew[ i ].m_vitality = vitality[ i ];
+		}
+	}
+
 	// hit the hull (shields down) and tell whether the hull breach warning came with it
 	static bool HitWarns( int armorBefore, int damage )
 	{
@@ -4935,12 +4969,17 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "M11 an undamaged new ship shows no damage", newDamageLine == "None", "status damage line '" + newDamageLine + "'" );
 		Check( "M11 an undamaged new ship has a full armor gauge and an empty shield gauge", Mathf.Approximately( newArmorGauge, 1.0f ) && ( newShieldGauge == 0.0f ), "armor gauge " + newArmorGauge.ToString( "F3" ) + ", shield gauge " + newShieldGauge.ToString( "F3" ) );
-		Check( "M11 Damage shows the DAMAGE display with the bare hull whole (its 250 of 250 points), no bars for the shield, missile and laser the new ship lacks, and writes nothing, as the original's does", ( newRows == "HULL 100, ENGINES 100, SENSORS 100, COMM. 100, SHIELD -, MISSILE -, LASER -" ) && ( newReport == "" ), newRows + " | text: '" + newReport + "'" );
+		Check( "M11 Damage shows the DAMAGE display with the hull whole, no bars for the shield, missile and laser the new ship lacks, and writes nothing, as the original's does", ( newRows == "HULL 100, ENGINES 100, SENSORS 100, COMM. 100, SHIELD -, MISSILE -, LASER -" ) && ( newReport == "" ), newRows + " | text: '" + newReport + "'" );
 
-		// ---- 2. the bare hull damaged: 200 of 250, and the engineer (skill 100, so 2 points a second) repairs it
+		// ---- 2. the bare hull's armor down to 200 of 250 is no damage to the hull (the status display's DAMAGE reads the hull and the systems, SCIENCE WE760); the
+		// hull's integrity at 60 is slight damage, and the engineer (skill 100, so on a bare hull 0.8 points of the hull's integrity a second) repairs it
 		ship.m_armorPoints = 200;
 
-		var hurtDamageLine = StatusDamageLine( out var hurtArmorGauge, out _ );
+		var armorOnlyDamageLine = StatusDamageLine( out var hurtArmorGauge, out _ );
+
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Hull, 60 );
+
+		var hurtDamageLine = StatusDamageLine( out _, out _ );
 
 		// the engineer asks for the hull's repair mineral (since roadmap 1.2): aluminum in the hold, and yes
 		ship.AddElement( 0, 200 );
@@ -4955,10 +4994,11 @@ public class ClaudeProbe : MonoBehaviour
 
 		ship.UpdateRepairs( 10.0f );
 
-		var armorAfter10s = ship.m_armorPoints;
+		var hullAfter10s = ship.GetHullIntegrity();
 
 		ship.UpdateRepairs( 10000.0f );
 
+		var hullWhenDone = ship.GetHullIntegrity();
 		var armorWhenDone = ship.m_armorPoints;
 		var stillUnderWay = ship.m_repairsAreUnderWay;
 		var doneMessage = MessageList();
@@ -4970,16 +5010,18 @@ public class ClaudeProbe : MonoBehaviour
 		var startedWithNothingToRepair = ship.m_repairsAreUnderWay;
 
 		ship.m_repairsAreUnderWay = false;
+		ship.m_armorPoints = 250;
 
-		Log( "M11 bare hull at 200/250: status damage line '" + hurtDamageLine + "', armor gauge " + hurtArmorGauge.ToString( "F3" ) + " | repair started " + repairsStarted + ", after 10 s " + armorAfter10s + ", when done " + armorWhenDone + " (still under way " + stillUnderWay + ")" );
-		Log( "M11 bare hull repair message: " + repairMessage );
-		Log( "M11 bare hull message when done: " + doneMessage );
-		Log( "M11 bare hull repair message with nothing to repair: " + nothingToRepairMessage );
+		Log( "M11 bare hull armor at 200/250: status damage line '" + armorOnlyDamageLine + "', armor gauge " + hurtArmorGauge.ToString( "F3" ) + " | the hull at 60: '" + hurtDamageLine + "' | repair started " + repairsStarted + ", after 10 s " + hullAfter10s + ", when done " + hullWhenDone + " (still under way " + stillUnderWay + "), armor " + armorWhenDone );
+		Log( "M11 hull repair message: " + repairMessage );
+		Log( "M11 hull message when done: " + doneMessage );
+		Log( "M11 hull repair message with nothing to repair: " + nothingToRepairMessage );
 
-		Check( "M11 a bare hull at 200 of 250 shows slight damage (the original's word for four fifths of the hull) and a gauge at four fifths", hurtDamageLine.Contains( ">Slight<" ) && Mathf.Approximately( hurtArmorGauge, 0.8f ), "status damage line '" + hurtDamageLine + "', armor gauge " + hurtArmorGauge.ToString( "F3" ) );
-		Check( "M11 the engineer repairs a bare hull", repairsStarted && ( armorAfter10s == 220 ), "repair started " + repairsStarted + ", armor after 10 s " + armorAfter10s + " (was 200) | " + repairMessage );
-		Check( "M11 the repair of a bare hull stops at its 250 points", ( armorWhenDone == 250 ) && !stillUnderWay && doneMessage.Contains( "completed" ), "armor when done " + armorWhenDone + ", still under way " + stillUnderWay + " | " + doneMessage );
-		Check( "M11 an undamaged bare hull needs no repairs", !startedWithNothingToRepair && nothingToRepairMessage.Contains( "No repairs" ), "started " + startedWithNothingToRepair + " | " + nothingToRepairMessage );
+		Check( "M11 armor lost is no damage to the hull (the status display's DAMAGE reads the hull and the systems), and the armor gauge shows four fifths of it", ( armorOnlyDamageLine == "None" ) && Mathf.Approximately( hurtArmorGauge, 0.8f ), "status damage line '" + armorOnlyDamageLine + "', armor gauge " + hurtArmorGauge.ToString( "F3" ) );
+		Check( "M11 the hull's integrity at 60 shows slight damage (the hull and the systems at nine tenths on average)", hurtDamageLine.Contains( ">Slight<" ), "status damage line '" + hurtDamageLine + "'" );
+		Check( "M11 the engineer repairs the hull's integrity", repairsStarted && ( hullAfter10s == 68 ), "repair started " + repairsStarted + ", hull after 10 s " + hullAfter10s + " (was 60) | " + repairMessage );
+		Check( "M11 the repair of the hull stops when it is whole, and leaves the armor to the Starport", ( hullWhenDone == 100 ) && !stillUnderWay && doneMessage.Contains( "completed" ) && ( armorWhenDone == 200 ), "hull when done " + hullWhenDone + ", still under way " + stillUnderWay + ", armor " + armorWhenDone + " | " + doneMessage );
+		Check( "M11 an undamaged hull needs no repairs", !startedWithNothingToRepair && nothingToRepairMessage.Contains( "No repairs" ), "started " + startedWithNothingToRepair + " | " + nothingToRepairMessage );
 
 		// ---- 3. class 2 armor (750 points): undamaged, then down to 300
 		ship.m_armorClass = 2;
@@ -5000,8 +5042,8 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "M11 class 2 armor damage display at 300/750: " + class2Rows );
 
 		Check( "M11 undamaged class 2 armor shows no damage and a full gauge", ( class2FullDamageLine == "None" ) && Mathf.Approximately( class2FullArmorGauge, 1.0f ), "status damage line '" + class2FullDamageLine + "', armor gauge " + class2FullArmorGauge.ToString( "F3" ) );
-		Check( "M11 class 2 armor at 300 of 750 shows heavy damage (the original's word for two fifths of the hull) and a gauge at two fifths", class2HurtDamageLine.Contains( ">Heavy<" ) && Mathf.Approximately( class2HurtArmorGauge, 0.4f ), "status damage line '" + class2HurtDamageLine + "', armor gauge " + class2HurtArmorGauge.ToString( "F3" ) );
-		Check( "M11 the DAMAGE display's hull bar counts installed armor by its own points (300 of 750: 40)", class2Rows.StartsWith( "HULL 40," ), class2Rows );
+		Check( "M11 class 2 armor at 300 of 750 shows a gauge at two fifths, and no damage to the hull", ( class2HurtDamageLine == "None" ) && Mathf.Approximately( class2HurtArmorGauge, 0.4f ), "status damage line '" + class2HurtDamageLine + "', armor gauge " + class2HurtArmorGauge.ToString( "F3" ) );
+		Check( "M11 the DAMAGE display's hull bar is the hull's integrity, not the armor (300 of 750 armor, the hull whole: 100)", class2Rows.StartsWith( "HULL 100," ), class2Rows );
 
 		// ---- 4. shields: class 1 (500 points) half charged, class 5 (2500 points) fully charged, and none
 		ship.m_shieldingClass = 1;
@@ -5049,7 +5091,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "M11 a scratch on a bare hull does not set off the hull breach warning", !bareScratchWarned && bareLowWarned, "250 to 240 warned " + bareScratchWarned + ", 70 to 60 warned " + bareLowWarned );
 		Check( "M11 class 5 armor warns below a quarter of its 1500 points", !class5AboveWarned && class5BelowWarned, "400 to 390 warned " + class5AboveWarned + ", 310 to 300 warned " + class5BelowWarned );
 
-		Finish( "scenario=m11 newShip=[" + newDamageLine + " gauge " + newArmorGauge.ToString( "F3" ) + "] bareHullRepair=" + repairsStarted + "/" + armorAfter10s + "/" + armorWhenDone + " class2=[" + class2FullDamageLine + " " + class2FullArmorGauge.ToString( "F3" ) + " | " + class2HurtArmorGauge.ToString( "F3" ) + "] shieldGauge=" + halfShieldGauge.ToString( "F3" ) + "/" + fullShieldGauge.ToString( "F3" ) + "/" + noShieldGauge.ToString( "F3" ) + " warned=" + bareScratchWarned + "/" + bareLowWarned + "/" + class5AboveWarned + "/" + class5BelowWarned + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+		Finish( "scenario=m11 newShip=[" + newDamageLine + " gauge " + newArmorGauge.ToString( "F3" ) + "] hullRepair=" + repairsStarted + "/" + hullAfter10s + "/" + hullWhenDone + " class2=[" + class2FullDamageLine + " " + class2FullArmorGauge.ToString( "F3" ) + " | " + class2HurtArmorGauge.ToString( "F3" ) + "] shieldGauge=" + halfShieldGauge.ToString( "F3" ) + "/" + fullShieldGauge.ToString( "F3" ) + "/" + noShieldGauge.ToString( "F3" ) + " warned=" + bareScratchWarned + "/" + bareLowWarned + "/" + class5AboveWarned + "/" + class5BelowWarned + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- M18: generating the planet maps does not hold up the main thread
@@ -8240,7 +8282,7 @@ public class ClaudeProbe : MonoBehaviour
 		var wrecksBefore = FindObjectsByType<DebrisTumble>( FindObjectsInactive.Include, FindObjectsSortMode.None ).Length;
 
 		// the hit that destroys the ship
-		combat.ApplyDamageToPlayer( 5000, Vector3.forward );
+		DestroyWithAHit();
 
 		var inTheAirAfterDestruction = MissilesInFlight();
 		var canFireLaserAfter = combat.CanFireLaser();
@@ -8263,9 +8305,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		var wrecks = FindObjectsByType<DebrisTumble>( FindObjectsInactive.Include, FindObjectsSortMode.None ).Length - wrecksBefore;
 
-		Log( "combat: the ship was destroyed, fired at by a " + alienVessel.m_name + " (laser class " + alienVessel.m_laserClass + ") and hit for 5000 again: wrecks spawned " + wrecks + ", game over called " + s_gameOverCalls + " times, armor " + ship.m_armorPoints + ", game over flag " + controller.m_gameOver + " | missiles in the air right after the destruction " + inTheAirAfterDestruction + " | could fire before " + couldFireBefore + ", laser after " + canFireLaserAfter + ", missile after " + canFireMissileAfter + " | messages from the alien's shot: [" + alienFireMessages + "]" );
+		Log( "combat: the ship was destroyed, fired at by a " + alienVessel.m_name + " (laser class " + alienVessel.m_laserClass + ") and hit for 5000 again: wrecks spawned " + wrecks + ", game over called " + s_gameOverCalls + " times, hull " + ship.GetHullIntegrity() + ", game over flag " + controller.m_gameOver + " | missiles in the air right after the destruction " + inTheAirAfterDestruction + " | could fire before " + couldFireBefore + ", laser after " + canFireLaserAfter + ", missile after " + canFireMissileAfter + " | messages from the alien's shot: [" + alienFireMessages + "]" );
 
-		Check( "combat: a destroyed ship is only destroyed once", ( wrecks == 1 ) && ( s_gameOverCalls == 1 ) && ( ship.m_armorPoints == 0 ) && controller.m_gameOver, "wrecks " + wrecks + ", game over called " + s_gameOverCalls + " times, armor " + ship.m_armorPoints );
+		Check( "combat: a destroyed ship is only destroyed once", ( wrecks == 1 ) && ( s_gameOverCalls == 1 ) && ship.IsDestroyed() && controller.m_gameOver, "wrecks " + wrecks + ", game over called " + s_gameOverCalls + " times, hull " + ship.GetHullIntegrity() );
 		Check( "combat: no missile stays in the air once the ship is destroyed", inTheAirAfterDestruction == 0, inTheAirAfterDestruction + " in the air right after the ship was destroyed" );
 		Check( "combat: a destroyed ship does not fire and is not fired at", couldFireBefore && !canFireLaserAfter && !canFireMissileAfter && ( alienFireMessages.Length == 0 ), "could fire before " + couldFireBefore + ", laser after " + canFireLaserAfter + ", missile after " + canFireMissileAfter + ", messages from the alien's shot: [" + alienFireMessages + "]" );
 
@@ -9245,9 +9287,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 10 );
 
-		playerData.m_playerShip.m_armorPoints = 100;
-
-		CombatController.m_instance.ApplyDamageToPlayer( 5000, Vector3.forward );
+		DestroyWithAHit();
 
 		yield return Frames( 5 );
 
@@ -9944,9 +9984,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Time.captureDeltaTime = 1.0f / 30.0f;
 
-		playerData.m_playerShip.m_shieldPoints = 0;
-		playerData.m_playerShip.m_armorPoints = 0;
-		combat.ApplyDamageToPlayer( 1, Vector3.forward );
+		DestroyWithAHit( 1 );
 
 		yield return ExplosionPictureSeries( camera, folder, "orbit_", frameTimes, null );
 
@@ -10774,9 +10812,7 @@ public class ClaudeProbe : MonoBehaviour
 			RenderFromAbove( shipPosition, 220.0f, System.IO.Path.Combine( folder, "player_ship.png" ) );
 		}
 
-		playerData.m_playerShip.m_shieldPoints = 0;
-		playerData.m_playerShip.m_armorPoints = 0;
-		combat.ApplyDamageToPlayer( 1, Vector3.forward );
+		DestroyWithAHit( 1 );
 
 		yield return new WaitForSecondsRealtime( 2.6f );
 
@@ -11674,16 +11710,22 @@ public class ClaudeProbe : MonoBehaviour
 		var statusBytes = Allocated( statusDisplay.Update, c_meterCalls ) / c_meterCalls;
 		var statusTextAfter = statusDisplay.m_values.text;
 
-		// it still has to follow the ship: half the armor gone, the shields up, and back
-		var armorBefore = ship.m_armorPoints;
+		// it still has to follow the ship: the hull and the systems at half (its damage reads them, not the armor), the weapons armed, and back
+		var healthBefore = SystemHealth();
 
-		ship.m_armorPoints = ship.GetMaximumArmorPoints() / 2;
+		for ( var system = 0; system < (int) PD_PlayerShip.ShipSystem.Count; system++ )
+		{
+			ship.SetSystemHealth( (PD_PlayerShip.ShipSystem) system, 50 );
+		}
 
 		statusDisplay.Update();
 
 		var damagedText = statusDisplay.m_values.text;
 
-		ship.m_armorPoints = armorBefore;
+		for ( var system = 0; ( system < healthBefore.Length ) && ( system < (int) PD_PlayerShip.ShipSystem.Count ); system++ )
+		{
+			ship.SetSystemHealth( (PD_PlayerShip.ShipSystem) system, healthBefore[ system ] );
+		}
 		ship.m_weaponsAreArmed = !ship.m_weaponsAreArmed;
 
 		statusDisplay.Update();
@@ -11697,7 +11739,7 @@ public class ClaudeProbe : MonoBehaviour
 		var statusTextAtTheEnd = statusDisplay.m_values.text;
 
 		Log( "perframe: status display: a frame in which nothing changes takes " + statusBytes + " bytes. Text: " + statusText.Replace( '\n', '/' ) );
-		Log( "perframe: status display with half the armor gone: " + damagedText.Replace( '\n', '/' ) );
+		Log( "perframe: status display with the hull and the systems at half: " + damagedText.Replace( '\n', '/' ) );
 
 		Check( "perframe: the status display takes no memory while nothing changes", ( statusBytes == 0 ) && ( statusText == statusTextAfter ) && ( statusText.Length > 20 ), statusBytes + " bytes per frame" );
 		Check( "perframe: the status display still shows what changes", damagedText.Contains( "Moderate" ) && ( armedText != statusText ) && ( statusTextAtTheEnd == statusText ), "damaged: " + damagedText.Replace( '\n', '/' ) + " | back to: " + statusTextAtTheEnd.Replace( '\n', '/' ) );
@@ -12598,7 +12640,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "old saves: armor points above the maximum are cut back to it on load", ( soldArmor == bareHull ) && ( tooManyForClass2 == class2Maximum ), "no armor: 1500 -> " + soldArmor + " (maximum " + bareHull + "), class 2: " + ( class2Maximum + 700 ) + " -> " + tooManyForClass2 + " (maximum " + class2Maximum + ")" );
 		Check( "old saves: armor points at or below the maximum are left alone", ( damagedClass2 == class2Maximum - 10 ) && ( wholeBareHull == bareHull ), "class 2 with " + ( class2Maximum - 10 ) + " -> " + damagedClass2 + ", bare hull with " + bareHull + " -> " + wholeBareHull );
-		Check( "old saves: a save written with a destroyed ship still loads with 1 armor point", ( destroyed == 1 ) && ( belowZero == 1 ), "0 -> " + destroyed + ", -50 -> " + belowZero );
+		Check( "old saves: a save with no armor left loads as it was, never below 0 (a ship is destroyed by its hull, not its armor)", ( destroyed == 0 ) && ( belowZero == 0 ), "0 -> " + destroyed + ", -50 -> " + belowZero );
 
 		// ---- 2. the bank shows its dates as stardates, whatever calendar the computer uses (thai: buddhist years)
 		var cultureBefore = System.Globalization.CultureInfo.CurrentCulture;
@@ -17964,15 +18006,25 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 4: the Rod Device
 
-	// the armor points one shot of this alien vessel takes off the player ship, with its shields down and armor to spare
+	// the armor points one shot of this alien vessel takes off the player ship, with its shields down and class 1 armor to spare (a chunk of a hit takes its own
+	// size off class 1 armor, DAMAGE-OV WF26A), fired from 3 cells away (240 units: the original's aliens fire from close by, and a laser's damage falls off with
+	// the distance)
 	static int ArmorLostToOneShot( PD_AlienShip alienShip, GD_Vessel vessel )
 	{
-		var ship = DataController.m_instance.m_playerData.m_playerShip;
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var armorClass = ship.m_armorClass;
+		var alienPosition = alienShip.m_coordinates;
 
 		ship.m_shieldsAreUp = false;
+		ship.m_armorClass = 1;
 		ship.m_armorPoints = 100000;
+		alienShip.m_coordinates = playerData.m_general.m_coordinates + new Vector3( 240.0f, 0.0f, 0.0f );
 
 		CombatController.m_instance.AlienFiresAtPlayer( alienShip, vessel );
+
+		alienShip.m_coordinates = alienPosition;
+		ship.m_armorClass = armorClass;
 
 		return 100000 - ship.m_armorPoints;
 	}
@@ -18034,8 +18086,8 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "roddevice: one laser shot of " + laserVessel.m_name + " (laser class " + laserVessel.m_laserClass + ") takes " + laserWithout + " armor points without the Rod Device, " + laserWith + " with it | a plasma bolt of " + ( ( plasmaVessel == null ) ? "none" : plasmaVessel.m_name ) + " " + plasmaWithout + " without, " + plasmaWith + " with" );
 
 		Check( "roddevice: an alien laser hits the ship (control)", laserWithout > 0, laserWithout.ToString() );
-		Check( "roddevice: with the Rod Device in the hold an alien laser does a quarter of the damage, as the original's (DAMAGE-OV WED36: ?ROD 4 /)", ( laserWithout > 0 ) && ( laserWith == laserWithout / 4 ), laserWithout + " -> " + laserWith );
-		Check( "roddevice: the Rod Device is a laser shield - a plasma bolt does the same damage (control)", plasmaWith == plasmaWithout, plasmaWithout + " -> " + plasmaWith );
+		Check( "roddevice: with the Rod Device in the hold an alien laser does a quarter of the damage, as the original's (DAMAGE-OV WED36: ?ROD 4 /)", ( laserWithout > 0 ) && ( Mathf.Abs( laserWith - laserWithout / 4 ) <= 12 ), laserWithout + " -> " + laserWith + " (a hit lands in chunks of at least 10 points, so each can be up to 9 more)" );
+		Check( "roddevice: the Rod Device is a laser shield - a plasma bolt does the same damage (control)", Mathf.Abs( plasmaWith - plasmaWithout ) <= 9, plasmaWithout + " -> " + plasmaWith );
 
 		Finish( "scenario=roddevice laser=" + laserWithout + "/" + laserWith + " plasma=" + plasmaWithout + "/" + plasmaWith, 0 );
 	}
@@ -18050,8 +18102,12 @@ public class ClaudeProbe : MonoBehaviour
 		var ship = playerData.m_playerShip;
 		var combat = CombatController.m_instance;
 		var pearlId = gameData.FindArtifactId( "Crystal Pearl" );
-		var maximum = ship.GetMaximumArmorPoints();
 		var speminId = FindEncounter( 1, 6, 3, 0 );
+
+		// class 1 armor (500 points): a chunk takes its own size off it ((6 - 1) / 5), so a hit takes about its own size (its last chunk is at least 10 points)
+		ship.m_armorClass = 1;
+
+		var maximum = ship.GetMaximumArmorPoints();
 
 		EnsureCrew();
 
@@ -18062,7 +18118,7 @@ public class ClaudeProbe : MonoBehaviour
 			ship.RemoveArtifact( pearlId );
 		}
 
-		// ---- 1. the control: without the Crystal Pearl a ship hit down to a twentieth of its armor stays in the encounter
+		// ---- 1. the control: without the Crystal Pearl a ship hit down to about a twentieth of its armor stays in the encounter
 		ship.m_armorPoints = maximum;
 
 		EnterEncounter( speminId );
@@ -18096,25 +18152,25 @@ public class ClaudeProbe : MonoBehaviour
 		var armorWith = ship.m_armorPoints;
 		var warpText = MessageList();
 
-		// ---- 3. and a hit that would destroy the ship warps it out with 1 armor point
+		// ---- 3. and a hit that would destroy the ship (its hull) warps it out with the hull at 1 point of its integrity
 		ship.m_armorPoints = maximum;
 
 		EnterEncounter( speminId );
 		yield return Frames( 10 );
 
-		combat.ApplyDamageToPlayer( maximum * 2, Vector3.forward );
+		DestroyWithAHit( 10 );
 
 		yield return Frames( 10 );
 
 		var locationAfterLethal = playerData.m_general.m_location;
-		var armorAfterLethal = ship.m_armorPoints;
+		var armorAfterLethal = ship.GetHullIntegrity();
 		var destroyed = combat.PlayerIsDestroyed();
 
-		Log( "crystalpearl: a hit down to " + ( maximum / 20 ) + " of " + maximum + " armor points without the Pearl: " + locationWithout + " with " + armorWithout + " | with the Pearl: " + locationWith + " with " + armorWith + " (" + warpText + ") | a hit of " + ( maximum * 2 ) + " with the Pearl: " + locationAfterLethal + " with " + armorAfterLethal + ", destroyed " + destroyed );
+		Log( "crystalpearl: a hit down to about " + ( maximum / 20 ) + " of " + maximum + " armor points without the Pearl: " + locationWithout + " with " + armorWithout + " | with the Pearl: " + locationWith + " with " + armorWith + " (" + warpText + ") | a hit that destroys the hull with the Pearl: " + locationAfterLethal + " with the hull at " + armorAfterLethal + ", destroyed " + destroyed );
 
-		Check( "crystalpearl: without the Crystal Pearl a critically wounded ship stays in the encounter (control)", ( locationWithout == PD_General.Location.Encounter ) && ( armorWithout == maximum / 20 ), locationWithout + ", " + armorWithout );
-		Check( "crystalpearl: with the Crystal Pearl a critically wounded ship is warped out of the encounter", ( locationWith != PD_General.Location.Encounter ) && ( armorWith == maximum / 20 ) && warpText.Contains( "Crystal Pearl" ), locationWith + ", " + armorWith + " | " + warpText );
-		Check( "crystalpearl: with the Crystal Pearl a hit that would destroy the ship warps it out with 1 armor point", ( locationAfterLethal != PD_General.Location.Encounter ) && ( armorAfterLethal == 1 ) && !destroyed, locationAfterLethal + ", " + armorAfterLethal + ", " + destroyed );
+		Check( "crystalpearl: without the Crystal Pearl a critically wounded ship stays in the encounter (control)", ( locationWithout == PD_General.Location.Encounter ) && ( armorWithout > 0 ) && ( armorWithout * 10 < maximum ), locationWithout + ", " + armorWithout );
+		Check( "crystalpearl: with the Crystal Pearl a critically wounded ship is warped out of the encounter", ( locationWith != PD_General.Location.Encounter ) && ( armorWith > 0 ) && ( armorWith * 10 < maximum ) && warpText.Contains( "Crystal Pearl" ), locationWith + ", " + armorWith + " | " + warpText );
+		Check( "crystalpearl: with the Crystal Pearl a hit that would destroy the ship warps it out with the hull at 1 point of its integrity", ( locationAfterLethal != PD_General.Location.Encounter ) && ( armorAfterLethal == 1 ) && !destroyed, locationAfterLethal + ", hull " + armorAfterLethal + ", " + destroyed );
 
 		Finish( "scenario=crystalpearl without=" + locationWithout + "/" + armorWithout + " with=" + locationWith + "/" + armorWith + " lethal=" + locationAfterLethal + "/" + armorAfterLethal + "/" + destroyed, 0 );
 	}
@@ -19322,7 +19378,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
-		// a bare hull (250 points) with shields and lasers but no missile launcher, the shields down
+		// a bare hull with shields and lasers but no missile launcher, the shields down
 		ship.m_armorClass = 0;
 		ship.m_shieldingClass = 1;
 		ship.m_laserCannonClass = 1;
@@ -19332,8 +19388,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		var whole = SystemHealth();
 
-		// ---- 1. one hit of 50 (a fifth of the hull): the hull loses 50 and one system a fifth of itself - a hit falls on the crew instead about once in
-		// seven since the combat wounds (DAMAGE-OV picks one of the fields), so the hit is made again on a whole ship until it falls on a system
+		// ---- 1. a hit of 50 while the armor holds damages no system (DAMAGE-OV WF378: the armor takes every chunk while it has points); once the armor is gone a
+		// hit of 50 lands on the parts in chunks, each taking a tenth of itself off one of them (10 times the chunk over the hull's integrity of 100) - a chunk falls
+		// on the crew instead about once in eight, so the hit is made again on a whole ship until one falls on a system
+		combat.ApplyDamageToPlayer( 50, Vector3.forward );
+
+		var behindArmor = SystemHealth();
 		var afterOne = SystemHealth();
 		var dropped = 0;
 		var totalDrop = 0;
@@ -19341,29 +19401,31 @@ public class ClaudeProbe : MonoBehaviour
 		for ( var attempt = 0; ( attempt < 20 ) && ( dropped == 0 ); attempt++ )
 		{
 			ship.RestoreSystems();
-			ship.m_armorPoints = ship.GetMaximumArmorPoints();
+			ship.m_armorPoints = 0;
 
-			whole = SystemHealth();
+			var before = SystemHealth();
 
 			combat.ApplyDamageToPlayer( 50, Vector3.forward );
 
 			afterOne = SystemHealth();
 			totalDrop = 0;
 
-			for ( var system = 0; ( system < afterOne.Length ) && ( system < whole.Length ); system++ )
+			for ( var system = 0; ( system < afterOne.Length ) && ( system < before.Length ); system++ )
 			{
-				if ( afterOne[ system ] < whole[ system ] )
+				if ( afterOne[ system ] < before[ system ] )
 				{
 					dropped++;
-					totalDrop += whole[ system ] - afterOne[ system ];
+					totalDrop += before[ system ] - afterOne[ system ];
 				}
 			}
 		}
 
-		// ---- 2. many small hits: only the systems the ship has are damaged (the missiles, index 4, stay whole)
+		// ---- 2. many small hits with the armor gone: only the systems the ship has are damaged (the missiles, index 4, stay whole)
+		ship.RestoreSystems();
+
 		for ( var hit = 0; hit < 40; hit++ )
 		{
-			ship.m_armorPoints = ship.GetMaximumArmorPoints();
+			ship.m_armorPoints = 0;
 
 			combat.ApplyDamageToPlayer( 5, Vector3.forward );
 		}
@@ -19404,10 +19466,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 2 );
 
-		Log( "systemdamage: whole " + string.Join( ",", whole ) + " | after a hit of 50 on a hull of 250: " + string.Join( ",", afterOne ) + " (" + dropped + " system lost " + totalDrop + ") | after 40 hits of 5: " + string.Join( ",", afterMany ) + " | saved and loaded " + survives + " | " + report.Replace( '\n', '/' ) );
+		Log( "systemdamage: whole " + string.Join( ",", whole ) + " | after a hit of 50 on the armor: " + string.Join( ",", behindArmor ) + " | after a hit of 50 with the armor gone: " + string.Join( ",", afterOne ) + " (" + dropped + " parts lost " + totalDrop + ") | after 40 hits of 5: " + string.Join( ",", afterMany ) + " | saved and loaded " + survives + " | " + report.Replace( '\n', '/' ) );
 
-		Check( "systemdamage: a new ship's systems are whole", ( whole.Length == 6 ) && ( string.Join( ",", whole ) == "100,100,100,100,100,100" ), string.Join( ",", whole ) );
-		Check( "systemdamage: a hit that gets through the shields also damages one system, by the same share as the hull (50 of 250: 20)", ( dropped == 1 ) && ( totalDrop == 20 ), dropped + " systems, " + totalDrop );
+		Check( "systemdamage: a new ship's systems and its hull are whole", ( whole.Length == 7 ) && ( string.Join( ",", whole ) == "100,100,100,100,100,100,100" ), string.Join( ",", whole ) );
+		Check( "systemdamage: a hit damages no system while the armor holds, and with the armor gone it takes a tenth of itself off the parts it lands on (a hit of 50: 1 to 5)", ( string.Join( ",", behindArmor ) == string.Join( ",", whole ) ) && ( dropped >= 1 ) && ( totalDrop >= 1 ) && ( totalDrop <= 5 ), "behind the armor " + string.Join( ",", behindArmor ) + ", then " + dropped + " parts, " + totalDrop );
 		Check( "systemdamage: only the systems the ship has are damaged (no missile launcher: the missiles stay whole)", missilesWhole && ( othersHit >= 3 ), string.Join( ",", afterMany ) );
 		Check( "systemdamage: the DAMAGE display shows each system the ship has as whole as it is (no bar for the missiles it lacks), and their health is saved", ( report == expectedRows ) && report.Contains( "MISSILE -" ) && survives, survives + " | shown " + report + " | expected " + expectedRows );
 
@@ -19745,9 +19807,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
-		// a bare hull at half its 250 points, the engines at 30, the sensors at 10, a laser cannon (whole) and no missile launcher
+		// a bare hull, its integrity at half, the engines at 30, the sensors at 10, a laser cannon (whole) and no missile launcher
 		ship.m_armorClass = 0;
 		ship.m_armorPoints = 125;
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Hull, 50 );
 		ship.m_laserCannonClass = 1;
 		ship.m_missileLauncherClass = 0;
 
@@ -22337,7 +22400,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "crewdeath: injury: " + deathMessages + " (Ada dead " + adaDead + ", captain " + captainAfter + ") || the last: Ben dead " + IsDead( ben ) + ", vitality " + ben.m_vitality + ", game over " + controller.m_gameOver + ", armor " + playerData.m_playerShip.m_armorPoints + " | " + gameOverText );
 
 		Check( "crewdeath: a captain who dies of an injury is dead, and the next in the chain of command takes command", ( adaDead == "True" ) && deathMessages.Contains( "Ada is dead" ) && ( captainAfter == "Ben" ) && deathMessages.Contains( "Ben takes command" ), adaDead + ", " + captainAfter + " | " + deathMessages );
-		Check( "crewdeath: when the last of the crew dies the game is lost, and it cannot be saved", ( IsDead( ben ) == "True" ) && controller.m_gameOver && gameOverText.Contains( "The entire crew has died" ) && ( playerData.m_playerShip.m_armorPoints <= 0 ), IsDead( ben ) + ", " + controller.m_gameOver + ", " + playerData.m_playerShip.m_armorPoints + " | " + gameOverText );
+		Check( "crewdeath: when the last of the crew dies the game is lost, and it cannot be saved", ( IsDead( ben ) == "True" ) && controller.m_gameOver && gameOverText.Contains( "The entire crew has died" ) && playerData.m_playerShip.IsDestroyed(), IsDead( ben ) + ", " + controller.m_gameOver + ", hull " + playerData.m_playerShip.GetHullIntegrity() + " | " + gameOverText );
 
 		Finish( "scenario=crewdeath captain=" + captainAfter + " gameover=" + controller.m_gameOver, 0 );
 	}
@@ -25241,12 +25304,16 @@ public class ClaudeProbe : MonoBehaviour
 		var shields = ( values.Length > 4 ) ? values[ 4 ] : "";
 		var weapons = ( values.Length > 5 ) ? values[ 5 ] : "";
 
-		// ---- the damage words over the hull (the original's table)
+		// ---- the damage words over the hull and the systems (the original's table, SCIENCE WE760: the average of their health, nothing once the hull is down
+		// to 19)
 		var words = "";
 
 		foreach ( var percent in new[] { 100, 97, 85, 60, 30, 10 } )
 		{
-			ship.m_armorPoints = Mathf.FloorToInt( ship.GetMaximumArmorPoints() * percent / 100.0f );
+			for ( var system = 0; system < (int) PD_PlayerShip.ShipSystem.Count; system++ )
+			{
+				ship.SetSystemHealth( (PD_PlayerShip.ShipSystem) system, percent );
+			}
 
 			yield return Frames( 3 );
 
@@ -25259,7 +25326,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "statusdisplay: a ship with no shields reads Down and one with no weapons Unarmed, as the original", ( shields == "Down" ) && ( weapons == "Unarmed" ), shields + " / " + weapons );
 		Check( "statusdisplay: energy has four figures and no unit, and cargo is a whole percent", energy.Contains( ">20.00<" ) && System.Text.RegularExpressions.Regex.IsMatch( cargo, @">\d+ %<" ), energy + " / " + cargo );
-		Check( "statusdisplay: damage is the original's word for what is left of the hull", words.Trim() == "100%=None 97%=Minimal 85%=Slight 60%=Moderate 30%=Heavy 10%=Critical", words );
+		ship.RestoreSystems();
+
+		Check( "statusdisplay: damage is the original's word for what is left of the hull and the systems", words.Trim() == "100%=None 97%=Minimal 85%=Slight 60%=Moderate 30%=Heavy 10%=Critical", words );
 
 		Finish( "scenario=statusdisplay", 0 );
 	}
@@ -27459,7 +27528,8 @@ public class ClaudeProbe : MonoBehaviour
 		captain.m_vitality = 100.0f;
 		captain.m_isDead = false;
 
-		ship.m_armorPoints = 100000;
+		// no armor, so that the hits reach the ship's parts, the crew among them (DAMAGE-OV picks a working part for each chunk once the armor is gone)
+		ship.m_armorPoints = 0;
 		ship.m_shieldsAreUp = false;
 
 		var encounterRange = SpaceflightController.m_instance.m_encounterRange;
@@ -35260,7 +35330,7 @@ public class ClaudeProbe : MonoBehaviour
 
 			Log( "playthrough-12: after the first part of the fight: " + PtEncounterText() + ", armor " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() + ", shields " + ship.m_shieldPoints + ", systems " + string.Join( ",", Array.ConvertAll( SystemHealth(), h => h.ToString() ) ) + ", fuel " + Endurium() );
 
-			Check( "playthrough-12: the ship survives the first part of the fight", !CombatController.m_instance.PlayerIsDestroyed() && ( ship.m_armorPoints > 0 ), "armor " + ship.m_armorPoints );
+			Check( "playthrough-12: the ship survives the first part of the fight", !CombatController.m_instance.PlayerIsDestroyed() && !ship.IsDestroyed(), "armor " + ship.m_armorPoints + ", hull " + ship.GetHullIntegrity() );
 		}
 
 		// the game is saved in the middle of the fight, and the next stage goes on with it after loading
@@ -35320,7 +35390,7 @@ public class ClaudeProbe : MonoBehaviour
 			var pointsAfterFight = PtAlienPoints();
 			var hitTheAliens = ( result[ 0 ] >= 1 ) || ( PtSumOfNumbers( pointsAfterFight ) < PtSumOfNumbers( loadedPoints ) );
 
-			Check( "playthrough-13: the ship's weapons hit the Uhlek (a ship destroyed, or their armor and shields down), and the ship survives", hitTheAliens && !CombatController.m_instance.PlayerIsDestroyed() && ( ship.m_armorPoints > 0 ), result[ 0 ] + " destroyed, armor " + ship.m_armorPoints + ", aliens " + PtAlienPoints() );
+			Check( "playthrough-13: the ship's weapons hit the Uhlek (a ship destroyed, or their armor and shields down), and the ship survives", hitTheAliens && !CombatController.m_instance.PlayerIsDestroyed() && !ship.IsDestroyed(), result[ 0 ] + " destroyed, armor " + ship.m_armorPoints + ", hull " + ship.GetHullIntegrity() + ", aliens " + PtAlienPoints() );
 
 			if ( !CombatController.m_instance.PlayerIsDestroyed() )
 			{
@@ -36627,6 +36697,252 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "clockrate: a star hour passes in 10 seconds of play, as the original's (REAL-MS 10000)", Mathf.Abs( minutesPerTenSeconds - 60.0f ) < 3.0f, minutesPerTenSeconds.ToString( "F1" ) + " game minutes per 10 s" );
 
 		Finish( "scenario=clockrate checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the hull's integrity and where a hit lands (DAMAGE-OV)
+
+	// the hull's integrity of a ship (-1 on the code from before the hull had an integrity of its own)
+	static int HullIntegrityOf( PD_PlayerShip ship )
+	{
+		var getter = typeof( PD_PlayerShip ).GetMethod( "GetHullIntegrity" );
+
+		return ( getter == null ) ? -1 : (int) getter.Invoke( ship, null );
+	}
+
+	// sets the hull's integrity (nothing on the code from before it)
+	static void SetHullIntegrity( int integrity )
+	{
+		if ( !System.Enum.IsDefined( typeof( PD_PlayerShip.ShipSystem ), "Hull" ) )
+		{
+			return;
+		}
+
+		var hull = (PD_PlayerShip.ShipSystem) System.Enum.Parse( typeof( PD_PlayerShip.ShipSystem ), "Hull" );
+
+		DataController.m_instance.m_playerData.m_playerShip.SetSystemHealth( hull, integrity );
+	}
+
+	// the sum of the health of every system and the vitality of the crew, to see whether a hit touched any of them
+	static float PartsTotal()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var total = 0.0f;
+
+		foreach ( var health in SystemHealth() )
+		{
+			total += health;
+		}
+
+		foreach ( var file in playerData.m_personnel.m_personnelList )
+		{
+			total += file.m_vitality;
+		}
+
+		return total;
+	}
+
+	IEnumerator ScenarioHullIntegrity()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var ship = playerData.m_playerShip;
+		var combat = CombatController.m_instance;
+
+		EnsureCrew();
+
+		yield return Frames( 5 );
+
+		// a bare hull (250 armor points) with a laser cannon and a missile launcher, the shields down, everything whole
+		ship.m_armorClass = 0;
+		ship.m_shieldingClass = 0;
+		ship.m_laserCannonClass = 1;
+		ship.m_missileLauncherClass = 1;
+		ship.m_shieldsAreUp = false;
+		ship.m_shieldPoints = 0;
+		ship.RestoreSystems();
+		SetHullIntegrity( 100 );
+
+		// ---- 1. three hits of 50 on a ship with armor left: the armor takes all of them, no system, the hull or the crew is touched (a hit lands on the parts
+		// only once the armor is gone, DAMAGE-OV WF378)
+		ship.m_armorPoints = 250;
+
+		var partsBefore = PartsTotal();
+
+		for ( var hit = 0; hit < 3; hit++ )
+		{
+			combat.ApplyDamageToPlayer( 50, Vector3.forward );
+		}
+
+		var armorAfterHits = ship.m_armorPoints;
+		var partsAfter = PartsTotal();
+
+		// ---- 2. better armor loses less of a chunk, (6 - class) / 5 of it (WF26A): a hit of 10 is one chunk of 10
+		ship.m_armorClass = 5;
+		ship.m_armorPoints = 1500;
+
+		combat.ApplyDamageToPlayer( 10, Vector3.forward );
+
+		var class5Lost = 1500 - ship.m_armorPoints;
+
+		ship.m_armorClass = 0;
+		ship.m_armorPoints = 250;
+
+		combat.ApplyDamageToPlayer( 10, Vector3.forward );
+
+		var bareLost = 250 - ship.m_armorPoints;
+
+		// ---- 3. raised shields take a whole chunk and pass nothing on to the armor, losing (6 - class) / 5 of it (WF248): class 3 shields with 3 points left, and
+		// with 100
+		ship.m_shieldingClass = 3;
+		ship.m_shieldsAreUp = true;
+		ship.m_shieldPoints = 3;
+		ship.m_armorPoints = 250;
+
+		combat.ApplyDamageToPlayer( 10, Vector3.forward );
+
+		var weakShieldsLeft = ship.m_shieldPoints;
+		var armorBehindWeakShields = ship.m_armorPoints;
+
+		ship.m_shieldPoints = 100;
+
+		combat.ApplyDamageToPlayer( 10, Vector3.forward );
+
+		var class3ShieldsLeft = ship.m_shieldPoints;
+
+		ship.m_shieldsAreUp = false;
+		ship.m_shieldPoints = 0;
+		ship.m_shieldingClass = 0;
+
+		// ---- 4. the armor gone: the ship lives on and can be saved, and a hit lands on its parts, each chunk on one of them; with the hull at 20 a chunk of 10 takes
+		// 5 off a system (10 times the chunk over the hull's integrity) - the hit is made again until it lands on a system rather than the crew
+		ship.RestoreSystems();
+		SetHullIntegrity( 100 );
+		ship.m_armorPoints = 0;
+
+		var savesBefore = MemorySaveSystem.s_saveCalls;
+
+		combat.ApplyDamageToPlayer( 50, Vector3.forward );
+
+		var destroyedAtNoArmor = combat.PlayerIsDestroyed();
+
+		dataController.SaveActiveGame();
+
+		var savedAtNoArmor = MemorySaveSystem.s_saveCalls > savesBefore;
+		var systemLoss = -1;
+
+		for ( var attempt = 0; ( attempt < 30 ) && ( systemLoss <= 0 ) && !combat.PlayerIsDestroyed(); attempt++ )
+		{
+			ship.RestoreSystems();
+			SetHullIntegrity( 20 );
+			ship.m_armorPoints = 0;
+
+			var before = SystemHealth();
+
+			combat.ApplyDamageToPlayer( 10, Vector3.forward );
+
+			var after = SystemHealth();
+
+			systemLoss = 0;
+
+			for ( var system = 0; ( system < before.Length ) && ( system < after.Length ); system++ )
+			{
+				// the hull's own loss is 5 as well, but at 20 it is easier to read on the others
+				systemLoss += before[ system ] - after[ system ];
+			}
+		}
+
+		ship.RestoreSystems();
+		SetHullIntegrity( 100 );
+
+		// ---- 5. the status display's DAMAGE reads the hull and the systems, not the armor (SCIENCE WE760): no armor and everything whole is no damage, every
+		// system and the hull at half is moderate, and a hull at 15 is critical
+		ship.m_armorPoints = 0;
+
+		var noArmorLine = StatusDamageLine( out _, out _ );
+
+		for ( var system = 0; system < (int) PD_PlayerShip.ShipSystem.Count; system++ )
+		{
+			ship.SetSystemHealth( (PD_PlayerShip.ShipSystem) system, 50 );
+		}
+
+		var halfLine = StatusDamageLine( out _, out _ );
+
+		ship.RestoreSystems();
+		SetHullIntegrity( 15 );
+
+		var weakHullLine = StatusDamageLine( out _, out _ );
+
+		// ---- 6. the Starport charges 250 M.U. a point of the hull's integrity (CONFIG-OV WF226), the rest whole
+		SetHullIntegrity( 90 );
+		ship.m_armorPoints = 250;
+
+		var repairCost = ship.GetStarportRepairCost();
+
+		// ---- 7. a save from before the hull had an integrity of its own (six systems) loads with a whole hull
+		var oldShip = JsonUtility.FromJson<PD_PlayerShip>( JsonUtility.ToJson( ship ) );
+
+		oldShip.m_systemHealth = new[] { 100, 90, 80, 100, 100, 100 };
+
+		var reloaded = JsonUtility.FromJson<PD_PlayerShip>( JsonUtility.ToJson( oldShip ) );
+		var oldSaveHull = HullIntegrityOf( reloaded );
+
+		// ---- 8. the engineer repairs the hull's integrity, never the armor (REPAIR-OV: the armor is the Starport's)
+		ship.RestoreSystems();
+		SetHullIntegrity( 50 );
+		ship.m_armorPoints = 100;
+		ship.StartRepairs( PD_PlayerShip.c_hullRepairItem );
+		ship.UpdateRepairs( 10.0f );
+
+		var hullAfterRepair = HullIntegrityOf( ship );
+		var armorAfterRepair = ship.m_armorPoints;
+
+		ship.StopRepairs();
+
+		Log( "hullintegrity: 3 hits of 50 on 250 armor: armor " + armorAfterHits + ", parts " + partsBefore + " -> " + partsAfter + " | a chunk of 10 takes " + class5Lost + " off class 5 armor, " + bareLost + " off a bare hull | class 3 shields at 3: " + weakShieldsLeft + " left, armor " + armorBehindWeakShields + "; at 100: " + class3ShieldsLeft + " left | no armor: destroyed " + destroyedAtNoArmor + ", saved " + savedAtNoArmor + ", a chunk of 10 at hull 20 took " + systemLoss + " | damage lines '" + noArmorLine + "' / '" + halfLine + "' / '" + weakHullLine + "' | repair cost at hull 90 " + repairCost + " | old save hull " + oldSaveHull + " | engineer: hull " + hullAfterRepair + ", armor " + armorAfterRepair );
+
+		Check( "hullintegrity: hits on a ship with armor left fall on the armor alone (no system, the hull or the crew is touched)", ( armorAfterHits < 250 ) && ( armorAfterHits > 0 ) && Mathf.Approximately( partsBefore, partsAfter ), "armor " + armorAfterHits + ", parts " + partsBefore + " -> " + partsAfter );
+		Check( "hullintegrity: better armor loses less of a hit, (6 - class) / 5 of it: 2 of 10 for class 5, 12 for a bare hull", ( class5Lost == 2 ) && ( bareLost == 12 ), class5Lost + " / " + bareLost );
+		Check( "hullintegrity: raised shields take a whole chunk and pass nothing on to the armor (class 3 lose 6 of 10)", ( weakShieldsLeft == 0 ) && ( armorBehindWeakShields == 250 ) && ( class3ShieldsLeft == 94 ), weakShieldsLeft + " left, armor " + armorBehindWeakShields + ", class 3 at 100: " + class3ShieldsLeft );
+		Check( "hullintegrity: a ship with no armor left is not destroyed and can be saved, and a chunk of 10 takes 5 off a part when the hull is at 20", !destroyedAtNoArmor && savedAtNoArmor && ( systemLoss == 5 ), "destroyed " + destroyedAtNoArmor + ", saved " + savedAtNoArmor + ", loss " + systemLoss );
+		Check( "hullintegrity: the status display's DAMAGE reads the hull and the systems, not the armor", ( noArmorLine == "None" ) && halfLine.Contains( ">Moderate<" ) && weakHullLine.Contains( ">Critical<" ), noArmorLine + " / " + halfLine + " / " + weakHullLine );
+		Check( "hullintegrity: the Starport charges 250 M.U. a point of the hull's integrity", repairCost == 2500, repairCost.ToString() );
+		Check( "hullintegrity: a save from before the hull's integrity loads with a whole hull", oldSaveHull == 100, oldSaveHull.ToString() );
+		Check( "hullintegrity: the engineer repairs the hull's integrity and never the armor", ( hullAfterRepair > 50 ) && ( armorAfterRepair == 100 ), "hull " + hullAfterRepair + ", armor " + armorAfterRepair );
+
+		// ---- 9. the hull's integrity at 0 destroys the ship, in the original's words ("!!HULL DESTROYED!!"), and the lost game is never saved: the hull at 1 and
+		// every system gone, so a chunk lands on the hull or the crew, hit until the ship is destroyed
+		ship.m_armorPoints = 0;
+
+		for ( var system = 0; system < (int) PD_PlayerShip.ShipSystem.Count; system++ )
+		{
+			ship.SetSystemHealth( (PD_PlayerShip.ShipSystem) system, 0 );
+		}
+
+		SetHullIntegrity( 1 );
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		for ( var hit = 0; ( hit < 50 ) && !combat.PlayerIsDestroyed(); hit++ )
+		{
+			combat.ApplyDamageToPlayer( 10, Vector3.forward );
+		}
+
+		var destroyed = combat.PlayerIsDestroyed();
+		var hullAtTheEnd = HullIntegrityOf( ship );
+
+		yield return new WaitForSecondsRealtime( 3.0f );
+
+		var gameOverText = MessageList();
+		var savesBeforeLost = MemorySaveSystem.s_saveCalls;
+
+		dataController.SaveActiveGame();
+
+		var savedLost = MemorySaveSystem.s_saveCalls > savesBeforeLost;
+
+		Log( "hullintegrity: destroyed " + destroyed + ", hull " + hullAtTheEnd + ", saved " + savedLost + " | " + gameOverText );
+
+		Check( "hullintegrity: the ship is destroyed when its hull's integrity reaches 0, in the original's words, and the lost game is never saved", destroyed && ( hullAtTheEnd == 0 ) && gameOverText.Contains( "Hull destroyed" ) && !savedLost, "destroyed " + destroyed + ", hull " + hullAtTheEnd + ", saved " + savedLost + " | " + gameOverText );
+
+		Finish( "scenario=hullintegrity checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
