@@ -8,9 +8,6 @@ using System.Collections.Generic;
 
 public class PD_Encounter : IComparable
 {
-	const float c_alienHyperspaceMoveSpeed = 32.0f;
-	const float c_alienStarSystemMoveSpeed = 128.0f;
-
 	// these fields must be public for JsonUtility serialization
 	public int m_encounterId;
 	public PD_General.Location m_location;
@@ -251,20 +248,6 @@ public class PD_Encounter : IComparable
 	public void SetCoordinates( Vector3 coordinates )
 	{
 		m_currentCoordinates = coordinates;
-	}
-
-	public void MoveTowards( Vector3 coordinates )
-	{
-		// get the move speed
-		var moveSpeed = ( m_location == PD_General.Location.Hyperspace ) ? c_alienHyperspaceMoveSpeed : c_alienStarSystemMoveSpeed;
-
-		// go torwards given coordinates
-		m_currentCoordinates += Vector3.Normalize( coordinates - m_currentCoordinates ) * Time.deltaTime * moveSpeed;
-	}
-
-	public void GoHome()
-	{
-		MoveTowards( m_homeCoordinates );
 	}
 
 	public PD_AlienShip[] GetAlienShipList()

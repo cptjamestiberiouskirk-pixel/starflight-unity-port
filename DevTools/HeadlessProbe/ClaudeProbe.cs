@@ -1510,6 +1510,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioTerrainVehicleFuel();
 				break;
 
+			case "alienpursuit":
+				yield return ScenarioAlienPursuit();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -18362,35 +18366,6 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 4: the Dodecahedron
 
-	// puts an encounter at its home, the ship (stopped) one and a half alien radar distances from it in hyperspace, and returns how much closer the encounter came in some real seconds
-	static IEnumerator EncounterCameCloser( PD_Encounter pdEncounter, float seconds, float[] cameCloser )
-	{
-		var playerData = DataController.m_instance.m_playerData;
-		var controller = SpaceflightController.m_instance;
-
-		pdEncounter.m_currentCoordinates = pdEncounter.m_homeCoordinates;
-
-		var shipCoordinates = pdEncounter.m_homeCoordinates + Vector3.right * ( controller.m_alienHyperspaceRadarDistance * 1.5f );
-
-		controller.m_playerShip.TurnOffEngines();
-		playerData.m_general.m_currentSpeed = 0.0f;
-		playerData.m_general.m_coordinates = shipCoordinates;
-		playerData.m_general.m_lastHyperspaceCoordinates = shipCoordinates;
-		controller.m_playerShip.transform.position = shipCoordinates;
-
-		yield return Frames( 2 );
-
-		var before = Vector3.Distance( pdEncounter.m_currentCoordinates, playerData.m_general.m_coordinates );
-		var end = Time.realtimeSinceStartup + seconds;
-
-		while ( Time.realtimeSinceStartup < end )
-		{
-			yield return null;
-		}
-
-		cameCloser[ 0 ] = before - Vector3.Distance( pdEncounter.m_currentCoordinates, playerData.m_general.m_coordinates );
-	}
-
 	IEnumerator ScenarioDodecahedron()
 	{
 		var dataController = DataController.m_instance;
@@ -18399,7 +18374,6 @@ public class ClaudeProbe : MonoBehaviour
 		var controller = SpaceflightController.m_instance;
 		var ship = playerData.m_playerShip;
 		var dodecahedronId = gameData.FindArtifactId( "Dodecahedron" );
-		var cameCloser = new float[ 1 ];
 
 		EnsureCrew();
 
@@ -18408,38 +18382,64 @@ public class ClaudeProbe : MonoBehaviour
 			ship.RemoveArtifact( dodecahedronId );
 		}
 
-		// in hyperspace, with no encounter able to begin while the aliens are watched
+		// in hyperspace, the ship standing still, with no encounter able to begin while the aliens are watched
+		var general = playerData.m_general;
 		var encounterRange = controller.m_encounterRange;
 
 		controller.m_encounterRange = 0.0f;
 
+		general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 20.0f, 0.0f, 20.0f ) );
+
 		controller.SwitchLocation( PD_General.Location.Hyperspace );
 
-		yield return Frames( 10 );
+		controller.m_playerShip.TurnOffEngines();
+		general.m_currentSpeed = 0.0f;
 
 		var encounterId = FindEncounter( 0, 1, 1, 0 );
 		var pdEncounter = playerData.FindEncounter( encounterId );
 
-		// ---- 1. the control: without the Dodecahedron aliens one and a half radar distances away do not come
-		yield return EncounterCameCloser( pdEncounter, 2.0f, cameCloser );
+		general.m_minute = 0;
+		general.m_second = 0;
 
-		var closerWithout = cameCloser[ 0 ];
+		yield return Frames( 10 );
 
-		// ---- 2. with the Dodecahedron in the hold they do
+		// ---- 1. the control: without the Dodecahedron a group 9 coordinates from its home (beyond the original's 63 units) does not come at the move
+		PlaceAlienGroup( pdEncounter, 5.0f, 9.0f );
+
+		AdvanceGameHours( 2 );
+
+		for ( var end = Time.time + 1.0f; Time.time < end; )
+		{
+			yield return null;
+		}
+
+		var without = AlienGroupCoordinates( pdEncounter );
+
+		// ---- 2. with the Dodecahedron in the hold it does, four fifths of the way in whole coordinates: 4 nearer
 		ship.AddArtifact( dodecahedronId );
 
-		yield return EncounterCameCloser( pdEncounter, 2.0f, cameCloser );
+		general.m_minute = 0;
+		general.m_second = 0;
 
-		var closerWith = cameCloser[ 0 ];
+		PlaceAlienGroup( pdEncounter, 5.0f, 9.0f );
+
+		AdvanceGameHours( 2 );
+
+		for ( var end = Time.time + 1.0f; Time.time < end; )
+		{
+			yield return null;
+		}
+
+		var with = AlienGroupCoordinates( pdEncounter );
 
 		controller.m_encounterRange = encounterRange;
 
-		Log( "dodecahedron: encounter " + encounterId + " at its home, the ship " + ( controller.m_alienHyperspaceRadarDistance * 1.5f ) + " away (alien radar distance " + controller.m_alienHyperspaceRadarDistance + "): came closer in 2 s by " + closerWithout + " without the Dodecahedron, " + closerWith + " with it" );
+		Log( "dodecahedron: encounter " + encounterId + " 5 coordinates from the ship and 9 from its home: after the move of 2 star hours it is " + without.ToString( "0.000" ) + " away without the Dodecahedron and " + with.ToString( "0.000" ) + " with it" );
 
-		Check( "dodecahedron: without the Dodecahedron aliens beyond their radar distance do not come at the ship (control)", Mathf.Abs( closerWithout ) < 1.0f, closerWithout.ToString() );
-		Check( "dodecahedron: with the Dodecahedron in the hold aliens from twice as far come at the ship", closerWith > 1.0f, closerWith.ToString() );
+		Check( "dodecahedron: without the Dodecahedron aliens more than 63 of the original's units from home stay where they are (the original's leash, HYPERMSG-OV WF3AB)", Mathf.Abs( without - 5.0f ) < 0.01f, without.ToString( "0.000" ) );
+		Check( "dodecahedron: with the Dodecahedron in the hold they come anyway, and four fifths of the way: 4 coordinates nearer (WF333 with ?12)", Mathf.Abs( with - 1.0f ) < 0.01f, with.ToString( "0.000" ) );
 
-		Finish( "scenario=dodecahedron without=" + closerWithout + " with=" + closerWith, 0 );
+		Finish( "scenario=dodecahedron without=" + without.ToString( "0.000" ) + " with=" + with.ToString( "0.000" ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 4: the Shimmering Ball
@@ -38613,6 +38613,122 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "tvfuel: at 7% below it the vehicle is out of fuel (control)", at7.Contains( "Out of fuel." ), at7 );
 
 		Finish( "scenario=tvfuel checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// moves the game clock on by whole star hours (the aliens' moves go by the hours the clock shows)
+	static void AdvanceGameHours( int hours )
+	{
+		var general = DataController.m_instance.m_playerData.m_general;
+
+		general.m_hour += hours;
+
+		while ( general.m_hour >= 24 )
+		{
+			general.m_hour -= 24;
+			general.m_day++;
+		}
+	}
+
+	// puts a group of aliens this many coordinates east of the ship in hyperspace, with its home this many coordinates west of where it is now
+	static void PlaceAlienGroup( PD_Encounter pdEncounter, float coordinatesEast, float homeCoordinatesWest )
+	{
+		var ship = DataController.m_instance.m_playerData.m_general.m_coordinates;
+
+		pdEncounter.m_currentCoordinates = ship + new Vector3( coordinatesEast * 256.0f, 0.0f, 0.0f );
+		pdEncounter.m_homeCoordinates = pdEncounter.m_currentCoordinates - new Vector3( homeCoordinatesWest * 256.0f, 0.0f, 0.0f );
+	}
+
+	// the distance from the ship to a group of aliens, in hyperspace coordinates
+	static float AlienGroupCoordinates( PD_Encounter pdEncounter )
+	{
+		var ship = DataController.m_instance.m_playerData.m_general.m_coordinates;
+
+		return Vector3.Distance( ship, pdEncounter.m_currentCoordinates ) / 256.0f;
+	}
+
+	// the aliens come after the ship as the original's (HYPERMSG-OV TRAK-E, run by TRAK-ENCS every 2 star hours): not at all between the moves, then in hyperspace half
+	// the way along each axis in whole coordinates (5 coordinates away: 2 nearer), the whole way when that comes to none (1.5 away: onto the ship), and only the
+	// groups of the region around the ship (12 coordinates away: none)
+	IEnumerator ScenarioAlienPursuit()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+
+		EnsureCrew();
+
+		// in hyperspace, in a quiet corner, the ship standing still, with no encounter able to begin while the aliens are watched
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 20.0f, 0.0f, 20.0f ) );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		controller.m_playerShip.TurnOffEngines();
+		general.m_currentSpeed = 0.0f;
+
+		var pdEncounter = playerData.FindEncounter( FindEncounter( 0, 1, 1, 0 ) );
+
+		// (no hour to come of itself while the aliens are watched: a star hour is 10 s)
+		general.m_minute = 0;
+		general.m_second = 0;
+
+		yield return Frames( 10 );
+
+		// ---- 1. 5 coordinates away: nothing for an hour, then 2 coordinates nearer at the second hour
+		PlaceAlienGroup( pdEncounter, 5.0f, 0.0f );
+
+		AdvanceGameHours( 1 );
+
+		for ( var end = Time.time + 1.0f; Time.time < end; )
+		{
+			yield return null;
+		}
+
+		var afterAnHour = AlienGroupCoordinates( pdEncounter );
+
+		AdvanceGameHours( 1 );
+
+		yield return Frames( 3 );
+
+		var afterTwoHours = AlienGroupCoordinates( pdEncounter );
+
+		// ---- 2. 1.5 coordinates away: onto the ship
+		general.m_minute = 0;
+		general.m_second = 0;
+
+		PlaceAlienGroup( pdEncounter, 1.5f, 0.0f );
+
+		AdvanceGameHours( 2 );
+
+		yield return Frames( 3 );
+
+		var landed = AlienGroupCoordinates( pdEncounter );
+
+		// ---- 3. 12 coordinates away, beyond the region around the ship: they stay (the control)
+		general.m_minute = 0;
+		general.m_second = 0;
+
+		PlaceAlienGroup( pdEncounter, 12.0f, 0.0f );
+
+		AdvanceGameHours( 2 );
+
+		yield return Frames( 3 );
+
+		var farAway = AlienGroupCoordinates( pdEncounter );
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "alienpursuit: a group 5 coordinates away is " + afterAnHour.ToString( "0.000" ) + " away after a star hour and " + afterTwoHours.ToString( "0.000" ) + " after two; one 1.5 away is " + landed.ToString( "0.000" ) + " away after two hours; one 12 away is " + farAway.ToString( "0.000" ) + " away" );
+
+		Check( "alienpursuit: between the moves of every 2 star hours the aliens stay where they are", Mathf.Abs( afterAnHour - 5.0f ) < 0.01f, afterAnHour.ToString( "0.000" ) );
+		Check( "alienpursuit: at the move a group 5 coordinates away comes half the way along the axis in whole coordinates, 2 nearer", Mathf.Abs( afterTwoHours - 3.0f ) < 0.01f, afterTwoHours.ToString( "0.000" ) );
+		Check( "alienpursuit: a group 1.5 coordinates away comes the whole way, onto the ship (half of it is no whole coordinate)", landed < 0.01f, landed.ToString( "0.000" ) );
+		Check( "alienpursuit: a group 12 coordinates away, beyond the region around the ship, does not move (control)", Mathf.Abs( farAway - 12.0f ) < 0.01f, farAway.ToString( "0.000" ) );
+
+		Finish( "scenario=alienpursuit checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

@@ -539,15 +539,24 @@ public class SpaceflightController : MonoBehaviour
 		// get the coordinates
 		var coordinates = playerData.m_general.m_coordinates;
 
-		// get the correct alien radar distance
-		var alienRadarDistance = ( location == PD_General.Location.Hyperspace ) ? m_alienHyperspaceRadarDistance : m_alienStarSystemRadarDistance;
+		// the aliens move only when the clock has gone 2 star hours on since they last did (the original's TRAK-ENCS: STAR-HR against TRAK-HR, then TRAK-E)
+		var hourCount = playerData.m_general.m_day * 24 + playerData.m_general.m_hour;
 
-		// the Dodecahedron is "an ancient distress beacon which attracts any ships in the area" (the Thrynn, STRINFO 2.5; the Starport's analysis: "it will attract the attention
-		// of anyone in the area") - with it in the hold the aliens notice the ship from twice as far (how far is the port's choice)
-		if ( playerData.m_playerShip.HasArtifact( "Dodecahedron" ) )
+		if ( ( m_trackedHourCount < 0 ) || ( hourCount < m_trackedHourCount ) )
 		{
-			alienRadarDistance *= 2.0f;
+			m_trackedHourCount = hourCount;
 		}
+
+		var trackAliens = ( hourCount - m_trackedHourCount ) >= c_trackingHours;
+
+		if ( trackAliens )
+		{
+			m_trackedHourCount = hourCount;
+		}
+
+		// the Dodecahedron is "an ancient distress beacon which attracts any ships in the area" (the Thrynn, STRINFO 2.5): with it aboard the aliens come farther at each
+		// move and are not held near home (the original's ?12, set when artifact 13 is in the hold)
+		var dodecahedronAboard = playerData.m_playerShip.HasArtifact( "Dodecahedron" );
 
 		// the encounter the player has run into in this frame (the nearest one, if more than one is within range)
 		PD_Encounter encounterToBegin = null;
@@ -598,16 +607,10 @@ public class SpaceflightController : MonoBehaviour
 			// calculate the distance from the player to the encounter
 			var distance = encounter.CalculateDistance( coordinates );
 
-			// can the aliens detect the player?
-			if ( distance < alienRadarDistance )
+			// every 2 star hours the aliens jump towards the ship (they never go back home)
+			if ( trackAliens && TrackTowards( encounter, coordinates, location == PD_General.Location.Hyperspace, dodecahedronAboard ) )
 			{
-				// yes - move the aliens towards the player (at a fixed speed)
-				encounter.MoveTowards( coordinates );
-			}
-			else
-			{
-				// no - move the aliens towards their home coordinates (at a fixed speed)
-				encounter.GoHome();
+				distance = encounter.CalculateDistance( coordinates );
 			}
 
 			// are the aliens and the player within encounter range?
@@ -627,6 +630,69 @@ public class SpaceflightController : MonoBehaviour
 			// yes - begin it
 			BeginEncounter( encounterToBegin );
 		}
+	}
+
+	// how the aliens come after the ship, as the original's TRAK-E (HYPERMSG-OV): every 2 star hours each group jumps towards the ship, along each axis a share of the
+	// way - a half in hyperspace, three quarters in a star system, four fifths and six sevenths with the Dodecahedron aboard (WF333) - in whole map coordinates of 8 of
+	// the original's units, rounded towards none, and the whole way once that comes to none, so that it lands on the ship (WF31B). In hyperspace only the groups of the
+	// region around the ship move (ILOCAL, 75 of the original's units), and only while they are within 63 of them of home on both axes (WF3AB), unless the
+	// Dodecahedron is aboard; in a star system every group of it moves (IGLOBAL)
+	const int c_trackingHours = 2;
+	const float c_hyperspaceUnit = 32.0f;
+	const float c_starSystemUnit = 8192.0f / 400.0f;
+	const float c_localRegionUnits = 75.0f;
+
+	// the game hour (days * 24 + hours) the aliens last moved at (-1 before the first: not saved, as the original's TRAK-HR is set at launch)
+	int m_trackedHourCount = -1;
+
+	// moves one group of aliens a step of the original's towards the ship - false if it did not move
+	bool TrackTowards( PD_Encounter encounter, Vector3 shipCoordinates, bool inHyperspace, bool dodecahedronAboard )
+	{
+		var unit = inHyperspace ? c_hyperspaceUnit : c_starSystemUnit;
+
+		if ( inHyperspace )
+		{
+			// only the region around the ship
+			if ( Vector3.Distance( shipCoordinates, encounter.m_currentCoordinates ) > c_localRegionUnits * unit )
+			{
+				return false;
+			}
+
+			// and only near home (the original's displacement bytes: -63 to 63 across, -64 to 63 along)
+			var displacementX = Mathf.RoundToInt( ( encounter.m_currentCoordinates.x - encounter.m_homeCoordinates.x ) / unit );
+			var displacementZ = Mathf.RoundToInt( ( encounter.m_currentCoordinates.z - encounter.m_homeCoordinates.z ) / unit );
+
+			if ( !dodecahedronAboard && ( ( displacementX < -63 ) || ( displacementX > 63 ) || ( displacementZ < -64 ) || ( displacementZ > 63 ) ) )
+			{
+				return false;
+			}
+		}
+
+		var numerator = ( inHyperspace ? 1 : 3 ) + ( dodecahedronAboard ? 3 : 0 );
+		var denominator = ( inHyperspace ? 2 : 4 ) + ( dodecahedronAboard ? 3 : 0 );
+
+		var stepX = TrackingStep( shipCoordinates.x - encounter.m_currentCoordinates.x, unit, numerator, denominator );
+		var stepZ = TrackingStep( shipCoordinates.z - encounter.m_currentCoordinates.z, unit, numerator, denominator );
+
+		encounter.m_currentCoordinates += new Vector3( stepX, 0.0f, stepZ );
+
+		return ( stepX != 0.0f ) || ( stepZ != 0.0f );
+	}
+
+	// one axis of a TRAK-E move: the share of the distance (in the original's units) in whole map coordinates, rounded towards none, or the whole distance once
+	// that is none
+	static float TrackingStep( float distance, float unit, int numerator, int denominator )
+	{
+		var units = Mathf.RoundToInt( distance / unit );
+
+		if ( units == 0 )
+		{
+			return 0.0f;
+		}
+
+		var step = units * numerator / denominator / 8 * 8;
+
+		return ( step != 0 ) ? ( step * unit ) : distance;
 	}
 
 	// true if the ship is inside a nebula: in hyperspace, by the nebulae of the game data; anywhere in a star system, if that star is inside one; in an encounter, where

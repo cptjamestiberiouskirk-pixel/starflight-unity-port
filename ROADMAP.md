@@ -152,7 +152,7 @@ Only the effects that matter for winning had to come before Phase 5. The others 
 | Tesseract | doubles engine efficiency: #124 (half the engines' fuel in hyperspace) | 18,50 planet 5 | no |
 | Crystal Pearl | warps a badly damaged ship away: #128 (out of an encounter below a tenth of the armor; the tenth is the port's choice) | City of the Ancients | no |
 | Red Cylinder | finds ancient ruins from orbit: flashes on the landing map near an ancient ruin (the shipped game's "THE RED CYLINDER IS FLASHING" is in its landing map code; how near is the port's choice) | Koann (planet: D5) | no |
-| Dodecahedron | attracts every ship nearby: #129 (twice the alien radar distance; the factor is the port's choice) | 118,146 planet 4 | no |
+| Dodecahedron | attracts every ship nearby: #129 (twice the alien radar distance), replaced on 2026-10-15 by the released game's rule (HYPERMSG-OV TRAK-E: groups come four fifths of the way at each move instead of half, and are not held near home) | 118,146 planet 4 | no |
 | Black Box, Hypercube, Ellipsoid | none beyond their documented roles (D5, decided 2026-10-11) | Thrynn trade, Earth, 81,98 | no |
 
 ## Phase 5: Main story and endgame
