@@ -660,11 +660,21 @@ public class PD_PlayerShip
 		return ( artifactId >= 0 ) && ( m_artifactStorage != null ) && ( m_artifactStorage.Find( artifactId ) != null );
 	}
 
-	// the Endurium (in cubic meters) the engines use to fly this many starmap coordinates in hyperspace (the engines use their class's fuel for every coordinate,
-	// as the ship's update takes it, and half of it with the Tesseract)
+	// the Endurium the engines use for one step of hyperspace flight, an eighth of a coordinate, in hundredths of a cubic meter: 7 less the engines' class (the
+	// engines' fuel for a coordinate, in the game data, is 8 of them), halved in whole hundredths with the Tesseract aboard (PORTMENU-OV WEAF0: E-USE, then
+	// -END, which HYPER-OV (-ENDURIUM) takes at every step)
+	public int GetFuelPerStepHundredths()
+	{
+		var hundredths = Mathf.Max( 0, Mathf.RoundToInt( GetEngines().m_fuelUsedPerCoordinate * 100.0f / 8.0f ) );
+
+		return HasArtifact( "Tesseract" ) ? ( hundredths / 2 ) : hundredths;
+	}
+
+	// the Endurium (in cubic meters) the engines use to fly this many starmap coordinates in hyperspace: 8 steps a coordinate (the starmap's estimate, MAP-OV
+	// WEB3A, takes the straight distance, as here)
 	public float GetFuelForDistance( float coordinates )
 	{
-		return Mathf.Max( 0.0f, coordinates ) * GetEngines().m_fuelUsedPerCoordinate * GetEngineFuelFactor();
+		return Mathf.Max( 0.0f, coordinates ) * 8.0f * GetFuelPerStepHundredths() / 100.0f;
 	}
 
 	// how much of the fuel the engines would use they do use: the Tesseract "projects a field which doubles the energy efficiency of a ship's engines" (the Starport's

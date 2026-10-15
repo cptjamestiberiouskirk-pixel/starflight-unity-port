@@ -1490,6 +1490,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportDoorLabels();
 				break;
 
+			case "hyperspacefuel":
+				yield return ScenarioHyperspaceFuel();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -37871,6 +37875,119 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		Finish( "scenario=starport-doorlabels checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// flies in hyperspace in one direction with the engines on for some real seconds from a standstill - gives back the fuel used (in cubic meters) and the
+	// distance flown along the longer axis (in coordinates), measured while the engines run (before the ship coasts to a stop)
+	static IEnumerator HyperspaceFuelOnHeading( Vector3 heading, float seconds, float[] fuelAndDistance )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		controller.m_playerShip.TurnOffEngines();
+		playerData.m_general.m_currentSpeed = 0.0f;
+		playerData.m_general.m_currentDirection = heading.normalized;
+
+		yield return Frames( 2 );
+
+		var enduriumBefore = Endurium();
+		var fuelUsedBefore = playerData.m_playerShip.m_fuelUsed;
+		var start = controller.m_playerShip.transform.position;
+
+		controller.m_playerShip.TurnOnEngines();
+
+		for ( var end = Time.realtimeSinceStartup + seconds; Time.realtimeSinceStartup < end; )
+		{
+			playerData.m_general.m_currentDirection = heading.normalized;
+
+			yield return null;
+		}
+
+		var moved = controller.m_playerShip.transform.position - start;
+
+		controller.m_playerShip.TurnOffEngines();
+
+		fuelAndDistance[ 0 ] = ( enduriumBefore - Endurium() ) * 0.1f + ( playerData.m_playerShip.m_fuelUsed - fuelUsedBefore );
+		fuelAndDistance[ 1 ] = Mathf.Max( Mathf.Abs( moved.x ), Mathf.Abs( moved.z ) ) / 256.0f;
+	}
+
+	// the engines burn their fuel at every step of the ship in hyperspace, an eighth of a coordinate, as the original's (HYPER-OV FLY and -ENDURIUM): a step on the
+	// diagonal moves the ship along both axes for the fuel of one, so the fuel goes by the longer of the two distances flown along the axes (class 1 engines: 6
+	// hundredths a step, 0.48 m3 a coordinate, straight or diagonal), and the Tesseract halves a step's fuel in whole hundredths (PORTMENU-OV WEAF0: class 2,
+	// 5 hundredths, 2 with it, 0.16 m3 a coordinate)
+	IEnumerator ScenarioHyperspaceFuel()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var tesseractId = gameData.FindArtifactId( "Tesseract" );
+		var measured = new float[ 2 ];
+
+		EnsureCrew();
+
+		// plenty of Endurium, class 1 engines and no Tesseract to begin with
+		ship.AddElement( 5, 500 );
+		ship.m_enginesClass = 1;
+
+		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( tesseractId ) != null ); guard++ )
+		{
+			ship.RemoveArtifact( tesseractId );
+		}
+
+		// out in hyperspace, in a corner of it and flying away from its edges, with no encounter able to begin
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 6.0f, 0.0f, 6.0f ) );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		// ---- 1. class 1 engines, straight along an axis (the control) and on the diagonal
+		yield return HyperspaceFuelOnHeading( new Vector3( 1.0f, 0.0f, 0.0f ), 4.0f, measured );
+
+		var straightFuel = measured[ 0 ];
+		var straightDistance = measured[ 1 ];
+		var straightRate = ( straightDistance > 0.0f ) ? ( straightFuel / straightDistance ) : -1.0f;
+
+		yield return Frames( 30 );
+
+		yield return HyperspaceFuelOnHeading( new Vector3( 1.0f, 0.0f, 1.0f ), 4.0f, measured );
+
+		var diagonalFuel = measured[ 0 ];
+		var diagonalDistance = measured[ 1 ];
+		var diagonalRate = ( diagonalDistance > 0.0f ) ? ( diagonalFuel / diagonalDistance ) : -1.0f;
+
+		Log( "hyperspacefuel: class 1 engines: straight " + straightFuel.ToString( "0.0000" ) + " m3 over " + straightDistance.ToString( "0.000" ) + " coordinates (" + straightRate.ToString( "0.000" ) + " a coordinate), diagonal " + diagonalFuel.ToString( "0.0000" ) + " m3 over " + diagonalDistance.ToString( "0.000" ) + " along the longer axis (" + diagonalRate.ToString( "0.000" ) + "); location " + playerData.m_general.m_location );
+
+		Check( "hyperspacefuel: class 1 engines burn 0.48 m3 a coordinate flying straight along an axis (control)", ( straightRate > 0.456f ) && ( straightRate < 0.504f ), straightRate.ToString( "0.000" ) );
+		Check( "hyperspacefuel: on the diagonal they burn the same 0.48 m3 a coordinate of the longer axis, not 1.41 times it", ( diagonalRate > 0.456f ) && ( diagonalRate < 0.504f ), diagonalRate.ToString( "0.000" ) + " (straight " + straightRate.ToString( "0.000" ) + ")" );
+
+		// ---- 2. class 2 engines with the Tesseract: 5 hundredths a step halved to 2
+		ship.m_enginesClass = 2;
+		ship.AddArtifact( tesseractId );
+
+		yield return Frames( 30 );
+
+		yield return HyperspaceFuelOnHeading( new Vector3( 0.0f, 0.0f, 1.0f ), 4.0f, measured );
+
+		var tesseractRate = ( measured[ 1 ] > 0.0f ) ? ( measured[ 0 ] / measured[ 1 ] ) : -1.0f;
+		var estimate = ship.GetFuelForDistance( 10.0f );
+
+		Log( "hyperspacefuel: class 2 engines with the Tesseract: " + measured[ 0 ].ToString( "0.0000" ) + " m3 over " + measured[ 1 ].ToString( "0.000" ) + " coordinates (" + tesseractRate.ToString( "0.000" ) + " a coordinate), the starmap's estimate for 10 coordinates " + estimate.ToString( "0.00" ) );
+
+		Check( "hyperspacefuel: with the Tesseract class 2 engines burn 2 hundredths a step, 0.16 m3 a coordinate (the original's whole hundredths, not 0.20)", ( tesseractRate > 0.152f ) && ( tesseractRate < 0.168f ), tesseractRate.ToString( "0.000" ) );
+		Check( "hyperspacefuel: the starmap's estimate goes by the same step (1.6 m3 for 10 coordinates)", Mathf.Abs( estimate - 1.6f ) < 0.001f, estimate.ToString( "0.000" ) );
+
+		ship.RemoveArtifact( tesseractId );
+		ship.m_enginesClass = 1;
+		controller.m_encounterRange = encounterRange;
+
+		Finish( "scenario=hyperspacefuel checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
