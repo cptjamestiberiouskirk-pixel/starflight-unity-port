@@ -1314,6 +1314,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportArmorEquivalency();
 				break;
 
+			case "starport-unknownartifacts":
+				yield return ScenarioStarportUnknownArtifacts();
+				break;
+
 			case "viewoverlays":
 				yield return ScenarioViewOverlays();
 				break;
@@ -32031,6 +32035,139 @@ public class ClaudeProbe : MonoBehaviour
 		yield return ClosePanel( panel, "ship configuration" );
 
 		Finish( "scenario=starport-armorequivalency checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the Trade Depot's Sell and Analysis lists show "???" for the value of an artifact whose kind has not been analysed, as the original's do (IT-OV WF096: the
+	// value only when the artifact's known byte is set or ???IT is on, and the Sell and Analysis screens turn ???IT off, TDEPOT-OV WEE73 and WF1D8), while
+	// the Buy list shows the Starport's prices whether its artifacts are known or not (WF3CA turns ???IT on); a sale pays the artifact's value either way
+	// (WEF62), and once the artifact has been analysed the lists show its value
+	IEnumerator ScenarioStarportUnknownArtifacts()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var depot = FindPanel<TradeDepotPanel>();
+		var known = playerData.m_knownArtifacts;
+
+		// Adrynna's Gold (1), not known, and the Flat Device (16), known at the start of a game, in the ship's hold
+		const int unknownId = 1;
+		const int knownId = 16;
+
+		var shipArtifacts = playerData.m_playerShip.m_artifactStorage;
+
+		shipArtifacts.m_artifactList.Clear();
+		shipArtifacts.Add( unknownId );
+		shipArtifacts.Add( knownId );
+
+		if ( known.IsKnown( unknownId ) )
+		{
+			known.Remove( unknownId );
+		}
+
+		playerData.m_bank.m_currentBalance = 100000;
+
+		yield return OpenPanel( depot, "trade depot" );
+
+		// the value column's row of each artifact on the list of a state
+		Func<string, Dictionary<string, string>> values = stateMethod =>
+		{
+			Call( depot, stateMethod, true );
+
+			var rows = depot.m_unitValueListText.text.Replace( "\r", "" ).Split( '\n' );
+			var found = new Dictionary<string, string>();
+
+			foreach ( var item in GetField( depot, "m_itemList" ) as IList )
+			{
+				if ( (int) GetField( item, "m_type" ) != 1 )
+				{
+					continue;
+				}
+
+				var id = (int) GetField( item, "m_id" );
+				var row = (int) GetField( item, "m_row" );
+
+				found[ id.ToString() ] = ( ( row >= 0 ) && ( row < rows.Length ) ) ? rows[ row ].Trim() : "(no row)";
+			}
+
+			return found;
+		};
+
+		Func<Dictionary<string, string>, string> show = found =>
+		{
+			var list = new List<string>();
+
+			foreach ( var pair in found )
+			{
+				list.Add( pair.Key + "=" + pair.Value );
+			}
+
+			return string.Join( " ", list );
+		};
+
+		var unknownValue = gameData.m_artifactList[ unknownId ].m_actualValue.ToString();
+		var knownValue = gameData.m_artifactList[ knownId ].m_actualValue.ToString();
+
+		var sell = values( "SwitchToSellItemState" );
+		var analyze = values( "SwitchToAnalyzeItemState" );
+
+		// the Starport's own stock has only known artifacts at the start of a game: one that is not known is put there for the Buy list's control
+		playerData.m_starport.AddArtifact( unknownId );
+
+		var buy = values( "SwitchToBuyItemState" );
+
+		playerData.m_starport.RemoveArtifact( unknownId );
+
+		Log( "starport-unknownartifacts: Sell " + show( sell ) + " | Analysis " + show( analyze ) + " | Buy " + show( buy ) );
+
+		// the Starport's artifacts for sale that are not known, with their price on the Buy list
+		var buyUnknown = 0;
+		var buyUnknownShown = 0;
+
+		foreach ( var pair in buy )
+		{
+			var id = int.Parse( pair.Key );
+
+			if ( !known.IsKnown( id ) )
+			{
+				buyUnknown++;
+
+				if ( pair.Value == gameData.m_artifactList[ id ].m_starportPrice.ToString() )
+				{
+					buyUnknownShown++;
+				}
+			}
+		}
+
+		Check( "starport-unknownartifacts: the Sell list shows \"???\" for the value of an artifact that has not been analysed, and the value of one that is known", sell.ContainsKey( "1" ) && ( sell[ "1" ] == "???" ) && sell.ContainsKey( "16" ) && ( sell[ "16" ] == knownValue ), show( sell ) );
+		Check( "starport-unknownartifacts: the Analysis list shows the same", analyze.ContainsKey( "1" ) && ( analyze[ "1" ] == "???" ) && analyze.ContainsKey( "16" ) && ( analyze[ "16" ] == knownValue ), show( analyze ) );
+		Check( "starport-unknownartifacts: the Buy list shows the price of every artifact the Starport sells, known or not (a control)", ( buyUnknown > 0 ) && ( buyUnknownShown == buyUnknown ), buyUnknownShown + " of " + buyUnknown + " unknown artifacts with their price | " + show( buy ) );
+
+		// analyse it: the lists show its value from then on
+		Call( depot, "SwitchToAnalyzeItemState", true );
+
+		var items = GetField( depot, "m_itemList" ) as IList;
+
+		for ( var index = 0; index < items.Count; index++ )
+		{
+			if ( ( (int) GetField( items[ index ], "m_type" ) == 1 ) && ( (int) GetField( items[ index ], "m_id" ) == unknownId ) )
+			{
+				SetField( depot, "m_currentItemIndex", index );
+			}
+		}
+
+		Call( depot, "AnalyzeSelectedItem" );
+		depot.YesClicked();
+
+		var sellAfter = values( "SwitchToSellItemState" );
+
+		Log( "starport-unknownartifacts: after the analysis, Sell " + show( sellAfter ) + ", known " + known.IsKnown( unknownId ) );
+
+		Check( "starport-unknownartifacts: once analysed, the Sell list shows the artifact's value", known.IsKnown( unknownId ) && sellAfter.ContainsKey( "1" ) && ( sellAfter[ "1" ] == unknownValue ), show( sellAfter ) );
+
+		Call( depot, "SwitchToMenuBarState" );
+
+		yield return ClosePanel( depot, "trade depot" );
+
+		Finish( "scenario=starport-unknownartifacts checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// what is drawn over the 3D views keeps the dark colours of the scheme in use in the light mode too (the light mode's dark accents and texts were hard
