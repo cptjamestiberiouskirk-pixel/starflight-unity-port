@@ -874,6 +874,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportInterest();
 				break;
 
+			case "starport-artifactstock":
+				yield return ScenarioStarportArtifactStock();
+				break;
+
 			case "starport-notices":
 				yield return ScenarioStarportNotices();
 				break;
@@ -12142,6 +12146,132 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-interest: going aboard at the Starport pays the interest up to today (100,000 M.U. for 150 days: 6,000), as the original's docking bay does", transporting && ( balanceAboard == 106000 ) && ( rowsAboard == rowsBefore + 1 ) && ( rowAboard == "4620-06-01 Interest 6000+" ), "transporting " + transporting + ", balance " + balanceAboard + ", rows " + rowsBefore + " -> " + rowsAboard + ", '" + rowAboard + "'" );
 
 		Finish( "scenario=starport-interest paid=" + paidAfter10Days + "/" + paidAfter250Days + "/" + paidOnRestart + "/" + paidOnAnOldSave + " aboard=" + balanceAboard + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the Trade Depot keeps its special artifacts and the ten curios it bought last when the ship leaves the Starport, as the original's <TDART does at launch
+	// (TDEPOT-OV, run by PORTMENU-OV WEAF0): with the Flat Device and the Whining Orb it starts with, a Rod Device and twelve curios sold to it, the two curios
+	// sold first are gone after the launch and everything else is still there
+	IEnumerator ScenarioStarportArtifactStock()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var stock = playerData.m_starport.m_artifactStorage;
+
+		Func<string, int> idOf = name =>
+		{
+			for ( var id = 0; id < gameData.m_artifactList.Length; id++ )
+			{
+				if ( gameData.m_artifactList[ id ].m_name == name )
+				{
+					return id;
+				}
+			}
+
+			return -1;
+		};
+
+		// twelve curios in the order they are sold, and a special artifact among them
+		var curioNames = new[] { "Amazing Artifact", "Armalcolite Relic", "Bladed Toy", "Blue Bauble", "Buttoned Box", "Complex Machine", "Cute Doodad", "Frightening Apparatus", "Glowing Disk", "Golden Globe", "Hot P.Y.T.", "Humming Gizzy" };
+		var specialNames = new[] { "Flat Device", "Whining Orb", "Rod Device" };
+
+		var before = new List<string>();
+
+		foreach ( var reference in stock.m_artifactList )
+		{
+			before.Add( gameData.m_artifactList[ reference.m_artifactId ].m_name );
+		}
+
+		for ( var index = 0; index < curioNames.Length; index++ )
+		{
+			playerData.m_starport.AddArtifact( idOf( curioNames[ index ] ) );
+
+			if ( index == 5 )
+			{
+				playerData.m_starport.AddArtifact( idOf( "Rod Device" ) );
+			}
+		}
+
+		var countSold = stock.m_artifactList.Count;
+
+		// a ship that can launch
+		EnsureCrew();
+
+		playerData.m_playerShip.m_name = "Probe";
+		playerData.m_playerShip.m_enginesClass = 1;
+
+		if ( playerData.m_playerShip.m_elementStorage.Find( 5 ) == null )
+		{
+			playerData.m_playerShip.AddElement( 5, 50 );
+		}
+
+		var panel = FindPanel<DockingBayPanel>();
+
+		if ( panel == null )
+		{
+			Finish( "scenario=starport-artifactstock abort: no docking bay panel", 2 );
+			yield break;
+		}
+
+		// the crew goes aboard through the docking bay
+		PanelController.m_instance.Open( panel );
+
+		var transporting = panel.IsTransporting();
+		var start = Time.realtimeSinceStartup;
+
+		while ( panel.IsTransporting() && ( Time.realtimeSinceStartup - start < 20.0f ) )
+		{
+			yield return null;
+		}
+
+		var after = new List<string>();
+
+		foreach ( var reference in stock.m_artifactList )
+		{
+			after.Add( gameData.m_artifactList[ reference.m_artifactId ].m_name );
+		}
+
+		var curiosLeft = new List<string>();
+
+		foreach ( var name in after )
+		{
+			if ( Array.IndexOf( curioNames, name ) >= 0 )
+			{
+				curiosLeft.Add( name );
+			}
+		}
+
+		var specialsLeft = 0;
+
+		foreach ( var name in specialNames )
+		{
+			if ( after.Contains( name ) )
+			{
+				specialsLeft++;
+			}
+		}
+
+		var expectedCurios = string.Join( ", ", curioNames, 2, 10 );
+
+		Log( "starport-artifactstock: the stock at the start " + string.Join( ", ", before ) + " | " + countSold + " after the sales | went aboard " + transporting + " | after the launch " + string.Join( ", ", after ) );
+
+		Check( "starport-artifactstock: the setup: the Starport starts with the Flat Device and the Whining Orb, and has 15 artifacts after the sales", before.Contains( "Flat Device" ) && before.Contains( "Whining Orb" ) && ( countSold == before.Count + 13 ) && transporting, string.Join( ", ", before ) + " | " + countSold + " | " + transporting );
+		Check( "starport-artifactstock: after the launch the Trade Depot keeps the ten curios it bought last, and the two sold first are gone", string.Join( ", ", curiosLeft ) == expectedCurios, string.Join( ", ", curiosLeft ) );
+		Check( "starport-artifactstock: it keeps every special artifact, the two it started with and the Rod Device (a control)", specialsLeft == specialNames.Length, specialsLeft + " of " + specialNames.Length );
+		Check( "starport-artifactstock: the stock's volume is the sum of what is left", stock.m_volumeUsed == SumOfArtifactVolumes( stock ), stock.m_volumeUsed + " / " + SumOfArtifactVolumes( stock ) );
+
+		Finish( "scenario=starport-artifactstock checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	static int SumOfArtifactVolumes( PD_ArtifactStorage storage )
+	{
+		var sum = 0;
+
+		foreach ( var reference in storage.m_artifactList )
+		{
+			sum += reference.GetVolume();
+		}
+
+		return sum;
 	}
 
 	// ---------------------------------------------------------------- Low: the ship's log after an empty log (where the list is scrolled to, and the two loops that scroll it)
