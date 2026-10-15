@@ -722,10 +722,9 @@ public class ShipConfigurationPanel : Panel
 		// pay, and the ship is whole again (the engineer has nothing left to do)
 		bank.m_currentBalance -= cost;
 
-		if ( !armorIsWhole )
-		{
-			ship.m_armorPoints = ship.GetMaximumArmorPoints();
-		}
+		// the armor gets the full points of its class, as the original's repair sets them (CONFIG-OV): points left over a class lowered by the armor class
+		// equivalency (PD_PlayerShip.InstallArmor) go with it
+		ship.m_armorPoints = ship.GetMaximumArmorPoints();
 
 		ship.m_shieldPoints = ship.GetMaximumShieldPoints();
 		ship.m_repairsAreUnderWay = false;
@@ -923,12 +922,14 @@ public class ShipConfigurationPanel : Panel
 			// yes so make the transaction and install the part
 			playerData.m_bank.m_currentBalance -= shipPartList[ classIndex ].m_buyPrice;
 
-			// upgrade the ship part
+			// upgrade the ship part (armor adds its points to what the hull has left, and counts the class those points are worth)
+			var armorClassIsLower = false;
+
 			switch ( m_currentPartIndex )
 			{
 				case 1: playerData.m_playerShip.m_enginesClass = classIndex; break;
 				case 2: playerData.m_playerShip.m_shieldingClass = classIndex; break;
-				case 3: playerData.m_playerShip.m_armorClass = classIndex; break;
+				case 3: armorClassIsLower = playerData.m_playerShip.InstallArmor( classIndex ); break;
 				case 4: playerData.m_playerShip.m_missileLauncherClass = classIndex; break;
 				case 5: playerData.m_playerShip.m_laserCannonClass = classIndex; break;
 			}
@@ -940,14 +941,14 @@ public class ShipConfigurationPanel : Panel
 			playerData.m_playerShip.RecalculateMass();
 			playerData.m_playerShip.RecalculateAcceleration();
 
-			// if we just bought armor then update the armor points on the ship
-			if ( m_currentPartIndex == 3 )
-			{
-				playerData.m_playerShip.m_armorPoints = playerData.m_playerShip.GetMaximumArmorPoints();
-			}
-
 			// switch back to the buy part state
 			SwitchToBuyPartState();
+
+			// armor bought onto a damaged hull: the original's warning (CONFIG-OV WEE20), which goes back to the parts when it is closed
+			if ( armorClassIsLower )
+			{
+				SwitchToErrorMessageState( "Warning: armor class equivalency will be lower due to unrepaired damage", false );
+			}
 
 			// play a ui sound
 			SoundController.m_instance.PlaySound( SoundController.Sound.Update );
