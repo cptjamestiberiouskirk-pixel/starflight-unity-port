@@ -1310,6 +1310,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportLighting();
 				break;
 
+			case "starport-armorequivalency":
+				yield return ScenarioStarportArmorEquivalency();
+				break;
+
 			case "viewoverlays":
 				yield return ScenarioViewOverlays();
 				break;
@@ -12654,9 +12658,11 @@ public class ClaudeProbe : MonoBehaviour
 		var gameData = dataController.m_gameData;
 		var playerData = dataController.m_playerData;
 
-		// ---- 1. a save with more armor points than its armor allows is cut back when it is loaded
+		// ---- 1. a save with more armor points than its armor allows is cut back when it is loaded, to the most the armor class equivalency can leave: up to one
+		// point short of the next class's full points (249 over the class's own)
 		var bareHull = PD_PlayerShip.c_bareHullArmorPoints;
 		var class2Maximum = gameData.m_armorList[ 2 ].m_points;
+		var leftOver = PD_PlayerShip.c_bareHullArmorPoints - 1;
 
 		var soldArmor = ArmorPointsAfterLoad( 0, 1500 );
 		var tooManyForClass2 = ArmorPointsAfterLoad( 2, class2Maximum + 700 );
@@ -12667,7 +12673,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "old saves: armor points after loading: no armor with 1500 points -> " + soldArmor + " (bare hull " + bareHull + "), class 2 with " + ( class2Maximum + 700 ) + " -> " + tooManyForClass2 + " (its armor has " + class2Maximum + "), class 2 with " + ( class2Maximum - 10 ) + " -> " + damagedClass2 + ", a whole bare hull -> " + wholeBareHull + ", destroyed with 0 -> " + destroyed + ", with -50 -> " + belowZero );
 
-		Check( "old saves: armor points above the maximum are cut back to it on load", ( soldArmor == bareHull ) && ( tooManyForClass2 == class2Maximum ), "no armor: 1500 -> " + soldArmor + " (maximum " + bareHull + "), class 2: " + ( class2Maximum + 700 ) + " -> " + tooManyForClass2 + " (maximum " + class2Maximum + ")" );
+		Check( "old saves: armor points above the maximum and what the armor class equivalency can leave over it are cut back to that on load", ( soldArmor == bareHull + leftOver ) && ( tooManyForClass2 == class2Maximum + leftOver ), "no armor: 1500 -> " + soldArmor + " (maximum " + bareHull + " + " + leftOver + "), class 2: " + ( class2Maximum + 700 ) + " -> " + tooManyForClass2 + " (maximum " + class2Maximum + " + " + leftOver + ")" );
 		Check( "old saves: armor points at or below the maximum are left alone", ( damagedClass2 == class2Maximum - 10 ) && ( wholeBareHull == bareHull ), "class 2 with " + ( class2Maximum - 10 ) + " -> " + damagedClass2 + ", bare hull with " + bareHull + " -> " + wholeBareHull );
 		Check( "old saves: a save with no armor left loads as it was, never below 0 (a ship is destroyed by its hull, not its armor)", ( destroyed == 0 ) && ( belowZero == 0 ), "0 -> " + destroyed + ", -50 -> " + belowZero );
 
@@ -31922,6 +31928,109 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-lighting: loading the scene does not try to compute its lighting in play mode (no \"Computing lightmaps is not available in play mode\")", s_lightmapMessages == 0, s_lightmapMessages + " messages" );
 
 		Finish( "scenario=starport-lighting checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the original's armor class equivalency (CONFIG-OV WEE20): armor bought onto the bare hull adds 250 points a class to the points the ship has, the class
+	// counted is the one those points are worth (bought class times points over the class's full points, rounded down), a bare hull with less than its 250
+	// points gives the warning, and buying armor sets the hull's integrity (the armor's condition byte, ship field 0x11) to 100; the load check keeps the points
+	// the purchase can leave over a lowered class, and the Starport repair sets the armor to its class's full points, as the original's does
+	IEnumerator ScenarioStarportArmorEquivalency()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var panel = FindPanel<ShipConfigurationPanel>();
+
+		playerData.m_bank.m_currentBalance = 5000000;
+
+		yield return OpenPanel( panel, "ship configuration" );
+
+		Func<string> state = () => GetField( panel, "m_currentState" ).ToString();
+		Func<string> message = () => ( panel.m_errorMessageText != null ) ? panel.m_errorMessageText.text : "";
+
+		Func<int, int, int, string> buy = ( points, hull, classIndex ) =>
+		{
+			ship.m_armorPoints = points;
+			ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Hull, hull );
+
+			SetField( panel, "m_currentPartIndex", 3 );
+			SetField( panel, "m_currentClassIndex", classIndex );
+			Call( panel, "BuySelectedClass" );
+
+			return "class " + ship.m_armorClass + ", " + ship.m_armorPoints + " points, hull " + ship.GetHullIntegrity() + ", state " + state() + " \"" + message() + "\"";
+		};
+
+		Action sell = () =>
+		{
+			SetField( panel, "m_currentPartIndex", 3 );
+			Call( panel, "SellSelectedPart" );
+			Call( panel, "SwitchToBuyPartState", true );
+		};
+
+		// ---- a control: class 3 armor bought onto a whole bare hull of 250 points is class 3 with its 1,000 points and no warning
+		var whole = buy( 250, 100, 2 );
+
+		Log( "armorequivalency: class 3 onto a whole hull: " + whole );
+
+		Check( "armorequivalency: class 3 armor on a whole bare hull is class 3 with 1000 points, and no warning", ( ship.m_armorClass == 3 ) && ( ship.m_armorPoints == 1000 ) && ( state() != "ErrorMessage" ), whole );
+
+		sell();
+
+		// ---- class 3 armor bought onto a bare hull down to 150 points: 3 x 250 + 150 = 900 points, worth class 900 x 3 / 1000 = 2.7, so class 2, with the warning,
+		// and the hull's integrity is whole again
+		var damaged = buy( 150, 60, 2 );
+		var stateBefore = GetField( panel, "m_stateBeforeError" ).ToString();
+
+		Log( "armorequivalency: class 3 onto a hull of 150 points: " + damaged + ", back to " + stateBefore );
+
+		Check( "armorequivalency: class 3 armor on a hull of 150 points has 900 points and counts class 2", ( ship.m_armorClass == 2 ) && ( ship.m_armorPoints == 900 ), damaged );
+		Check( "armorequivalency: it gives the original's warning, which closes back to the parts", ( state() == "ErrorMessage" ) && message().ToLowerInvariant().Contains( "armor class equivalency will be lower due to unrepaired damage" ) && ( stateBefore == "BuyPart" ), damaged + ", back to " + stateBefore );
+		Check( "armorequivalency: buying armor makes the hull's integrity whole (100)", ship.GetHullIntegrity() == 100, damaged );
+
+		ship.ValidateArmorPoints();
+
+		Check( "armorequivalency: the load check keeps the 900 points of the class 2 ship (its class's full points are 750)", ship.m_armorPoints == 900, ship.m_armorPoints + " points" );
+
+		sell();
+
+		// ---- class 1 armor bought onto a bare hull down to 200 points: 450 points, worth 450 / 500, so no class at all (the original's), with the warning; the load
+		// check keeps the 450, and class 2 bought onto it afterwards adds to them with no warning: 950 points, class 2
+		var none = buy( 200, 100, 0 );
+
+		Log( "armorequivalency: class 1 onto a hull of 200 points: " + none );
+
+		var noneClass = ship.m_armorClass;
+		var nonePoints = ship.m_armorPoints;
+		var noneWarned = ( state() == "ErrorMessage" );
+
+		ship.ValidateArmorPoints();
+
+		var noneValidated = ship.m_armorPoints;
+
+		Call( panel, "SwitchToBuyPartState", true );
+
+		var again = buy( ship.m_armorPoints, 100, 1 );
+
+		Log( "armorequivalency: class 2 onto it: " + again );
+
+		Check( "armorequivalency: class 1 armor on a hull of 200 points has 450 points and no class, with the warning, and the load check keeps them", ( noneClass == 0 ) && ( nonePoints == 450 ) && noneWarned && ( noneValidated == 450 ), "class " + noneClass + ", " + nonePoints + " points, warned " + noneWarned + ", after the load check " + noneValidated );
+		Check( "armorequivalency: class 2 armor bought onto those 450 points has 950 points and is class 2, with no warning", ( ship.m_armorClass == 2 ) && ( ship.m_armorPoints == 950 ) && ( state() != "ErrorMessage" ), again );
+
+		// ---- the Starport repair sets the armor to its class's full points (750 for class 2), as the original's does, also when the ship has more (the 950 the
+		// purchase above left, set again for the old code, whose purchase left 750)
+		ship.m_armorPoints = 950;
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Hull, 90 );
+
+		panel.RepairClicked();
+
+		Log( "armorequivalency: repaired: " + ship.m_armorPoints + " points, hull " + ship.GetHullIntegrity() );
+
+		Check( "armorequivalency: the Starport repair sets the armor to its class's full 750 points", ( ship.m_armorPoints == 750 ) && ( ship.GetHullIntegrity() == 100 ), ship.m_armorPoints + " points, hull " + ship.GetHullIntegrity() );
+
+		Call( panel, "SwitchToMenuBarState" );
+
+		yield return ClosePanel( panel, "ship configuration" );
+
+		Finish( "scenario=starport-armorequivalency checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// what is drawn over the 3D views keeps the dark colours of the scheme in use in the light mode too (the light mode's dark accents and texts were hard

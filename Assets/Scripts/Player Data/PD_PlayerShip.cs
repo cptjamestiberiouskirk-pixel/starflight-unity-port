@@ -268,16 +268,33 @@ public class PD_PlayerShip
 		return (int) Mathf.Max( value, 5 );
 	}
 
-	// a part just bought is whole (the parts are numbered as the ship configuration numbers them; the armor has no condition of its own)
+	// a part just bought is whole (the parts are numbered as the ship configuration numbers them); the armor's condition is the hull's integrity, the original's
+	// ship field 0x11, which buying armor sets to 100 as buying any part sets its own (CONFIG-OV WEE20)
 	public void InstallNewPart( int partIndex )
 	{
 		switch ( partIndex )
 		{
 			case 1: SetSystemHealth( ShipSystem.Engines, 100 ); break;
 			case 2: SetSystemHealth( ShipSystem.Shields, 100 ); break;
+			case 3: SetSystemHealth( ShipSystem.Hull, 100 ); break;
 			case 4: SetSystemHealth( ShipSystem.Missiles, 100 ); break;
 			case 5: SetSystemHealth( ShipSystem.Lasers, 100 ); break;
 		}
+	}
+
+	// the original's armor class equivalency (CONFIG-OV WEE20): armor is bought onto the bare hull (the old plating has to be sold first), and it adds 250 points
+	// a class to the points the ship has, so unrepaired damage stays; the class the ship then counts is the one those points are worth, the class bought times
+	// the share of its full points the ship has, rounded down, which is lower than the class bought when the bare hull had less than its 250 points ("WARNING:
+	// ARMOR CLASS EQUIVALENCY WILL BE LOWER DUE TO UNREPAIRED DAMAGE"), and is none at all for class 1 armor; returns true when it was lower
+	public bool InstallArmor( int classBought )
+	{
+		var oldPoints = Mathf.Max( 0, m_armorPoints );
+		var points = classBought * c_bareHullArmorPoints + oldPoints;
+
+		m_armorPoints = points;
+		m_armorClass = ( classBought > 0 ) ? points * classBought / ( ( classBought + 1 ) * c_bareHullArmorPoints ) : 0;
+
+		return oldPoints < c_bareHullArmorPoints;
 	}
 
 	// make sure there is a health for every system (save files from before the systems could be damaged have none: their systems are whole)
@@ -470,8 +487,9 @@ public class PD_PlayerShip
 		}
 
 		// never more than the most this ship can have, and never below 0 (the old damage took armor points below 0, and a ship is destroyed by its hull, not its
-		// armor: this never adds a usable point)
-		m_armorPoints = Mathf.Clamp( m_armorPoints, 0, GetMaximumArmorPoints() );
+		// armor: this never adds a usable point); armor bought onto a damaged hull counts a lower class than it has points for (InstallArmor), up to one point
+		// short of the next class's full points, which the original keeps until the next repair
+		m_armorPoints = Mathf.Clamp( m_armorPoints, 0, GetMaximumArmorPoints() + c_bareHullArmorPoints - 1 );
 	}
 
 	// the most shield points this ship can have - the full charge of the shielding that is installed (zero if there is none)
