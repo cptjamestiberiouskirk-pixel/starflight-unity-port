@@ -18002,15 +18002,25 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 4: the Rod Device
 
-	// the armor points one shot of this alien vessel takes off the player ship, with its shields down and armor to spare
+	// the armor points one shot of this alien vessel takes off the player ship, with its shields down and class 1 armor to spare (a chunk of a hit takes its own
+	// size off class 1 armor, DAMAGE-OV WF26A), fired from 3 cells away (240 units: the original's aliens fire from close by, and a laser's damage falls off with
+	// the distance)
 	static int ArmorLostToOneShot( PD_AlienShip alienShip, GD_Vessel vessel )
 	{
-		var ship = DataController.m_instance.m_playerData.m_playerShip;
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var armorClass = ship.m_armorClass;
+		var alienPosition = alienShip.m_coordinates;
 
 		ship.m_shieldsAreUp = false;
+		ship.m_armorClass = 1;
 		ship.m_armorPoints = 100000;
+		alienShip.m_coordinates = playerData.m_general.m_coordinates + new Vector3( 240.0f, 0.0f, 0.0f );
 
 		CombatController.m_instance.AlienFiresAtPlayer( alienShip, vessel );
+
+		alienShip.m_coordinates = alienPosition;
+		ship.m_armorClass = armorClass;
 
 		return 100000 - ship.m_armorPoints;
 	}
@@ -18072,8 +18082,8 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "roddevice: one laser shot of " + laserVessel.m_name + " (laser class " + laserVessel.m_laserClass + ") takes " + laserWithout + " armor points without the Rod Device, " + laserWith + " with it | a plasma bolt of " + ( ( plasmaVessel == null ) ? "none" : plasmaVessel.m_name ) + " " + plasmaWithout + " without, " + plasmaWith + " with" );
 
 		Check( "roddevice: an alien laser hits the ship (control)", laserWithout > 0, laserWithout.ToString() );
-		Check( "roddevice: with the Rod Device in the hold an alien laser does a quarter of the damage, as the original's (DAMAGE-OV WED36: ?ROD 4 /)", ( laserWithout > 0 ) && ( laserWith == laserWithout / 4 ), laserWithout + " -> " + laserWith );
-		Check( "roddevice: the Rod Device is a laser shield - a plasma bolt does the same damage (control)", plasmaWith == plasmaWithout, plasmaWithout + " -> " + plasmaWith );
+		Check( "roddevice: with the Rod Device in the hold an alien laser does a quarter of the damage, as the original's (DAMAGE-OV WED36: ?ROD 4 /)", ( laserWithout > 0 ) && ( Mathf.Abs( laserWith - laserWithout / 4 ) <= 12 ), laserWithout + " -> " + laserWith + " (a hit lands in chunks of at least 10 points, so each can be up to 9 more)" );
+		Check( "roddevice: the Rod Device is a laser shield - a plasma bolt does the same damage (control)", Mathf.Abs( plasmaWith - plasmaWithout ) <= 9, plasmaWithout + " -> " + plasmaWith );
 
 		Finish( "scenario=roddevice laser=" + laserWithout + "/" + laserWith + " plasma=" + plasmaWithout + "/" + plasmaWith, 0 );
 	}
