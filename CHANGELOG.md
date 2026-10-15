@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-15
+
+Combat as the original's. The player's ship now takes hits the way the original's does: they fall on the shields, then the armor, and only then on the hull, the systems and the crew, and the ship is lost when its hull is, not its armor (#389). The weapons do the original's damage, about five times what they did, falling off with distance, with alien lasers twice as strong and the Uhlek plasma bolt a missile that follows the ship (#390). The navigator's skill decides whether a shot hits, and every shot burns the original's fuel (#391). The Starport's hall, the station and the docking bay now take the colors of the chosen scheme (#382, #388), and the documentation and this changelog were rewritten in one voice. On this release's code the headless probe passes all of its scenarios, and the automated playthrough plays a new game through to the ending and Interstel's bonus.
+
 ### Added
 
 - **Contributing Guide**: `CONTRIBUTING.md` explains how the project is run: the fidelity principle, one change per pull request, conventional commits, the changelog, the code style and how changes are tested.
