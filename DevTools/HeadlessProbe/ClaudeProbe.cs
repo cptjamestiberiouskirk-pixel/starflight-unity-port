@@ -22881,6 +22881,8 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 6: specimens sold at the Trade Depot
 
+	// a specimen sells for half the value saved with it, as the original's sale pays its value times the Sell screen's %VAL of 50 (TDEPOT-OV WEF38, WEE73),
+	// and the Sell list shows that half (IT-OV WEF89)
 	IEnumerator ScenarioStarportSpecimens()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -22906,7 +22908,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return OpenPanel( depot, "trade depot" );
 
-		// the sale list shows it, and selling it pays what it is worth
+		// the sale list shows it at half its value, and selling it pays that
 		Call( depot, "SwitchToSellItemState", true );
 
 		var items = GetField( depot, "m_itemList" ) as IList;
@@ -22922,6 +22924,15 @@ public class ClaudeProbe : MonoBehaviour
 
 		var listed = depot.m_itemListText.text;
 		var balanceBefore = playerData.m_bank.m_currentBalance;
+		var valueRows = depot.m_unitValueListText.text.Replace( "\r", "" ).Split( '\n' );
+		var listedValue = "(no row)";
+
+		if ( index >= 0 )
+		{
+			var row = (int) GetField( items[ index ], "m_row" );
+
+			listedValue = ( ( row >= 0 ) && ( row < valueRows.Length ) ) ? valueRows[ row ].Trim() : "(no row)";
+		}
 
 		if ( index >= 0 )
 		{
@@ -22938,10 +22949,11 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return ClosePanel( depot, "trade depot" );
 
-		Log( "starport-specimens: held " + heldBefore + " (volume " + volumeBefore + "), listed at " + index + " | paid " + paid + ", held " + heldAfter + " (volume " + volumeAfter + ") | " + listed.Replace( "\n", "/" ) );
+		Log( "starport-specimens: held " + heldBefore + " (volume " + volumeBefore + "), listed at " + index + " for " + listedValue + " | paid " + paid + ", held " + heldAfter + " (volume " + volumeAfter + ") | " + listed.Replace( "\n", "/" ) );
 
 		Check( "starport-specimens: the Trade Depot lists a specimen in the ship's hold for sale", ( heldBefore == 1 ) && ( index >= 0 ) && listed.Contains( "Specimens" ) && listed.Contains( "Radial, many legs" ), heldBefore + ", " + index );
-		Check( "starport-specimens: selling it pays its value and frees its room in the hold", ( paid == 1234 ) && ( heldAfter == 0 ) && ( volumeAfter == volumeBefore - 16 ), paid + ", " + heldAfter + ", " + volumeBefore + " -> " + volumeAfter );
+		Check( "starport-specimens: the Sell list shows half its value of 1234, 617", listedValue == "617", listedValue );
+		Check( "starport-specimens: selling it pays half its value, 617, and frees its room in the hold", ( paid == 617 ) && ( heldAfter == 0 ) && ( volumeAfter == volumeBefore - 16 ), paid + ", " + heldAfter + ", " + volumeBefore + " -> " + volumeAfter );
 
 		Finish( "scenario=starport-specimens paid=" + paid, 0 );
 	}

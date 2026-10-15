@@ -7,6 +7,10 @@ using System;
 
 public class PD_Specimen
 {
+	// the share of its value the Trade Depot pays for a specimen, in percent: the original's sale pays the value saved with it times %VAL, which its Sell screen
+	// sets to 50 (TDEPOT-OV WEF38 and WEE73), and its Sell list shows the same (IT-OV WEF89)
+	const int c_salePercentage = 50;
+
 	// its planet and the index of its species there (GD_Species.ForPlanet)
 	public int m_planetId;
 	public int m_speciesIndex;
@@ -17,6 +21,12 @@ public class PD_Specimen
 	// its volume, in tenths of a cubic meter like everything in the cargo holds
 	public int m_volume;
 
-	// what the Trade Depot pays for it
+	// the value saved with it when it was captured (TerrainLifeforms)
 	public int m_value;
+
+	// what the Trade Depot pays for it
+	public int GetSaleValue()
+	{
+		return m_value * c_salePercentage / 100;
+	}
 }

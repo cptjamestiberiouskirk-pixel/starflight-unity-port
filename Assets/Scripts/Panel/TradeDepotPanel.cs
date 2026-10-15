@@ -794,7 +794,7 @@ public class TradeDepotPanel : Panel
 
 						m_itemListText.text += specimen.m_name + Environment.NewLine;
 						m_volumeListText.text += ( specimen.m_volume / 10 ) + "." + ( specimen.m_volume % 10 ) + Environment.NewLine;
-						m_unitValueListText.text += specimen.m_value + Environment.NewLine;
+						m_unitValueListText.text += specimen.GetSaleValue() + Environment.NewLine;
 
 						m_itemList.Add( new Item( m_rowCount++, 2, specimenIndex, 0 ) );
 					}
@@ -1208,7 +1208,7 @@ public class TradeDepotPanel : Panel
 		}
 		else if ( item.m_type == 2 )
 		{
-			// it's a specimen - the Trade Depot pays the value saved with it
+			// it's a specimen - the Trade Depot pays half the value saved with it
 			PlayerData playerData = DataController.m_instance.m_playerData;
 			PD_SpecimenStorage specimenStorage = playerData.m_playerShip.GetSpecimenStorage();
 
@@ -1216,7 +1216,7 @@ public class TradeDepotPanel : Panel
 			{
 				PD_Specimen specimen = specimenStorage.m_specimenList[ item.m_id ];
 
-				playerData.m_bank.m_currentBalance += specimen.m_value;
+				playerData.m_bank.m_currentBalance += specimen.GetSaleValue();
 
 				playerData.m_playerShip.RemoveSpecimen( specimen );
 			}
