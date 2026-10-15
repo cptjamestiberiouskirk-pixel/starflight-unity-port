@@ -33,15 +33,51 @@ public class CombatController : MonoBehaviour
 	const float c_baseLaserCooldown = 1.0f;
 	const float c_baseMissileCooldown = 2.0f;
 
-	// damage values per weapon class
-	static readonly int[] c_laserDamage = { 0, 20, 35, 50, 70, 100 };
-	static readonly int[] c_missileDamage = { 0, 40, 70, 100, 140, 200 };
+	// the damage of a laser and of a missile by its class, the original's (DAMAGE-OV LDAMAGE and MDAMAGE): the same for the player's weapons and the aliens', and
+	// a missile of class 6 is the plasma bolt
+	static readonly int[] c_laserDamage = { 0, 90, 210, 360, 510, 660 };
+	static readonly int[] c_missileDamage = { 0, 200, 400, 700, 1000, 1500, 4000 };
+	const int c_plasmaBoltClass = 6;
+
+	// how many of the port's units in an encounter are one cell of the original's combat map: a laser's damage falls to nothing at 10 cells (DAMAGE-OV WED12), and
+	// the port's laser reaches 800 units, so a cell is 80 (the port's encounters are larger than the original's, so this keeps the original's proportions)
+	public const float c_unitsPerCell = 80.0f;
+
+	// a laser's damage at a distance (DAMAGE-OV WED12): (10 - cells) / 10 of its class's damage, the cells counted whole as the original's square root does, and
+	// nothing at 10 cells and beyond
+	public static int GetLaserDamage( int laserClass, float distance )
+	{
+		var damage = c_laserDamage[ Mathf.Clamp( laserClass, 0, c_laserDamage.Length - 1 ) ];
+		var cells = Mathf.FloorToInt( Mathf.Max( 0.0f, distance ) / c_unitsPerCell );
+
+		return Mathf.Max( 0, ( 10 - cells ) * damage / 10 );
+	}
+
+	// an alien laser's damage to the player ship (DAMAGE-OV WF3EA and WED36): a laser's damage at that distance, a quarter of it with the Rod Device aboard, then
+	// twice that
+	public static int GetAlienLaserDamage( int laserClass, float distance, bool rodDevice )
+	{
+		var damage = GetLaserDamage( laserClass, distance );
+
+		if ( rodDevice )
+		{
+			damage /= 4;
+		}
+
+		return damage * 2;
+	}
+
+	// a missile's damage, whatever the distance (DAMAGE-OV WF23A and WF47F): class 6 is the plasma bolt
+	public static int GetMissileDamage( int missileClass )
+	{
+		return c_missileDamage[ Mathf.Clamp( missileClass, 0, c_missileDamage.Length - 1 ) ];
+	}
 
 	// weapon ranges
 	const float c_laserRange = 800.0f;
 	const float c_missileRange = 1500.0f;
 
-	// endurium used up by every shot, in cubic meters (a missile does twice the damage of a laser of the same class and uses twice the fuel)
+	// endurium used up by every shot, in cubic meters
 	const float c_laserFuelPerShot = 0.01f;
 	const float c_missileFuelPerShot = 0.02f;
 
@@ -386,7 +422,8 @@ public class CombatController : MonoBehaviour
 		// apply damage if not immune
 		if ( !targetVessel.m_immuneToLasers )
 		{
-			int damage = c_laserDamage[ Mathf.Clamp( playerData.m_playerShip.m_laserCannonClass, 0, c_laserDamage.Length - 1 ) ];
+			// the laser's damage falls off with the distance to the target
+			int damage = GetLaserDamage( playerData.m_playerShip.m_laserCannonClass, Vector3.Distance( playerPosition, targetPosition ) );
 
 			// a damaged laser cannon does damage in proportion to its health
 			damage = Mathf.Max( 1, Mathf.RoundToInt( damage * playerData.m_playerShip.GetSystemFactor( PD_PlayerShip.ShipSystem.Lasers ) ) );
@@ -469,7 +506,7 @@ public class CombatController : MonoBehaviour
 		// fire the missile - find target model (its model slot is not the same as the target index, so ask the encounter for it)
 		var targetModel = encounter.GetAlienShipModel( m_currentTargetIndex );
 		int targetIndex = m_currentTargetIndex;
-		int damage = c_missileDamage[ Mathf.Clamp( playerData.m_playerShip.m_missileLauncherClass, 0, c_missileDamage.Length - 1 ) ];
+		int damage = GetMissileDamage( Mathf.Min( playerData.m_playerShip.m_missileLauncherClass, c_plasmaBoltClass - 1 ) );
 
 		// a damaged missile launcher's missiles do damage in proportion to its health
 		damage = Mathf.Max( 1, Mathf.RoundToInt( damage * playerData.m_playerShip.GetSystemFactor( PD_PlayerShip.ShipSystem.Missiles ) ) );
@@ -972,20 +1009,44 @@ public class CombatController : MonoBehaviour
 		// what weapon does the alien have?
 		if ( vessel.m_hasPlasmaBolts )
 		{
-			// fire plasma bolt (use laser visual with different color)
-			var laser = GetAvailableLaser();
-			if ( laser != null )
+			// a plasma bolt is the original's missile of class 6, the one missile that follows the ship (COMBAT-OV WE929): it flies after the ship and does its
+			// damage when it reaches it, so a ship that keeps away until it runs out of time escapes it; one of the aliens' missiles in the air (fewer than 10)
+			var bolt = ( m_alienMissilesInFlight < c_maximumAlienMissilesInFlight ) ? GetAvailableMissile() : null;
+
+			if ( bolt != null )
 			{
-				laser.SetColor( new Color( 0.5f, 1.0f, 0.5f ) ); // green plasma
-				laser.Fire( alienPosition, playerPosition );
+				var playerShip = SpaceflightController.m_instance.m_playerShip;
+				int damage = GetMissileDamage( c_plasmaBoltClass );
+
+				m_alienMissilesInFlight++;
+
+				bolt.Fire( alienPosition, playerShip.transform, ( hitPosition, reachedTarget ) =>
+				{
+					m_alienMissilesInFlight = Mathf.Max( 0, m_alienMissilesInFlight - 1 );
+
+					if ( reachedTarget && !m_playerIsDestroyed )
+					{
+						// what hit the ship, in the original's words (DAMAGE-OV: PLASMA BOLT)
+						SpaceflightController.m_instance.m_messages.AddText( "<color=red>Plasma bolt</color>" );
+
+						ApplyDamageToPlayer( damage, direction );
+					}
+
+					// play explosion
+					var explosion = GetAvailableExplosion();
+					if ( explosion != null )
+					{
+						explosion.SetScale( 0.5f );
+						explosion.Play( hitPosition );
+					}
+
+					// play torpedo explosion sound
+					SoundController.m_instance.PlaySound( SoundController.Sound.TorpedoExplosion );
+				} );
+
+				// play torpedo launch sound
+				SoundController.m_instance.PlaySound( SoundController.Sound.TorpedoFire );
 			}
-
-			// apply damage
-			int damage = 30 + vessel.m_shieldClass * 10;
-			ApplyDamageToPlayer( damage, direction );
-
-			// what hit the ship, in the original's words (DAMAGE-OV: PLASMA BOLT)
-			SpaceflightController.m_instance.m_messages.AddText( "<color=red>Plasma bolt</color>" );
 		}
 		else if ( vessel.m_laserClass > 0 )
 		{
@@ -997,15 +1058,9 @@ public class CombatController : MonoBehaviour
 				laser.Fire( alienPosition, playerPosition );
 			}
 
-			// apply damage
-			int damage = c_laserDamage[ Mathf.Clamp( vessel.m_laserClass, 0, c_laserDamage.Length - 1 ) ];
-
-			// the Rod Device "projects an enhanced laser shield around a spaceship" (the Starport's analysis): an alien laser does a quarter of its damage with it
-			// aboard (DAMAGE-OV WED36: ?ROD @ IF 4 /)
-			if ( playerData.m_playerShip.HasArtifact( "Rod Device" ) )
-			{
-				damage /= 4;
-			}
+			// apply damage: twice a laser's damage at that distance, and the Rod Device "projects an enhanced laser shield around a spaceship" (the Starport's
+			// analysis): a quarter of it with the Rod aboard (DAMAGE-OV WF3EA and WED36: ?ROD @ IF 4 /)
+			int damage = GetAlienLaserDamage( vessel.m_laserClass, Vector3.Distance( alienPosition, playerPosition ), playerData.m_playerShip.HasArtifact( "Rod Device" ) );
 
 			// what hit the ship, in the original's words (COMBAT-OV WECEA: LASER CLASS n, or LASER PARTIALLY DEFLECTED with the Rod Device)
 			SpaceflightController.m_instance.m_messages.AddText( playerData.m_playerShip.HasArtifact( "Rod Device" ) ? "<color=red>Laser partially deflected</color>" : "<color=red>Laser class " + vessel.m_laserClass + "</color>" );
@@ -1022,12 +1077,12 @@ public class CombatController : MonoBehaviour
 			if ( missile != null )
 			{
 				var playerShip = SpaceflightController.m_instance.m_playerShip;
-				int damage = c_missileDamage[ Mathf.Clamp( vessel.m_missileClass, 0, c_missileDamage.Length - 1 ) ];
+				int damage = GetMissileDamage( Mathf.Min( vessel.m_missileClass, c_plasmaBoltClass - 1 ) );
 
 				m_alienMissilesInFlight++;
 
 				// it flies to where the ship was when it was launched, and only the plasma bolt follows the ship (COMBAT-OV WE929): it hits if the ship is still
-				// within a cell of that place (the original's map cell; the port's cell is 100 units, as the laser's range of 800 is the original's 7 cells)
+				// about in that place (within 100 units, a cell and a quarter of the original's combat map at c_unitsPerCell)
 				missile.Fire( alienPosition, playerShip.transform.position, ( hitPosition, reachedTarget ) =>
 				{
 					m_alienMissilesInFlight = Mathf.Max( 0, m_alienMissilesInFlight - 1 );

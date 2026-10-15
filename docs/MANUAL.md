@@ -354,10 +354,11 @@ Some things to know:
 
 | Weapon | Range | Damage, class 1 to 5 | Notes |
 |---|---|---|---|
-| Laser | 800 | 20, 35, 50, 70, 100 | Fast to recharge |
-| Missile | 1500 | 40, 70, 100, 140, 200 | Homes in on the target |
+| Laser | 800 | 90, 210, 360, 510, 660 close up | Weaker with distance, nothing at 800; fast to recharge |
+| Missile | 1500 | 200, 400, 700, 1000, 1500 | The same at any distance; homes in on the target |
 
 - Weapons need no ammunition, but every shot burns a little Endurium. Damaged weapons do less damage.
+- Alien lasers hit twice as hard as yours, and aliens open fire only once they are close.
 - Hits on you go to your shields while they are up, then to your armor. Only once the armor is gone do they reach the ship itself: each part of a hit lands on the hull, one of the systems or the crew. "Hull breach imminent" means your armor is almost gone. **The ship is destroyed when its hull's integrity reaches 0**; without armor it fights on, but every hit hurts.
 - Alien missiles fly to where your ship was when they were launched: keep moving and they miss.
 - Aliens' shields protect them only while raised, and not inside a nebula.
@@ -412,9 +413,9 @@ This is a faithful remake of *Starflight* (Binary Systems, Electronic Arts, 1986
 - a new console and Starport design, in 15 color schemes;
 - lifeforms on the planets' surfaces rebuilt from the game's 1984 design notes.
 
-Known differences in version 1.0.0:
+Known differences:
 
-- **Combat**: the port's weapons do less damage than the original's, so fights last longer.
+- **Combat**: every shot hits (the original's aim depends on the navigator), and shields recharge slowly during a fight.
 - **The navigator's skill** has no effect yet.
 - Smaller details of hyperspace flight (aliens' pursuit, speeds) are simplified.
 
