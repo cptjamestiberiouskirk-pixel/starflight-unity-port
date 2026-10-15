@@ -543,6 +543,18 @@ public class Encounter : MonoBehaviour
 	// how far away an alien ship can fire on the player
 	const float c_alienFireRange = 1000.0f;
 
+	// how far across and along an alien fires from (COMBAT-OV WE079: 5 cells of the original's combat map)
+	const float c_alienWeaponsReach = 5 * CombatController.c_unitsPerCell;
+
+	// true if an alien at this place is close enough to fire at the ship: within 5 cells of it across and along (COMBAT-OV WE07D and WE0AB), so its laser always
+	// does at least half its damage
+	public static bool IsWithinWeaponsReach( Vector3 alienCoordinates, Vector3 playerCoordinates )
+	{
+		var offset = alienCoordinates - playerCoordinates;
+
+		return ( Mathf.Abs( offset.x ) < c_alienWeaponsReach ) && ( Mathf.Abs( offset.z ) < c_alienWeaponsReach );
+	}
+
 	// the camera frames the alien ships out to this distance from the player and no further: the original shows an encounter at a fixed scale, and ships
 	// farther away come into view as they close in (framing every ship of the encounter took the camera so high that the ships were specks)
 	const float c_cameraViewRange = c_alienFireRange;
@@ -2516,14 +2528,13 @@ public class Encounter : MonoBehaviour
 				}
 
 				// check range
-				float distance = Vector3.Distance( alienShip.m_coordinates, playerData.m_general.m_coordinates );
-				if ( distance < c_alienFireRange )
+				if ( IsWithinWeaponsReach( alienShip.m_coordinates, playerData.m_general.m_coordinates ) )
 				{
 					eligibleShips.Add( i );
 				}
 				else
 				{
-					Debug.Log( $"UpdateAlienCombat: Ship {i} out of range (distance={distance:F0})" );
+					Debug.Log( $"UpdateAlienCombat: Ship {i} out of range" );
 				}
 			}
 

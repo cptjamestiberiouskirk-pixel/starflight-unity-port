@@ -1456,6 +1456,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioHullIntegrity();
 				break;
 
+			case "weapondamage":
+				yield return ScenarioWeaponDamage();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -27539,13 +27543,17 @@ public class ClaudeProbe : MonoBehaviour
 		EnterEncounter( FindEncounter( 1, 6, 3, 0 ) );
 		yield return Frames( 10 );
 
-		// ---- 1. sixty hits that get through the shields (none are up): some fall on the crew, and the text window says how badly they are wounded, with no numbers
+		// ---- 1. forty hits that get through the shields (none are up) and past the armor (none is left): some fall on the crew, and the text window says how badly they are wounded, with no numbers
 		SpaceflightController.m_instance.m_messages.Clear();
 
 		var said = "";
 
-		for ( var i = 0; i < 60; i++ )
+		for ( var i = 0; i < 40; i++ )
 		{
+			// the hull kept whole, so that a wound from a chunk of 20 stays the least (5 points, DAMAGE-OV WED6A): with the armor gone the hits also take the hull's
+			// integrity down, and the wounds, 10 times the chunk over it, would grow until the crew died
+			ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Hull, 100 );
+
 			combat.ApplyDamageToPlayer( 20, Vector3.forward );
 
 			said += MessageList() + " / ";
@@ -27557,15 +27565,29 @@ public class ClaudeProbe : MonoBehaviour
 		var wounded = said.Contains( " wounded." );
 		var numbers = said.Contains( "Hull takes" ) || said.Contains( "damage!" );
 
-		// ---- 2. a plasma bolt (an Uhlek warship's) says what hit the ship, in the original's words
+		// ---- 2. a plasma bolt (an Uhlek warship's) says what hit the ship, in the original's words - it is a missile that follows the ship, so it is fired from close
+		// by and says so when it arrives (the armor back to spare, so that its 4000 points leave the ship whole)
 		var alienShip = SpaceflightController.m_instance.m_encounter.m_pdEncounter.GetAlienShipList()[ 0 ];
 		var uhlekWarship = gameData.m_vesselList[ 17 ];
+		var alienPosition = alienShip.m_coordinates;
+
+		ship.m_armorPoints = 100000;
+		alienShip.m_coordinates = DataController.m_instance.m_playerData.m_general.m_coordinates + new Vector3( 240.0f, 0.0f, 0.0f );
 
 		SpaceflightController.m_instance.m_messages.Clear();
 
 		combat.AlienFiresAtPlayer( alienShip, uhlekWarship );
 
+		var plasmaUntil = Time.realtimeSinceStartup + 10.0f;
+
+		while ( !MessageList().Contains( "Plasma bolt" ) && ( Time.realtimeSinceStartup < plasmaUntil ) )
+		{
+			yield return null;
+		}
+
 		var plasma = MessageList();
+
+		alienShip.m_coordinates = alienPosition;
 
 		ClearMissiles();
 		LeaveEncounter();
@@ -27575,7 +27597,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		captain.m_vitality = 100.0f;
 
-		Log( "combatwounds: after 60 hits the captain's vitality " + vitalityAfter + ", wounded said " + wounded + ", numbers said " + numbers + " | plasma: " + plasma + " | said: " + ( said.Length > 600 ? said.Substring( 0, 600 ) : said ) );
+		Log( "combatwounds: after 40 hits the captain's vitality " + vitalityAfter + ", wounded said " + wounded + ", numbers said " + numbers + " | plasma: " + plasma + " | said: " + ( said.Length > 600 ? said.Substring( 0, 600 ) : said ) );
 
 		Check( "combatwounds: hits that get through the shields wound the crew at times, and the text window says how badly, as the original", ( vitalityAfter < 100.0f ) && ( vitalityAfter > 0.0f ) && wounded, vitalityAfter + " " + wounded );
 		Check( "combatwounds: the text window gives no numbers of damage, as the original", !numbers, said.Length > 300 ? said.Substring( 0, 300 ) : said );
@@ -32729,8 +32751,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		var pods = ship.m_numCargoPods;
 
-		// engines 3, shields 3, armor 3, missile launcher 2, laser cannon 3 (classes counted from 1)
-		var classes = new[] { 0, 3, 3, 3, 2, 3 };
+		// engines 3, shields 5, armor 5, missile launcher 2, laser cannon 3 (classes counted from 1): the best shields and armor, since the route seeks out the Uhlek,
+		// whose plasma bolts do the original's 4000 (DAMAGE-OV MDAMAGE) and a chunk takes only a fifth of itself off class 5 shields and armor
+		var classes = new[] { 0, 3, 5, 5, 2, 3 };
 		price += 4 * gameData.m_misc.m_cargoPodBuyPrice;
 
 		for ( var part = 1; part < 6; part++ )
@@ -32781,9 +32804,9 @@ public class ClaudeProbe : MonoBehaviour
 		var status = PtText( shipConfiguration.m_statusValuesText );
 		var configuration = PtText( shipConfiguration.m_configurationValuesText );
 
-		Log( "playthrough-1: ship configuration: selected in Buy " + selectedInBuy + ", pods " + pods + ", installed " + installed + " (wanted 3/3/3/2/3), name '" + ship.m_name + "', cost " + shipCost + " (prices add up to " + price + "), armor points " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() + ", shields " + ship.m_shieldPoints + "/" + ship.GetMaximumShieldPoints() + ", mass " + ship.m_mass + ", acceleration " + ship.m_acceleration + " | configuration '" + configuration + "' | status '" + status + "'" );
+		Log( "playthrough-1: ship configuration: selected in Buy " + selectedInBuy + ", pods " + pods + ", installed " + installed + " (wanted 3/5/5/2/3), name '" + ship.m_name + "', cost " + shipCost + " (prices add up to " + price + "), armor points " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() + ", shields " + ship.m_shieldPoints + "/" + ship.GetMaximumShieldPoints() + ", mass " + ship.m_mass + ", acceleration " + ship.m_acceleration + " | configuration '" + configuration + "' | status '" + status + "'" );
 
-		Check( "playthrough-1: Ship Configuration buys four cargo pods and the classes chosen with the stick", ( pods == 4 ) && ( installed == "3/3/3/2/3" ), pods + " pods, " + installed );
+		Check( "playthrough-1: Ship Configuration buys four cargo pods and the classes chosen with the stick", ( pods == 4 ) && ( installed == "3/5/5/2/3" ), pods + " pods, " + installed );
 		Check( "playthrough-1: the ship costs what its parts cost", shipCost == price, shipCost + " vs " + price );
 		Check( "playthrough-1: the ship is named Enterprise", ship.m_name == "Enterprise", ship.m_name );
 		Check( "playthrough-1: the bought armor gives the ship its maximum armor points", ship.m_armorPoints == ship.GetMaximumArmorPoints(), ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() );
@@ -35326,7 +35349,9 @@ public class ClaudeProbe : MonoBehaviour
 
 			// the first part of the fight ends with the shields down to half, and stage 13 goes on with the other half: since alien ships fire their laser and missile
 			// each, 55 s of it took all the shields and the hull down to about half, and from there the ship could not fire on the Uhlek after loading and still get out
-			yield return PtFight( 55.0f, result, () => ship.m_shieldPoints <= ship.GetMaximumShieldPoints() / 2 );
+			// (or with the first Uhlek ship destroyed: with the original's weapon damage the ship can destroy them all long before its class 5 shields are at half, and
+			// stage 13 needs some left to fight)
+			yield return PtFight( 55.0f, result, () => ( ship.m_shieldPoints <= ship.GetMaximumShieldPoints() / 2 ) || PtAlienPoints().Contains( "dead" ) );
 
 			Log( "playthrough-12: after the first part of the fight: " + PtEncounterText() + ", armor " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() + ", shields " + ship.m_shieldPoints + ", systems " + string.Join( ",", Array.ConvertAll( SystemHealth(), h => h.ToString() ) ) + ", fuel " + Endurium() );
 
@@ -36943,6 +36968,136 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "hullintegrity: the ship is destroyed when its hull's integrity reaches 0, in the original's words, and the lost game is never saved", destroyed && ( hullAtTheEnd == 0 ) && gameOverText.Contains( "Hull destroyed" ) && !savedLost, "destroyed " + destroyed + ", hull " + hullAtTheEnd + ", saved " + savedLost + " | " + gameOverText );
 
 		Finish( "scenario=hullintegrity checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the weapons' damage (DAMAGE-OV LDAMAGE and MDAMAGE)
+
+	// a static method of a type that returns a number, called with these arguments (-1 on the code that has no such method)
+	static int CallStaticInt( System.Type type, string name, params object[] args )
+	{
+		var method = type.GetMethod( name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static );
+
+		if ( method == null )
+		{
+			return -1;
+		}
+
+		var result = method.Invoke( null, args );
+
+		return ( result is bool flag ) ? ( flag ? 1 : 0 ) : (int) result;
+	}
+
+	// the index of a vessel in the game data by its name (-1 if there is none)
+	static int VesselIndex( string name )
+	{
+		var vessels = DataController.m_instance.m_gameData.m_vesselList;
+
+		for ( var i = 0; i < vessels.Length; i++ )
+		{
+			if ( vessels[ i ].m_name == name )
+			{
+				return i;
+			}
+		}
+
+		return -1;
+	}
+
+	IEnumerator ScenarioWeaponDamage()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var ship = playerData.m_playerShip;
+		var combat = CombatController.m_instance;
+
+		EnsureCrew();
+
+		yield return Frames( 5 );
+
+		// ---- 1. a laser's damage, falling off with the distance (WED12: (10 - cells) / 10 of LDAMAGE, a cell 80 units in the port)
+		var laser1Close = CallStaticInt( typeof( CombatController ), "GetLaserDamage", 1, 0.0f );
+		var laser1FiveCells = CallStaticInt( typeof( CombatController ), "GetLaserDamage", 1, 400.0f );
+		var laser1TenCells = CallStaticInt( typeof( CombatController ), "GetLaserDamage", 1, 800.0f );
+		var laser5Close = CallStaticInt( typeof( CombatController ), "GetLaserDamage", 5, 0.0f );
+
+		// ---- 2. a missile's damage, whatever the distance (MDAMAGE: class 6 is the plasma bolt)
+		var missile1 = CallStaticInt( typeof( CombatController ), "GetMissileDamage", 1 );
+		var missile5 = CallStaticInt( typeof( CombatController ), "GetMissileDamage", 5 );
+		var plasmaBolt = CallStaticInt( typeof( CombatController ), "GetMissileDamage", 6 );
+
+		// ---- 3. an alien laser does twice a laser's damage, a quarter of it first with the Rod Device aboard (WF3EA, WED36): class 3 from 3 cells is (10 - 3) / 10
+		// of 360, 252, so 504, and 63 twice with the Rod, 126
+		var alienLaser = CallStaticInt( typeof( CombatController ), "GetAlienLaserDamage", 3, 240.0f, false );
+		var alienLaserRod = CallStaticInt( typeof( CombatController ), "GetAlienLaserDamage", 3, 240.0f, true );
+
+		// ---- 4. an alien fires only within 5 cells of the ship across and along (COMBAT-OV WE07D, WE0AB: 400 units in the port)
+		var inReach = CallStaticInt( typeof( Encounter ), "IsWithinWeaponsReach", new Vector3( 399.0f, 0.0f, -399.0f ), Vector3.zero );
+		var outAcross = CallStaticInt( typeof( Encounter ), "IsWithinWeaponsReach", new Vector3( 401.0f, 0.0f, 0.0f ), Vector3.zero );
+		var outAlong = CallStaticInt( typeof( Encounter ), "IsWithinWeaponsReach", new Vector3( 0.0f, 0.0f, -401.0f ), Vector3.zero );
+
+		// ---- 5. end to end: a Thrynn scout's class 5 laser from 3 cells (twice 462, 924), with the Rod Device (twice 115, 230), and an Uhlek warship's plasma bolt
+		// (4000), on class 1 armor with plenty of points (a chunk takes its own size off it; a hit's last chunk is at least 10 points, so up to 9 more)
+		ship.m_shieldsAreUp = false;
+		ship.m_armorClass = 1;
+		ship.m_armorPoints = 100000;
+		ship.RestoreSystems();
+
+		var rodId = gameData.FindArtifactId( "Rod Device" );
+
+		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( rodId ) != null ); guard++ )
+		{
+			ship.RemoveArtifact( rodId );
+		}
+
+		var scoutIndex = VesselIndex( "Thrynn Scout" );
+		var warshipIndex = VesselIndex( "Uhlek Warship" );
+		var alienShip = new PD_AlienShip();
+
+		alienShip.m_coordinates = playerData.m_general.m_coordinates + new Vector3( 240.0f, 0.0f, 0.0f );
+
+		var before = ship.m_armorPoints;
+
+		combat.AlienFiresAtPlayer( alienShip, gameData.m_vesselList[ scoutIndex ] );
+
+		var laserLoss = before - ship.m_armorPoints;
+
+		ship.AddArtifact( rodId );
+
+		before = ship.m_armorPoints;
+
+		combat.AlienFiresAtPlayer( alienShip, gameData.m_vesselList[ scoutIndex ] );
+
+		var rodLoss = before - ship.m_armorPoints;
+
+		ship.RemoveArtifact( rodId );
+
+		before = ship.m_armorPoints;
+
+		combat.AlienFiresAtPlayer( alienShip, gameData.m_vesselList[ warshipIndex ] );
+
+		// the plasma bolt is a missile that follows the ship (COMBAT-OV WE929): nothing until it arrives
+		var plasmaRightAway = before - ship.m_armorPoints;
+		var waitUntil = Time.realtimeSinceStartup + 10.0f;
+
+		while ( ( ship.m_armorPoints == before ) && ( Time.realtimeSinceStartup < waitUntil ) )
+		{
+			yield return null;
+		}
+
+		var plasmaLoss = before - ship.m_armorPoints;
+
+		ship.m_armorPoints = ship.GetMaximumArmorPoints();
+
+		Log( "weapondamage: laser class 1 at 0/400/800 units " + laser1Close + "/" + laser1FiveCells + "/" + laser1TenCells + ", class 5 at 0 " + laser5Close + " | missiles " + missile1 + "/" + missile5 + ", plasma " + plasmaBolt + " | alien class 3 laser from 240 " + alienLaser + ", with the Rod " + alienLaserRod + " | reach " + inReach + "/" + outAcross + "/" + outAlong + " | end to end: Thrynn scout's laser " + laserLoss + ", with the Rod " + rodLoss + ", Uhlek plasma " + plasmaRightAway + " right away and " + plasmaLoss + " when it arrived" );
+
+		Check( "weapondamage: a laser does the original's damage, falling off with the distance (class 1: 90 close, 45 at 5 cells, nothing at 10; class 5: 660)", ( laser1Close == 90 ) && ( laser1FiveCells == 45 ) && ( laser1TenCells == 0 ) && ( laser5Close == 660 ), laser1Close + "/" + laser1FiveCells + "/" + laser1TenCells + "/" + laser5Close );
+		Check( "weapondamage: a missile does the original's damage whatever the distance (200 for class 1, 1500 for class 5, 4000 for the plasma bolt)", ( missile1 == 200 ) && ( missile5 == 1500 ) && ( plasmaBolt == 4000 ), missile1 + "/" + missile5 + "/" + plasmaBolt );
+		Check( "weapondamage: an alien laser does twice a laser's damage, a quarter of it first with the Rod Device (class 3 from 3 cells: 504, with the Rod 126)", ( alienLaser == 504 ) && ( alienLaserRod == 126 ), alienLaser + "/" + alienLaserRod );
+		Check( "weapondamage: an alien fires only within 5 cells of the ship across and along", ( inReach == 1 ) && ( outAcross == 0 ) && ( outAlong == 0 ), inReach + "/" + outAcross + "/" + outAlong );
+		Check( "weapondamage: end to end a Thrynn scout's laser from 3 cells takes 924, 230 with the Rod Device, and an Uhlek warship's plasma bolt, a missile that follows the ship, 4000 when it arrives", ( laserLoss >= 924 ) && ( laserLoss <= 933 ) && ( rodLoss >= 230 ) && ( rodLoss <= 239 ) && ( plasmaRightAway == 0 ) && ( plasmaLoss >= 4000 ) && ( plasmaLoss <= 4009 ), laserLoss + "/" + rodLoss + "/" + plasmaRightAway + "/" + plasmaLoss );
+
+		Finish( "scenario=weapondamage checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
