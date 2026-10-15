@@ -1464,6 +1464,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAimAndFuel();
 				break;
 
+			case "starport-doorlabels":
+				yield return ScenarioStarportDoorLabels();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -37283,6 +37287,312 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "aimandfuel: a laser shot uses a tenth of a cubic meter of Endurium, a missile half a cubic meter", laserFired && missileFired && ( laserUsed == 1 ) && ( missileUsed == 5 ), laserUsed + " / " + missileUsed );
 
 		Finish( "scenario=aimandfuel checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// renders every camera in its order of depth (as RenderScreenPicture) and gives back the picture's pixels, 1920 x 1080, bottom row first
+	static Color32[] RenderScreenPixels()
+	{
+		var renderTexture = new RenderTexture( 1920, 1080, 24, RenderTextureFormat.ARGB32 );
+		var picture = new Texture2D( 1920, 1080, TextureFormat.RGB24, false );
+		var cameras = new List<Camera>( Camera.allCameras );
+
+		cameras.Sort( ( a, b ) => a.depth.CompareTo( b.depth ) );
+
+		var active = RenderTexture.active;
+
+		RenderTexture.active = renderTexture;
+		GL.Clear( true, true, Color.black );
+
+		foreach ( var camera in cameras )
+		{
+			if ( !camera.enabled || ( camera.targetTexture != null ) )
+			{
+				continue;
+			}
+
+			camera.targetTexture = renderTexture;
+			camera.Render();
+			camera.targetTexture = null;
+		}
+
+		RenderTexture.active = renderTexture;
+		picture.ReadPixels( new Rect( 0, 0, 1920, 1080 ), 0, 0 );
+		picture.Apply();
+		RenderTexture.active = active;
+
+		var pixels = picture.GetPixels32();
+
+		UnityEngine.Object.Destroy( picture );
+		renderTexture.Release();
+		UnityEngine.Object.Destroy( renderTexture );
+
+		return pixels;
+	}
+
+	// the relative luminance of a colour as the screen shows it (WCAG 2)
+	static float DoorLabelLuminance( Color colour )
+	{
+		Func<float, float> channel = c => ( c <= 0.04045f ) ? ( c / 12.92f ) : Mathf.Pow( ( c + 0.055f ) / 1.055f, 2.4f );
+
+		return 0.2126f * channel( colour.r ) + 0.7152f * channel( colour.g ) + 0.0722f * channel( colour.b );
+	}
+
+	// the contrast of two luminances (WCAG 2: 1 to 21)
+	static float DoorLabelContrast( float a, float b )
+	{
+		return ( Mathf.Max( a, b ) + 0.05f ) / ( Mathf.Min( a, b ) + 0.05f );
+	}
+
+	// how well a text can be read against the screen behind it: the screen is drawn without the text, and the text's colour is compared with every pixel of
+	// the hall in the text's box - gives back the contrast over 95% and over 80% of the box (WCAG 2), and the picture with the text into the path if one is given
+	static Vector2 DoorLabelContrasts( TMPro.TMP_Text text, string picturePath, out string box )
+	{
+		var withText = RenderScreenPixels();
+
+		text.enabled = false;
+
+		var behind = RenderScreenPixels();
+
+		text.enabled = true;
+
+		// the box of the text on the picture (the UI camera's viewport, so the picture's size does not have to be the screen's)
+		text.ForceMeshUpdate();
+
+		var bounds = text.textBounds;
+		var uiCamera = ( text.canvas != null ) ? text.canvas.worldCamera : null;
+		var xMin = 1919;
+		var xMax = 0;
+		var yMin = 1079;
+		var yMax = 0;
+
+		for ( var corner = 0; corner < 4; corner++ )
+		{
+			var local = new Vector3( ( ( corner & 1 ) == 0 ) ? bounds.min.x : bounds.max.x, ( ( corner & 2 ) == 0 ) ? bounds.min.y : bounds.max.y, 0.0f );
+			var viewport = ( uiCamera != null ) ? uiCamera.WorldToViewportPoint( text.rectTransform.TransformPoint( local ) ) : Vector3.zero;
+
+			xMin = Mathf.Min( xMin, Mathf.FloorToInt( viewport.x * 1920.0f ) );
+			xMax = Mathf.Max( xMax, Mathf.CeilToInt( viewport.x * 1920.0f ) );
+			yMin = Mathf.Min( yMin, Mathf.FloorToInt( viewport.y * 1080.0f ) );
+			yMax = Mathf.Max( yMax, Mathf.CeilToInt( viewport.y * 1080.0f ) );
+		}
+
+		xMin = Mathf.Clamp( xMin, 0, 1919 );
+		xMax = Mathf.Clamp( xMax, 0, 1919 );
+		yMin = Mathf.Clamp( yMin, 0, 1079 );
+		yMax = Mathf.Clamp( yMax, 0, 1079 );
+
+		box = xMin + ".." + xMax + " x " + yMin + ".." + yMax;
+
+		var textLuminance = DoorLabelLuminance( text.color );
+		var contrasts = new List<float>();
+
+		for ( var y = yMin; y <= yMax; y++ )
+		{
+			for ( var x = xMin; x <= xMax; x++ )
+			{
+				contrasts.Add( DoorLabelContrast( textLuminance, DoorLabelLuminance( behind[ y * 1920 + x ] ) ) );
+			}
+		}
+
+		contrasts.Sort();
+
+		if ( !string.IsNullOrEmpty( picturePath ) )
+		{
+			var picture = new Texture2D( 1920, 1080, TextureFormat.RGB24, false );
+
+			picture.SetPixels32( withText );
+			picture.Apply();
+
+			System.IO.File.WriteAllBytes( picturePath, picture.EncodeToPNG() );
+
+			UnityEngine.Object.Destroy( picture );
+		}
+
+		return ( contrasts.Count > 0 ) ? new Vector2( contrasts[ contrasts.Count / 20 ], contrasts[ contrasts.Count / 5 ] ) : Vector2.zero;
+	}
+
+	// the name of the door the astronaut stands at (the label at the top of the screen in the Starport's hall) can be read in every scheme of the UI kit, in its
+	// dark and its light mode: it takes the colours of the 3D views (the scheme's dark theme in either mode, UIKitOverView), as the hall behind it does, and
+	// with -Graphics, against the picture of the hall behind it without the text, the label's colour has a contrast of at least 4.5 to 1 (WCAG AA) over most of
+	// its box and of at least 3 to 1 (AA for large text) over nearly all of it, at the Operations door in every scheme and at each of the seven doors
+	IEnumerator ScenarioStarportDoorLabels()
+	{
+		var folder = ScreenPictureFolder( "starport-door-labels" );
+
+		yield return Frames( 60 );
+
+		// the scene's fade in has to be over, or the hall is darker in the first pictures (it turns its black image off when it is done)
+		for ( var frame = 0; ( frame < 600 ) && ( SceneFadeController.m_instance != null ) && ( SceneFadeController.m_instance.m_fadeImage != null ) && SceneFadeController.m_instance.m_fadeImage.gameObject.activeInHierarchy; frame++ )
+		{
+			yield return null;
+		}
+
+		var astronaut = FindFirstObjectByType<AstronautController>();
+		var doorName = ( astronaut != null ) ? astronaut.m_doorNameController : null;
+
+		if ( ( doorName == null ) || ( doorName.m_doorNameText == null ) )
+		{
+			Finish( "abort: the Starport has no astronaut with a door name", 2 );
+
+			yield break;
+		}
+
+		// the doors' triggers (each one's tag is its door's name)
+		var doorNames = new[] { "Operations", "Personnel", "Crew Assignment", "Bank", "Ship Configuration", "Trade Depot", "Docking Bay" };
+		var doors = new Dictionary<string, Collider>();
+
+		foreach ( var collider in FindObjectsByType<Collider>( FindObjectsSortMode.None ) )
+		{
+			if ( collider.isTrigger && ( Array.IndexOf( doorNames, collider.tag ) >= 0 ) )
+			{
+				doors[ collider.tag ] = collider;
+			}
+		}
+
+		var text = doorName.m_doorNameText;
+		var start = astronaut.transform.position;
+		var failures = new List<string>();
+		var wrongColours = new List<string>();
+		var shownNames = new List<string>();
+		var measured = 0;
+		var pictureNumber = 0;
+		var box = "";
+
+		// ---- each door: the astronaut walks onto its trigger from the middle of the hall (so that leaving one door's trigger cannot hide the next one's name),
+		// and its name is read in the classic scheme's dark and light modes
+		foreach ( var name in doorNames )
+		{
+			if ( !doors.ContainsKey( name ) )
+			{
+				continue;
+			}
+
+			// (the triggers are met in physics steps, and a frame without a graphics device is much shorter than one, so the waits are in game time)
+			astronaut.m_navMeshAgent.Warp( start );
+
+			for ( var end = Time.time + 2.0f; ( Time.time < end ) && doorName.IsShowingDoorName(); )
+			{
+				yield return null;
+			}
+
+			astronaut.m_navMeshAgent.Warp( doors[ name ].bounds.center );
+
+			for ( var end = Time.time + 2.0f; ( Time.time < end ) && !( doorName.IsShowingDoorName() && ( doorName.GetCurrentDoorName() == name ) ); )
+			{
+				yield return null;
+			}
+
+			yield return Frames( 3 );
+
+			if ( doorName.IsShowingDoorName() && ( doorName.GetCurrentDoorName() == name ) )
+			{
+				shownNames.Add( name );
+			}
+
+			for ( var light = 0; ( light < 2 ) && ( folder != "" ); light++ )
+			{
+				UIKitTheme.SetScheme( 0, false );
+				UIKitTheme.SetMode( ( light == 1 ) ? UIKitTheme.Mode.Light : UIKitTheme.Mode.Dark, false );
+
+				yield return Frames( 3 );
+
+				var label = name + " in Classic " + ( ( light == 1 ) ? "light" : "dark" );
+				var contrast = DoorLabelContrasts( text, System.IO.Path.Combine( folder, ( ++pictureNumber ).ToString( "00" ) + "_" + label.Replace( ' ', '_' ) + ".png" ), out box );
+
+				measured++;
+
+				Log( "starport-doorlabels: " + label + ": text " + ColorUtility.ToHtmlStringRGB( text.color ) + ", box " + box + ", contrast (95%) " + contrast.x.ToString( "F2" ) + ", (80%) " + contrast.y.ToString( "F2" ) );
+
+				if ( ( contrast.x < 3.0f ) || ( contrast.y < 4.5f ) )
+				{
+					failures.Add( label + " " + contrast.x.ToString( "F1" ) + "/" + contrast.y.ToString( "F1" ) );
+				}
+			}
+		}
+
+		Log( "starport-doorlabels: door triggers found " + doors.Count + ", names shown at their doors: " + string.Join( ", ", shownNames ) + "; screen " + Screen.width + " x " + Screen.height );
+
+		Check( "starport-doorlabels: standing at each of the seven doors shows its name", shownNames.Count == doorNames.Length, shownNames.Count + " of " + doorNames.Length + ": " + string.Join( ", ", shownNames ) );
+
+		// ---- the Operations door in every scheme, dark and light
+		if ( doors.ContainsKey( "Operations" ) )
+		{
+			astronaut.m_navMeshAgent.Warp( start );
+
+			for ( var end = Time.time + 2.0f; ( Time.time < end ) && doorName.IsShowingDoorName(); )
+			{
+				yield return null;
+			}
+
+			astronaut.m_navMeshAgent.Warp( doors[ "Operations" ].bounds.center );
+
+			for ( var end = Time.time + 2.0f; ( Time.time < end ) && !( doorName.IsShowingDoorName() && ( doorName.GetCurrentDoorName() == "Operations" ) ); )
+			{
+				yield return null;
+			}
+		}
+
+		if ( !doorName.IsShowingDoorName() )
+		{
+			doorName.SetText( "Operations" );
+
+			yield return Frames( 3 );
+		}
+
+		for ( var scheme = 0; scheme < UIKitTheme.c_schemes.Length; scheme++ )
+		{
+			for ( var light = 0; light < 2; light++ )
+			{
+				UIKitTheme.SetScheme( scheme, false );
+				UIKitTheme.SetMode( ( light == 1 ) ? UIKitTheme.Mode.Light : UIKitTheme.Mode.Dark, false );
+
+				yield return Frames( 3 );
+
+				var label = UIKitTheme.c_schemes[ scheme ].m_name + ( ( light == 1 ) ? " light" : " dark" );
+
+				// the label's colour is the views' primary text colour (the scheme's dark theme), in the light mode too
+				var viewText = UIKitTheme.GetViewTheme().GetColor( UIKitTheme.ColorRole.TextPrimary );
+
+				if ( ( Mathf.Abs( text.color.r - viewText.r ) > 1.5f / 255.0f ) || ( Mathf.Abs( text.color.g - viewText.g ) > 1.5f / 255.0f ) || ( Mathf.Abs( text.color.b - viewText.b ) > 1.5f / 255.0f ) )
+				{
+					wrongColours.Add( label + " " + ColorUtility.ToHtmlStringRGB( text.color ) + " not " + ColorUtility.ToHtmlStringRGB( viewText ) );
+				}
+
+				if ( folder == "" )
+				{
+					continue;
+				}
+
+				var contrast = DoorLabelContrasts( text, System.IO.Path.Combine( folder, ( ++pictureNumber ).ToString( "00" ) + "_Operations_in_" + label.Replace( ' ', '_' ) + ".png" ), out box );
+
+				measured++;
+
+				Log( "starport-doorlabels: Operations in " + label + ": text " + ColorUtility.ToHtmlStringRGB( text.color ) + ", box " + box + ", contrast (95%) " + contrast.x.ToString( "F2" ) + ", (80%) " + contrast.y.ToString( "F2" ) );
+
+				if ( ( contrast.x < 3.0f ) || ( contrast.y < 4.5f ) )
+				{
+					failures.Add( "Operations in " + label + " " + contrast.x.ToString( "F1" ) + "/" + contrast.y.ToString( "F1" ) );
+				}
+			}
+		}
+
+		UIKitTheme.SetScheme( 0, false );
+		UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+		Check( "starport-doorlabels: the door's name takes the 3D views' text colour (the scheme's dark theme) in every scheme, dark and light", wrongColours.Count == 0, wrongColours.Count + " of " + ( UIKitTheme.c_schemes.Length * 2 ) + " wrong: " + string.Join( ", ", wrongColours.GetRange( 0, Mathf.Min( 6, wrongColours.Count ) ) ) );
+
+		if ( folder == "" )
+		{
+			Log( "starport-doorlabels: no graphics device (-nographics), so no pictures to measure the contrast in; run probe.ps1 with -Graphics" );
+		}
+		else
+		{
+			Check( "starport-doorlabels: the door's name can be read at every door and in every scheme, dark and light (contrast at least 3:1 over 95% and 4.5:1 over 80% of its box)", ( measured == doorNames.Length * 2 + UIKitTheme.c_schemes.Length * 2 ) && ( failures.Count == 0 ), measured + " measured, " + failures.Count + " too faint: " + string.Join( ", ", failures.GetRange( 0, Mathf.Min( 8, failures.Count ) ) ) );
+
+			Log( "starport-doorlabels: " + pictureNumber + " pictures in " + folder );
+		}
+
+		Finish( "scenario=starport-doorlabels checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
