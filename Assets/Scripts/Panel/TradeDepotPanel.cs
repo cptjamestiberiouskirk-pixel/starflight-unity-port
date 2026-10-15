@@ -765,7 +765,12 @@ public class TradeDepotPanel : Panel
 
 						m_itemListText.text += artifactGameData.m_name + Environment.NewLine;
 						m_volumeListText.text += ( artifactGameData.m_volume / 10 ) + "." + ( artifactGameData.m_volume % 10 ) + Environment.NewLine;
-						m_unitValueListText.text += artifactGameData.m_actualValue + Environment.NewLine;
+
+						// what the Starport pays for it, or "???" for an artifact of a kind that has not been analysed: the original's Sell and Analysis lists show the
+						// value only of a known artifact (IT-OV WF096, with ???IT off in TDEPOT-OV WEE73 and WF1D8), and the sale pays it either way (WEF62)
+						var isKnown = ( playerData.m_knownArtifacts != null ) && playerData.m_knownArtifacts.IsKnown( artifactReference.m_artifactId );
+
+						m_unitValueListText.text += ( isKnown ? artifactGameData.m_actualValue.ToString() : "???" ) + Environment.NewLine;
 
 						m_itemList.Add( new Item( m_rowCount++, 1, artifactReference.m_artifactId, 0 ) );
 					}
