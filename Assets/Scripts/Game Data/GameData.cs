@@ -128,6 +128,8 @@ public class GameData
 			}
 		}
 
+		// STRINFO's list of suitable planets: the game rates a planet by the original's rules instead (GD_Planet.GetColonyBonus), and the list is kept as the record
+		// the rules were checked against
 		foreach ( var colonyEvaluation in m_colonyEvaluationList )
 		{
 			colonyEvaluation.m_planetId = FindPlanetFromSun( colonyEvaluation.m_starX, colonyEvaluation.m_starY, colonyEvaluation.m_planetFromSun );

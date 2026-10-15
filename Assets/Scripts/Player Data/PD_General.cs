@@ -177,11 +177,14 @@ public class PD_General
 		public string m_name;
 
 		// the bonus or the fine is booked in the ledger when the planet is recommended, as the original's (CAPTAIN overlay WF37A and WF292): whether it has been
-		// (a save file from before this has its recommendations booked when the ship is back at the Starport), the fine of an unsuitable planet (0 for a planet of
-		// Interstel's list) and whether it was the first unsuitable one (the one that is only a warning)
+		// (a save file from before this has its recommendations booked when the ship is back at the Starport), the fine of an unsuitable planet (0 for a suitable
+		// planet) and whether it was the first unsuitable one (the one that is only a warning)
 		public bool m_booked;
 		public int m_fine;
 		public bool m_firstUnsuitable;
+
+		// the bonus a suitable planet earned (0 for an unsuitable one, and in a save file from before it was kept)
+		public int m_bonus;
 	}
 
 	public const int c_maximumPlanetNameLength = 15;

@@ -233,20 +233,12 @@ public class PlayerData
 	public const int c_unsuitableFineStep = 10000;
 	public const int c_unsuitableFineSteps = 8;
 
-	// the planet of Interstel's list that this one is (null for an unsuitable planet)
-	GD_ColonyEvaluation FindColonyEvaluation( int planetId )
+	// a planet of the game data (null if there is no such planet)
+	GD_Planet FindPlanet( int planetId )
 	{
-		GD_ColonyEvaluation colonyEvaluation = null;
+		var planetList = DataController.m_instance.m_gameData.m_planetList;
 
-		foreach ( var candidate in DataController.m_instance.m_gameData.m_colonyEvaluationList )
-		{
-			if ( candidate.m_planetId == planetId )
-			{
-				colonyEvaluation = candidate;
-			}
-		}
-
-		return colonyEvaluation;
+		return ( ( planetId >= 0 ) && ( planetId < planetList.Length ) ) ? planetList[ planetId ] : null;
 	}
 
 	// call this when a planet is recommended for colonization: the original books its bonus or its fine in the ledger at once, after the interest (CAPTAIN overlay
@@ -258,14 +250,19 @@ public class PlayerData
 			return;
 		}
 
-		var colonyEvaluation = FindColonyEvaluation( record.m_planetId );
+		// the original rates the planet as the captain logs it (CAPTAIN overlay WF30E and WF348): a planet with none of the reasons to be unsuitable earns its
+		// rating's bonus, any other is fined
+		var planet = FindPlanet( record.m_planetId );
 
-		if ( colonyEvaluation != null )
+		if ( ( planet != null ) && ( planet.GetUnsuitableReasons().Count == 0 ) )
 		{
-			// a planet of Interstel's list - the bonus, a BONUS in the original's ledger (transaction type 3)
-			m_bank.m_currentBalance += colonyEvaluation.m_bonus;
-			m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Bonus", colonyEvaluation.m_bonus + "+" ) );
+			// the bonus, a BONUS in the original's ledger (transaction type 3)
+			var bonus = planet.GetColonyBonus();
 
+			m_bank.m_currentBalance += bonus;
+			m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Bonus", bonus + "+" ) );
+
+			record.m_bonus = bonus;
 			record.m_fine = 0;
 			record.m_firstUnsuitable = false;
 		}
@@ -287,8 +284,8 @@ public class PlayerData
 		record.m_booked = true;
 	}
 
-	// call this when the ship is back at the Starport: Interstel evaluates the planets recommended for colonization since the last visit - a planet of its list
-	// earns its bonus, any other is unsuitable and fined (STRINFO 1.2), both booked when the planet was recommended - returns how many it evaluated
+	// call this when the ship is back at the Starport: Interstel evaluates the planets recommended for colonization since the last visit - a suitable planet earns
+	// its bonus, any other is unsuitable and fined (STRINFO 1.2), both booked when the planet was recommended - returns how many it evaluated
 	public int EvaluateColonyRecommendations()
 	{
 		var gameData = DataController.m_instance.m_gameData;
@@ -318,17 +315,16 @@ public class PlayerData
 
 			BookColonyRecommendation( record );
 
-			// is it a planet of Interstel's list?
-			var colonyEvaluation = FindColonyEvaluation( planetId );
-
-			if ( colonyEvaluation != null )
+			// was it suitable? (a record booked by a save file from before the bonus was kept has its planet's)
+			if ( record.m_fine <= 0 )
 			{
-				// yes - the bonus
-				var text = gameData.FindStoryText( ( colonyEvaluation.m_rating == "Optimal" ) ? "EvaluationOptimal" : "EvaluationSuitable" );
+				// yes - the bonus, optimal above 40,000 MU (OP-OV WEEE3)
+				var bonus = ( record.m_bonus > 0 ) ? record.m_bonus : gameData.m_planetList[ planetId ].GetColonyBonus();
+				var text = gameData.FindStoryText( ( bonus > GD_Planet.c_optimalColonyBonus ) ? "EvaluationOptimal" : "EvaluationSuitable" );
 
 				if ( text != null )
 				{
-					m_general.AddColonyEvaluation( heading + text.m_text.Replace( "[REWARD]", colonyEvaluation.m_bonus.ToString() ) );
+					m_general.AddColonyEvaluation( heading + text.m_text.Replace( "[REWARD]", bonus.ToString() ) );
 				}
 
 				continue;

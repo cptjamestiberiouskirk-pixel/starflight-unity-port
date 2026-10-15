@@ -81,90 +81,157 @@ public class GD_Planet
 		return gameData.m_planetTypeList[ m_planetTypeId ].m_name == c_crystalPlanetTypeName;
 	}
 
-	// the gravity above which a planet's gravity is crushing (in hundredths of a G - the port's choice: STRINFO names crushing gravity as a reason, not where it
-	// begins)
+	// the gravity above which a planet's gravity is crushing, and the gravity that is best for a colony (in hundredths of a G: the original's CAPTAIN overlay
+	// WF1BD, 2.00 G, and 0.70 to 1.30 G)
 	public const int c_crushingGravity = 200;
+	const int c_lowestBestGravity = 70;
+	const int c_highestBestGravity = 130;
 
-	// why this planet is unsuitable for colonization, in the words of Interstel's evaluation (STRINFO 1.2: extreme heat, extreme cold, crushing gravity, violent
-	// storms, lack of water, lack of oxygen), from what the planet tables of the game data mark habitable - an empty list if none of them applies
+	// the temperatures and the weather a colony can stand (the codes of the game data's lists, which are the original's: sub-arctic 0 to inferno 5, no weather 0
+	// to very violent 4)
+	const int c_lowestLivableTemperatureId = 2;
+	const int c_highestLivableTemperatureId = 3;
+	const int c_roughestLivableWeatherId = 2;
+	const int c_veryViolentWeatherId = 4;
+
+	// what a point of a colony's rating is worth: the original's score is 5 a point (WF348) and its bonus 1000 MU a point of the score (WF292)
+	public const int c_colonyBonusPerPoint = 5000;
+
+	// the bonus above which a colony is optimal: the original's score over 40 (OP-OV WEEE3)
+	public const int c_optimalColonyBonus = 40000;
+
+	// why this planet is unsuitable for colonization, in the words and the order of Interstel's evaluation (OP-OV (BAD-PLAN)), by the checks the original makes
+	// when the captain logs the planet (CAPTAIN overlay WF1AB to WF219) - an empty list if none of them applies
 	public System.Collections.Generic.List<string> GetUnsuitableReasons()
 	{
-		var gameData = DataController.m_instance.m_gameData;
 		var reasons = new System.Collections.Generic.List<string>();
 
-		// the temperature range: below the habitable ones is cold, above them hot (the list goes from sub-arctic to inferno)
-		var heat = false;
-		var cold = false;
-
-		foreach ( var temperatureId in new[] { m_temperatureIdA, m_temperatureIdB } )
-		{
-			if ( ( temperatureId >= 0 ) && ( temperatureId < gameData.m_temperatureList.Length ) && !gameData.m_temperatureList[ temperatureId ].m_habitable )
-			{
-				var firstHabitable = 0;
-
-				while ( ( firstHabitable < gameData.m_temperatureList.Length ) && !gameData.m_temperatureList[ firstHabitable ].m_habitable )
-				{
-					firstHabitable++;
-				}
-
-				if ( temperatureId < firstHabitable )
-				{
-					cold = true;
-				}
-				else
-				{
-					heat = true;
-				}
-			}
-		}
-
-		if ( heat )
+		// the whole temperature range too hot (WF1AB: its cold end above tropical), or too cold (WF199: its hot end below temperate)
+		if ( m_temperatureIdA > c_highestLivableTemperatureId )
 		{
 			reasons.Add( "EXTREME HEAT" );
 		}
 
-		if ( cold )
+		if ( m_temperatureIdB < c_lowestLivableTemperatureId )
 		{
 			reasons.Add( "EXTREME COLD" );
 		}
 
+		// WF1BD
 		if ( m_gravity > c_crushingGravity )
 		{
 			reasons.Add( "CRUSHING GRAVITY" );
 		}
 
-		if ( ( m_weatherId >= 0 ) && ( m_weatherId < gameData.m_weatherList.Length ) && !gameData.m_weatherList[ m_weatherId ].m_habitable )
+		// WF1DF: weather rougher than moderate
+		if ( m_weatherId > c_roughestLivableWeatherId )
 		{
 			reasons.Add( "VIOLENT STORMS" );
 		}
 
-		if ( ( m_hydrosphereId < 0 ) || ( m_hydrosphereId >= gameData.m_hydrosphereList.Length ) || !gameData.m_hydrosphereList[ m_hydrosphereId ].m_habitable )
-		{
-			reasons.Add( "LACK OF WATER" );
-		}
-
-		// oxygen in the atmosphere, and an atmosphere at all
-		var oxygen = false;
-
-		foreach ( var atmosphereId in new[] { m_atmosphereIdA, m_atmosphereIdB, m_atmosphereIdC } )
-		{
-			if ( ( atmosphereId >= 0 ) && ( atmosphereId < gameData.m_atmosphereList.Length ) && gameData.m_atmosphereList[ atmosphereId ].m_habitable )
-			{
-				oxygen = true;
-			}
-		}
-
-		if ( ( m_atmosphereDensityId < 0 ) || ( m_atmosphereDensityId >= gameData.m_atmosphereDensityList.Length ) || !gameData.m_atmosphereDensityList[ m_atmosphereDensityId ].m_habitable )
-		{
-			oxygen = false;
-		}
-
-		if ( !oxygen )
+		// WF1FB and WF219
+		if ( !HasOxygen() )
 		{
 			reasons.Add( "LACK OF OXYGEN" );
 		}
 
+		if ( !HasWater() )
+		{
+			reasons.Add( "LACK OF WATER" );
+		}
+
 		return reasons;
+	}
+
+	// the points the original rates a planet with when the captain logs it (CAPTAIN overlay WF1AB to WF23F, added up in WF18D): 1 for each end of the temperature
+	// range a colony can stand, 2 for a gravity from 0.70 to 1.30 G and 1 for any other, 2 for weather that is moderate at most and 1 for violent, 1 for life, and
+	// for the minerals their density byte over 50, at least 1 for any minerals at all
+	public int GetColonyPoints()
+	{
+		var points = 0;
+
+		if ( m_temperatureIdA <= c_highestLivableTemperatureId )
+		{
+			points++;
+		}
+
+		if ( m_temperatureIdB >= c_lowestLivableTemperatureId )
+		{
+			points++;
+		}
+
+		points += ( ( m_gravity >= c_lowestBestGravity ) && ( m_gravity <= c_highestBestGravity ) ) ? 2 : 1;
+
+		if ( m_weatherId < c_veryViolentWeatherId )
+		{
+			points++;
+		}
+
+		if ( m_weatherId <= c_roughestLivableWeatherId )
+		{
+			points++;
+		}
+
+		if ( m_bioDensity > 0 )
+		{
+			points++;
+		}
+
+		// the game data holds the densities in percent of the original's byte (byte * 100 / 255, rounded down): the smallest byte of the percentage stands for
+		// it, which gives every planet that passes the checks the same points as any other byte of its percentage would
+		var mineralByte = ( Mathf.Clamp( m_mineralDensity, 0, 100 ) * 255 + 99 ) / 100;
+
+		points += Mathf.Max( ( mineralByte > 0 ) ? 1 : 0, mineralByte / 50 );
+
+		return points;
+	}
+
+	// the bonus Interstel pays for a planet with none of the reasons above (the original's score times 1000 MU)
+	public int GetColonyBonus()
+	{
+		return GetColonyPoints() * c_colonyBonusPerPoint;
+	}
+
+	// the gases of the atmosphere, none if it has no density
+	bool HasGas( string name )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		if ( ( m_atmosphereDensityId < 0 ) || ( m_atmosphereDensityId >= gameData.m_atmosphereDensityList.Length ) || !gameData.m_atmosphereDensityList[ m_atmosphereDensityId ].m_habitable )
+		{
+			return false;
+		}
+
+		foreach ( var atmosphereId in new[] { m_atmosphereIdA, m_atmosphereIdB, m_atmosphereIdC } )
+		{
+			if ( ( atmosphereId >= 0 ) && ( atmosphereId < gameData.m_atmosphereList.Length ) && ( gameData.m_atmosphereList[ atmosphereId ].m_name == name ) )
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	// the hydrosphere's name
+	string GetHydrosphereName()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		return ( ( m_hydrosphereId >= 0 ) && ( m_hydrosphereId < gameData.m_hydrosphereList.Length ) ) ? gameData.m_hydrosphereList[ m_hydrosphereId ].m_name : "";
+	}
+
+	// oxygen a colony can breathe (WF1FB): an atmosphere of nitrogen and oxygen or of oxygen and carbon dioxide (the original's compounds 15 and 16; oxygen with
+	// hydrogen does not count), or a hydrosphere of oxygen
+	public bool HasOxygen()
+	{
+		return ( HasGas( "Oxygen" ) && ( HasGas( "Nitrogen" ) || HasGas( "Carbon Dioxide" ) ) ) || ( GetHydrosphereName() == "Oxygen" );
+	}
+
+	// water (WF219): a hydrosphere of water, or an atmosphere of oxygen and hydrogen (the original's compound 21)
+	public bool HasWater()
+	{
+		return ( GetHydrosphereName() == "Water" ) || ( HasGas( "Oxygen" ) && HasGas( "Hydrogen" ) );
 	}
 
 	// call this to get the orbit angle (in degrees) of the planet
