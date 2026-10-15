@@ -12,7 +12,7 @@
 
 The galaxy is the original's, down to the last detail: every star, planet, price and line of alien dialogue comes straight from the 1986 game, and the rules follow the original code. What's new is the way it looks, with fully 3D planets, stars and terrain, a redesigned ship's console and 15 color schemes to choose from.
 
-Version 1.0.0 is the first complete release, playable from the first launch to the final ending.
+Version 1.0.0 was the first complete release, playable from the first launch to the final ending. Version 1.1.0 brings the original's combat: hits that wear down the shields, the armor and then the hull, the original's weapon damage, and a navigator whose skill decides whether your shots hit.
 
 <p align="center">
   <img src="docs/images/orbit.jpg" width="49%" alt="A planet seen from orbit, with the System Map and the ship's console">
@@ -26,7 +26,7 @@ Version 1.0.0 is the first complete release, playable from the first launch to t
 
 ## 🎮 Download and play
 
-1. Download **Starflight-1.0.0-win64.zip** (600 MB) from the [latest release](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port/releases/latest).
+1. Download **Starflight-1.1.0-win64.zip** (600 MB) from the [latest release](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port/releases/latest).
 2. Unzip it anywhere, for example into `Documents\Games`. Keep the files together: `Starflight.exe` needs the folders next to it.
 3. Run `Starflight.exe`.
 
@@ -34,12 +34,12 @@ There is no installer. To uninstall, delete the folder, along with the saved gam
 
 **Requirements:** Windows 10 or 11 (64-bit), a DirectX 11 graphics card and 1.1 GB of free disk space.
 
-**If Windows blocks the game.** Version 1.0.0 is not code-signed, so Windows treats it as an unknown program:
+**If Windows blocks the game.** The game is not code-signed, so Windows treats it as an unknown program:
 
 - *"Windows protected your PC"* (Microsoft Defender SmartScreen): choose **More info**, then **Run anyway**.
 - *"An Application Control policy has blocked this file"* (Smart App Control, Windows 11): Smart App Control does not allow exceptions for individual programs, so the game cannot start while it is switched on. You can still play it in the Unity Editor (see [Build from source](#-build-from-source)).
 
-The release page lists the zip's SHA-256 checksum. To verify your download, run `Get-FileHash Starflight-1.0.0-win64.zip` in PowerShell and compare the two.
+The release page lists the zip's SHA-256 checksum. To verify your download, run `Get-FileHash Starflight-1.1.0-win64.zip` in PowerShell and compare the two.
 
 ## 📖 How to play
 
@@ -56,13 +56,13 @@ The game saves automatically. On the Escape panel, **Copy** keeps a spare copy o
 
 New to *Starflight*? Read the notices in Operations, create and assign a crew of six, name your ship, buy a few cargo pods and launch. Your first few trips should be about making money.
 
-## ✅ Status: version 1.0.0
+## ✅ Status: version 1.1.0
 
 The whole game is playable, from a new game to the ending. Every item on the [roadmap to parity with the original](ROADMAP.md) is done or decided (59 of 59), and every screen has been compared side by side with the original's.
 
 Every change is compile-checked in CI and exercised by a headless test harness that plays the real game scenes: more than 200 scenarios with over 1,100 checks, all passing on this release, plus an automated playthrough that plays a new game all the way to the ending and Interstel's bonus.
 
-The known differences from the original are listed at the end of the [manual](docs/MANUAL.md#13-this-port-and-the-1986-original). The biggest one is combat, which runs slower than in the original. Found a bug? Please [open an issue](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port/issues).
+The known differences from the original are listed at the end of the [manual](docs/MANUAL.md#13-this-port-and-the-1986-original). The biggest one left is that shields recharge at the port's own pace during a fight. Found a bug? Please [open an issue](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port/issues).
 
 The full history is in [CHANGELOG.md](CHANGELOG.md).
 
@@ -193,7 +193,7 @@ Assets/
 └── Unity Player/          # Build assets (icons and splash screens)
 ```
 
-## 🎯 Everything in version 1.0.0
+## 🎯 Everything in version 1.1.0
 
 **Spoiler warning.** This list names the game's secrets, its artifacts and its ending. Skip it if you'd rather discover them yourself.
 
