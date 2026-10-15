@@ -22,20 +22,27 @@ public class Hyperspace : MonoBehaviour
 	// flux travel timer
 	float m_timer;
 
-	// flux travel duration
+	// flux travel duration (the warp effect's: the jump itself is instant)
 	float m_fluxTravelDuration;
+
+	// how long the warp effect of a flux jump plays, with the ship already at the far end (the original plays its FLUX-EFFECT and then puts the ship there)
+	const float c_fluxEffectSeconds = 1.5f;
+
+	// the eight directions the ship can come out of a flux in, one step of the original's along an axis or along both (HYPER-OV JMPSHP: HEADDXDY of a random
+	// heading), and how far, 4 of the original's units (RCOLLIDE + 1), each 32 of the port's
+	static readonly Vector3[] c_fluxExitDirections =
+	{
+		new Vector3( 1.0f, 0.0f, 0.0f ), new Vector3( 1.0f, 0.0f, 1.0f ), new Vector3( 0.0f, 0.0f, 1.0f ), new Vector3( -1.0f, 0.0f, 1.0f ),
+		new Vector3( -1.0f, 0.0f, 0.0f ), new Vector3( -1.0f, 0.0f, -1.0f ), new Vector3( 0.0f, 0.0f, -1.0f ), new Vector3( 1.0f, 0.0f, -1.0f )
+	};
+
+	const float c_fluxExitDistance = 128.0f;
 
 	// starting point
 	Vector3 m_fluxTravelStartPosition;
 
 	// ending point
 	Vector3 m_fluxTravelEndPosition;
-
-	// true if we are currently flashing the screen (for continuum flux)
-	bool m_flashingScreen;
-
-	// flash timer
-	float m_flashTimer;
 
 	// remember the maximum speed of the player before flux travel
 	float m_oldMaximumSpeed;
@@ -132,31 +139,6 @@ public class Hyperspace : MonoBehaviour
 			// update the ship position
 			playerData.m_general.m_coordinates = SpaceflightController.m_instance.m_playerShip.transform.position = newPosition;
 
-			// are we flashing the screen?
-			if ( m_flashingScreen )
-			{
-				m_flashTimer += Time.deltaTime;
-
-				// flash the viewport with random colors
-				if ( Random.Range( 0, 100 ) < 50 )
-				{
-					SpaceflightController.m_instance.m_viewport.m_fadeImage.color = new Color( Random.value, Random.value, Random.value, 0.5f );
-					SpaceflightController.m_instance.m_viewport.m_fadeImage.enabled = true;
-				}
-				else
-				{
-					SpaceflightController.m_instance.m_viewport.m_fadeImage.enabled = false;
-				}
-
-				// stop flashing after a while
-				if ( m_flashTimer >= 2.0f )
-				{
-					m_flashingScreen = false;
-					SpaceflightController.m_instance.m_viewport.m_fadeImage.color = Color.black;
-					SpaceflightController.m_instance.m_viewport.m_fadeImage.enabled = false;
-				}
-			}
-
 			// have we arrived?
 			if ( m_timer >= m_fluxTravelDuration )
 			{
@@ -234,12 +216,21 @@ public class Hyperspace : MonoBehaviour
 					// reset the timer
 					m_timer = 0.0f;
 
-					// figure out how long we should take to travel through this flux
-					m_fluxTravelDuration = Mathf.Max( 2.0f, Vector3.Distance( flux.GetFrom(), flux.GetTo() ) / 2048.0f );
+					// the jump is instant, as the original's (HYPER-OV >FLUX-NODE and JMPSHP): the ship comes out just past the far end, a step off it in one of
+					// the eight directions at random (outside the flux there, which is 96 across), keeping its heading, and the warp effect plays with it there
+					var exitDirection = c_fluxExitDirections[ Random.Range( 0, c_fluxExitDirections.Length ) ];
+					var arrival = flux.GetTo() + exitDirection * c_fluxExitDistance;
 
-					// compute the starting and ending point of the flux travel
-					m_fluxTravelStartPosition = playerData.m_general.m_coordinates;
-					m_fluxTravelEndPosition = flux.GetTo() + (Vector3) playerData.m_general.m_currentDirection * ( flux.GetBreachDistance() + 16.0f );
+					playerData.m_general.m_coordinates = arrival;
+					playerData.m_general.m_lastHyperspaceCoordinates = arrival;
+					SpaceflightController.m_instance.m_playerShip.transform.position = arrival;
+
+					m_fluxTravelDuration = c_fluxEffectSeconds;
+					m_fluxTravelStartPosition = arrival;
+					m_fluxTravelEndPosition = arrival;
+
+					// and the navigator loses the ship's bearings for a while
+					SpaceflightController.m_instance.LoseBearings();
 
 					// start the warp cinematics
 					m_travelingThroughFlux = true;
@@ -261,14 +252,8 @@ public class Hyperspace : MonoBehaviour
 					// play the enter warp sound
 					SoundController.m_instance.PlaySound( SoundController.Sound.EnterWarp );
 
-					// is this a continuum flux? (random chance for now, or check flux properties if available)
-					if ( Random.Range( 0, 100 ) < 25 )
-					{
-						m_flashingScreen = true;
-						m_flashTimer = 0.0f;
-
-						SpaceflightController.m_instance.m_messages.AddText( "<color=#00FFFF>Continuum flux detected! Navigational sensors offline!</color>" );
-					}
+					// one flux at a time (the ship is now at the far end of this one)
+					break;
 				}
 			}
 
