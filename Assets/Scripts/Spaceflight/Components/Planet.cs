@@ -557,6 +557,46 @@ public class Planet : MonoBehaviour
 		return m_material;
 	}
 
+	// true if the natural look's maps are the ones to show (it is shown, and its maps are made)
+	bool NaturalMapsShown()
+	{
+		return ShowsNaturalLook() && ( m_naturalPlanet != null ) && m_naturalPlanet.IsBaked();
+	}
+
+	// the maps the console's displays show the planet with (the System Map, the sensor picture): its natural ones when it shows the natural look, else its
+	// generator's (null while there are none); the landing map keeps the generator's maps in either look, since its colours are the heights its legend
+	// explains
+	public Texture GetDisplayAlbedoMap()
+	{
+		if ( NaturalMapsShown() )
+		{
+			return m_naturalPlanet.GetAlbedoMap();
+		}
+
+		return ( m_planetGenerator != null ) ? m_planetGenerator.m_albedoTexture : null;
+	}
+
+	public Texture GetDisplayNormalMap()
+	{
+		if ( NaturalMapsShown() )
+		{
+			return m_naturalPlanet.GetNormalMap();
+		}
+
+		return ( m_planetGenerator != null ) ? m_planetGenerator.m_normalTexture : null;
+	}
+
+	// (the natural maps keep the open sea in the albedo's alpha, which the displays do not read: no glint on their sea)
+	public Texture GetDisplayWaterMaskMap()
+	{
+		if ( NaturalMapsShown() )
+		{
+			return Texture2D.blackTexture;
+		}
+
+		return ( m_planetGenerator != null ) ? m_planetGenerator.m_waterMaskTexture : null;
+	}
+
 	// the natural look of this planet (null when it is not shown; for the probe)
 	public NaturalPlanet GetNaturalPlanet()
 	{
