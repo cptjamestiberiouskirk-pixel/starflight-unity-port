@@ -40156,7 +40156,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		var firstSteps = general.m_currentSpeed;
 
-		for ( var end = Time.time + 3.5f; Time.time < end; )
+		// (the step grows from 1 to 12 in 11 / 12.2 = 0.9 s, and at the top speed the ship crosses from Arth's orbit to the system's edge in about 3 s)
+		for ( var end = Time.time + 1.5f; Time.time < end; )
 		{
 			general.m_currentDirection = Vector3.right;
 
@@ -40164,6 +40165,7 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		var systemTop = general.m_currentSpeed;
+		var stillInStarSystem = general.m_location == PD_General.Location.StarSystem;
 
 		controller.m_playerShip.TurnOffEngines();
 
@@ -40171,10 +40173,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		var systemStopped = general.m_currentSpeed;
 
-		Log( "shipspeeds: in the star system (" + general.m_location + "): " + firstSteps.ToString( "0.0" ) + " two frames after the engines went on, " + systemTop.ToString( "0.0" ) + " after 3.5 s, " + systemStopped.ToString( "0.0" ) + " three frames after they went off" );
+		Log( "shipspeeds: in the star system (" + general.m_location + "): " + firstSteps.ToString( "0.0" ) + " two frames after the engines went on, " + systemTop.ToString( "0.0" ) + " after 1.5 s, " + systemStopped.ToString( "0.0" ) + " three frames after they went off" );
 
 		Check( "shipspeeds: in a star system the ship starts at a twelfth of its top speed or more, and less than half of it (the original's step grows from 1 to 12)", inStarSystem && ( firstSteps >= 2998.272f / 12.0f - 0.01f ) && ( firstSteps < 2998.272f / 2.0f ), firstSteps.ToString( "0.0" ) );
-		Check( "shipspeeds: its top speed in a star system is 12 units of 20.48 a step at the original's 12.2 steps a second at GOG's speed (2998.3)", Mathf.Abs( systemTop - 2998.272f ) < 0.5f, systemTop.ToString( "0.0" ) );
+		Check( "shipspeeds: its top speed in a star system is 12 units of 20.48 a step at the original's 12.2 steps a second at GOG's speed (2998.3)", stillInStarSystem && ( Mathf.Abs( systemTop - 2998.272f ) < 0.5f ), systemTop.ToString( "0.0" ) );
 		Check( "shipspeeds: with no direction held it stops at once", systemStopped == 0.0f, systemStopped.ToString( "0.0" ) );
 
 		// ---- 2. hyperspace, in a quiet corner
