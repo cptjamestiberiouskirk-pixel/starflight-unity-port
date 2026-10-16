@@ -62,6 +62,10 @@ public class OperationsPanel : Panel
 	// the starport controller
 	public AstronautController m_astronautController;
 
+	// a crew that has to report to Operations gets its evaluation by itself, a second after the room opens (OP-OV (U-OP): 1000 ms, then WF47A); 0 when none is due
+	const float c_evaluationDelay = 1.0f;
+	float m_evaluationTimer;
+
 	// panel open
 	public override bool Open()
 	{
@@ -70,6 +74,9 @@ public class OperationsPanel : Panel
 
 		// show the welcome screen
 		ShowWelcome();
+
+		// the evaluation comes up by itself for a crew that has to report here
+		m_evaluationTimer = DataController.m_instance.m_playerData.m_general.MustReportToOperations() ? c_evaluationDelay : 0.0f;
 
 		// panel was opened
 		return true;
@@ -88,6 +95,17 @@ public class OperationsPanel : Panel
 	// panel tick
 	public override void Tick()
 	{
+		// the evaluation a crew has to report for
+		if ( m_evaluationTimer > 0.0f )
+		{
+			m_evaluationTimer -= Time.deltaTime;
+
+			if ( m_evaluationTimer <= 0.0f )
+			{
+				ShowEvaluations();
+			}
+		}
+
 		// get the height of the message shown
 		float newOffset = m_messageText.renderedHeight + m_baseOffset;
 

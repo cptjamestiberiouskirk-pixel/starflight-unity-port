@@ -140,45 +140,8 @@ public class AstronautController : MonoBehaviour
 				// check if we are showing a door name
 				if ( m_doorNameController.IsShowingDoorName() )
 				{
-					// get the name of the current door
-					string currentDoorName = m_doorNameController.GetCurrentDoorName();
-
-					// figure out which controller to give control to
-					if ( currentDoorName == "Operations" )
-					{
-						// give control to the operations controller
-						OpenPanel( m_operationsPanel );
-					}
-					else if ( currentDoorName == "Personnel" )
-					{
-						// give control to the personnel controller
-						OpenPanel( m_personnelPanel );
-					}
-					else if ( currentDoorName == "Crew Assignment" )
-					{
-						// give control to the personnel controller
-						OpenPanel( m_crewAssignmentPanel );
-					}
-					else if ( currentDoorName == "Bank" )
-					{
-						// give control to the bank controller
-						OpenPanel( m_bankPanel );
-					}
-					else if ( currentDoorName == "Ship Configuration" )
-					{
-						// give control to the ship configuration controller
-						OpenPanel( m_shipConfigurationPanel );
-					}
-					else if ( currentDoorName == "Trade Depot" )
-					{
-						// give control to the trade depot controller
-						OpenPanel( m_tradeDepotPanel );
-					}
-					else if ( currentDoorName == "Docking Bay" )
-					{
-						// see if we can teleport to the docking bay
-						OpenPanel( m_dockingBayPanel );
-					}
+					// give control to the room of the door the astronaut stands at
+					EnterDoor( m_doorNameController.GetCurrentDoorName() );
 				}
 			}
 			else if ( InputController.m_instance.m_cancel )
@@ -189,6 +152,57 @@ public class AstronautController : MonoBehaviour
 
 				OpenPanel( PanelController.m_instance.m_saveGamePanel );
 			}
+		}
+	}
+
+	// the rooms the original locks while an evaluation waits (PORTMENU-OV WEA7F: it beeps and opens nothing; Operations and the docking bay stay open)
+	static readonly string[] c_roomsLockedForEvaluation = { "Personnel", "Crew Assignment", "Bank", "Ship Configuration", "Trade Depot" };
+
+	// call this when the astronaut enters a door: its room's panel opens, unless the crew has to report to Operations first
+	public void EnterDoor( string doorName )
+	{
+		if ( DataController.m_instance.m_playerData.m_general.MustReportToOperations() && ( System.Array.IndexOf( c_roomsLockedForEvaluation, doorName ) >= 0 ) )
+		{
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+			return;
+		}
+
+		// figure out which controller to give control to
+		if ( doorName == "Operations" )
+		{
+			// give control to the operations controller
+			OpenPanel( m_operationsPanel );
+		}
+		else if ( doorName == "Personnel" )
+		{
+			// give control to the personnel controller
+			OpenPanel( m_personnelPanel );
+		}
+		else if ( doorName == "Crew Assignment" )
+		{
+			// give control to the personnel controller
+			OpenPanel( m_crewAssignmentPanel );
+		}
+		else if ( doorName == "Bank" )
+		{
+			// give control to the bank controller
+			OpenPanel( m_bankPanel );
+		}
+		else if ( doorName == "Ship Configuration" )
+		{
+			// give control to the ship configuration controller
+			OpenPanel( m_shipConfigurationPanel );
+		}
+		else if ( doorName == "Trade Depot" )
+		{
+			// give control to the trade depot controller
+			OpenPanel( m_tradeDepotPanel );
+		}
+		else if ( doorName == "Docking Bay" )
+		{
+			// see if we can teleport to the docking bay
+			OpenPanel( m_dockingBayPanel );
 		}
 	}
 

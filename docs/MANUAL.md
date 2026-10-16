@@ -390,7 +390,7 @@ Some things to know:
 
 ### Distress calls
 
-Communications, **Distress**, then **Yes**, calls Interstel to tow the ship home to the Starport. It works anywhere but in an encounter (the aliens jam it) and at the Starport. The towing fine is at least 15,000 M.U. and grows with the distance from Arth, with no upper limit.
+Communications, **Distress**, then **Yes**, calls Interstel to tow the ship home to the Starport. It works anywhere but in an encounter (the aliens jam it) and at the Starport. The towing fine is at least 15,000 M.U. and grows with the distance from Arth, with no upper limit. Back at the Starport after a tow, or after losing the terrain vehicle, report to Operations first: Interstel's evaluation comes up there by itself, and until you have seen it the other rooms stay shut and the ship cannot launch.
 
 ---
 

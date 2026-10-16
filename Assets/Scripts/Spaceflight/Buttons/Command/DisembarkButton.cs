@@ -43,6 +43,13 @@ public class DisembarkButton : ShipButton
 				// make sure we are standing in the middle of the transporter pad
 				playerData.m_general.m_lastStarportCoordinates = new Vector3( 0.0f, 0.5f, 0.0f );
 
+				// back towed or without the terrain vehicle: the crew is sent to Operations first (SHIPBUTTONS WF077, WF03F)
+				if ( playerData.m_general.MustReportToOperations() )
+				{
+					SpaceflightController.m_instance.m_messages.Clear();
+					SpaceflightController.m_instance.m_messages.AddText( "<color=yellow>Report to Operations for evaluation.</color>" );
+				}
+
 				// switch to the starport location
 				SpaceflightController.m_instance.SwitchLocation( PD_General.Location.Starport );
 
