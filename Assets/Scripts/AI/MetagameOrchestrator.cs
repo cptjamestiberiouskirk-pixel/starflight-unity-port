@@ -1,6 +1,5 @@
 
 using System;
-using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -95,12 +94,12 @@ namespace Starflight.AI
 				gameObject.AddComponent<MainThreadDispatcher>();
 			}
 
-			// the options are read here on the main thread (Application paths may not be read from other threads)
+			// the options are read here on the main thread (no working folder is set, so each call to claude makes its own in the
+			// system's temporary folder: Application.temporaryCachePath is under /tmp on linux, where another user could have made it first)
 			var options = new ClaudeCliOptions
 			{
 				m_executable = m_claudeExecutable,
 				m_model = m_model,
-				m_workingDirectory = Path.Combine( Application.temporaryCachePath, "ClaudeCli" ),
 				m_timeout = TimeSpan.FromSeconds( Mathf.Max( 10, m_timeoutSeconds ) ),
 				m_maximumToolRounds = Mathf.Max( 0, m_maximumToolRounds ),
 			};
