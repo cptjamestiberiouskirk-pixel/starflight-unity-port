@@ -432,7 +432,8 @@ public class PD_CrewAssignment
 		// with nobody left alive the game is lost
 		if ( !HasLivingCrew() && ( CombatController.m_instance != null ) )
 		{
-			CombatController.m_instance.EndGame( "The entire crew has died." );
+			// the original's words (HEAL-OV: "!!CREW DECEASED!!", "**GAME OVER**")
+			CombatController.m_instance.EndGame( "Crew deceased!", true );
 		}
 
 		return true;

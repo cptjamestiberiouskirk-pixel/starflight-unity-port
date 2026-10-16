@@ -23102,7 +23102,9 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "crewdeath: injury: " + deathMessages + " (Ada dead " + adaDead + ", captain " + captainAfter + ") || the last: Ben dead " + IsDead( ben ) + ", vitality " + ben.m_vitality + ", game over " + controller.m_gameOver + ", armor " + playerData.m_playerShip.m_armorPoints + " | " + gameOverText );
 
 		Check( "crewdeath: a captain who dies of an injury is dead, and the next in the chain of command takes command", ( adaDead == "True" ) && deathMessages.Contains( "Ada is dead" ) && ( captainAfter == "Ben" ) && deathMessages.Contains( "Ben takes command" ), adaDead + ", " + captainAfter + " | " + deathMessages );
-		Check( "crewdeath: when the last of the crew dies the game is lost, and it cannot be saved", ( IsDead( ben ) == "True" ) && controller.m_gameOver && gameOverText.Contains( "The entire crew has died" ) && playerData.m_playerShip.IsDestroyed(), IsDead( ben ) + ", " + controller.m_gameOver + ", hull " + playerData.m_playerShip.GetHullIntegrity() + " | " + gameOverText );
+		Check( "crewdeath: when the last of the crew dies the game is lost, and it cannot be saved", ( IsDead( ben ) == "True" ) && controller.m_gameOver && playerData.m_playerShip.IsDestroyed(), IsDead( ben ) + ", " + controller.m_gameOver + ", hull " + playerData.m_playerShip.GetHullIntegrity() + " | " + gameOverText );
+
+		Check( "crewdeath: the game over screen says the original's words, crew deceased and game over", gameOverText.Contains( "Crew deceased!" ) && gameOverText.Contains( "GAME OVER" ), gameOverText );
 
 		Finish( "scenario=crewdeath captain=" + captainAfter + " gameover=" + controller.m_gameOver, 0 );
 	}
