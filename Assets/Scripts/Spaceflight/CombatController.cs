@@ -128,6 +128,9 @@ public class CombatController : MonoBehaviour
 	// what destroyed the player ship, when it was not the damage it took (null for that) - the game over screen says it
 	string m_gameOverCause;
 
+	// the game over screen adds GAME OVER after the cause (the original's crew death, HEAL-OV: "!!CREW DECEASED!!" and "**GAME OVER**")
+	bool m_gameOverCauseSaysGameOver;
+
 	// the Shimmering Ball cloaks the ship in combat, and a shot of the player drops the cloak for a while (decided 2026-10-10; how long is the port's
 	// choice) - the time until it cloaks the ship again
 	const float c_uncloakedTime = 3.0f;
@@ -917,7 +920,7 @@ public class CombatController : MonoBehaviour
 
 	// the game is lost without the ship being destroyed (the whole crew has died): the game over screen with its cause, and the ship's hull at 0, so that the
 	// lost game is never saved (DataController.SavePlayerData refuses a destroyed ship, and the game over reloads the last save)
-	public void EndGame( string cause )
+	public void EndGame( string cause, bool sayGameOver = false )
 	{
 		if ( m_playerIsDestroyed )
 		{
@@ -926,6 +929,7 @@ public class CombatController : MonoBehaviour
 
 		m_playerIsDestroyed = true;
 		m_gameOverCause = cause;
+		m_gameOverCauseSaysGameOver = sayGameOver;
 
 		DataController.m_instance.m_playerData.m_playerShip.DestroyHull();
 
@@ -1026,6 +1030,11 @@ public class CombatController : MonoBehaviour
 		else
 		{
 			SpaceflightController.m_instance.m_messages.AddText( "<color=#FF0000>" + m_gameOverCause + "</color>" );
+
+			if ( m_gameOverCauseSaysGameOver )
+			{
+				SpaceflightController.m_instance.m_messages.AddText( "<color=#FFFF00>GAME OVER</color>" );
+			}
 		}
 
 		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Press ESC to return to title screen.</color>" );
