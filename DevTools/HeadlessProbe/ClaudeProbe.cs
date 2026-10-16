@@ -4947,6 +4947,13 @@ public class ClaudeProbe : MonoBehaviour
 		// ---- fire at a ship 1200 away, leave at once, and go straight into another encounter
 		yield return new WaitForSecondsRealtime( 0.5f );
 
+		// (the close shot can destroy its target, a Spemin transport has 200 armor points, and a missile fired at a dead ship is not launched: the far shot goes
+		// to a living one)
+		if ( EncounterShip( target ).m_isDead )
+		{
+			target = FirstLivingAlien();
+		}
+
 		var alienShip = EncounterShip( target );
 
 		alienShip.m_coordinates = playerData.m_general.m_coordinates + Vector3.forward * 1200.0f;
