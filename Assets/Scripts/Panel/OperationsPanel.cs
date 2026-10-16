@@ -42,8 +42,12 @@ public class OperationsPanel : Panel
 	string m_moreLabel;
 	string m_quitLabel;
 
-	// the original types a notice out a paragraph at a time, 0.3 s apart (OP-OV WE912: 300 of the game's milliseconds after every paragraph but the last); the
-	// spacebar (More) shows the next one at once, and the abort key (Quit) ends the notice with "***NOTICE ABORTED***"
+	// the original types a notice out a paragraph at a time, pausing after every paragraph but the last for 300 ms a byte of the paragraph's encoded text (OP-OV
+	// WE912: the STRING record's byte 0x0b times 300 ms), from 5.7 s for a short line to 42 s for the longest, so there is time to read it; the spacebar
+	// (More) shows the next one at once, and the abort key (Quit) ends the notice with "***NOTICE ABORTED***"
+	const float c_secondsPerEncodedByte = 0.3f;
+
+	// the pause after a paragraph of a notice without the original's lengths
 	const float c_paragraphDelay = 0.3f;
 	float m_paragraphTimer;
 
@@ -98,7 +102,7 @@ public class OperationsPanel : Panel
 		{
 			m_paragraphTimer += Time.deltaTime;
 
-			if ( m_paragraphTimer >= c_paragraphDelay )
+			if ( m_paragraphTimer >= GetPauseAfterParagraph( m_currentLine - 1 ) )
 			{
 				ShowNextLine();
 
@@ -582,6 +586,26 @@ public class OperationsPanel : Panel
 	}
 
 	// call this to show the next line of the current message
+	// the seconds the original waits after a paragraph of the notice shown before it types the next (c_paragraphDelay for a notice without the lengths)
+	float GetPauseAfterParagraph( int paragraph )
+	{
+		var noticeList = DataController.m_instance.m_gameData.m_noticeList;
+
+		if ( ( m_currentNoticeId < 0 ) || ( m_currentNoticeId >= noticeList.Length ) )
+		{
+			return c_paragraphDelay;
+		}
+
+		var lengths = noticeList[ m_currentNoticeId ].m_paragraphLengths;
+
+		if ( ( lengths == null ) || ( paragraph < 0 ) || ( paragraph >= lengths.Length ) )
+		{
+			return c_paragraphDelay;
+		}
+
+		return lengths[ paragraph ] * c_secondsPerEncodedByte;
+	}
+
 	void ShowNextLine()
 	{
 		// get access to the game data

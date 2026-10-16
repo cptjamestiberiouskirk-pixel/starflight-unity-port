@@ -28596,7 +28596,7 @@ public class ClaudeProbe : MonoBehaviour
 		return ( rows.Length > 0 ) ? System.Text.RegularExpressions.Regex.Replace( rows[ rows.Length - 1 ], "<[^>]*>", "" ).Trim() : "";
 	}
 
-	// a notice is typed out a paragraph at a time, 0.3 s apart, as the original's (OP-OV WE912), and the abort key (Quit) ends the notice being typed with
+	// a notice is typed out a paragraph at a time, pausing after each for the original's 300 ms a byte of its encoded text (OP-OV WE912), and the abort key (Quit) ends the notice being typed with
 	// "***NOTICE ABORTED***" (and the end of the notices after the newest) before a second Quit leaves the screen
 	IEnumerator ScenarioStarportNoticeTyping()
 	{
@@ -28633,6 +28633,25 @@ public class ClaudeProbe : MonoBehaviour
 
 		var after11 = Paragraphs( panel );
 
+		// the original's pauses after the first two paragraphs of the first notice are 40.5 and 34.5 s (135 and 115 bytes of encoded text at 300 ms a byte): the
+		// panel's timer is set just short of each and just past it, and one frame lets the panel decide
+		var paragraphTimer = typeof( OperationsPanel ).GetField( "m_paragraphTimer", c_any );
+		var timed = new List<int>();
+
+		foreach ( var seconds in new[] { 40.0f, 40.6f, 34.0f, 34.6f } )
+		{
+			if ( paragraphTimer != null )
+			{
+				paragraphTimer.SetValue( panel, seconds );
+			}
+
+			yield return null;
+
+			timed.Add( Paragraphs( panel ) );
+		}
+
+		var beforeQuit = Paragraphs( panel );
+
 		// ---- 2. Quit while it is typed: the notice is aborted and the screen stays
 		panel.QuitClicked();
 
@@ -28658,10 +28677,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		playerData.m_general.m_currentStardateYMD = "4620-01-01";
 
-		Log( "starport-noticetyping: the first notice (" + firstParagraphs + " paragraphs): " + atOnce + " at once, " + after01 + " after 0.1 s, " + after11 + " after 1.1 s | Quit: stayed " + stayed + ", ends '" + Tail( aborted ) + "', " + afterAbort + " paragraphs 1 s later | the newest aborted: '" + Tail( newestAborted ) + "' | a second Quit: the menu " + backToMenu );
+		var timedText = string.Join( "/", timed );
 
-		Check( "starport-noticetyping: a notice is typed out a paragraph at a time without a press, 0.3 s apart", ( atOnce == 1 ) && ( after01 == 1 ) && ( after11 >= 4 ) && ( after11 <= 5 ), atOnce + ", " + after01 + ", " + after11 );
-		Check( "starport-noticetyping: Quit while a notice is typed ends it with the original's NOTICE ABORTED, and the screen stays", stayed && aborted.EndsWith( "\n\n***Notice aborted***" ) && ( afterAbort == after11 ) && ( after11 < firstParagraphs ), "stayed " + stayed + ", '" + Tail( aborted ) + "', " + afterAbort + " after (" + after11 + " before, of " + firstParagraphs + ")" );
+		Log( "starport-noticetyping: the first notice (" + firstParagraphs + " paragraphs): " + atOnce + " at once, " + after01 + " after 0.1 s, " + after11 + " after 1.1 s, with the timer at 40.0/40.6 s and then 34.0/34.6 s " + timedText + " | Quit: stayed " + stayed + ", ends '" + Tail( aborted ) + "', " + afterAbort + " paragraphs 1 s later | the newest aborted: '" + Tail( newestAborted ) + "' | a second Quit: the menu " + backToMenu );
+
+		Check( "starport-noticetyping: a notice is typed out a paragraph at a time without a press, the first at once and the next after the original's pause (40.5 s after the first paragraph, 34.5 s after the second)", ( atOnce == 1 ) && ( after01 == 1 ) && ( after11 == 1 ) && ( timedText == "1/2/2/3" ), atOnce + ", " + after01 + ", " + after11 + ", " + timedText );
+		Check( "starport-noticetyping: Quit while a notice is typed ends it with the original's NOTICE ABORTED, and the screen stays", stayed && aborted.EndsWith( "\n\n***Notice aborted***" ) && ( afterAbort == beforeQuit ) && ( beforeQuit < firstParagraphs ), "stayed " + stayed + ", '" + Tail( aborted ) + "', " + afterAbort + " after (" + beforeQuit + " before, of " + firstParagraphs + ")" );
 		Check( "starport-noticetyping: the newest notice aborted says NOTICE ABORTED, then END OF NOTICES", newestAborted.EndsWith( "\n\n***Notice aborted***\n\n***End of notices***" ), "'" + Tail( newestAborted ) + "'" );
 		Check( "starport-noticetyping: a second Quit goes back to the menu", backToMenu, backToMenu.ToString() );
 
