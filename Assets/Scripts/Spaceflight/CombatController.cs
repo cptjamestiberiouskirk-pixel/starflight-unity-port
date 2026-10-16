@@ -105,7 +105,7 @@ public class CombatController : MonoBehaviour
 	}
 
 	// the skill the aim comes from: the navigator's, none without a navigator who can work
-	static int GetNavigatorSkill()
+	public static int GetNavigatorSkill()
 	{
 		var crewAssignment = DataController.m_instance.m_playerData.m_crewAssignment;
 

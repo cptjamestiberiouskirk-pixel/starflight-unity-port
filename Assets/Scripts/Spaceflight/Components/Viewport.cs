@@ -239,6 +239,10 @@ public class Viewport : MonoBehaviour
 		m_label.text = text;
 	}
 
+	// the coordinates shown while the bearings are lost, and when the next ones are picked
+	string m_lostCoordinates = "";
+	float m_nextLostCoordinatesTime;
+
 	// call this to update the coordinates
 	public void UpdateCoordinates()
 	{
@@ -255,6 +259,18 @@ public class Viewport : MonoBehaviour
 			var northSouth = Mathf.RoundToInt( z );
 
 			text = Mathf.Abs( northSouth ).ToString() + ( ( northSouth < 0 ) ? "S" : "N" ) + " x " + Mathf.Abs( eastWest ).ToString() + ( ( eastWest < 0 ) ? "W" : "E" );
+		}
+		else if ( ( SpaceflightController.m_instance != null ) && SpaceflightController.m_instance.HasLostBearings() )
+		{
+			// the navigator has lost the ship's bearings after a flux jump: the coordinates are anything, new ones a few times a second (the original's HYPER-OV
+			// .COORDINATES shows two random numbers at every step while ?CAN-NAVIGATE is false)
+			if ( Time.time >= m_nextLostCoordinatesTime )
+			{
+				m_lostCoordinates = ( ( Random.Range( 0, 1758 ) + 3 ) / 8 ).ToString() + "   " + ( ( Random.Range( 0, 1998 ) + 3 ) / 8 ).ToString();
+				m_nextLostCoordinatesTime = Time.time + 0.25f;
+			}
+
+			text = m_lostCoordinates;
 		}
 		else
 		{

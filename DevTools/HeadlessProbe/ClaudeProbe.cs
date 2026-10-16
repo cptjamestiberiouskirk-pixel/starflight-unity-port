@@ -1494,6 +1494,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioHyperspaceFuel();
 				break;
 
+			case "fluxjump":
+				yield return ScenarioFluxJump();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -38000,6 +38004,146 @@ public class ClaudeProbe : MonoBehaviour
 		controller.m_encounterRange = encounterRange;
 
 		Finish( "scenario=hyperspacefuel checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// puts the ship onto the near end of a flux in hyperspace and waits until it has jumped - gives back the seconds of play since the jump began
+	static IEnumerator FluxJumpFrom( GD_Flux flux, bool[] jumped )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		controller.m_playerShip.TurnOffEngines();
+		playerData.m_general.m_currentSpeed = 0.0f;
+		playerData.m_general.m_coordinates = flux.GetFrom();
+		controller.m_playerShip.transform.position = flux.GetFrom();
+
+		jumped[ 0 ] = false;
+
+		for ( var frame = 0; ( frame < 30 ) && !jumped[ 0 ]; frame++ )
+		{
+			yield return null;
+
+			jumped[ 0 ] = Equals( GetField( controller.m_hyperspace, "m_travelingThroughFlux" ), true );
+		}
+	}
+
+	// a flux jump is the original's (HYPER-OV >FLUX-NODE, JMPSHP): instant, with the ship a step of 4 of the original's units (128) off the far end in one of the
+	// eight directions, and the navigator loses the ship's bearings for (250 - skill) half seconds: meanwhile the starmap says "I can't get our bearings, captain."
+	// (MAP-OV (/STARMAP), WEC57) and the coordinates above the main view are anything (.COORDINATES while ?CAN-NAVIGATE is false); a navigator of skill 250 keeps
+	// them (the control)
+	IEnumerator ScenarioFluxJump()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var flux = gameData.m_fluxList[ 0 ];
+		var jumped = new bool[ 1 ];
+
+		EnsureCrew();
+
+		var navigator = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Navigator );
+
+		playerData.m_playerShip.AddElement( 5, 500 );
+
+		// out in hyperspace a little way from the flux, with no encounter able to begin
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		playerData.m_general.m_lastHyperspaceCoordinates = flux.GetFrom() + new Vector3( 1024.0f, 0.0f, 0.0f );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		// ---- 1. a navigator of skill 250: the ship is at the far end at once, and the starmap works once the warp effect is over
+		navigator.m_navigation = 250;
+
+		yield return FluxJumpFrom( flux, jumped );
+		yield return Frames( 2 );
+
+		var offset = controller.m_playerShip.transform.position - flux.GetTo();
+		var offAxisOrDiagonal = ( Mathf.Abs( Mathf.Abs( offset.x ) - 128.0f ) < 1.0f || Mathf.Abs( offset.x ) < 1.0f ) && ( Mathf.Abs( Mathf.Abs( offset.z ) - 128.0f ) < 1.0f || Mathf.Abs( offset.z ) < 1.0f ) && ( offset.magnitude > 100.0f );
+
+		Log( "fluxjump: flux 0 from " + Tools.WorldToGameCoordinates( flux.GetFrom() ) + " to " + Tools.WorldToGameCoordinates( flux.GetTo() ) + ": jumped " + jumped[ 0 ] + ", 2 frames later the ship is " + offset + " from the far end (" + offset.magnitude.ToString( "0" ) + " units)" );
+
+		Check( "fluxjump: flying into a flux the ship is at its far end at once, a step of 128 off it along an axis or a diagonal", jumped[ 0 ] && offAxisOrDiagonal, jumped[ 0 ] + ", " + offset + " " + offset.magnitude.ToString( "0" ) );
+
+		for ( var end = Time.time + 5.0f; ( Time.time < end ) && Equals( GetField( controller.m_hyperspace, "m_travelingThroughFlux" ), true ); )
+		{
+			yield return null;
+		}
+
+		controller.m_messages.Clear();
+
+		new StarmapButton().Execute();
+
+		var openedWithSkill250 = controller.m_starmap.IsOpen();
+
+		controller.m_starmap.Hide();
+
+		yield return Frames( 3 );
+
+		Check( "fluxjump: with a navigator of skill 250 the starmap opens right after the jump (control)", openedWithSkill250, openedWithSkill250 + ", " + MessageList() );
+
+		// ---- 2. a navigator of skill 240 loses the bearings for 5 s
+		navigator.m_navigation = 240;
+
+		yield return FluxJumpFrom( flux, jumped );
+
+		var jumpTime = Time.time;
+
+		Log( "fluxjump: just after the second jump: time " + Time.time.ToString( "0.00" ) + ", bearings lost until " + FieldOrNull( controller, "m_bearingsLostUntil" ) + ", navigator skill " + navigator.m_navigation + " (" + navigator.m_name + "), location " + playerData.m_general.m_location );
+
+		for ( var end = Time.time + 5.0f; ( Time.time < end ) && Equals( GetField( controller.m_hyperspace, "m_travelingThroughFlux" ), true ); )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 5 );
+
+		var real = Tools.WorldToGameCoordinates( playerData.m_general.m_lastHyperspaceCoordinates );
+		var realText = Mathf.RoundToInt( real.x ) + "   " + Mathf.RoundToInt( real.z );
+		var shownWhileLost = controller.m_viewport.m_label.text;
+
+		controller.m_messages.Clear();
+
+		new StarmapButton().Execute();
+
+		var openedWhileLost = controller.m_starmap.IsOpen();
+		var refusal = MessageList();
+		var lostAt = Time.time - jumpTime;
+
+		controller.m_starmap.Hide();
+
+		while ( Time.time < jumpTime + 5.5f )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 3 );
+
+		var shownAfter = controller.m_viewport.m_label.text;
+
+		controller.m_messages.Clear();
+
+		new StarmapButton().Execute();
+
+		var openedAfter = controller.m_starmap.IsOpen();
+
+		controller.m_starmap.Hide();
+
+		Log( "fluxjump: navigator of skill 240: " + lostAt.ToString( "0.0" ) + " s after the jump the starmap opened " + openedWhileLost + " ('" + refusal + "') and the coordinates read '" + shownWhileLost + "' (really '" + realText + "'); at 5.5 s it opened " + openedAfter + " and they read '" + shownAfter + "'" );
+
+		Check( "fluxjump: with a navigator of skill 240 the starmap is refused for a while after the jump: \"I can't get our bearings, captain.\"", jumped[ 0 ] && !openedWhileLost && refusal.Contains( "bearings" ), openedWhileLost + ", '" + refusal + "'" );
+		Check( "fluxjump: meanwhile the coordinates above the main view are two numbers that are not the ship's", System.Text.RegularExpressions.Regex.IsMatch( shownWhileLost, "^[0-9]+   [0-9]+$" ) && ( shownWhileLost != realText ), "'" + shownWhileLost + "' / '" + realText + "'" );
+		Check( "fluxjump: after (250 - 240) half seconds the bearings are back: the starmap opens and the coordinates are the ship's", openedAfter && ( shownAfter == realText ), openedAfter + ", '" + shownAfter + "' / '" + realText + "'" );
+
+		navigator.m_navigation = 250;
+		controller.m_encounterRange = encounterRange;
+
+		Finish( "scenario=fluxjump checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

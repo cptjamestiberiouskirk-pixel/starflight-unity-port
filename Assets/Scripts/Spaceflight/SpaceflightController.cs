@@ -208,6 +208,16 @@ public class SpaceflightController : MonoBehaviour
 			playerData.m_playerShip.DropShields();
 		}
 
+		// while the bearings are lost the coordinates above the main view keep changing, and they come right when the navigator has the bearings back
+		var bearingsLost = HasLostBearings();
+
+		if ( ( bearingsLost || m_bearingsWereLost ) && ( ( playerData.m_general.m_location == PD_General.Location.Hyperspace ) || ( playerData.m_general.m_location == PD_General.Location.StarSystem ) ) )
+		{
+			m_viewport.UpdateCoordinates();
+		}
+
+		m_bearingsWereLost = bearingsLost;
+
 		// the engineer and the doctor carry on with the repairs and the treatment they were told to do
 		playerData.m_playerShip.UpdateRepairs( Time.deltaTime );
 		playerData.m_crewAssignment.UpdateTreatment( Time.deltaTime );
@@ -476,6 +486,26 @@ public class SpaceflightController : MonoBehaviour
 	public void HoldOffEncounters()
 	{
 		m_encountersResumeTime = Time.time + c_encounterHoldOffSeconds;
+	}
+
+	// after a flux jump the navigator has lost the ship's bearings for a while, the longer the less skilled (the original's HYPER-OV JMPSHP sets NAV-TIME to the time
+	// plus 250 less the navigator's skill, in half seconds, and ?CAN-NAVIGATE is false until then: the coordinates above the main view are anything and the starmap
+	// cannot be shown); not saved, as the original's starts again at launch
+	float m_bearingsLostUntil;
+
+	// whether the coordinates were shown for lost bearings in the last frame (so that they are shown right once the bearings are back)
+	bool m_bearingsWereLost;
+
+	// call this when a flux jump has thrown the ship off its bearings
+	public void LoseBearings()
+	{
+		m_bearingsLostUntil = Time.time + Mathf.Max( 0, 250 - CombatController.GetNavigatorSkill() ) * 0.5f;
+	}
+
+	// true while the navigator has not got the ship's bearings back after a flux jump
+	public bool HasLostBearings()
+	{
+		return Time.time < m_bearingsLostUntil;
 	}
 
 	// the planet whose gravity the science officer has analysed (the original's ?G-AWARE: only then does Land warn), and the planet Land has warned about once

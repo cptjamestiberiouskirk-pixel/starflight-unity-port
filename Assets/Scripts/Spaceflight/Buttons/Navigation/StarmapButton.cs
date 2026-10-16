@@ -21,6 +21,17 @@ public class StarmapButton : ShipButton
 
 			SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
 		}
+		else if ( SpaceflightController.m_instance.HasLostBearings() )
+		{
+			// after a flux jump the navigator has to get the bearings back first (the original's MAP-OV (/STARMAP) waits for NAV-TIME, and WEC57 says this)
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+			SpaceflightController.m_instance.m_messages.Clear();
+
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>I can't get our bearings, captain.</color>" );
+
+			SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+		}
 		else
 		{
 			// show the starmap
