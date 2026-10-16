@@ -15,8 +15,10 @@ The project is normally driven from the Unity Editor. Press Play in **any** of t
 Headless compile check (fails if the project is already open in an Editor; a fresh worktree has no `Library/` so the first run does a full import and is slow):
 
 ```bash
-"/c/Program Files/Unity/Hub/Editor/6000.3.13f1/Editor/Unity.exe" -batchmode -nographics -quit -projectPath . -logFile -
+"/c/Program Files/Unity/Hub/Editor/6000.3.13f1/Editor/Unity.exe" -batchmode -nographics --burst-disable-compilation -quit -projectPath . -logFile -
 ```
+
+Every headless launch takes `--burst-disable-compilation` (the probe scripts below do): Smart App Control blocks the unsigned DLLs Burst writes to `Library/BurstCache/JIT/`, and only the experimental `TerrainJob` uses Burst.
 
 CI runs the same compile check headless on every PR and push to `master` (`.github/workflows/compile-check.yml`, GameCI EditMode test run; needs `UNITY_EMAIL`, `UNITY_PASSWORD`, and either `UNITY_SERIAL` (Pro/Student) or `UNITY_LICENSE` (Personal `.ulf` contents) as repo secrets).
 
