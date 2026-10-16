@@ -1566,6 +1566,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioEncounterWaves();
 				break;
 
+			case "distresscalls":
+				yield return ScenarioDistressCalls();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -40244,6 +40248,217 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "encounterwaves: first waves of 1, 2 and 3 ships all come (the original's M - 2 to M, not always M)", ( counts[ 1 ] > 0 ) && ( counts[ 2 ] > 0 ) && ( counts[ 3 ] > 0 ), counts[ 1 ] + "/" + counts[ 2 ] + "/" + counts[ 3 ] );
 
 		Finish( "scenario=encounterwaves checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the aliens' distress call (COMM-OV <AUX> CALL-FOR-SHIPS, SHIPS-ARRIVE)
+
+	// leaves this many of the encounter's added living ships in it (the others out of it, as not yet come), the aliens hostile and no call pending
+	static void KeepAlienShips( int keep )
+	{
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var kept = 0;
+
+		foreach ( var alienShip in encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			alienShip.m_isDead = false;
+
+			if ( alienShip.m_addedToEncounter && ( kept < keep ) )
+			{
+				kept++;
+			}
+			else
+			{
+				alienShip.m_addedToEncounter = false;
+			}
+		}
+
+		// (a ship that is not in it yet is put in when the probe needs it)
+		foreach ( var alienShip in encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			if ( kept >= keep )
+			{
+				break;
+			}
+
+			if ( !alienShip.m_addedToEncounter )
+			{
+				alienShip.m_addedToEncounter = true;
+				alienShip.m_coordinates = new Vector3( 1000.0f, 0.0f, 1000.0f );
+				kept++;
+			}
+		}
+
+		encounter.m_pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+
+		var called = typeof( PD_Encounter ).GetField( "m_distressCalled" );
+
+		if ( called != null )
+		{
+			called.SetValue( encounter.m_pdEncounter, false );
+		}
+	}
+
+	// the living ships in the encounter
+	static int AlienShipsPresent()
+	{
+		var present = 0;
+
+		foreach ( var alienShip in SpaceflightController.m_instance.m_encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			if ( alienShip.m_addedToEncounter && !alienShip.m_isDead )
+			{
+				present++;
+			}
+		}
+
+		return present;
+	}
+
+	// runs the distress call's passes until one returns the wanted result (1 a call, 2 the ships warping in), at most a number of passes; -1 if it never did
+	// (int.MinValue on the code before the distress call)
+	static int PassesUntil( int wanted, int most )
+	{
+		var method = typeof( Encounter ).GetMethod( "DistressCallPass" );
+
+		if ( method == null )
+		{
+			return int.MinValue;
+		}
+
+		for ( var pass = 1; pass <= most; pass++ )
+		{
+			if ( (int) method.Invoke( SpaceflightController.m_instance.m_encounter, null ) == wanted )
+			{
+				return pass;
+			}
+		}
+
+		return -1;
+	}
+
+	// the aliens' distress call as the original's: a Spemin group (135, 6 ships, 3 at a time) of one hostile ship calls for help with a chance of 1 in 1500 a pass
+	// (60 tries average 1000 to 2100 passes), and once it has called more ships warp in with a chance of 1 in 50 / 3 = 16 a pass (60 tries average 9 to 25),
+	// as a new wave of 1 to 3, with the original's lines; neutral or friendly aliens, three ships, and a race that does not call (the Minstrels, 311) never call
+	// (6000 passes each); the Thrynn home fleet (165) of one ship calls at its first pass
+	IEnumerator ScenarioDistressCalls()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var encounter = controller.m_encounter;
+
+		EnsureCrew();
+		playerData.m_playerShip.m_armorPoints = 100000;
+		controller.m_encounterRange = 0.0f;
+
+		// ---- 1. Spemin group 135, one hostile ship: passes to the call, then to the ships warping in
+		EnterEncounter( 135 );
+		yield return Frames( 3 );
+
+		var callPasses = new List<int>();
+		var arrivePasses = new List<int>();
+		var waveSizes = new List<int>();
+		var callText = "";
+		var arriveText = "";
+
+		for ( var trial = 0; trial < 60; trial++ )
+		{
+			KeepAlienShips( 1 );
+			controller.m_messages.Clear();
+
+			var toCall = PassesUntil( 1, 20000 );
+
+			callPasses.Add( toCall );
+
+			if ( trial == 0 )
+			{
+				callText = MessageList();
+			}
+
+			controller.m_messages.Clear();
+
+			var toArrive = PassesUntil( 2, 2000 );
+
+			arrivePasses.Add( toArrive );
+			waveSizes.Add( AlienShipsPresent() - 1 );
+
+			if ( trial == 0 )
+			{
+				arriveText = MessageList();
+			}
+		}
+
+		var calls = callPasses.FindAll( p => p > 0 );
+		var arrivals = arrivePasses.FindAll( p => p > 0 );
+		var callSum = 0;
+		var arriveSum = 0;
+		var waveMin = int.MaxValue;
+		var waveMax = int.MinValue;
+
+		foreach ( var p in calls )
+		{
+			callSum += p;
+		}
+
+		foreach ( var p in arrivals )
+		{
+			arriveSum += p;
+		}
+
+		foreach ( var w in waveSizes )
+		{
+			waveMin = Mathf.Min( waveMin, w );
+			waveMax = Mathf.Max( waveMax, w );
+		}
+
+		var meanCall = ( calls.Count > 0 ) ? (float) callSum / calls.Count : 0.0f;
+		var meanArrive = ( arrivals.Count > 0 ) ? (float) arriveSum / arrivals.Count : 0.0f;
+
+		// ---- 2. the controls: neutral aliens, three ships, and the Minstrels
+		KeepAlienShips( 1 );
+		encounter.m_pdEncounter.m_alienStance = GD_Comm.Stance.Neutral;
+
+		var neutral = PassesUntil( 1, 6000 );
+
+		KeepAlienShips( 3 );
+
+		var three = PassesUntil( 1, 6000 );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		EnterEncounter( 311 );
+		yield return Frames( 3 );
+
+		KeepAlienShips( 1 );
+
+		var minstrel = PassesUntil( 1, 6000 );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 3. the Thrynn home fleet (165, orbit 4 of 129,33), down to one ship: a call at the first pass
+		var thrynnStar = StarAt( 129, 33 );
+
+		yield return GoIntoOrbit( thrynnStar, PlanetInOrbit( thrynnStar, 4 ) );
+
+		var homeBegun = ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == 165 );
+
+		KeepAlienShips( 1 );
+
+		var home = homeBegun ? PassesUntil( 1, 3 ) : -2;
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		Log( "distresscalls: Spemin 135, one hostile ship, 60 tries: calls " + calls.Count + ", mean " + meanCall.ToString( "F0" ) + " passes; ships warped in " + arrivals.Count + ", mean " + meanArrive.ToString( "F1" ) + " passes, waves of " + waveMin + " to " + waveMax + " | call '" + callText + "' | arrival '" + arriveText + "' || neutral " + neutral + ", three ships " + three + ", Minstrels " + minstrel + " || Thrynn home fleet begun " + homeBegun + ", call at pass " + home );
+
+		Check( "distresscalls: one hostile Spemin ship calls for help with a chance of 1 in 1500 a pass (COMM-OV WE80E), saying so", ( calls.Count == 60 ) && ( meanCall >= 1000.0f ) && ( meanCall <= 2100.0f ) && callText.Contains( "Captain, I'm picking up an alien distress call." ), calls.Count + " calls, mean " + meanCall.ToString( "F0" ) + " | " + callText );
+		Check( "distresscalls: after the call more ships warp in with a chance of 1 in 16 a pass (WE850, 50 / 3), a new wave of 1 to 3 (+A-VESS), saying so", ( arrivals.Count == 60 ) && ( meanArrive >= 9.0f ) && ( meanArrive <= 25.0f ) && ( waveMin >= 1 ) && ( waveMax <= 3 ) && arriveText.Contains( "Captain, more alien ships have warped in." ), arrivals.Count + " arrivals, mean " + meanArrive.ToString( "F1" ) + ", waves " + waveMin + " to " + waveMax + " | " + arriveText );
+		Check( "distresscalls: neutral aliens, three ships and a race that does not call never call (control)", ( neutral == -1 ) && ( three == -1 ) && ( minstrel == -1 ), neutral + " / " + three + " / " + minstrel );
+		Check( "distresscalls: a home fleet calls at once (SPACIAL-CONTEXT 2)", home == 1, homeBegun + ", " + home );
+
+		Finish( "scenario=distresscalls calls=" + calls.Count + " mean=" + meanCall.ToString( "F0" ) + " arrive=" + meanArrive.ToString( "F1" ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

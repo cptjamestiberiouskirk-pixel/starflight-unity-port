@@ -79,6 +79,9 @@ public class PD_Encounter : IComparable
 	// set once the Elowan or the Thrynn have said what they think of the crew's other friends (false in older save files)
 	public bool m_rivalLineSaid;
 
+	// set while the aliens' distress call has not been answered yet: more of their ships are on the way (the original's ?CALLED; false in older save files)
+	public bool m_distressCalled;
+
 	public void Reset( int encounterId )
 	{
 		// get access to the game data

@@ -240,6 +240,7 @@ Assets/
 - The game can be won: destroying the Crystal Planet ends the flares, Interstel pays its 500,000 MU bonus at once, and a supplemental evaluation waits at the Starport
 - Arth's sun flares on 01-01-4621 unless the game has been won: the Starport is destroyed, and any ship in Arth's system is incinerated
 - 10 alien races, each with its own encounter behavior
+- Aliens with only a ship or two left call for help, and more of their ships warp in
 - Encounters that guard planets from orbit, fought over the planet's own surface; a Veloxi drone grants permission to orbit to a crew that answers its numbers the Veloxi way
 - The Spemin, Thrynn and Veloxi home fleets warn ships away from their homeworlds, more sternly each time, and attack after the last warning
 - The Spemin, Thrynn and Veloxi give up after losing half their ships: they stop fighting and surrender
@@ -262,7 +263,7 @@ Assets/
 
 Every item in [ROADMAP.md](ROADMAP.md) is done or decided, and so is every item in the screen-by-screen comparison with the original (`Research/Screen comparison.md`), the UI kit included. The headless test harness covers every one of them, and its playthrough plays a new game through to the win. A full playthrough of 1.0.0 by hand is still to come.
 
-Still open from the comparison with the original's code: how fast alien ships move against the player's ship and how often an alien distress call brings in another wave, both of which need a measurement in the original game.
+Still open from the comparison with the original's code: how fast alien ships move against the player's ship in an encounter.
 
 See [CHANGELOG.md](CHANGELOG.md) for the detailed version history.
 
