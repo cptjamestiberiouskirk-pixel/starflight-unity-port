@@ -17747,9 +17747,18 @@ public class ClaudeProbe : MonoBehaviour
 
 			PanelController.m_instance.Open( operationsPanel );
 
-			yield return new WaitForSecondsRealtime( 1.0f );
+			// with a supplemental evaluation waiting Operations shows the evaluations by itself a second after it opens; otherwise the Evaluation button shows them
+			var shownBy = Time.realtimeSinceStartup + 3.0f;
 
-			operationsPanel.ShowEvaluations();
+			while ( ( Time.realtimeSinceStartup < shownBy ) && !operationsPanel.m_evaluationGameObject.activeSelf )
+			{
+				yield return null;
+			}
+
+			if ( !operationsPanel.m_evaluationGameObject.activeSelf )
+			{
+				operationsPanel.ShowEvaluations();
+			}
 
 			yield return Frames( 2 );
 
@@ -30403,17 +30412,29 @@ public class ClaudeProbe : MonoBehaviour
 		var balanceBefore = bank.m_currentBalance;
 		var ledgerBefore = bank.m_transactionList.Count;
 
-		yield return OpenPanel( panel, "operations" );
+		PanelController.m_instance.Open( panel );
 
-		var balanceBeforeShown = bank.m_currentBalance;
+		yield return Frames( 2 );
 
-		// the evaluation screen shows it
-		panel.EvaluationClicked();
+		var paidOnOpening = balanceBefore - bank.m_currentBalance;
+
+		// the evaluation screen shows it: Operations shows it by itself a second after it opens, since an evaluation waits (or the Evaluation button does)
+		var shownBy = Time.realtimeSinceStartup + 3.0f;
+
+		while ( ( Time.realtimeSinceStartup < shownBy ) && !panel.m_evaluationGameObject.activeSelf )
+		{
+			yield return null;
+		}
+
+		if ( !panel.m_evaluationGameObject.activeSelf )
+		{
+			panel.EvaluationClicked();
+		}
 
 		yield return Frames( 2 );
 
 		var shown = System.Text.RegularExpressions.Regex.Replace( panel.m_evaluationGameObject.GetComponentInChildren<TMPro.TextMeshProUGUI>().text, "<[^>]*>", "" ).Replace( "\n", " / " );
-		var paidWhenShown = balanceBeforeShown - bank.m_currentBalance;
+		var paidWhenShown = balanceBefore - paidOnOpening - bank.m_currentBalance;
 		var ledger = ( bank.m_transactionList.Count > ledgerBefore ) ? bank.m_transactionList[ bank.m_transactionList.Count - 1 ].m_description + " " + bank.m_transactionList[ bank.m_transactionList.Count - 1 ].m_amount : "nothing";
 
 		panel.QuitClicked();
@@ -30433,9 +30454,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return ClosePanel( panel, "operations" );
 
-		Log( "starport-supplementalfine: paid before Operations " + ( balanceBefore - balanceBeforeShown ) + ", when the evaluation was shown " + paidWhenShown + " (ledger '" + ledger + "'), shown again " + paidAgain + " | shown: " + shown );
+		Log( "starport-supplementalfine: paid on opening Operations " + paidOnOpening + ", when the evaluation was shown " + paidWhenShown + " (ledger '" + ledger + "'), shown again " + paidAgain + " | shown: " + shown );
 
-		Check( "starport-supplementalfine: the fine is booked when Operations shows the evaluation, as a FINE in the ledger, as the original's", ( paidWhenShown == 15000 ) && ( ledger == "Fine 15000-" ), paidWhenShown + ", '" + ledger + "'" );
+		Check( "starport-supplementalfine: the fine is booked when Operations shows the evaluation, as a FINE in the ledger, as the original's", ( paidOnOpening == 0 ) && ( paidWhenShown == 15000 ) && ( ledger == "Fine 15000-" ), paidOnOpening + " on opening, " + paidWhenShown + " when shown, '" + ledger + "'" );
 		Check( "starport-supplementalfine: and only once", paidAgain == 0, paidAgain.ToString() );
 
 		Finish( "scenario=starport-supplementalfine checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
