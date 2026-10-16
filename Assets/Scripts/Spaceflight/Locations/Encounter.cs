@@ -15,8 +15,8 @@ public class Encounter : MonoBehaviour
 	// how long the "permission to orbit granted" message stays up before the ship is back in orbit (in seconds)
 	const float c_returnToOrbitDelay = 3.0f;
 
-	// the speed the alien ships move at
-	public float m_alienShipSpeed;
+	// the speed the alien ships move at this frame (GetAlienShipSpeed)
+	float m_alienShipSpeedNow;
 
 	// the rate the alien ships turn at
 	public float m_alienShipTurnRate;
@@ -376,6 +376,8 @@ public class Encounter : MonoBehaviour
 		// do we want to update the ships (both alien and player)?
 		if ( !m_pdEncounter.m_connected )
 		{
+			m_alienShipSpeedNow = GetAlienShipSpeed();
+
 			// update the position and rotation of the active alien ship models
 			for ( var alienShipIndex = 0; alienShipIndex < m_alienShipModelList.Length; alienShipIndex++ )
 			{
@@ -2625,7 +2627,36 @@ public class Encounter : MonoBehaviour
 		var gameData = DataController.m_instance.m_gameData;
 		var speedFactor = ( ( alienShip.m_vesselId >= 0 ) && ( alienShip.m_vesselId < gameData.m_vesselList.Length ) ) ? gameData.m_vesselList[ alienShip.m_vesselId ].GetSpeedFactor() : 1.0f;
 
-		alienShip.m_coordinates += alienShip.m_currentDirection * Time.deltaTime * m_alienShipSpeed * alienShipSpeedMultiplier * speedFactor;
+		alienShip.m_coordinates += alienShip.m_currentDirection * Time.deltaTime * m_alienShipSpeedNow * alienShipSpeedMultiplier * speedFactor;
+	}
+
+	// the speed an alien ship moves at, as the original's (COMBAT-OV COMBAT, WEDCE): each pass of the original's main loop one icon of the encounter takes its
+	// turn (^VES, round the local icons: the player's ship and the aliens' ships), and an alien ship's turn moves it one cell (CombatController.c_unitsPerCell):
+	// a cell every (ships + 1) passes (c_passSeconds) - with one ship two cells a second (measured in the original at GOG's speed: a turn every 0.508 s)
+	public float GetAlienShipSpeed()
+	{
+		return CombatController.c_unitsPerCell / ( ( GetAlienShipsPresent() + 1 ) * c_passSeconds );
+	}
+
+	// the living alien ships in the encounter (the original's #VESS)
+	public int GetAlienShipsPresent()
+	{
+		var present = 0;
+
+		if ( m_pdEncounter == null )
+		{
+			return 0;
+		}
+
+		foreach ( var alienShip in m_pdEncounter.GetAlienShipList() )
+		{
+			if ( alienShip.m_addedToEncounter && !alienShip.m_isDead )
+			{
+				present++;
+			}
+		}
+
+		return present;
 	}
 
 	void FinalizeAlienShips()

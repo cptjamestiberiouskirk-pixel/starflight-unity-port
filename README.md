@@ -225,7 +225,7 @@ Assets/
 - Nebulae keep the shields down
 - The Starport repairs the hull and damaged systems at the original's prices, and buys parts back according to their condition
 - A confirmed distress call gets the ship towed home, for a fine that grows with the distance from Arth
-- Alien ships have the armor, shields and speed of their vessels in the game data
+- Alien ships have the armor and shields of their vessels in the game data, and move at the original's pace: the more of them, the slower each
 - The starmap shows the fuel needed to fly to the cursor
 - Planets can be recommended for colonization and named by the player; Interstel pays a bonus or fines the crew at the Starport, and each evaluation appears under its recommendation's number, date, system, orbit and name, one per page on the Operations evaluation screen
 - The 35 planets with life have lifeforms of their own species, which Scan reads and the terrain vehicle's laser and stunner affect. Dangerous lifeforms come after the vehicle and attack the crew, while timid ones flee. A crew member whose vitality reaches 0 dies, a dead captain's command passes down the chain of command, and the game is lost when the whole crew has died. Lifeforms hunt, flee and eat one another, and some fly or float out of reach. The terrain vehicle's Cargo button records a lifeform's data, which Interstel pays for at the Starport, or captures it into stasis as a specimen the Trade Depot will buy. Look describes the nearest lifeform and what it is doing, along with the minerals, ruins and dropped cargo next to the vehicle
@@ -263,7 +263,7 @@ Assets/
 
 Every item in [ROADMAP.md](ROADMAP.md) is done or decided, and so is every item in the screen-by-screen comparison with the original (`Research/Screen comparison.md`), the UI kit included. The headless test harness covers every one of them, and its playthrough plays a new game through to the win. A full playthrough of 1.0.0 by hand is still to come.
 
-Still open from the comparison with the original's code: how fast alien ships move against the player's ship in an encounter.
+Nothing is open from the comparison with the original's code: its last two items, the speeds in an encounter and the aliens' distress calls, were measured in the original game.
 
 See [CHANGELOG.md](CHANGELOG.md) for the detailed version history.
 

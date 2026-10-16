@@ -1570,6 +1570,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioDistressCalls();
 				break;
 
+			case "encounterspeeds":
+				yield return ScenarioEncounterSpeeds();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -40459,6 +40463,143 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "distresscalls: a home fleet calls at once (SPACIAL-CONTEXT 2)", home == 1, homeBegun + ", " + home );
 
 		Finish( "scenario=distresscalls calls=" + calls.Count + " mean=" + meanCall.ToString( "F0" ) + " arrive=" + meanArrive.ToString( "F1" ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the speeds in an encounter (COMBAT-OV COMBAT, HYPER-OV #VES-SPEED, ACCELERATE)
+
+	// the path length an alien ship flies in this many seconds of game time, over the time
+	static IEnumerator MeasureAlienSpeed( int alienIndex, float seconds, float[] result )
+	{
+		var ship = EncounterShip( alienIndex );
+		var last = ship.m_coordinates;
+		var path = 0.0f;
+		var start = Time.time;
+
+		while ( Time.time - start < seconds )
+		{
+			yield return null;
+
+			path += Vector3.Distance( ship.m_coordinates, last );
+			last = ship.m_coordinates;
+		}
+
+		result[ 0 ] = path / Mathf.Max( 0.001f, Time.time - start );
+	}
+
+	// holds a direction (turning round a circle, so the ship stays in the encounter) and samples the ship's path speed over the half seconds that end at the given
+	// times of game time
+	static IEnumerator MeasurePlayerSpeeds( float[] times, float[] speeds )
+	{
+		var controller = SpaceflightController.m_instance;
+		var general = DataController.m_instance.m_playerData.m_general;
+		var start = Time.time;
+		var last = general.m_coordinates;
+		var window = new List<KeyValuePair<float, float>>();
+
+		controller.m_playerShip.TurnOnEngines();
+
+		for ( var i = 0; i < times.Length; i++ )
+		{
+			while ( Time.time - start < times[ i ] )
+			{
+				var t = Time.time - start;
+
+				general.m_currentDirection = new Vector3( Mathf.Cos( t ), 0.0f, Mathf.Sin( t ) );
+
+				yield return null;
+
+				window.Add( new KeyValuePair<float, float>( Time.time - start, Vector3.Distance( general.m_coordinates, last ) ) );
+				last = general.m_coordinates;
+			}
+
+			var path = 0.0f;
+			var from = times[ i ] - 0.5f;
+
+			foreach ( var kv in window )
+			{
+				if ( kv.Key > from )
+				{
+					path += kv.Value;
+				}
+			}
+
+			speeds[ i ] = path / 0.5f;
+		}
+	}
+
+	// the speeds in an encounter as the original's: an alien ship moves a cell (80) every (ships + 1) passes of a quarter of a second, 160 a second with one ship
+	// and 80 with three; the player's ship (7 G) moves a cell a pass at first (320) and a cell more every 96 / 7 + 1 = 14 passes (640 from 3.5 s, 960 from 7),
+	// up to 6 cells with one alien ship and 2 with three, and stops at once with no direction held
+	IEnumerator ScenarioEncounterSpeeds()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		EnsureCrew();
+		playerData.m_playerShip.m_armorPoints = 100000;
+		playerData.m_playerShip.m_acceleration = 7;
+		controller.m_encounterRange = 0.0f;
+		SetSystemHealth( 0, 100 );
+
+		// ---- 1. Spemin encounter 96, one ship
+		EnterEncounter( 96 );
+		yield return Frames( 5 );
+
+		if ( GetField( controller.m_buttonController, "m_currentButton" ) is ManeuverButton )
+		{
+			controller.m_buttonController.DeactivateButton();
+		}
+
+		var one = new float[ 1 ];
+
+		yield return MeasureAlienSpeed( FirstLivingAlien(), 2.0f, one );
+
+		var times = new[] { 0.75f, 5.0f, 9.0f };
+		var oneShipSpeeds = new float[ times.Length ];
+
+		yield return MeasurePlayerSpeeds( times, oneShipSpeeds );
+
+		controller.m_playerShip.TurnOffEngines();
+
+		yield return Frames( 2 );
+
+		var stopped = playerData.m_general.m_currentSpeed;
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 2. Spemin group 135, three ships
+		EnterEncounter( 135 );
+		yield return Frames( 5 );
+
+		if ( GetField( controller.m_buttonController, "m_currentButton" ) is ManeuverButton )
+		{
+			controller.m_buttonController.DeactivateButton();
+		}
+
+		var threePresent = AlienShipsPresent();
+		var three = new float[ 1 ];
+
+		yield return MeasureAlienSpeed( FirstLivingAlien(), 2.0f, three );
+
+		var threeTimes = new[] { 10.0f };
+		var threeShipSpeeds = new float[ 1 ];
+
+		yield return MeasurePlayerSpeeds( threeTimes, threeShipSpeeds );
+
+		controller.m_playerShip.TurnOffEngines();
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		Log( "encounterspeeds: one ship: alien " + one[ 0 ].ToString( "F1" ) + ", player at 0.75/5/9 s " + oneShipSpeeds[ 0 ].ToString( "F0" ) + "/" + oneShipSpeeds[ 1 ].ToString( "F0" ) + "/" + oneShipSpeeds[ 2 ].ToString( "F0" ) + ", after letting go " + stopped.ToString( "F1" ) + " || " + threePresent + " ships: alien " + three[ 0 ].ToString( "F1" ) + ", player after 10 s " + threeShipSpeeds[ 0 ].ToString( "F0" ) );
+
+		Check( "encounterspeeds: an alien ship moves a cell every (ships + 1) passes of the original's loop: 160 with one ship, 80 with three (COMBAT-OV COMBAT, WEDCE)", ( Mathf.Abs( one[ 0 ] - 160.0f ) < 8.0f ) && ( threePresent == 3 ) && ( Mathf.Abs( three[ 0 ] - 80.0f ) < 4.0f ), one[ 0 ].ToString( "F1" ) + " / " + threePresent + " ships " + three[ 0 ].ToString( "F1" ) );
+		Check( "encounterspeeds: the player's ship moves a cell a pass at first and a cell more every 14 passes with 7 G (320, 640, 960: HYPER-OV ACCELERATE)", ( Mathf.Abs( oneShipSpeeds[ 0 ] - 320.0f ) < 25.0f ) && ( Mathf.Abs( oneShipSpeeds[ 1 ] - 640.0f ) < 40.0f ) && ( Mathf.Abs( oneShipSpeeds[ 2 ] - 960.0f ) < 60.0f ), oneShipSpeeds[ 0 ].ToString( "F0" ) + " / " + oneShipSpeeds[ 1 ].ToString( "F0" ) + " / " + oneShipSpeeds[ 2 ].ToString( "F0" ) );
+		Check( "encounterspeeds: with three alien ships the step stops at 2 cells (640: HYPER-OV #VES-SPEED)", Mathf.Abs( threeShipSpeeds[ 0 ] - 640.0f ) < 40.0f, threeShipSpeeds[ 0 ].ToString( "F0" ) );
+		Check( "encounterspeeds: with no direction held the ship stops at once", stopped < 0.1f, stopped.ToString( "F1" ) );
+
+		Finish( "scenario=encounterspeeds alien=" + one[ 0 ].ToString( "F0" ) + "/" + three[ 0 ].ToString( "F0" ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
