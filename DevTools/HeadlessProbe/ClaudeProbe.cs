@@ -7999,18 +7999,21 @@ public class ClaudeProbe : MonoBehaviour
 		var hadSensorData = sensors.m_hasSensorData;
 		var scanType = sensors.m_scanType;
 
+		// (each analysis below on a reading of its own: an analysis uses its reading up)
 		sensors.m_hasSensorData = true;
 
 		// (a science officer of full skill, who gives every line of the analysis: roadmap 1.7)
 		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer ).m_science = 250;
 
 		sensors.m_scanType = (SensorsDisplay.ScanType) 6;
+		sensors.m_readingCount++;
 
 		new AnalysisButton().Execute();
 
 		var smallVessel = MessageList();
 
 		sensors.m_scanType = (SensorsDisplay.ScanType) 1;
+		sensors.m_readingCount++;
 
 		new AnalysisButton().Execute();
 
@@ -21887,7 +21890,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var full = AnalyzeNewReading( true );
 
-		// ---- 2. the same reading again: already attempted
+		// ---- 2. the same reading again: the analysis has used it up
 		var again = AnalyzeNewReading( false );
 
 		// ---- 3. no skill: the object's class, and every other line unknown
@@ -21905,7 +21908,7 @@ public class ClaudeProbe : MonoBehaviour
 			unknownOfHalf += UnknownLines( AnalyzeNewReading( true ) );
 		}
 
-		// ---- 5. an alien ship's reading may be analyzed as often as wanted
+		// ---- 5. an alien ship's reading is used up by its analysis too
 		scienceOfficer.m_science = 250;
 
 		sensors.StartScanning( SensorsDisplay.ScanType.ElowanScout, 1, 50, 0, 0 );
@@ -21923,10 +21926,10 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "analysisskill: skill 250: " + full + " || again: " + again + " || skill 0: " + none + " || skill 100: " + unknownOfHalf + " of 120 lines unknown || a ship twice: " + shipTwice );
 
 		Check( "analysisskill: a science officer of full skill gives every line (control)", full.Contains( "Object: <color=white>Planet" ) && ( UnknownLines( full ) == 0 ), full );
-		Check( "analysisskill: the same reading of a planet is not analyzed twice", again.Contains( "I have already attempted analysis of this data, Captain." ), again );
+		Check( "analysisskill: an analysis uses up the reading: the same reading again needs a new one (the original's \"I need a current sensor reading.\")", again.Contains( "I need a current sensor reading." ), again );
 		Check( "analysisskill: with no skill only the object's class is given", none.Contains( "Object: <color=white>Planet" ) && ( UnknownLines( none ) == 6 ), none );
 		Check( "analysisskill: with a skill of 100 about half the lines are given (skill / 2 percent each)", ( unknownOfHalf >= 36 ) && ( unknownOfHalf <= 84 ), unknownOfHalf + " of 120" );
-		Check( "analysisskill: an alien ship's reading may be analyzed again", !shipTwice.Contains( "already attempted" ) && shipTwice.Contains( "Analysis of Last Sensor Reading" ), shipTwice );
+		Check( "analysisskill: an alien ship's reading is used up too: its second analysis needs a new reading", ( shipTwice == "<color=white>I need a current sensor reading.</color>" ), shipTwice );
 
 		Finish( "scenario=analysisskill unknown100=" + unknownOfHalf, 0 );
 	}
@@ -25916,8 +25919,10 @@ public class ClaudeProbe : MonoBehaviour
 	{
 		var sensors = SpaceflightController.m_instance.m_displayController.m_sensorsDisplay;
 
+		// a new reading (an analysis uses its reading up)
 		sensors.m_hasSensorData = true;
 		sensors.m_scanType = scanType;
+		sensors.m_readingCount++;
 
 		new AnalysisButton().Execute();
 
