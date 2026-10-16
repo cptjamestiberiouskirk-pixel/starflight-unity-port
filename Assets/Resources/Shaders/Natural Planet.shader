@@ -1,5 +1,6 @@
 // a planet in its natural look, from the maps NaturalPlanet bakes: the ground lit by sunlight that reddens where it has crossed more air (near the line
-// between day and night), the sun's glint on the open sea and a sheen of sky at grazing angles, the shadows of the clouds, and the air in front of the
+// between day and night), the sun's glint on the open sea and a sheen of sky at grazing angles (on a molten world the albedo's alpha is the glow of its
+// lava instead, which shines by itself, day and night), the shadows of the clouds, and the air in front of the
 // ground (the haze that thickens towards the planet's edge, worked out by the same scattering as the halo round it), brought down to the screen by a
 // filmic tone curve
 // it is in a Resources folder so that it is always in a build: the material is made in code
@@ -21,6 +22,9 @@ Shader "Starflight/Natural Planet"
 		_AirHeight( "Air Height (planet radii)", Float ) = 0.06
 		_AirScaleHeight( "Scale Height (share of the air's height)", Float ) = 0.15
 		_AirLight( "Sunlight In The Air", Float ) = 14
+		_Molten( "Molten (the albedo's alpha is the lava's glow)", Float ) = 0
+		_LavaColor( "Lava Colour", Color ) = ( 1, 0.38, 0.08, 1 )
+		_LavaIntensity( "Lava Brightness", Float ) = 2.2
 	}
 
 	SubShader
@@ -61,6 +65,9 @@ Shader "Starflight/Natural Planet"
 			float _AirHeight;
 			float _AirScaleHeight;
 			float _AirLight;
+			float _Molten;
+			float4 _LavaColor;
+			float _LavaIntensity;
 			float4 _LightColor0;
 
 			struct appdata
@@ -114,7 +121,8 @@ Shader "Starflight/Natural Planet"
 			{
 				float4 albedoAndSea = tex2D( _Albedo, i.uv );
 				float3 albedo = albedoAndSea.rgb;
-				float water = albedoAndSea.a;
+				float water = albedoAndSea.a * ( 1.0 - _Molten );
+				float glow = albedoAndSea.a * _Molten;
 
 				// the normal of the ground, from its map (x along u, y along v)
 				float3 normalTangent = tex2D( _NormalMap, i.uv ).xyz * 2.0 - 1.0;
@@ -156,6 +164,9 @@ Shader "Starflight/Natural Planet"
 
 				// (only clouds thick enough to see cast a shadow, so that the faint wisps between them leave none)
 				color *= 1.0 - smoothstep( 0.15, 0.75, shadow ) * _CloudShadow;
+
+				// the lava's own light (dimmed a little under thick clouds)
+				color += glow * _LavaColor.rgb * _LavaIntensity * ( 1.0 - smoothstep( 0.15, 0.75, shadow ) * _CloudShadow * 0.5 );
 
 				// the air in front of the ground
 				NP_Air air = NP_MakeAir( _AirHeight, _AirScaleHeight, _AirColor.rgb, _AirTint, _AirDensity );

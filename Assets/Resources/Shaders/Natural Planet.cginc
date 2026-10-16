@@ -51,27 +51,36 @@ NP_Air NP_MakeAir( float height, float scaleShare, float3 color, float tint, flo
 
 // the sunlight the air scatters towards the eye along a line of sight (from origin in direction, between start and end, all in planet radii) and how
 // much of what lies behind gets through it
+// the line is sampled in two halves, before and after the point where it passes closest to the planet, where the air is densest: that point is always
+// between two samples, so that the light changes smoothly from pixel to pixel where the line of sight grazes the air (evenly spaced samples along the
+// whole line showed as rings there)
 void NP_Scatter( NP_Air air, float3 origin, float3 direction, float start, float end, float3 light, float sunIntensity, out float3 inscatter, out float3 transmittance )
 {
-	const int steps = 12;
+	const int halfSteps = 8;
 	const int sunSteps = 4;
 
-	float stepLength = max( end - start, 0.0 ) / steps;
+	float closest = clamp( -dot( origin, direction ), start, max( end, start ) );
 	float3 opticalDepth = 0.0;
 	float3 scattered = 0.0;
 
-	for ( int s = 0; s < steps; s++ )
+	for ( int s = 0; s < halfSteps * 2; s++ )
 	{
-		float3 p = origin + direction * ( start + ( s + 0.5 ) * stepLength );
+		float segmentStart = ( s < halfSteps ) ? start : closest;
+		float segmentEnd = ( s < halfSteps ) ? closest : max( end, start );
+		float stepLength = ( segmentEnd - segmentStart ) / halfSteps;
+		float3 p = origin + direction * ( segmentStart + ( ( s % halfSteps ) + 0.5 ) * stepLength );
 		float height = length( p ) - 1.0;
 		float density = exp( -height / air.scaleHeight ) * stepLength;
 
 		opticalDepth += density;
 
-		// the light from the sun to this point: none where the planet is in the way
-		float2 sunGround = NP_RaySphere( p, light, 1.0 );
+		// the light from the sun to this point: none where the planet is in the way, fading out over a little way below the point's horizon (a hard edge
+		// showed as steps in the air along the line between day and night)
+		float pointRadius = max( length( p ), 1.0001 );
+		float horizon = -sqrt( 1.0 - 1.0 / ( pointRadius * pointRadius ) );
+		float sunlit = smoothstep( horizon - 0.03, horizon + 0.01, dot( p / pointRadius, light ) );
 
-		if ( ( sunGround.x < sunGround.y ) && ( sunGround.x > 0.0 ) )
+		if ( sunlit <= 0.0 )
 		{
 			continue;
 		}
@@ -85,7 +94,7 @@ void NP_Scatter( NP_Air air, float3 origin, float3 direction, float start, float
 			sunDepth += exp( -( length( q ) - 1.0 ) / air.scaleHeight ) * sunLength;
 		}
 
-		scattered += density * exp( -air.betaExtinction * ( opticalDepth + sunDepth ) );
+		scattered += density * sunlit * exp( -air.betaExtinction * ( opticalDepth + sunDepth ) );
 	}
 
 	float mu = dot( direction, light );

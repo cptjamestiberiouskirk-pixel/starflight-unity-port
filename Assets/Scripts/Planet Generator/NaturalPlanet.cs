@@ -109,6 +109,53 @@ public class NaturalPlanet
 	// water ice, for a frozen world without a sea
 	static readonly Color c_waterIce = new Color( 0.88f, 0.92f, 0.96f );
 
+	// the bands of a gas giant: its light zones, its dark belts and its storms
+	struct Bands
+	{
+		public Color m_light;
+		public Color m_dark;
+		public Color m_accent;
+
+		public Bands( Color light, Color dark, Color accent )
+		{
+			m_light = light;
+			m_dark = dark;
+			m_accent = accent;
+		}
+	}
+
+	// the gases of the game data (by name), as a gas giant's bands would look in them: hydrogen and helium cream and brown with a red storm, as Jupiter,
+	// methane cyan and blue with a dark storm, as Neptune, ammonia pale gold, nitrogen and oxygen pale blue-gray, chlorine and fluorine yellow-green
+	static readonly Dictionary<string, Bands> c_gasGiantBands = new Dictionary<string, Bands>
+	{
+		{ "Hydrogen", new Bands( new Color( 0.92f, 0.86f, 0.74f ), new Color( 0.66f, 0.48f, 0.34f ), new Color( 0.80f, 0.42f, 0.28f ) ) },
+		{ "Helium", new Bands( new Color( 0.92f, 0.86f, 0.74f ), new Color( 0.66f, 0.48f, 0.34f ), new Color( 0.80f, 0.42f, 0.28f ) ) },
+		{ "Methane", new Bands( new Color( 0.62f, 0.84f, 0.90f ), new Color( 0.24f, 0.46f, 0.72f ), new Color( 0.12f, 0.22f, 0.50f ) ) },
+		{ "Ammonia", new Bands( new Color( 0.93f, 0.87f, 0.72f ), new Color( 0.72f, 0.56f, 0.38f ), new Color( 0.95f, 0.93f, 0.86f ) ) },
+		{ "Ammonia Compounds", new Bands( new Color( 0.93f, 0.87f, 0.72f ), new Color( 0.72f, 0.56f, 0.38f ), new Color( 0.95f, 0.93f, 0.86f ) ) },
+		{ "Nitrogen", new Bands( new Color( 0.86f, 0.88f, 0.90f ), new Color( 0.55f, 0.62f, 0.72f ), new Color( 0.92f, 0.80f, 0.62f ) ) },
+		{ "Argon", new Bands( new Color( 0.86f, 0.88f, 0.90f ), new Color( 0.55f, 0.62f, 0.72f ), new Color( 0.92f, 0.80f, 0.62f ) ) },
+		{ "Oxygen", new Bands( new Color( 0.84f, 0.90f, 0.94f ), new Color( 0.52f, 0.64f, 0.78f ), new Color( 0.90f, 0.78f, 0.60f ) ) },
+		{ "Carbon Dioxide", new Bands( new Color( 0.92f, 0.86f, 0.76f ), new Color( 0.70f, 0.58f, 0.48f ), new Color( 0.82f, 0.50f, 0.35f ) ) },
+		{ "Hydrogen Cyanide", new Bands( new Color( 0.90f, 0.78f, 0.60f ), new Color( 0.62f, 0.44f, 0.28f ), new Color( 0.70f, 0.36f, 0.20f ) ) },
+		{ "Fluorine", new Bands( new Color( 0.92f, 0.93f, 0.70f ), new Color( 0.62f, 0.68f, 0.36f ), new Color( 0.86f, 0.78f, 0.40f ) ) },
+		{ "Fluorine Compounds", new Bands( new Color( 0.92f, 0.93f, 0.70f ), new Color( 0.62f, 0.68f, 0.36f ), new Color( 0.86f, 0.78f, 0.40f ) ) },
+		{ "Chlorine", new Bands( new Color( 0.86f, 0.94f, 0.66f ), new Color( 0.50f, 0.64f, 0.30f ), new Color( 0.80f, 0.84f, 0.40f ) ) },
+		{ "Chlorine Compounds", new Bands( new Color( 0.86f, 0.94f, 0.66f ), new Color( 0.50f, 0.64f, 0.30f ), new Color( 0.80f, 0.84f, 0.40f ) ) },
+		{ "Metal Compounds", new Bands( new Color( 0.80f, 0.74f, 0.66f ), new Color( 0.50f, 0.44f, 0.38f ), new Color( 0.70f, 0.50f, 0.36f ) ) },
+	};
+
+	// the ash of a molten world without seas, on its crust, and the clouds of ash over a molten world
+	static readonly Color c_ash = new Color( 0.35f, 0.33f, 0.30f );
+	static readonly Color c_ashClouds = new Color( 0.32f, 0.30f, 0.29f );
+
+	// how brightly lava glows (in the light of the sun's 1.9)
+	const float c_lavaIntensity = 1.6f;
+
+	// how much of the light a gas giant's bands send back (the colours of the table are their hues at full brightness), and how strongly its air scatters
+	const float c_gasGiantAlbedo = 0.6f;
+	const float c_gasGiantAir = 1.2f;
+
 	// the shaders (in a Resources folder, so that they are in every build), and the material the maps are baked with
 	static Shader s_bakeShader;
 	static Shader s_surfaceShader;
@@ -185,11 +232,10 @@ public class NaturalPlanet
 		return ( s_bakeMaterial != null ) && ( s_surfaceShader != null ) && s_surfaceShader.isSupported && ( s_cloudShader != null ) && s_cloudShader.isSupported && ( s_atmosphereShader != null ) && s_atmosphereShader.isSupported;
 	}
 
-	// true if the natural look is made for this kind of planet (rock, liquid and frozen worlds: the gas giants, the molten worlds and the Crystal Planet keep
-	// the original look)
+	// true if the natural look is made for this kind of planet (every kind but the Crystal Planet, which keeps the original look)
 	public static bool Suits( GD_Planet planet )
 	{
-		return ( planet != null ) && ( ( planet.m_surfaceId == 2 ) || ( planet.m_surfaceId == 3 ) || ( planet.m_surfaceId == 5 ) ) && !planet.IsCrystalPlanet();
+		return ( planet != null ) && ( planet.m_surfaceId >= 1 ) && ( planet.m_surfaceId <= 5 ) && !planet.IsCrystalPlanet();
 	}
 
 	// how wide the maps of the planet in orbit are on this computer
@@ -240,10 +286,16 @@ public class NaturalPlanet
 		return IsBaked() ? m_mapWidth : 0;
 	}
 
-	// true if the planet has clouds (it has air and some weather)
+	// true if the planet has clouds (it has air and some weather; a gas giant's clouds are its bands)
 	public bool HasClouds()
 	{
 		return m_planet.HasAtmosphere() && ( m_planet.m_weatherId > 0 );
+	}
+
+	// true if the planet has air round it: an atmosphere, or the deep air of a gas giant
+	public bool HasAir()
+	{
+		return m_planet.HasAtmosphere() || m_planet.IsGasGiant();
 	}
 
 	// the material of the ground (null until the maps are made)
@@ -296,10 +348,19 @@ public class NaturalPlanet
 
 			SetBakeProperties( blueprint, generator, width, height );
 
-			// the height first: the other maps are worked out from it
+			// the height first: the other maps are worked out from it (a gas giant has none: its clouds are flat)
+			var isGasGiant = m_planet.IsGasGiant();
+
 			heightMap = MakeMap( "Natural Height", width, height, RenderTextureFormat.RFloat, true, false );
 
-			Graphics.Blit( null, heightMap, s_bakeMaterial, 0 );
+			if ( isGasGiant )
+			{
+				Graphics.Blit( Texture2D.blackTexture, heightMap );
+			}
+			else
+			{
+				Graphics.Blit( null, heightMap, s_bakeMaterial, 0 );
+			}
 
 			s_bakeMaterial.SetTexture( c_heightMapId, heightMap );
 
@@ -307,13 +368,14 @@ public class NaturalPlanet
 			normalMap = MakeMap( "Natural Normal", width, height, RenderTextureFormat.ARGB32, true, true );
 			cloudMap = MakeMap( "Natural Clouds", width / 2, height / 2, SystemInfo.SupportsRenderTextureFormat( RenderTextureFormat.R8 ) ? RenderTextureFormat.R8 : RenderTextureFormat.ARGB32, true, true );
 
-			Graphics.Blit( null, albedoMap, s_bakeMaterial, 1 );
+			// the colours: a gas giant's bands, a molten world's crust and lava, or the ground and sea of any other
+			Graphics.Blit( null, albedoMap, s_bakeMaterial, isGasGiant ? 4 : ( m_planet.IsMolten() ? 5 : 1 ) );
 			Graphics.Blit( null, normalMap, s_bakeMaterial, 2 );
 			Graphics.Blit( null, cloudMap, s_bakeMaterial, 3 );
 
 			if ( s_measureCoasts )
 			{
-				m_coastAgreement = MeasureCoastAgreement( heightMap, generator );
+				m_coastAgreement = isGasGiant ? 1.0f : MeasureCoastAgreement( heightMap, generator );
 			}
 
 			// the new maps take the place of the old ones
@@ -366,8 +428,26 @@ public class NaturalPlanet
 		var width = elevation.GetLength( 1 );
 		var height = elevation.GetLength( 0 );
 
+		var middle = generator.m_waterElevation;
 		var up = Mathf.Max( generator.m_maximumElevation - generator.m_waterElevation, 1e-4f );
 		var down = Mathf.Max( generator.m_waterElevation - generator.m_minimumElevation, 1e-4f );
+
+		// a gas giant has no sea and no highest point worked out: its bands run from its lowest elevation (-1) to its highest (1)
+		if ( ( generator.GetPlanet() != null ) && generator.GetPlanet().IsGasGiant() )
+		{
+			var lowest = float.MaxValue;
+			var highest = float.MinValue;
+
+			foreach ( var value in elevation )
+			{
+				lowest = Mathf.Min( lowest, value );
+				highest = Mathf.Max( highest, value );
+			}
+
+			middle = ( lowest + highest ) * 0.5f;
+			up = Mathf.Max( ( highest - lowest ) * 0.5f, 1e-4f );
+			down = up;
+		}
 
 		if ( ( s_blueprintData == null ) || ( s_blueprintData.Length != width * height ) )
 		{
@@ -380,7 +460,7 @@ public class NaturalPlanet
 		{
 			for ( var x = 0; x < width; x++ )
 			{
-				var aboveWater = elevation[ y, x ] - generator.m_waterElevation;
+				var aboveWater = elevation[ y, x ] - middle;
 
 				s_blueprintData[ index++ ] = Mathf.Clamp( ( aboveWater >= 0.0f ) ? aboveWater / up : aboveWater / down, -1.0f, 1.0f );
 			}
@@ -433,12 +513,90 @@ public class NaturalPlanet
 
 		material.SetFloat( "_HasSea", hasSea ? 1.0f : 0.0f );
 		material.SetFloat( "_SeaFrozen", seaFrozen ? 1.0f : 0.0f );
-		material.SetColor( "_SeaShallow", hasSea ? sea.m_shallow : Color.black );
+		// (on a molten world the colour of the deposits its seas leave on its crust)
+		material.SetColor( "_SeaShallow", hasSea ? sea.m_shallow : ( m_planet.IsMolten() ? c_ash : Color.black ) );
 		material.SetColor( "_SeaDeep", hasSea ? sea.m_deep : Color.black );
 		material.SetColor( "_SeaIce", hasSea ? sea.m_ice : c_waterIce );
 		material.SetFloat( "_Airless", m_planet.HasAtmosphere() ? 0.0f : 1.0f );
 		material.SetFloat( "_Icy", frozen ? 1.0f : 0.0f );
 		material.SetFloat( "_Weather", HasClouds() ? m_planet.m_weatherId / 4.0f : 0.0f );
+
+		// a molten world's crust: broad yellow fields of sulfur, as on Io, where its seas are of sulfur compounds, fewer deposits of other stuff
+		material.SetFloat( "_DepositAmount", ( hydrosphere == "Sulfur Compounds" ) ? 0.6f : ( hasSea ? 0.3f : 0.15f ) );
+
+		// a gas giant's bands
+		GetBands( out var bands );
+
+		material.SetColor( "_GasLight", bands.m_light );
+		material.SetColor( "_GasDark", bands.m_dark );
+		material.SetColor( "_GasAccent", bands.m_accent );
+	}
+
+	// the colours of a gas giant's bands: its gases' (the first counts most, as for the colour of its air)
+	void GetBands( out Bands bands )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var ids = new[] { m_planet.m_atmosphereIdA, m_planet.m_atmosphereIdB, m_planet.m_atmosphereIdC };
+		var weights = new[] { 1.0f, 0.5f, 0.25f };
+		var light = Color.black;
+		var dark = Color.black;
+		var accent = Color.black;
+		var totalWeight = 0.0f;
+
+		for ( var i = 0; i < ids.Length; i++ )
+		{
+			if ( ( ids[ i ] < 0 ) || ( ids[ i ] >= gameData.m_atmosphereList.Length ) || !c_gasGiantBands.TryGetValue( gameData.m_atmosphereList[ ids[ i ] ].m_name, out var gas ) )
+			{
+				continue;
+			}
+
+			light += gas.m_light * weights[ i ];
+			dark += gas.m_dark * weights[ i ];
+			accent += gas.m_accent * weights[ i ];
+			totalWeight += weights[ i ];
+		}
+
+		if ( totalWeight <= 0.0f )
+		{
+			light = c_gasGiantBands[ "Hydrogen" ].m_light;
+			dark = c_gasGiantBands[ "Hydrogen" ].m_dark;
+			accent = c_gasGiantBands[ "Hydrogen" ].m_accent;
+			totalWeight = 1.0f;
+		}
+
+		light /= totalWeight;
+		dark /= totalWeight;
+		accent /= totalWeight;
+
+		light.a = 1.0f;
+		dark.a = 1.0f;
+		accent.a = 1.0f;
+
+		bands = new Bands( light * c_gasGiantAlbedo, dark * c_gasGiantAlbedo, accent * c_gasGiantAlbedo );
+
+		bands.m_light.a = 1.0f;
+		bands.m_dark.a = 1.0f;
+		bands.m_accent.a = 1.0f;
+	}
+
+	// the colour of a molten world's lava, by what its seas are made of: molten metal white-hot, sodium compounds yellow-orange, sulfur deep red-orange,
+	// rock (and anything else) orange
+	static Color GetLavaColor( string hydrosphere )
+	{
+		switch ( hydrosphere )
+		{
+			case "Metal Compounds":
+				return new Color( 1.0f, 0.72f, 0.40f );
+
+			case "Sodium Compounds":
+				return new Color( 1.0f, 0.55f, 0.12f );
+
+			case "Sulfur Compounds":
+				return new Color( 1.0f, 0.30f, 0.06f );
+
+			default:
+				return new Color( 1.0f, 0.38f, 0.08f );
+		}
 	}
 
 	// the colour of the planet's air, how far it draws the sky from a clean sky's blue, and the colour of its clouds: its gases' (the first counts most,
@@ -505,9 +663,9 @@ public class NaturalPlanet
 			m_atmosphereMaterial.name = "Natural Atmosphere " + m_planet.m_id;
 		}
 
-		var hasAir = m_planet.HasAtmosphere();
-		var density = hasAir ? m_planet.GetAtmosphereDensity() : 0.0f;
-		var airDensity = hasAir ? Mathf.Lerp( c_thinnestAir, c_thickestAir, density ) : 0.0f;
+		var hasAir = HasAir();
+		var density = hasAir ? Mathf.Clamp01( m_planet.GetAtmosphereDensity() ) : 0.0f;
+		var airDensity = hasAir ? ( m_planet.IsGasGiant() ? c_gasGiantAir : Mathf.Lerp( c_thinnestAir, c_thickestAir, density ) ) : 0.0f;
 
 		GetAir( out var airColor, out var airTint, out var cloudColor );
 
@@ -530,8 +688,17 @@ public class NaturalPlanet
 		// the sea shows the sky above it
 		m_surfaceMaterial.SetColor( "_SkyColor", Color.Lerp( c_gases[ "Nitrogen" ].m_color, airColor, airTint ) );
 
+		// a molten world glows by its lava
+		var gameData = DataController.m_instance.m_gameData;
+		var hydrosphere = ( ( m_planet.m_hydrosphereId >= 0 ) && ( m_planet.m_hydrosphereId < gameData.m_hydrosphereList.Length ) ) ? gameData.m_hydrosphereList[ m_planet.m_hydrosphereId ].m_name : "None";
+
+		m_surfaceMaterial.SetFloat( "_Molten", m_planet.IsMolten() ? 1.0f : 0.0f );
+		m_surfaceMaterial.SetColor( "_LavaColor", GetLavaColor( hydrosphere ) );
+		m_surfaceMaterial.SetFloat( "_LavaIntensity", c_lavaIntensity );
+
+		// (the clouds of a molten world are ash)
 		m_cloudMaterial.SetTexture( c_cloudsId, m_cloudMap );
-		m_cloudMaterial.SetColor( "_CloudColor", cloudColor );
+		m_cloudMaterial.SetColor( "_CloudColor", m_planet.IsMolten() ? c_ashClouds : cloudColor );
 	}
 
 	// turns the clouds round a little faster than the ground (the turn of the planet in degrees)
@@ -589,7 +756,7 @@ public class NaturalPlanet
 		if ( atmosphere != null )
 		{
 			var placed = Planet.PlaceAtmosphere( atmosphere, planetModel, out var radius, out var lift );
-			var hasAir = m_planet.HasAtmosphere() && placed;
+			var hasAir = HasAir() && placed;
 
 			atmosphere.SetActive( hasAir );
 
