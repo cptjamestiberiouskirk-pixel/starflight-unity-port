@@ -1002,6 +1002,14 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCrewPosts();
 				break;
 
+			case "launchreport":
+				yield return ScenarioLaunchReport();
+				break;
+
+			case "starport-reportrooms":
+				yield return ScenarioStarportReportRooms();
+				break;
+
 			case "mates":
 				yield return ScenarioMates();
 				break;
@@ -23004,6 +23012,143 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "crewposts: a dead captain's command goes to the science officer (a control)", afterCaptain.StartsWith( "Captain Sci" ), afterCaptain );
 
 		Finish( "scenario=crewposts checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the evaluation of a ship back without its terrain vehicle, or towed (the supplemental evaluation that waits for Operations)
+	static string ReportEvaluationText()
+	{
+		var lossText = DataController.m_instance.m_gameData.FindStoryText( "TerrainVehicleLost" );
+
+		return ( lossText != null ) ? lossText.m_text : "SUPPLEMENTAL EVALUATION";
+	}
+
+	// a ship back without its terrain vehicle or towed stays docked until Operations has given its evaluation: the captain's Launch in the docking bay says
+	// "Report to Operations for evaluation." and asks nothing (SHIPBUTTONS WF18E), and with nothing waiting it asks to confirm the launch (a control)
+	IEnumerator ScenarioLaunchReport()
+	{
+		var controller = SpaceflightController.m_instance;
+		var playerData = DataController.m_instance.m_playerData;
+
+		EnsureCrew();
+
+		controller.SwitchLocation( PD_General.Location.DockingBay );
+
+		yield return Frames( 10 );
+
+		// ---- 1. an evaluation waits: Launch refuses
+		playerData.m_general.AddSupplementalEvaluation( ReportEvaluationText() );
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.CommandA, 0 );
+
+		yield return Frames( 2 );
+
+		var refusal = MessageList();
+		var setAfterRefusal = controller.m_buttonController.GetCurrentButtonSet().ToString();
+
+		// ---- 2. nothing waits: Launch asks to confirm
+		playerData.m_general.m_supplementalEvaluationList.Clear();
+		controller.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.CommandA );
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.CommandA, 0 );
+
+		yield return Frames( 2 );
+
+		var question = MessageList();
+		var setAfterQuestion = controller.m_buttonController.GetCurrentButtonSet().ToString();
+
+		controller.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.CommandA );
+
+		Log( "launchreport: with an evaluation waiting: '" + refusal + "', buttons " + setAfterRefusal + " | with none: '" + question + "', buttons " + setAfterQuestion );
+
+		Check( "launchreport: with an evaluation waiting, Launch in the docking bay says \"Report to Operations for evaluation.\" and asks nothing", refusal.Contains( "Report to Operations for evaluation" ) && ( setAfterRefusal != "Launch" ), refusal + " | " + setAfterRefusal );
+		Check( "launchreport: with nothing waiting, Launch asks to confirm (a control)", question.Contains( "Ready to launch" ) && ( setAfterQuestion == "Launch" ), question + " | " + setAfterQuestion );
+
+		Finish( "scenario=launchreport checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// while an evaluation waits for Operations the original locks Personnel, Crew Assignment, the Bank, Ship Configuration and the Trade Depot (PORTMENU-OV
+	// WEA7F: a beep, and nothing opens), and Operations brings up the evaluation by itself a second after it opens ((U-OP)); once it has been shown the rooms
+	// open again (a control)
+	IEnumerator ScenarioStarportReportRooms()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var astronaut = UnityEngine.Object.FindFirstObjectByType<AstronautController>();
+		var operations = FindPanel<OperationsPanel>();
+		var enterDoor = typeof( AstronautController ).GetMethod( "EnterDoor", c_any );
+		var lockedRooms = new[] { "Personnel", "Crew Assignment", "Bank", "Ship Configuration", "Trade Depot" };
+
+		yield return Frames( 30 );
+
+		playerData.m_general.AddSupplementalEvaluation( ReportEvaluationText() );
+
+		// ---- 1. the five rooms (the code before the lock has no EnterDoor, and opens every room)
+		var opened = new List<string>();
+
+		foreach ( var room in lockedRooms )
+		{
+			if ( ( enterDoor == null ) || ( astronaut == null ) )
+			{
+				opened.Add( room );
+
+				continue;
+			}
+
+			enterDoor.Invoke( astronaut, new object[] { room } );
+
+			yield return Frames( 5 );
+
+			if ( PanelController.m_instance.HasActivePanel() )
+			{
+				opened.Add( room );
+
+				yield return ClosePanel( null, room );
+			}
+		}
+
+		// ---- 2. Operations opens, and the evaluation comes up by itself
+		if ( ( enterDoor != null ) && ( astronaut != null ) )
+		{
+			enterDoor.Invoke( astronaut, new object[] { "Operations" } );
+		}
+		else
+		{
+			PanelController.m_instance.Open( operations );
+		}
+
+		yield return new WaitForSecondsRealtime( 2.5f );
+
+		var evaluationShown = ( operations != null ) && operations.m_evaluationGameObject.activeSelf;
+		var stillWaiting = ( playerData.m_general.m_supplementalEvaluationList != null ) && ( playerData.m_general.m_supplementalEvaluationList.Count > 0 );
+
+		yield return ClosePanel( operations, "operations" );
+
+		// ---- 3. the Trade Depot opens now
+		var tradeDepotOpens = false;
+
+		if ( ( enterDoor != null ) && ( astronaut != null ) )
+		{
+			enterDoor.Invoke( astronaut, new object[] { "Trade Depot" } );
+
+			yield return Frames( 5 );
+
+			tradeDepotOpens = PanelController.m_instance.HasActivePanel();
+
+			yield return ClosePanel( null, "trade depot" );
+		}
+		else
+		{
+			tradeDepotOpens = true;
+		}
+
+		Log( "starport-reportrooms: opened while the evaluation waited: " + ( ( opened.Count > 0 ) ? string.Join( ", ", opened ) : "none" ) + ( ( enterDoor == null ) ? " (no EnterDoor: every room opens)" : "" ) + " | Operations: evaluation shown " + evaluationShown + ", still waiting " + stillWaiting + " | the Trade Depot afterwards: " + tradeDepotOpens );
+
+		Check( "starport-reportrooms: while an evaluation waits, Personnel, Crew Assignment, the Bank, Ship Configuration and the Trade Depot do not open", opened.Count == 0, string.Join( ", ", opened ) );
+		Check( "starport-reportrooms: Operations brings up the evaluation by itself, and it is read", evaluationShown && !stillWaiting, "shown " + evaluationShown + ", still waiting " + stillWaiting );
+		Check( "starport-reportrooms: once the evaluation has been shown, the Trade Depot opens (a control)", tradeDepotOpens, tradeDepotOpens.ToString() );
+
+		Finish( "scenario=starport-reportrooms checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 6: the lifeforms' mates

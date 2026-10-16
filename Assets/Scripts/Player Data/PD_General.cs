@@ -508,6 +508,14 @@ public class PD_General
 		return m_colonyEvaluationUnread || ( ( m_supplementalEvaluationList != null ) && ( m_supplementalEvaluationList.Count > 0 ) ) || ( m_gameWon && !m_missionCompleteShown );
 	}
 
+	// true while the ship is back towed or without its terrain vehicle and Operations has not shown that evaluation yet: the original's ?>OP, set when the crew
+	// disembarks with ?TV off or ?RECALL on (SHIPBUTTONS WF077) and cleared when Operations shows the evaluation (OP-OV WF47A) - meanwhile the ship cannot launch
+	// from its docking bay (WF18E), and the Starport's rooms but Operations and the docking bay are locked (PORTMENU-OV WEA7F)
+	public bool MustReportToOperations()
+	{
+		return ( m_supplementalEvaluationList != null ) && ( m_supplementalEvaluationList.Count > 0 );
+	}
+
 	// call this when a supplemental evaluation comes with a fine: it is booked when the evaluation screen shows the evaluation
 	public void AddSupplementalFine( int fine )
 	{
