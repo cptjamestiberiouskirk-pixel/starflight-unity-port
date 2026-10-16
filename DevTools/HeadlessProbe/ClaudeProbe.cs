@@ -19254,9 +19254,30 @@ public class ClaudeProbe : MonoBehaviour
 
 		var ratio = ( elowanSpeed > 0.0f ) ? ( speminSpeed / elowanSpeed ) : -1.0f;
 
-		// the shorter the move delay the faster: the speeds go as the inverse of the delays (2200 / 1500 = 1.47 for an Elowan transport or scout, 2700 / 1500 = 1.80
-		// for an Elowan warship)
-		var expected = ( speminDelay > 0 ) ? ( (float) elowanDelay / speminDelay ) : -1.0f;
+		// every vessel alike, as the original's (COMBAT-OV moves every alien ship one unit a turn; the move delays of the vessel records, 1500 for the Spemin and
+		// 2200 or 2700 for the Elowan, are read nowhere)
+		var expected = 1.0f;
+
+		// a vessel whose record's byte 6 is 0 does not move at all (COMBAT-OV WE06B): a Spemin encounter whose ships are all Mechan Scouts
+		var standstillId = FindEncounter( 1, 6, 3, 0, GameData.Race.Spemin );
+
+		ForceVessel( standstillId, 4 );
+		EnterEncounter( standstillId );
+		yield return Frames( 10 );
+
+		var standstillShip = SpaceflightController.m_instance.m_encounter.m_pdEncounter.GetAlienShipList()[ 0 ];
+		var standstillStart = standstillShip.m_coordinates;
+
+		for ( var end = Time.time + 2.0f; Time.time < end; )
+		{
+			yield return null;
+		}
+
+		var standstillTravel = Vector3.Distance( standstillStart, standstillShip.m_coordinates );
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
 
 		// every ship has the points of its vessel: "armor/vessel's armor shields/vessel's shields" with the two halves equal
 		var allMatch = true;
@@ -19276,10 +19297,11 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		Log( "vesselstats: spemin ships " + speminPoints + "| elowan ships " + elowanPoints + "| travel per second of game time: " + speminVessel + " (move delay " + speminDelay + ") " + speminSpeed.ToString( "0.0" ) + ", " + elowanVessel + " (move delay " + elowanDelay + ") " + elowanSpeed.ToString( "0.0" ) + ", ratio " + ratio.ToString( "0.000" ) + " (expected " + expected.ToString( "0.000" ) + ")" );
+		Log( "vesselstats: spemin ships " + speminPoints + "| elowan ships " + elowanPoints + "| travel per second of game time: " + speminVessel + " (move delay " + speminDelay + ") " + speminSpeed.ToString( "0.0" ) + ", " + elowanVessel + " (move delay " + elowanDelay + ") " + elowanSpeed.ToString( "0.0" ) + ", ratio " + ratio.ToString( "0.000" ) + " (expected " + expected.ToString( "0.000" ) + "); a Mechan Scout travelled " + standstillTravel.ToString( "0.000" ) + " in 2 s" );
 
 		Check( "vesselstats: every alien ship has the armor and shield points of its vessel in the game data", allMatch, speminPoints + elowanPoints );
-		Check( "vesselstats: an alien ship moves at the speed of its vessel's move delay (a Spemin ship is as many times as fast as an Elowan one as the Elowan vessel's move delay is longer)", ( expected > 1.0f ) && ( Mathf.Abs( ratio - expected ) < 0.02f * expected ), ratio.ToString( "0.000" ) + " (expected " + expected.ToString( "0.000" ) + ", " + speminVessel + " " + speminDelay + ", " + elowanVessel + " " + elowanDelay + ")" );
+		Check( "vesselstats: every alien ship moves at one speed whatever its vessel, as the original's (a Spemin ship as fast as an Elowan one; the move delays are read nowhere)", Mathf.Abs( ratio - expected ) < 0.02f, ratio.ToString( "0.000" ) + " (" + speminVessel + " " + speminDelay + ", " + elowanVessel + " " + elowanDelay + ")" );
+		Check( "vesselstats: a Mechan Scout, whose vessel record's byte 6 is 0, does not move at all (COMBAT-OV WE06B)", standstillTravel < 0.01f, standstillTravel.ToString( "0.000" ) );
 
 		Finish( "scenario=vesselstats ratio=" + ratio.ToString( "0.000" ) + " expected=" + expected.ToString( "0.000" ) + " elowan=" + elowanDelay + " points=" + allMatch, 0 );
 	}
