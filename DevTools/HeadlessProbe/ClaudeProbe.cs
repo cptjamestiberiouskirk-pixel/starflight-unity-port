@@ -3071,9 +3071,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		pdEncounter.Reset( encounterId );
 
+		// the reset draws each ship's vessel and gives it that vessel's hit points: the ships take this vessel's, so that a living ship reads its vessel's
+		// readings and not a share of them (they fall with the damage)
 		foreach ( var alienShip in pdEncounter.GetAlienShipList() )
 		{
 			alienShip.m_vesselId = vesselId;
+			alienShip.ResetHitPoints( DataController.m_instance.m_gameData.m_vesselList[ vesselId ] );
 		}
 
 		EnterEncounter( encounterId );
@@ -3950,9 +3953,11 @@ public class ClaudeProbe : MonoBehaviour
 			pdEncounter.Reset( encounterId );
 		}
 
+		// (with the hit points of this vessel, not of the one the reset drew)
 		foreach ( var alienShip in pdEncounter.GetAlienShipList() )
 		{
 			alienShip.m_vesselId = vesselId;
+			alienShip.ResetHitPoints( DataController.m_instance.m_gameData.m_vesselList[ vesselId ] );
 		}
 	}
 
