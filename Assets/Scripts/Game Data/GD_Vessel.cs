@@ -15,16 +15,16 @@ public class GD_Vessel
 	public int m_bioDensity;
 	public int m_mass;
 
+	// (the vessel record's move delay: the released game reads it nowhere, so it does not set the vessel's speed)
 	public int m_moveDelay;
 
-	// the move delay at which an alien ship moves at the encounter's alien ship speed (the delay of most of the vessels between the fastest and the slowest - the
-	// port's choice: the game data gives how the vessels' speeds compare, not how fast any of them is)
-	public const float c_referenceMoveDelay = 2200.0f;
-
-	// how fast this vessel moves compared with the encounter's alien ship speed: the shorter its move delay in the game data, the faster
+	// how fast this vessel moves compared with the encounter's alien ship speed: every vessel alike, as the original's (COMBAT-OV moves an alien ship one unit in
+	// each of its turns, whatever its vessel), and not at all if its vessel record's byte 6 is 0 (+A-VESS copies it to the ship, and WE06B lets only a ship whose
+	// byte is not 0 move: the Mechan Scout, the Veloxi Drone, the Nomad Probe and the Noah 9 derelict stay where they are) - the game data keeps that byte as
+	// m_bioDensity, 100 for every other vessel
 	public float GetSpeedFactor()
 	{
-		return ( m_moveDelay > 0 ) ? ( c_referenceMoveDelay / m_moveDelay ) : 1.0f;
+		return ( m_bioDensity != 0 ) ? 1.0f : 0.0f;
 	}
 	public int m_fireDelay;
 
