@@ -13,9 +13,9 @@ public class Hyperspace : MonoBehaviour
 	// true if we are currently traveling through a flux
 	bool m_travelingThroughFlux;
 
-	// the copies of the flux template, one for each flux, and whether they are shown - they are only with the Ring Device aboard: it "will identify any nearby
-	// continuum flux" (the Starport's analysis) and "causes continuum fluxes to appear on ones ships screens" (the Thrynn, STRINFO 2.5), and Noah 1 failed for want
-	// of one (decided 2026-10-10). A flux that is not shown is still there: a ship that flies into it goes through
+	// the copies of the flux template, one for each flux, and whether they are shown - they are with the Ring Device aboard, which "will identify any nearby
+	// continuum flux" (the Starport's analysis), or to a navigator of skill above 150 (the original's HYPER-OV .FLUX-ICON draws a flux, as (skill - 150) * 6 / 100 + 1
+	// points, when NAV-SKILL is above 150 or ?HAS-RING-DEVICE is set). A flux that is not shown is still there: a ship that flies into it goes through
 	readonly List<GameObject> m_fluxObjectList = new List<GameObject>();
 	bool m_fluxesShown;
 
@@ -111,8 +111,8 @@ public class Hyperspace : MonoBehaviour
 		// get to the game data
 		var gameData = DataController.m_instance.m_gameData;
 
-		// the fluxes can be seen only with the Ring Device aboard
-		var showFluxes = playerData.m_playerShip.HasArtifact( "Ring Device" );
+		// the fluxes can be seen with the Ring Device aboard or by a navigator of skill above 150
+		var showFluxes = playerData.m_playerShip.HasArtifact( "Ring Device" ) || ( CombatController.GetNavigatorSkill() > 150 );
 
 		if ( showFluxes != m_fluxesShown )
 		{

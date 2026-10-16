@@ -18561,6 +18561,11 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
+		// a navigator of skill 150, who does not see the fluxes (the original's .FLUX-ICON shows them above 150)
+		var navigator = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Navigator );
+
+		navigator.m_navigation = 150;
+
 		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( ringId ) != null ); guard++ )
 		{
 			ship.RemoveArtifact( ringId );
@@ -18610,13 +18615,27 @@ public class ClaudeProbe : MonoBehaviour
 
 		var shownWith = FluxesShown();
 
+		// ---- 4. without the Ring Device again, a navigator of skill 151 sees them (HYPER-OV .FLUX-ICON: NAV-SKILL above 150)
+		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( ringId ) != null ); guard++ )
+		{
+			ship.RemoveArtifact( ringId );
+		}
+
+		navigator.m_navigation = 151;
+
+		yield return Frames( 5 );
+
+		var shownBySkill = FluxesShown();
+
+		navigator.m_navigation = 250;
 		controller.m_encounterRange = encounterRange;
 
-		Log( "ringdevice: fluxes shown in hyperspace without the Ring Device " + shownWithout + ", with it " + shownWith + " of " + fluxCount + " | without it the ship flew into the flux at " + flux.m_x1 + ", " + flux.m_y1 + ": going through " + throughHiddenFlux );
+		Log( "ringdevice: fluxes shown in hyperspace without the Ring Device (navigator of skill 150) " + shownWithout + ", with it " + shownWith + ", without it to a navigator of skill 151 " + shownBySkill + " of " + fluxCount + " | without it the ship flew into the flux at " + flux.m_x1 + ", " + flux.m_y1 + ": going through " + throughHiddenFlux );
 
-		Check( "ringdevice: without the Ring Device no continuum flux is shown", shownWithout == 0, shownWithout + " of " + fluxCount );
+		Check( "ringdevice: without the Ring Device a navigator of skill 150 sees no continuum flux", shownWithout == 0, shownWithout + " of " + fluxCount );
 		Check( "ringdevice: a flux that is not shown is still there, and a ship that flies into it goes through (control)", throughHiddenFlux, throughHiddenFlux.ToString() );
 		Check( "ringdevice: with the Ring Device in the hold every continuum flux is shown", shownWith == fluxCount, shownWith + " of " + fluxCount );
+		Check( "ringdevice: without it a navigator of skill above 150 sees every continuum flux (HYPER-OV .FLUX-ICON)", shownBySkill == fluxCount, shownBySkill + " of " + fluxCount );
 
 		Finish( "scenario=ringdevice without=" + shownWithout + " with=" + shownWith + " of=" + fluxCount + " through=" + throughHiddenFlux, 0 );
 	}
