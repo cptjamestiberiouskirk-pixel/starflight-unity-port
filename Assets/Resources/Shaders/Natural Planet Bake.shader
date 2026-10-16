@@ -5,6 +5,8 @@
 //         bare regolith on a world without air, ice on a frozen world, rock on steep ground, snow and ice where it is cold
 // pass 2: the normal map (x along u, y along v), from the height, flat on the sea
 // pass 3: the cloud cover, as much as the planet's weather: latitude bands and cyclones
+// pass 4: the colours of a gas giant: bands of cloud in the colours of its gases, laid out as its blueprint's bands, torn into eddies, with oval storms
+// pass 5: the colours of a molten world (rgb) and how brightly it glows (a): a dark crust, glowing lava in its low ground and in the cracks of the crust
 // every map is equirectangular (u the longitude, v the latitude), as the game's own planet maps are, and its noise comes from the direction on the sphere,
 // so that it has no seam
 // it is in a Resources folder so that it is always in a build: the material is made in code
@@ -31,6 +33,10 @@ Shader "Starflight/Natural Planet Bake"
 		_Airless( "Airless", Float ) = 0
 		_Icy( "Frozen World", Float ) = 0
 		_Weather( "Weather", Float ) = 0.5
+		_GasLight( "Gas Giant Zones", Color ) = ( 0.92, 0.86, 0.74, 1 )
+		_GasDark( "Gas Giant Belts", Color ) = ( 0.66, 0.48, 0.34, 1 )
+		_GasAccent( "Gas Giant Storms", Color ) = ( 0.80, 0.42, 0.28, 1 )
+		_DepositAmount( "Deposits On A Molten Crust", Float ) = 0.5
 	}
 
 	CGINCLUDE
@@ -55,6 +61,10 @@ Shader "Starflight/Natural Planet Bake"
 	float _Airless;
 	float _Icy;
 	float _Weather;
+	float4 _GasLight;
+	float4 _GasDark;
+	float4 _GasAccent;
+	float _DepositAmount;
 
 	float3 Hash3( float3 p )
 	{
@@ -386,6 +396,109 @@ Shader "Starflight/Natural Planet Bake"
 
 		return float4( smoothstep( threshold, threshold + 0.28, cover ), 0, 0, 1 );
 	}
+
+	// an oval storm: how strongly a point of the sphere is inside it (1 in its middle), and the point turned round its middle as the storm turns it
+	float Storm( float3 direction, float3 centre, float2 size, float spin, inout float3 turned )
+	{
+		// the storm is an ellipse on the sphere, wider along the longitude than across it
+		float3 east = normalize( cross( float3( 0, 1, 0 ), centre ) );
+		float3 north = cross( centre, east );
+		float2 offset = float2( dot( direction - centre, east ), dot( direction - centre, north ) ) / size;
+		float inside = exp( -dot( offset, offset ) * 2.0 ) * step( 0.0, dot( direction, centre ) );
+		float angle = inside * spin;
+		float cosine = cos( angle );
+		float sine = sin( angle );
+
+		turned = turned * cosine + cross( centre, turned ) * sine + centre * dot( centre, turned ) * ( 1.0 - cosine );
+
+		return inside;
+	}
+
+	// pass 4: the colours of a gas giant: bands of cloud along the latitudes, light zones and dark belts in the colours of its gases, laid out as its
+	// blueprint's own bands, their edges torn into eddies as the bands slide past each other, and a few oval storms, one of them great
+	float4 fragGasGiant( v2f i ) : SV_Target
+	{
+		float3 direction = SphereDirection( i.uv );
+		float3 turned = direction;
+
+		// the storms (where they are comes from the seed: the great one in the southern half, as on Jupiter, the small white ones in the bands)
+		float3 r = frac( sin( _Seed.xyz * float3( 12.9898, 78.233, 37.719 ) ) * 43758.5453 );
+		float greatLatitude = -( 0.25 + 0.2 * r.x ) * 1.5707963;
+		float greatLongitude = r.y * 6.2831853;
+		float3 greatCentre = float3( cos( greatLatitude ) * cos( greatLongitude ), sin( greatLatitude ), cos( greatLatitude ) * sin( greatLongitude ) );
+		float great = Storm( direction, greatCentre, float2( 0.22, 0.12 ), 2.5, turned );
+		float white = 0.0;
+
+		for ( int s = 0; s < 6; s++ )
+		{
+			float3 q = frac( sin( float3( s * 12.9898 + _Seed.x, s * 78.233 + _Seed.y, s * 37.719 + _Seed.z ) ) * 43758.5453 );
+			float stormLatitude = ( q.x * 1.4 - 0.7 ) * 1.5707963;
+			float stormLongitude = q.y * 6.2831853;
+			float3 centre = float3( cos( stormLatitude ) * cos( stormLongitude ), sin( stormLatitude ), cos( stormLatitude ) * sin( stormLongitude ) );
+
+			white = max( white, Storm( direction, centre, float2( 0.05, 0.03 ) * ( 0.6 + q.z ), 2.0, turned ) );
+		}
+
+		// the flow: the bands slide along the longitude, and tear into eddies where they meet
+		float3 p = turned * 2.0 + _Seed.xyz;
+		float latitude = asin( clamp( turned.y, -1.0, 1.0 ) ) / 1.5707963;
+		float eddies = Fbm( float3( p.x * 1.5, latitude * 18.0, p.z * 1.5 ), 5 );
+		float bandLatitude = latitude + eddies * 0.035 + Fbm( p * 6.0, 3 ) * 0.008;
+
+		// the band at that latitude: the blueprint's elevation says zone (light) or belt (dark), and a little more variety
+		float band = tex2D( _Elevation, float2( i.uv.x, bandLatitude * 0.5 + 0.5 ) ).r;
+		float zone = saturate( 0.5 + band * 0.5 + sin( bandLatitude * 19.0 + _Seed.x ) * 0.28 + sin( bandLatitude * 43.0 + _Seed.y ) * 0.14 + eddies * 0.6 );
+
+		float3 color = lerp( _GasDark.rgb, _GasLight.rgb, smoothstep( 0.25, 0.75, zone ) );
+
+		// streaks of the accent colour in the belts, and lighter haze toward the poles
+		color = lerp( color, _GasAccent.rgb, smoothstep( 0.55, 0.85, Fbm( float3( p.x * 3.0, latitude * 40.0, p.z * 3.0 ) + 3.0, 4 ) + 0.5 ) * ( 1.0 - zone ) * 0.6 );
+		color = lerp( color, _GasLight.rgb * 0.9, smoothstep( 0.6, 0.95, abs( latitude ) ) * 0.5 );
+
+		// the great storm in the accent colour with a lighter rim, the small storms white
+		color = lerp( color, _GasAccent.rgb * 0.95, smoothstep( 0.35, 0.8, great ) );
+		color = lerp( color, _GasLight.rgb * 1.08, smoothstep( 0.15, 0.35, great ) * smoothstep( 0.6, 0.35, great ) * 0.5 );
+		color = lerp( color, float3( 0.95, 0.94, 0.92 ), smoothstep( 0.3, 0.7, white ) * 0.85 );
+
+		return float4( color, 0 );
+	}
+
+	// pass 5: the colours of a molten world: a dark crust of cooled rock (with the deposits of what its seas are made of), glowing lava in its low ground
+	// and in the cracks of the crust; the alpha is how brightly it glows
+	float4 fragMolten( v2f i ) : SV_Target
+	{
+		float height = tex2D( _HeightMap, i.uv ).r;
+		float3 direction = SphereDirection( i.uv );
+		float3 p = direction + _Seed.xyz;
+
+		float variation = Fbm( p * 18.0, 4 );
+		float blueprint = dot( tex2D( _Blueprint, i.uv ).rgb, float3( 0.3, 0.59, 0.11 ) );
+		float mineral = saturate( 0.5 + variation * 0.9 + ( blueprint - 0.4 ) * 0.8 );
+
+		// the crust: black to dark grey basalt, with broad patches of the deposits of the seas' stuff
+		float3 crust = lerp( Srgb( float3( 0.06, 0.05, 0.05 ) ), Srgb( float3( 0.22, 0.20, 0.19 ) ), mineral );
+		float deposits = smoothstep( 0.1, 0.5, Fbm( p * 2.5 + 7.0, 4 ) ) * _DepositAmount;
+
+		crust = lerp( crust, _SeaShallow.rgb * ( 0.7 + 0.4 * mineral ), deposits );
+
+		// thin glowing cracks in the crust of the land, a little wider in the low ground
+		float3 warp = float3( Fbm( p * 3.0, 3 ), Fbm( p * 3.0 + 4.1, 3 ), Fbm( p * 3.0 + 8.3, 3 ) );
+		float crack = 1.0 - abs( Noise( p * 9.0 + warp * 1.5 ) ) * ( 10.0 - 4.0 * smoothstep( 0.4, 0.0, height ) );
+
+		crack = saturate( crack ) * saturate( crack );
+
+		// the lava: the low ground, as the blueprint has its seas there (they are lava on a molten world), crusted over in dark plates that drift apart
+		// along glowing seams, the seams wider and brighter far from the shore, where the lava is hotter
+		float lava = ( _HasSea > 0.5 ) ? smoothstep( 0.0, -0.06, height ) : 0.0;
+		float hot = smoothstep( -0.05, -0.4, height );
+		float seam = 1.0 - abs( Noise( p * 8.0 + warp * 2.0 ) ) * lerp( 20.0, 10.0, hot );
+		float seams = saturate( seam ) * saturate( seam );
+		float glow = max( lava * seams, crack * 0.8 * ( 1.0 - lava ) );
+
+		float3 color = lerp( crust, Srgb( float3( 0.09, 0.05, 0.04 ) ), max( lava, crack ) );
+
+		return float4( color, saturate( glow ) );
+	}
 	ENDCG
 
 	SubShader
@@ -424,6 +537,24 @@ Shader "Starflight/Natural Planet Bake"
 			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment fragClouds
+			#pragma target 3.5
+			ENDCG
+		}
+
+		Pass
+		{
+			CGPROGRAM
+			#pragma vertex vert
+			#pragma fragment fragGasGiant
+			#pragma target 3.5
+			ENDCG
+		}
+
+		Pass
+		{
+			CGPROGRAM
+			#pragma vertex vert
+			#pragma fragment fragMolten
 			#pragma target 3.5
 			ENDCG
 		}

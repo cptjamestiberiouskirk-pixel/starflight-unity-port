@@ -11535,7 +11535,8 @@ public class ClaudeProbe : MonoBehaviour
 
 	// the planets the natural look is checked on, one of each kind it has to tell apart: Arth (rock, a sea of water, very thin air, no life), planet 94 of
 	// Arth's system (a hot rock world without weather), planet 524 (a world of water with life and very violent weather), the first frozen world with air and
-	// a sea, the first rock world without air, and the first gas giant (which keeps the original look); none of them with an encounter waiting in orbit
+	// a sea, the first rock world without air, the first gas giant and the first molten world with seas of lava; none of them with an encounter waiting in
+	// orbit
 	static List<GD_Planet> NaturalLookPlanets()
 	{
 		var gameData = DataController.m_instance.m_gameData;
@@ -11573,7 +11574,8 @@ public class ClaudeProbe : MonoBehaviour
 		{
 			planet => ( planet.m_surfaceId == 3 ) && planet.HasAtmosphere() && ( gameData.m_hydrosphereList[ planet.m_hydrosphereId ].m_name != "None" ),
 			planet => ( planet.m_surfaceId == 5 ) && !planet.HasAtmosphere(),
-			planet => planet.IsGasGiant()
+			planet => planet.IsGasGiant(),
+			planet => planet.IsMolten() && ( gameData.m_hydrosphereList[ planet.m_hydrosphereId ].m_name != "None" )
 		};
 
 		foreach ( var kind in kinds )
@@ -11714,7 +11716,8 @@ public class ClaudeProbe : MonoBehaviour
 					wrongClouds.Add( planet.m_id + " " + ( orbit.m_clouds.gameObject.activeSelf ? ShaderName( orbit.m_clouds.sharedMaterial ) : "hidden" ) );
 				}
 
-				var airRight = orbit.m_planetAtmosphere.activeSelf == planet.HasAtmosphere();
+				// (a gas giant's deep air glows too)
+				var airRight = orbit.m_planetAtmosphere.activeSelf == ( planet.HasAtmosphere() || planet.IsGasGiant() );
 
 				if ( !airRight || ( orbit.m_planetAtmosphere.activeSelf && ( ShaderName( orbit.m_planetAtmosphere.GetComponent<MeshRenderer>().sharedMaterial ) != "Starflight/Natural Atmosphere" ) ) )
 				{
@@ -11780,9 +11783,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		NaturalPlanet.s_measureCoasts = false;
 
-		Check( "naturalplanets: in orbit, a rock, liquid or frozen world is drawn in its natural look, and a gas giant keeps its original look", ( orbits >= 5 ) && ( wrongLook.Count == 0 ), orbits + " orbits" + ( ( wrongLook.Count > 0 ) ? ": " + string.Join( ", ", wrongLook ) : "" ) );
+		Check( "naturalplanets: in orbit, every kind of planet (rock, liquid, frozen, gas giant, molten) is drawn in its natural look", ( orbits >= 6 ) && ( wrongLook.Count == 0 ), orbits + " orbits" + ( ( wrongLook.Count > 0 ) ? ": " + string.Join( ", ", wrongLook ) : "" ) );
 		Check( "naturalplanets: its clouds are shown, in the natural look, only where it has air and weather", wrongClouds.Count == 0, string.Join( ", ", wrongClouds ) );
-		Check( "naturalplanets: its air's halo is shown, in the natural look, only where it has air", wrongAir.Count == 0, string.Join( ", ", wrongAir ) );
+		Check( "naturalplanets: its air's halo is shown, in the natural look, only where it has air (a gas giant always)", wrongAir.Count == 0, string.Join( ", ", wrongAir ) );
 		Check( "naturalplanets: its maps in orbit are as wide as orbit needs on this computer", wrongWidth.Count == 0, string.Join( ", ", wrongWidth ) );
 		Check( "naturalplanets: its natural maps keep at least 97% of the land and sea where the terrain has them", coastsMoved.Count == 0, string.Join( ", ", coastsMoved ) );
 		Check( "naturalplanets: picking the original look puts the original material, clouds and atmosphere back at once, and lets go of the natural maps", notBack.Count == 0, string.Join( " | ", notBack ) );
