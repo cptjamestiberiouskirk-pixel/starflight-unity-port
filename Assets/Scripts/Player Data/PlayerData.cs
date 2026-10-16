@@ -176,15 +176,16 @@ public class PlayerData
 		var today = m_general.m_day;
 		var interest = m_bank.GetInterestDue( today );
 
-		if ( interest > 0 )
+		// (a balance below 0 is charged its interest)
+		if ( interest != 0 )
 		{
 			m_bank.m_currentBalance += interest;
 
-			m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Interest", interest.ToString() + "+" ) );
+			m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Interest", ( interest > 0 ) ? ( interest.ToString() + "+" ) : ( ( -interest ).ToString() + "-" ) ) );
 		}
 
 		// a save file from before the interest starts counting now
-		if ( ( interest > 0 ) || restartTheCount || !m_bank.m_interestDayIsSet )
+		if ( ( interest != 0 ) || restartTheCount || !m_bank.m_interestDayIsSet )
 		{
 			m_bank.m_interestDay = today;
 			m_bank.m_interestDayIsSet = true;

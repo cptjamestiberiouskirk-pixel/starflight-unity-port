@@ -12235,6 +12235,18 @@ public class ClaudeProbe : MonoBehaviour
 		var paidOnRestart = PayInterestIfPresent( true );
 		var dayOnRestart = IntFieldOrMin( bank, "m_interestDay" );
 
+		// a balance below 0, which fines can bring, is charged the interest, as the original's signed INT% works it out: -10,000 M.U. over 150 days, 600
+		bank.m_currentBalance = -10000;
+		SetFieldIfPresent( bank, "m_interestDay", 410 );
+		SetStarportDay( 560 );
+
+		var paidBelowZero = PayInterestIfPresent( false );
+		var dayBelowZero = IntFieldOrMin( bank, "m_interestDay" );
+		var balanceBelowZero = bank.m_currentBalance;
+		var rowBelowZero = LastLedgerRow();
+
+		Log( "starport-interest: -10,000 M.U. from day 410 to day 560: paid " + paidBelowZero + " (up to day " + dayBelowZero + ", balance " + balanceBelowZero + ", '" + rowBelowZero + "')" );
+
 		// a save file from before the interest: nothing is paid for the days before, and the count starts today
 		SetFieldIfPresent( bank, "m_interestDayIsSet", false );
 		SetFieldIfPresent( bank, "m_interestDay", 0 );
@@ -12250,6 +12262,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-interest: less than 1 M.U. of interest pays nothing, and those days count on (the original moves PORTDAT only when it pays)", ( paidAfter10Days == 0 ) && ( dayAfter10Days == 150 ), paidAfter10Days + ", up to day " + dayAfter10Days );
 		Check( "starport-interest: 12% a year of 300 days, rounded down at each step as the original works it out (100 M.U. over 250 days: 10), with an Interest row in the ledger", ( paidAfter250Days == 10 ) && ( dayAfter250Days == 400 ) && ( balanceAfter250Days == 110 ) && ( rowAfter250Days == "4621-04-11 Interest 10+" ), paidAfter250Days + ", up to day " + dayAfter250Days + ", balance " + balanceAfter250Days + ", '" + rowAfter250Days + "'" );
 		Check( "starport-interest: a recommendation starts the count again whatever was paid", ( paidOnRestart == 0 ) && ( dayOnRestart == 410 ), paidOnRestart + ", up to day " + dayOnRestart );
+		Check( "starport-interest: a balance below 0 is charged its interest (-10,000 M.U. over 150 days: 600), with an Interest row in the ledger", ( paidBelowZero == -600 ) && ( dayBelowZero == 560 ) && ( balanceBelowZero == -10600 ) && ( rowBelowZero == "4621-09-21 Interest 600-" ), paidBelowZero + ", up to day " + dayBelowZero + ", balance " + balanceBelowZero + ", '" + rowBelowZero + "'" );
 		Check( "starport-interest: a save file from before the interest is paid nothing for the days before, and counts from today", ( paidOnAnOldSave == 0 ) && ( dayOnAnOldSave == 600 ) && ( balanceOnAnOldSave == 100000 ), paidOnAnOldSave + ", up to day " + dayOnAnOldSave + ", balance " + balanceOnAnOldSave );
 
 		// ---- 2. the real docking bay: 100,000 M.U. for half a year (150 days) earn 6,000 when the crew goes aboard
