@@ -190,8 +190,9 @@ public class AnalysisButton : ShipButton
 
 				case SensorsDisplay.ScanType.Debris:
 				{
-					// debris is only its class (the 1984 notes, starship.txt: "DEBRIS - Nothing") - what it holds is in the sensor reading
-					text += "Object: <color=white>Debris</color>";
+					// debris is its class and what it is made of, whatever the science officer's skill (ANALYZE-OV .CONSTIT: "CONSTITUENTS:" and the elements of the
+					// vessel's debris)
+					text += "Object: <color=white>Debris</color>\nConstituents:" + SensorsDisplay.GetConstituentLines( sensorsDisplay.m_debrisVesselId );
 
 					break;
 				}
