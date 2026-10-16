@@ -374,7 +374,7 @@ Some things to know:
 
 **Repair** (Engineering): pick what to repair with Up and Down, and Enter. The engineer asks for the minerals the repair needs, taken from your cargo. Repairs take time, faster with a better engineer. The engineer repairs the hull and the systems, never the armor: only the Starport restores the armor. A destroyed system cannot be repaired in space: the Starport's Ship Configuration room can.
 
-**Examine** and **Treat** (Medical): pick a crew member with Left and Right, and Enter. Examine shows their wounds and vitality. Treat starts a treatment that takes time, one patient at a time.
+**Examine** and **Treat** (Medical): pick a crew member with Left and Right, and Enter. Examine shows their wounds and vitality. Everyone on board heals slowly by themselves. Treat makes one crew member the doctor's patient, who heals twice as fast (but not on a planet's surface), and a better doctor makes everyone heal faster.
 
 **Crew deaths**: a crew member whose vitality reaches 0 dies, and the dead are beyond help. Their posts go to the crew members best at them, and if the captain dies the science officer takes command. Before the next launch you must fill the dead officer's post.
 
