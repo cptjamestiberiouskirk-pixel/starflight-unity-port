@@ -86,22 +86,13 @@ public class StatusDisplay : ShipDisplay
 		return ( integrity >= 20 ) ? "<color=red>Heavy</color>" : "<color=red>Critical</color>";
 	}
 
-	// the energy (the Endurium in the hold, in cubic meters) with four figures and no unit, as the original's "20.00", "48.20", "123.8"
+	// the energy (the Endurium in the hold, in cubic meters) with no unit, as the original's: two decimals below 100 cubic meters and one from 100 on ("5.00",
+	// "48.20", "123.8", "1234.5"; SCIENCE WE8CE prints the hundredths over 100, a point, the tenths, and the hundredths' last figure only below 100)
 	public static string GetEnergyText( float energyAmount )
 	{
 		var culture = System.Globalization.CultureInfo.InvariantCulture;
 
-		if ( energyAmount < 10.0f )
-		{
-			return energyAmount.ToString( "F3", culture );
-		}
-
-		if ( energyAmount < 100.0f )
-		{
-			return energyAmount.ToString( "F2", culture );
-		}
-
-		return ( energyAmount < 1000.0f ) ? energyAmount.ToString( "F1", culture ) : energyAmount.ToString( "F0", culture );
+		return ( energyAmount < 100.0f ) ? energyAmount.ToString( "F2", culture ) : energyAmount.ToString( "F1", culture );
 	}
 
 	public override void Update()
