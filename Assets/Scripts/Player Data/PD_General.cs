@@ -511,11 +511,11 @@ public class PD_General
 
 	// this updates the game time
 	// call this to add a supplemental evaluation from Interstel (the Operations evaluation screen shows them)
-	// whether an evaluation waits unread: a colony evaluation, a supplemental evaluation (the lost terrain vehicle, the towing charges), or the completion of the
-	// mission (CHKFLIGHT-OV WF40A: ?EVAL, ?TV, ?RECALL)
+	// whether an evaluation waits unread that keeps the ship docked: a colony evaluation or a supplemental evaluation (the lost terrain vehicle, the towing
+	// charges) - not the completion of the mission, which Operations shows once all the same (CHKFLIGHT-OV WF40A checks ?EVAL, ?TV and ?RECALL, not the win's WMSG)
 	public bool HasUnreadEvaluation()
 	{
-		return m_colonyEvaluationUnread || ( ( m_supplementalEvaluationList != null ) && ( m_supplementalEvaluationList.Count > 0 ) ) || ( m_gameWon && !m_missionCompleteShown );
+		return m_colonyEvaluationUnread || ( ( m_supplementalEvaluationList != null ) && ( m_supplementalEvaluationList.Count > 0 ) );
 	}
 
 	// true while the ship is back towed or without its terrain vehicle and Operations has not shown that evaluation yet: the original's ?>OP, set when the crew
