@@ -17701,6 +17701,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		ship.AddArtifact( gameData.FindArtifactId( "Crystal Orb" ) );
 
+		var balanceBeforeTheWin = playerData.m_bank.m_currentBalance;
+		var ledgerBeforeTheWin = playerData.m_bank.m_transactionList.Count;
+
 		yield return GoIntoOrbit( gameData.m_planetList[ 33 ].m_starId, 33 );
 
 		var end = Time.realtimeSinceStartup + 12.0f;
@@ -17714,10 +17717,14 @@ public class ClaudeProbe : MonoBehaviour
 
 		var won = Equals( FieldOrNull( playerData.m_general, "m_gameWon" ), true );
 		var bonusPending = Equals( FieldOrNull( playerData.m_general, "m_winBonusPending" ), true );
+		var paidAtTheWin = playerData.m_bank.m_currentBalance - balanceBeforeTheWin;
+		var winEntry = ( playerData.m_bank.m_transactionList.Count > ledgerBeforeTheWin ) ? playerData.m_bank.m_transactionList[ playerData.m_bank.m_transactionList.Count - 1 ] : null;
+		var winEntryText = ( winEntry == null ) ? "no entry" : winEntry.m_stardate + " " + winEntry.m_description + " " + winEntry.m_amount;
 
-		Log( "win: after the egg at the nexus: won " + won + ", bonus pending " + bonusPending + ", location " + playerData.m_general.m_location );
+		Log( "win: after the egg at the nexus: won " + won + ", bonus pending " + bonusPending + ", paid " + paidAtTheWin + " (ledger: " + winEntryText + "), location " + playerData.m_general.m_location );
 
-		Check( "win: destroying the Crystal Planet at its control nexus wins the game, with Interstel's bonus to be paid", won && bonusPending, won + "/" + bonusPending );
+		Check( "win: destroying the Crystal Planet at its control nexus wins the game, and Interstel pays its bonus of 500,000 MU at once, in the ledger as the original's BONUS of that day", won && !bonusPending && ( paidAtTheWin == 500000 ) && ( winEntry != null ) && ( winEntry.m_description == "Bonus" ) && ( winEntry.m_amount == "500000+" ) && ( winEntry.m_stardate == playerData.m_general.m_currentStardateYMD ),
+			won + ", pending " + bonusPending + ", paid " + paidAtTheWin + ", " + winEntryText );
 
 		// ---- 2. after the win no star flares: in the star system of the star that flares soonest through the day of its flare (the gameover scenario has the control)
 		yield return ThroughTheFlareDay( flareStarId, destroyed );
@@ -17728,11 +17735,28 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "win: after the win no star flares", !destroyedAfterTheWin, destroyedAfterTheWin.ToString() );
 
-		// ---- 3. back at the Starport: the bonus, once
+		// ---- 3. back at the Starport: nothing more to pay
 		playerData.m_general.m_currentStarId = gameData.m_misc.m_arthStarId;
 		playerData.m_general.m_currentPlanetId = gameData.m_misc.m_arthPlanetId;
 
 		var balanceBefore = playerData.m_bank.m_currentBalance;
+
+		controller.m_messages.Clear();
+		controller.SwitchLocation( PD_General.Location.DockingBay );
+
+		yield return Frames( 10 );
+
+		var paidOnDocking = playerData.m_bank.m_currentBalance - balanceBefore;
+
+		// ---- 4. a game saved after the win when the bonus was paid at the Starport: out, the bonus still to come, and back in
+		controller.SwitchLocation( PD_General.Location.JustLaunched );
+
+		yield return Frames( 10 );
+
+		playerData.m_general.m_winBonusPending = true;
+
+		balanceBefore = playerData.m_bank.m_currentBalance;
+
 		var ledgerBefore = playerData.m_bank.m_transactionList.Count;
 
 		controller.m_messages.Clear();
@@ -17755,15 +17779,16 @@ public class ClaudeProbe : MonoBehaviour
 
 		var paidAgain = playerData.m_bank.m_currentBalance - balanceBefore - paid;
 
-		Log( "win: docking at the Starport paid " + paid + " MU (ledger: " + ( ( ledgerEntry == null ) ? "nothing" : ledgerEntry.m_description + " " + ledgerEntry.m_amount ) + "), docking again paid " + paidAgain + " | " + dockText );
+		Log( "win: docking at the Starport after the win paid " + paidOnDocking + " MU | an older save's pending bonus paid " + paid + " MU on docking (ledger: " + ( ( ledgerEntry == null ) ? "nothing" : ledgerEntry.m_description + " " + ledgerEntry.m_amount ) + "), docking again paid " + paidAgain + " | " + dockText );
 
-		Check( "win: back at the Starport Interstel pays the bonus of 500,000 MU, in the ledger as the original's BONUS and in the messages", ( paid == 500000 ) && ( ledgerEntry != null ) && ( ledgerEntry.m_amount == "500000+" ) && ( ledgerEntry.m_description == "Bonus" ) && dockText.Contains( "500,000" ), paid + ", " + ( ( ledgerEntry == null ) ? "no entry" : ledgerEntry.m_description + " " + ledgerEntry.m_amount ) + ", " + dockText );
-		Check( "win: the bonus is paid once", paidAgain == 0, paidAgain.ToString() );
+		Check( "win: docking at the Starport after the win pays nothing more, the bonus paid at the win", paidOnDocking == 0, paidOnDocking.ToString() );
+		Check( "win: a game saved after the win with the bonus still to come is paid it on docking, in the ledger as the original's BONUS and in the messages (a control)", ( paid == 500000 ) && ( ledgerEntry != null ) && ( ledgerEntry.m_amount == "500000+" ) && ( ledgerEntry.m_description == "Bonus" ) && dockText.Contains( "500,000" ), paid + ", " + ( ( ledgerEntry == null ) ? "no entry" : ledgerEntry.m_description + " " + ledgerEntry.m_amount ) + ", " + dockText );
+		Check( "win: that bonus is paid once", paidAgain == 0, paidAgain.ToString() );
 
 		// a later scenario must not start from a won game
 		SetFieldIfPresent( playerData.m_general, "m_gameWon", false );
 
-		Finish( "scenario=win won=" + won + " flaredAfter=" + destroyedAfterTheWin + " paid=" + paid + " paidAgain=" + paidAgain, 0 );
+		Finish( "scenario=win won=" + won + " flaredAfter=" + destroyedAfterTheWin + " paidAtTheWin=" + paidAtTheWin + " paidOnDocking=" + paidOnDocking + " paid=" + paid + " paidAgain=" + paidAgain, 0 );
 	}
 
 	IEnumerator ScenarioStarportWin()
@@ -33945,7 +33970,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
-		// the game is won and its bonus is still to be paid, and the ship calls for a tow from a star near Arth
+		// the game is won and its bonus is still to be paid (a game saved after the win when the bonus was paid at the Starport), and the ship calls for a tow from a
+		// star near Arth
 		playerData.m_general.m_gameWon = true;
 		playerData.m_general.m_winBonusPending = true;
 
@@ -37352,7 +37378,10 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "playthrough-19: after the launch: location " + general.m_location + ", won " + general.m_gameWon + ", bonus pending " + general.m_winBonusPending + ", Crystal Planet destroyed " + destroyed + ", said: " + all );
 
 		Check( "playthrough-19: back in orbit the egg counts down and goes BOOM", all.Contains( "COUNTDOWN TRANSMISSION FROM THE BLACK EGG" ) && all.Contains( "BOOM!" ), Head( all ) );
-		Check( "playthrough-19: the Crystal Planet is destroyed and the game is won, the bonus waiting for the Starport", destroyed && general.m_gameWon && general.m_winBonusPending, destroyed + ", " + general.m_gameWon + ", " + general.m_winBonusPending );
+		var lastRow = ( playerData.m_bank.m_transactionList.Count > 0 ) ? playerData.m_bank.m_transactionList[ playerData.m_bank.m_transactionList.Count - 1 ] : null;
+		var lastRowText = ( lastRow == null ) ? "no ledger" : lastRow.m_description + " " + lastRow.m_amount;
+
+		Check( "playthrough-19: the Crystal Planet is destroyed and the game is won, and Interstel pays its bonus at once", destroyed && general.m_gameWon && !general.m_winBonusPending && ( lastRowText == "Bonus 500000+" ), destroyed + ", " + general.m_gameWon + ", " + general.m_winBonusPending + ", " + lastRowText );
 		Check( "playthrough-19: Interstel's message of the win", all.Contains( "INTERSTEL MEDAL OF SUBLIME ACHIEVEMENT" ), Tail( all ) );
 
 		var settle = Time.realtimeSinceStartup + 6.0f;
@@ -37379,7 +37408,7 @@ public class ClaudeProbe : MonoBehaviour
 	}
 
 	// stage 20: in hyperspace by the Crystal Planet's star after the win. Home to Arth: hyperspace to its star (or, with the hold out of fuel, a distress call and
-	// Interstel's tow), the docking bay, which pays the bonus, and into the Starport
+	// Interstel's tow), the docking bay, and into the Starport
 	IEnumerator ScenarioPlaythrough20()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -37395,7 +37424,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "playthrough-20: loaded: location " + general.m_location + ", won " + general.m_gameWon + ", bonus pending " + general.m_winBonusPending + ", fuel " + Endurium() + ", balance " + balanceBefore + ", stardate " + general.m_currentStardateYMD );
 
-		Check( "playthrough-20: the save of stage 19 keeps the win and the bonus waiting", general.m_gameWon && general.m_winBonusPending, general.m_gameWon + ", " + general.m_winBonusPending );
+		Check( "playthrough-20: the save of stage 19 keeps the win, with the bonus paid", general.m_gameWon && !general.m_winBonusPending, general.m_gameWon + ", " + general.m_winBonusPending );
 
 		yield return PtHyperspaceTo( gameData.m_misc.m_arthStarId, 2.0f, done );
 
@@ -37444,7 +37473,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "playthrough-20: in the docking bay (towed " + towed + "): balance " + balanceBefore + " -> " + bank.m_currentBalance + " (" + bonus + "), bonus pending " + general.m_winBonusPending + ", new ledger rows " + newRows + "messages '" + PtMessages() + "'" );
 
-		Check( "playthrough-20: docking at the Starport after the win pays the 500,000 MU bonus with a ledger entry", ( bonus >= 500000 ) && !general.m_winBonusPending && newRows.Contains( "Bonus 500000+" ), bonus + ", " + newRows );
+		Check( "playthrough-20: docking at the Starport after the win pays no second bonus", !general.m_winBonusPending && !newRows.Contains( "Bonus" ), bonus + ", " + newRows );
 
 		// into the Starport
 		if ( general.m_location == PD_General.Location.DockingBay )

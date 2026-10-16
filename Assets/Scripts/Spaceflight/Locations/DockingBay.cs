@@ -99,8 +99,8 @@ public class DockingBay : MonoBehaviour
 			SpaceflightController.m_instance.m_messages.AddText( "<color=green>Interstel has paid " + lifeformDataValue.ToString( "N0", System.Globalization.CultureInfo.InvariantCulture ) + " MU for the lifeform data you recorded.</color>" );
 		}
 
-		// back at the Starport after the win: Interstel pays the bonus that comes with its medal
-		if ( playerData.PayWinBonus() )
+		// a game saved after the win when the bonus was paid at the Starport: Interstel pays it now
+		if ( playerData.PayPendingWinBonus() )
 		{
 			SpaceflightController.m_instance.m_messages.AddText( "<color=green>Interstel has paid the bonus of " + PD_General.c_winBonus.ToString( "N0", System.Globalization.CultureInfo.InvariantCulture ) + " MU into your account.</color>" );
 		}
