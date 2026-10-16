@@ -1282,6 +1282,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportSupplementalFine();
 				break;
 
+			case "starport-evaluationonce":
+				yield return ScenarioStarportEvaluationOnce();
+				break;
+
 			case "starport-preflight":
 				yield return ScenarioStarportPreflight();
 				break;
@@ -30929,6 +30933,54 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-supplementalfine: and only once", paidAgain == 0, paidAgain.ToString() );
 
 		Finish( "scenario=starport-supplementalfine checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the evaluations Operations brings up by itself a second after it opens do not come again over the ones the player has already opened: Evaluation pressed
+	// as Operations opens, the page of a supplemental evaluation is still there two seconds later
+	IEnumerator ScenarioStarportEvaluationOnce()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var panel = FindPanel<OperationsPanel>();
+
+		if ( panel == null )
+		{
+			Finish( "scenario=starport-evaluationonce abort: no operations panel", 2 );
+			yield break;
+		}
+
+		Func<string> evaluationText = () =>
+		{
+			var textTransform = panel.m_evaluationGameObject.transform.Find( "Display/Error Text Mask/Error Text" );
+			var text = ( textTransform == null ) ? null : textTransform.GetComponent<TMPro.TextMeshProUGUI>();
+
+			return ( text == null ) ? "no text" : text.text.Replace( "\r", "" ).Replace( '\n', '/' );
+		};
+
+		playerData.m_general.AddSupplementalEvaluation( "SUPPLEMENTAL EVALUATION\nONCE TEST\nTHE PROBE'S PAGE." );
+
+		PanelController.m_instance.Open( panel );
+
+		yield return Frames( 2 );
+
+		// Evaluation, before Operations brings the evaluations up by itself
+		panel.EvaluationClicked();
+
+		yield return Frames( 2 );
+
+		var textAtOnce = evaluationText();
+
+		yield return new WaitForSecondsRealtime( 2.0f );
+
+		var textLater = evaluationText();
+
+		yield return ClosePanel( panel, "operations" );
+
+		Log( "starport-evaluationonce: Evaluation pressed as Operations opens: '" + textAtOnce + "' | two seconds later: '" + textLater + "'" );
+
+		Check( "starport-evaluationonce: Evaluation pressed as Operations opens shows the supplemental evaluation (the setup is the case)", textAtOnce.Contains( "ONCE TEST" ), textAtOnce );
+		Check( "starport-evaluationonce: two seconds later its page is still there, Operations not bringing the evaluations up again", textLater.Contains( "ONCE TEST" ), textLater );
+
+		Finish( "scenario=starport-evaluationonce checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// the docking bay's preflight check says the original's lines (CHKFLIGHT-OV ?CAN-LEAVE): REPORT TO OPERATIONS FOR EVALUATION while an evaluation waits unread,

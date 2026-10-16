@@ -293,6 +293,9 @@ public class OperationsPanel : Panel
 	// call this to enter the evaluations screen
 	public void ShowEvaluations()
 	{
+		// the evaluations are on the screen now, so Operations does not bring them up again by itself (that would take away the supplemental ones being read)
+		m_evaluationTimer = 0.0f;
+
 		// show and hide objects
 		m_welcomeGameObject.SetActive( false );
 		m_noticesGameObject.SetActive( false );
