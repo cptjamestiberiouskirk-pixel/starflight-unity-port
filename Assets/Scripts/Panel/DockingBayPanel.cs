@@ -176,6 +176,9 @@ public class DockingBayPanel : Panel
 				// the bank pays its interest, as the original's does when the crew goes aboard (PORTMENU-OV in the decompiled original: I-TRANS after the flight check)
 				playerData.PayInterest( false );
 
+				// the Trade Depot keeps its special artifacts and the ten curios it bought last, as the original's does at launch (PORTMENU-OV WEAF0: <TDART)
+				playerData.m_starport.LimitArtifactStock();
+
 				// the Endurium price of the day holds until the next launch, as the original sets it here (PORTMENU-OV WEBA2, after I-TRANS)
 				playerData.m_starport.FixEnduriumPrice( playerData.m_general.m_currentStardateYMD );
 

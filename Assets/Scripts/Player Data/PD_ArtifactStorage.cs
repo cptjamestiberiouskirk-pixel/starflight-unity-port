@@ -42,6 +42,21 @@ public class PD_ArtifactStorage
 		m_volumeUsed -= artifactReference.GetVolume();
 	}
 
+	public void RemoveAt( int index )
+	{
+		// leave the storage alone if there is no such item
+		if ( ( index < 0 ) || ( index >= m_artifactList.Count ) )
+		{
+			return;
+		}
+
+		// update the volume used
+		m_volumeUsed -= m_artifactList[ index ].GetVolume();
+
+		// remove it
+		m_artifactList.RemoveAt( index );
+	}
+
 	public PD_ArtifactReference Find( int artifactId )
 	{
 		// search for a known artifact by the artifact id

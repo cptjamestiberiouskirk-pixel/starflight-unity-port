@@ -34,6 +34,42 @@ public class PD_Starport
 		m_artifactStorage.Add( artifactId );
 	}
 
+	// the most curios the Trade Depot keeps from one launch to the next
+	const int c_curiosKept = 10;
+
+	// call this when the ship leaves the Starport: the Trade Depot keeps the ten curios it bought last and throws the others away, and keeps every special
+	// artifact, as the original's <TDART does at launch (TDEPOT-OV, run by PORTMENU-OV WEAF0); the original's box holds the artifact sold last first, and this
+	// list holds it last, so it is walked from the end
+	public void LimitArtifactStock()
+	{
+		if ( ( m_artifactStorage == null ) || ( m_artifactStorage.m_artifactList == null ) )
+		{
+			return;
+		}
+
+		var gameData = DataController.m_instance.m_gameData;
+		var artifactList = m_artifactStorage.m_artifactList;
+		var curios = 0;
+
+		for ( var index = artifactList.Count - 1; index >= 0; index-- )
+		{
+			var artifactId = artifactList[ index ].m_artifactId;
+
+			// an artifact the game data does not have is left alone
+			if ( ( artifactId < 0 ) || ( artifactId >= gameData.m_artifactList.Length ) || gameData.m_artifactList[ artifactId ].IsSpecial() )
+			{
+				continue;
+			}
+
+			curios++;
+
+			if ( curios > c_curiosKept )
+			{
+				m_artifactStorage.RemoveAt( index );
+			}
+		}
+	}
+
 	public void RemoveArtifact( int artifactId )
 	{
 		if ( m_artifactStorage == null )
