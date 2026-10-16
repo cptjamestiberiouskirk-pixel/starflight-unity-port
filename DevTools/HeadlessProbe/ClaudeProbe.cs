@@ -1246,6 +1246,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportDeadCrew();
 				break;
 
+			case "starport-personnelrules":
+				yield return ScenarioStarportPersonnelRules();
+				break;
+
 			case "surfacepictures":
 				yield return ScenarioSurfacePictures();
 				break;
@@ -30058,6 +30062,128 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-deadcrew: Train on a living crew member's file asks for a skill (a control)", stateAfterSpare == "TrainCrewmember", stateAfterSpare );
 
 		Finish( "scenario=starport-deadcrew checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// Personnel's roster as the original's (PERSONNEL-OV): 25 files, names typed with 14 letters at most, and no name twice ("THIS NAME IS ALREADY ON FILE")
+	IEnumerator ScenarioStarportPersonnelRules()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var personnel = playerData.m_personnel;
+		var panel = FindPanel<PersonnelPanel>();
+
+		if ( panel == null )
+		{
+			Finish( "scenario=starport-personnelrules abort: no personnel panel", 2 );
+			yield break;
+		}
+
+		Action<string> addFile = name =>
+		{
+			var file = personnel.CreateNewPersonnel();
+
+			file.m_name = name;
+			file.m_crewRaceId = 0;
+			file.m_vitality = 100.0f;
+
+			personnel.m_personnelList.Add( file );
+		};
+
+		// 23 crew members on file
+		personnel.m_personnelList.Clear();
+		playerData.m_crewAssignment.Reset();
+
+		for ( var index = 1; index <= 23; index++ )
+		{
+			addFile( "Crew " + index );
+		}
+
+		yield return OpenPanel( panel, "personnel" );
+
+		// ---- 1. Create, a race, and the name box
+		PanelCall( "CreateClicked", () => panel.CreateClicked() );
+
+		yield return Frames( 3 );
+
+		PanelCall( "SelectClicked", () => panel.SelectClicked() );
+
+		yield return Frames( 3 );
+
+		var characterLimit = panel.m_nameInputField.characterLimit;
+
+		// ---- 2. a name already on file, in other letters
+		panel.m_nameInputField.text = "CREW 3";
+
+		PanelCall( "OnEndEdit", () => panel.OnEndEdit() );
+
+		yield return Frames( 3 );
+
+		var countAfterTwice = personnel.m_personnelList.Count;
+		var stateAfterTwice = GetField( panel, "m_currentState" ).ToString();
+		var promptAfterTwice = "";
+
+		foreach ( var text in panel.m_namePanel.GetComponentsInChildren<TMPro.TextMeshProUGUI>( true ) )
+		{
+			if ( text.text.Contains( "already on file" ) )
+			{
+				promptAfterTwice = text.text;
+			}
+		}
+
+		// ---- 3. a name of 21 letters, as a paste would set it
+		if ( stateAfterTwice != "GiveName" )
+		{
+			PanelCall( "CreateClicked", () => panel.CreateClicked() );
+
+			yield return Frames( 3 );
+
+			PanelCall( "SelectClicked", () => panel.SelectClicked() );
+
+			yield return Frames( 3 );
+		}
+
+		panel.m_nameInputField.text = "A very long crew name";
+
+		PanelCall( "OnEndEdit", () => panel.OnEndEdit() );
+
+		yield return Frames( 3 );
+
+		var newest = personnel.m_personnelList[ personnel.m_personnelList.Count - 1 ].m_name;
+		var countAfterLong = personnel.m_personnelList.Count;
+
+		// ---- 4. Create with 24 files on the roster, and with 25
+		while ( personnel.m_personnelList.Count > 24 )
+		{
+			personnel.m_personnelList.RemoveAt( personnel.m_personnelList.Count - 1 );
+		}
+
+		while ( personnel.m_personnelList.Count < 24 )
+		{
+			addFile( "Extra " + personnel.m_personnelList.Count );
+		}
+
+		// (the panel shows the first file, which is still there)
+		SetField( panel, "m_currentFileIndex", 0 );
+		Call( panel, "UpdateScreen" );
+
+		var createWith24 = panel.m_createButton.interactable;
+
+		addFile( "Crew 25" );
+
+		Call( panel, "UpdateScreen" );
+
+		var createWith25 = panel.m_createButton.interactable;
+
+		yield return ClosePanel( panel, "personnel" );
+
+		Log( "starport-personnelrules: the name box takes " + characterLimit + " letters | CREW 3 again: " + countAfterTwice + " files, state " + stateAfterTwice + ", prompt '" + promptAfterTwice + "' | a 21-letter name: " + countAfterLong + " files, the newest '" + newest + "' | Create with 24 files " + createWith24 + ", with 25 " + createWith25 );
+
+		Check( "starport-personnelrules: the name box takes 14 letters, as the original's", characterLimit == 14, characterLimit.ToString() );
+		Check( "starport-personnelrules: a name already on file is refused, in any letters, and the name box asks again", ( countAfterTwice == 23 ) && ( stateAfterTwice == "GiveName" ) && ( promptAfterTwice == "This name is already on file" ), countAfterTwice + " files, " + stateAfterTwice + ", '" + promptAfterTwice + "'" );
+		Check( "starport-personnelrules: a longer name is cut to 14 letters", ( countAfterLong == 24 ) && ( newest == "A very long cr" ), countAfterLong + " files, '" + newest + "'" );
+		Check( "starport-personnelrules: with 24 files on the roster Create is offered", createWith24, createWith24.ToString() );
+		Check( "starport-personnelrules: with 25, the roster is full (a control)", !createWith25, createWith25.ToString() );
+
+		Finish( "scenario=starport-personnelrules checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 7: pictures of the landed ship and of the terrain vehicle's screens (probe.ps1 -Graphics)

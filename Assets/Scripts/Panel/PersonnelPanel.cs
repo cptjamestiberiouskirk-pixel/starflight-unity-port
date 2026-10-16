@@ -72,6 +72,13 @@ public class PersonnelPanel : Panel
 	const int c_numRaces = 5;
 	const int c_numSkills = 5;
 
+	// the original's roster has 25 files, and a name is typed with 14 letters at most (PERSONNEL-OV: its loops over the roster, OV#IN$ with 14)
+	const int c_maximumFiles = 25;
+	const int c_maximumNameLength = 14;
+
+	// the name panel's prompt
+	const string c_namePrompt = "Type this crewmember's name";
+
 	// the original asks how many sessions to train the chosen skill for, "HOW MANY TRAINING SESSIONS (0-N)?", N being the fewer of the sessions the skill has left
 	// to its maximum and the sessions the balance pays for (counted up to 100,000 M.U.), and trains them all at once (PERSONNEL-OV WEE65 and WF2CD); the port
 	// sets the number with the stick: right and left one more and one fewer, up the most and down none, and the fire button trains that many
@@ -80,6 +87,9 @@ public class PersonnelPanel : Panel
 	bool m_choosingSessions;
 	int m_sessionCount;
 	int m_maximumSessions;
+
+	// the name panel's prompt, which also says when a name is already on file (found by its text, since the scene has no field for it)
+	TextMeshProUGUI m_namePromptText;
 
 	// unity awake
 	void Awake()
@@ -91,6 +101,16 @@ public class PersonnelPanel : Panel
 		RectTransform rectTransform = m_selectionXform.GetComponent<RectTransform>();
 		m_baseSelectionOffsetMin = rectTransform.offsetMin;
 		m_baseSelectionOffsetMax = rectTransform.offsetMax;
+
+		// find the name panel's prompt
+		foreach ( var text in m_namePanel.GetComponentsInChildren<TextMeshProUGUI>( true ) )
+		{
+			if ( text.text == c_namePrompt )
+			{
+				m_namePromptText = text;
+				break;
+			}
+		}
 	}
 
 	// panel open
@@ -374,6 +394,15 @@ public class PersonnelPanel : Panel
 		// erase the current text input
 		m_nameInputField.text = "";
 
+		// a name has 14 letters at most
+		m_nameInputField.characterLimit = c_maximumNameLength;
+
+		// ask for the name
+		if ( m_namePromptText != null )
+		{
+			m_namePromptText.text = c_namePrompt;
+		}
+
 		// select the text input by default
 		m_nameInputField.Select();
 	}
@@ -547,8 +576,8 @@ public class PersonnelPanel : Panel
 		// get access to the player data
 		PlayerData playerData = DataController.m_instance.m_playerData;
 
-		// enable the create button only if we have less than 20 personnel files
-		if ( playerData.m_personnel.m_personnelList.Count < 20 )
+		// enable the create button only while the roster has room
+		if ( playerData.m_personnel.m_personnelList.Count < c_maximumFiles )
 		{
 			buttonIsInteractable[ (int) Buttons.CreateButton ] = true;
 		}
@@ -1145,6 +1174,12 @@ public class PersonnelPanel : Panel
 	{
 		InputController.m_instance.Debounce();
 
+		// a name has 14 letters at most
+		if ( m_nameInputField.text.Length > c_maximumNameLength )
+		{
+			m_nameInputField.text = m_nameInputField.text.Substring( 0, c_maximumNameLength );
+		}
+
 		if ( m_nameInputField.text.Length == 0 )
 		{
 			// cancel because the player did not type in anything
@@ -1152,6 +1187,20 @@ public class PersonnelPanel : Panel
 
 			// play a ui sound
 			SoundController.m_instance.PlaySound( SoundController.Sound.Deactivate );
+		}
+		else if ( IsNameOnFile( m_nameInputField.text ) )
+		{
+			// the original refuses a name already on file, to choose another or abort the creation (PERSONNEL-OV WEFFF, WEF53: "THIS NAME IS ALREADY ON FILE")
+			if ( m_namePromptText != null )
+			{
+				m_namePromptText.text = "This name is already on file";
+			}
+
+			m_nameInputField.text = "";
+
+			m_nameInputField.Select();
+
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
 		}
 		else
 		{
@@ -1184,5 +1233,19 @@ public class PersonnelPanel : Panel
 			// play a ui sound
 			SoundController.m_instance.PlaySound( SoundController.Sound.Update );
 		}
+	}
+
+	// true if a crew member on file has this name, dead or alive (PERSONNEL-OV WEFFF compares it with the name of every file on the roster)
+	static bool IsNameOnFile( string name )
+	{
+		foreach ( var file in DataController.m_instance.m_playerData.m_personnel.m_personnelList )
+		{
+			if ( ( file.m_name != null ) && string.Equals( file.m_name.Trim(), name.Trim(), StringComparison.OrdinalIgnoreCase ) )
+			{
+				return true;
+			}
+		}
+
+		return false;
 	}
 }

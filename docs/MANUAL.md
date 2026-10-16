@@ -105,9 +105,9 @@ Time stands still while you are docked. The clock only runs once you launch.
 
 ### Personnel
 
-The crew files. Up to 20 people can be on file.
+The crew files. Up to 25 people can be on file.
 
-- **Create**: pick a race with Left and Right, then name the new crew member. New recruits cost nothing.
+- **Create**: pick a race with Left and Right, then name the new crew member, in up to 14 letters and with a name no one on file has. New recruits cost nothing.
 - **Train**: each session costs 300 M.U. and raises one skill by the race's learning rate, up to the race's limit. Choose the number of sessions with Left and Right (Up for the most you can afford, Down for none). The dead cannot be trained.
 - **Delete**: removes a crew member, also from any post they hold.
 - **Previous** and **Next** page through the files.

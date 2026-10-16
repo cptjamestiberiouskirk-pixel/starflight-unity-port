@@ -266,6 +266,7 @@ What the probe does:
 | `starport-notices` | the Operations notices screen as the original's: today's date as the header beside NOTICES, END OF NOTICES after the newest notice and not after an earlier one, and with nothing new NO NEW NOTICES and REPEAT LAST NOTICE? with More and Quit as Yes and No, No back to the menu, Yes the last notice after REPEATING LAST NOTICE (about 20 s) |
 | `starport-training` | training asks how many sessions, as the original's HOW MANY TRAINING SESSIONS (0-N)?: for a human with no science and 11,700 M.U. the question offers 0 to 28 and trains nothing yet, three sessions train 27 points for 900 M.U., and asking for 999 trains the 25 left to the maximum of 250 (about 20 s) |
 | `starport-deadcrew` | a dead crew member can be neither assigned nor trained, as in the original: in Crew Assignment the stick to a dead crew member's file leaves the post to the captain, the stick to a living one's gives it to them (a control), and an empty post starts on the first living file rather than the dead one before it; in Personnel, Train on a dead crew member's file says "You can't train a dead crewmember" and charges nothing, and on a living one's asks for a skill (a control) (about 20 s) |
+| `starport-personnelrules` | Personnel's roster as the original's: with 23 crew members on file the name box takes 14 letters, "CREW 3" is refused while "Crew 3" is on file ("This name is already on file", and the box asks again), a 21-letter name is cut to 14, Create is offered with 24 files and not with 25 (a control) (about 20 s) |
 | `starport-noyes` | the Starport's two yes or no questions (Personnel's DELETE THIS CREWMEMBER? and the Trade Depot's before an analysis) put No left of Yes, as the original's <-N Y->, with No selected first (about 15 s) |
 | `motiondetected` | the radar reports motion through a skilled science officer only, as the original's (above 150): in dark hyperspace with an alien group in reach, a science officer of science 100 says nothing and one of 200 says "Motion detected."; with no science officer assigned, nobody reports it and nothing throws (about 20 s) |
 | `launchlines` | the launch from the Starport says the original's lines in its order, OPENING DOCKING BAY DOORS, COMMENCING LAUNCH SEQUENCE... with the countdown, LEAVING STARPORT..., ...STARPORT CLEAR and STANDING BY TO MANEUVER, and keeps the last three together in the window (about 50 s) |
@@ -295,7 +296,7 @@ What the probe does:
 | `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 | `combatmessages` | the combat messages are the original's: WEAPONS NOT ARMED, NO TARGET PRESENT, WEAPON NOT AVAILABLE and OUT OF FUEL! when a weapon cannot fire, nothing of the port's own when the player's shot hits, and LASER CLASS n (LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (246 scenarios, about 206 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (247 scenarios, about 207 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### The playthrough
 
