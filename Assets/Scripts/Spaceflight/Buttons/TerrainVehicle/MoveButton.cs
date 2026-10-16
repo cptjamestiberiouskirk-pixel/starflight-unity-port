@@ -146,6 +146,10 @@ public class MoveButton : ShipButton
 					SpaceflightController.m_instance.m_messages.Clear();
 					SpaceflightController.m_instance.m_messages.AddText( "<color=red>Out of fuel.</color>\n<color=white>Returning to ship on foot.</color>" + ( ( dropped > 0 ) ? "\n<color=yellow>The cargo is left where the vehicle stopped.</color>" : "" ) );
 
+					// the walk is a map cell at a time, and each cell has a chance in five of injuring one of the crew, by the ground walked over (MOVE-OV WF16E
+					// walks the cells to the ship and WF122 rolls RRND(0,5) for 'INJURE at each)
+					WalkBackToTheShip();
+
 					// the walk back: the map fades, and the crew are in the ship
 					SpaceflightController.m_instance.m_planetside.UpdateTerrainGridNow();
 					SpaceflightController.m_instance.m_viewport.StartFade( 0.0f, 2.0f );
@@ -191,5 +195,36 @@ public class MoveButton : ShipButton
 
 		// returning true prevents the default spaceflight update from running
 		return true;
+	}
+
+	// the crew's walk from where the vehicle stopped to the ship, a cell (a kilometer) at a time: each cell a chance in five of an injury, by the E/M of the cell
+	static void WalkBackToTheShip()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var vehicle = SpaceflightController.m_instance.m_terrainVehicle;
+		var from = playerData.m_general.m_lastDisembarkedCoordinates;
+		var to = Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude );
+		var steps = Mathf.Min( 2000, Mathf.FloorToInt( Tools.SurfaceStepsInKm( from, to ) ) );
+		var injured = new System.Collections.Generic.List<PD_Personnel.PD_PersonnelFile>();
+
+		for ( var step = 1; step <= steps; step++ )
+		{
+			if ( Random.Range( 0, 5 ) == 0 )
+			{
+				var place = Vector3.Lerp( from, to, (float) step / steps );
+				var victim = PlanetWeather.InjureOnTheSurface( vehicle.GetEnergyPerStepAt( place ), PlanetWeather.GetEfficiency(), false );
+
+				if ( ( victim != null ) && !injured.Contains( victim ) )
+				{
+					injured.Add( victim );
+				}
+			}
+		}
+
+		// (the original's walk shows each injury as it comes; the port's walk is over at once, so each crew member hurt on the way is named once)
+		foreach ( var victim in injured )
+		{
+			SpaceflightController.m_instance.m_messages.AddText( "<color=red>" + victim.m_name + " is injured.</color>" );
+		}
 	}
 }

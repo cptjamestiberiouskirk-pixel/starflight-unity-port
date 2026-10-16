@@ -224,6 +224,50 @@ public static class PlanetWeather
 		SpaceflightController.m_instance.m_messages.AddText( ( IsStorm() ? "<color=yellow>" : "<color=white>" ) + GetSkyText() + "</color>" );
 	}
 
+	// the original's injury on a planet's surface (STORM-OV INJURE-PL): one of the six posts at random (WF298), and its crew member loses the larger of 1 and a
+	// roll (1 to 3 times the ground's E/M, 2 to 30, less one: WF2DA) over the race's durability, times the larger of 1 and 3 times E/M over the weather's %EFF,
+	// so harder over high ground and a liquid and in bad weather - "ALPHA IS INJURED." (at 0 the crew member dies: PD_CrewAssignment.InjureCrewMember)
+	// - gives back who was injured (null if nobody: the post is empty or its crew member is dead), and says so unless told not to
+	public static PD_Personnel.PD_PersonnelFile InjureOnTheSurface( float energyPerStep, float efficiency, bool announce = true )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var role = (PD_CrewAssignment.Role) Random.Range( (int) PD_CrewAssignment.Role.First, (int) PD_CrewAssignment.Role.Count );
+
+		if ( !playerData.m_crewAssignment.IsAssigned( role ) )
+		{
+			return null;
+		}
+
+		var victim = playerData.m_crewAssignment.GetPersonnelFile( role );
+
+		if ( ( victim == null ) || victim.m_isDead || ( victim.m_vitality <= 0.0f ) )
+		{
+			return null;
+		}
+
+		var durability = c_humanDurability;
+
+		if ( ( victim.m_crewRaceId >= 0 ) && ( victim.m_crewRaceId < gameData.m_crewRaceList.Length ) )
+		{
+			durability = Mathf.Max( 1, gameData.m_crewRaceList[ victim.m_crewRaceId ].m_durability );
+		}
+
+		var energy = Mathf.Abs( Mathf.RoundToInt( energyPerStep ) );
+		var roll = Random.Range( 1, Mathf.Clamp( energy * 3, 2, 30 ) );
+		var percentEfficiency = Mathf.Max( 1, Mathf.RoundToInt( efficiency * 100.0f ) );
+		var loss = Mathf.Max( 1, roll / durability ) * Mathf.Max( 1, energy * 3 / percentEfficiency );
+
+		if ( announce && ( SpaceflightController.m_instance != null ) )
+		{
+			SpaceflightController.m_instance.m_messages.AddText( "<color=red>" + victim.m_name + " is injured.</color>" );
+		}
+
+		playerData.m_crewAssignment.InjureCrewMember( victim, loss );
+
+		return victim;
+	}
+
 	// a storm hour may injure one or two of the crew in the terrain vehicle ("ALPHA IS INJURED.")
 	static void InjureCrew()
 	{
