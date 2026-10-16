@@ -906,6 +906,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioColonies();
 				break;
 
+			case "colonyrating":
+				yield return ScenarioColonyRating();
+				break;
+
 			case "systemdamage":
 				yield return ScenarioSystemDamage();
 				break;
@@ -19606,6 +19610,102 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "colonies: a name is cut to the original's 15 characters, and a planet left unnamed has an empty NAME line", evaluationText.Contains( "RECOMMENDATION: 2\n" ) && evaluationText.Contains( "SYSTEM: 55,32\nORBIT: " + orbitA + "\nNAME: ABCDEFGHIJKLMNO\nEVALUATION:\nDUE TO" ) && evaluationText.Contains( "RECOMMENDATION: 3\n" ) && evaluationText.Contains( "ORBIT: " + orbitB + "\nNAME: \nEVALUATION:\nDUE TO" ), evaluationText.Replace( '\n', '/' ) );
 
 		Finish( "scenario=colonies asked=" + askedForHeaven + " pending=" + pendingCount + " change=" + change + " pendingAfter=" + pendingAfter, 0 );
+	}
+
+	// a planet recommended for colonization is rated by the original's rules as the captain logs it (CAPTAIN overlay WF30E, WF348 and WF292): six checks that make
+	// it unsuitable, and points that make its bonus, 5,000 MU a point. Every planet of the game data goes through the real booking: STRINFO's list of 51 suitable
+	// planets is the record the rules are checked against (50 of them come out with their listed bonus; its "planet 3 of 209,80" is a slip for planet 4, which
+	// scores the listed 35,000), and the rules also pay five Tropical-Inferno planets the list does not have
+	IEnumerator ScenarioColonyRating()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var bank = playerData.m_bank;
+
+		yield return Frames( 10 );
+
+		var balanceBefore = bank.m_currentBalance;
+		var unsuitableBefore = playerData.m_general.m_unsuitableRecommendationCount;
+
+		// the bonus each planet earns through the real booking (0 for a fined one)
+		var bonuses = new int[ gameData.m_planetList.Length ];
+		var suitable = 0;
+
+		for ( var planetId = 0; planetId < gameData.m_planetList.Length; planetId++ )
+		{
+			var record = new PD_General.ColonyRecommendation { m_planetId = planetId };
+			var rowsBefore = bank.m_transactionList.Count;
+
+			playerData.BookColonyRecommendation( record );
+
+			if ( ( record.m_fine <= 0 ) && ( bank.m_transactionList.Count > rowsBefore ) )
+			{
+				var amount = bank.m_transactionList[ bank.m_transactionList.Count - 1 ].m_amount.TrimEnd( '+' );
+
+				bonuses[ planetId ] = int.TryParse( amount, out var value ) ? value : -1;
+				suitable++;
+			}
+		}
+
+		bank.m_currentBalance = balanceBefore;
+		playerData.m_general.m_unsuitableRecommendationCount = unsuitableBefore;
+
+		// STRINFO's list against the bookings
+		const int slipPlanetId = 263;
+		const int slipMeantPlanetId = 262;
+
+		var listMatches = 0;
+		var listCompared = 0;
+		var listMisses = new List<string>();
+
+		foreach ( var colonyEvaluation in gameData.m_colonyEvaluationList )
+		{
+			if ( ( colonyEvaluation.m_planetId < 0 ) || ( colonyEvaluation.m_planetId == slipPlanetId ) )
+			{
+				continue;
+			}
+
+			listCompared++;
+
+			var bonus = bonuses[ colonyEvaluation.m_planetId ];
+			var optimal = bonus > 40000;
+
+			if ( ( bonus == colonyEvaluation.m_bonus ) && ( optimal == ( colonyEvaluation.m_rating == "Optimal" ) ) )
+			{
+				listMatches++;
+			}
+			else
+			{
+				listMisses.Add( colonyEvaluation.m_planetId + ": " + bonus + " (listed " + colonyEvaluation.m_rating + " " + colonyEvaluation.m_bonus + ")" );
+			}
+		}
+
+		// the planets the list lacks: 123,101 orbit 1, 121,158 orbit 2, 114,138 orbit 3, 17,108 orbit 3 and 88,78 orbit 2
+		var unlistedIds = new[] { 101, 391, 427, 641, 692 };
+		var unlistedBonuses = new[] { 35000, 30000, 30000, 30000, 35000 };
+		var unlisted = new List<string>();
+		var unlistedRight = 0;
+
+		for ( var index = 0; index < unlistedIds.Length; index++ )
+		{
+			unlisted.Add( unlistedIds[ index ] + ": " + bonuses[ unlistedIds[ index ] ] );
+
+			if ( bonuses[ unlistedIds[ index ] ] == unlistedBonuses[ index ] )
+			{
+				unlistedRight++;
+			}
+		}
+
+		var slipReasons = string.Join( ", ", gameData.m_planetList[ slipPlanetId ].GetUnsuitableReasons() );
+
+		Log( "colonyrating: " + suitable + " planets earn a bonus | STRINFO's list: " + listMatches + " of " + listCompared + " match, misses " + string.Join( "; ", listMisses ) + " | planet " + slipPlanetId + ": " + bonuses[ slipPlanetId ] + " (" + slipReasons + "), planet " + slipMeantPlanetId + ": " + bonuses[ slipMeantPlanetId ] + " | not on the list: " + string.Join( ", ", unlisted ) );
+
+		Check( "colonyrating: the 50 planets of STRINFO's list other than its slip earn the listed bonus and rating (a control)", ( listCompared == 50 ) && ( listMatches == 50 ), listMatches + " of " + listCompared + " " + string.Join( "; ", listMisses ) );
+		Check( "colonyrating: STRINFO's planet 3 of 209,80 is unsuitable, in the original's words and order, and planet 4 earns the listed 35,000", ( bonuses[ slipPlanetId ] == 0 ) && ( slipReasons == "CRUSHING GRAVITY, VIOLENT STORMS, LACK OF OXYGEN, LACK OF WATER" ) && ( bonuses[ slipMeantPlanetId ] == 35000 ), bonuses[ slipPlanetId ] + " (" + slipReasons + "), " + bonuses[ slipMeantPlanetId ] );
+		Check( "colonyrating: the five Tropical-Inferno planets the list lacks earn their bonus", unlistedRight == unlistedIds.Length, string.Join( ", ", unlisted ) );
+		Check( "colonyrating: 56 planets of the game data earn a bonus", suitable == 56, suitable.ToString() );
+
+		Finish( "scenario=colonyrating suitable=" + suitable + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 1: damage to the ship's systems
