@@ -35,13 +35,15 @@ public class PlayerShip : MonoBehaviour
 	// 1 in hyperspace and 12 in a star system, and only while a direction is held. In hyperspace the top speed is there from the first step; in a star system
 	// the step grows by one each step from 1 to 12. A unit of the star system is 8192 / 400 of the port's (SYSRADIUS 400), one of hyperspace 32, so the star
 	// system's top speed in a step is 12 * 20.48 / 32 = 7.68 times hyperspace's. The original takes a step each pass of its main loop, as fast as the computer
-	// runs it: in hyperspace the port takes the original's pace at GOG's speed (DOSBox at 1500 cycles: 1.45 coordinates a second in open space, 11.6 steps of 32
-	// of the port's units, 371 a second); in a star system it keeps its own 4 steps a second (m_maximumSpeed 128 times 7.68, a step every 0.25 s), not measured
+	// runs it, and the port takes the original's pace at GOG's speed (DOSBox at 1500 cycles): in hyperspace 1.45 coordinates a second in open space, 11.6 steps
+	// of 32 of the port's units (371 a second); in a star system 400 units from the sun to the edge in 2.72 s at the top step, 12.2 steps of 12 units of 20.48
+	// (2998 a second), the step growing from 1 to 12 in about a second
 	public const float c_starSystemSpeedFactor = 12.0f * ( 8192.0f / 400.0f ) / 32.0f;
-	const float c_stepSeconds = 32.0f / 128.0f;
 	const int c_starSystemSteps = 12;
 	public const float c_hyperspaceStepsPerSecond = 11.6f;
 	const float c_hyperspaceUnit = 32.0f;
+	public const float c_starSystemStepsPerSecond = 12.2f;
+	const float c_starSystemUnit = 8192.0f / 400.0f;
 
 	// the ship's steps in an encounter, as the original's (HYPER-OV #VES-SPEED, ACCELERATE, !S/A): each pass of its main loop (Encounter.c_passSeconds) with a
 	// direction held the ship moves its step, in cells (CombatController.c_unitsPerCell); the step starts at 1 and grows by one every 96 / ESPEED + 1 passes, where
@@ -179,14 +181,14 @@ public class PlayerShip : MonoBehaviour
 				else
 				{
 					// in hyperspace and in a star system the engines' health does not change the speed, but destroyed engines move nothing (DAMAGE-OV WF2AC)
-					var topSpeed = ( enginesFactor > 0.0f ) ? ( ( location == PD_General.Location.StarSystem ) ? m_maximumSpeed * c_starSystemSpeedFactor : c_hyperspaceStepsPerSecond * c_hyperspaceUnit ) : 0.0f;
+					var topSpeed = ( enginesFactor > 0.0f ) ? ( ( location == PD_General.Location.StarSystem ) ? c_starSystemStepsPerSecond * c_starSystemSteps * c_starSystemUnit : c_hyperspaceStepsPerSecond * c_hyperspaceUnit ) : 0.0f;
 
 					playerData.m_general.m_currentMaximumSpeed = topSpeed;
 
 					if ( location == PD_General.Location.StarSystem )
 					{
 						// a step more each step, from 1 of the 12 to all of them (at least the first step's at once)
-						var rampedSpeed = Mathf.Max( playerData.m_general.m_currentSpeed, topSpeed / c_starSystemSteps ) + topSpeed / c_starSystemSteps * Time.deltaTime / c_stepSeconds;
+						var rampedSpeed = Mathf.Max( playerData.m_general.m_currentSpeed, topSpeed / c_starSystemSteps ) + topSpeed / c_starSystemSteps * Time.deltaTime * c_starSystemStepsPerSecond;
 
 						playerData.m_general.m_currentSpeed = Mathf.Min( rampedSpeed, topSpeed );
 					}

@@ -40102,8 +40102,8 @@ public class ClaudeProbe : MonoBehaviour
 	}
 
 	// the ship's speeds in flight as the original's (HYPER-OV CSPEED, !MAXSPEED, ACCELERATE): in a star system the step grows from 1 to 12 of the system's units,
-	// to a top speed 12 * 20.48 / 32 = 7.68 times hyperspace's (983 of the port's units a second, not 4 times, 512); in hyperspace the top speed is there from the
-	// first step; with no direction held the ship stops at once; and the engines' health does not change the speed, though destroyed engines move nothing
+	// to a top speed of 12 units a step at the original's 12.2 steps a second at GOG's speed (2998 of the port's units a second); in hyperspace the top speed is
+	// there from the first step; with no direction held the ship stops at once; and the engines' health does not change the speed, though destroyed engines move nothing
 	// (DAMAGE-OV WF2AC)
 	IEnumerator ScenarioShipSpeeds()
 	{
@@ -40173,8 +40173,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "shipspeeds: in the star system (" + general.m_location + "): " + firstSteps.ToString( "0.0" ) + " two frames after the engines went on, " + systemTop.ToString( "0.0" ) + " after 3.5 s, " + systemStopped.ToString( "0.0" ) + " three frames after they went off" );
 
-		Check( "shipspeeds: in a star system the ship starts at a twelfth of its top speed or more, and less than half of it (the original's step grows from 1 to 12)", inStarSystem && ( firstSteps >= 983.04f / 12.0f - 0.01f ) && ( firstSteps < 983.04f / 2.0f ), firstSteps.ToString( "0.0" ) );
-		Check( "shipspeeds: its top speed in a star system is 983 (12 units of 20.48 a step, at the port's 4 steps a second)", Mathf.Abs( systemTop - 983.04f ) < 0.5f, systemTop.ToString( "0.0" ) );
+		Check( "shipspeeds: in a star system the ship starts at a twelfth of its top speed or more, and less than half of it (the original's step grows from 1 to 12)", inStarSystem && ( firstSteps >= 2998.272f / 12.0f - 0.01f ) && ( firstSteps < 2998.272f / 2.0f ), firstSteps.ToString( "0.0" ) );
+		Check( "shipspeeds: its top speed in a star system is 12 units of 20.48 a step at the original's 12.2 steps a second at GOG's speed (2998.3)", Mathf.Abs( systemTop - 2998.272f ) < 0.5f, systemTop.ToString( "0.0" ) );
 		Check( "shipspeeds: with no direction held it stops at once", systemStopped == 0.0f, systemStopped.ToString( "0.0" ) );
 
 		// ---- 2. hyperspace, in a quiet corner

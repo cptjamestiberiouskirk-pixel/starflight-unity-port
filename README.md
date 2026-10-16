@@ -215,7 +215,7 @@ Assets/
 - The Whining Orb translates the Spemin
 - The Rod Device cuts the damage of alien lasers to a quarter
 - The Crystal Pearl warps a critically damaged ship out of an encounter
-- Hyperspace travel at the original's pace, as measured in GOG's version of the game
+- Hyperspace and star system travel at the original's pace, as measured in GOG's version of the game
 - Alien ships come after you as in the original: every two star hours they jump toward your ship, half the way in hyperspace and three quarters in a star system, and in hyperspace they stay near their home ground; the Dodecahedron draws them farther and faster
 - The Shimmering Ball cloaks the ship in combat until it fires
 - The Flat Device shields the terrain vehicle: lifeforms hit its crew half as often
