@@ -4310,9 +4310,23 @@ public class Encounter : MonoBehaviour
 				if ( ( vesselId >= 0 ) && ( vesselId < gameData.m_vesselList.Length ) )
 				{
 					var vessel = gameData.m_vesselList[ vesselId ];
+					var alienShip = alienShipList[ currentSelection - 1 ];
+
+					// the readings fall with the damage, as the original's (SCIENCE WF39C): what is left of the ship's armor and shields over its vessel's, at most
+					// 100; Bio reads it if the ship carries life, Energy if it has power (the vessel's 100 or 0), and a damaged ship with life gives a random 75 to
+					// 85% of it as its energy (WF239)
+					var left = Mathf.Max( 0, alienShip.m_armorPoints ) + Mathf.Max( 0, alienShip.m_shieldPoints );
+					var share = Mathf.Min( 100, 100 * left / Mathf.Max( 1, vessel.m_armor + vessel.m_shields ) );
+					var bio = ( vessel.m_bioDensity != 0 ) ? share : 0;
+					var energy = ( vessel.m_mineralDensity != 0 ) ? share : 0;
+
+					if ( ( bio > 0 ) && ( share < 100 ) )
+					{
+						energy = energy * Random.Range( 75, 86 ) / 100;
+					}
 
 					// start the scan
-					SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.StartScanning( scanType, 0, vessel.m_mass, vessel.m_bioDensity, vessel.m_mineralDensity );
+					SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.StartScanning( scanType, 0, vessel.m_mass, bio, energy );
 				}
 				else
 				{
