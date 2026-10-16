@@ -192,8 +192,8 @@ public class Hyperspace : MonoBehaviour
 					playerData.m_general.m_lastStarSystemCoordinates = playerData.m_general.m_coordinates;
 
 					// scale the speed of the player
-					playerData.m_general.m_currentSpeed *= 4.0f;
-					playerData.m_general.m_currentMaximumSpeed *= 4.0f;
+					playerData.m_general.m_currentSpeed *= PlayerShip.c_starSystemSpeedFactor;
+					playerData.m_general.m_currentMaximumSpeed *= PlayerShip.c_starSystemSpeedFactor;
 
 					// switch to the star system location
 					SpaceflightController.m_instance.SwitchLocation( PD_General.Location.StarSystem );
