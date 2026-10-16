@@ -262,7 +262,7 @@ Assets/
 
 Every item in [ROADMAP.md](ROADMAP.md) is done or decided, and so is every item in the screen-by-screen comparison with the original (`Research/Screen comparison.md`), the UI kit included. The headless test harness covers every one of them, and its playthrough plays a new game through to the win. A full playthrough of 1.0.0 by hand is still to come.
 
-Still open from the comparison with the original's code: the combat damage model (the original's weapons hit about five times harder, and its ship fights on at 0 armor until the hull gives out), plus smaller details: alien pursuit through hyperspace, hyperspace speeds and fuel per step, flux jumps and the navigator's skill, terrain vehicle fuel by terrain type, buying armor, and the timing of Endurium price changes.
+Still open from the comparison with the original's code: how fast alien ships move against the player's ship and how often an alien distress call brings in another wave, both of which need a measurement in the original game.
 
 See [CHANGELOG.md](CHANGELOG.md) for the detailed version history.
 
