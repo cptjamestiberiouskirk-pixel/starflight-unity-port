@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Build Test in Windows Sandbox**: `DevTools/WindowsSandbox/test-build.ps1` tries a Windows build on a clean copy of Windows. It maps the build folder read-only into Windows Sandbox, runs the game there in a window and collects the game's log (written straight to the host, so it survives a crash of the Sandbox), a record every 10 seconds of whether the game was running and responding, and, once it is quit, its saves and the Code Integrity events. Nothing touches the real saves. It also runs a build on a PC where Smart App Control blocks unsigned programs, since Smart App Control is in evaluation mode in the Sandbox. The graphics card is not shared by default, because sharing it crashed the Sandbox as the game started, and in full screen the picture stopped updating, so the game always runs in a window. Tried with the 1.1.0 build: from the intro through the Starport to orbit, with the saves and their backups written and no file blocked.
+
 ### Fixed
 
 - **Alien Ships Move at One Speed**: every alien ship moved at a speed taken from its vessel's move delay in the game data, so Spemin ships ran at 1.47 times the speed of most others and the Mysterion barely moved. The released game reads that delay nowhere: COMBAT-OV moves every alien ship one unit in each of its turns, and only if its vessel record's byte 6 is not 0 (`WE06B`, copied by `+A-VESS`), which keeps the Mechan Scout, the Veloxi Drone, the Nomad Probe and the Noah 9 derelict where they are. Every vessel now moves at the encounter's one alien speed, and those four stay still. How fast the aliens move against the player's ship is unchanged for now: the original's ratio depends on how often its main loop ran, which still needs a measurement in the original. Probe scenario `vesselstats`.
