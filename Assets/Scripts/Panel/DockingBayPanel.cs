@@ -176,6 +176,9 @@ public class DockingBayPanel : Panel
 				// the bank pays its interest, as the original's does when the crew goes aboard (PORTMENU-OV in the decompiled original: I-TRANS after the flight check)
 				playerData.PayInterest( false );
 
+				// the Endurium price of the day holds until the next launch, as the original sets it here (PORTMENU-OV WEBA2, after I-TRANS)
+				playerData.m_starport.FixEnduriumPrice( playerData.m_general.m_currentStardateYMD );
+
 				// save the player data
 				DataController.m_instance.SaveActiveGame();
 

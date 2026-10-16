@@ -866,6 +866,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportEndurium();
 				break;
 
+			case "starport-enduriumlaunch":
+				yield return ScenarioStarportEnduriumLaunch();
+				break;
+
 			case "starport-interest":
 				yield return ScenarioStarportInterest();
 				break;
@@ -18561,6 +18565,79 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-endurium: the other minerals keep their prices (control)", molybdenumBefore == molybdenumAfter, molybdenumBefore + " -> " + molybdenumAfter );
 
 		Finish( "scenario=starport-endurium " + dates[ 0 ] + "=" + bought[ 0 ] + "/" + sold[ 0 ] + " " + dates[ 1 ] + "=" + bought[ 1 ] + "/" + sold[ 1 ] + " " + dates[ 2 ] + "=" + bought[ 2 ] + "/" + sold[ 2 ], 0 );
+	}
+
+	// the Endurium price is fixed when the ship leaves the Starport, as the original sets ELEM-VAL only at launch (PORTMENU-OV WEBA2): a ship that goes aboard
+	// on day 40 (1000 MU a cubic meter) pays and is paid that price after the rises of days 49 and 134 until it launches again, the price is kept in the save,
+	// and a save from before it was kept uses the price of the day (a control)
+	IEnumerator ScenarioStarportEnduriumLaunch()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var endurium = gameData.m_elementList[ gameData.m_misc.m_enduriumElementId ];
+
+		// a ship that can launch, on day 40
+		EnsureCrew();
+
+		playerData.m_playerShip.m_name = "Probe";
+		playerData.m_playerShip.m_enginesClass = 1;
+
+		if ( playerData.m_playerShip.m_elementStorage.Find( 5 ) == null )
+		{
+			playerData.m_playerShip.AddElement( 5, 50 );
+		}
+
+		SetStarportDay( 40 );
+
+		var priceOnDay40 = endurium.GetStarportPrice();
+		var panel = FindPanel<DockingBayPanel>();
+
+		if ( panel == null )
+		{
+			Finish( "scenario=starport-enduriumlaunch abort: no docking bay panel", 2 );
+			yield break;
+		}
+
+		// the crew goes aboard through the docking bay
+		PanelController.m_instance.Open( panel );
+
+		var transporting = panel.IsTransporting();
+		var start = Time.realtimeSinceStartup;
+
+		while ( panel.IsTransporting() && ( Time.realtimeSinceStartup - start < 20.0f ) )
+		{
+			yield return null;
+		}
+
+		// the flight goes on past both rises
+		SetStarportDay( 60 );
+
+		var boughtOnDay60 = endurium.GetStarportPrice();
+		var soldOnDay60 = endurium.GetActualValue();
+
+		SetStarportDay( 140 );
+
+		var boughtOnDay140 = endurium.GetStarportPrice();
+		var soldOnDay140 = endurium.GetActualValue();
+
+		// the price goes into the save
+		var copy = JsonUtility.FromJson<PlayerData>( JsonUtility.ToJson( playerData ) );
+		var savedPrice = ( copy != null ) ? IntFieldOrMin( copy.m_starport, "m_enduriumPrice" ) : int.MinValue;
+
+		// a save from before the price was kept
+		SetFieldIfPresent( playerData.m_starport, "m_enduriumPrice", 0 );
+
+		var oldSaveOnDay140 = endurium.GetStarportPrice();
+
+		Log( "starport-enduriumlaunch: price on day 40 " + priceOnDay40 + ", went aboard " + transporting + " | after the launch: day 60 bought/sold " + boughtOnDay60 + "/" + soldOnDay60 + ", day 140 " + boughtOnDay140 + "/" + soldOnDay140 + " | saved " + savedPrice + " | an older save on day 140 " + oldSaveOnDay140 );
+
+		Check( "starport-enduriumlaunch: the crew went aboard on day 40, when Endurium costs 1000 MU (the setup)", transporting && ( priceOnDay40 == 1000 ), transporting + ", " + priceOnDay40 );
+		Check( "starport-enduriumlaunch: after the rise of day 49 the ship still buys and sells Endurium at the 1000 MU of its launch", ( boughtOnDay60 == 1000 ) && ( soldOnDay60 == 1000 ), boughtOnDay60 + " / " + soldOnDay60 );
+		Check( "starport-enduriumlaunch: after the rise of day 134 too", ( boughtOnDay140 == 1000 ) && ( soldOnDay140 == 1000 ), boughtOnDay140 + " / " + soldOnDay140 );
+		Check( "starport-enduriumlaunch: the price of the launch is kept in the save", savedPrice == 1000, savedPrice.ToString() );
+		Check( "starport-enduriumlaunch: a save from before the price was kept uses the price of the day (2000 MU on day 140, a control)", oldSaveOnDay140 == 2000, oldSaveOnDay140.ToString() );
+
+		Finish( "scenario=starport-enduriumlaunch checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 1: nebulae keep the shields down

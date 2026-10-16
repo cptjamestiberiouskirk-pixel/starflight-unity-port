@@ -182,6 +182,7 @@ What the probe does:
 | `shimmeringball` | the Shimmering Ball, one alien laser shot at a time: without it (the control, a hit), with it (no shot at the cloaked ship), right after the player fires the laser (a hit) and 4 s later (cloaked again) (about 25 s) |
 | `ringdevice` | the Ring Device, in hyperspace with no encounter able to begin: the fluxes shown without it (none), the ship put at a hidden flux (the control, it goes through) and the fluxes shown with it in the hold (all) (about 30 s) |
 | `starport-endurium` | the price of Endurium: one cubic meter bought and sold at the real trade depot on 19-02-4620 (1000 both ways), 20-02-4620 (1500) and 15-05-4620 (2000), and what the Starport pays for molybdenum on the first and last date (the control, unchanged) (about 20 s) |
+| `starport-enduriumlaunch` | the Endurium price is fixed when the ship leaves the Starport: the crew goes aboard through the real docking bay on day 40 (1000 MU a cubic meter), and on days 60 and 140, after both rises, Endurium is still bought and sold at 1000; the price is kept in the save, and a save from before it was kept uses the price of the day (2000 on day 140, a control) (about 30 s) |
 | `nebula` | nebulae keep the shields down: Raise Shields in a star system outside the nebulae (the control, up and staying up), coming into a star system inside a nebula with them up (they collapse, with a message) and pressing it there (refused), and in hyperspace inside a nebula clear of the stars (refused) and outside the nebulae (the control, up) (about 40 s) |
 | `shieldmessages` | the shields' and weapons' messages in the original's words, through the console's buttons: up and down, arming the weapons that work (missiles and lasers, then lasers only), Disarm disarming and saying so, and no fuel (about 25 s) |
 | `starport-repair` | Repair in ship configuration, at the original's prices (CONFIG-OV WF226): a whole ship (nothing paid), class 1 armor at 200 of 500 with the shields empty (1,200 M.U., 4 a point, whole again with full shields), a bare hull at 100 of 250 (600 M.U.), with 10 M.U. in the bank (refused, nothing changes), a class 3 laser cannon at 40% and the sensors at 50% (39,020 M.U., whole again); and a class 5 missile launcher's resale whole and at 50% (190,400 and 95,200, WECB0) (about 20 s) |
@@ -279,7 +280,7 @@ What the probe does:
 | `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 | `combatmessages` | the combat messages are the original's: WEAPONS NOT ARMED, NO TARGET PRESENT, WEAPON NOT AVAILABLE and OUT OF FUEL! when a weapon cannot fire, nothing of the port's own when the player's shot hits, and LASER CLASS n (LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (232 scenarios, about 192 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (233 scenarios, about 193 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### The playthrough
 
