@@ -21866,12 +21866,12 @@ public class ClaudeProbe : MonoBehaviour
 		return MessageList();
 	}
 
-	// how many lines of an analysis read "Unknown"
+	// how many lines of an analysis read the original's "Not certain"
 	static int UnknownLines( string analysis )
 	{
 		var count = 0;
 
-		for ( var index = analysis.IndexOf( ">Unknown<" ); index >= 0; index = analysis.IndexOf( ">Unknown<", index + 1 ) )
+		for ( var index = analysis.IndexOf( ">Not certain<" ); index >= 0; index = analysis.IndexOf( ">Not certain<", index + 1 ) )
 		{
 			count++;
 		}
@@ -21902,12 +21902,12 @@ public class ClaudeProbe : MonoBehaviour
 		// ---- 2. the same reading again: the analysis has used it up
 		var again = AnalyzeNewReading( false );
 
-		// ---- 3. no skill: the object's class, and every other line unknown
+		// ---- 3. no skill: the object's class and the orbit number, and every other line not certain
 		scienceOfficer.m_science = 0;
 
 		var none = AnalyzeNewReading( true );
 
-		// ---- 4. a skill of 100: about half of 120 lines in 20 readings
+		// ---- 4. a skill of 100: about half of 100 lines in 20 readings (5 a reading: the orbit number is always given)
 		scienceOfficer.m_science = 100;
 
 		var unknownOfHalf = 0;
@@ -21932,12 +21932,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 3 );
 
-		Log( "analysisskill: skill 250: " + full + " || again: " + again + " || skill 0: " + none + " || skill 100: " + unknownOfHalf + " of 120 lines unknown || a ship twice: " + shipTwice );
+		Log( "analysisskill: skill 250: " + full + " || again: " + again + " || skill 0: " + none + " || skill 100: " + unknownOfHalf + " of 100 lines not certain || a ship twice: " + shipTwice );
 
 		Check( "analysisskill: a science officer of full skill gives every line (control)", full.Contains( "Object: <color=white>Planet" ) && ( UnknownLines( full ) == 0 ), full );
 		Check( "analysisskill: an analysis uses up the reading: the same reading again needs a new one (the original's \"I need a current sensor reading.\")", again.Contains( "I need a current sensor reading." ), again );
-		Check( "analysisskill: with no skill only the object's class is given", none.Contains( "Object: <color=white>Planet" ) && ( UnknownLines( none ) == 6 ), none );
-		Check( "analysisskill: with a skill of 100 about half the lines are given (skill / 2 percent each)", ( unknownOfHalf >= 36 ) && ( unknownOfHalf <= 84 ), unknownOfHalf + " of 120" );
+		Check( "analysisskill: with no skill only the object's class and the orbit number are given, and the other 5 lines are \"Not certain\"", none.Contains( "Object: <color=white>Planet" ) && none.Contains( "Orbit Number: <color=white>" + DataController.m_instance.m_gameData.m_planetList[ playerData.m_general.m_currentPlanetId ].m_orbitPosition + "<" ) && ( UnknownLines( none ) == 5 ), none );
+		Check( "analysisskill: with a skill of 100 about half the lines are given (skill / 2 percent each)", ( unknownOfHalf >= 30 ) && ( unknownOfHalf <= 70 ), unknownOfHalf + " of 100" );
 		Check( "analysisskill: an alien ship's reading is used up too: its second analysis needs a new reading", ( shipTwice == "<color=white>I need a current sensor reading.</color>" ), shipTwice );
 
 		Finish( "scenario=analysisskill unknown100=" + unknownOfHalf, 0 );
