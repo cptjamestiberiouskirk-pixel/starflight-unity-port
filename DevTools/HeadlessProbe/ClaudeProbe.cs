@@ -26352,7 +26352,12 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "statusdisplay: " + shown + " || damage over the hull: " + words );
 
 		Check( "statusdisplay: a ship with no shields reads Down and one with no weapons Unarmed, as the original", ( shields == "Down" ) && ( weapons == "Unarmed" ), shields + " / " + weapons );
-		Check( "statusdisplay: energy has four figures and no unit, and cargo is a whole percent", energy.Contains( ">20.00<" ) && System.Text.RegularExpressions.Regex.IsMatch( cargo, @">\d+ %<" ), energy + " / " + cargo );
+		var energyTexts = StatusDisplay.GetEnergyText( 5.0f ) + " " + StatusDisplay.GetEnergyText( 48.2f ) + " " + StatusDisplay.GetEnergyText( 123.8f ) + " " + StatusDisplay.GetEnergyText( 1234.5f );
+
+		Log( "statusdisplay: energy of 5, 48.2, 123.8 and 1234.5 cubic meters: " + energyTexts );
+
+		Check( "statusdisplay: energy has two decimals below 100 cubic meters and one from 100 on, as the original's (5.00, 48.20, 123.8, 1234.5)", energyTexts == "5.00 48.20 123.8 1234.5", energyTexts );
+		Check( "statusdisplay: energy has no unit, and cargo is a whole percent", energy.Contains( ">20.00<" ) && System.Text.RegularExpressions.Regex.IsMatch( cargo, @">\d+ %<" ), energy + " / " + cargo );
 		ship.RestoreSystems();
 
 		Check( "statusdisplay: damage is the original's word for what is left of the hull and the systems", words.Trim() == "100%=None 97%=Minimal 85%=Slight 60%=Moderate 30%=Heavy 10%=Critical", words );
