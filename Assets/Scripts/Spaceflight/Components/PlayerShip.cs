@@ -40,6 +40,15 @@ public class PlayerShip : MonoBehaviour
 	const float c_stepSeconds = 32.0f / 128.0f;
 	const int c_starSystemSteps = 12;
 
+	// the ship's steps in an encounter, as the original's (HYPER-OV #VES-SPEED, ACCELERATE, !S/A): each pass of its main loop (Encounter.c_passSeconds) with a
+	// direction held the ship moves its step, in cells (CombatController.c_unitsPerCell); the step starts at 1 and grows by one every 96 / ESPEED + 1 passes, where
+	// ESPEED is the larger of 2 and the ship's acceleration in G times the engines' health in percent over 100, up to the larger of 2 and 6 over the alien ships
+	// in the encounter (6 with one ship, 3 with two, 2 from three); with no direction held the ship stops at once and the step goes back to 1
+	const int c_encounterStepPasses = 96;
+	const int c_encounterSteps = 6;
+	float m_encounterPassTimer;
+	int m_encounterPasses;
+
 	// set to true when the engines are on (to accelerate) or off (to brake)
 	bool m_enginesAreOn;
 
@@ -132,7 +141,29 @@ public class PlayerShip : MonoBehaviour
 				var location = playerData.m_general.m_location;
 				var enginesFactor = playerData.m_playerShip.GetSystemFactor( PD_PlayerShip.ShipSystem.Engines );
 
-				if ( ( location != PD_General.Location.Hyperspace ) && ( location != PD_General.Location.StarSystem ) )
+				if ( location == PD_General.Location.Encounter )
+				{
+					var aliens = ( SpaceflightController.m_instance.m_encounter != null ) ? SpaceflightController.m_instance.m_encounter.GetAlienShipsPresent() : 0;
+					var topStep = Mathf.Max( 2, c_encounterSteps / Mathf.Max( 1, aliens ) );
+					var espeed = Mathf.Max( 2, Mathf.FloorToInt( playerData.m_playerShip.m_acceleration * enginesFactor ) );
+					var passesPerStep = c_encounterStepPasses / espeed + 1;
+
+					m_encounterPassTimer += Time.deltaTime;
+
+					for ( var pass = 0; ( pass < 8 ) && ( m_encounterPassTimer >= Encounter.c_passSeconds ); pass++ )
+					{
+						m_encounterPassTimer -= Encounter.c_passSeconds;
+						m_encounterPasses++;
+					}
+
+					var step = Mathf.Min( 1 + m_encounterPasses / passesPerStep, topStep );
+					var cellsPerSecond = CombatController.c_unitsPerCell / Encounter.c_passSeconds;
+
+					// destroyed engines move nothing (DAMAGE-OV WF2AC)
+					playerData.m_general.m_currentMaximumSpeed = ( enginesFactor > 0.0f ) ? topStep * cellsPerSecond : 0.0f;
+					playerData.m_general.m_currentSpeed = ( enginesFactor > 0.0f ) ? step * cellsPerSecond : 0.0f;
+				}
+				else if ( ( location != PD_General.Location.Hyperspace ) && ( location != PD_General.Location.StarSystem ) )
 				{
 					// elsewhere (an encounter above all) damaged engines are slower, and accelerate more slowly, in proportion to their health (the original's %ENGINE
 					// counts in an encounter's acceleration, HYPER-OV !S/A)
@@ -188,10 +219,13 @@ public class PlayerShip : MonoBehaviour
 					WarnOfFuel( enduriumBefore, GetEnduriumTenths(), stepTenths );
 				}
 			}
-			else if ( ( playerData.m_general.m_location == PD_General.Location.Hyperspace ) || ( playerData.m_general.m_location == PD_General.Location.StarSystem ) )
+			else if ( ( playerData.m_general.m_location == PD_General.Location.Hyperspace ) || ( playerData.m_general.m_location == PD_General.Location.StarSystem ) || ( playerData.m_general.m_location == PD_General.Location.Encounter ) )
 			{
-				// with no direction held the original's ship takes no step: it stops at once
+				// with no direction held the original's ship takes no step: it stops at once (in an encounter the step goes back to 1: HYPER-OV, KEYINC)
 				playerData.m_general.m_currentSpeed = 0.0f;
+
+				m_encounterPassTimer = 0.0f;
+				m_encounterPasses = 0;
 			}
 			else
 			{
