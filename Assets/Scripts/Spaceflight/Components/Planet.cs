@@ -597,6 +597,18 @@ public class Planet : MonoBehaviour
 		return ( m_planetGenerator != null ) ? m_planetGenerator.m_waterMaskTexture : null;
 	}
 
+	// the albedo map the ground is drawn with on the surface (the terrain): its natural one, as detailed as in orbit, when it shows the natural look, else
+	// its generator's (the terrain keeps the generator's elevation, water mask and normals in either look)
+	public Texture GetTerrainAlbedoMap()
+	{
+		if ( ShowsNaturalLook() && MakeNaturalLook( NaturalPlanet.GetOrbitMapWidth() ) )
+		{
+			return m_naturalPlanet.GetAlbedoMap();
+		}
+
+		return ( m_planetGenerator != null ) ? m_planetGenerator.m_albedoTexture : null;
+	}
+
 	// the natural look of this planet (null when it is not shown; for the probe)
 	public NaturalPlanet GetNaturalPlanet()
 	{

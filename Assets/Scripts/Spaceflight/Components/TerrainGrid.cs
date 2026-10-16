@@ -78,6 +78,16 @@ public class TerrainGrid : MonoBehaviour
 		m_initialized = true;
 	}
 
+	// puts the albedo map the ground is drawn with (the planet's natural one in the natural look: Planet.GetTerrainAlbedoMap) on the material, after the
+	// elevation map or the baked-in elevation have put the generator's there
+	public void SetAlbedoMap( Texture albedoMap )
+	{
+		if ( ( m_material != null ) && ( albedoMap != null ) )
+		{
+			m_material.SetTexture( "_MainTex", albedoMap );
+		}
+	}
+
 	// call this to set an elevation texture and switch the mode to dynamic terrain grid
 	public void SetElevationMap( Texture2D elevationTexture, PlanetGenerator planetGenerator )
 	{

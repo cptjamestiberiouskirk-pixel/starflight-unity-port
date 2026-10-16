@@ -11925,6 +11925,49 @@ public class ClaudeProbe : MonoBehaviour
 			yield return Frames( 10 );
 		}
 
+		// ---- 3c. on the surface: the ground of planet 94 of Arth's system drawn with the planet's natural albedo map in the natural look (the ship's view and
+		// the terrain vehicle's), the generator's in the original look, switched at once while the terrain vehicle is out
+		{
+			var landed = new bool[ 1 ];
+
+			EnsureCrew();
+
+			yield return LandInTheArthSystemAt( 94, Vector3.zero, landed );
+			yield return Frames( 10 );
+
+			var planetController = controller.m_starSystem.GetPlanetController( 94 );
+			var natural = planetController.GetNaturalPlanet();
+			var vehicleMaterial = FieldOrNull( controller.m_disembarked.m_terrainGrid, "m_material" ) as Material;
+			var shipMaterial = FieldOrNull( controller.m_planetside.m_terrainGrid, "m_material" ) as Material;
+			var vehicleNatural = ( natural != null ) && ( vehicleMaterial != null ) && ( vehicleMaterial.GetTexture( "_MainTex" ) == natural.GetAlbedoMap() );
+			var shipNatural = ( natural != null ) && ( shipMaterial != null ) && ( shipMaterial.GetTexture( "_MainTex" ) == natural.GetAlbedoMap() );
+			var location = DataController.m_instance.m_playerData.m_general.m_location;
+
+			RenderCameraPicture( camera, System.IO.Path.Combine( folder, "terrain94_natural.png" ) );
+
+			PlanetLook.SetLook( PlanetLook.Look.Original, false );
+
+			yield return Frames( 3 );
+
+			var vehicleOriginal = ( vehicleMaterial != null ) && ( vehicleMaterial.GetTexture( "_MainTex" ) == planetController.GetPlanetGenerator().m_albedoTexture );
+
+			RenderCameraPicture( camera, System.IO.Path.Combine( folder, "terrain94_original.png" ) );
+
+			PlanetLook.SetLook( PlanetLook.Look.Natural, false );
+
+			yield return Frames( 3 );
+
+			var vehicleNaturalAgain = ( vehicleMaterial != null ) && ( planetController.GetNaturalPlanet() != null ) && ( vehicleMaterial.GetTexture( "_MainTex" ) == planetController.GetNaturalPlanet().GetAlbedoMap() );
+
+			Log( "naturalplanets: on planet 94 (" + location + "): the terrain vehicle's ground natural " + vehicleNatural + ", the ship's natural " + shipNatural + ", original after the switch " + vehicleOriginal + ", natural again " + vehicleNaturalAgain );
+
+			Check( "naturalplanets: on the surface the ground is drawn with the planet's natural colors in the natural look, and its own in the original look, switched at once", ( location == PD_General.Location.Disembarked ) && vehicleNatural && shipNatural && vehicleOriginal && vehicleNaturalAgain, location + ": " + vehicleNatural + " " + shipNatural + " " + vehicleOriginal + " " + vehicleNaturalAgain );
+
+			controller.SwitchLocation( PD_General.Location.StarSystem );
+
+			yield return Frames( 10 );
+		}
+
 		// ---- 4. the save panel's Colors screen: the planets' two looks, the one in use marked, a click switches it (and is the player's setting, put back after)
 		PressEscape();
 

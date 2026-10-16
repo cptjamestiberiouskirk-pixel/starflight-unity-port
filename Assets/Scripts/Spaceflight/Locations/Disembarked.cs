@@ -33,6 +33,35 @@ public class Disembarked : MonoBehaviour
 	// the planet generator
 	PlanetGenerator m_planetGenerator;
 
+	// unity awake
+	void Awake()
+	{
+		// the ground takes the look the player picks at once
+		PlanetLook.Changed += ApplyLook;
+	}
+
+	// unity on destroy
+	void OnDestroy()
+	{
+		PlanetLook.Changed -= ApplyLook;
+	}
+
+	// puts the look the player has picked on the ground, while the terrain vehicle is out
+	void ApplyLook()
+	{
+		if ( !gameObject.activeInHierarchy || ( SpaceflightController.m_instance == null ) )
+		{
+			return;
+		}
+
+		var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( DataController.m_instance.m_playerData.m_general.m_currentPlanetId );
+
+		if ( ( planetController != null ) && planetController.HasMaps() )
+		{
+			m_terrainGrid.SetAlbedoMap( planetController.GetTerrainAlbedoMap() );
+		}
+	}
+
 	// unity start
 	void Start()
 	{
@@ -187,6 +216,9 @@ public class Disembarked : MonoBehaviour
 		var elevationTexture = m_planetGenerator.CreateElevationTexture();
 
 		m_terrainGrid.SetElevationMap( elevationTexture, m_planetGenerator );
+
+		// in the look the player has picked
+		m_terrainGrid.SetAlbedoMap( planetController.GetTerrainAlbedoMap() );
 
 		// place the arth ship at the selected landing coordinates
 		var shipPosition = Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude );
