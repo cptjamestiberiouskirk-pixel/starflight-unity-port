@@ -36715,8 +36715,24 @@ public class ClaudeProbe : MonoBehaviour
 			yield break;
 		}
 
-		// ---- 3. into orbit around Sphexi: the drones
-		yield return PtFlyToPlanetAndEnter( orbSite.m_planetId, PD_General.Location.Encounter, done );
+		// ---- 3. into orbit around Sphexi: the drones (a group that meets the ship on the way is flown away from, as a player would, and the planet is tried again:
+		// the minute without encounters after it keeps the group off)
+		for ( var attempt = 0; attempt < 3; attempt++ )
+		{
+			yield return PtFlyToPlanetAndEnter( orbSite.m_planetId, PD_General.Location.Encounter, done );
+
+			if ( ( playerData.m_general.m_location != PD_General.Location.Encounter ) || ( playerData.m_general.m_currentEncounterId == 305 ) )
+			{
+				break;
+			}
+
+			s_ptEncounters.Add( "on the way to Sphexi's planet: " + PtEncounterText() + ", flown away from" );
+
+			Log( "playthrough-6: met on the way to the planet: " + PtEncounterText() + "; flying out of it" );
+
+			yield return PtFlyOutOfEncounter( 4.0f );
+			yield return Frames( 10 );
+		}
 
 		Log( "playthrough-6: going into orbit around Sphexi: " + playerData.m_general.m_location + ( ( playerData.m_general.m_location == PD_General.Location.Encounter ) ? " " + PtEncounterText() : "" ) + ", messages '" + PtMessages() + "'" );
 
