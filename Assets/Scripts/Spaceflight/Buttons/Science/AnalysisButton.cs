@@ -79,11 +79,11 @@ public class AnalysisButton : ShipButton
 		return armed ? "Armed" : "Not armed";
 	}
 
-	// a line of the analysis the science officer gives with a chance of their science skill / 2 percent, else "Unknown" (starship.txt: "For each header there is a
-	// chance that the Science Officer will give some information. That % chance is = the Science Officer's skill / 2")
+	// a line of a planet's analysis the science officer gives with a chance of their science skill / 2 percent, else the original's "NOT CERTAIN" (ANALYZE-OV
+	// ?.CERTAIN, as for an alien ship's lines)
 	static string Known( string value, int scienceSkill )
 	{
-		return ( UnityEngine.Random.Range( 0.0f, 100.0f ) < scienceSkill / 2.0f ) ? value : "Unknown";
+		return Certain( value, scienceSkill );
 	}
 
 	public override bool Execute()
@@ -135,8 +135,9 @@ public class AnalysisButton : ShipButton
 					GD_Planet planet = gameData.m_planetList[ playerData.m_general.m_currentPlanetId ];
 
 					// object and orbit number
-					// (the object's class is given whatever the science officer's skill, every other line by the skill's chance)
-					text += "Object: <color=white>Planet</color>   Orbit Number: <color=white>" + Known( planet.m_orbitPosition.ToString(), skill ) + "</color>\n";
+					// (the object's class and the orbit number are given whatever the science officer's skill, as the original's .ORBIT is never in doubt, every
+					// other line by the skill's chance)
+					text += "Object: <color=white>Planet</color>   Orbit Number: <color=white>" + planet.m_orbitPosition + "</color>\n";
 
 					// surface
 					text += "Predominant Surface: <color=white>" + Known( planet.GetSurfaceText(), skill ) + "</color>\n";
@@ -144,7 +145,7 @@ public class AnalysisButton : ShipButton
 					// gravity (once it is known, Land warns of a gravity the ship cannot land in or launch from: the original's ?G-AWARE)
 					var gravityText = Known( planet.GetGravityText(), skill );
 
-					if ( gravityText != "Unknown" )
+					if ( gravityText != "Not certain" )
 					{
 						SpaceflightController.m_instance.m_gravityAnalysedPlanetId = planet.m_id;
 					}
