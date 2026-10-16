@@ -1330,6 +1330,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportUnknownArtifacts();
 				break;
 
+			case "starport-knownartifacts":
+				yield return ScenarioStarportKnownArtifacts();
+				break;
+
 			case "viewoverlays":
 				yield return ScenarioViewOverlays();
 				break;
@@ -32521,6 +32525,68 @@ public class ClaudeProbe : MonoBehaviour
 		yield return ClosePanel( depot, "trade depot" );
 
 		Finish( "scenario=starport-unknownartifacts checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// a new game knows the four artifacts the original's does: those whose analysis byte (ARTIFACT field 0x1d) is set in the shipped game's new-game data
+	// (START\STARB.COM): the Whining Orb, the Flat Device, the Red Herring and the Terrain Vehicle Debris, so the Sell list shows their value, not "???"
+	IEnumerator ScenarioStarportKnownArtifacts()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var depot = FindPanel<TradeDepotPanel>();
+
+		var knownNames = new List<string>();
+
+		foreach ( var reference in playerData.m_knownArtifacts.m_artifactList )
+		{
+			knownNames.Add( gameData.m_artifactList[ reference.m_artifactId ].m_name );
+		}
+
+		knownNames.Sort( StringComparer.Ordinal );
+
+		// the Red Herring in the hold, on the Sell list
+		var redHerring = -1;
+
+		for ( var id = 0; id < gameData.m_artifactList.Length; id++ )
+		{
+			if ( gameData.m_artifactList[ id ].m_name == "Red Herring" )
+			{
+				redHerring = id;
+			}
+		}
+
+		playerData.m_playerShip.m_artifactStorage.m_artifactList.Clear();
+		playerData.m_playerShip.m_artifactStorage.Add( redHerring );
+
+		yield return OpenPanel( depot, "trade depot" );
+
+		Call( depot, "SwitchToSellItemState", true );
+
+		var rows = depot.m_unitValueListText.text.Replace( "\r", "" ).Split( '\n' );
+		var listedValue = "(not listed)";
+
+		foreach ( var item in GetField( depot, "m_itemList" ) as IList )
+		{
+			if ( ( (int) GetField( item, "m_type" ) == 1 ) && ( (int) GetField( item, "m_id" ) == redHerring ) )
+			{
+				var row = (int) GetField( item, "m_row" );
+
+				listedValue = ( ( row >= 0 ) && ( row < rows.Length ) ) ? rows[ row ].Trim() : "(no row)";
+			}
+		}
+
+		Call( depot, "SwitchToMenuBarState" );
+
+		yield return ClosePanel( depot, "trade depot" );
+
+		var expected = "Flat Device, Red Herring, Terrain Vehicle Debris, Whining Orb";
+
+		Log( "starport-knownartifacts: known at the start: " + string.Join( ", ", knownNames ) + " | the Red Herring on the Sell list: " + listedValue );
+
+		Check( "starport-knownartifacts: a new game knows the Whining Orb, the Flat Device, the Red Herring and the Terrain Vehicle Debris, as the original's", string.Join( ", ", knownNames ) == expected, string.Join( ", ", knownNames ) );
+		Check( "starport-knownartifacts: the Sell list shows the Red Herring's value", listedValue == gameData.m_artifactList[ redHerring ].m_actualValue.ToString(), listedValue );
+
+		Finish( "scenario=starport-knownartifacts checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// what is drawn over the 3D views keeps the dark colours of the scheme in use in the light mode too (the light mode's dark accents and texts were hard

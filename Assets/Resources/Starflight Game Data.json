@@ -863,7 +863,7 @@
       "m_thrynnPrice": "",
       "m_actualValue": "32750",
       "m_availableInStarport": "",
-      "m_knownAtStart": "",
+      "m_knownAtStart": true,
       "m_analysisText": "Starport analysis is impossible to obtain because this artifact is too voluminous to be transported."
     },
     {
@@ -973,7 +973,7 @@
       "m_thrynnPrice": "",
       "m_actualValue": "0",
       "m_availableInStarport": "",
-      "m_knownAtStart": "",
+      "m_knownAtStart": true,
       "m_analysisText": "Analysis of this artifact has revealed very little of interest. It has slight value as an alien curio, but otherwise is totally useless to us."
     },
     {
