@@ -4292,11 +4292,9 @@ public class Encounter : MonoBehaviour
 				var vesselId = alienShipList[ currentSelection - 1 ].m_vesselId;
 				var vessel = gameData.m_vesselList[ vesselId ];
 
-				// calculate salvage value based on vessel type (mineral density represents salvage potential)
-				var salvageDensity = UnityEngine.Mathf.Clamp( vessel.m_mass / 5, 10, 80 );
-
-				// start the debris scan (with the picture of what is left of this vessel, and the mass of the vessel in tons)
-				SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.StartScanning( scanType, 0, vessel.m_mass, 0, salvageDensity, vesselId );
+				// start the debris scan (with the picture of what is left of this vessel, and the mass of the vessel in tons): debris reads no Bio and no Energy, as the
+				// original's (SCIENCE WF239 zeroes the reading for debris)
+				SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.StartScanning( scanType, 0, vessel.m_mass, 0, 0, vesselId );
 			}
 			else
 			{

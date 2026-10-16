@@ -2964,7 +2964,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		// a wreck has the mass of its vessel in tons (it was one power of ten too high) and its salvage potential as minerals
 		yield return ScanShip( 2, true, true, result => scan = result );
-		Check( "spemin scout wreck readout: 4x10^2 tons, min, with no percent sign", scan.Contains( "finished=True" ) && scan.Contains( "4x10<sup>2</sup>" ) && scan.Contains( "Min: " ) && !scan.Contains( "Energy" ) && !scan.Contains( "%" ), scan );
+		Check( "spemin scout wreck readout: 4x10^2 tons, bio 0 and energy 0 as the original's, with no percent sign", scan.Contains( "finished=True" ) && scan.Contains( "4x10<sup>2</sup>" ) && scan.Contains( "Bio: <color=\"white\">0</color>" ) && scan.Contains( "Energy: <color=\"white\">0</color>" ) && !scan.Contains( "Min: " ) && !scan.Contains( "%" ), scan );
 
 		// every slot of the two texture arrays is either empty or a texture that is there (a reference to a missing asset reads as null too, so count the slots that are set)
 		var slotsSet = 0;
@@ -22233,11 +22233,20 @@ public class ClaudeProbe : MonoBehaviour
 
 		var readout = MessageList();
 
+		// ---- 6. the analysis of the wreck gives what it is made of, as the original's
+		controller.m_messages.Clear();
+
+		new AnalysisButton().Execute();
+
+		var analysis = MessageList();
+
 		ClearMissiles();
 		LeaveEncounter();
 		yield return Frames( 10 );
 
 		controller.m_encounterRange = encounterRange;
+
+		Log( "salvage: the analysis of the wreck: " + analysis );
 
 		Log( "salvage: " + vessel.m_name + " (endurium " + vessel.m_enduriumVolume + ", element " + vessel.m_elementIdA + " " + vessel.m_elementVolumeA + ") | hold " + holdBefore + " -> far " + holdFar + " | endurium " + enduriumBefore + " -> " + enduriumAfter + ", element " + elementBefore + " -> " + elementAfter + " | " + salvageMessage + " | again " + holdOnce + " -> " + holdAgain + " | full hold: " + fullMessage + " | wreck readout: " + readout );
 
@@ -22248,6 +22257,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "salvage: a wreck is salvaged once", holdAgain == holdOnce, holdOnce + " -> " + holdAgain );
 		Check( "salvage: with the hold full there is no room for the debris", fullMessage.Contains( "no room in the cargo hold" ), fullMessage );
 		Check( "salvage: the sensors read what a wreck is made of", readout.Contains( "Object Constituents" ) && readout.Contains( elementName ), readout );
+		Check( "salvage: the analysis of a wreck gives its constituents, as the original's", analysis.Contains( "Constituents:" ) && analysis.Contains( elementName ), analysis );
 
 		Finish( "scenario=salvage endurium=" + ( enduriumAfter - enduriumBefore ) + " element=" + ( elementAfter - elementBefore ), 0 );
 	}

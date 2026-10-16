@@ -288,27 +288,7 @@ public class SensorsDisplay : ShipDisplay
 					// a wreck shows what it is made of: the debris of its vessel (the original's vessel records)
 					SpaceflightController.m_instance.m_messages.Clear();
 
-					string text = "Object Constituents:";
-
-					if ( ( m_debrisVesselId >= 0 ) && ( m_debrisVesselId < gameData.m_vesselList.Length ) )
-					{
-						var wreck = gameData.m_vesselList[ m_debrisVesselId ];
-
-						if ( wreck.m_enduriumVolume > 0 )
-						{
-							text += "\n<color=white>" + gameData.m_elementList[ gameData.m_misc.m_enduriumElementId ].m_name + "</color>";
-						}
-
-						foreach ( var debris in new[] { new[] { wreck.m_elementIdA, wreck.m_elementVolumeA }, new[] { wreck.m_elementIdB, wreck.m_elementVolumeB }, new[] { wreck.m_elementIdC, wreck.m_elementVolumeC } } )
-						{
-							if ( ( debris[ 1 ] > 0 ) && ( debris[ 0 ] >= 0 ) && ( debris[ 0 ] < gameData.m_elementList.Length ) )
-							{
-								text += "\n<color=white>" + gameData.m_elementList[ debris[ 0 ] ].m_name + "</color>";
-							}
-						}
-					}
-
-					SpaceflightController.m_instance.m_messages.AddText( text );
+					SpaceflightController.m_instance.m_messages.AddText( "Object Constituents:" + GetConstituentLines( m_debrisVesselId ) );
 
 					break;
 				}
@@ -396,14 +376,44 @@ public class SensorsDisplay : ShipDisplay
 			m_massText.text = "Mass: <color=\"white\">" + massBase + "x10<sup>" + massPower + "</sup></color> Tons";
 		}
 
-		// update the bio text (the sensors read the minerals of a planet or of debris, and the energy of a vessel, as in the original)
-		var secondLabel = IsVessel( m_scanType ) ? "Energy" : "Min";
+		// update the bio text (the sensors read the minerals of a planet, and the energy of a vessel or of debris, as in the original: SCIENCE WF239 shows Bio and
+		// Energy for both, 0 for debris)
+		var secondLabel = ( IsVessel( m_scanType ) || ( m_scanType == ScanType.Debris ) ) ? "Energy" : "Min";
 
 		// the original shows plain numbers here, with no percent sign
 		m_bioMinText.text = "Bio: <color=\"white\">" + Mathf.RoundToInt( scannedBio ) + "</color>   " + secondLabel + ": <color=\"white\">" + Mathf.RoundToInt( scannedMinerals ) + "</color>";
 	}
 
 	// returns true if this scan type is a vessel (and not a planet, debris or an unknown object)
+	// what a vessel's wreck is made of, a line each: its Endurium, then its elements (the vessel's record, as the original's ANALYZE-OV .DELEM reads it)
+	public static string GetConstituentLines( int vesselId )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var text = "";
+
+		if ( ( vesselId < 0 ) || ( vesselId >= gameData.m_vesselList.Length ) )
+		{
+			return text;
+		}
+
+		var wreck = gameData.m_vesselList[ vesselId ];
+
+		if ( wreck.m_enduriumVolume > 0 )
+		{
+			text += "\n<color=white>" + gameData.m_elementList[ gameData.m_misc.m_enduriumElementId ].m_name + "</color>";
+		}
+
+		foreach ( var debris in new[] { new[] { wreck.m_elementIdA, wreck.m_elementVolumeA }, new[] { wreck.m_elementIdB, wreck.m_elementVolumeB }, new[] { wreck.m_elementIdC, wreck.m_elementVolumeC } } )
+		{
+			if ( ( debris[ 1 ] > 0 ) && ( debris[ 0 ] >= 0 ) && ( debris[ 0 ] < gameData.m_elementList.Length ) )
+			{
+				text += "\n<color=white>" + gameData.m_elementList[ debris[ 0 ] ].m_name + "</color>";
+			}
+		}
+
+		return text;
+	}
+
 	static bool IsVessel( ScanType scanType )
 	{
 		return ( scanType != ScanType.Planet ) && ( scanType != ScanType.Debris ) && ( scanType != ScanType.Unknown );
