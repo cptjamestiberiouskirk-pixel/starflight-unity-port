@@ -88,6 +88,7 @@ What the probe does:
 | `combat` | a missile in the air while the game is paused, the size of an explosion that is used again, a launch with every missile of the pool in the air, and a ship that is fired at and hit again while it explodes |
 | `combatwounds` | the combat messages and the crew's wounds of the original (DAMAGE-OV): sixty hits through lowered shields wound the crew at times, the text window says how badly ("is slightly wounded.") and gives no damage numbers, and a plasma bolt says "Plasma bolt" (about 25 s) |
 | `encounters` | a ship that has just launched and the hyperspace encounters, the side the aliens appear on in a star system, two encounters that reach the ship in the same frame, and the radar with an encounter dead astern |
+| `encounterwaves` | the first wave of an encounter as the original's (HYPERMSG-OV `+A-VESS`): a Spemin encounter of 6 ships, 3 at a time, entered 30 times comes with 1, 2 and 3 ships and never with none or more than 3 (the old code always brought 3) (about 55 s) |
 | `comms` | the captain's name in what the aliens say, Mechan 9 after five right answers with and without having fired on the Mechans, a press of the fire button when the aliens ask a question before the press is carried out, and a Thrynn patrol's statements least used first: six in the order of the game data, then three more at a second meeting carrying on |
 | `systemtravel` | the messages of travel in a star system in the original's words: Maneuver after the launch and leaving orbit say Leaving orbit... and ...Commencing system travel, over Arth Standing by to dock with Starport, over planet 94 Standing by to orbit and Press Enter to orbit, away from the planets Outside orbital range, and docking Closing docking bay doors (about 45 s) |
 | `terrain` | the crater maps (read once, the same values as the textures), the game's random numbers after rocks are placed, an object on the right edge of the map, a scan while a deposit is being picked up, and scan labels after going back into the ship |
@@ -288,7 +289,7 @@ What the probe does:
 | `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 | `combatmessages` | the combat messages are the original's: WEAPONS NOT ARMED, NO TARGET PRESENT, WEAPON NOT AVAILABLE and OUT OF FUEL! when a weapon cannot fire, nothing of the port's own when the player's shot hits, and LASER CLASS n (LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (239 scenarios, about 199 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (240 scenarios, about 200 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### The playthrough
 
