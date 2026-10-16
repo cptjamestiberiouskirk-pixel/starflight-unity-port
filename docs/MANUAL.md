@@ -100,7 +100,7 @@ Time stands still while you are docked. The clock only runs once you launch.
 
 ### Operations
 
-- **Notices**: Interstel's dated bulletins. New ones are typed out for you; More, Previous and Next page through them, and Quit stops one. With nothing new, it offers to repeat the last notice.
+- **Notices**: Interstel's dated bulletins. New ones are typed out for you a paragraph at a time, with time to read each one; More shows the next paragraph at once, Previous and Next page through the notices, and Quit stops one. With nothing new, it offers to repeat the last notice.
 - **Evaluation**: Interstel's verdict on each planet you have recommended for colonists, one to a page.
 
 ### Personnel
