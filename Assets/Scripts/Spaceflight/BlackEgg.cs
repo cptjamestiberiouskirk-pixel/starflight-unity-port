@@ -199,6 +199,7 @@ public class BlackEgg
 		{
 			// the game is won: no star flares any more
 			playerData.m_general.m_gameWon = true;
+			playerData.m_general.m_winTime = playerData.m_general.m_gameTime;
 
 			AddStoryText( "CrystalPlanetDestroyed" );
 
