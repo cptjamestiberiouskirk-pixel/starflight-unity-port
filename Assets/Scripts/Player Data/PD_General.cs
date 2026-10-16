@@ -48,6 +48,10 @@ public class PD_General
 	public int m_day;
 	public int m_hour;
 	public int m_minute;
+
+	// the day the ship last left the Starport, from which the crew left behind has rested (the original's WEA07, PORTMENU-OV WEA0B; 0 in a new game and in a
+	// save from before it was kept)
+	public int m_lastLaunchDay;
 	public int m_second;
 	public int m_millisecond;
 
@@ -291,6 +295,7 @@ public class PD_General
 
 		// reset the current game time
 		m_day = 0;
+		m_lastLaunchDay = 0;
 		m_hour = 0;
 		m_minute = 0;
 		m_second = 0;

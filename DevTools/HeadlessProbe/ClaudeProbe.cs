@@ -878,6 +878,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportArtifactStock();
 				break;
 
+			case "starport-rest":
+				yield return ScenarioStarportRest();
+				break;
+
 			case "starport-notices":
 				yield return ScenarioStarportNotices();
 				break;
@@ -12406,6 +12410,67 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		return sum;
+	}
+
+	// the crew left at the Starport rests: when the ship leaves, every living crew member on file who is not on board gains 20 points of vitality a day since the
+	// ship last left, up to 100 (PORTMENU-OV WEA0B); the crew on board and the dead do not (a control)
+	IEnumerator ScenarioStarportRest()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		// a ship that can launch, two days after it last left
+		EnsureCrew();
+
+		playerData.m_playerShip.m_name = "Probe";
+		playerData.m_playerShip.m_enginesClass = 1;
+
+		if ( playerData.m_playerShip.m_elementStorage.Find( 5 ) == null )
+		{
+			playerData.m_playerShip.AddElement( 5, 50 );
+		}
+
+		SetFieldIfPresent( playerData.m_general, "m_lastLaunchDay", 10 );
+		SetStarportDay( 12 );
+
+		// left behind: one hurt, one nearly whole, one dead; on board: the navigator, hurt
+		var hurt = AddPerson( "Resting", 40.0f, 50 );
+		var nearlyWhole = AddPerson( "Nearly", 90.0f, 50 );
+		var dead = AddPerson( "Gone", 0.0f, 50 );
+
+		dead.m_isDead = true;
+
+		var navigator = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Navigator );
+
+		navigator.m_vitality = 40.0f;
+
+		var panel = FindPanel<DockingBayPanel>();
+
+		if ( panel == null )
+		{
+			Finish( "scenario=starport-rest abort: no docking bay panel", 2 );
+			yield break;
+		}
+
+		// the crew goes aboard through the docking bay
+		PanelController.m_instance.Open( panel );
+
+		var transporting = panel.IsTransporting();
+		var start = Time.realtimeSinceStartup;
+
+		while ( panel.IsTransporting() && ( Time.realtimeSinceStartup - start < 20.0f ) )
+		{
+			yield return null;
+		}
+
+		var lastLaunchDay = IntFieldOrMin( playerData.m_general, "m_lastLaunchDay" );
+
+		Log( "starport-rest: two days after the last launch, went aboard " + transporting + " | left behind: Resting 40 -> " + hurt.m_vitality + ", Nearly 90 -> " + nearlyWhole.m_vitality + ", Gone (dead) -> " + dead.m_vitality + " | on board: the navigator 40 -> " + navigator.m_vitality + " | last launch day " + lastLaunchDay );
+
+		Check( "starport-rest: a crew member left at the Starport gains 20 points a day since the ship last left (40 -> 80 in two days), up to 100 (90 -> 100)", transporting && ( hurt.m_vitality == 80.0f ) && ( nearlyWhole.m_vitality == 100.0f ), hurt.m_vitality + ", " + nearlyWhole.m_vitality );
+		Check( "starport-rest: the crew on board and the dead do not rest (a control)", ( navigator.m_vitality < 50.0f ) && ( dead.m_vitality == 0.0f ), "navigator " + navigator.m_vitality + ", dead " + dead.m_vitality );
+		Check( "starport-rest: the launch day is kept for the next rest", lastLaunchDay == 12, lastLaunchDay.ToString() );
+
+		Finish( "scenario=starport-rest checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- Low: the ship's log after an empty log (where the list is scrolled to, and the two loops that scroll it)

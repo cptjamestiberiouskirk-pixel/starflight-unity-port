@@ -273,6 +273,7 @@ What the probe does:
 | `starport-interest` | the bank's interest: less than 1 M.U. pays nothing and the days count on, 100 M.U. over 250 days earn 10 with an Interest row, a recommendation starts the count again, a save file from before the interest counts from today, and going aboard through the real docking bay pays 6,000 on 100,000 M.U. for 150 days (about 20 s) |
 | `starport-specimens` | a specimen in the ship's hold is listed for sale at the Trade Depot under Specimens at half the value saved with it (617 for 1,234), and selling it pays that half and frees its room (about 25 s) |
 | `starport-artifactstock` | the Trade Depot keeps its special artifacts and the ten curios it bought last when the ship leaves the Starport: with the Flat Device and the Whining Orb it starts with, a Rod Device and twelve curios sold to it, the crew goes aboard through the real docking bay and the two curios sold first are gone, everything else is still there, and the stock's volume adds up (about 30 s) |
+| `starport-rest` | the crew left at the Starport rests: two days after the last launch, the crew goes aboard through the real docking bay, and a crew member left behind at 40 vitality is at 80 and one at 90 is at 100; the navigator on board and a dead crew member are unchanged (a control), and the launch day is kept for the next rest (about 30 s) |
 | `lifeformmodels` | the lifeform models: every body plan's prefab is in `Resources/Lifeforms` and fits a cube of one unit, the snake lies along +Z (the models face +Z), and on planet 92 every lifeform is its model, its skin in the species colour, standing on the ground (about 40 s) |
 | `lifeformpictures` | with `-Graphics`, renders the game view of planet 92 with the planet's lifeforms, then with all 17 models in a ring around the terrain vehicle, and a close-up of each model, into `Logs/lifeform-pictures/` (or `-probePictures`); without a graphics device it only lands (about 60 s) |
 | `look` | Look on planet 92 with one lifeform at a time beside the vehicle: a living plant (its body plan, not moving, alive), a test animal that wanders (wandering) and the plant made dead (dead) (about 40 s) |
@@ -293,7 +294,7 @@ What the probe does:
 | `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 | `combatmessages` | the combat messages are the original's: WEAPONS NOT ARMED, NO TARGET PRESENT, WEAPON NOT AVAILABLE and OUT OF FUEL! when a weapon cannot fire, nothing of the port's own when the player's shot hits, and LASER CLASS n (LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (244 scenarios, about 204 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (245 scenarios, about 205 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### The playthrough
 

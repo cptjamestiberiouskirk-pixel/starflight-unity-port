@@ -137,6 +137,36 @@ public class PlayerData
 		return null;
 	}
 
+	// how much a crew member left at the Starport recovers in a day (the original's 20 points of vitality, PORTMENU-OV WEA0B)
+	public const int c_starportRestPerDay = 20;
+
+	// call this when the ship leaves the Starport: the crew left behind has rested, every living crew member on file who is not on board gaining 20 points of
+	// vitality for each day since the ship last left, up to 100, as the original's does at launch (PORTMENU-OV WEA0B, after the interest) - returns how many rested
+	public int RestCrewAtTheStarport()
+	{
+		var days = Mathf.Max( 0, m_general.m_day - m_general.m_lastLaunchDay );
+		var rested = 0;
+
+		if ( ( days > 0 ) && ( m_personnel.m_personnelList != null ) )
+		{
+			foreach ( var file in m_personnel.m_personnelList )
+			{
+				if ( ( file == null ) || file.m_isDead || ( file.m_vitality <= 0.0f ) || ( file.m_vitality >= 100.0f ) || m_crewAssignment.IsOnBoard( file.m_fileId ) )
+				{
+					continue;
+				}
+
+				file.m_vitality = Mathf.Min( 100.0f, file.m_vitality + days * c_starportRestPerDay );
+
+				rested++;
+			}
+		}
+
+		m_general.m_lastLaunchDay = m_general.m_day;
+
+		return rested;
+	}
+
 	// the bank pays its interest up to today, as the original's does when the crew goes aboard the ship at the Starport and when a planet is recommended for
 	// colonization (BANK-OV, INT%, called from the Starport's docking bay and from the captain's Log Planet), with an INTEREST row in the ledger - nothing is paid
 	// while the interest comes to less than 1 M.U., and those days count on (the original moves its PORTDAT only when it pays); a recommendation starts the
