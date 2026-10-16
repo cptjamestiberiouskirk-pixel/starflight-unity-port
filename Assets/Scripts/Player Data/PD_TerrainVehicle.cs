@@ -187,4 +187,14 @@ public class PD_TerrainVehicle
 	{
 		return Mathf.CeilToInt( m_fuelRemaining * 100.0f );
 	}
+
+	// the reserve below the display's 0%: the original's tank holds 32767, its 0% is at 2000 of them and it is empty at none (TV-OV, MOVE-OV), so the reserve is
+	// 2000 / 30767 of the full tank, 6.5%
+	public const float c_reserve = 2000.0f / 30767.0f;
+
+	// true when the vehicle has used its reserve too
+	public bool IsOutOfFuel()
+	{
+		return m_fuelRemaining <= -c_reserve;
+	}
 }

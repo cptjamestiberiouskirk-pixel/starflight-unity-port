@@ -1502,6 +1502,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioFluxJump();
 				break;
 
+			case "tvfuel":
+				yield return ScenarioTerrainVehicleFuel();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -23410,7 +23414,7 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=lifeformpictures pictures=" + pictures, 0 );
 	}
 
-	// ---------------------------------------------------------------- phase 6: going uphill is slow
+	// ---------------------------------------------------------------- phase 6: going uphill is no slower (the original's MOVE-OV reads only the cell the vehicle is in)
 
 	// drives the terrain vehicle from this place in this direction at this speed for a second - returns how far it went
 	static IEnumerator DriveForASecond( Vector3 start, Vector3 direction, float speed, float[] distance )
@@ -23507,7 +23511,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "uphill: steepest rise " + bestRise + " at " + bestPlace + " towards " + bestDirection + " | a second uphill " + uphill[ 0 ] + ", downhill " + downhill[ 0 ] );
 
 		Check( "uphill: there is a slope to climb near the landing place (control)", bestRise > 0.1f, bestRise.ToString() );
-		Check( "uphill: the terrain vehicle goes less far up a slope than down it", ( downhill[ 0 ] > 1.0f ) && ( uphill[ 0 ] < downhill[ 0 ] * 0.85f ), uphill[ 0 ] + " / " + downhill[ 0 ] );
+		Check( "uphill: the terrain vehicle goes up a slope no slower than down it (the original's speed takes no slope: MOVE-OV SET-SPEED reads only the cell the vehicle is in; down the way may run into a liquid, which slows the wheels)", ( downhill[ 0 ] > 1.0f ) && ( uphill[ 0 ] >= downhill[ 0 ] * 0.95f ), uphill[ 0 ] + " / " + downhill[ 0 ] );
 
 		Finish( "scenario=uphill rise=" + bestRise + " up=" + uphill[ 0 ] + " down=" + downhill[ 0 ], 0 );
 	}
@@ -32701,7 +32705,8 @@ public class ClaudeProbe : MonoBehaviour
 		playerData.m_general.m_lastDisembarkedCoordinates = farAway;
 		controller.m_terrainVehicle.transform.localPosition = farAway;
 
-		vehicle.m_fuelRemaining = -0.05f;
+		// (the tank is empty at 6.5% below the display's 0%, the original's 2000 of 32767)
+		vehicle.m_fuelRemaining = -0.07f;
 
 		yield return Frames( 5 );
 
@@ -38221,6 +38226,263 @@ public class ClaudeProbe : MonoBehaviour
 		controller.m_encounterRange = encounterRange;
 
 		Finish( "scenario=fluxjump checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the steps of the original's terrain vehicle between two places, in its kilometers: the longer of the east-west and north-south distances (a step is a map cell
+	// along one axis or both; 6.4 km a degree of longitude, 5.3 a degree of latitude, as the port's display)
+	static float ProbeSurfaceSteps( Vector3 from, Vector3 to )
+	{
+		Tools.WorldToLatLongCoordinates( from, out var fromLongitude, out var fromLatitude );
+		Tools.WorldToLatLongCoordinates( to, out var toLongitude, out var toLatitude );
+
+		var degreesEastWest = Mathf.Repeat( toLongitude - fromLongitude + 180.0f, 360.0f ) - 180.0f;
+
+		return Mathf.Max( Mathf.Abs( degreesEastWest * 6.4f ), Mathf.Abs( ( toLatitude - fromLatitude ) * 5.3f ) );
+	}
+
+	// holds the surface's weather at this sky, rolled for the hour it is (so that no new hour changes it while it is measured)
+	static void HoldWeather( PlanetWeather.Sky sky )
+	{
+		var general = DataController.m_instance.m_playerData.m_general;
+		var skyField = typeof( PlanetWeather ).GetField( "s_sky", BindingFlags.NonPublic | BindingFlags.Static );
+		var hourField = typeof( PlanetWeather ).GetField( "s_rolledHour", BindingFlags.NonPublic | BindingFlags.Static );
+
+		if ( ( skyField != null ) && ( hourField != null ) )
+		{
+			skyField.SetValue( null, sky );
+			hourField.SetValue( null, general.m_day * 24 + general.m_hour );
+		}
+	}
+
+	// drives the terrain vehicle with its engines on from this place in this direction for some seconds of play under this sky - gives back the fuel used (of the
+	// full tank), the original's steps driven and the distance (in units)
+	static IEnumerator DriveMeasuringFuel( Vector3 start, Vector3 direction, float seconds, PlanetWeather.Sky sky, float[] fuelStepsDistance )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var general = playerData.m_general;
+		var vehicle = SpaceflightController.m_instance.m_terrainVehicle;
+
+		// (Move, while it runs, turns the engines off whenever the stick is centered)
+		if ( GetField( SpaceflightController.m_instance.m_buttonController, "m_currentButton" ) is MoveButton )
+		{
+			SpaceflightController.m_instance.m_buttonController.DeactivateButton();
+		}
+
+		vehicle.TurnOffEngines();
+		general.m_currentSpeed = 0.0f;
+		general.m_coordinates = start;
+		general.m_lastDisembarkedCoordinates = start;
+		vehicle.transform.localPosition = start;
+		general.m_currentDirection = direction;
+		playerData.m_terrainVehicle.m_fuelRemaining = 1.0f;
+
+		HoldWeather( sky );
+
+		yield return Frames( 3 );
+
+		var from = general.m_coordinates;
+		var fuelBefore = playerData.m_terrainVehicle.m_fuelRemaining;
+
+		vehicle.TurnOnEngines();
+
+		for ( var end = Time.time + seconds; Time.time < end; )
+		{
+			// (at a set speed, as the uphill scenario drives: the vehicle's acceleration comes from the ship's)
+			general.m_currentDirection = direction;
+			general.m_currentSpeed = 10.0f;
+
+			HoldWeather( sky );
+
+			yield return null;
+		}
+
+		var to = general.m_coordinates;
+
+		fuelStepsDistance[ 0 ] = fuelBefore - playerData.m_terrainVehicle.m_fuelRemaining;
+
+		vehicle.TurnOffEngines();
+		general.m_currentSpeed = 0.0f;
+
+		var delta = to - from;
+
+		delta.y = 0.0f;
+
+		fuelStepsDistance[ 1 ] = ProbeSurfaceSteps( from, to );
+		fuelStepsDistance[ 2 ] = delta.magnitude;
+
+		yield return Frames( 5 );
+	}
+
+	// the terrain vehicle burns its fuel as the original's (MOVE-OV SET-SPEED and WF29C): at every step, a map cell (a kilometer of the display), E/M times 100 over
+	// the weather's %EFF of a tank of 30767 above its reserve - E/M is 170 in a liquid, so there a step takes 170 whatever the place, a storm (%EFF 50) makes each
+	// step dear twice over and leaves the speed alone, land costs one and a half times its contour (16 to 127), and the tank is empty only at 6.5% below its 0%
+	IEnumerator ScenarioTerrainVehicleFuel()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+		ProbeKeyboard();
+
+		// planet 92 of the Arth system, which has seas
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var populator = FieldOrNull( controller.m_disembarked.m_terrainGrid, "m_terrainLifeforms" ) as TerrainLifeforms;
+		var planetGenerator = controller.m_starSystem.GetPlanetController( general.m_currentPlanetId ).GetPlanetGenerator();
+
+		if ( ( populator == null ) || ( planetGenerator == null ) || ( general.m_location != PD_General.Location.Disembarked ) )
+		{
+			Finish( "scenario=tvfuel abort: not out in the terrain vehicle (" + general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var start = general.m_coordinates;
+		var waterLevel = planetGenerator.m_waterElevation * controller.m_terrainVehicle.m_elevationScale;
+
+		// a stretch of sea near the landing place: a place and a direction with liquid under the next 60 units, the farther from the shore the better
+		var seaPlace = Vector3.zero;
+		var seaDirection = Vector3.forward;
+		var seaFound = false;
+
+		for ( var ring = 1; ( ring <= 40 ) && !seaFound; ring++ )
+		{
+			for ( var i = 0; ( i < 16 ) && !seaFound; i++ )
+			{
+				var angle = i * 22.5f * Mathf.Deg2Rad;
+				var place = start + new Vector3( Mathf.Sin( angle ), 0.0f, Mathf.Cos( angle ) ) * ring * 40.0f;
+
+				for ( var d = 0; ( d < 8 ) && !seaFound; d++ )
+				{
+					var dAngle = d * 45.0f * Mathf.Deg2Rad;
+					var direction = new Vector3( Mathf.Sin( dAngle ), 0.0f, Mathf.Cos( dAngle ) );
+					var allSea = true;
+
+					for ( var k = -20; ( k <= 80 ) && allSea; k += 4 )
+					{
+						// (over a liquid GetGround says no, and gives the liquid's surface; off the maps it gives 0)
+						allSea = !populator.GetGround( place + direction * k, out var ground ) && ( ground > 0.0f );
+					}
+
+					if ( allSea )
+					{
+						seaPlace = place;
+						seaDirection = direction;
+						seaFound = true;
+					}
+				}
+			}
+		}
+
+		Log( "tvfuel: planet " + general.m_currentPlanetId + ", water level " + waterLevel.ToString( "0.0" ) + ", a stretch of sea " + ( seaFound ? "at " + seaPlace + " towards " + seaDirection + " (" + Vector3.Distance( start, seaPlace ).ToString( "0" ) + " from the landing place)" : "not found" ) );
+
+		Check( "tvfuel: there is a stretch of sea near the landing place to drive on (control)", seaFound, seaFound.ToString() );
+
+		if ( !seaFound )
+		{
+			Finish( "scenario=tvfuel checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+			yield break;
+		}
+
+		// ---- 1. on the sea, clear: 170 a step
+		var measured = new float[ 3 ];
+
+		yield return DriveMeasuringFuel( seaPlace, seaDirection, 2.0f, PlanetWeather.Sky.Clear, measured );
+
+		var clearFuel = measured[ 0 ];
+		var clearSteps = measured[ 1 ];
+		var clearDistance = measured[ 2 ];
+		var clearPerStep = ( clearSteps > 0.0f ) ? ( clearFuel / clearSteps * 30767.0f ) : -1.0f;
+
+		// ---- 2. the same in a windstorm
+		yield return DriveMeasuringFuel( seaPlace, seaDirection, 2.0f, PlanetWeather.Sky.Windstorm, measured );
+
+		var stormPerStep = ( measured[ 1 ] > 0.0f ) ? ( measured[ 0 ] / measured[ 1 ] * 30767.0f ) : -1.0f;
+		var stormDistance = measured[ 2 ];
+
+		Log( "tvfuel: on the sea, clear: " + clearFuel.ToString( "0.00000" ) + " of the tank over " + clearSteps.ToString( "0.00" ) + " steps (" + clearDistance.ToString( "0.0" ) + " units): " + clearPerStep.ToString( "0.0" ) + " a step; in a windstorm " + stormPerStep.ToString( "0.0" ) + " a step over " + stormDistance.ToString( "0.0" ) + " units" );
+
+		Check( "tvfuel: on a sea a step of the vehicle takes 170 of the tank's 30767 (E/M in a liquid, whatever the place)", ( clearPerStep > 161.5f ) && ( clearPerStep < 178.5f ), clearPerStep.ToString( "0.0" ) );
+		Check( "tvfuel: in a storm each step takes twice as much (%EFF 50)", ( clearPerStep > 0.0f ) && ( stormPerStep / clearPerStep > 1.9f ) && ( stormPerStep / clearPerStep < 2.1f ), stormPerStep.ToString( "0.0" ) + " / " + clearPerStep.ToString( "0.0" ) );
+		Check( "tvfuel: and the storm does not slow the vehicle down", ( clearDistance > 1.0f ) && ( stormDistance / clearDistance > 0.95f ) && ( stormDistance / clearDistance < 1.05f ), stormDistance.ToString( "0.0" ) + " / " + clearDistance.ToString( "0.0" ) );
+
+		// ---- 3. on land near the landing place (the control: one and a half times a contour of 16 to 127)
+		var landPlace = start;
+		var landDirection = Vector3.forward;
+		var landFound = false;
+
+		for ( var ring = 0; ( ring <= 40 ) && !landFound; ring++ )
+		{
+			for ( var i = 0; ( i < 16 ) && !landFound; i++ )
+			{
+				var angle = i * 22.5f * Mathf.Deg2Rad;
+				var place = start + new Vector3( Mathf.Sin( angle ), 0.0f, Mathf.Cos( angle ) ) * ring * 40.0f;
+
+				for ( var d = 0; ( d < 8 ) && !landFound; d++ )
+				{
+					var dAngle = d * 45.0f * Mathf.Deg2Rad;
+					var direction = new Vector3( Mathf.Sin( dAngle ), 0.0f, Mathf.Cos( dAngle ) );
+					var allLand = true;
+
+					for ( var k = -10; ( k <= 60 ) && allLand; k += 4 )
+					{
+						allLand = populator.GetGround( place + direction * k, out var ground ) && ( ground > waterLevel + 2.0f );
+					}
+
+					if ( allLand )
+					{
+						landPlace = place;
+						landDirection = direction;
+						landFound = true;
+					}
+				}
+			}
+		}
+
+		yield return DriveMeasuringFuel( landPlace, landDirection, 2.0f, PlanetWeather.Sky.Clear, measured );
+
+		var landPerStep = ( measured[ 1 ] > 0.0f ) ? ( measured[ 0 ] / measured[ 1 ] * 30767.0f ) : -1.0f;
+
+		Log( "tvfuel: on land (" + landFound + ") at " + landPlace + " towards " + landDirection + ": " + landPerStep.ToString( "0.0" ) + " a step over " + measured[ 1 ].ToString( "0.00" ) + " steps" );
+
+		Check( "tvfuel: on land a step takes one and a half times the contour, 24 to 190 (control)", landFound && ( landPerStep >= 23.0f ) && ( landPerStep <= 191.0f ), landFound + ", " + landPerStep.ToString( "0.0" ) );
+
+		// ---- 4. the reserve: at 6% below the display's 0% the vehicle still drives, at 7% it is out of fuel
+		general.m_coordinates = start;
+		general.m_lastDisembarkedCoordinates = start;
+		controller.m_terrainVehicle.transform.localPosition = start;
+		general.m_currentDirection = landDirection;
+		playerData.m_terrainVehicle.m_fuelRemaining = -0.06f;
+		playerData.m_general.m_messageList.Clear();
+
+		yield return Frames( 5 );
+
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
+
+		for ( var end = Time.time + 0.5f; Time.time < end; )
+		{
+			yield return null;
+		}
+
+		var at6 = System.Text.RegularExpressions.Regex.Replace( string.Join( " | ", general.m_messageList ), "<[^>]*>", "" );
+		var drivingAt6 = !at6.Contains( "Out of fuel." ) && ( general.m_location == PD_General.Location.Disembarked );
+
+		playerData.m_terrainVehicle.m_fuelRemaining = -0.07f;
+
+		for ( var end = Time.time + 1.0f; ( Time.time < end ) && ( general.m_location == PD_General.Location.Disembarked ); )
+		{
+			yield return null;
+		}
+
+		var at7 = System.Text.RegularExpressions.Regex.Replace( string.Join( " | ", general.m_messageList ), "<[^>]*>", "" );
+
+		Log( "tvfuel: at -6% the messages read '" + at6 + "'; at -7% '" + at7 + "', location " + general.m_location );
+
+		Check( "tvfuel: at 6% below the display's 0% the vehicle still drives on its reserve (the original's tank is empty at 6.5%)", drivingAt6, at6 );
+		Check( "tvfuel: at 7% below it the vehicle is out of fuel (control)", at7.Contains( "Out of fuel." ), at7 );
+
+		Finish( "scenario=tvfuel checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
