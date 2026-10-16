@@ -239,19 +239,7 @@ public class TerrainVehicle : MonoBehaviour
 		}
 
 		// the fuel a step takes on the ground the vehicle is on
-		var maximumElevation = 1.25f * m_elevationScale;
-		var waterElevation = m_planetGenerator.m_waterElevation * m_elevationScale;
-
-		if ( tvPosition.y < waterElevation )
-		{
-			m_energyPerStep = c_liquidEnergyPerStep;
-		}
-		else
-		{
-			var contour = Mathf.Floor( Mathf.Lerp( c_shoreContour, c_highestContour, Mathf.Clamp01( ( tvPosition.y - waterElevation ) / ( maximumElevation - waterElevation ) ) ) );
-
-			m_energyPerStep = Mathf.Floor( contour * 3.0f / 2.0f );
-		}
+		m_energyPerStep = GetEnergyPerStepAtHeight( tvPosition.y );
 
 		// calculate the normal of the terrain between the center and the front wheels
 		var wheel1 = ApplyElevation( m_wheels[ 1 ].transform.position, false );
@@ -326,6 +314,33 @@ public class TerrainVehicle : MonoBehaviour
 		var percent = Mathf.Floor( PlanetWeather.GetEfficiency() * 100.0f * 100.0f / ( 4.0f * Mathf.Max( 1.0f, m_energyPerStep ) ) );
 
 		return Mathf.Min( 99.0f, percent ) / 100.0f;
+	}
+
+	// E/M at a height of the ground (where the vehicle stands: the float height on a liquid): 170 on a liquid, else one and a half times the contour
+	float GetEnergyPerStepAtHeight( float height )
+	{
+		var maximumElevation = 1.25f * m_elevationScale;
+		var waterElevation = m_planetGenerator.m_waterElevation * m_elevationScale;
+
+		if ( height < waterElevation )
+		{
+			return c_liquidEnergyPerStep;
+		}
+
+		var contour = Mathf.Floor( Mathf.Lerp( c_shoreContour, c_highestContour, Mathf.Clamp01( ( height - waterElevation ) / ( maximumElevation - waterElevation ) ) ) );
+
+		return Mathf.Floor( contour * 3.0f / 2.0f );
+	}
+
+	// E/M at a place on the planet's surface (the crew's walk back to the ship goes cell by cell over it)
+	public float GetEnergyPerStepAt( Vector3 worldCoordinates )
+	{
+		if ( m_planetGenerator == null )
+		{
+			return c_liquidEnergyPerStep;
+		}
+
+		return GetEnergyPerStepAtHeight( ApplyElevation( worldCoordinates, false ).y );
 	}
 
 	// the fuel a step takes on the ground the vehicle is on, in the original's units (E/M: for the probe)

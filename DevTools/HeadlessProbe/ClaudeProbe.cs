@@ -33240,6 +33240,16 @@ public class ClaudeProbe : MonoBehaviour
 		playerData.m_general.m_lastDisembarkedCoordinates = farAway;
 		controller.m_terrainVehicle.transform.localPosition = farAway;
 
+		// the crew's vitality before the walk back (the walk is 40 cells, each with a chance in five of an injury)
+		var vitalityBefore = 0.0f;
+
+		for ( var role = PD_CrewAssignment.Role.First; role < PD_CrewAssignment.Role.Count; role++ )
+		{
+			var file = playerData.m_crewAssignment.GetPersonnelFile( role );
+
+			vitalityBefore += ( file != null ) ? file.m_vitality : 0.0f;
+		}
+
 		// (the tank is empty at 6.5% below the display's 0%, the original's 2000 of 32767)
 		vehicle.m_fuelRemaining = -0.07f;
 
@@ -33259,6 +33269,19 @@ public class ClaudeProbe : MonoBehaviour
 		var droppedAfter = ( playerData.m_planetSurfaces != null ) ? playerData.m_planetSurfaces.m_droppedCargoList.Count : 0;
 		var ironInShip = playerData.m_playerShip.m_elementStorage.Find( ironId );
 		var ironShipAfter = ( ironInShip != null ) ? ironInShip.m_volume : 0;
+
+		var vitalityAfter = 0.0f;
+
+		for ( var role = PD_CrewAssignment.Role.First; role < PD_CrewAssignment.Role.Count; role++ )
+		{
+			var file = playerData.m_crewAssignment.GetPersonnelFile( role );
+
+			vitalityAfter += ( file != null ) ? file.m_vitality : 0.0f;
+		}
+
+		Log( "outoffuel: the crew's vitality, all posts counted, " + vitalityBefore.ToString( "0.0" ) + " before the walk back and " + vitalityAfter.ToString( "0.0" ) + " after" );
+
+		Check( "outoffuel: the 40 km walk back injures the crew (a chance in five at each cell, MOVE-OV WF122, by the original's INJURE-PL)", messages.Contains( "is injured." ) && ( vitalityAfter < vitalityBefore ), vitalityBefore.ToString( "0.0" ) + " -> " + vitalityAfter.ToString( "0.0" ) );
 
 		Log( "outoffuel: messages '" + messages.Replace( "\n", " | " ) + "' | location " + location + " | dropped cargo " + droppedBefore + " then " + droppedAfter + " | iron in the ship " + ironShipBefore + " then " + ironShipAfter + " | the vehicle's fuel " + vehicle.GetPercentFuelRemaining() + "%" );
 
