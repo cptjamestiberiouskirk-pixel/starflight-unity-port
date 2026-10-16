@@ -83,6 +83,19 @@ public class Encounter : MonoBehaviour
 	bool m_aliensHadShieldsUp;
 	bool m_aliensWereArmed;
 
+	// unity awake
+	void Awake()
+	{
+		// the planet under an encounter that began in orbit takes the look the player picks at once
+		PlanetLook.Changed += RefreshPlanetBackdropLook;
+	}
+
+	// unity on destroy
+	void OnDestroy()
+	{
+		PlanetLook.Changed -= RefreshPlanetBackdropLook;
+	}
+
 	// unity start
 	void Start()
 	{
@@ -1063,7 +1076,7 @@ public class Encounter : MonoBehaviour
 			m_planetBackdrop.AddComponent<MeshRenderer>();
 		}
 
-		m_planetBackdrop.GetComponent<MeshRenderer>().sharedMaterial = planetController.GetMaterial();
+		m_planetBackdrop.GetComponent<MeshRenderer>().sharedMaterial = planetController.GetOrbitViewMaterial();
 		m_planetBackdrop.SetActive( true );
 
 		// (the orbit view's sphere has a radius of one; Show runs when the encounter is entered or loaded, so the planet is placed under the ship then)
@@ -1072,6 +1085,22 @@ public class Encounter : MonoBehaviour
 		m_planetBackdrop.transform.localScale = Vector3.one * radius;
 		m_planetBackdrop.transform.rotation = Quaternion.identity;
 		m_planetBackdrop.transform.position = playerData.m_general.m_coordinates + Vector3.down * ( radius + c_backdropDepth );
+	}
+
+	// puts the look the player has picked on the planet under the encounter (it stays where it is)
+	void RefreshPlanetBackdropLook()
+	{
+		if ( ( m_planetBackdrop == null ) || !m_planetBackdrop.activeInHierarchy || ( SpaceflightController.m_instance == null ) )
+		{
+			return;
+		}
+
+		var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( DataController.m_instance.m_playerData.m_general.m_currentPlanetId );
+
+		if ( planetController != null )
+		{
+			m_planetBackdrop.GetComponent<MeshRenderer>().sharedMaterial = planetController.GetOrbitViewMaterial();
+		}
 	}
 
 	// true while the planet is drawn under the encounter (for the probe)
