@@ -1,4 +1,5 @@
-// a planet in its natural look, from the maps NaturalPlanet bakes: the ground lit by sunlight that reddens where it has crossed more air (near the line
+// a planet in its natural look, from the maps NaturalPlanet bakes (and, close up, finer detail of the ground worked out on the spot): the ground lit by
+// sunlight that reddens where it has crossed more air (near the line
 // between day and night), the sun's glint on the open sea and a sheen of sky at grazing angles (on a molten world the albedo's alpha is the glow of its
 // lava instead, which shines by itself, day and night), the shadows of the clouds, and the air in front of the
 // ground (the haze that thickens towards the planet's edge, worked out by the same scattering as the halo round it), brought down to the screen by a
@@ -25,6 +26,8 @@ Shader "Starflight/Natural Planet"
 		_Molten( "Molten (the albedo's alpha is the lava's glow)", Float ) = 0
 		_LavaColor( "Lava Colour", Color ) = ( 1, 0.38, 0.08, 1 )
 		_LavaIntensity( "Lava Brightness", Float ) = 2.2
+		_MapSize( "Map Size (texels)", Vector ) = ( 4096, 2048, 0, 0 )
+		_GasGiant( "Gas Giant (no detail close up)", Float ) = 0
 	}
 
 	SubShader
@@ -68,6 +71,8 @@ Shader "Starflight/Natural Planet"
 			float _Molten;
 			float4 _LavaColor;
 			float _LavaIntensity;
+			float4 _MapSize;
+			float _GasGiant;
 			float4 _LightColor0;
 
 			struct appdata
@@ -87,6 +92,7 @@ Shader "Starflight/Natural Planet"
 				float3 tangentWorld : TEXCOORD3;
 				float3 binormalWorld : TEXCOORD4;
 				float4 sphere : TEXCOORD5;
+				float3 objectPos : TEXCOORD6;
 			};
 
 			v2f vert( appdata v )
@@ -104,8 +110,39 @@ Shader "Starflight/Natural Planet"
 				float3 center = mul( unity_ObjectToWorld, float4( 0.0, 0.0, 0.0, 1.0 ) ).xyz;
 
 				o.sphere = float4( center, length( o.worldPos - center ) );
+				o.objectPos = v.vertex.xyz;
 
 				return o;
+			}
+
+			// a hash without sines, which stays exact at the large coordinates of the finest detail
+			float3 DetailHash( float3 p )
+			{
+				p = frac( p * float3( 0.1031, 0.1030, 0.0973 ) );
+				p += dot( p, p.yxz + 33.33 );
+
+				return frac( ( p.xxy + p.yxx ) * p.zyx ) * 2.0 - 1.0;
+			}
+
+			// gradient noise (about -0.7 to 0.7)
+			float DetailNoise( float3 p )
+			{
+				float3 i = floor( p );
+				float3 f = frac( p );
+				float3 u = f * f * ( 3.0 - 2.0 * f );
+
+				return lerp( lerp( lerp( dot( DetailHash( i + float3( 0, 0, 0 ) ), f - float3( 0, 0, 0 ) ), dot( DetailHash( i + float3( 1, 0, 0 ) ), f - float3( 1, 0, 0 ) ), u.x ),
+					lerp( dot( DetailHash( i + float3( 0, 1, 0 ) ), f - float3( 0, 1, 0 ) ), dot( DetailHash( i + float3( 1, 1, 0 ) ), f - float3( 1, 1, 0 ) ), u.x ), u.y ),
+					lerp( lerp( dot( DetailHash( i + float3( 0, 0, 1 ) ), f - float3( 0, 0, 1 ) ), dot( DetailHash( i + float3( 1, 0, 1 ) ), f - float3( 1, 0, 1 ) ), u.x ),
+					lerp( dot( DetailHash( i + float3( 0, 1, 1 ) ), f - float3( 0, 1, 1 ) ), dot( DetailHash( i + float3( 1, 1, 1 ) ), f - float3( 1, 1, 1 ) ), u.x ), u.y ), u.z );
+			}
+
+			// the fine detail of the ground (about -1 to 1) at a direction on the sphere: three octaves, the coarsest a little finer than a texel of the maps
+			float DetailHeight( float3 direction )
+			{
+				float3 p = direction * 900.0;
+
+				return DetailNoise( p ) * 0.8 + DetailNoise( p * 2.13 + 3.7 ) * 0.45 + DetailNoise( p * 4.37 + 7.1 ) * 0.25;
 			}
 
 			// a little noise for the ripples of the sea
@@ -130,6 +167,28 @@ Shader "Starflight/Natural Planet"
 				float3 tangent = normalize( i.tangentWorld - normalGeometry * dot( i.tangentWorld, normalGeometry ) );
 				float3 binormal = cross( normalGeometry, tangent ) * sign( dot( cross( normalGeometry, tangent ), i.binormalWorld ) );
 				float3 normal = normalize( tangent * normalTangent.x + binormal * normalTangent.y + normalGeometry * normalTangent.z );
+
+				// close up, where a texel of the maps covers more than a pixel (the first seconds of a launch from the surface), finer detail of the ground worked
+				// out on the spot, so that it stays sharp: a little light and shade in its colour, and bumps, whose slope comes from how the height changes from
+				// pixel to pixel (worked out everywhere and faded in, since such changes are not known inside a branch)
+				float2 texels = fwidth( i.uv * _MapSize.xy );
+				float magnification = 1.0 / max( max( texels.x, texels.y ), 1e-6 );
+				float detail = saturate( ( magnification - 1.5 ) * 0.5 ) * ( 1.0 - water ) * ( 1.0 - _GasGiant );
+				float bump = DetailHeight( normalize( i.objectPos ) );
+				float bumpHeight = bump * i.sphere.w * 0.0003 * detail;
+				float3 dpdx = ddx( i.worldPos );
+				float3 dpdy = ddy( i.worldPos );
+				float3 r1 = cross( dpdy, normal );
+				float3 r2 = cross( normal, dpdx );
+				float determinant = dot( dpdx, r1 );
+				float3 surfaceGradient = sign( determinant ) * ( ddx( bumpHeight ) * r1 + ddy( bumpHeight ) * r2 );
+
+				if ( detail > 0.001 )
+				{
+					normal = normalize( abs( determinant ) * normal - surfaceGradient );
+				}
+
+				albedo *= 1.0 + bump * 0.25 * detail;
 
 				float3 light = NP_LightDirection( i.worldPos );
 				float3 view = normalize( _WorldSpaceCameraPos - i.worldPos );

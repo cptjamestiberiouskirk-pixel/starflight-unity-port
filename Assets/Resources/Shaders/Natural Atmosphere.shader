@@ -1,7 +1,8 @@
-// the halo of a planet's air in its natural look, drawn on the atmosphere's quad just above the planet (Planet.FitAtmosphere places it): each pixel
-// follows its line of sight through the shell of air round the planet and adds the sunlight the air scatters towards the camera, dimming what lies
-// behind by the light lost on the way; where the planet's own natural shader has been drawn (it marks the stencil) it adds nothing, since that shader
-// works out the air in front of the ground itself
+// the halo of a planet's air in its natural look, drawn on the far side of a dome round the planet (NaturalPlanet.PlaceAirDome: the atmosphere object's
+// quad swapped for a sphere a little bigger than the air): each pixel follows its line of sight through the shell of air round the planet and adds the
+// sunlight the air scatters towards the camera, dimming what lies behind by the light lost on the way; where the planet's own natural shader has been
+// drawn (it marks the stencil, and it is in front of the dome's far side) it adds nothing, since that shader works out the air in front of the ground
+// itself; the far side is all round the camera when the camera is in the air
 // it is in a Resources folder so that it is always in a build: the material is made in code
 Shader "Starflight/Natural Atmosphere"
 {
@@ -28,7 +29,7 @@ Shader "Starflight/Natural Atmosphere"
 			Blend One OneMinusSrcAlpha
 			ZWrite Off
 			ZTest LEqual
-			Cull Off
+			Cull Front
 
 			// not over the planet's natural surface (Natural Planet sets this bit)
 			Stencil
@@ -73,7 +74,7 @@ Shader "Starflight/Natural Atmosphere"
 
 			float4 frag( v2f i ) : SV_Target
 			{
-				// the middle of the planet, straight below the quad
+				// the middle of the planet (the dome's own)
 				float3 quadPosition = float3( unity_ObjectToWorld[ 0 ][ 3 ], unity_ObjectToWorld[ 1 ][ 3 ], unity_ObjectToWorld[ 2 ][ 3 ] );
 				float3 center = quadPosition - float3( 0.0, _CenterDepth, 0.0 );
 				float radius = max( _PlanetRadius, 1e-3 );

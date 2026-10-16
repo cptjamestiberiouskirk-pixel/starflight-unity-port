@@ -11792,6 +11792,92 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "naturalplanets: picking the natural look again puts it back at once", notAgain.Count == 0, string.Join( " | ", notAgain ) );
 		Check( "naturalplanets: the planet in the star system wears the look too", notInSystem.Count == 0, string.Join( ", ", notInSystem ) );
 
+		// ---- 3b. the launch from a planet: the camera starts on the top of the planet in orbit and looks round before it rises (the planet as close as it
+		// gets), pictures of it through the first 18 s
+		{
+			var arth = planets[ 0 ];
+
+			yield return GoIntoOrbit( arth.m_starId, arth.m_id );
+			yield return WaitForPlanetMaps( 90.0f );
+			yield return Frames( 10 );
+
+			var launchPictures = 0;
+			var naturalThroughout = true;
+			var groundBelowHorizon = -1.0f;
+
+			// (in the original look too, for a comparison)
+			foreach ( var look in new[] { PlanetLook.Look.Natural, PlanetLook.Look.Original } )
+			{
+				if ( DataController.m_instance.m_playerData.m_general.m_location != PD_General.Location.InOrbit )
+				{
+					break;
+				}
+
+				PlanetLook.SetLook( look, false );
+
+				yield return Frames( 3 );
+
+				Time.captureDeltaTime = 1.0f / 30.0f;
+
+				controller.m_playerCamera.StartAnimation( "Launching (Planetside)" );
+
+				for ( var frame = 1; frame <= 18 * 30; frame++ )
+				{
+					yield return null;
+
+					if ( ( frame % 90 ) == 0 )
+					{
+						if ( look == PlanetLook.Look.Natural )
+						{
+							naturalThroughout &= ShaderName( controller.m_inOrbit.m_planetModel.sharedMaterial ) == "Starflight/Natural Planet";
+
+							launchPictures++;
+
+							// at 3 s the camera looks out over the ground from the top of the planet: how bright the bottom quarter of the view is (the ground below
+							// the horizon; space and its stars where the camera is inside the planet, as it was on the smooth sphere of the planet's full radius)
+							if ( frame == 90 )
+							{
+								var brightness = RenderBrightness( camera );
+								var sum = 0.0;
+								var count = 0;
+
+								for ( var y = 30; y < 135; y++ )
+								{
+									for ( var x = 20; x < 690; x++ )
+									{
+										sum += brightness[ y * 960 + x ];
+										count++;
+									}
+								}
+
+								groundBelowHorizon = (float) ( sum / count );
+							}
+						}
+
+						RenderCameraPicture( camera, System.IO.Path.Combine( folder, "launch_" + look.ToString().ToLowerInvariant() + "_" + ( frame / 30 ).ToString( "00" ) + "s.png" ) );
+					}
+				}
+
+				Time.captureDeltaTime = 0.0f;
+
+				controller.m_playerCamera.StartAnimation( "In Space" );
+
+				yield return Frames( 3 );
+			}
+
+			PlanetLook.SetLook( PlanetLook.Look.Natural, false );
+
+			Log( "naturalplanets: the launch from Arth: " + launchPictures + " pictures, natural throughout " + naturalThroughout + ", the bottom of the first view " + groundBelowHorizon.ToString( "F3" ) + " bright" );
+
+			Check( "naturalplanets: at the start of the launch from the surface the ground fills the view below the horizon (not space seen through the planet)", groundBelowHorizon > 0.08f, groundBelowHorizon.ToString( "F3" ) );
+
+			Check( "naturalplanets: the planet keeps its natural look through the launch from its surface", ( launchPictures == 6 ) && naturalThroughout, launchPictures + " pictures, natural " + naturalThroughout );
+
+			controller.SwitchLocation( PD_General.Location.StarSystem );
+
+			yield return Frames( 10 );
+		}
+
 		// ---- 4. the save panel's Colors screen: the planets' two looks, the one in use marked, a click switches it (and is the player's setting, put back after)
 		PressEscape();
 
