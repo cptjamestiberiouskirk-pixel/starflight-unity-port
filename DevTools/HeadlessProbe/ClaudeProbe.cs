@@ -24287,21 +24287,27 @@ public class ClaudeProbe : MonoBehaviour
 		return crew;
 	}
 
-	// passes this many game hours of weather, the crew healed before each: returns the storm hours, the heavy snow hours, the storm hours that injured, and the
-	// other hours that injured
+	// passes this many game hours of weather, the crew healed before each: returns the storm hours, the heavy snow hours, the storm hours that injured, the other
+	// hours that injured, the most hours a new spell of weather had left as it began (-1 on the code before the original's weather), and the weather codes seen,
+	// one bit each (0 on that code)
 	static int[] PassWeatherHours( int hours )
 	{
-		var counts = new int[ 4 ];
+		var counts = new int[ 6 ];
+
+		counts[ 4 ] = -1;
 
 		for ( var i = 0; i < hours; i++ )
 		{
 			var crew = HealCrew();
+			var hoursLeftBefore = Weather( "GetHoursLeft" );
 
 			Weather( "PassHour" );
 
 			var sky = Weather( "GetSky" );
 			var storm = Weather( "IsStorm" ) is bool && (bool) Weather( "IsStorm" );
 			var injured = crew.Exists( file => file.m_vitality < 100.0f );
+			var code = Weather( "GetCode" );
+			var hoursLeft = Weather( "GetHoursLeft" );
 
 			if ( storm )
 			{
@@ -24317,6 +24323,17 @@ public class ClaudeProbe : MonoBehaviour
 			{
 				counts[ storm ? 2 : 3 ]++;
 			}
+
+			// a new spell begins when the one before had no hours left
+			if ( ( hoursLeftBefore is int ) && ( (int) hoursLeftBefore == 0 ) && ( hoursLeft is int ) )
+			{
+				counts[ 4 ] = Mathf.Max( counts[ 4 ], (int) hoursLeft );
+			}
+
+			if ( code is int )
+			{
+				counts[ 5 ] |= 1 << Mathf.Clamp( (int) code, 0, 30 );
+			}
 		}
 
 		HealCrew();
@@ -24324,6 +24341,41 @@ public class ClaudeProbe : MonoBehaviour
 		return counts;
 	}
 
+	// the weather codes in a bit set, as a list
+	static string WeatherCodes( int bits )
+	{
+		var codes = "";
+
+		for ( var code = 0; code < 31; code++ )
+		{
+			if ( ( bits & ( 1 << code ) ) != 0 )
+			{
+				codes += code + " ";
+			}
+		}
+
+		return ( codes == "" ) ? "none" : codes.Trim();
+	}
+
+	// passes weather hours, the crew healed before each, until the sky is the one asked for (at most this many hours)
+	static void PassWeatherHoursUntil( System.Func<bool> sky, int most )
+	{
+		var tries = 0;
+
+		while ( !sky() && ( tries++ < most ) )
+		{
+			HealCrew();
+			Weather( "PassHour" );
+		}
+
+		HealCrew();
+	}
+
+	// the weather on the surface as the original's (BEHAV-OV ?STORM, STORM-OV (DO.STORM): planet 91 of Arth (weather activity 4, frozen) has a storm in most
+	// hours and only the frozen surface's weather, in spells of at most 3 hours; a storm hour injures the crew 29 times in 99 while the vehicle stands, once more
+	// as the storm begins, and no other hour injures; a storm halves the vehicle's efficiency and heavy snow takes a quarter of it; the bearing to the ship is
+	// lost only with a navigator of skill 199 or less; planet 94 (activity 0) has no storms, and planet 90 (activity 1, 0 in the port's data before) has a few,
+	// in spells of up to 12 hours
 	IEnumerator ScenarioStorms()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -24332,7 +24384,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
-		// ---- 1. planet 91 of Arth, Very Violent and frozen: storms half of the hours, heavy snow some, injuries only in storms
+		var navigator = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Navigator );
+		var navigatorSkill = navigator.m_navigation;
+
+		// ---- 1. planet 91 of Arth, weather activity 4 and frozen
 		yield return LandInTheArthSystemAt( 91, Vector3.zero, done );
 
 		yield return Frames( 5 );
@@ -24340,44 +24395,68 @@ public class ClaudeProbe : MonoBehaviour
 		var firstSky = MessageList();
 		var violent = PassWeatherHours( 300 );
 
-		// ---- 2. in a storm: half the efficiency, and the bearing to the ship lost
-		var tries = 0;
+		// the frozen surface's weather: a calm sky (1 to 3), the storms 6, 7, 9 and 10, and heavy snow (11)
+		var frozenCodes = ( 1 << 1 ) | ( 1 << 2 ) | ( 1 << 3 ) | ( 1 << 6 ) | ( 1 << 7 ) | ( 1 << 9 ) | ( 1 << 10 ) | ( 1 << 11 );
 
-		while ( !( ( Weather( "IsStorm" ) is bool ) && (bool) Weather( "IsStorm" ) ) && ( tries++ < 100 ) )
-		{
-			HealCrew();
-			Weather( "PassHour" );
-		}
+		// ---- 2. in a storm, with a navigator of skill 250 and then of 150
+		PassWeatherHoursUntil( () => ( Weather( "IsStorm" ) is bool ) && (bool) Weather( "IsStorm" ), 200 );
 
-		HealCrew();
+		navigator.m_navigation = 250;
 
 		yield return Frames( 3 );
 
 		var stormEfficiency = Weather( "GetEfficiency" );
-		var displayInStorm = controller.m_displayController.m_terrainVehicleDisplay.m_statusValues.text;
-		var fuelEfficiencyInStorm = controller.m_terrainVehicle.GetFuelEfficiency();
+		var displaySkilled = controller.m_displayController.m_terrainVehicleDisplay.m_statusValues.text;
 
-		// ---- 3. back in the ship nothing happens
+		navigator.m_navigation = 150;
+
+		yield return Frames( 3 );
+
+		var displayUnskilled = controller.m_displayController.m_terrainVehicleDisplay.m_statusValues.text;
+		var stillStorm = ( Weather( "IsStorm" ) is bool ) && (bool) Weather( "IsStorm" );
+
+		navigator.m_navigation = navigatorSkill;
+
+		// ---- 3. in heavy snow
+		PassWeatherHoursUntil( () => ( Weather( "GetSky" ) != null ) && ( Weather( "GetSky" ).ToString() == "SnowingHeavily" ), 300 );
+
+		var snowEfficiency = Weather( "GetEfficiency" );
+
+		// ---- 4. back in the ship nothing happens
 		controller.SwitchLocation( PD_General.Location.Planetside );
 
 		yield return Frames( 5 );
 
 		var inShip = PassWeatherHours( 50 );
 
-		// ---- 4. planet 90 of Arth, weather None: storms now and then
+		// ---- 5. planet 94 of Arth, weather activity 0
+		yield return LandInTheArthSystemAt( 94, Vector3.zero, done );
+
+		yield return Frames( 5 );
+
+		var still = PassWeatherHours( 300 );
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+
+		// ---- 6. planet 90 of Arth, weather activity 1
 		yield return LandInTheArthSystemAt( 90, Vector3.zero, done );
 
 		yield return Frames( 5 );
 
-		var calm = PassWeatherHours( 300 );
+		var calm = PassWeatherHours( 600 );
 
-		Log( "storms: first sky " + firstSky + " || planet 91 (Very Violent), 300 hours: storms " + violent[ 0 ] + ", heavy snow " + violent[ 1 ] + ", storm hours that injured " + violent[ 2 ] + ", other hours that injured " + violent[ 3 ] + " | in a storm: efficiency " + stormEfficiency + ", fuel efficiency " + fuelEfficiencyInStorm + ", display " + displayInStorm.Replace( "\n", "/" ) + " || in the ship, 50 hours: storms " + inShip[ 0 ] + ", injuries " + ( inShip[ 2 ] + inShip[ 3 ] ) + " || planet 90 (None), 300 hours: storms " + calm[ 0 ] + ", injured " + calm[ 2 ] + "/" + calm[ 3 ] );
+		Log( "storms: first sky " + firstSky + " || planet 91 (activity 4), 300 hours: storms " + violent[ 0 ] + ", heavy snow " + violent[ 1 ] + ", storm hours that injured " + violent[ 2 ] + ", other hours that injured " + violent[ 3 ] + ", the longest new spell " + violent[ 4 ] + " more hours, codes " + WeatherCodes( violent[ 5 ] ) + " | in a storm: efficiency " + stormEfficiency + ", display with skill 250 " + displaySkilled.Replace( "\n", "/" ) + ", with skill 150 " + displayUnskilled.Replace( "\n", "/" ) + " | in heavy snow: efficiency " + snowEfficiency + " || in the ship, 50 hours: storms " + inShip[ 0 ] + ", injuries " + ( inShip[ 2 ] + inShip[ 3 ] ) + " || planet 94 (activity 0), 300 hours: storms " + still[ 0 ] + ", heavy snow " + still[ 1 ] + ", codes " + WeatherCodes( still[ 5 ] ) + " || planet 90 (activity 1), 600 hours: storms " + calm[ 0 ] + ", injured " + calm[ 2 ] + "/" + calm[ 3 ] + ", the longest new spell " + calm[ 4 ] + " more hours, codes " + WeatherCodes( calm[ 5 ] ) );
 
-		Check( "storms: on a Very Violent planet storms come in about half of the hours, with heavy snow besides", ( violent[ 0 ] >= 120 ) && ( violent[ 0 ] <= 180 ) && ( violent[ 1 ] >= 30 ), violent[ 0 ] + " storms, " + violent[ 1 ] + " heavy snow of 300 hours" );
-		Check( "storms: a storm injures the crew in about half of its hours, and nothing else does", ( violent[ 0 ] > 0 ) && ( violent[ 2 ] >= violent[ 0 ] * 3 / 10 ) && ( violent[ 2 ] <= violent[ 0 ] * 7 / 10 ) && ( violent[ 3 ] == 0 ), violent[ 2 ] + " of " + violent[ 0 ] + " storm hours, " + violent[ 3 ] + " others" );
-		Check( "storms: in a storm the terrain vehicle has half its efficiency and the bearing to the ship is lost", ( stormEfficiency is float ) && Mathf.Approximately( (float) stormEfficiency, 0.5f ) && displayInStorm.Contains( "LOST!" ), stormEfficiency + " | " + displayInStorm.Replace( "\n", "/" ) );
-		Check( "storms: in the ship there is no weather and no injury", ( inShip[ 0 ] == 0 ) && ( inShip[ 2 ] + inShip[ 3 ] == 0 ), inShip[ 0 ] + " storms, " + ( inShip[ 2 ] + inShip[ 3 ] ) + " injuries" );
-		Check( "storms: on a planet whose weather is None storms are rare but come", ( calm[ 0 ] >= 15 ) && ( calm[ 0 ] <= 60 ), calm[ 0 ] + " storms of 300 hours" );
+		Check( "storms: on planet 91 (weather activity 4, frozen) a storm comes in most hours, with heavy snow besides, and only the frozen surface's weather", ( violent[ 0 ] >= 170 ) && ( violent[ 0 ] <= 260 ) && ( violent[ 1 ] >= 15 ) && ( violent[ 5 ] != 0 ) && ( ( violent[ 5 ] & ~frozenCodes ) == 0 ), violent[ 0 ] + " storms, " + violent[ 1 ] + " heavy snow of 300 hours, codes " + WeatherCodes( violent[ 5 ] ) );
+		Check( "storms: on planet 91 a new spell of weather has 1 or 2 more hours (RRND(1, 3))", ( violent[ 4 ] >= 1 ) && ( violent[ 4 ] <= 2 ), violent[ 4 ].ToString() );
+		Check( "storms: a storm hour injures the crew 29 times in 99 while the vehicle stands, with one more roll as the storm begins, and no other hour injures", ( violent[ 0 ] > 0 ) && ( violent[ 2 ] * 100 >= violent[ 0 ] * 27 ) && ( violent[ 2 ] * 100 <= violent[ 0 ] * 49 ) && ( violent[ 3 ] == 0 ), violent[ 2 ] + " of " + violent[ 0 ] + " storm hours, " + violent[ 3 ] + " others" );
+		Check( "storms: a storm halves the terrain vehicle's efficiency and heavy snow takes a quarter of it", ( stormEfficiency is float ) && Mathf.Approximately( (float) stormEfficiency, 0.5f ) && ( snowEfficiency is float ) && Mathf.Approximately( (float) snowEfficiency, 0.75f ), stormEfficiency + " | " + snowEfficiency );
+		Check( "storms: in a storm the bearing to the ship is lost with a navigator of skill 150, and kept with one of 250", stillStorm && !displaySkilled.Contains( "LOST!" ) && displayUnskilled.Contains( "LOST!" ), stillStorm + " | " + displaySkilled.Replace( "\n", "/" ) + " | " + displayUnskilled.Replace( "\n", "/" ) );
+		Check( "storms: in the ship there is no weather and no injury (control)", ( inShip[ 0 ] == 0 ) && ( inShip[ 2 ] + inShip[ 3 ] == 0 ), inShip[ 0 ] + " storms, " + ( inShip[ 2 ] + inShip[ 3 ] ) + " injuries" );
+		Check( "storms: on planet 94 (weather activity 0) no storm and no heavy snow comes", ( still[ 0 ] == 0 ) && ( still[ 1 ] == 0 ) && ( still[ 2 ] + still[ 3 ] == 0 ), still[ 0 ] + " storms, " + still[ 1 ] + " heavy snow, " + ( still[ 2 ] + still[ 3 ] ) + " injuries" );
+		Check( "storms: on planet 90 (weather activity 1) storms are rare but come, in spells of up to 11 more hours", ( calm[ 0 ] >= 1 ) && ( calm[ 0 ] <= 150 ) && ( calm[ 4 ] > 2 ) && ( calm[ 4 ] <= 11 ), calm[ 0 ] + " storms of 600 hours, the longest new spell " + calm[ 4 ] );
 
 		Finish( "scenario=storms violent=" + violent[ 0 ] + " calm=" + calm[ 0 ], 0 );
 	}
@@ -38831,12 +38910,29 @@ public class ClaudeProbe : MonoBehaviour
 	{
 		var general = DataController.m_instance.m_playerData.m_general;
 		var skyField = typeof( PlanetWeather ).GetField( "s_sky", BindingFlags.NonPublic | BindingFlags.Static );
+		var codeField = typeof( PlanetWeather ).GetField( "s_code", BindingFlags.NonPublic | BindingFlags.Static );
+		var hoursLeftField = typeof( PlanetWeather ).GetField( "s_hoursLeft", BindingFlags.NonPublic | BindingFlags.Static );
 		var hourField = typeof( PlanetWeather ).GetField( "s_rolledHour", BindingFlags.NonPublic | BindingFlags.Static );
 
-		if ( ( skyField != null ) && ( hourField != null ) )
+		if ( hourField != null )
+		{
+			hourField.SetValue( null, general.m_day * 24 + general.m_hour );
+		}
+
+		if ( skyField != null )
 		{
 			skyField.SetValue( null, sky );
-			hourField.SetValue( null, general.m_day * 24 + general.m_hour );
+		}
+
+		// (the weather is the original's code since the storms were redone: 0 clear, 10 a windstorm, held for the spell)
+		if ( codeField != null )
+		{
+			codeField.SetValue( null, ( sky == PlanetWeather.Sky.Windstorm ) ? 10 : ( sky == PlanetWeather.Sky.ElectricalStorm ) ? 6 : ( sky == PlanetWeather.Sky.SnowingHeavily ) ? 11 : 0 );
+		}
+
+		if ( hoursLeftField != null )
+		{
+			hoursLeftField.SetValue( null, 12 );
 		}
 	}
 

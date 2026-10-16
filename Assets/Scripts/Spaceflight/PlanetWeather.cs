@@ -1,13 +1,12 @@
 using UnityEngine;
 
-// the weather the terrain vehicle meets on a planet's surface, as the original game has it (observed in the GOG copy of Starflight 1, 2026-10-11, on planets 90
-// and 91 of Arth's system; the phrases are the shipped game's, STARB.COM): every game hour the sky is rolled again from the planet's weather and shown in the
-// text window, with no message of its own when a storm begins or ends - in a storm (a windstorm, hail, a thunder storm or an electrical storm) the vehicle's
-// efficiency is halved (EFF 14% to 7%), the bearing to the ship reads "LOST!", and in about half of the storm hours a crew member is injured by 10 to 50 points
-// of vitality (a Human, of durability 6), which can kill; heavy snow costs some efficiency (EFF 11%) and also loses the bearing, but injures no one; in the ship
-// nothing happens - the original picks its phrases from a probability table in STARB.COM (STORMS) whose keys were not decoded, so the port picks them by the
-// planet's surface, with the share of storm hours rising with its weather class from the 12% seen on planet 90 (None) to the half seen on planet 91 (Very
-// Violent); the pools for the surfaces not seen, the shares of the classes between and the chances within a storm hour are the port's
+// the weather the terrain vehicle meets on a planet's surface, as the original's (BEHAV-OV ?STORM, MOVE-OV WEA6E, STORM-OV (DO.STORM): a planet with no atmosphere
+// has none; otherwise, every star hour, a spell of weather counts down, and when it is over a new one is rolled from the planet's weather activity (its byte 0x11,
+// the port's m_weatherId: 0 none, 1 calm to 4 very violent): a storm with a chance of 0, 20, 40, 60 or 85 in 99 (%STORM against RRND(1,100)), picked by the
+// planet's surface from the STORMS table, else a calm sky (hazy, clear or overcast), either lasting 1 to (5 - activity) * 3 - 1 hours (at most 12). In an
+// electrical storm, a thunder storm, ground shaking, hail or a windstorm (codes 6 to 10) each kilometre costs the vehicle twice the fuel (%EFF 50) and each hour
+// may injure the crew: 29 times in 99 while the vehicle stands, a third of the time while it moves, and once more as the storm begins; snow, mist, fog and rain
+// cost a third more (%EFF 75); from code 4 to 11 the bearing to the ship is lost unless the navigator's skill is above 199
 public static class PlanetWeather
 {
 	// the original's phrases, in its order
@@ -31,25 +30,30 @@ public static class PlanetWeather
 
 	static readonly string[] c_skyTexts = { "It is raining heavily.", "It is overcast.", "It is snowing lightly.", "It is misty.", "You are in an electrical storm.", "The ground is shaking and rumbling.", "It is snowing heavily.", "It is hailing.", "You are in a thunder storm.", "You are in a windstorm.", "It is foggy.", "It is hazy.", "It is raining.", "It is clear." };
 
-	// the share of the hours that are storms, by weather class (None, Calm, Moderate, Violent, Very Violent): 12% and 50% as observed, the others between
-	static readonly float[] c_stormShare = { 0.12f, 0.2f, 0.3f, 0.4f, 0.5f };
+	// the original's weather codes (#STORM, MAPS-OV WPHRASE: 0 clear, 1 hazy, 2 clear, 3 overcast, 4 snowing lightly, 5 misty, 6 electrical storm, 7 thunder storm,
+	// 8 ground shaking, 9 hailing, 10 windstorm, 11 snowing heavily, 12 foggy, 13 raining) and the port's sky for each
+	static readonly Sky[] c_codeSkies = { Sky.Clear, Sky.Hazy, Sky.Clear, Sky.Overcast, Sky.SnowingLightly, Sky.Misty, Sky.ElectricalStorm, Sky.ThunderStorm, Sky.GroundShaking, Sky.Hailing, Sky.Windstorm, Sky.SnowingHeavily, Sky.Foggy, Sky.Raining };
 
-	// on a frozen planet, the share of the hours with heavy snow, for each storm hour (4 heavy snow hours to 9 storm hours on planet 91)
-	const float c_heavySnowPerStorm = 0.45f;
+	// the chance of a storm in 99 by weather activity (BEHAV-OV %STORM: 0, 20, 40, 60, 85 against RRND(1,100))
+	static readonly int[] c_stormChance = { 0, 20, 40, 60, 85 };
 
-	// the vehicle's efficiency in a storm and in heavy snow (EFF 7% and 11% of the 14% of a clear sky)
-	public const float c_stormEfficiency = 0.5f;
-	public const float c_heavySnowEfficiency = 11.0f / 14.0f;
+	// the storms of each surface and how many of the 99 rolls give each (STORM-OV STORMS, by the planet's surface byte: 2 liquid, 3 frozen, 4 molten, 5 rock;
+	// a gas giant has none)
+	static readonly int[][] c_liquidStorms = { new[] { 6, 16 }, new[] { 7, 15 }, new[] { 10, 15 }, new[] { 12, 15 }, new[] { 13, 38 } };
+	static readonly int[][] c_frozenStorms = { new[] { 6, 16 }, new[] { 7, 15 }, new[] { 11, 15 }, new[] { 9, 15 }, new[] { 10, 38 } };
+	static readonly int[][] c_moltenStorms = { new[] { 6, 26 }, new[] { 7, 25 }, new[] { 8, 48 } };
+	static readonly int[][] c_rockStorms = { new[] { 6, 33 }, new[] { 7, 33 }, new[] { 10, 33 } };
 
-	// a storm hour injures nobody half of the time, one crew member a third of it, and two the rest (4 of 10 and 4 of 7 storm hours injured, sometimes twice)
-	const float c_noInjuryChance = 0.5f;
-	const float c_oneInjuryChance = 0.85f;
+	// an injury in a storm hour: 29 rolls of the 99 under 30 while the vehicle stands (BEHAV-OV WE91A, and STORM-OV WF2B2 as a storm begins), one in three while
+	// it moves (MOVE-OV WEA1D)
+	const int c_injuryRollsOf99 = 29;
 
-	// an injury takes 10 to 50 points of vitality (by tens, as seen) from a Human, and as much more or less as the crew member's race is weaker or tougher
+	// a Human's durability, for crew members of no known race
 	const int c_humanDurability = 6;
 
-	// the sky now, and the game hour it was rolled for (-1 while the terrain vehicle is not out)
-	static Sky s_sky = Sky.Clear;
+	// the weather code now (#STORM), the star hours its spell has left (STORM), and the game hour it was last moved on for (-1 while the terrain vehicle is not out)
+	static int s_code;
+	static int s_hoursLeft;
 	static int s_rolledHour = -1;
 
 	// the terrain vehicle goes out: the first sky is rolled and shown, alone in the text window, as the original's first line on the surface ("IT IS CLEAR.",
@@ -57,8 +61,10 @@ public static class PlanetWeather
 	public static void Begin()
 	{
 		s_rolledHour = GetGameHour();
+		s_code = 0;
+		s_hoursLeft = 0;
 
-		Roll();
+		Hour( false );
 
 		if ( SpaceflightController.m_instance != null )
 		{
@@ -72,10 +78,11 @@ public static class PlanetWeather
 	public static void End()
 	{
 		s_rolledHour = -1;
-		s_sky = Sky.Clear;
+		s_code = 0;
+		s_hoursLeft = 0;
 	}
 
-	// call this every frame while the terrain vehicle is out: every game hour the sky is rolled again, shown when it has changed, and a storm may injure the crew
+	// call this every frame while the terrain vehicle is out: every star hour the weather moves on, and a storm may injure the crew
 	public static void Update()
 	{
 		if ( s_rolledHour < 0 )
@@ -95,7 +102,7 @@ public static class PlanetWeather
 		PassHour();
 	}
 
-	// one game hour of weather (Update calls it; the probe too)
+	// one star hour of weather (Update calls it; the probe too)
 	public static void PassHour()
 	{
 		if ( ( DataController.m_instance.m_playerData.m_general.m_location != PD_General.Location.Disembarked ) || ( s_rolledHour < 0 ) )
@@ -103,53 +110,57 @@ public static class PlanetWeather
 			return;
 		}
 
-		var skyBefore = s_sky;
-
-		Roll();
-
-		if ( s_sky != skyBefore )
+		if ( Hour( true ) )
 		{
 			Show();
-		}
-
-		if ( IsStorm() )
-		{
-			InjureCrew();
 		}
 	}
 
 	// the sky now, in the original's words
 	public static string GetSkyText()
 	{
-		return c_skyTexts[ (int) s_sky ];
+		return c_skyTexts[ (int) GetSky() ];
 	}
 
 	public static Sky GetSky()
 	{
-		return s_sky;
+		return c_codeSkies[ Mathf.Clamp( s_code, 0, c_codeSkies.Length - 1 ) ];
 	}
 
-	// true in a windstorm, hail, a thunder storm or an electrical storm (while the terrain vehicle is out)
+	// the original's weather code now (#STORM: for the probe)
+	public static int GetCode()
+	{
+		return s_code;
+	}
+
+	// the star hours the spell of weather now has left (STORM: for the probe)
+	public static int GetHoursLeft()
+	{
+		return s_hoursLeft;
+	}
+
+	// true in an electrical storm, a thunder storm, ground shaking, hail or a windstorm (codes 6 to 10, while the terrain vehicle is out): the weather that
+	// injures and halves the efficiency
 	public static bool IsStorm()
 	{
-		return ( s_rolledHour >= 0 ) && ( ( s_sky == Sky.Windstorm ) || ( s_sky == Sky.Hailing ) || ( s_sky == Sky.ThunderStorm ) || ( s_sky == Sky.ElectricalStorm ) );
+		return ( s_rolledHour >= 0 ) && ( s_code >= 6 ) && ( s_code <= 10 );
 	}
 
-	// true when the bearing to the ship is lost (a storm or heavy snow)
+	// true when the bearing to the ship is lost: codes 4 to 11, unless the navigator's skill is above 199 (the original's LOST! on the vehicle's display)
 	public static bool IsShipLost()
 	{
-		return IsStorm() || ( ( s_rolledHour >= 0 ) && ( s_sky == Sky.SnowingHeavily ) );
+		return ( s_rolledHour >= 0 ) && ( s_code >= 4 ) && ( s_code <= 11 ) && ( CombatController.GetNavigatorSkill() <= 199 );
 	}
 
-	// how much of its speed (and of its fuel's worth) the weather leaves the terrain vehicle
+	// the weather's share of the vehicle's efficiency (%EFF over 100: STORM-OV WF42E): 1 for a calm sky, 0.5 in a storm, 0.75 in snow, mist, fog or rain
 	public static float GetEfficiency()
 	{
-		if ( IsStorm() )
+		if ( ( s_rolledHour < 0 ) || ( s_code <= 3 ) )
 		{
-			return c_stormEfficiency;
+			return 1.0f;
 		}
 
-		return ( ( s_rolledHour >= 0 ) && ( s_sky == Sky.SnowingHeavily ) ) ? c_heavySnowEfficiency : 1.0f;
+		return ( s_code <= 10 ) && ( s_code >= 6 ) ? 0.5f : 0.75f;
 	}
 
 	// the game hour as one number (days and hours)
@@ -160,57 +171,129 @@ public static class PlanetWeather
 		return general.m_day * 24 + general.m_hour;
 	}
 
-	// rolls the sky for the current planet
-	static void Roll()
+	// one star hour of the original's ?STORM: the spell counts down, or a new one is rolled, and a storm may injure the crew; returns true when the sky is to be
+	// shown again, as the original shows it: every hour of a spell of snow, mist, fog, rain or a storm, a new calm sky, and a new storm that is not the one before
+	static bool Hour( bool injure )
 	{
 		var gameData = DataController.m_instance.m_gameData;
 		var planetId = DataController.m_instance.m_playerData.m_general.m_currentPlanetId;
 
 		if ( ( planetId < 0 ) || ( planetId >= gameData.m_planetList.Length ) )
 		{
-			s_sky = Sky.Clear;
+			s_code = 0;
+			s_hoursLeft = 0;
 
-			return;
+			return false;
 		}
 
 		var planet = gameData.m_planetList[ planetId ];
-		var stormShare = c_stormShare[ Mathf.Clamp( planet.m_weatherId, 0, c_stormShare.Length - 1 ) ];
-		var frozen = planet.m_surfaceId == 3;
-		var molten = planet.m_surfaceId == 4;
-		var heavySnowShare = frozen ? stormShare * c_heavySnowPerStorm : 0.0f;
 
-		var roll = Random.value;
+		// no atmosphere, no weather
+		if ( planet.m_atmosphereDensityId == 0 )
+		{
+			s_code = 0;
+			s_hoursLeft = 0;
 
-		if ( roll < stormShare )
-		{
-			// a storm: on a molten planet electrical storms and windstorms, elsewhere any of the four
-			s_sky = molten ? Pick( Sky.ElectricalStorm, Sky.Windstorm ) : Pick( Sky.Windstorm, Sky.Hailing, Sky.ThunderStorm, Sky.ElectricalStorm );
+			return false;
 		}
-		else if ( roll < stormShare + heavySnowShare )
+
+		var activity = Mathf.Clamp( planet.m_weatherId, 0, c_stormChance.Length - 1 );
+
+		var show = false;
+
+		if ( s_hoursLeft > 0 )
 		{
-			s_sky = Sky.SnowingHeavily;
+			// the spell goes on (shown again while it has hours left, unless the sky is calm: ?.STORM)
+			s_hoursLeft--;
+
+			show = ( s_code > 3 ) && ( s_hoursLeft > 0 );
 		}
-		else if ( frozen )
+		else if ( c_stormChance[ activity ] > Random.Range( 1, 100 ) )
 		{
-			s_sky = Pick( Sky.Hazy, Sky.Overcast, Sky.Clear, Sky.SnowingLightly );
-		}
-		else if ( molten )
-		{
-			s_sky = Pick( Sky.Hazy, Sky.Clear, Sky.GroundShaking );
-		}
-		else if ( planet.m_surfaceId == 2 )
-		{
-			s_sky = Pick( Sky.Raining, Sky.RainingHeavily, Sky.Misty, Sky.Foggy, Sky.Overcast, Sky.Hazy, Sky.Clear );
+			// a storm
+			var codeBefore = s_code;
+
+			s_hoursLeft = SpellLength( activity );
+			s_code = PickStorm( planet.m_surfaceId );
+
+			show = ( s_code != codeBefore );
+
+			// (the original's FORCED tick: a storm may injure as it begins)
+			if ( injure && IsStorm() && ( Random.Range( 1, 100 ) <= c_injuryRollsOf99 ) )
+			{
+				InjureInTheStorm();
+			}
 		}
 		else
 		{
-			s_sky = Pick( Sky.Hazy, Sky.Overcast, Sky.Clear, Sky.Raining, Sky.Misty );
+			// a calm sky: hazy, clear or overcast
+			s_code = Random.Range( 1, 4 );
+			s_hoursLeft = SpellLength( activity );
+
+			show = true;
 		}
+
+		// the hour's injury in a storm: 29 times in 99 while the vehicle stands, one in three while it moves
+		if ( injure && IsStorm() )
+		{
+			var moving = DataController.m_instance.m_playerData.m_general.m_currentSpeed >= 0.1f;
+			var injured = moving ? ( Random.Range( 0, 3 ) == 0 ) : ( Random.Range( 1, 100 ) <= c_injuryRollsOf99 );
+
+			if ( injured )
+			{
+				InjureInTheStorm();
+			}
+		}
+
+		return show;
 	}
 
-	static Sky Pick( params Sky[] skies )
+	// how many star hours a spell of weather lasts: RRND(1, (5 - activity) * 3), at most 12
+	static int SpellLength( int activity )
 	{
-		return skies[ Random.Range( 0, skies.Length ) ];
+		return Mathf.Clamp( Random.Range( 1, Mathf.Max( 2, ( 5 - activity ) * 3 ) ), 0, 12 );
+	}
+
+	// a storm of the planet's surface, by the original's STORMS table (a roll of 1 to 99 against its shares)
+	static int PickStorm( int surfaceId )
+	{
+		int[][] storms;
+
+		switch ( surfaceId )
+		{
+			case 2: storms = c_liquidStorms; break;
+			case 3: storms = c_frozenStorms; break;
+			case 4: storms = c_moltenStorms; break;
+			case 5: storms = c_rockStorms; break;
+			default: return 0;
+		}
+
+		var roll = Random.Range( 1, 100 );
+
+		foreach ( var storm in storms )
+		{
+			roll -= storm[ 1 ];
+
+			if ( roll <= 0 )
+			{
+				return storm[ 0 ];
+			}
+		}
+
+		return storms[ storms.Length - 1 ][ 0 ];
+	}
+
+	// an injury in a storm: the original's INJURE-PL with the E/M of the ground the vehicle is on
+	static void InjureInTheStorm()
+	{
+		var energyPerStep = 24.0f;
+
+		if ( ( SpaceflightController.m_instance != null ) && ( SpaceflightController.m_instance.m_terrainVehicle != null ) )
+		{
+			energyPerStep = SpaceflightController.m_instance.m_terrainVehicle.GetEnergyPerStep();
+		}
+
+		InjureOnTheSurface( energyPerStep, GetEfficiency() );
 	}
 
 	// shows the sky in the text window
@@ -266,59 +349,5 @@ public static class PlanetWeather
 		playerData.m_crewAssignment.InjureCrewMember( victim, loss );
 
 		return victim;
-	}
-
-	// a storm hour may injure one or two of the crew in the terrain vehicle ("ALPHA IS INJURED.")
-	static void InjureCrew()
-	{
-		var playerData = DataController.m_instance.m_playerData;
-		var gameData = DataController.m_instance.m_gameData;
-
-		var roll = Random.value;
-		var injuries = ( roll < c_noInjuryChance ) ? 0 : ( ( roll < c_oneInjuryChance ) ? 1 : 2 );
-
-		for ( var i = 0; i < injuries; i++ )
-		{
-			// the crew on board who are alive
-			var crew = new System.Collections.Generic.List<PD_Personnel.PD_PersonnelFile>();
-
-			for ( var role = PD_CrewAssignment.Role.First; role < PD_CrewAssignment.Role.Count; role++ )
-			{
-				if ( !playerData.m_crewAssignment.IsAssigned( role ) )
-				{
-					continue;
-				}
-
-				var file = playerData.m_crewAssignment.GetPersonnelFile( role );
-
-				if ( ( file != null ) && !file.m_isDead && ( file.m_vitality > 0.0f ) && !crew.Contains( file ) )
-				{
-					crew.Add( file );
-				}
-			}
-
-			if ( crew.Count == 0 )
-			{
-				return;
-			}
-
-			var victim = crew[ Random.Range( 0, crew.Count ) ];
-			var durability = c_humanDurability;
-
-			if ( ( victim.m_crewRaceId >= 0 ) && ( victim.m_crewRaceId < gameData.m_crewRaceList.Length ) )
-			{
-				durability = Mathf.Max( 1, gameData.m_crewRaceList[ victim.m_crewRaceId ].m_durability );
-			}
-
-			var damage = Random.Range( 1, 6 ) * 10.0f * c_humanDurability / durability;
-
-			if ( SpaceflightController.m_instance != null )
-			{
-				SpaceflightController.m_instance.m_messages.AddText( "<color=red>" + victim.m_name + " is injured.</color>" );
-			}
-
-			// (at 0 the crew member dies, and with nobody left the game is lost: PD_CrewAssignment.InjureCrewMember)
-			playerData.m_crewAssignment.InjureCrewMember( victim, damage );
-		}
 	}
 }

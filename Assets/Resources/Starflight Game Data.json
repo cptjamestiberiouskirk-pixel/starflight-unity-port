@@ -6597,7 +6597,7 @@
       "m_gravity": "108",
       "m_temperatureIdA": "0",
       "m_temperatureIdB": "0",
-      "m_weatherId": "0"
+      "m_weatherId": "1"
     },
     {
       "m_id": "91",
@@ -14946,7 +14946,7 @@
       "m_gravity": "57",
       "m_temperatureIdA": "2",
       "m_temperatureIdB": "4",
-      "m_weatherId": "0"
+      "m_weatherId": "1"
     },
     {
       "m_id": "454",
@@ -16096,7 +16096,7 @@
       "m_gravity": "1700",
       "m_temperatureIdA": "2",
       "m_temperatureIdB": "4",
-      "m_weatherId": "0"
+      "m_weatherId": "4"
     },
     {
       "m_id": "504",

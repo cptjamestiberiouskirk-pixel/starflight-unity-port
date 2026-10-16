@@ -143,7 +143,7 @@ public class TerrainVehicleDisplay : ShipDisplay
 		// the distance as it is shown, in whole kilometers (the original's integer square root)
 		var roundedDistanceInKm = Mathf.FloorToInt( distanceInKm );
 
-		// in a storm or heavy snow the bearing to the ship is lost (the original shows "SHIP: LOST!")
+		// from light snow to heavy snow (weather codes 4 to 11) the bearing to the ship is lost, unless the navigator's skill is above 199 (the original shows "SHIP: LOST!")
 		var shipLost = PlanetWeather.IsShipLost();
 
 		// has anything the text shows changed since we last built it?
