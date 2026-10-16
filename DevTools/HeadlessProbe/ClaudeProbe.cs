@@ -22576,13 +22576,15 @@ public class ClaudeProbe : MonoBehaviour
 		// ---- 2. the stunner: what the species record says it does
 		var switchText = Press( "TVSwitchWeaponButton" );
 		var stunsBefore = ( target == null ) ? "" : LifeformField( target, "m_stuns" );
+		var fuelBeforeStun = playerData.m_terrainVehicle.m_fuelRemaining;
 		var stunText = Press( "TVFireButton" );
+		var stunFuel = fuelBeforeStun - playerData.m_terrainVehicle.m_fuelRemaining;
 		var stunsAfter = ( target == null ) ? "" : LifeformField( target, "m_stuns" );
 		var statusAfterStun = ( target == null ) ? "" : LifeformField( target, "m_status" );
 		var species = ( target == null ) ? null : FieldOrNull( target.GetComponent( "TerrainLifeform" ), "m_species" );
 		var stunEffect = ( species == null ) ? "" : FieldOrNull( species, "m_stunEffect" ).ToString();
 
-		// ---- 3. the laser: 8 units of energy a shot, 20 to 100 hit points, until it is dead
+		// ---- 3. the laser: 600 of the tank's 30767 a shot (the stunner 300: TV-OV DO.WEAPON), 20 to 100 hit points, until it is dead
 		Press( "TVSwitchWeaponButton" );
 
 		var hitsBefore = ( target == null ) ? 0 : int.Parse( "0" + LifeformField( target, "m_hits" ) );
@@ -22602,13 +22604,14 @@ public class ClaudeProbe : MonoBehaviour
 		// ---- 4. nothing left within range: the laser hits nothing
 		var nothingText = Press( "TVFireButton" );
 
-		Log( "tvweapons: weapon set " + weaponSet + " | switch: " + switchText + " | stunner (effect " + stunEffect + "): " + stunText + " (stuns " + stunsBefore + " -> " + stunsAfter + ", " + statusAfterStun + ") | laser: " + laserText + " (hits " + hitsBefore + " -> " + hitsAfter + ", energy " + fuelBefore + " -> " + fuelAfter + ") | last: " + lastText + " (" + statusAtTheEnd + ") | then: " + nothingText );
+		Log( "tvweapons: weapon set " + weaponSet + " | switch: " + switchText + " | stunner (effect " + stunEffect + "): " + stunText + " (stuns " + stunsBefore + " -> " + stunsAfter + ", " + statusAfterStun + ") | laser: " + laserText +  " (hits " + hitsBefore + " -> " + hitsAfter + ", energy " + fuelBefore + " -> " + fuelAfter + ", " + ( ( fuelBefore - fuelAfter ) * 30767.0f ).ToString( "F1" ) + " of the tank; the stunner " + ( stunFuel * 30767.0f ).ToString( "F1" ) + ") | last: " + lastText + " (" + statusAtTheEnd + ") | then: " + nothingText );
 
 		var stunAsRecorded = ( stunEffect == "Unaffected" ) ? stunText.Contains( "no effect" ) : ( ( stunEffect == "Killed" ) ? stunText.Contains( "kills" ) : ( stunText.Contains( "stunned" ) || ( stunsAfter != stunsBefore ) || ( statusAfterStun == "Dead" ) ) );
 
 		Check( "tvweapons: Weapon shows the weapon buttons, with the laser mounted", ( weaponSet == "TerrainVehicleWeapon" ) && switchText.Contains( "stunner is mounted" ), weaponSet + " | " + switchText );
 		Check( "tvweapons: the stunner does what the species record says", ( target != null ) && ( stunEffect != "" ) && stunAsRecorded, stunEffect + " | " + stunText );
-		Check( "tvweapons: a laser shot costs 8 units of energy and does 20 to 100 points of damage", ( Mathf.Abs( fuelBefore - fuelAfter - 8.0f / 999.0f ) < 0.0001f ) && ( ( statusAfterStun == "Dead" ) || ( ( hitsBefore - hitsAfter >= 20 ) && ( hitsBefore - hitsAfter <= 100 ) ) || ( hitsAfter == 0 ) ), ( fuelBefore - fuelAfter ) + ", " + hitsBefore + " -> " + hitsAfter );
+		Check( "tvweapons: a stunner shot takes 300 of the tank's 30767, as the original's (TV-OV DO.WEAPON)", Mathf.Abs( stunFuel * 30767.0f - 300.0f ) < 0.5f, ( stunFuel * 30767.0f ).ToString( "F1" ) );
+		Check( "tvweapons: a laser shot takes 600 of the tank's 30767, as the original's (TV-OV DO.WEAPON), and does 20 to 100 points of damage", ( Mathf.Abs( ( fuelBefore - fuelAfter ) * 30767.0f - 600.0f ) < 0.5f ) && ( ( statusAfterStun == "Dead" ) || ( ( hitsBefore - hitsAfter >= 20 ) && ( hitsBefore - hitsAfter <= 100 ) ) || ( hitsAfter == 0 ) ), ( ( fuelBefore - fuelAfter ) * 30767.0f ).ToString( "F1" ) + ", " + hitsBefore + " -> " + hitsAfter );
 		Check( "tvweapons: the laser kills it", statusAtTheEnd == "Dead", statusAtTheEnd + " | " + lastText );
 		Check( "tvweapons: with no living lifeform within range the laser hits nothing (control)", nothingText.Contains( "hits nothing" ), nothingText );
 
