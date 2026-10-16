@@ -370,6 +370,9 @@ public class Encounter : MonoBehaviour
 		// and let the aliens' mood follow the player's shields and weapons
 		UpdatePlayerShieldsAndWeapons();
 
+		// a few of a race's ships may call for help, and more of them warp in
+		UpdateDistressCall();
+
 		// do we want to update the ships (both alien and player)?
 		if ( !m_pdEncounter.m_connected )
 		{
@@ -905,6 +908,7 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_playerPostures = 0;
 			m_pdEncounter.m_alienHails = 0;
 			m_pdEncounter.m_rivalLineSaid = false;
+			m_pdEncounter.m_distressCalled = false;
 
 			// initialize race encounter
 			switch ( m_gdEncounter.m_race )
@@ -1084,9 +1088,20 @@ public class Encounter : MonoBehaviour
 		// get to the list of alien ships
 		var alienShipList = m_pdEncounter.GetAlienShipList();
 
-		// how many come
+		// how many come (no more than there are models for: a wave called in by a distress call joins the ships already there)
 		var atOnce = m_gdEncounter.m_maxNumShipsAtOnce;
 		var waveSize = Mathf.Max( Random.Range( atOnce - 2, atOnce + 1 ), 1 );
+		var present = 0;
+
+		foreach ( var alienShip in alienShipList )
+		{
+			if ( alienShip.m_addedToEncounter && !alienShip.m_isDead )
+			{
+				present++;
+			}
+		}
+
+		waveSize = Mathf.Min( waveSize, m_alienShipModelList.Length - present );
 
 		// go through alien ship slots (as many as come)
 		for ( var alienShipIndex = 0; alienShipIndex < waveSize; alienShipIndex++ )
@@ -2881,6 +2896,104 @@ public class Encounter : MonoBehaviour
 
 			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Captain, they've " + ( armed ? "armed" : "disarmed" ) + " their weapons.</color>" );
 		}
+	}
+
+	// the aliens' call for help, as the original's (COMM-OV <AUX> CALL-FOR-SHIPS and SHIPS-ARRIVE, run once a pass of its main loop through the encounter's
+	// 'EXTERNAL-EVENTS, COMBAT-OV WF2EA): with one or two of their ships in the encounter, fewer than 20 come into it so far, a race that calls (the Elowan,
+	// Gazurtoid, Mechans, Spemin, Thrynn, Velox, Uhlek and the Interstel police: COMM-OV (?RACE)), neither friendly nor neutral and not surrendering, they call
+	// with a chance of 1 in 1500 a pass, and at once at their homeworld (SPACIAL-CONTEXT 2); once they have called, more of their ships warp in with a chance of
+	// 1 in 50 / (2 x their ships + 1) a pass (WE850), as a new wave (+A-VESS, as the first one: AddAlienShips)
+	public const float c_passSeconds = 0.25f;
+	const int c_distressCallOdds = 1500;
+	const int c_shipsArriveOdds = 50;
+	const int c_mostShipsCallingForHelp = 2;
+	const int c_mostShipsInAnEncounter = 20;
+	static readonly GameData.Race[] c_racesThatCallForHelp = { GameData.Race.Elowan, GameData.Race.Gazurtoid, GameData.Race.Mechan, GameData.Race.Spemin, GameData.Race.Thrynn, GameData.Race.Velox, GameData.Race.Uhlek, GameData.Race.InterstelPolice };
+
+	// the time to the next pass of the distress call's rolls (the port's step of the original's main loop in an encounter: c_passSeconds)
+	float m_distressPassTimer;
+
+	void UpdateDistressCall()
+	{
+		m_distressPassTimer += Time.deltaTime;
+
+		for ( var pass = 0; ( pass < 8 ) && ( m_distressPassTimer >= c_passSeconds ); pass++ )
+		{
+			m_distressPassTimer -= c_passSeconds;
+
+			DistressCallPass();
+		}
+
+		// (a long frame does not save up passes)
+		m_distressPassTimer = Mathf.Min( m_distressPassTimer, c_passSeconds );
+	}
+
+	// one pass of the original's rolls: returns 1 when the aliens call for help, 2 when their ships warp in, 0 otherwise (public for the probe)
+	public int DistressCallPass()
+	{
+		if ( ( m_pdEncounter == null ) || ( m_gdEncounter == null ) || ( System.Array.IndexOf( c_racesThatCallForHelp, m_gdEncounter.m_race ) < 0 ) )
+		{
+			return 0;
+		}
+
+		var present = 0;
+		var added = 0;
+
+		foreach ( var alienShip in m_pdEncounter.GetAlienShipList() )
+		{
+			if ( alienShip.m_addedToEncounter )
+			{
+				added++;
+
+				if ( !alienShip.m_isDead )
+				{
+					present++;
+				}
+			}
+		}
+
+		if ( present == 0 )
+		{
+			return 0;
+		}
+
+		var messages = SpaceflightController.m_instance.m_messages;
+
+		if ( m_pdEncounter.m_distressCalled )
+		{
+			// SHIPS-ARRIVE: a new wave, and the aliens hail again as if they had just arrived
+			if ( Random.Range( 0, Mathf.Max( 1, c_shipsArriveOdds / ( present * 2 + 1 ) ) ) != 0 )
+			{
+				return 0;
+			}
+
+			m_pdEncounter.m_distressCalled = false;
+			m_pdEncounter.m_alienHails = 0;
+
+			AddAlienShips();
+
+			messages.AddText( "<color=white>Captain, more alien ships have warped in.</color>" );
+
+			return 2;
+		}
+
+		var stance = m_pdEncounter.m_alienStance;
+
+		if ( ( present > c_mostShipsCallingForHelp ) || ( added >= c_mostShipsInAnEncounter ) || ( stance == GD_Comm.Stance.Friendly ) || ( stance == GD_Comm.Stance.Neutral ) || AliensAreSurrendering( stance ) )
+		{
+			return 0;
+		}
+
+		if ( !IsHomeFleet() && ( Random.Range( 0, c_distressCallOdds ) != 0 ) )
+		{
+			return 0;
+		}
+
+		m_pdEncounter.m_distressCalled = true;
+
+		messages.AddText( "<color=white>Captain, I'm picking up an alien distress call.</color>" );
+
+		return 1;
 	}
 
 	// whether the aliens have raised their shields, as the original's ?A-SHIELDS-UP (COMM-OV, <AUX>): up when a ship of the encounter has shields and their
