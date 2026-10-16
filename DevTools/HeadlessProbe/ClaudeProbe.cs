@@ -11672,6 +11672,7 @@ public class ClaudeProbe : MonoBehaviour
 		var notBack = new List<string>();
 		var notAgain = new List<string>();
 		var notInSystem = new List<string>();
+		var displaysWrong = new List<string>();
 		var orbits = 0;
 
 		foreach ( var planet in planets )
@@ -11737,6 +11738,32 @@ public class ClaudeProbe : MonoBehaviour
 
 			RenderCameraPicture( camera, System.IO.Path.Combine( folder, "planet" + planet.m_id + "_natural.png" ) );
 
+			// the console's displays show the natural maps too: the System Map's planet, and the sensor picture of a scan of the planet
+			var systemDisplay = controller.m_displayController.m_systemDisplay;
+			var sensorsDisplay = controller.m_displayController.m_sensorsDisplay;
+			var orbitIndex = planet.m_orbitPosition - 1;
+
+			// (the sensors display makes its picture's material when it is first shown, as a scan shows it)
+			controller.m_displayController.ChangeDisplay( sensorsDisplay );
+
+			yield return Frames( 2 );
+
+			Call( sensorsDisplay, "ShowPlanetSurface" );
+
+			controller.m_displayController.ChangeDisplay( systemDisplay );
+
+			yield return Frames( 3 );
+
+			var systemMapTexture = ( ( orbitIndex >= 0 ) && ( orbitIndex < systemDisplay.m_planetList.Length ) ) ? systemDisplay.m_planetList[ orbitIndex ].material.GetTexture( "_PlanetTex" ) : null;
+			var sensorMaterial = FieldOrNull( sensorsDisplay, "m_planetSurfaceMaterial" ) as Material;
+			var sensorTexture = ( sensorMaterial != null ) ? sensorMaterial.GetTexture( "_PlanetTex" ) : null;
+			var displayMap = suits ? (Texture) planetController.GetNaturalPlanet().GetAlbedoMap() : planetController.GetPlanetGenerator().m_albedoTexture;
+
+			if ( ( systemMapTexture != displayMap ) || ( sensorTexture != displayMap ) )
+			{
+				displaysWrong.Add( planet.m_id + " natural: System Map " + ( ( systemMapTexture != null ) ? systemMapTexture.name : "none" ) + ", sensors " + ( ( sensorTexture != null ) ? sensorTexture.name : "none" ) );
+			}
+
 			// the original look, at once
 			PlanetLook.SetLook( PlanetLook.Look.Original, false );
 
@@ -11753,6 +11780,25 @@ public class ClaudeProbe : MonoBehaviour
 			}
 
 			RenderCameraPicture( camera, System.IO.Path.Combine( folder, "planet" + planet.m_id + "_original.png" ) );
+
+			// and the displays the generator's maps
+			controller.m_displayController.ChangeDisplay( sensorsDisplay );
+
+			yield return Frames( 2 );
+
+			Call( sensorsDisplay, "ShowPlanetSurface" );
+
+			controller.m_displayController.ChangeDisplay( systemDisplay );
+
+			yield return Frames( 3 );
+
+			systemMapTexture = ( ( orbitIndex >= 0 ) && ( orbitIndex < systemDisplay.m_planetList.Length ) ) ? systemDisplay.m_planetList[ orbitIndex ].material.GetTexture( "_PlanetTex" ) : null;
+			sensorTexture = ( sensorMaterial != null ) ? sensorMaterial.GetTexture( "_PlanetTex" ) : null;
+
+			if ( ( systemMapTexture != planetController.GetPlanetGenerator().m_albedoTexture ) || ( sensorTexture != planetController.GetPlanetGenerator().m_albedoTexture ) )
+			{
+				displaysWrong.Add( planet.m_id + " original: System Map " + ( ( systemMapTexture != null ) ? systemMapTexture.name : "none" ) + ", sensors " + ( ( sensorTexture != null ) ? sensorTexture.name : "none" ) );
+			}
 
 			// and the natural look again
 			PlanetLook.SetLook( PlanetLook.Look.Natural, false );
@@ -11791,6 +11837,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "naturalplanets: picking the original look puts the original material, clouds and atmosphere back at once, and lets go of the natural maps", notBack.Count == 0, string.Join( " | ", notBack ) );
 		Check( "naturalplanets: picking the natural look again puts it back at once", notAgain.Count == 0, string.Join( " | ", notAgain ) );
 		Check( "naturalplanets: the planet in the star system wears the look too", notInSystem.Count == 0, string.Join( ", ", notInSystem ) );
+		Check( "naturalplanets: the System Map and the sensor picture show the planet's natural maps in the natural look, and its own in the original look", ( orbits >= 6 ) && ( displaysWrong.Count == 0 ), string.Join( " | ", displaysWrong ) );
 
 		// ---- 3b. the launch from a planet: the camera starts on the top of the planet in orbit and looks round before it rises (the planet as close as it
 		// gets), pictures of it through the first 18 s

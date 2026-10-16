@@ -623,17 +623,19 @@ public class SensorsDisplay : ShipDisplay
 			return;
 		}
 
-		var planetGenerator = planetController.GetPlanetGenerator();
+		// the planet's maps (its natural ones in the natural look: PlanetLook)
+		var albedoMap = planetController.GetDisplayAlbedoMap();
+		var waterMaskMap = planetController.GetDisplayWaterMaskMap();
+		var normalMap = planetController.GetDisplayNormalMap();
 
-		if ( ( planetGenerator.m_albedoTexture == null ) || ( planetGenerator.m_waterMaskTexture == null ) || ( planetGenerator.m_normalTexture == null ) )
+		if ( ( albedoMap == null ) || ( waterMaskMap == null ) || ( normalMap == null ) )
 		{
 			return;
 		}
 
-		// the planet's maps
-		m_planetSurfaceMaterial.SetTexture( "_PlanetTex", planetGenerator.m_albedoTexture );
-		m_planetSurfaceMaterial.SetTexture( "_WaterTex", planetGenerator.m_waterMaskTexture );
-		m_planetSurfaceMaterial.SetTexture( "_NormalTex", planetGenerator.m_normalTexture );
+		m_planetSurfaceMaterial.SetTexture( "_PlanetTex", albedoMap );
+		m_planetSurfaceMaterial.SetTexture( "_WaterTex", waterMaskMap );
+		m_planetSurfaceMaterial.SetTexture( "_NormalTex", normalMap );
 
 		// the rim of its atmosphere (a gas giant has none)
 		var planet = planetController.m_planet;
@@ -644,7 +646,7 @@ public class SensorsDisplay : ShipDisplay
 		m_planetSurfaceMaterial.SetFloat( "_Reveal", 0.0f );
 		m_planetSurfaceMaterial.SetFloat( "_Spin", m_planetSpin );
 
-		m_planetAlbedoTexture = planetGenerator.m_albedoTexture;
+		m_planetAlbedoTexture = albedoMap;
 		m_pictureMaterial = m_planetSurfaceMaterial;
 	}
 

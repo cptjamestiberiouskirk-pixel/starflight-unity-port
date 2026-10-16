@@ -99,6 +99,11 @@ public class SystemDisplay : ShipDisplay
 	// remember whether or not we have been initialized
 	bool m_alreadyInitialized;
 
+	// true once the planets are shown with their maps (until the star system changes)
+	bool m_planetMapsShown;
+
+	static readonly int c_planetTexId = Shader.PropertyToID( "_PlanetTex" );
+
 	// unity start
 	public override void Start()
 	{
@@ -116,6 +121,9 @@ public class SystemDisplay : ShipDisplay
 
 		// get to the star data
 		var star = gameData.m_starList[ playerData.m_general.m_currentStarId ];
+
+		// the planets with the maps they are to show
+		UpdatePlanetMaps();
 
 		// the planets turn while the game runs
 		var spin = SpaceflightController.m_instance.m_gameIsPaused ? 0.0f : Time.deltaTime * c_planetSpinSpeed;
@@ -272,6 +280,9 @@ public class SystemDisplay : ShipDisplay
 
 		// the wake starts again, and the sensors ping soon after the ship has come in
 		m_wakeCount = 0;
+
+		// the planets of the new star system get their maps once they are made (ShowPlanetMaps)
+		m_planetMapsShown = false;
 		m_pingStartTime = m_animationTime - c_pingInterval + 0.5f;
 
 		// change the color of the star based on the class (the colours of real stars of that class)
@@ -358,16 +369,49 @@ public class SystemDisplay : ShipDisplay
 				continue;
 			}
 
-			// its albedo map (a plain grey one for a planet that could not be mapped)
-			var planetGenerator = planetController.GetPlanetGenerator();
+			// its albedo map (a plain grey one for a planet that could not be mapped, its natural one in the natural look)
+			var albedoMap = planetController.GetDisplayAlbedoMap();
 
-			if ( ( planetGenerator == null ) || ( planetGenerator.m_albedoTexture == null ) )
+			if ( albedoMap == null )
 			{
 				continue;
 			}
 
-			m_planetList[ i ].material.SetTexture( "_PlanetTex", planetGenerator.m_albedoTexture );
+			m_planetList[ i ].material.SetTexture( "_PlanetTex", albedoMap );
 			m_planetList[ i ].color = Color.white;
+		}
+
+		m_planetMapsShown = true;
+	}
+
+	// shows the planets with their maps again when the maps they show are not the ones to show any more (the player has picked the other look of the
+	// planets, or a planet's natural maps were made again, larger, as it went into orbit, and the old ones are gone)
+	void UpdatePlanetMaps()
+	{
+		if ( !m_planetMapsShown || ( SpaceflightController.m_instance.m_starSystem == null ) )
+		{
+			return;
+		}
+
+		var planetControllers = SpaceflightController.m_instance.m_starSystem.m_planetController;
+
+		for ( var i = 0; ( i < GD_Star.c_maxNumPlanets ) && ( i < m_planetList.Length ) && ( i < planetControllers.Length ); i++ )
+		{
+			var planetController = planetControllers[ i ];
+
+			if ( ( planetController.m_planet == null ) || ( planetController.m_planet.m_id == -1 ) )
+			{
+				continue;
+			}
+
+			var albedoMap = planetController.GetDisplayAlbedoMap();
+
+			if ( ( albedoMap != null ) && ( m_planetList[ i ].material.GetTexture( c_planetTexId ) != albedoMap ) )
+			{
+				ShowPlanetMaps();
+
+				return;
+			}
 		}
 	}
 

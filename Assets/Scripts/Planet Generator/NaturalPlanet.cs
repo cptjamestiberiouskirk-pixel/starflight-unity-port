@@ -320,6 +320,11 @@ public class NaturalPlanet
 		return m_cloudMap;
 	}
 
+	public RenderTexture GetNormalMap()
+	{
+		return m_normalMap;
+	}
+
 	/// <summary>
 	/// Makes the natural look's maps of the planet, at least this wide, from the maps its generator has made (nothing to do when they are already that
 	/// wide). Returns false if they could not be made: the planet then keeps its original look. Never throws (it runs in the middle of the generation of
