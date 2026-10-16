@@ -193,8 +193,6 @@ public class PlayerData
 		return interest;
 	}
 
-	// call this when the ship is back at the Starport: after the win Interstel pays the bonus that comes with its medal, once ("this award includes a special bonus of
-	// 500,000 MU when you return to Starport" - STRINFO 2.12) - returns true if it was paid now
 	// Interstel pays for the lifeform data recorded since the last visit (planet.txt: "When the player returns to starport recorded information is automatically
 	// paid for") - returns what it paid
 	public int PayLifeformData()
@@ -215,19 +213,27 @@ public class PlayerData
 		return value;
 	}
 
-	public bool PayWinBonus()
+	// call this as the Crystal Planet goes: Interstel pays the bonus that comes with its medal at once, though the medal's message speaks of the return to the
+	// Starport (DPART-OV WF09C adds 500,000 MU to the balance and books it as a BONUS, transaction type 3, right after the award)
+	public void PayWinBonus()
+	{
+		m_general.m_winBonusPending = false;
+
+		m_bank.m_currentBalance += PD_General.c_winBonus;
+
+		m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Bonus", PD_General.c_winBonus.ToString() + "+" ) );
+	}
+
+	// call this when the ship is back at the Starport: a game saved between the win and the return, when the bonus was paid at the Starport, still has it to come -
+	// returns true if it was paid now
+	public bool PayPendingWinBonus()
 	{
 		if ( !m_general.m_gameWon || !m_general.m_winBonusPending )
 		{
 			return false;
 		}
 
-		m_general.m_winBonusPending = false;
-
-		m_bank.m_currentBalance += PD_General.c_winBonus;
-
-		// the original books the win's bonus as a BONUS (DPART-OV in the decompiled original, transaction type 3)
-		m_bank.m_transactionList.Add( new PD_Bank.Transaction( m_general.m_currentStardateYMD, "Bonus", PD_General.c_winBonus.ToString() + "+" ) );
+		PayWinBonus();
 
 		return true;
 	}

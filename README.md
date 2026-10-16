@@ -237,7 +237,7 @@ Assets/
 - The science officer's skill decides how much of an analysis is revealed, and each planet's readings are analyzed once
 - The bank pays the original's 12% annual interest on the balance when the crew boards at the Starport and with each new colony recommendation, shown as an Interest row in the ledger
 - Hits that get past the shields fall on the armor, and only once the armor is gone on the hull, the ship's systems (engines, sensors, comms, shield generator, missile launcher, laser cannon) and the crew, as in the original. The ship is lost when the hull's integrity is gone, and damaged systems work in proportion to their health (damaged engines slow the ship only in a fight, as in the original). Damage shows the original's DAMAGE display, with a bar for the hull and each system, and Repair lets the player choose what the engineer repairs (the hull and the systems, never the armor), using minerals from the hold
-- The game can be won: destroying the Crystal Planet ends the flares, and Interstel pays its 500,000 MU bonus and a supplemental evaluation at the Starport
+- The game can be won: destroying the Crystal Planet ends the flares, Interstel pays its 500,000 MU bonus at once, and a supplemental evaluation waits at the Starport
 - Arth's sun flares on 01-01-4621 unless the game has been won: the Starport is destroyed, and any ship in Arth's system is incinerated
 - 10 alien races, each with its own encounter behavior
 - Encounters that guard planets from orbit, fought over the planet's own surface; a Veloxi drone grants permission to orbit to a crew that answers its numbers the Veloxi way

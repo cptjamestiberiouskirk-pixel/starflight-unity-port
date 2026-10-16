@@ -95,7 +95,8 @@ public class PD_General
 	// true once a Black Egg has destroyed the Crystal Planet at its control nexus: the game is won, and no star flares any more (the original's ?WIN, disys.txt ?FLARE)
 	public bool m_gameWon;
 
-	// true from the win until the ship is back at the Starport, where Interstel pays the bonus (the original's WMSG, "play the win evaluation message")
+	// true in a game saved between the win and the return to the Starport when Interstel paid its bonus there: the bonus is paid on docking (a new win pays it at
+	// once, PlayerData.PayWinBonus)
 	public bool m_winBonusPending;
 
 	// the bonus that comes with the Interstel Medal of Sublime Achievement (STRINFO 1.2 and 2.12)
