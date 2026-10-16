@@ -140,7 +140,7 @@ public class AnalysisButton : ShipButton
 					text += "Object: <color=white>Planet</color>   Orbit Number: <color=white>" + planet.m_orbitPosition + "</color>\n";
 
 					// surface
-					text += "Predominant Surface: <color=white>" + Known( planet.GetSurfaceText(), skill ) + "</color>\n";
+					text += "Predominant Surface: <color=white>" + Known( GetSurfaceWord( planet ), skill ) + "</color>\n";
 
 					// gravity (once it is known, Land warns of a gravity the ship cannot land in or launch from: the original's ?G-AWARE)
 					var gravityText = Known( planet.GetGravityText(), skill );
@@ -259,5 +259,18 @@ public class AnalysisButton : ShipButton
 		SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
 
 		return false;
+	}
+
+	// the predominant surface as the original's analysis words it (ANALYZE-OV (.SURF)): GAS for a gas giant, and UKNOWN [sic] for the one surface it has no
+	// word for, the Crystal Planet's
+	static string GetSurfaceWord( GD_Planet planet )
+	{
+		switch ( planet.m_surfaceId )
+		{
+			case 0: return "Unknown";
+			case 1: return "Gas";
+		}
+
+		return planet.GetSurfaceText();
 	}
 }

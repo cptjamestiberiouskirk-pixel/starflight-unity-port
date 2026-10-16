@@ -1202,6 +1202,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAnalysisHeading();
 				break;
 
+			case "analysissurface":
+				yield return ScenarioAnalysisSurface();
+				break;
+
 			case "orbitlines":
 				yield return ScenarioOrbitLines();
 				break;
@@ -28868,6 +28872,73 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "analysisheading: the analysis heading ends with a colon, as the original", analysis.Contains( "Analysis of Last Sensor Reading:" ), analysis );
 
 		Finish( "scenario=analysisheading", 0 );
+	}
+
+	// the analysis words the predominant surface as the original's (ANALYZE-OV (.SURF)): Gas for a gas giant, Unknown for the Crystal Planet's, and the rest by
+	// their names
+	IEnumerator ScenarioAnalysisSurface()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+
+		EnsureCrew();
+
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer ).m_science = 250;
+
+		var gas = -1;
+		var rock = -1;
+		var crystal = -1;
+
+		foreach ( var planet in gameData.m_planetList )
+		{
+			if ( ( planet.m_surfaceId == 1 ) && ( gas < 0 ) )
+			{
+				gas = planet.m_id;
+			}
+
+			if ( ( planet.m_surfaceId == 5 ) && ( rock < 0 ) )
+			{
+				rock = planet.m_id;
+			}
+
+			if ( planet.IsCrystalPlanet() )
+			{
+				crystal = planet.m_id;
+			}
+		}
+
+		// in orbit with the sensor window up, for a reading
+		var sensors = SpaceflightController.m_instance.m_displayController.m_sensorsDisplay;
+
+		yield return EnterOrbit( 90 );
+
+		SpaceflightController.m_instance.m_displayController.ChangeDisplay( sensors );
+
+		yield return Frames( 3 );
+
+		// the analysis is of the planet the ship is at
+		var planetBefore = playerData.m_general.m_currentPlanetId;
+		var surfaces = new List<string>();
+
+		foreach ( var planetId in new[] { gas, crystal, rock } )
+		{
+			playerData.m_general.m_currentPlanetId = planetId;
+
+			var analysis = AnalyzeNewReading( true );
+			var match = System.Text.RegularExpressions.Regex.Match( analysis, "Predominant Surface: <color=white>([^<]*)<" );
+
+			surfaces.Add( match.Success ? match.Groups[ 1 ].Value : "no surface line" );
+		}
+
+		playerData.m_general.m_currentPlanetId = planetBefore;
+
+		Log( "analysissurface: a gas giant (planet " + gas + "): " + surfaces[ 0 ] + " | the Crystal Planet (" + crystal + "): " + surfaces[ 1 ] + " | a rock planet (" + rock + "): " + surfaces[ 2 ] );
+
+		Check( "analysissurface: a gas giant's surface is Gas, as the original's", surfaces[ 0 ] == "Gas", surfaces[ 0 ] );
+		Check( "analysissurface: the Crystal Planet's surface, which the original has no word for, is Unknown", surfaces[ 1 ] == "Unknown", surfaces[ 1 ] );
+		Check( "analysissurface: a rock planet's is Rock (a control)", surfaces[ 2 ] == "Rock", surfaces[ 2 ] );
+
+		Finish( "scenario=analysissurface checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 7: the lines that lead up to orbit scroll on (starflt_141, starflt_143)

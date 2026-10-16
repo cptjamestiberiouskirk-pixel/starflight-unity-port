@@ -221,6 +221,7 @@ What the probe does:
 | `alienshieldhits` | what an alien ship's shields take of a hit, as the original's: an Uhlek ship's raised shields with 30 points take the whole hit of 50 and the armor nothing, and a Spemin ship (the Spemin never raise their shields) takes it all on the armor with its shields untouched (about 40 s) |
 | `alienanalysis` | the analysis of an alien ship in the original's words: in a Mechan encounter the scouts' shields read Class 2 equivalent raised when neutral or hostile and lowered when friendly or surrendering, the weapons Armed only when hostile; a Gazurtoid warship's shields Unknown, a Spemin scout's None apparent; and the size with no label, as a whole number or the decimals to the first that is not zero (about 20 s) |
 | `analysisheading` | the Analysis heading's colon on a Mechan scout's reading, and a planet's temperature with the same word at both ends given as the one word (and a range as a range) (about 25 s) |
+| `analysissurface` | the analysis words the predominant surface as the original's: at science skill 250, a gas giant's is Gas, the Crystal Planet's (no word in the original) is Unknown, and a rock planet's is Rock (a control) (about 15 s) |
 | `ancientsites` | the ancient ruins STRINFO's editors place: on planet 5 of 145,107 a ruin at 36N x 90E with 3.1 cubic meters of Endurium, on planet 2 of 154,62 two ruins at 42S x 13W with 3.1 and 5.9 (about 30 s) |
 | `analysisskill` | the science officer's skill and the analysis, in orbit of planet 90: skill 250 (every line, the control), the same reading again (used up: "I need a current sensor reading."), skill 0 (only the object's class and the orbit number, the other 5 lines "Not certain"), skill 100 over 20 readings (about half of 100 lines not certain) and an alien ship analyzed twice (its reading is used up too) (about 25 s) |
 | `salvage` | salvage from debris, two Spemin ships destroyed in a star system with a hold of 16 pods: a wreck 2000 units away (the control, not taken), the wreck under the ship (its vessel's Endurium and debris come aboard, with the message), the same wreck again (nothing more), a wreck with the hold full ("no room") and the sensor reading of a wreck (its constituents) (about 25 s) |
@@ -297,7 +298,7 @@ What the probe does:
 | `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 | `combatmessages` | the combat messages are the original's: WEAPONS NOT ARMED, NO TARGET PRESENT, WEAPON NOT AVAILABLE and OUT OF FUEL! when a weapon cannot fire, nothing of the port's own when the player's shot hits, and LASER CLASS n (LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (248 scenarios, about 208 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (249 scenarios, about 209 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### The playthrough
 
