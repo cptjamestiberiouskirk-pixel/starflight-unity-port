@@ -331,8 +331,17 @@ public class CrewAssignmentPanel : Panel
 		// check if we have don't have someone assigned to this position
 		if ( !crewAssignment.IsAssigned( m_currentRole ) )
 		{
-			// automatically select the first personnel file
-			ChangeCurrentPersonnelId( 0, true );
+			// automatically select the first living personnel file (a dead one cannot be assigned)
+			var personnelList = DataController.m_instance.m_playerData.m_personnel.m_personnelList;
+
+			var firstLivingId = 0;
+
+			while ( ( firstLivingId < personnelList.Count - 1 ) && PD_CrewAssignment.IsDeadFile( personnelList[ firstLivingId ] ) )
+			{
+				firstLivingId++;
+			}
+
+			ChangeCurrentPersonnelId( firstLivingId, true );
 		}
 		else
 		{
@@ -366,6 +375,17 @@ public class CrewAssignmentPanel : Panel
 
 			// get the personnel file
 			PD_Personnel.PD_PersonnelFile personnelFile = personnel.m_personnelList[ m_currentPersonnelId ];
+
+			// a dead crew member's file is shown, but the post is not given to them (ASSCREW-OV WF395 takes only a living crew member, WF2B1: "YOU CAN'T ASSIGN"
+			// a dead crewmember)
+			if ( PD_CrewAssignment.IsDeadFile( personnelFile ) )
+			{
+				UpdateAssignedCrewmemberList();
+
+				SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+				return;
+			}
 
 			// assign this personnel to this position
 			crewAssignment.Assign( m_currentRole, personnelFile.m_fileId );

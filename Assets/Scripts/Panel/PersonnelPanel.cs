@@ -823,6 +823,13 @@ public class PersonnelPanel : Panel
 				m_trainingText.text = "Your bank balance is too low";
 				break;
 			}
+
+			case 6:
+			{
+				// the original's words (PERSONNEL-OV WF192: "YOU CAN'T TRAIN" a dead crewmember)
+				m_trainingText.text = "You can't train a dead crewmember";
+				break;
+			}
 		}
 
 		// show the training text
@@ -999,6 +1006,18 @@ public class PersonnelPanel : Panel
 	public void TrainClicked()
 	{
 		InputController.m_instance.Debounce();
+
+		// the dead cannot be trained, and pay nothing (PERSONNEL-OV WF3A3)
+		var playerDataForTheDead = DataController.m_instance.m_playerData;
+
+		if ( ( m_currentFileIndex >= 0 ) && ( m_currentFileIndex < playerDataForTheDead.m_personnel.m_personnelList.Count ) && PD_CrewAssignment.IsDeadFile( playerDataForTheDead.m_personnel.m_personnelList[ m_currentFileIndex ] ) )
+		{
+			UpdateTrainingText( 6 );
+
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+			return;
+		}
 
 		// check if the current race is an android
 		if ( m_currentRaceIndex == 4 )

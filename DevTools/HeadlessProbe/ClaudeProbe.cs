@@ -1242,6 +1242,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportTraining();
 				break;
 
+			case "starport-deadcrew":
+				yield return ScenarioStarportDeadCrew();
+				break;
+
 			case "surfacepictures":
 				yield return ScenarioSurfacePictures();
 				break;
@@ -29876,6 +29880,114 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-training: asking for more than the most trains the most, to the skill's maximum", mostRight && ( secondQuestion == "How many training sessions (0-" + ( expectedMost - 3 ) + ")? 1" ), "'" + secondQuestion + "', " + afterMost + " (expected " + maximum + " science, " + ( 11700 - 300 * expectedMost ) + " M.U.)" );
 
 		Finish( "scenario=starport-training checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// a dead crew member can be neither assigned nor trained, as in the original (ASSCREW-OV WF395 takes only a living crew member, PERSONNEL-OV WF3A3 trains
+	// only one)
+	IEnumerator ScenarioStarportDeadCrew()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var personnel = playerData.m_personnel;
+		var crewAssignment = playerData.m_crewAssignment;
+		var crewPanel = FindPanel<CrewAssignmentPanel>();
+		var personnelPanel = FindPanel<PersonnelPanel>();
+
+		if ( ( crewPanel == null ) || ( personnelPanel == null ) )
+		{
+			Finish( "scenario=starport-deadcrew abort: crew assignment " + ( crewPanel != null ) + ", personnel " + ( personnelPanel != null ), 2 );
+			yield break;
+		}
+
+		Func<string, bool, PD_Personnel.PD_PersonnelFile> makeFile = ( name, isDead ) =>
+		{
+			var file = personnel.CreateNewPersonnel();
+
+			file.m_name = name;
+			file.m_crewRaceId = 0;
+			file.m_vitality = isDead ? 0.0f : 100.0f;
+			file.m_isDead = isDead;
+
+			personnel.m_personnelList.Add( file );
+
+			return file;
+		};
+
+		// file 1 is a dead crew member, file 2 the captain, file 3 a spare; only the captain's post is filled
+		personnel.m_personnelList.Clear();
+
+		var dead = makeFile( "Dead", true );
+		var captain = makeFile( "Captain", false );
+		var spare = makeFile( "Spare", false );
+
+		crewAssignment.Reset();
+		crewAssignment.Assign( PD_CrewAssignment.Role.Captain, captain.m_fileId );
+
+		// ---- Crew Assignment: Assign starts on the captain's post, showing the captain's file
+		yield return OpenPanel( crewPanel, "crew assignment" );
+
+		crewPanel.AssignClicked();
+
+		yield return Frames( 3 );
+
+		// the stick to the dead crew member's file, then to the spare's
+		Call( crewPanel, "ChangeCurrentPersonnelId", 0, false );
+
+		var captainAfterDead = crewAssignment.GetFileId( PD_CrewAssignment.Role.Captain );
+
+		Call( crewPanel, "ChangeCurrentPersonnelId", 2, false );
+
+		var captainAfterSpare = crewAssignment.GetFileId( PD_CrewAssignment.Role.Captain );
+
+		// down to the science officer's empty post, with the dead crew member's file first on the list
+		Call( crewPanel, "ChangeCurrentRole", PD_CrewAssignment.Role.ScienceOfficer );
+
+		var scienceOfficer = crewAssignment.GetFileId( PD_CrewAssignment.Role.ScienceOfficer );
+
+		yield return ClosePanel( crewPanel, "crew assignment" );
+
+		// ---- Personnel: Train on the dead crew member's file, then on the spare's
+		yield return OpenPanel( personnelPanel, "personnel" );
+
+		SetField( personnelPanel, "m_currentFileIndex", 0 );
+		Call( personnelPanel, "UpdateScreen" );
+
+		var balanceBefore = playerData.m_bank.m_currentBalance;
+
+		personnelPanel.TrainClicked();
+
+		yield return Frames( 3 );
+
+		var stateAfterDead = GetField( personnelPanel, "m_currentState" ).ToString();
+		var textAfterDead = personnelPanel.m_trainingText.text;
+		var balanceAfterDead = playerData.m_bank.m_currentBalance;
+
+		SetField( personnelPanel, "m_currentFileIndex", 2 );
+		Call( personnelPanel, "UpdateScreen" );
+
+		personnelPanel.TrainClicked();
+
+		yield return Frames( 3 );
+
+		var stateAfterSpare = GetField( personnelPanel, "m_currentState" ).ToString();
+
+		if ( stateAfterSpare == "TrainCrewmember" )
+		{
+			personnelPanel.CancelClicked();
+
+			yield return Frames( 3 );
+		}
+
+		yield return ClosePanel( personnelPanel, "personnel" );
+
+		Log( "starport-deadcrew: files dead " + dead.m_fileId + ", captain " + captain.m_fileId + ", spare " + spare.m_fileId + " | the captain's post after the dead file " + captainAfterDead + ", after the spare's " + captainAfterSpare + " | the science officer's empty post starts on " + scienceOfficer + " | Train on the dead: " + stateAfterDead + " '" + textAfterDead + "', balance " + balanceBefore + " -> " + balanceAfterDead + " | Train on the spare: " + stateAfterSpare );
+
+		Check( "starport-deadcrew: browsing to a dead crew member's file leaves the post to the captain", captainAfterDead == captain.m_fileId, "the captain's post holds file " + captainAfterDead + " (the dead " + dead.m_fileId + ", the captain " + captain.m_fileId + ")" );
+		Check( "starport-deadcrew: browsing to a living crew member's file gives them the post (a control)", captainAfterSpare == spare.m_fileId, "the captain's post holds file " + captainAfterSpare + " (the spare " + spare.m_fileId + ")" );
+		Check( "starport-deadcrew: an empty post starts on the first living crew member's file, not the dead one before it", scienceOfficer == captain.m_fileId, "the science officer's post holds file " + scienceOfficer + " (the dead " + dead.m_fileId + ", the first living " + captain.m_fileId + ")" );
+		Check( "starport-deadcrew: Train on a dead crew member's file refuses with the original's words and charges nothing", ( stateAfterDead != "TrainCrewmember" ) && ( textAfterDead == "You can't train a dead crewmember" ) && ( balanceAfterDead == balanceBefore ), stateAfterDead + " '" + textAfterDead + "', balance " + balanceBefore + " -> " + balanceAfterDead );
+		Check( "starport-deadcrew: Train on a living crew member's file asks for a skill (a control)", stateAfterSpare == "TrainCrewmember", stateAfterSpare );
+
+		Finish( "scenario=starport-deadcrew checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 7: pictures of the landed ship and of the terrain vehicle's screens (probe.ps1 -Graphics)

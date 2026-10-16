@@ -317,7 +317,7 @@ public class PD_CrewAssignment
 	}
 
 	// true if a personnel file is of a crew member who has died
-	static bool IsDeadFile( PD_Personnel.PD_PersonnelFile file )
+	public static bool IsDeadFile( PD_Personnel.PD_PersonnelFile file )
 	{
 		return file.m_isDead || ( file.m_vitality <= 0.0f );
 	}
