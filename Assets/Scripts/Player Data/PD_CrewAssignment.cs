@@ -249,12 +249,85 @@ public class PD_CrewAssignment
 		}
 	}
 
-	// the chain of command (the 1984 notes, starship.txt: "When the captain dies the next in command automatically becomes captain. Chain of command: Captain,
-	// Sci.Off., Navig., Engin., Commun., Doctor")
-	static readonly Role[] c_chainOfCommand = { Role.ScienceOfficer, Role.Navigator, Role.Engineer, Role.CommunicationsOfficer, Role.Doctor };
+	// true if a personnel file is of a crew member who has died
+	static bool IsDeadFile( PD_Personnel.PD_PersonnelFile file )
+	{
+		return file.m_isDead || ( file.m_vitality <= 0.0f );
+	}
 
-	// a crew member takes an injury: their vitality falls, and at 0 they are dead - a dead captain's command passes down the chain of command, and with nobody
-	// left alive the game is lost - returns true if the injury killed them
+	// the post holder with the best skill for a post, the captain's holder if none of them has any (HEAL-OV WF42F: the six post holders, in the order of the
+	// posts, the first with the highest skill)
+	int FindBestHolder( Role role )
+	{
+		var best = m_captainFileId;
+		var bestSkill = 0;
+
+		for ( var candidate = Role.First; candidate < Role.Count; candidate++ )
+		{
+			var file = GetPersonnelFile( candidate );
+
+			if ( file == null )
+			{
+				continue;
+			}
+
+			// the posts after the captain's are the five skills in their order (science officer: science ... doctor: medicine)
+			var skill = file.GetSkill( (int) role - 1 );
+
+			if ( skill > bestSkill )
+			{
+				best = file.m_fileId;
+				bestSkill = skill;
+			}
+		}
+
+		return best;
+	}
+
+	// what the original does after a crew member dies (HEAL-OV OBITS, run after every wound): a dead member's skills are gone, each post but the captain's that a
+	// dead member holds goes to whichever post holder has the best skill for it, and a dead captain's command goes to whoever then holds the science officer's
+	// post - returns true if the captain changed
+	public bool ReassignPostsOfTheDead()
+	{
+		var captainBefore = m_captainFileId;
+
+		// WF4C1: the posts after the captain's
+		for ( var role = Role.ScienceOfficer; role < Role.Count; role++ )
+		{
+			var file = GetPersonnelFile( role );
+
+			if ( ( file == null ) || !IsDeadFile( file ) )
+			{
+				continue;
+			}
+
+			// WF489: the dead member's skills are lost (so they are never the best holder)
+			for ( var skillIndex = 0; skillIndex < 5; skillIndex++ )
+			{
+				file.SetSkill( skillIndex, 0 );
+			}
+
+			Assign( role, FindBestHolder( role ) );
+		}
+
+		// WF497: a dead captain
+		var captain = GetPersonnelFile( Role.Captain );
+
+		if ( ( captain != null ) && IsDeadFile( captain ) )
+		{
+			for ( var skillIndex = 0; skillIndex < 5; skillIndex++ )
+			{
+				captain.SetSkill( skillIndex, 0 );
+			}
+
+			Assign( Role.Captain, m_scienceOfficerFileId );
+		}
+
+		return m_captainFileId != captainBefore;
+	}
+
+	// a crew member takes an injury: their vitality falls, and at 0 they are dead - their posts go to the crew members best at them (ReassignPostsOfTheDead), and
+	// with nobody left alive the game is lost - returns true if the injury killed them
 	public bool InjureCrewMember( PD_Personnel.PD_PersonnelFile file, float damage )
 	{
 		if ( ( file == null ) || file.m_isDead )
@@ -278,29 +351,14 @@ public class PD_CrewAssignment
 			messages.AddText( "<color=red>" + file.m_name + " is dead!</color>" );
 		}
 
-		// a dead captain's command passes down the chain of command
-		if ( IsAssigned( Role.Captain ) && ( GetPersonnelFile( Role.Captain ) == file ) )
+		// the dead member's posts go to the crew members best at them, and a dead captain's command to the science officer
+		if ( ReassignPostsOfTheDead() )
 		{
-			foreach ( var role in c_chainOfCommand )
+			var captain = GetPersonnelFile( Role.Captain );
+
+			if ( ( messages != null ) && ( captain != null ) && !IsDeadFile( captain ) )
 			{
-				if ( !IsAssigned( role ) )
-				{
-					continue;
-				}
-
-				var next = GetPersonnelFile( role );
-
-				if ( ( next != null ) && !next.m_isDead && ( next.m_vitality > 0.0f ) )
-				{
-					Assign( Role.Captain, next.m_fileId );
-
-					if ( messages != null )
-					{
-						messages.AddText( "<color=yellow>" + next.m_name + " takes command.</color>" );
-					}
-
-					break;
-				}
+				messages.AddText( "<color=yellow>" + captain.m_name + " takes command.</color>" );
 			}
 		}
 

@@ -376,7 +376,7 @@ Some things to know:
 
 **Examine** and **Treat** (Medical): pick a crew member with Left and Right, and Enter. Examine shows their wounds and vitality. Treat starts a treatment that takes time, one patient at a time.
 
-**Crew deaths**: a crew member whose vitality reaches 0 dies, and the dead are beyond help. If the captain dies, command passes down the chain of command. Before the next launch you must fill the dead officer's post.
+**Crew deaths**: a crew member whose vitality reaches 0 dies, and the dead are beyond help. Their posts go to the crew members best at them, and if the captain dies the science officer takes command. Before the next launch you must fill the dead officer's post.
 
 ---
 

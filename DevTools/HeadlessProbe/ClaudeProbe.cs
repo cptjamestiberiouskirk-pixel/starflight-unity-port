@@ -998,6 +998,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCrewDeath();
 				break;
 
+			case "crewposts":
+				yield return ScenarioCrewPosts();
+				break;
+
 			case "mates":
 				yield return ScenarioMates();
 				break;
@@ -22872,6 +22876,94 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "crewdeath: when the last of the crew dies the game is lost, and it cannot be saved", ( IsDead( ben ) == "True" ) && controller.m_gameOver && gameOverText.Contains( "The entire crew has died" ) && playerData.m_playerShip.IsDestroyed(), IsDead( ben ) + ", " + controller.m_gameOver + ", hull " + playerData.m_playerShip.GetHullIntegrity() + " | " + gameOverText );
 
 		Finish( "scenario=crewdeath captain=" + captainAfter + " gameover=" + controller.m_gameOver, 0 );
+	}
+
+	// a dead crew member's posts go to the crew members best at them, as the original's do (HEAL-OV OBITS: the dead member's skills are lost, each post after the
+	// captain's goes to the post holder with the highest skill for it, or to the captain if none has any, and a dead captain's command to the science officer)
+	IEnumerator ScenarioCrewPosts()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var crewAssignment = playerData.m_crewAssignment;
+		var injure = typeof( PD_CrewAssignment ).GetMethod( "InjureCrewMember" );
+
+		yield return Frames( 10 );
+
+		// four crew members, each best at something: the navigator dies first, then the engineer who has taken over the navigator's post, then the captain
+		var cap = AddPerson( "Cap", 100.0f, 0 );
+		var sci = AddPerson( "Sci", 100.0f, 0 );
+		var nav = AddPerson( "Nav", 100.0f, 0 );
+		var eng = AddPerson( "Eng", 100.0f, 0 );
+
+		// science, navigation, engineering, communications, medicine
+		Action<PD_Personnel.PD_PersonnelFile, int[]> skills = ( file, values ) =>
+		{
+			for ( var index = 0; index < values.Length; index++ )
+			{
+				file.SetSkill( index, values[ index ] );
+			}
+		};
+
+		skills( cap, new[] { 20, 30, 20, 20, 20 } );
+		skills( sci, new[] { 90, 10, 40, 10, 80 } );
+		skills( nav, new[] { 10, 120, 10, 10, 10 } );
+		skills( eng, new[] { 10, 60, 150, 70, 10 } );
+
+		crewAssignment.Assign( PD_CrewAssignment.Role.Captain, cap.m_fileId );
+		crewAssignment.Assign( PD_CrewAssignment.Role.ScienceOfficer, sci.m_fileId );
+		crewAssignment.Assign( PD_CrewAssignment.Role.Navigator, nav.m_fileId );
+		crewAssignment.Assign( PD_CrewAssignment.Role.Engineer, eng.m_fileId );
+		crewAssignment.Assign( PD_CrewAssignment.Role.CommunicationsOfficer, eng.m_fileId );
+		crewAssignment.Assign( PD_CrewAssignment.Role.Doctor, sci.m_fileId );
+
+		Func<string> posts = () =>
+		{
+			var list = new List<string>();
+
+			for ( var role = PD_CrewAssignment.Role.First; role < PD_CrewAssignment.Role.Count; role++ )
+			{
+				var file = crewAssignment.GetPersonnelFile( role );
+
+				list.Add( role + " " + ( ( file != null ) ? file.m_name : "-" ) );
+			}
+
+			return string.Join( ", ", list );
+		};
+
+		Func<PD_Personnel.PD_PersonnelFile, string> skillsOf = file => file.m_science + "/" + file.m_navigation + "/" + file.m_engineering + "/" + file.m_communications + "/" + file.m_medicine;
+
+		Action<PD_Personnel.PD_PersonnelFile> kill = file =>
+		{
+			if ( injure != null )
+			{
+				injure.Invoke( crewAssignment, new object[] { file, 500.0f } );
+			}
+		};
+
+		// ---- 1. the navigator dies: the post goes to the best navigator among the post holders (Eng, 60), and the dead navigator's skills are gone
+		kill( nav );
+
+		var afterNavigator = posts();
+		var navSkills = skillsOf( nav );
+
+		// ---- 2. the engineer dies, holding the engineer's, the communications officer's and now the navigator's posts: each goes to the best of the others
+		// (engineering: Sci 40; communications: Cap 20, the first of the best in the order of the posts; navigation: Cap 30), and repairs go on
+		kill( eng );
+
+		var afterEngineer = posts();
+		var repairRate = playerData.m_playerShip.GetRepairRate();
+
+		// ---- 3. the captain dies: the science officer takes command (a control: the old chain of command gave the same)
+		kill( cap );
+
+		var afterCaptain = posts();
+
+		Log( "crewposts: after the navigator: " + afterNavigator + " (Nav's skills " + navSkills + ") | after the engineer: " + afterEngineer + ", repair rate " + repairRate + " | after the captain: " + afterCaptain );
+
+		Check( "crewposts: a dead navigator's post goes to the best navigator among the post holders, and the dead navigator's skills are gone", afterNavigator.Contains( "Navigator Eng" ) && ( navSkills == "0/0/0/0/0" ), afterNavigator + " | " + navSkills );
+		Check( "crewposts: a dead engineer's posts go to the best of the others for each (engineer Sci, communications Cap, navigator Cap), and the ship can be repaired", afterEngineer.Contains( "Engineer Sci" ) && afterEngineer.Contains( "CommunicationsOfficer Cap" ) && afterEngineer.Contains( "Navigator Cap" ) && ( repairRate > 0.0f ), afterEngineer + ", repair rate " + repairRate );
+		Check( "crewposts: a dead captain's command goes to the science officer (a control)", afterCaptain.StartsWith( "Captain Sci" ), afterCaptain );
+
+		Finish( "scenario=crewposts checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 6: the lifeforms' mates
