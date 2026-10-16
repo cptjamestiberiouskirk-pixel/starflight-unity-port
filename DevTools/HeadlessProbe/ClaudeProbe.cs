@@ -11873,9 +11873,14 @@ public class ClaudeProbe : MonoBehaviour
 	}
 
 	// the measurement itself has to be shown to work: an array of 256 bytes per call must come out as at least 256 bytes per call
+	// the control's calls: a tenth of a measurement's, 512 KB of arrays in all, which the heap's few-kilobyte blocks still resolve to a byte or two a call. With
+	// a full measurement's 5 MB a garbage collection ran in every try in the Starport scene once the probe started Unity with Burst off (#406), and the control
+	// came out as "could not be measured" (-1, shown as 0 bytes a call)
+	const int c_controlCalls = c_meterCalls / 10;
+
 	static long AllocatedByTheControl()
 	{
-		return Allocated( () => { s_garbage = new byte[ 256 ]; }, c_meterCalls ) / c_meterCalls;
+		return Allocated( () => { s_garbage = new byte[ 256 ]; }, c_controlCalls ) / c_controlCalls;
 	}
 
 	IEnumerator ScenarioPerFrame()
