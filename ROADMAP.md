@@ -144,7 +144,7 @@ Only the effects that matter for winning had to come before Phase 5. The others 
 | Crystal Orb | cancels the Crystal Planet's field: #115, with item 5.2 | Sphexi, 46N 14E | yes |
 | Black Egg | a planet bomb, armed by dropping it: #117 (countdown in orbit, the planet destroyed and saved) | three Old Empire sites | yes |
 | Crystal Cone | finds the Crystal Planet's nexus from orbit: #118 (the messages report it on entering orbit and on Land; how it is shown is the port's choice) | Uhlek space | INFERRED yes |
-| Ring Device | shows nearby fluxes (alpha.txt: fluxes are hidden without it and navigation skill) | Mars, 90N 0 | no; decided 2026-10-10: fluxes are hidden without it. #132 |
+| Ring Device | shows nearby fluxes (alpha.txt: fluxes are hidden without it and navigation skill) | Mars, 90N 0 | no; decided 2026-10-10: fluxes are hidden without it (#132); since 2026-10-15 also shown to a navigator of skill above 150, as the released game's HYPER-OV .FLUX-ICON |
 | Whining Orb | translates Spemin: #126 | Starport, 6000 MU | no |
 | Flat Device | shields the terrain vehicle from lifeforms: a lifeform hits half as often with the device in the ship or the terrain vehicle (the half is the port's choice) | Starport, 30,000 MU | no |
 | Shimmering Ball | automatic cloak in combat; decided 2026-10-10: the aliens cannot fire at the ship until it fires. #130 (3 s uncloaked after each shot) | 68,66 planet 1 | no |
