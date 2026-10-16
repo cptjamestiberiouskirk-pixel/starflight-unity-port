@@ -1522,6 +1522,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAlienPursuit();
 				break;
 
+			case "shipspeeds":
+				yield return ScenarioShipSpeeds();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -19912,7 +19916,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		SetSystemHealth( 3, 100 );
 
-		// ---- 2. the engines: the top speed in proportion to their health (in hyperspace, with no encounter able to begin)
+		// ---- 2. the engines: in hyperspace their health does not change the top speed, as the original's (with no encounter able to begin)
 		var encounterRange = controller.m_encounterRange;
 
 		controller.m_encounterRange = 0.0f;
@@ -20036,7 +20040,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "systemeffects: maximum shields " + shieldsWhole + " whole, " + shieldsHalf + " at half | top speed " + speedWhole + " whole, " + speedHalf + " at half | laser hit " + laserHits[ 0 ] + " whole, " + laserHits[ 1 ] + " at half, can fire when destroyed " + firesDestroyed + " | comm whole: " + commWhole + " | destroyed: " + commDestroyed + " | sensors whole: " + sensorsWhole + " | at 20: " + sensorsBroken );
 
 		Check( "systemeffects: a damaged shield generator holds less charge (half of it at half its health)", ( shieldsWhole > 0 ) && ( shieldsHalf == shieldsWhole / 2 ), shieldsWhole + " -> " + shieldsHalf );
-		Check( "systemeffects: damaged engines are slower (half the top speed at half their health)", ( speedWhole > 0.0f ) && Mathf.Abs( speedHalf - speedWhole / 2.0f ) < 0.01f, speedWhole + " -> " + speedHalf );
+		Check( "systemeffects: in hyperspace engines at half health keep the top speed (the original's engine damage counts only in an encounter's acceleration, HYPER-OV !S/A)", ( speedWhole > 0.0f ) && Mathf.Abs( speedHalf - speedWhole ) < 0.01f, speedWhole + " -> " + speedHalf );
 		Check( "systemeffects: a damaged laser cannon does less damage, and a destroyed one does not fire", ( laserHits[ 0 ] > 0 ) && ( laserHits[ 1 ] == Mathf.RoundToInt( laserHits[ 0 ] / 2.0f ) ) && !firesDestroyed, laserHits[ 0 ] + " -> " + laserHits[ 1 ] + ", " + firesDestroyed );
 		Check( "systemeffects: destroyed comm equipment garbles what a fully trained officer understands", commWhole.Contains( speminComm.m_text ) && !commDestroyed.Contains( speminComm.m_text ), commDestroyed );
 		Check( "systemeffects: badly damaged sensors give no readings", sensorsWhole.Contains( "Star System Scan" ) && sensorsBroken.Contains( "too badly damaged" ), sensorsBroken );
@@ -38917,6 +38921,127 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "alienpursuit: a group 12 coordinates away, beyond the region around the ship, does not move (control)", Mathf.Abs( farAway - 12.0f ) < 0.01f, farAway.ToString( "0.000" ) );
 
 		Finish( "scenario=alienpursuit checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the ship's speeds in flight as the original's (HYPER-OV CSPEED, !MAXSPEED, ACCELERATE): in a star system the step grows from 1 to 12 of the system's units,
+	// to a top speed 12 * 20.48 / 32 = 7.68 times hyperspace's (983 of the port's units a second, not 4 times, 512); in hyperspace the top speed is there from the
+	// first step; with no direction held the ship stops at once; and the engines' health does not change the speed, though destroyed engines move nothing
+	// (DAMAGE-OV WF2AC)
+	IEnumerator ScenarioShipSpeeds()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+		var starSystem = controller.m_starSystem;
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets, and no encounter able to begin
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		SetSystemHealth( 0, 100 );
+
+		// ---- 1. the star system of Arth, after Maneuver from the Starport
+		controller.SwitchLocation( PD_General.Location.JustLaunched );
+
+		for ( var end = Time.realtimeSinceStartup + 60.0f; ( Time.realtimeSinceStartup < end ) && starSystem.GeneratingPlanets(); )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 10 );
+
+		PressButton( ButtonController.ButtonSet.NavigationA, 0 );
+
+		yield return Frames( 10 );
+
+		// (Maneuver, while it runs, turns the engines off when no direction is held)
+		if ( GetField( controller.m_buttonController, "m_currentButton" ) is ManeuverButton )
+		{
+			controller.m_buttonController.DeactivateButton();
+		}
+
+		yield return Frames( 3 );
+
+		var inStarSystem = general.m_location == PD_General.Location.StarSystem;
+
+		general.m_currentSpeed = 0.0f;
+		general.m_currentDirection = Vector3.right;
+
+		controller.m_playerShip.TurnOnEngines();
+
+		yield return Frames( 2 );
+
+		var firstSteps = general.m_currentSpeed;
+
+		for ( var end = Time.time + 3.5f; Time.time < end; )
+		{
+			general.m_currentDirection = Vector3.right;
+
+			yield return null;
+		}
+
+		var systemTop = general.m_currentSpeed;
+
+		controller.m_playerShip.TurnOffEngines();
+
+		yield return Frames( 3 );
+
+		var systemStopped = general.m_currentSpeed;
+
+		Log( "shipspeeds: in the star system (" + general.m_location + "): " + firstSteps.ToString( "0.0" ) + " two frames after the engines went on, " + systemTop.ToString( "0.0" ) + " after 3.5 s, " + systemStopped.ToString( "0.0" ) + " three frames after they went off" );
+
+		Check( "shipspeeds: in a star system the ship starts at a twelfth of its top speed or more, and less than half of it (the original's step grows from 1 to 12)", inStarSystem && ( firstSteps >= 983.04f / 12.0f - 0.01f ) && ( firstSteps < 983.04f / 2.0f ), firstSteps.ToString( "0.0" ) );
+		Check( "shipspeeds: its top speed in a star system is 7.68 times hyperspace's, 983 (12 units of 20.48 a step against 1 of 32)", Mathf.Abs( systemTop - 983.04f ) < 0.5f, systemTop.ToString( "0.0" ) );
+		Check( "shipspeeds: with no direction held it stops at once", systemStopped == 0.0f, systemStopped.ToString( "0.0" ) );
+
+		// ---- 2. hyperspace, in a quiet corner
+		general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 6.0f, 0.0f, 6.0f ) );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		general.m_currentSpeed = 0.0f;
+		general.m_currentDirection = Vector3.right;
+
+		controller.m_playerShip.TurnOnEngines();
+
+		for ( var end = Time.time + 0.1f; Time.time < end; )
+		{
+			yield return null;
+		}
+
+		var hyperspaceAtOnce = general.m_currentSpeed;
+
+		SetSystemHealth( 0, 50 );
+
+		yield return Frames( 3 );
+
+		var hyperspaceHalfEngines = general.m_currentSpeed;
+
+		SetSystemHealth( 0, 0 );
+
+		yield return Frames( 3 );
+
+		var hyperspaceNoEngines = general.m_currentSpeed;
+
+		SetSystemHealth( 0, 100 );
+
+		controller.m_playerShip.TurnOffEngines();
+		controller.m_encounterRange = encounterRange;
+
+		Log( "shipspeeds: in hyperspace: " + hyperspaceAtOnce.ToString( "0.0" ) + " 0.1 s after the engines went on, " + hyperspaceHalfEngines.ToString( "0.0" ) + " with the engines at half health, " + hyperspaceNoEngines.ToString( "0.0" ) + " with them destroyed" );
+
+		Check( "shipspeeds: in hyperspace the ship is at its top speed, 128, from the first step", Mathf.Abs( hyperspaceAtOnce - 128.0f ) < 0.01f, hyperspaceAtOnce.ToString( "0.0" ) );
+		Check( "shipspeeds: engines at half health do not slow the ship (the original's engine damage counts only in an encounter)", Mathf.Abs( hyperspaceHalfEngines - 128.0f ) < 0.01f, hyperspaceHalfEngines.ToString( "0.0" ) );
+		Check( "shipspeeds: destroyed engines move nothing (DAMAGE-OV WF2AC; the old code left the ship at the speed it had)", hyperspaceNoEngines < 0.01f, hyperspaceNoEngines.ToString( "0.0" ) );
+
+		Finish( "scenario=shipspeeds checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

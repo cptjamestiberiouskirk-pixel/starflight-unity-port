@@ -28,8 +28,17 @@ public class PlayerShip : MonoBehaviour
 	// the minimum time to reach the maximum speed
 	public float m_minimumTimeToReachMaximumSpeed;
 
-	// the time to slow down (coast) to a stop
+	// the time to slow down (coast) to a stop (in an encounter: in hyperspace and in a star system the ship stops at once)
 	public float m_timeToStop;
+
+	// the speeds as the original's (HYPER-OV CSPEED, !MAXSPEED, ACCELERATE): its ship moves a step at a time, as many of its units a step as its top speed allows,
+	// 1 in hyperspace and 12 in a star system, and only while a direction is held. In hyperspace the top speed is there from the first step; in a star system
+	// the step grows by one each step from 1 to 12. A unit of the star system is 8192 / 400 of the port's (SYSRADIUS 400), one of hyperspace 32, so the star
+	// system's top speed is 12 * 20.48 / 32 = 7.68 times hyperspace's (the port's m_maximumSpeed, 128, is 4 steps a second: how many steps a second the original
+	// made is not known, and the port keeps its own)
+	public const float c_starSystemSpeedFactor = 12.0f * ( 8192.0f / 400.0f ) / 32.0f;
+	const float c_stepSeconds = 32.0f / 128.0f;
+	const int c_starSystemSteps = 12;
 
 	// set to true when the engines are on (to accelerate) or off (to brake)
 	bool m_enginesAreOn;
@@ -120,17 +129,39 @@ public class PlayerShip : MonoBehaviour
 			// are the engines turned on?
 			if ( m_enginesAreOn )
 			{
-				// update the current maximum speed of the player
-				// (damaged engines are slower, and accelerate more slowly, in proportion to their health)
+				var location = playerData.m_general.m_location;
 				var enginesFactor = playerData.m_playerShip.GetSystemFactor( PD_PlayerShip.ShipSystem.Engines );
 
-				playerData.m_general.m_currentMaximumSpeed = m_maximumSpeed * ( ( playerData.m_general.m_location == PD_General.Location.StarSystem ) ? 4.0f : 1.0f ) * enginesFactor;
+				if ( ( location != PD_General.Location.Hyperspace ) && ( location != PD_General.Location.StarSystem ) )
+				{
+					// elsewhere (an encounter above all) damaged engines are slower, and accelerate more slowly, in proportion to their health (the original's %ENGINE
+					// counts in an encounter's acceleration, HYPER-OV !S/A)
+					playerData.m_general.m_currentMaximumSpeed = m_maximumSpeed * enginesFactor;
 
-				// calculate the acceleration
-				var acceleration = Time.deltaTime * playerData.m_playerShip.m_acceleration * enginesFactor / ( m_minimumTimeToReachMaximumSpeed * 25.0f );
+					var acceleration = Time.deltaTime * playerData.m_playerShip.m_acceleration * enginesFactor / ( m_minimumTimeToReachMaximumSpeed * 25.0f );
 
-				// increase the current speed
-				playerData.m_general.m_currentSpeed = Mathf.Lerp( playerData.m_general.m_currentSpeed, playerData.m_general.m_currentMaximumSpeed, acceleration );
+					playerData.m_general.m_currentSpeed = Mathf.Lerp( playerData.m_general.m_currentSpeed, playerData.m_general.m_currentMaximumSpeed, acceleration );
+				}
+				else
+				{
+					// in hyperspace and in a star system the engines' health does not change the speed, but destroyed engines move nothing (DAMAGE-OV WF2AC)
+					var topSpeed = ( enginesFactor > 0.0f ) ? m_maximumSpeed * ( ( location == PD_General.Location.StarSystem ) ? c_starSystemSpeedFactor : 1.0f ) : 0.0f;
+
+					playerData.m_general.m_currentMaximumSpeed = topSpeed;
+
+					if ( location == PD_General.Location.StarSystem )
+					{
+						// a step more each step, from 1 of the 12 to all of them (at least the first step's at once)
+						var rampedSpeed = Mathf.Max( playerData.m_general.m_currentSpeed, topSpeed / c_starSystemSteps ) + topSpeed / c_starSystemSteps * Time.deltaTime / c_stepSeconds;
+
+						playerData.m_general.m_currentSpeed = Mathf.Min( rampedSpeed, topSpeed );
+					}
+					else
+					{
+						// at the top speed from the first step
+						playerData.m_general.m_currentSpeed = topSpeed;
+					}
+				}
 
 				// are we in hyperspace?
 				if ( playerData.m_general.m_location == PD_General.Location.Hyperspace )
@@ -156,6 +187,11 @@ public class PlayerShip : MonoBehaviour
 
 					WarnOfFuel( enduriumBefore, GetEnduriumTenths(), stepTenths );
 				}
+			}
+			else if ( ( playerData.m_general.m_location == PD_General.Location.Hyperspace ) || ( playerData.m_general.m_location == PD_General.Location.StarSystem ) )
+			{
+				// with no direction held the original's ship takes no step: it stops at once
+				playerData.m_general.m_currentSpeed = 0.0f;
 			}
 			else
 			{
