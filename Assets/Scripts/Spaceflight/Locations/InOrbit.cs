@@ -18,6 +18,9 @@ public class InOrbit : MonoBehaviour
 	// current planet spin
 	float m_spin;
 
+	// the planet the ship orbits (found when the orbit is shown)
+	Planet m_planetController;
+
 	// true from the moment the ship goes into orbit until we have looked for an encounter that waits in orbit around this planet (we look once every time)
 	bool m_lookForEncounter;
 
@@ -35,6 +38,14 @@ public class InOrbit : MonoBehaviour
 	// unity awake
 	void Awake()
 	{
+		// the planet takes the look the player picks at once
+		PlanetLook.Changed += MaterialUpdated;
+	}
+
+	// unity on destroy
+	void OnDestroy()
+	{
+		PlanetLook.Changed -= MaterialUpdated;
 	}
 
 	// unity start
@@ -94,6 +105,12 @@ public class InOrbit : MonoBehaviour
 
 		// apply it to the planet
 		m_planetModel.transform.localRotation = newRotation;
+
+		// the clouds of the natural look go round a little faster than the ground
+		if ( m_planetController != null )
+		{
+			m_planetController.SetCloudDrift( m_spin );
+		}
 	}
 
 	// the Crystal Planet generates a powerful magnetic force that only the Crystal Orb negates: a ship that orbits it without the orb takes on damage rapidly (STRINFO 5.1, the kernel's crystal planet heating routine)
@@ -196,6 +213,8 @@ public class InOrbit : MonoBehaviour
 		// get the planet controller
 		var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( playerData.m_general.m_currentPlanetId );
 
+		m_planetController = planetController;
+
 		// set the scale of the planet model and atmosphere
 		var scale = planetController.m_planet.GetScale();
 		m_planetModel.transform.localScale = scale * 3.0f;
@@ -257,6 +276,8 @@ public class InOrbit : MonoBehaviour
 		MaterialUpdated();
 	}
 
+	// puts the planet's look on the planet model, its clouds and its atmosphere (when its maps are ready, and when the player picks another look): its
+	// natural look, with maps made as detailed as orbit needs, or its original material
 	public void MaterialUpdated()
 	{
 		if ( gameObject.activeInHierarchy )
@@ -267,8 +288,14 @@ public class InOrbit : MonoBehaviour
 			// get the planet controller
 			var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( playerData.m_general.m_currentPlanetId );
 
+			if ( planetController == null )
+			{
+				return;
+			}
+
 			// apply the material to the planet model
-			m_planetModel.material = planetController.GetMaterial();
+			planetController.ApplyOrbitLook( m_planetModel, m_clouds, m_planetAtmosphere );
+			planetController.SetCloudDrift( m_spin );
 		}
 	}
 }
