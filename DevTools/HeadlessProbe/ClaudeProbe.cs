@@ -33240,6 +33240,13 @@ public class ClaudeProbe : MonoBehaviour
 		playerData.m_general.m_lastDisembarkedCoordinates = farAway;
 		controller.m_terrainVehicle.transform.localPosition = farAway;
 
+		// a crew of six, one at each post, as a player's: each of the walk's injuries falls on the person at the post it rolls (INJURE-PL), and with one person at
+		// every post they could add up to a death, which would leave nobody to walk back
+		for ( var role = PD_CrewAssignment.Role.First; role < PD_CrewAssignment.Role.Count; role++ )
+		{
+			playerData.m_crewAssignment.Assign( role, AddPerson( "Walker " + (int) role, 100.0f, 100 ).m_fileId );
+		}
+
 		// the crew's vitality before the walk back (the walk is 40 cells, each with a chance in five of an injury)
 		var vitalityBefore = 0.0f;
 
