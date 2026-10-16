@@ -25,7 +25,8 @@ namespace Starflight.AI
 		// the model alias or id passed with --model (empty uses the command line's default)
 		public string m_model = "";
 
-		// the folder the process runs in (keep it away from the project, or claude reads the project's CLAUDE.md)
+		// the folder in which each call makes a new folder of its own for the process to run in (empty uses the system's
+		// temporary folder; it has to be one that only this user can write to, and away from the project, or claude reads the project's CLAUDE.md)
 		public string m_workingDirectory = "";
 
 		// how long one call to claude may take
@@ -65,9 +66,6 @@ namespace Starflight.AI
 
 		// the attributes semantic kernel reads from a service
 		readonly Dictionary<string, object?> m_attributes = new Dictionary<string, object?>();
-
-		// counts calls, to give each system prompt file its own name
-		int m_callCounter;
 
 		// constructor
 		public ClaudeCliChatService( ClaudeCliOptions options )
@@ -367,24 +365,33 @@ namespace Starflight.AI
 		// runs claude once and reads its answer
 		async Task<Reply> RunClaudeAsync( string systemPrompt, string transcript, CancellationToken cancellationToken )
 		{
+			// claude runs in a new folder of its own, which nobody else can have made first or put settings, hooks or a CLAUDE.md in
+			var parentDirectory = string.IsNullOrEmpty( m_options.m_workingDirectory ) ? Path.GetTempPath() : m_options.m_workingDirectory;
+
+			var workingDirectory = CreateRunDirectory( parentDirectory );
+
 			// the system prompt goes in a file, so it never has to be quoted on the command line
-			var workingDirectory = string.IsNullOrEmpty( m_options.m_workingDirectory ) ? Path.GetTempPath() : m_options.m_workingDirectory;
-
-			Directory.CreateDirectory( workingDirectory );
-
-			var systemPromptPath = Path.Combine( workingDirectory, "claude-system-prompt-" + Process.GetCurrentProcess().Id.ToString( CultureInfo.InvariantCulture ) + "-" + Interlocked.Increment( ref m_callCounter ).ToString( CultureInfo.InvariantCulture ) + ".txt" );
-
-			File.WriteAllText( systemPromptPath, systemPrompt, new UTF8Encoding( false ) );
+			var systemPromptPath = Path.Combine( workingDirectory, "claude-system-prompt.txt" );
 
 			try
 			{
-				// fixed arguments only: the prompt goes on standard input
+				// a new file only, so the write never goes through a file or a link that is already there
+				using ( var stream = new FileStream( systemPromptPath, FileMode.CreateNew, FileAccess.Write, FileShare.None ) )
+				{
+					using ( var writer = new StreamWriter( stream, new UTF8Encoding( false ) ) )
+					{
+						writer.Write( systemPrompt );
+					}
+				}
+
+				// fixed arguments only: the prompt goes on standard input (only the user's own settings are read, never those of the working folder)
 				var arguments = new List<string>
 				{
 					"-p",
 					"--output-format", "json",
 					"--tools", "",
 					"--strict-mcp-config",
+					"--setting-sources", "user",
 					"--no-session-persistence",
 					"--disable-slash-commands",
 					"--system-prompt-file", systemPromptPath,
@@ -413,7 +420,47 @@ namespace Starflight.AI
 				catch ( UnauthorizedAccessException )
 				{
 				}
+
+				// the folder goes too, but only once it is empty: nothing else is deleted with it
+				try
+				{
+					Directory.Delete( workingDirectory );
+				}
+				catch ( IOException )
+				{
+				}
+				catch ( UnauthorizedAccessException )
+				{
+				}
 			}
+		}
+
+		// makes the folder one run of claude works in, under a name nobody can guess, and never one that is already there
+		static string CreateRunDirectory( string parentDirectory )
+		{
+			// a few tries, in case a name is already taken
+			const int c_maximumTries = 10;
+
+			// the parent is made if it is missing, as before
+			Directory.CreateDirectory( parentDirectory );
+
+			for ( var attempt = 0; attempt < c_maximumTries; attempt++ )
+			{
+				// a random name (Path.GetRandomFileName draws it from a cryptographic generator)
+				var runDirectory = Path.Combine( parentDirectory, "claude-" + Path.GetRandomFileName().Replace( ".", "" ) );
+
+				// a folder, file or link that is already there is never used, whoever made it
+				if ( Directory.Exists( runDirectory ) || File.Exists( runDirectory ) )
+				{
+					continue;
+				}
+
+				Directory.CreateDirectory( runDirectory );
+
+				return runDirectory;
+			}
+
+			throw new IOException( "Could not make a new working folder for claude in '" + parentDirectory + "'." );
 		}
 
 		// reads the json that claude -p --output-format json writes
