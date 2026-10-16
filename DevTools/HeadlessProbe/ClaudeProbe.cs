@@ -1526,6 +1526,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioShipSpeeds();
 				break;
 
+			case "encounterwaves":
+				yield return ScenarioEncounterWaves();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -1564,7 +1568,62 @@ public class ClaudeProbe : MonoBehaviour
 		return -1;
 	}
 
+	// enters an encounter with a full first wave, as many ships as it has at a time: the original's first wave is 1 to that many at random (HYPERMSG-OV +A-VESS),
+	// and the scenarios that count on the ships they fight need them all (EnterEncounterRaw leaves the wave as it came)
 	static void EnterEncounter( int encounterId )
+	{
+		EnterEncounterRaw( encounterId );
+
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var atOnce = DataController.m_instance.m_gameData.m_encounterList[ encounterId ].m_maxNumShipsAtOnce;
+		var present = 0;
+
+		foreach ( var alienShip in encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			if ( alienShip.m_addedToEncounter && !alienShip.m_isDead )
+			{
+				present++;
+			}
+		}
+
+		var added = false;
+
+		foreach ( var alienShip in encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			if ( present >= atOnce )
+			{
+				break;
+			}
+
+			if ( alienShip.m_addedToEncounter || alienShip.m_isDead )
+			{
+				continue;
+			}
+
+			// on the circle around the player, facing the middle, as Encounter.AddAlienShips puts a later ship
+			var randomPosition = UnityEngine.Random.insideUnitCircle;
+			var coordinates = Vector3.Normalize( new Vector3( randomPosition.x, 0.0f, randomPosition.y ) ) * 4096.0f;
+			var direction = -Vector3.Normalize( coordinates );
+
+			alienShip.m_coordinates = coordinates;
+			alienShip.m_targetCoordinates = Vector3.zero;
+			alienShip.m_currentDirection = direction;
+			alienShip.m_lastDirection = direction;
+			alienShip.m_currentBankingAngle = 0.0f;
+			alienShip.m_addedToEncounter = true;
+
+			present++;
+			added = true;
+		}
+
+		if ( added )
+		{
+			typeof( Encounter ).GetMethod( "ResetAlienShipModels", BindingFlags.NonPublic | BindingFlags.Instance ).Invoke( encounter, null );
+		}
+	}
+
+	// enters an encounter as the game does, with whatever first wave comes
+	static void EnterEncounterRaw( int encounterId )
 	{
 		var playerData = DataController.m_instance.m_playerData;
 		var spaceflightController = SpaceflightController.m_instance;
@@ -39061,6 +39120,54 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "shipspeeds: destroyed engines move nothing (DAMAGE-OV WF2AC; the old code left the ship at the speed it had)", hyperspaceNoEngines < 0.01f, hyperspaceNoEngines.ToString( "0.0" ) );
 
 		Finish( "scenario=shipspeeds checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the first wave of an encounter is the original's (HYPERMSG-OV +A-VESS): from 2 fewer than the encounter's ships at a time up to that many, at random, and at
+	// least one - a Spemin encounter of 6 ships, 3 at a time, entered 30 times, comes with 1, 2 and 3 ships, never more (the old code always brought 3)
+	IEnumerator ScenarioEncounterWaves()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var encounterId = FindEncounter( 1, 6, 3, 0 );
+		var counts = new int[ 5 ];
+		var outside = 0;
+
+		EnsureCrew();
+
+		for ( var entry = 0; entry < 30; entry++ )
+		{
+			EnterEncounterRaw( encounterId );
+			yield return Frames( 5 );
+
+			var present = 0;
+
+			foreach ( var alienShip in SpaceflightController.m_instance.m_encounter.m_pdEncounter.GetAlienShipList() )
+			{
+				if ( alienShip.m_addedToEncounter && !alienShip.m_isDead )
+				{
+					present++;
+				}
+			}
+
+			if ( ( present >= 1 ) && ( present <= 3 ) )
+			{
+				counts[ present ]++;
+			}
+			else
+			{
+				outside++;
+			}
+
+			ClearMissiles();
+			LeaveEncounter();
+			yield return Frames( 5 );
+		}
+
+		Log( "encounterwaves: encounter " + encounterId + " (" + gameData.m_encounterList[ encounterId ].m_maxNumShipsAtOnce + " at a time): first waves of 1 ship " + counts[ 1 ] + ", 2 ships " + counts[ 2 ] + ", 3 ships " + counts[ 3 ] + ", other " + outside + " in 30 entries" );
+
+		Check( "encounterwaves: a first wave is never more than the encounter's ships at a time, nor none", outside == 0, outside.ToString() );
+		Check( "encounterwaves: first waves of 1, 2 and 3 ships all come (the original's M - 2 to M, not always M)", ( counts[ 1 ] > 0 ) && ( counts[ 2 ] > 0 ) && ( counts[ 3 ] > 0 ), counts[ 1 ] + "/" + counts[ 2 ] + "/" + counts[ 3 ] );
+
+		Finish( "scenario=encounterwaves checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

@@ -1074,7 +1074,8 @@ public class Encounter : MonoBehaviour
 		return ( m_planetBackdrop != null ) && m_planetBackdrop.activeInHierarchy;
 	}
 
-	// adds a number of alien ships to the encounter - up to the maximum allowed by the encounter
+	// adds a wave of alien ships to the encounter, as the original's HYPERMSG-OV +A-VESS: 2 fewer than the encounter's ships at a time up to that many, at random,
+	// and at least one (RRND from M - 2 to M + 1, which gives M - 2 to M), and no more than the encounter has left
 	void AddAlienShips()
 	{
 		// get to the player data
@@ -1083,8 +1084,12 @@ public class Encounter : MonoBehaviour
 		// get to the list of alien ships
 		var alienShipList = m_pdEncounter.GetAlienShipList();
 
-		// go through alien ship slots (up to the maximum allowed at once)
-		for ( var alienShipIndex = 0; alienShipIndex < m_gdEncounter.m_maxNumShipsAtOnce; alienShipIndex++ )
+		// how many come
+		var atOnce = m_gdEncounter.m_maxNumShipsAtOnce;
+		var waveSize = Mathf.Max( Random.Range( atOnce - 2, atOnce + 1 ), 1 );
+
+		// go through alien ship slots (as many as come)
+		for ( var alienShipIndex = 0; alienShipIndex < waveSize; alienShipIndex++ )
 		{
 			// no - go through all of the alien ships in the encounter and add the next one
 			foreach ( var alienShip in alienShipList )
