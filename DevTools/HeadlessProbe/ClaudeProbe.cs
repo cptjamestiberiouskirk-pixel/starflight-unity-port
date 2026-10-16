@@ -31164,10 +31164,17 @@ public class ClaudeProbe : MonoBehaviour
 
 		var evaluationsBefore = playerData.m_general.GetColonyEvaluationList().Count;
 
+		// the game won, with the completion of the mission not read yet (the original's WMSG), which does not keep the ship docked
+		playerData.m_general.m_gameWon = true;
+		playerData.m_general.m_missionCompleteShown = false;
+
 		// the passing check starts the transporter: the evaluations and the evaluation screen are looked at in this frame, before the scene changes
 		var passed = !dockingBay.Open() && ( dockingBay.m_errorText.text.Trim() == "" );
+		var refusedForTheWin = dockingBay.m_errorText.text.Replace( "\n", " | " ).Trim();
 
 		var evaluationsAfter = playerData.m_general.GetColonyEvaluationList().Count;
+
+		playerData.m_general.m_gameWon = false;
 
 		operations.EvaluationClicked();
 
@@ -31178,6 +31185,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-preflight: with an evaluation unread the check says the original's REPORT TO OPERATIONS FOR EVALUATION", unread.Contains( "Report to Operations for evaluation." ), unread );
 		Check( "starport-preflight: a dead crew member gets the original's REPORT TO CREW ASSIGNMENT, not a line of the port's", dead.Contains( "Report to Crew Assignment." ) && !dead.Contains( "dead" ) && !dead.Contains( "Operations" ), dead );
 		Check( "starport-preflight: no name and no engines are one line, as the original's REPORT TO SHIP-CONFIGURATION TO CHRISTEN SHIP AND PURCHASE ENGINES", nameAndEngines.Contains( "Report to Ship Configuration to christen ship and purchase engines." ), nameAndEngines );
+		Check( "starport-preflight: the completion of the mission, unread, does not keep the ship docked, as the original's (WF40A checks ?EVAL, ?TV and ?RECALL, not WMSG)", passed, passed + ", '" + refusedForTheWin + "'" );
 		Check( "starport-preflight: leaving with the evaluations read deletes the colony evaluations, and then none new has been filed", passed && ( evaluationsBefore > 0 ) && ( evaluationsAfter == 0 ) && noneNew.Contains( "You have not filed any new colony world recommendations" ), passed + ", " + evaluationsBefore + " -> " + evaluationsAfter + ", '" + noneNew + "'" );
 
 		Finish( "scenario=starport-preflight checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
@@ -37834,18 +37842,15 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "playthrough-21: the save of stage 20 is at the Starport with the win", ( general.m_location == PD_General.Location.Starport ) && general.m_gameWon, general.m_location + " " + general.m_gameWon );
 
-		// the docking bay first: an evaluation waits unread
+		// the evaluation of the win waits unread, but does not keep the ship docked: the original's preflight check (CHKFLIGHT-OV WF40A) does not look at the
+		// win's WMSG (the docking bay is not opened here, since a passing check starts the transporter)
 		var dockingBay = FindPanel<DockingBayPanel>();
+		var missionCompleteUnread = !general.m_missionCompleteShown;
+		var keptDocked = general.HasUnreadEvaluation();
 
-		yield return OpenPanel( dockingBay, "docking bay" );
+		Log( "playthrough-21: before the evaluation: the completion of the mission unread " + missionCompleteUnread + ", an evaluation keeps the ship docked " + keptDocked );
 
-		var preflight = PreflightText( dockingBay );
-
-		yield return ClosePanel( dockingBay, "docking bay" );
-
-		Log( "playthrough-21: the docking bay before the evaluation: '" + preflight + "'" );
-
-		Check( "playthrough-21: the docking bay sends the crew to Operations for the evaluation", preflight.Contains( "Report to Operations for evaluation." ), preflight );
+		Check( "playthrough-21: the evaluation of the win waits unread and does not keep the ship docked, as the original's", missionCompleteUnread && !keptDocked, missionCompleteUnread + ", " + keptDocked );
 
 		// Operations: the evaluation's pages
 		var operations = FindPanel<OperationsPanel>();
