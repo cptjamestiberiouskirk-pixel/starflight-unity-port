@@ -293,7 +293,7 @@ Once landed, Command, **Disembark** sends the crew out in the terrain vehicle, r
 | **Cargo** | Acts on what is next to the vehicle (see below); otherwise lists the vehicle's cargo, which you can **Drop**. |
 | **Look** | Describes the sky, temperature, gravity, atmosphere, water and terrain, and anything close by. |
 | **Scan** | Reads the mineral and life density, lists the planet's elements and labels the objects nearby. |
-| **Weapon** | **Fire** at the nearest lifeform, **Switch** between the laser and the stunner. |
+| **Weapon** | **Fire** at the nearest lifeform, **Switch** between the laser and the stunner. Every shot uses some of the vehicle's fuel, the laser twice as much as the stunner. |
 
 The vehicle's status display shows its fuel, its efficiency, how full its hold is, the crew's health and **the ship's distance and direction** from you.
 

@@ -1,15 +1,16 @@
 using UnityEngine;
 
 // fires the terrain vehicle's mounted weapon at the nearest lifeform within its range - the 1984 design notes (planet.txt): the laser "goes about 3/4 of the distance
-// from the TV to the edge of the View Screen", the stunner "about 1/2 as far as the laser", the laser "uses 8 units of energy each time it is fired. The stunner
-// uses 4." (of a full terrain vehicle's 999) - the original aims with the joystick, the port at the nearest lifeform, and the ranges are the port's
+// from the TV to the edge of the View Screen", the stunner "about 1/2 as far as the laser"; a shot takes the released game's fuel (TV-OV DO.WEAPON: the weapon
+// chosen, 1 for the stunner and 2 for the laser, times 300 of the vehicle's tank, with no check of what is left) - the original aims with the joystick, the port at
+// the nearest lifeform, and the ranges are the port's
 public class TVFireButton : ShipButton
 {
 	public const float c_laserRange = 60.0f;
 	public const float c_stunnerRange = 30.0f;
 
-	const float c_laserEnergy = 8.0f / 999.0f;
-	const float c_stunnerEnergy = 4.0f / 999.0f;
+	public const float c_laserEnergy = 600.0f / TerrainVehicle.c_tankUnits;
+	public const float c_stunnerEnergy = 300.0f / TerrainVehicle.c_tankUnits;
 
 	public override string GetLabel()
 	{
@@ -26,7 +27,8 @@ public class TVFireButton : ShipButton
 
 		messages.Clear();
 
-		if ( terrainVehicle.m_fuelRemaining < energy )
+		// (the original fires whatever is left in the tank; the port refuses only once the reserve is gone too, when the crew would be walking back)
+		if ( terrainVehicle.IsOutOfFuel() )
 		{
 			messages.AddText( "<color=red>There is not enough energy to fire the " + weaponName + ".</color>" );
 
