@@ -34,11 +34,14 @@ public class PlayerShip : MonoBehaviour
 	// the speeds as the original's (HYPER-OV CSPEED, !MAXSPEED, ACCELERATE): its ship moves a step at a time, as many of its units a step as its top speed allows,
 	// 1 in hyperspace and 12 in a star system, and only while a direction is held. In hyperspace the top speed is there from the first step; in a star system
 	// the step grows by one each step from 1 to 12. A unit of the star system is 8192 / 400 of the port's (SYSRADIUS 400), one of hyperspace 32, so the star
-	// system's top speed is 12 * 20.48 / 32 = 7.68 times hyperspace's (the port's m_maximumSpeed, 128, is 4 steps a second: how many steps a second the original
-	// made is not known, and the port keeps its own)
+	// system's top speed in a step is 12 * 20.48 / 32 = 7.68 times hyperspace's. The original takes a step each pass of its main loop, as fast as the computer
+	// runs it: in hyperspace the port takes the original's pace at GOG's speed (DOSBox at 1500 cycles: 1.45 coordinates a second in open space, 11.6 steps of 32
+	// of the port's units, 371 a second); in a star system it keeps its own 4 steps a second (m_maximumSpeed 128 times 7.68, a step every 0.25 s), not measured
 	public const float c_starSystemSpeedFactor = 12.0f * ( 8192.0f / 400.0f ) / 32.0f;
 	const float c_stepSeconds = 32.0f / 128.0f;
 	const int c_starSystemSteps = 12;
+	public const float c_hyperspaceStepsPerSecond = 11.6f;
+	const float c_hyperspaceUnit = 32.0f;
 
 	// the ship's steps in an encounter, as the original's (HYPER-OV #VES-SPEED, ACCELERATE, !S/A): each pass of its main loop (Encounter.c_passSeconds) with a
 	// direction held the ship moves its step, in cells (CombatController.c_unitsPerCell); the step starts at 1 and grows by one every 96 / ESPEED + 1 passes, where
@@ -176,7 +179,7 @@ public class PlayerShip : MonoBehaviour
 				else
 				{
 					// in hyperspace and in a star system the engines' health does not change the speed, but destroyed engines move nothing (DAMAGE-OV WF2AC)
-					var topSpeed = ( enginesFactor > 0.0f ) ? m_maximumSpeed * ( ( location == PD_General.Location.StarSystem ) ? c_starSystemSpeedFactor : 1.0f ) : 0.0f;
+					var topSpeed = ( enginesFactor > 0.0f ) ? ( ( location == PD_General.Location.StarSystem ) ? m_maximumSpeed * c_starSystemSpeedFactor : c_hyperspaceStepsPerSecond * c_hyperspaceUnit ) : 0.0f;
 
 					playerData.m_general.m_currentMaximumSpeed = topSpeed;
 
