@@ -66,6 +66,11 @@ public class SaveGamePanel : Panel
 	Button[] m_modeButtons;
 	Image[] m_modeMarkers;
 
+	// the screen's buttons for the two looks of the planets (PlanetLook), the diamonds that mark the look in use, and their label
+	Button[] m_planetLookButtons;
+	Image[] m_planetLookMarkers;
+	TextMeshProUGUI m_planetLookLabel;
+
 	// the screen's heading, the schemes' names on their buttons, the line about the scheme in use, and the button that closes the screen
 	TextMeshProUGUI m_colorsHeadingText;
 	TMP_Text[] m_schemeLabels;
@@ -274,6 +279,19 @@ public class SaveGamePanel : Panel
 		SoundController.m_instance.PlaySound( SoundController.Sound.Update );
 	}
 
+	// called when the player picks the original or the natural look of the planets on the Colors screen: the planets on screen take it at once
+	public void PlanetLookClicked( PlanetLook.Look look )
+	{
+		InputController.m_instance.Debounce();
+
+		PlanetLook.SetLook( look );
+
+		UpdateColorsPanel();
+
+		// play the update sound
+		SoundController.m_instance.PlaySound( SoundController.Sound.Update );
+	}
+
 	// called when the player picks the dark or the light mode on the Colors screen
 	public void ModeClicked( UIKitTheme.Mode mode )
 	{
@@ -341,7 +359,8 @@ public class SaveGamePanel : Panel
 	}
 
 	// makes the Colors screen the first time it is needed: a copy of the switch panel (the kit's popup with its frame and a heading), made as large as
-	// the slots, with a button for each colour scheme (its name and swatches of its colours), the two modes at the top and a done button at the bottom
+	// the slots, with a button for each colour scheme (its name and swatches of its colours), the two modes at the top, the two looks of the planets at the
+	// bottom and a done button beside them
 	void MakeColorsPanel()
 	{
 		if ( ( m_colorsPanel != null ) || ( m_switchPanel == null ) || ( m_switchCancelButton == null ) )
@@ -424,6 +443,39 @@ public class SaveGamePanel : Panel
 
 			m_modeButtons[ i ] = button;
 			m_modeMarkers[ i ] = MakeMarker( button.transform );
+		}
+
+		// the two looks of the planets, at the bottom left, after their label
+		if ( heading != null )
+		{
+			m_planetLookLabel = Instantiate( heading, content );
+			m_planetLookLabel.name = "Planet Look Label";
+			m_planetLookLabel.text = "Planets";
+
+			PlaceAt( m_planetLookLabel.rectTransform, Vector2.zero, Vector2.zero, Vector2.zero, new Vector2( 150.0f, 64.0f ) );
+
+			if ( m_planetLookLabel.TryGetComponent<UIKitStyle>( out var labelStyle ) )
+			{
+				labelStyle.m_textStyle = UIKitTheme.TextStyleRole.BodyM;
+				labelStyle.m_color = UIKitTheme.ColorRole.TextSecondary;
+				labelStyle.m_fontSize = 22.0f;
+				labelStyle.Apply();
+			}
+		}
+
+		m_planetLookButtons = new Button[ 2 ];
+		m_planetLookMarkers = new Image[ 2 ];
+
+		for ( var i = 0; i < 2; i++ )
+		{
+			var look = ( i == 0 ) ? PlanetLook.Look.Original : PlanetLook.Look.Natural;
+			var button = CopyButton( m_switchCancelButton, content, look + " Planets Button", look.ToString(), () => PlanetLookClicked( look ) );
+
+			PlaceAt( (RectTransform) button.transform, Vector2.zero, Vector2.zero, new Vector2( 160.0f + i * 216.0f, 4.0f ), new Vector2( 360.0f + i * 216.0f, 60.0f ) );
+			CenterLabel( button );
+
+			m_planetLookButtons[ i ] = button;
+			m_planetLookMarkers[ i ] = MakeMarker( button.transform );
 		}
 
 		// the done button, at the bottom right
@@ -639,6 +691,7 @@ public class SaveGamePanel : Panel
 		// the texts' alignments (TextMesh Pro gives a copied text its own back when the text first wakes, so they are set whenever the screen is shown)
 		SetAlignment( m_colorsHeadingText, HorizontalAlignmentOptions.Left, VerticalAlignmentOptions.Middle );
 		SetAlignment( m_schemeDescriptionText, HorizontalAlignmentOptions.Left, VerticalAlignmentOptions.Middle );
+		SetAlignment( m_planetLookLabel, HorizontalAlignmentOptions.Left, VerticalAlignmentOptions.Middle );
 
 		foreach ( var label in m_schemeLabels )
 		{
@@ -668,6 +721,16 @@ public class SaveGamePanel : Panel
 			if ( m_modeMarkers[ i ] != null )
 			{
 				m_modeMarkers[ i ].enabled = ( ( i == 0 ) ? UIKitTheme.Mode.Dark : UIKitTheme.Mode.Light ) == modeInUse;
+			}
+		}
+
+		var lookInUse = PlanetLook.GetLook();
+
+		for ( var i = 0; i < m_planetLookMarkers.Length; i++ )
+		{
+			if ( m_planetLookMarkers[ i ] != null )
+			{
+				m_planetLookMarkers[ i ].enabled = ( ( i == 0 ) ? PlanetLook.Look.Original : PlanetLook.Look.Natural ) == lookInUse;
 			}
 		}
 

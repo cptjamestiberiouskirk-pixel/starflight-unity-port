@@ -36,6 +36,9 @@ public class Planet : MonoBehaviour
 	// the planet generator whose maps are on the material right now (that of the planet this controller had before, until the maps of the new planet are ready)
 	PlanetGenerator m_shownPlanetGenerator;
 
+	// the planet in its natural look (made once its maps are generated, when the player has picked that look: PlanetLook)
+	NaturalPlanet m_naturalPlanet;
+
 	// the current rotation
 	float m_currentRotationAngle;
 
@@ -64,6 +67,9 @@ public class Planet : MonoBehaviour
 	void Awake()
 	{
 		MakeOrbitPath();
+
+		// the planet takes the look the player picks at once
+		PlanetLook.Changed += ApplyLook;
 	}
 
 	// unity start
@@ -85,6 +91,12 @@ public class Planet : MonoBehaviour
 		// update the rotation of the planet
 		m_planetModel.transform.localRotation = Quaternion.AngleAxis( -30.0f, Vector3.right ) * Quaternion.AngleAxis( m_currentRotationAngle, Vector3.forward );
 
+		// the clouds of the natural look go round a little faster than the ground
+		if ( m_naturalPlanet != null )
+		{
+			m_naturalPlanet.SetCloudDrift( m_currentRotationAngle );
+		}
+
 		// update the rotation of the starport
 		if ( m_starportModel != null )
 		{
@@ -95,9 +107,12 @@ public class Planet : MonoBehaviour
 	// unity on destroy
 	void OnDestroy()
 	{
+		PlanetLook.Changed -= ApplyLook;
+
 		// the maps would stay in memory until unity next clears out its unused assets
 		ReleaseUnshownMaps();
 		ReleaseShownMaps();
+		ReleaseNaturalLook();
 
 		// so would the mesh of the orbit path (the material is one for every planet, and stays)
 		if ( m_orbitPathMesh != null )
@@ -133,6 +148,14 @@ public class Planet : MonoBehaviour
 		ReleaseUnshownMaps();
 
 		m_planetGenerator = null;
+
+		// and with the natural look of the planet we had (its original material goes back on the model, as the original look's maps stay until the new ones
+		// are ready)
+		if ( m_naturalPlanet != null )
+		{
+			ShowOriginalLook();
+			ReleaseNaturalLook();
+		}
 
 		// check if we have a planet
 		if ( ( planet == null ) || ( planet.m_id == -1 ) )
@@ -209,6 +232,9 @@ public class Planet : MonoBehaviour
 
 		// set up the clouds and atmosphere
 		SetupClouds( m_planetClouds, m_planetAtmosphere, false, false );
+
+		// in the look the player has picked
+		ApplyLook();
 	}
 
 	// makes the ring of the orbit path: its triangles and its u (once round the orbit) and v (across) are always the same, its vertices are filled in when the
@@ -396,9 +422,145 @@ public class Planet : MonoBehaviour
 			}
 
 			ShowTextureMaps();
+
+			// in the look the player has picked (the natural look's maps are made from the generator's now)
+			ApplyLook();
 		}
 
 		return progress;
+	}
+
+	// true if this planet is drawn in its natural look: the player has picked it, it is made for this kind of planet, the graphics card can make its maps,
+	// and the planet's own maps (its blueprint) are ready
+	public bool ShowsNaturalLook()
+	{
+		return PlanetLook.IsNatural() && NaturalPlanet.Suits( m_planet ) && HasMaps() && NaturalPlanet.IsSupported();
+	}
+
+	// the natural look of this planet, its maps made at least this wide (false if they could not be made: it keeps its original look then)
+	bool MakeNaturalLook( int width )
+	{
+		if ( m_naturalPlanet == null )
+		{
+			m_naturalPlanet = new NaturalPlanet( m_planet );
+		}
+
+		return m_naturalPlanet.Bake( m_planetGenerator, width );
+	}
+
+	// puts the look the player has picked on the planet's model, clouds and atmosphere in the star system
+	void ApplyLook()
+	{
+		if ( ( m_planet == null ) || ( m_meshRenderer == null ) )
+		{
+			return;
+		}
+
+		if ( ShowsNaturalLook() && MakeNaturalLook( NaturalPlanet.c_starSystemMapWidth ) )
+		{
+			m_meshRenderer.sharedMaterial = m_naturalPlanet.GetSurfaceMaterial();
+
+			m_naturalPlanet.ShowOn( m_planetClouds, m_planetAtmosphere, m_planetModel );
+			m_naturalPlanet.SetCloudDrift( m_currentRotationAngle );
+		}
+		else
+		{
+			ShowOriginalLook();
+
+			// the natural look's maps are not needed any more (the orbit's are big)
+			ReleaseNaturalLook();
+		}
+	}
+
+	// puts the original look back on the planet's model, clouds and atmosphere in the star system
+	void ShowOriginalLook()
+	{
+		if ( ( m_meshRenderer != null ) && ( m_material != null ) )
+		{
+			m_meshRenderer.sharedMaterial = m_material;
+		}
+
+		NaturalPlanet.UseOriginalSphere( m_planetModel );
+
+		if ( m_planet != null )
+		{
+			SetupOriginalCloudsAndAtmosphere( m_planetClouds, m_planetAtmosphere, m_planetModel );
+		}
+		else
+		{
+			NaturalPlanet.ShowOriginalOn( m_planetClouds, m_planetAtmosphere );
+		}
+	}
+
+	// lets go of the natural look's maps and materials (call it once nothing shows them)
+	void ReleaseNaturalLook()
+	{
+		if ( m_naturalPlanet != null )
+		{
+			m_naturalPlanet.Release();
+
+			m_naturalPlanet = null;
+		}
+	}
+
+	/// <summary>
+	/// Puts this planet's look on the orbit's model, clouds and atmosphere: its natural look, with maps as detailed as orbit needs, when that is what is
+	/// shown, else its original material, clouds and atmosphere.
+	/// </summary>
+	public void ApplyOrbitLook( MeshRenderer planetModel, MeshRenderer clouds, GameObject atmosphere )
+	{
+		if ( planetModel == null )
+		{
+			return;
+		}
+
+		if ( ShowsNaturalLook() && MakeNaturalLook( NaturalPlanet.GetOrbitMapWidth() ) )
+		{
+			planetModel.sharedMaterial = m_naturalPlanet.GetSurfaceMaterial();
+
+			m_naturalPlanet.ShowOn( clouds, atmosphere, planetModel.gameObject );
+
+			return;
+		}
+
+		if ( m_material != null )
+		{
+			planetModel.sharedMaterial = m_material;
+		}
+
+		NaturalPlanet.UseOriginalSphere( planetModel.gameObject );
+
+		if ( m_planet != null )
+		{
+			SetupOriginalCloudsAndAtmosphere( clouds, atmosphere, planetModel.gameObject );
+		}
+	}
+
+	// turns the clouds of the natural look round a little faster than the ground (the turn of the planet in degrees; the orbit turns its own model)
+	public void SetCloudDrift( float planetAngle )
+	{
+		if ( m_naturalPlanet != null )
+		{
+			m_naturalPlanet.SetCloudDrift( planetAngle );
+		}
+	}
+
+	// the material the planet is drawn with as large as in orbit (under an encounter that began in orbit): its natural one, with maps as detailed as orbit
+	// needs, when it shows the natural look, else its original one
+	public Material GetOrbitViewMaterial()
+	{
+		if ( ShowsNaturalLook() && MakeNaturalLook( NaturalPlanet.GetOrbitMapWidth() ) )
+		{
+			return m_naturalPlanet.GetSurfaceMaterial();
+		}
+
+		return m_material;
+	}
+
+	// the natural look of this planet (null when it is not shown; for the probe)
+	public NaturalPlanet GetNaturalPlanet()
+	{
+		return m_naturalPlanet;
 	}
 
 	// puts the texture maps of the current planet generator on the material and destroys the ones that were on it
@@ -463,11 +625,8 @@ public class Planet : MonoBehaviour
 		}
 
 		var atmosphereRenderer = atmosphere.GetComponent<MeshRenderer>();
-		var atmosphereMesh = atmosphere.GetComponent<MeshFilter>();
-		var planetRenderer = planetModel.GetComponentInChildren<Renderer>();
-		var planetMesh = planetModel.GetComponentInChildren<MeshFilter>();
 
-		if ( ( atmosphereRenderer == null ) || ( atmosphereMesh == null ) || ( atmosphereMesh.sharedMesh == null ) || ( planetRenderer == null ) || ( planetMesh == null ) || ( planetMesh.sharedMesh == null ) )
+		if ( atmosphereRenderer == null )
 		{
 			return;
 		}
@@ -494,30 +653,13 @@ public class Planet : MonoBehaviour
 			atmosphereRenderer.receiveShadows = false;
 		}
 
-		// how big the planet is (from its mesh and its scale: the bounds of a renderer are the mesh's box turned with it, up to 41% too big for a turned sphere), and where its middle is
-		var planetBounds = planetRenderer.bounds;
-		var planetRadius = planetMesh.sharedMesh.bounds.extents.x * planetMesh.transform.lossyScale.x;
-		var atmosphereHeight = planetRadius * c_atmosphereHeight;
-
-		if ( planetRadius <= 0.0f )
+		// the quad just above the planet, big enough for the halo
+		if ( !PlaceAtmosphere( atmosphere, planetModel, out var planetRadius, out var lift ) )
 		{
 			return;
 		}
 
-		// the quad just above the planet's top, so that it is in front of the planet
-		var lift = planetRadius * ( 1.0f + c_atmosphereQuadLift );
-
-		atmosphere.transform.position = planetBounds.center + Vector3.up * lift;
-
-		// big enough for the halo (the quad mesh is flat: its half size is its largest extent)
-		var meshExtents = atmosphereMesh.sharedMesh.bounds.extents;
-		var meshHalfSize = Mathf.Max( meshExtents.x, Mathf.Max( meshExtents.y, meshExtents.z ) );
-		var parentScale = ( atmosphere.transform.parent != null ) ? atmosphere.transform.parent.lossyScale.x : 1.0f;
-
-		if ( ( meshHalfSize > 0.0f ) && ( parentScale > 0.0f ) )
-		{
-			atmosphere.transform.localScale = Vector3.one * ( ( planetRadius + atmosphereHeight ) * c_atmosphereQuadMargin / meshHalfSize / parentScale );
-		}
+		var atmosphereHeight = planetRadius * c_atmosphereHeight;
 
 		// the game data's atmosphere colours are often dark, and the atmosphere adds its light: bring the colour up to full brightness, and let the density say how strong it is
 		var brightest = Mathf.Max( atmosphereColor.r, Mathf.Max( atmosphereColor.g, atmosphereColor.b ) );
@@ -534,9 +676,133 @@ public class Planet : MonoBehaviour
 		shared.SetFloat( "_CenterDepth", lift );
 	}
 
+	/// <summary>
+	/// Puts a planet's atmosphere quad just above the planet, so that it is in front of the planet, and makes it big enough for the halo. Gives the planet's
+	/// radius and how far above the planet's middle the quad is (both in world units); false if the planet or the quad has no mesh.
+	/// </summary>
+	public static bool PlaceAtmosphere( GameObject atmosphere, GameObject planetModel, out float planetRadius, out float lift )
+	{
+		planetRadius = 0.0f;
+		lift = 0.0f;
+
+		if ( ( atmosphere == null ) || ( planetModel == null ) )
+		{
+			return false;
+		}
+
+		var atmosphereMesh = atmosphere.GetComponent<MeshFilter>();
+		var planetRenderer = planetModel.GetComponentInChildren<Renderer>();
+		var planetMesh = planetModel.GetComponentInChildren<MeshFilter>();
+
+		if ( ( atmosphereMesh == null ) || ( atmosphereMesh.sharedMesh == null ) || ( planetRenderer == null ) || ( planetMesh == null ) || ( planetMesh.sharedMesh == null ) )
+		{
+			return false;
+		}
+
+		// how big the planet is (from its mesh and its scale: the bounds of a renderer are the mesh's box turned with it, up to 41% too big for a turned sphere), and where its middle is
+		var planetBounds = planetRenderer.bounds;
+
+		planetRadius = planetMesh.sharedMesh.bounds.extents.x * planetMesh.transform.lossyScale.x;
+
+		if ( planetRadius <= 0.0f )
+		{
+			return false;
+		}
+
+		var atmosphereHeight = planetRadius * c_atmosphereHeight;
+
+		// the quad just above the planet's top, so that it is in front of the planet
+		lift = planetRadius * ( 1.0f + c_atmosphereQuadLift );
+
+		atmosphere.transform.position = planetBounds.center + Vector3.up * lift;
+
+		// big enough for the halo (the quad mesh is flat: its half size is its largest extent)
+		var meshExtents = atmosphereMesh.sharedMesh.bounds.extents;
+		var meshHalfSize = Mathf.Max( meshExtents.x, Mathf.Max( meshExtents.y, meshExtents.z ) );
+		var parentScale = ( atmosphere.transform.parent != null ) ? atmosphere.transform.parent.lossyScale.x : 1.0f;
+
+		if ( ( meshHalfSize > 0.0f ) && ( parentScale > 0.0f ) )
+		{
+			atmosphere.transform.localScale = Vector3.one * ( ( planetRadius + atmosphereHeight ) * c_atmosphereQuadMargin / meshHalfSize / parentScale );
+		}
+
+		return true;
+	}
+
 	// sets up the clouds based on planet properties (the planet model is the one the atmosphere goes round: this planet's own if none is given)
 	public void SetupClouds( MeshRenderer planetClouds, GameObject planetAtmosphere, bool updateSkybox, bool enableFog, GameObject planetModel = null )
 	{
+		// the clouds and the atmosphere in the original look
+		SetupOriginalCloudsAndAtmosphere( planetClouds, planetAtmosphere, planetModel );
+
+		// does the planet have an atmosphere?
+		if ( m_planet.HasAtmosphere() )
+		{
+			// get the primary atmosphere of the planet
+			var atmosphereColor = m_planet.GetAtmosphereColor();
+
+			// get the atmosphere density
+			var atmosphereDensity = m_planet.GetAtmosphereDensity();
+
+			// update the skybox if needed
+			if ( updateSkybox )
+			{
+				// blend to the the planet skybox
+				StarflightSkybox.m_instance.SwitchSkyboxTextures( "B", "planet" );
+
+				// set the color tint
+				StarflightSkybox.m_instance.m_colorTintB = atmosphereColor;
+			}
+
+			// also do fog settings
+			if ( enableFog )
+			{
+				RenderSettings.fog = true;
+				RenderSettings.fogColor = atmosphereColor;
+				RenderSettings.fogMode = FogMode.Linear;
+				RenderSettings.fogDensity = 1.0f;
+				RenderSettings.fogStartDistance = 1000.0f - atmosphereDensity * 950.0f;
+				RenderSettings.fogEndDistance = 1000.0f;
+
+				// Debug.Log( "Fog enabled, atmospheric density = " + atmosphereDensity );
+			}
+		}
+		else
+		{
+			if ( updateSkybox )
+			{
+				StarflightSkybox.m_instance.SwitchSkyboxTextures( "B", "planet" );
+
+				StarflightSkybox.m_instance.m_colorTintB = Color.black;
+			}
+
+			// we want to turn off the fog
+			enableFog = false;
+		}
+
+		// turn off the fog if it is not enabled
+		if ( !enableFog )
+		{
+			RenderSettings.fog = false;
+			RenderSettings.fogColor = Color.magenta;
+			RenderSettings.fogMode = FogMode.Linear;
+			RenderSettings.fogDensity = 0.0f;
+			RenderSettings.fogStartDistance = 50.0f;
+			RenderSettings.fogEndDistance = 1000.0f;
+		}
+	}
+
+	// shows or hides the clouds and the atmosphere in the original look, by whether the planet has an atmosphere (the natural look's materials come off them
+	// first; the planet model is the one the atmosphere goes round: this planet's own if none is given)
+	void SetupOriginalCloudsAndAtmosphere( MeshRenderer planetClouds, GameObject planetAtmosphere, GameObject planetModel )
+	{
+		NaturalPlanet.ShowOriginalOn( planetClouds, planetAtmosphere );
+
+		if ( planetClouds == null )
+		{
+			return;
+		}
+
 		// does the planet have an atmosphere?
 		if ( m_planet.HasAtmosphere() )
 		{
@@ -580,29 +846,6 @@ public class Planet : MonoBehaviour
 			{
 				FitAtmosphere( planetAtmosphere, ( planetModel != null ) ? planetModel : m_planetModel, atmosphereColor, atmosphereDensity );
 			}
-
-			// update the skybox if needed
-			if ( updateSkybox )
-			{
-				// blend to the the planet skybox
-				StarflightSkybox.m_instance.SwitchSkyboxTextures( "B", "planet" );
-
-				// set the color tint
-				StarflightSkybox.m_instance.m_colorTintB = atmosphereColor;
-			}
-
-			// also do fog settings
-			if ( enableFog )
-			{
-				RenderSettings.fog = true;
-				RenderSettings.fogColor = atmosphereColor;
-				RenderSettings.fogMode = FogMode.Linear;
-				RenderSettings.fogDensity = 1.0f;
-				RenderSettings.fogStartDistance = 1000.0f - atmosphereDensity * 950.0f;
-				RenderSettings.fogEndDistance = 1000.0f;
-
-				// Debug.Log( "Fog enabled, atmospheric density = " + atmosphereDensity );
-			}
 		}
 		else
 		{
@@ -614,27 +857,6 @@ public class Planet : MonoBehaviour
 			{
 				planetAtmosphere.SetActive( false );
 			}
-
-			if ( updateSkybox )
-			{
-				StarflightSkybox.m_instance.SwitchSkyboxTextures( "B", "planet" );
-
-				StarflightSkybox.m_instance.m_colorTintB = Color.black;
-			}
-
-			// we want to turn off the fog
-			enableFog = false;
-		}
-
-		// turn off the fog if it is not enabled
-		if ( !enableFog )
-		{
-			RenderSettings.fog = false;
-			RenderSettings.fogColor = Color.magenta;
-			RenderSettings.fogMode = FogMode.Linear;
-			RenderSettings.fogDensity = 0.0f;
-			RenderSettings.fogStartDistance = 50.0f;
-			RenderSettings.fogEndDistance = 1000.0f;
 		}
 	}
 }

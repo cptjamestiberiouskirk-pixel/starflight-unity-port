@@ -682,6 +682,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAtmospherePictures();
 				break;
 
+			case "naturalplanets":
+				yield return ScenarioNaturalPlanets();
+				break;
+
 			case "starfieldpictures":
 				yield return ScenarioStarfieldPictures();
 				break;
@@ -11423,6 +11427,11 @@ public class ClaudeProbe : MonoBehaviour
 			System.IO.Directory.CreateDirectory( folder );
 		}
 
+		// the atmospheres of the original look (with a graphics card the natural look is the default, and naturalplanets checks it)
+		PlanetLook.SetLook( PlanetLook.Look.Original, false );
+
+		yield return Frames( 3 );
+
 		// the planets of the star system with an atmosphere, the first of each colour
 		var star = gameData.m_starList[ playerData.m_general.m_currentStarId ];
 		var chosen = new List<GD_Planet>();
@@ -11520,6 +11529,323 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "atmospherepictures: no error is logged while the atmospheres are set up", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=atmospherepictures planets=" + chosen.Count + " noRoom=" + noRoom.Count + " hidden=" + hidden.Count + " dim=" + dim.Count + " errors=" + errorsDuring + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the natural look of the planets (PlanetLook, NaturalPlanet)
+
+	// the planets the natural look is checked on, one of each kind it has to tell apart: Arth (rock, a sea of water, very thin air, no life), planet 94 of
+	// Arth's system (a hot rock world without weather), planet 524 (a world of water with life and very violent weather), the first frozen world with air and
+	// a sea, the first rock world without air, and the first gas giant (which keeps the original look); none of them with an encounter waiting in orbit
+	static List<GD_Planet> NaturalLookPlanets()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var guarded = new HashSet<int>();
+
+		foreach ( var encounter in gameData.m_encounterList )
+		{
+			if ( encounter.m_location != 2 )
+			{
+				continue;
+			}
+
+			foreach ( var star in gameData.m_starList )
+			{
+				if ( ( star.m_xCoordinate == encounter.m_xCoordinate ) && ( star.m_yCoordinate == encounter.m_yCoordinate ) )
+				{
+					var planet = star.GetPlanet( encounter.m_orbitPosition - 1 );
+
+					if ( planet != null )
+					{
+						guarded.Add( planet.m_id );
+					}
+				}
+			}
+		}
+
+		var chosen = new List<GD_Planet>();
+
+		foreach ( var id in new[] { gameData.m_misc.m_arthPlanetId, 94, 524 } )
+		{
+			chosen.Add( gameData.m_planetList[ id ] );
+		}
+
+		System.Func<GD_Planet, bool>[] kinds =
+		{
+			planet => ( planet.m_surfaceId == 3 ) && planet.HasAtmosphere() && ( gameData.m_hydrosphereList[ planet.m_hydrosphereId ].m_name != "None" ),
+			planet => ( planet.m_surfaceId == 5 ) && !planet.HasAtmosphere(),
+			planet => planet.IsGasGiant()
+		};
+
+		foreach ( var kind in kinds )
+		{
+			foreach ( var planet in gameData.m_planetList )
+			{
+				if ( ( planet.m_starId >= 0 ) && !guarded.Contains( planet.m_id ) && kind( planet ) )
+				{
+					chosen.Add( planet );
+
+					break;
+				}
+			}
+		}
+
+		return chosen;
+	}
+
+	// what the orbit's model, clouds and atmosphere are drawn with
+	static string DescribeOrbitLook()
+	{
+		var orbit = SpaceflightController.m_instance.m_inOrbit;
+		var atmosphereRenderer = orbit.m_planetAtmosphere.GetComponent<MeshRenderer>();
+
+		return "planet " + ShaderName( orbit.m_planetModel.sharedMaterial ) + " on " + orbit.m_planetModel.GetComponent<MeshFilter>().sharedMesh.name + ", clouds " + ( orbit.m_clouds.gameObject.activeSelf ? ShaderName( orbit.m_clouds.sharedMaterial ) + " on " + orbit.m_clouds.GetComponent<MeshFilter>().sharedMesh.name : "hidden" ) + ", atmosphere " + ( orbit.m_planetAtmosphere.activeSelf ? ShaderName( atmosphereRenderer.sharedMaterial ) : "hidden" );
+	}
+
+	static string ShaderName( Material material )
+	{
+		return ( ( material != null ) && ( material.shader != null ) ) ? material.shader.name : "(none)";
+	}
+
+	IEnumerator ScenarioNaturalPlanets()
+	{
+		var controller = SpaceflightController.m_instance;
+		var gameData = DataController.m_instance.m_gameData;
+		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+		var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "natural-planets" ) );
+		var camera = Camera.main;
+		var errorsBefore = s_errorCount;
+
+		if ( hasGraphics )
+		{
+			System.IO.Directory.CreateDirectory( folder );
+		}
+
+		// ---- 1. the setting: the natural look unless the player has picked the original one; a test changes it without touching the player's setting
+		var playerHasPicked = PlayerPrefs.HasKey( PlanetLook.c_lookKey );
+		var playersSetting = PlayerPrefs.GetString( PlanetLook.c_lookKey, "" );
+		var lookAtStart = PlanetLook.GetLook();
+
+		Log( "naturalplanets: the look at the start is " + lookAtStart + " (" + ( playerHasPicked ? "the player's setting " + playersSetting : "no setting on this computer" ) + "), the natural look can be made here: " + NaturalPlanet.IsSupported() + ", orbit maps " + NaturalPlanet.GetOrbitMapWidth() + " wide, graphics memory " + SystemInfo.graphicsMemorySize + " MB" );
+
+		Check( "naturalplanets: a player who has not picked a look gets the natural one", playerHasPicked || ( lookAtStart == PlanetLook.Look.Natural ), playerHasPicked ? "this computer has a setting (" + playersSetting + "), not checked" : lookAtStart.ToString() );
+
+		PlanetLook.SetLook( PlanetLook.Look.Natural, false );
+
+		Check( "naturalplanets: a test can change the look without changing the player's setting", ( PlanetLook.GetLook() == PlanetLook.Look.Natural ) && ( PlayerPrefs.GetString( PlanetLook.c_lookKey, "" ) == playersSetting ), PlanetLook.GetLook() + ", setting \"" + PlayerPrefs.GetString( PlanetLook.c_lookKey, "" ) + "\"" );
+
+		var planets = NaturalLookPlanets();
+
+		// ---- 2. without a graphics card the natural look cannot be made: the planets keep their original look, and nothing goes wrong
+		if ( !hasGraphics )
+		{
+			var arth = planets[ 0 ];
+
+			yield return GoIntoOrbit( arth.m_starId, arth.m_id );
+			yield return WaitForPlanetMaps( 90.0f );
+			yield return Frames( 10 );
+
+			var planetController = controller.m_starSystem.GetPlanetController( arth.m_id );
+			var original = ( planetController != null ) && ( controller.m_inOrbit.m_planetModel.sharedMaterial == planetController.GetMaterial() ) && ( planetController.GetNaturalPlanet() == null );
+
+			Log( "naturalplanets: without a graphics card, in orbit around Arth: " + DescribeOrbitLook() );
+
+			Check( "naturalplanets: without a graphics card the natural look is not offered as possible", !NaturalPlanet.IsSupported(), NaturalPlanet.IsSupported().ToString() );
+			Check( "naturalplanets: without a graphics card the planet in orbit keeps its original look", original, DescribeOrbitLook() );
+			Check( "naturalplanets: no error is logged", s_errorCount == errorsBefore, ( s_errorCount - errorsBefore ) + " errors" + ( ( s_errorCount > errorsBefore ) ? ", the last: " + s_lastError : "" ) );
+
+			Finish( "scenario=naturalplanets graphics=no checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+
+			yield break;
+		}
+
+		// ---- 3. in orbit around each planet: the natural look where it is made for the planet, its maps as wide as orbit needs, its coastlines where the
+		// terrain has them; then the original look at once when the player picks it, and the natural look again
+		NaturalPlanet.s_measureCoasts = true;
+
+		var wrongLook = new List<string>();
+		var wrongClouds = new List<string>();
+		var wrongAir = new List<string>();
+		var wrongWidth = new List<string>();
+		var coastsMoved = new List<string>();
+		var notBack = new List<string>();
+		var notAgain = new List<string>();
+		var notInSystem = new List<string>();
+		var orbits = 0;
+
+		foreach ( var planet in planets )
+		{
+			yield return GoIntoOrbit( planet.m_starId, planet.m_id );
+			yield return WaitForPlanetMaps( 90.0f );
+			yield return Frames( 10 );
+
+			var location = DataController.m_instance.m_playerData.m_general.m_location;
+			var planetController = controller.m_starSystem.GetPlanetController( planet.m_id );
+
+			if ( ( location != PD_General.Location.InOrbit ) || ( planetController == null ) )
+			{
+				Log( "naturalplanets: planet " + planet.m_id + " skipped: the ship is in " + location );
+
+				continue;
+			}
+
+			orbits++;
+
+			var orbit = controller.m_inOrbit;
+			var suits = NaturalPlanet.Suits( planet );
+			var natural = planetController.GetNaturalPlanet();
+			var name = "planet " + planet.m_id + " (surface " + planet.m_surfaceId + ", " + gameData.m_hydrosphereList[ planet.m_hydrosphereId ].m_name + ", density " + planet.m_atmosphereDensityId + ", weather " + planet.m_weatherId + ", bio " + planet.m_bioDensity + ")";
+
+			Log( "naturalplanets: " + name + " in orbit: " + DescribeOrbitLook() + ( ( natural != null ) ? ", maps " + natural.GetMapWidth() + " wide, coasts " + natural.m_coastAgreement.ToString( "F4" ) : "" ) );
+
+			// (the natural look on a smooth copy of the sphere mesh, so that the edge is round where the air glows)
+			var surfaceIsNatural = ( ShaderName( orbit.m_planetModel.sharedMaterial ) == "Starflight/Natural Planet" ) && orbit.m_planetModel.GetComponent<MeshFilter>().sharedMesh.name.EndsWith( "(smooth)" );
+
+			if ( surfaceIsNatural != suits )
+			{
+				wrongLook.Add( planet.m_id + " " + ShaderName( orbit.m_planetModel.sharedMaterial ) );
+			}
+
+			if ( suits )
+			{
+				var cloudsRight = orbit.m_clouds.gameObject.activeSelf == ( planet.HasAtmosphere() && ( planet.m_weatherId > 0 ) );
+
+				if ( !cloudsRight || ( orbit.m_clouds.gameObject.activeSelf && ( ShaderName( orbit.m_clouds.sharedMaterial ) != "Starflight/Natural Clouds" ) ) )
+				{
+					wrongClouds.Add( planet.m_id + " " + ( orbit.m_clouds.gameObject.activeSelf ? ShaderName( orbit.m_clouds.sharedMaterial ) : "hidden" ) );
+				}
+
+				var airRight = orbit.m_planetAtmosphere.activeSelf == planet.HasAtmosphere();
+
+				if ( !airRight || ( orbit.m_planetAtmosphere.activeSelf && ( ShaderName( orbit.m_planetAtmosphere.GetComponent<MeshRenderer>().sharedMaterial ) != "Starflight/Natural Atmosphere" ) ) )
+				{
+					wrongAir.Add( planet.m_id + " " + ( orbit.m_planetAtmosphere.activeSelf ? ShaderName( orbit.m_planetAtmosphere.GetComponent<MeshRenderer>().sharedMaterial ) : "hidden" ) );
+				}
+
+				if ( ( natural == null ) || ( natural.GetMapWidth() != NaturalPlanet.GetOrbitMapWidth() ) )
+				{
+					wrongWidth.Add( planet.m_id + " " + ( ( natural != null ) ? natural.GetMapWidth().ToString() : "none" ) );
+				}
+
+				if ( ( natural == null ) || ( natural.m_coastAgreement < 0.97f ) )
+				{
+					coastsMoved.Add( planet.m_id + " " + ( ( natural != null ) ? natural.m_coastAgreement.ToString( "F3" ) : "none" ) );
+				}
+			}
+
+			RenderCameraPicture( camera, System.IO.Path.Combine( folder, "planet" + planet.m_id + "_natural.png" ) );
+
+			// the original look, at once
+			PlanetLook.SetLook( PlanetLook.Look.Original, false );
+
+			yield return Frames( 3 );
+
+			var atmosphereRenderer = orbit.m_planetAtmosphere.GetComponent<MeshRenderer>();
+			var originalAgain = ( orbit.m_planetModel.sharedMaterial == planetController.GetMaterial() ) && !orbit.m_planetModel.GetComponent<MeshFilter>().sharedMesh.name.EndsWith( "(smooth)" ) && ( !orbit.m_clouds.gameObject.activeSelf || ( ShaderName( orbit.m_clouds.sharedMaterial ) != "Starflight/Natural Clouds" ) ) && ( !orbit.m_planetAtmosphere.activeSelf || ( ShaderName( atmosphereRenderer.sharedMaterial ) == "Starflight/Planet Atmosphere" ) ) && ( orbit.m_clouds.gameObject.activeSelf == planet.HasAtmosphere() ) && ( planetController.GetNaturalPlanet() == null );
+
+			Log( "naturalplanets: " + name + " in the original look: " + DescribeOrbitLook() );
+
+			if ( !originalAgain )
+			{
+				notBack.Add( planet.m_id + " " + DescribeOrbitLook() );
+			}
+
+			RenderCameraPicture( camera, System.IO.Path.Combine( folder, "planet" + planet.m_id + "_original.png" ) );
+
+			// and the natural look again
+			PlanetLook.SetLook( PlanetLook.Look.Natural, false );
+
+			yield return Frames( 3 );
+
+			if ( ( ShaderName( orbit.m_planetModel.sharedMaterial ) == "Starflight/Natural Planet" ) != suits )
+			{
+				notAgain.Add( planet.m_id + " " + DescribeOrbitLook() );
+			}
+
+			// the planet in the star system wears it too
+			controller.SwitchLocation( PD_General.Location.StarSystem );
+
+			yield return Frames( 10 );
+
+			var systemRenderer = planetController.m_planetModel.GetComponent<MeshRenderer>();
+			var systemNatural = planetController.GetNaturalPlanet();
+			var systemIsNatural = ( systemNatural != null ) && ( systemRenderer.sharedMaterial == systemNatural.GetSurfaceMaterial() );
+
+			if ( systemIsNatural != suits )
+			{
+				notInSystem.Add( planet.m_id + " " + ShaderName( systemRenderer.sharedMaterial ) );
+			}
+
+			RenderFromAbove( planetController.transform.position, planetController.m_planetModel.transform.lossyScale.x * 4.0f, System.IO.Path.Combine( folder, "system_planet" + planet.m_id + ".png" ) );
+		}
+
+		NaturalPlanet.s_measureCoasts = false;
+
+		Check( "naturalplanets: in orbit, a rock, liquid or frozen world is drawn in its natural look, and a gas giant keeps its original look", ( orbits >= 5 ) && ( wrongLook.Count == 0 ), orbits + " orbits" + ( ( wrongLook.Count > 0 ) ? ": " + string.Join( ", ", wrongLook ) : "" ) );
+		Check( "naturalplanets: its clouds are shown, in the natural look, only where it has air and weather", wrongClouds.Count == 0, string.Join( ", ", wrongClouds ) );
+		Check( "naturalplanets: its air's halo is shown, in the natural look, only where it has air", wrongAir.Count == 0, string.Join( ", ", wrongAir ) );
+		Check( "naturalplanets: its maps in orbit are as wide as orbit needs on this computer", wrongWidth.Count == 0, string.Join( ", ", wrongWidth ) );
+		Check( "naturalplanets: its natural maps keep at least 97% of the land and sea where the terrain has them", coastsMoved.Count == 0, string.Join( ", ", coastsMoved ) );
+		Check( "naturalplanets: picking the original look puts the original material, clouds and atmosphere back at once, and lets go of the natural maps", notBack.Count == 0, string.Join( " | ", notBack ) );
+		Check( "naturalplanets: picking the natural look again puts it back at once", notAgain.Count == 0, string.Join( " | ", notAgain ) );
+		Check( "naturalplanets: the planet in the star system wears the look too", notInSystem.Count == 0, string.Join( ", ", notInSystem ) );
+
+		// ---- 4. the save panel's Colors screen: the planets' two looks, the one in use marked, a click switches it (and is the player's setting, put back after)
+		PressEscape();
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var savePanel = PanelController.m_instance.m_saveGamePanel;
+
+		Call( savePanel, "ColorsClicked" );
+
+		yield return Frames( 10 );
+
+		var lookButtons = FieldOrNull( savePanel, "m_planetLookButtons" ) as UnityEngine.UI.Button[];
+		var lookMarkers = FieldOrNull( savePanel, "m_planetLookMarkers" ) as UnityEngine.UI.Image[];
+		var lookLabels = ( lookButtons != null ) ? string.Join( "/", System.Array.ConvertAll( lookButtons, button => button.GetComponentInChildren<TMPro.TMP_Text>( true ).text ) ) : "(none)";
+		var naturalMarked = ( lookMarkers != null ) && ( lookMarkers.Length == 2 ) && !lookMarkers[ 0 ].enabled && lookMarkers[ 1 ].enabled;
+
+		RenderScreenPicture( System.IO.Path.Combine( folder, "colors_screen.png" ) );
+
+		Call( savePanel, "PlanetLookClicked", PlanetLook.Look.Original );
+
+		yield return Frames( 5 );
+
+		var originalMarked = ( lookMarkers != null ) && ( lookMarkers.Length == 2 ) && lookMarkers[ 0 ].enabled && !lookMarkers[ 1 ].enabled;
+		var lookAfterClick = PlanetLook.GetLook();
+
+		Call( savePanel, "PlanetLookClicked", PlanetLook.Look.Natural );
+
+		yield return Frames( 5 );
+
+		var lookAfterSecondClick = PlanetLook.GetLook();
+
+		Call( savePanel, "CancelClicked" );
+
+		yield return Frames( 5 );
+
+		// the player's own setting back as it was
+		if ( playerHasPicked )
+		{
+			PlayerPrefs.SetString( PlanetLook.c_lookKey, playersSetting );
+		}
+		else
+		{
+			PlayerPrefs.DeleteKey( PlanetLook.c_lookKey );
+		}
+
+		PlayerPrefs.Save();
+
+		Log( "naturalplanets: the Colors screen's planet buttons " + lookLabels + ", natural marked " + naturalMarked + ", after Original " + lookAfterClick + " (marked " + originalMarked + "), after Natural " + lookAfterSecondClick );
+
+		Check( "naturalplanets: the Colors screen has the planets' Original and Natural buttons, the look in use marked", ( lookLabels == "Original/Natural" ) && naturalMarked, lookLabels + ", natural marked " + naturalMarked );
+		Check( "naturalplanets: its buttons switch the look", ( lookAfterClick == PlanetLook.Look.Original ) && originalMarked && ( lookAfterSecondClick == PlanetLook.Look.Natural ), lookAfterClick + " " + originalMarked + " " + lookAfterSecondClick );
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "naturalplanets: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=naturalplanets graphics=yes orbits=" + orbits + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- Low: starfield pictures (the stars' sizes, colours, glints and twinkle, and the game's random numbers they take)
@@ -24574,7 +24900,7 @@ public class ClaudeProbe : MonoBehaviour
 		var shown = ( backdrop != null ) && backdrop.gameObject.activeInHierarchy;
 		var below = shown && ( backdrop.position.y + backdrop.localScale.y < playerData.m_general.m_coordinates.y - 100.0f );
 		var planetController = starSystem.GetPlanetController( guardedPlanetId );
-		var samePlanet = shown && ( planetController != null ) && ( backdrop.GetComponent<MeshRenderer>().sharedMaterial == planetController.GetMaterial() );
+		var samePlanet = shown && ( planetController != null ) && ( backdrop.GetComponent<MeshRenderer>().sharedMaterial == planetController.GetOrbitViewMaterial() );
 
 		// ---- 3. with a graphics device, a picture of it (probe.ps1 -Graphics)
 		var picture = "none (no graphics device)";

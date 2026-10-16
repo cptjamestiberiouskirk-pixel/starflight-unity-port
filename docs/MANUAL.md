@@ -58,7 +58,7 @@ Read the notices in Operations before every launch. The first ones give your ord
 | Switch | Change to another slot. An empty slot starts a new game. |
 | Copy | Copy the active game into another slot. |
 | Reset | Start the active slot over as a new game. |
-| Colors | Pick one of 15 color schemes, each in a dark and a light mode. The choice applies at once and is remembered on this computer. |
+| Colors | Pick one of 15 color schemes, each in a dark and a light mode, and whether the planets are drawn in natural colors (Natural) or as they first looked in this port (Original). The choice applies at once and is remembered on this computer. |
 | Resume | Close the panel and play on. |
 | Quit | Save and leave the game. |
 
@@ -410,7 +410,7 @@ The game is lost when:
 
 This is a faithful remake of *Starflight* (Binary Systems, Electronic Arts, 1986), rebuilt in Unity 6. The 270 stars and their planets, the prices, the aliens' words and the game's rules all come straight from the original game and its code. What the port adds:
 
-- 3D views: real planets and stars, a 3D Starport and terrain;
+- 3D views: real planets and stars (the planets in natural colors with skies and clouds, if you like), a 3D Starport and terrain;
 - a new console and Starport design, in 15 color schemes;
 - lifeforms on the planets' surfaces rebuilt from the game's 1984 design notes.
 
