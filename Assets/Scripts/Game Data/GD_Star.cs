@@ -21,6 +21,10 @@ public class GD_Star
 
 	// the day of the game (0 is the first day) the star flares on - negative for a star that flared that many days before the game began (see Initialize)
 	public int m_daysToNextFlare;
+
+	// the days before its flare from which a star reads stable, and within which it gives the days to its flare (ANALYZE-OV WF31E)
+	const int c_stableDays = 399;
+	const int c_unstableDays = 60;
 	public int m_daysSincePreviousFlare;
 
 	// the same day as a date of the original's calendar of 10 months of 30 days - not used by the game
@@ -77,26 +81,30 @@ public class GD_Star
 		}
 	}
 
-	// call this to get the breach distance
-	// the star's stability as the analysis of a star gives it, by the days left to its next flare (the 1984 notes, starship.txt: "STABLE [POSTFLARE]", "SLIGHTLY
-	// UNSTABLE" with more than 1000 Arth days to its flare, "UNSTABLE - ESTIMATED TIME TO FLARE XXX DAYS" with less)
-	public string GetStabilityText( float today )
+	// the star's stability as the analysis of a star gives it (ANALYZE-OV WF31E): "STABLE" while its flare is 399 Arth days or more away, once it has flared and
+	// once the game is won, with "(POST-FLARE)" after a flare that came before the win (WEC04); "SLIGHTLY UNSTABLE" from 398 to 61 days before its flare; and
+	// within 60 days "UNSTABLE - ESTIMATED TIME TO FLARE:" and the days - winTime is the game time of the win, below 0 if it is not known
+	public string GetStabilityText( float today, bool won, float winTime )
 	{
 		var days = Mathf.CeilToInt( m_daysToNextFlare - today );
 
-		if ( days <= 0 )
+		if ( won || ( days < 1 ) || ( days >= c_stableDays ) )
 		{
-			return "Stable (post-flare)";
+			// a flare day after the win had no flare (with no time of the win, a game saved after the win before it was kept, the flare counts as before it)
+			var flared = ( days < 1 ) && ( !won || ( winTime < 0.0f ) || ( Mathf.FloorToInt( winTime ) > m_daysToNextFlare ) );
+
+			return flared ? "Stable (post-flare)" : "Stable";
 		}
 
-		if ( days > 1000 )
+		if ( days > c_unstableDays )
 		{
 			return "Slightly unstable";
 		}
 
-		return "Unstable - estimated time to flare " + days + ( ( days == 1 ) ? " day" : " days" );
+		return "Unstable - estimated time to flare: " + days + ( ( days == 1 ) ? " Arth day" : " Arth days" );
 	}
 
+	// call this to get the breach distance
 	public float GetBreachDistance()
 	{
 		return ( 1.0f + m_spectralClass.m_scale / 0.6f ) * 48.0f;

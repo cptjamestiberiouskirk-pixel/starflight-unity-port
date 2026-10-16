@@ -21913,36 +21913,81 @@ public class ClaudeProbe : MonoBehaviour
 
 		controller.m_encounterRange = 0.0f;
 
+		var general = DataController.m_instance.m_playerData.m_general;
 		var flared = StarThatNeverFlares();
 		var near = StarFlaringBetween( 150, 290 );
 		var nearDay = ( near >= 0 ) ? gameData.m_starList[ near ].m_daysToNextFlare : 0;
+		var far = StarFlaringBetween( 420, 1000 );
+
+		if ( ( flared < 0 ) || ( near < 0 ) || ( far < 0 ) )
+		{
+			Finish( "scenario=starstability abort: stars flared " + flared + ", near " + near + ", far " + far, 2 );
+			yield break;
+		}
 
 		var scans = new List<string>();
+
+		Action scanHere = () =>
+		{
+			controller.m_messages.Clear();
+
+			new SensorsButton().Execute();
+
+			scans.Add( MessageList() );
+		};
 
 		// ---- 1. a star that flared before the game began
 		yield return ScanStarSystem( flared, scans );
 
-		// (no star of the game data is more than 792 days from its flare, so none is ever "slightly unstable")
+		// ---- 2. a star 420 days or more from its flare
+		yield return ScanStarSystem( far, scans );
 
-		// ---- 2. a star with less than 1000 days to its flare: the days to its flare, and 100 of them once the day is 100 before it
+		// ---- 3. a star 150 to 290 days from its flare, then on the 61st and the 60th day before it
 		yield return ScanStarSystem( near, scans );
 
-		SetGameDay( nearDay - 100 );
+		SetGameDay( nearDay - 61 );
 
 		yield return Frames( 3 );
 
-		controller.m_messages.Clear();
+		scanHere();
 
-		new SensorsButton().Execute();
+		SetGameDay( nearDay - 60 );
 
-		scans.Add( MessageList() );
+		yield return Frames( 3 );
+
+		scanHere();
+
+		// ---- 4. the game won 30 days before that flare: the star 30 days before its flare day and 10 days after it, then the star that flared before the game began
+		general.m_gameWon = true;
+
+		SetFieldIfPresent( general, "m_winTime", (float) ( nearDay - 30 ) );
+		SetGameDay( nearDay - 30 );
+
+		yield return Frames( 3 );
+
+		scanHere();
+
+		SetGameDay( nearDay + 10 );
+
+		yield return Frames( 3 );
+
+		scanHere();
+
+		yield return ScanStarSystem( flared, scans );
+
+		general.m_gameWon = false;
+
+		SetFieldIfPresent( general, "m_winTime", -1.0f );
 
 		controller.m_encounterRange = encounterRange;
 
-		Log( "starstability: flared star " + flared + ", near star " + near + " (flare day " + nearDay + ") || " + string.Join( " || ", scans ) );
+		Log( "starstability: flared star " + flared + ", far star " + far + " (flare day " + gameData.m_starList[ far ].m_daysToNextFlare + "), near star " + near + " (flare day " + nearDay + ") || " + string.Join( " || ", scans ) );
 
-		Check( "starstability: a star that has flared is stable", scans[ 0 ].Contains( "Stability: <color=white>Stable (post-flare)" ), scans[ 0 ] );
-		Check( "starstability: a star with less gives the days to its flare", ( near >= 0 ) && scans[ 1 ].Contains( "Unstable - estimated time to flare " + nearDay + " days" ) && scans[ 2 ].Contains( "Unstable - estimated time to flare 100 days" ), scans[ 1 ] + " || " + scans[ 2 ] );
+		Check( "starstability: a star that flared before the game began is stable, post-flare (a control)", scans[ 0 ].Contains( "Stability: <color=white>Stable (post-flare)</color>" ), scans[ 0 ] );
+		Check( "starstability: a star 399 days or more from its flare is stable, as the original's", scans[ 1 ].Contains( "Stability: <color=white>Stable</color>" ), scans[ 1 ] );
+		Check( "starstability: from 398 to 61 days before its flare a star is slightly unstable", scans[ 2 ].Contains( "Stability: <color=white>Slightly unstable</color>" ) && scans[ 3 ].Contains( "Stability: <color=white>Slightly unstable</color>" ), scans[ 2 ] + " || " + scans[ 3 ] );
+		Check( "starstability: within 60 days of its flare a star is unstable, with the days to its flare", scans[ 4 ].Contains( "Stability: <color=white>Unstable - estimated time to flare: 60 Arth days</color>" ), scans[ 4 ] );
+		Check( "starstability: after the win a star is stable, a flare day after the win shows no flare, and a flare before it is post-flare", scans[ 5 ].Contains( "Stability: <color=white>Stable</color>" ) && scans[ 6 ].Contains( "Stability: <color=white>Stable</color>" ) && scans[ 7 ].Contains( "Stability: <color=white>Stable (post-flare)</color>" ), scans[ 5 ] + " || " + scans[ 6 ] + " || " + scans[ 7 ] );
 
 		Finish( "scenario=starstability near=" + near + "/" + nearDay, 0 );
 	}

@@ -95,6 +95,9 @@ public class PD_General
 	// true once a Black Egg has destroyed the Crystal Planet at its control nexus: the game is won, and no star flares any more (the original's ?WIN, disys.txt ?FLARE)
 	public bool m_gameWon;
 
+	// the game time of the win (the original's ?WIN keeps its stardate), below 0 before the win and in a game saved after the win before it was kept
+	public float m_winTime = -1.0f;
+
 	// true in a game saved between the win and the return to the Starport when Interstel paid its bonus there: the bonus is paid on docking (a new win pays it at
 	// once, PlayerData.PayWinBonus)
 	public bool m_winBonusPending;
@@ -314,6 +317,7 @@ public class PD_General
 
 		// the game has not been won yet, and the Starport is still there
 		m_gameWon = false;
+		m_winTime = -1.0f;
 		m_winBonusPending = false;
 		m_starportDestroyed = false;
 		m_currentEncounterId = 0;
