@@ -177,6 +177,11 @@ public class NaturalPlanet
 	// how many smaller triangles each side of a triangle of a sphere mesh is cut into for its smooth copy
 	const int c_sphereSubdivisions = 8;
 
+	// how big the smooth copy is (a share of the mesh's radius): a little smaller, so that the camera of a launch from the surface, which starts at the
+	// top of the planet in orbit, is above the ground and sees it below the horizon (on a sphere of the mesh's full radius it was inside the planet and saw
+	// space through it); in orbit and in the star system the difference does not show
+	const float c_smoothSphereScale = 0.99f;
+
 	static readonly int c_elevationId = Shader.PropertyToID( "_Elevation" );
 	static readonly int c_blueprintId = Shader.PropertyToID( "_Blueprint" );
 	static readonly int c_heightMapId = Shader.PropertyToID( "_HeightMap" );
@@ -693,6 +698,10 @@ public class NaturalPlanet
 		var hydrosphere = ( ( m_planet.m_hydrosphereId >= 0 ) && ( m_planet.m_hydrosphereId < gameData.m_hydrosphereList.Length ) ) ? gameData.m_hydrosphereList[ m_planet.m_hydrosphereId ].m_name : "None";
 
 		m_surfaceMaterial.SetFloat( "_Molten", m_planet.IsMolten() ? 1.0f : 0.0f );
+
+		// how big the maps are (close up the ground gets finer detail where a texel covers more than a pixel), and no such detail on a gas giant's clouds
+		m_surfaceMaterial.SetVector( "_MapSize", new Vector4( m_mapWidth, m_mapWidth / 2, 0.0f, 0.0f ) );
+		m_surfaceMaterial.SetFloat( "_GasGiant", m_planet.IsGasGiant() ? 1.0f : 0.0f );
 		m_surfaceMaterial.SetColor( "_LavaColor", GetLavaColor( hydrosphere ) );
 		m_surfaceMaterial.SetFloat( "_LavaIntensity", c_lavaIntensity );
 
@@ -755,8 +764,7 @@ public class NaturalPlanet
 
 		if ( atmosphere != null )
 		{
-			var placed = Planet.PlaceAtmosphere( atmosphere, planetModel, out var radius, out var lift );
-			var hasAir = HasAir() && placed;
+			var hasAir = HasAir() && ( planetRadius > 0.0f ) && PlaceAirDome( atmosphere, planetModel, planetRadius );
 
 			atmosphere.SetActive( hasAir );
 
@@ -767,15 +775,65 @@ public class NaturalPlanet
 				atmosphereRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 				atmosphereRenderer.receiveShadows = false;
 
-				// where the planet is, for this quad
+				// where the planet is, for this dome (its middle is the planet's)
 				var properties = new MaterialPropertyBlock();
 
-				properties.SetFloat( c_planetRadiusId, radius );
-				properties.SetFloat( c_centerDepthId, lift );
+				properties.SetFloat( c_planetRadiusId, planetRadius );
+				properties.SetFloat( c_centerDepthId, 0.0f );
 
 				atmosphereRenderer.SetPropertyBlock( properties );
 			}
 		}
+	}
+
+	/// <summary>
+	/// Puts the halo of the air on a dome round the planet: the atmosphere object's quad swapped for a smooth sphere, centred on the planet and a little
+	/// bigger than its air. The halo's shader draws only the dome's far side, which is behind the planet wherever the planet is (the planet works out the
+	/// air in front of itself), and all round the camera when the camera is in the air, as at the start of a launch from the surface (a quad above the
+	/// planet left the view below its own plane without any air).
+	/// </summary>
+	static bool PlaceAirDome( GameObject atmosphere, GameObject planetModel, float planetRadius )
+	{
+		var atmosphereFilter = atmosphere.GetComponent<MeshFilter>();
+		var planetFilter = ( planetModel != null ) ? planetModel.GetComponent<MeshFilter>() : null;
+		var planetRenderer = ( planetModel != null ) ? planetModel.GetComponent<Renderer>() : null;
+
+		if ( ( atmosphereFilter == null ) || ( planetFilter == null ) || ( planetFilter.sharedMesh == null ) || ( planetRenderer == null ) )
+		{
+			return false;
+		}
+
+		ForgetDestroyedFilters();
+
+		var planetMesh = s_originalMeshes.TryGetValue( planetFilter, out var original ) ? original : planetFilter.sharedMesh;
+		var dome = GetSmoothSphere( planetMesh );
+
+		if ( ( dome == null ) || ( dome.bounds.extents.x <= 0.0f ) )
+		{
+			return false;
+		}
+
+		if ( atmosphereFilter.sharedMesh != dome )
+		{
+			if ( !s_originalMeshes.ContainsKey( atmosphereFilter ) )
+			{
+				s_originalMeshes[ atmosphereFilter ] = atmosphereFilter.sharedMesh;
+			}
+
+			atmosphereFilter.sharedMesh = dome;
+		}
+
+		var parentScale = ( atmosphere.transform.parent != null ) ? atmosphere.transform.parent.lossyScale.x : 1.0f;
+
+		if ( parentScale <= 0.0f )
+		{
+			return false;
+		}
+
+		atmosphere.transform.position = planetRenderer.bounds.center;
+		atmosphere.transform.localScale = Vector3.one * ( planetRadius * ( 1.0f + c_airHeight ) * 1.02f / dome.bounds.extents.x / parentScale );
+
+		return true;
 	}
 
 	// takes the natural look's materials off these and puts back the ones they had (call it before the original look is set up on them)
@@ -791,6 +849,9 @@ public class NaturalPlanet
 		if ( ( atmosphere != null ) && atmosphere.TryGetComponent<MeshRenderer>( out var atmosphereRenderer ) )
 		{
 			TakeOff( atmosphereRenderer );
+
+			// (the quad back in place of the dome; the original look puts it above the planet again)
+			UseOriginalSphere( atmosphere );
 		}
 	}
 
@@ -860,7 +921,7 @@ public class NaturalPlanet
 		}
 
 		var center = original.bounds.center;
-		var radius = original.bounds.extents.x;
+		var radius = original.bounds.extents.x * c_smoothSphereScale;
 		var newVertices = new List<Vector3>();
 		var newNormals = new List<Vector3>();
 		var newUvs = new List<Vector2>();
