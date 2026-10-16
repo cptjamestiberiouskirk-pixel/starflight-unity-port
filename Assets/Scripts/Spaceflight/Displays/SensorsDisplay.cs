@@ -111,6 +111,10 @@ public class SensorsDisplay : ShipDisplay
 	// counts the sensor readings taken (each one can be analyzed once, see AnalysisButton)
 	public int m_readingCount;
 
+	// the reading the science officer has analyzed last: an analysis uses the reading up, as the original's does (ANALYZE-OV (/ANALYSIS) sets SENSE-ADDR to
+	// NULL), so the next analysis needs a new reading (-1 for none)
+	[System.NonSerialized] public int m_analyzedReadingCount = -1;
+
 	// the vessel whose wreck the sensors read (-1 for any other reading)
 	public int m_debrisVesselId = -1;
 

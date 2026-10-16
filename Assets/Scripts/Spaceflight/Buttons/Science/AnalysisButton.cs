@@ -79,10 +79,6 @@ public class AnalysisButton : ShipButton
 		return armed ? "Armed" : "Not armed";
 	}
 
-	// the reading of a planet the science officer has analyzed last (the 1984 notes, starship.txt: "I have already attempted analysis of this data, Captain" - alien
-	// ships "may be read and analyzed as often as desired")
-	static int s_analyzedReading = -1;
-
 	// a line of the analysis the science officer gives with a chance of their science skill / 2 percent, else "Unknown" (starship.txt: "For each header there is a
 	// chance that the Science Officer will give some information. That % chance is = the Science Officer's skill / 2")
 	static string Known( string value, int scienceSkill )
@@ -119,27 +115,13 @@ public class AnalysisButton : ShipButton
 
 		var skill = scienceOfficer.m_science;
 
-		// a planet's reading is analyzed once
-		if ( sensorsDisplay.m_hasSensorData && ( sensorsDisplay.m_scanType == SensorsDisplay.ScanType.Planet ) )
+		// do we have sensor data to analyze? an analysis uses the reading up, whatever was read (ANALYZE-OV (/ANALYSIS)), so a second one needs a new reading
+		var hasCurrentReading = sensorsDisplay.m_hasSensorData && ( sensorsDisplay.m_readingCount != sensorsDisplay.m_analyzedReadingCount );
+
+		if ( hasCurrentReading )
 		{
-			if ( sensorsDisplay.m_readingCount == s_analyzedReading )
-			{
-				SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+			sensorsDisplay.m_analyzedReadingCount = sensorsDisplay.m_readingCount;
 
-				SpaceflightController.m_instance.m_messages.Clear();
-				SpaceflightController.m_instance.m_messages.AddText( "<color=white>I have already attempted analysis of this data, Captain.</color>" );
-
-				SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
-
-				return false;
-			}
-
-			s_analyzedReading = sensorsDisplay.m_readingCount;
-		}
-
-		// do we have sensor data to analyze?
-		if ( sensorsDisplay.m_hasSensorData )
-		{
 			// yes - start building the new messages text
 			// (the original's heading has a colon: ANALYZE-OV, "ANALYSIS OF LAST SENSOR READING:")
 			text = "<color=white>Analysis of Last Sensor Reading:</color>\n";
