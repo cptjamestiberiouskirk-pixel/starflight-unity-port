@@ -25,13 +25,22 @@ public class PD_CrewAssignment
 	public int m_communicationsOfficerFileId;
 	public int m_doctorFileId;
 
-	// how much vitality the doctor restores each second for every point of medicine skill, and the slowest a doctor ever works
-	public const float c_treatmentRatePerSkillPoint = 0.02f;
-	public const float c_minimumTreatmentRate = 0.5f;
+	// the crew heals in ticks, one every (260 - the doctor's medicine) quarters of a second (the original's HEALTI, (260 - medicine) x 250 ms, HEAL-OV WF292); each
+	// tick gives every living crew member on board 1 point of vitality and the doctor's patient 2, or 1 on a planet's surface (WF2CD)
+	public const int c_healTickBase = 260;
+	public const float c_healTickSecondsPerPoint = 0.25f;
+	const int c_healTickPoints = 1;
+	const int c_patientHealTickPoints = 2;
+
+	// the most heal ticks one update makes up for (a guard: a long pause in the game is not a reason to heal forever)
+	const int c_maximumHealTicksPerUpdate = 1000;
 
 	// true while the doctor is treating someone, and the personnel file of that patient (false in save files from before treatment took time)
 	public bool m_treatmentIsUnderWay;
 	public int m_patientFileId;
+
+	// the seconds since the last heal tick (not saved: a loaded game starts a new tick)
+	float m_healTimer;
 
 	public void Reset()
 	{
@@ -116,6 +125,15 @@ public class PD_CrewAssignment
 		return playerData.m_personnel.GetPersonnelFile( fileId );
 	}
 
+	// the personnel file of a post, null if the post is not filled or its file is gone (GetPersonnelFile throws for those)
+	PD_Personnel.PD_PersonnelFile FindPersonnelFile( Role role )
+	{
+		var fileId = GetFileId( role );
+		var personnel = DataController.m_instance.m_playerData.m_personnel;
+
+		return ( ( fileId != -1 ) && personnel.HasPersonnelFile( fileId ) ) ? personnel.GetPersonnelFile( fileId ) : null;
+	}
+
 	// returns true if this personnel file has at least one role (in other words this person is on board the ship)
 	public bool IsOnBoard( int fileId )
 	{
@@ -162,25 +180,14 @@ public class PD_CrewAssignment
 		return mostInjured;
 	}
 
-	// the amount of vitality the doctor restores each second (zero if there is no doctor who can work)
-	public float GetTreatmentRate()
+	// the seconds between two heal ticks: (260 - the doctor's medicine) quarters of a second, so from 1.25 s with the best doctor to 65 s with none (a dead
+	// member's skills are gone, and a missing doctor counts as no medicine)
+	public float GetHealTickSeconds()
 	{
-		// nobody gets treated without a doctor
-		if ( !IsAssigned( Role.Doctor ) )
-		{
-			return 0.0f;
-		}
+		var doctor = FindPersonnelFile( Role.Doctor );
+		var medicine = ( ( doctor != null ) && !IsDeadFile( doctor ) ) ? Mathf.Clamp( doctor.m_medicine, 0, 255 ) : 0;
 
-		var doctor = GetPersonnelFile( Role.Doctor );
-
-		// or with one who is incapacitated
-		if ( doctor.m_vitality <= 0 )
-		{
-			return 0.0f;
-		}
-
-		// the better the doctor the faster the patient recovers
-		return Mathf.Max( c_minimumTreatmentRate, doctor.m_medicine * c_treatmentRatePerSkillPoint );
+		return ( c_healTickBase - medicine ) * c_healTickSecondsPerPoint;
 	}
 
 	// the crew member the doctor is treating (null if the doctor is not treating anyone)
@@ -205,48 +212,108 @@ public class PD_CrewAssignment
 		m_patientFileId = patient.m_fileId;
 	}
 
-	// call this every frame during spaceflight - the patient recovers a little at a time
+	// call this every frame during spaceflight - the crew heals in ticks (HEAL-OV WF2CD), and the treatment is over when the patient is healed, has died or is not
+	// on board any more
 	public void UpdateTreatment( float deltaTime )
 	{
-		// nothing to do unless the doctor has been told to treat someone
-		if ( !m_treatmentIsUnderWay )
+		if ( m_treatmentIsUnderWay )
+		{
+			var patient = GetPatient();
+
+			if ( ( patient == null ) || IsDeadFile( patient ) )
+			{
+				m_treatmentIsUnderWay = false;
+			}
+		}
+
+		var tickSeconds = GetHealTickSeconds();
+
+		m_healTimer += deltaTime;
+
+		for ( var tick = 0; ( tick < c_maximumHealTicksPerUpdate ) && ( m_healTimer >= tickSeconds ); tick++ )
+		{
+			m_healTimer -= tickSeconds;
+
+			HealTick();
+		}
+
+		// a long pause is not made up for beyond the guard
+		m_healTimer = Mathf.Min( m_healTimer, tickSeconds );
+	}
+
+	// a heal tick (WF2CD): each living crew member on board gains a point of vitality, once however many posts they hold, and the doctor's patient two, except on
+	// a planet's surface; a patient healed to 100 off the surface is done ("<NAME> IS HEALED", WF2B4) - nothing heals while the whole crew is whole (WF280)
+	void HealTick()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var location = playerData.m_general.m_location;
+		var onTheSurface = ( location == PD_General.Location.Planetside ) || ( location == PD_General.Location.Disembarked );
+
+		if ( !SomeoneOnBoardIsHurt() )
 		{
 			return;
 		}
 
-		// the treatment is over if the patient is not on board any more or has died
-		var patient = GetPatient();
-
-		if ( ( patient == null ) || ( patient.m_vitality <= 0 ) )
+		for ( var role = Role.First; role < Role.Count; role++ )
 		{
-			m_treatmentIsUnderWay = false;
+			var file = FindPersonnelFile( role );
 
-			return;
+			if ( ( file == null ) || IsDeadFile( file ) || HoldsAnEarlierPost( file, role ) )
+			{
+				continue;
+			}
+
+			var isPatient = m_treatmentIsUnderWay && ( file.m_fileId == m_patientFileId );
+
+			if ( isPatient && !onTheSurface )
+			{
+				file.m_vitality = Mathf.Min( 100.0f, file.m_vitality + c_patientHealTickPoints );
+
+				if ( file.m_vitality >= 100.0f )
+				{
+					m_treatmentIsUnderWay = false;
+
+					if ( SpaceflightController.m_instance != null )
+					{
+						SpaceflightController.m_instance.m_messages.AddText( "<color=#00FF00>" + file.m_name + " is healed.</color>" );
+					}
+				}
+			}
+			else
+			{
+				file.m_vitality = Mathf.Min( 100.0f, file.m_vitality + c_healTickPoints );
+			}
+		}
+	}
+
+	// true if a living crew member on board is below full vitality (WF280: the original heals nobody while every one of them is at 100)
+	bool SomeoneOnBoardIsHurt()
+	{
+		for ( var role = Role.First; role < Role.Count; role++ )
+		{
+			var file = FindPersonnelFile( role );
+
+			if ( ( file != null ) && !IsDeadFile( file ) && ( file.m_vitality < 100.0f ) )
+			{
+				return true;
+			}
 		}
 
-		// the treatment stops if the doctor is gone or incapacitated
-		var treatmentRate = GetTreatmentRate();
+		return false;
+	}
 
-		if ( treatmentRate <= 0.0f )
+	// true if a crew member also holds a post before this one (ROLE-C lists each crew member on board once)
+	bool HoldsAnEarlierPost( PD_Personnel.PD_PersonnelFile file, Role role )
+	{
+		for ( var earlier = Role.First; earlier < role; earlier++ )
 		{
-			m_treatmentIsUnderWay = false;
-
-			SpaceflightController.m_instance.m_messages.AddText( "<color=red>Treatment has stopped. No doctor is available!</color>" );
-
-			return;
+			if ( GetFileId( earlier ) == file.m_fileId )
+			{
+				return true;
+			}
 		}
 
-		// the patient recovers a little more
-		patient.m_vitality = Mathf.Min( 100.0f, patient.m_vitality + treatmentRate * deltaTime );
-
-		// has the patient fully recovered?
-		if ( patient.m_vitality >= 100.0f )
-		{
-			// yes - the doctor is done
-			m_treatmentIsUnderWay = false;
-
-			SpaceflightController.m_instance.m_messages.AddText( "<color=#00FF00>" + patient.m_name + " has fully recovered.</color>" );
-		}
+		return false;
 	}
 
 	// true if a personnel file is of a crew member who has died
@@ -264,7 +331,7 @@ public class PD_CrewAssignment
 
 		for ( var candidate = Role.First; candidate < Role.Count; candidate++ )
 		{
-			var file = GetPersonnelFile( candidate );
+			var file = FindPersonnelFile( candidate );
 
 			if ( file == null )
 			{
@@ -294,7 +361,7 @@ public class PD_CrewAssignment
 		// WF4C1: the posts after the captain's
 		for ( var role = Role.ScienceOfficer; role < Role.Count; role++ )
 		{
-			var file = GetPersonnelFile( role );
+			var file = FindPersonnelFile( role );
 
 			if ( ( file == null ) || !IsDeadFile( file ) )
 			{
@@ -311,7 +378,7 @@ public class PD_CrewAssignment
 		}
 
 		// WF497: a dead captain
-		var captain = GetPersonnelFile( Role.Captain );
+		var captain = FindPersonnelFile( Role.Captain );
 
 		if ( ( captain != null ) && IsDeadFile( captain ) )
 		{
@@ -354,7 +421,7 @@ public class PD_CrewAssignment
 		// the dead member's posts go to the crew members best at them, and a dead captain's command to the science officer
 		if ( ReassignPostsOfTheDead() )
 		{
-			var captain = GetPersonnelFile( Role.Captain );
+			var captain = FindPersonnelFile( Role.Captain );
 
 			if ( ( messages != null ) && ( captain != null ) && !IsDeadFile( captain ) )
 			{

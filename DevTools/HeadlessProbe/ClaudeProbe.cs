@@ -4339,54 +4339,85 @@ public class ClaudeProbe : MonoBehaviour
 			Check( "M20 repairs never touch a destroyed ship, or run without an engineer", ( destroyedHull == 0 ) && ( hullWithoutEngineer == 40 ), "destroyed ship " + destroyedHull + ", no engineer " + hullWithoutEngineer );
 		}
 
-		// ---- treat (the player chooses who: the one hurt the most)
+		// ---- treat (the player chooses who: the one hurt the most); from here the heal ticks are driven by hand, with the frames' own ticks held off
 		SpaceflightController.m_instance.m_messages.Clear();
+		// the seconds since the last heal tick (private, and missing on the code before the heal ticks)
+		var healTimer = typeof( PD_CrewAssignment ).GetField( "m_healTimer", c_any );
+		Action<float> setHealTimer = seconds =>
+		{
+			if ( healTimer != null )
+			{
+				healTimer.SetValue( crew, seconds );
+			}
+		};
+
+		setHealTimer( -100000.0f );
 
 		TreatThroughTheConsole( worse );
 
 		var treatMessage = MessageList();
 		var rightAfterTreat = "Worse " + worse.m_vitality.ToString( "F0" ) + " Hurt " + hurt.m_vitality.ToString( "F0" ) + " Ashore " + ashore.m_vitality.ToString( "F0" );
 
-		yield return new WaitForSecondsRealtime( 5.0f );
-
-		var worseAfter5s = worse.m_vitality;
-		var hurtAfter5s = hurt.m_vitality;
-		var ashoreAfter5s = ashore.m_vitality;
-
-		Log( "M20 treat, doctor skill 100 (Worse 20, Hurt 50 on board, Ashore 40 left at starport): right after the button " + rightAfterTreat + ", 5 s later Worse " + worseAfter5s.ToString( "F1" ) + " Hurt " + hurtAfter5s.ToString( "F1" ) + " Ashore " + ashoreAfter5s.ToString( "F1" ) );
+		Log( "M20 treat, doctor skill 100 (Worse 20, Hurt 50 on board, Ashore 40 left at starport): right after the button " + rightAfterTreat );
 		Log( "M20 treat message: " + treatMessage );
 
 		Check( "M20 the treat button does not heal anyone on the spot", rightAfterTreat == "Worse 20 Hurt 50 Ashore 40", rightAfterTreat );
-		Check( "M20 the doctor treats the crew member chosen, about 2 points a second at skill 100", ( worseAfter5s >= 29.0f ) && ( worseAfter5s <= 32.0f ) && ( hurtAfter5s == 50.0f ), "after 5 s Worse " + worseAfter5s.ToString( "F1" ) + ", Hurt " + hurtAfter5s.ToString( "F1" ) );
-		Check( "M20 someone who is not on board is not treated", ashoreAfter5s == 40.0f, "Ashore " + ashoreAfter5s.ToString( "F1" ) + " (was 40)" );
 
 		var treat = "n/a";
 
 		if ( ( updateTreatment != null ) && ( treatmentField != null ) && ( patientField != null ) )
 		{
-			// to the end of the first treatment
-			updateTreatment.Invoke( crew, new object[] { 1000.0f } );
+			// the crew after some seconds of healing, from the start of a heal tick
+			Func<float, string> heal = seconds =>
+			{
+				setHealTimer( 0.0f );
+				updateTreatment.Invoke( crew, new object[] { seconds } );
+				setHealTimer( -100000.0f );
+
+				return "Worse " + worse.m_vitality.ToString( "F0" ) + " Hurt " + hurt.m_vitality.ToString( "F0" ) + " Ashore " + ashore.m_vitality.ToString( "F0" );
+			};
+
+			// 1. at medicine 100 a heal tick comes every (260 - 100) / 4 = 40 s: nothing in 39 s, then the patient gains 2 and the others on board 1
+			var after39s = heal( 39.0f );
+			var after40s = heal( 40.0f );
+
+			// 2. the treatment ends when the patient is healed, and everyone on board heals meanwhile: 2,000 s more is 50 ticks
+			SpaceflightController.m_instance.m_messages.Clear();
+
+			heal( 2000.0f );
 
 			var worseWhenDone = worse.m_vitality;
 			var hurtWhenWorseIsDone = hurt.m_vitality;
 			var stillUnderWayWhenDone = (bool) treatmentField.GetValue( crew );
 			var doneMessage = MessageList();
 
-			// the next press treats the next one chosen
+			// 3. the next command treats the next one chosen, and a better doctor is faster: at medicine 250 a tick every 2.5 s, 10 of them in 25 s
+			hurt.m_vitality = 10.0f;
+
 			TreatThroughTheConsole( hurt );
 
 			var nextPatient = (int) patientField.GetValue( crew );
 
-			// a better doctor works faster: 10 seconds at skill 250 is 50 points
 			doctor.m_medicine = 250;
+
+			heal( 25.0f );
+
+			var hurtAfter25sAtSkill250 = hurt.m_vitality;
+
+			// 4. on a planet's surface the patient gains only 1 a tick
+			var location = playerData.m_general.m_location;
+
 			hurt.m_vitality = 10.0f;
+			playerData.m_general.m_location = PD_General.Location.Planetside;
 
-			updateTreatment.Invoke( crew, new object[] { 10.0f } );
+			heal( 25.0f );
 
-			var hurtAfter10sAtSkill250 = hurt.m_vitality;
+			var hurtOnTheSurface = hurt.m_vitality;
 
-			// the dead are not treated
-			updateTreatment.Invoke( crew, new object[] { 1000.0f } );
+			playerData.m_general.m_location = location;
+
+			// 5. the dead are not treated
+			heal( 1000.0f );
 
 			worse.m_vitality = 0.0f;
 
@@ -4395,16 +4426,18 @@ public class ClaudeProbe : MonoBehaviour
 			var treatingTheDead = (bool) treatmentField.GetValue( crew );
 			var nobodyMessage = MessageList();
 
-			treat = "done=" + worseWhenDone.ToString( "F0" ) + "/" + hurtWhenWorseIsDone.ToString( "F0" ) + " next=" + ( ( nextPatient == hurt.m_fileId ) ? "Hurt" : nextPatient.ToString() ) + " 10s@250=" + hurtAfter10sAtSkill250.ToString( "F0" ) + " dead=" + treatingTheDead;
+			treat = "39s=" + after39s + " 40s=" + after40s + " done=" + worseWhenDone.ToString( "F0" ) + "/" + hurtWhenWorseIsDone.ToString( "F0" ) + " next=" + ( ( nextPatient == hurt.m_fileId ) ? "Hurt" : nextPatient.ToString() ) + " 25s@250=" + hurtAfter25sAtSkill250.ToString( "F0" ) + " surface=" + hurtOnTheSurface.ToString( "F0" ) + " dead=" + treatingTheDead;
 
 			Log( "M20 treat: " + treat + " | message when done: " + doneMessage + " | message with only a dead crew member left: " + nobodyMessage );
 
-			Check( "M20 one patient per command, and the treatment stops at full health", ( worseWhenDone == 100.0f ) && ( hurtWhenWorseIsDone == 50.0f ) && !stillUnderWayWhenDone && doneMessage.Contains( "recovered" ), "Worse " + worseWhenDone.ToString( "F0" ) + ", Hurt " + hurtWhenWorseIsDone.ToString( "F0" ) + ", still under way " + stillUnderWayWhenDone );
-			Check( "M20 the next command treats the next one chosen, and a better doctor is faster", ( nextPatient == hurt.m_fileId ) && ( hurtAfter10sAtSkill250 == 60.0f ), "next patient file " + nextPatient + " (Hurt is " + hurt.m_fileId + "), 10 s at skill 250 took Hurt from 10 to " + hurtAfter10sAtSkill250.ToString( "F0" ) );
+			Check( "M20 a heal tick every (260 - medicine) / 4 s: at medicine 100 nothing in 39 s, then the patient gains 2 and the others on board 1, and nobody ashore", ( after39s == "Worse 20 Hurt 50 Ashore 40" ) && ( after40s == "Worse 22 Hurt 51 Ashore 40" ), after39s + " | " + after40s );
+			Check( "M20 the treatment ends when the patient is healed (\"Worse is healed.\"), and everyone on board heals meanwhile", ( worseWhenDone == 100.0f ) && ( hurtWhenWorseIsDone == 100.0f ) && !stillUnderWayWhenDone && doneMessage.Contains( "Worse is healed" ), "Worse " + worseWhenDone.ToString( "F0" ) + ", Hurt " + hurtWhenWorseIsDone.ToString( "F0" ) + ", still under way " + stillUnderWayWhenDone + " | " + doneMessage );
+			Check( "M20 the next command treats the next one chosen, and a better doctor is faster (medicine 250: 10 ticks in 25 s, 10 to 30)", ( nextPatient == hurt.m_fileId ) && ( hurtAfter25sAtSkill250 == 30.0f ), "next patient file " + nextPatient + " (Hurt is " + hurt.m_fileId + "), 25 s at skill 250 took Hurt from 10 to " + hurtAfter25sAtSkill250.ToString( "F0" ) );
+			Check( "M20 on a planet's surface the patient gains 1 a tick (10 to 20 in 10 ticks)", hurtOnTheSurface == 20.0f, "Hurt from 10 to " + hurtOnTheSurface.ToString( "F0" ) );
 			Check( "M20 a dead crew member is not treated", !treatingTheDead && nobodyMessage.Contains( "beyond help" ), "treatment under way " + treatingTheDead + ", message: " + nobodyMessage );
 		}
 
-		Finish( "scenario=m20 repairOnThePress=" + ( hullRightAfter - 40 ) + " repairIn5s=" + ( hullAfter5s - 40 ) + " repair=[" + repair + "] treatOnThePress=[" + rightAfterTreat + "] treatIn5s=Worse" + worseAfter5s.ToString( "F1" ) + "/Hurt" + hurtAfter5s.ToString( "F1" ) + "/Ashore" + ashoreAfter5s.ToString( "F1" ) + " treat=[" + treat + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+		Finish( "scenario=m20 repairOnThePress=" + ( hullRightAfter - 40 ) + " repairIn5s=" + ( hullAfter5s - 40 ) + " repair=[" + repair + "] treatOnThePress=[" + rightAfterTreat + "] treat=[" + treat + "] checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- H8: missiles are not counted, every shot uses a little endurium

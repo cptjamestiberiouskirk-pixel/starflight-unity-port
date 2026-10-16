@@ -90,7 +90,7 @@ The port runs on **Unity 6 (6000.3.13f1)** and has been modernized throughout:
 
 - **Combat**: laser cannons, missile launchers, shields and armor, with alien tactics and victory and defeat detection. Alien ships have their own armor and shield points, any race turns hostile when fired on (the Uhlek attack on sight), aliens hold their fire while a comm link is up, and every shot burns a little Endurium.
 - **Encounters in orbit**: home fleets, drones and a derelict wait in orbit around their planets and meet the ship when it arrives. Leaving the encounter returns the ship to the star system, as in the original.
-- **Ship systems over time**: shields keep their charge and recharge slowly, and the engineer's repairs and the doctor's treatments take time, going faster with higher skill. The doctor asks which crew member to examine or treat, just like the original.
+- **Ship systems over time**: shields keep their charge and recharge slowly, and the engineer's repairs and the crew's healing take time, going faster with higher skill: everyone on board heals slowly, and the doctor's patient twice as fast. The doctor asks which crew member to examine or treat, just like the original.
 - **Living suns**: each star system's sun churns, its corona flickers and small flares rise from its rim and fall back, all in the color of real stars of its class.
 - **Planets lit by their star**: in the 3D star system view every planet is lit by its own star, in that star's color, with a day side, a night side and an atmosphere that glows along the sunlit edge.
 - **A Milky Way in the sky**: a faint band of the Milky Way crosses the spaceflight sky beneath the nebula of the territory you are in, and turns with the sky as the ship flies.

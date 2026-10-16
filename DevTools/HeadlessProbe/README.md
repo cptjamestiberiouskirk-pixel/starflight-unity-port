@@ -64,7 +64,7 @@ What the probe does:
 | `m19` | shield charge kept when lowered, slow recharge |
 | `h7` | game over reloads the last save, a destroyed ship is never saved, copied or carried through a slot switch (goes through the Intro, Spaceflight and Starport scenes) |
 | `m12` | hostile when fired on, until the encounter is left; Uhlek hostile on sight; the Enterprise shoots back (about 60 s) |
-| `m20` | repair and treat take time, treat is for the crew on board |
+| `m20` | repair and treat take time; the crew heals in the original's ticks, one every (260 - the doctor's medicine) / 4 s: nothing in 39 s at medicine 100, then the patient +2 and the others on board +1 (nobody ashore), the treatment ends with "<name> is healed.", 10 ticks in 25 s at medicine 250, the patient +1 a tick on a planet's surface, and the dead are not treated |
 | `h8` | no missile count, every shot uses Endurium, no Endurium no weapons |
 | `m10` | a deposit can only be picked up once (orbit, surface, terrain vehicle through the real Disembark button) |
 | `m23` | the console is locked during the 35 s landing, and the landing prints each message once and in order (about 55 s) |
