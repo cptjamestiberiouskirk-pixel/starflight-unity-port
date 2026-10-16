@@ -36715,8 +36715,24 @@ public class ClaudeProbe : MonoBehaviour
 			yield break;
 		}
 
-		// ---- 3. into orbit around Sphexi: the drones
-		yield return PtFlyToPlanetAndEnter( orbSite.m_planetId, PD_General.Location.Encounter, done );
+		// ---- 3. into orbit around Sphexi: the drones (a group that meets the ship on the way is flown away from, as a player would, and the planet is tried again:
+		// the minute without encounters after it keeps the group off)
+		for ( var attempt = 0; attempt < 3; attempt++ )
+		{
+			yield return PtFlyToPlanetAndEnter( orbSite.m_planetId, PD_General.Location.Encounter, done );
+
+			if ( ( playerData.m_general.m_location != PD_General.Location.Encounter ) || ( playerData.m_general.m_currentEncounterId == 305 ) )
+			{
+				break;
+			}
+
+			s_ptEncounters.Add( "on the way to Sphexi's planet: " + PtEncounterText() + ", flown away from" );
+
+			Log( "playthrough-6: met on the way to the planet: " + PtEncounterText() + "; flying out of it" );
+
+			yield return PtFlyOutOfEncounter( 4.0f );
+			yield return Frames( 10 );
+		}
 
 		Log( "playthrough-6: going into orbit around Sphexi: " + playerData.m_general.m_location + ( ( playerData.m_general.m_location == PD_General.Location.Encounter ) ? " " + PtEncounterText() : "" ) + ", messages '" + PtMessages() + "'" );
 
@@ -40158,7 +40174,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "shipspeeds: in the star system (" + general.m_location + "): " + firstSteps.ToString( "0.0" ) + " two frames after the engines went on, " + systemTop.ToString( "0.0" ) + " after 3.5 s, " + systemStopped.ToString( "0.0" ) + " three frames after they went off" );
 
 		Check( "shipspeeds: in a star system the ship starts at a twelfth of its top speed or more, and less than half of it (the original's step grows from 1 to 12)", inStarSystem && ( firstSteps >= 983.04f / 12.0f - 0.01f ) && ( firstSteps < 983.04f / 2.0f ), firstSteps.ToString( "0.0" ) );
-		Check( "shipspeeds: its top speed in a star system is 7.68 times hyperspace's, 983 (12 units of 20.48 a step against 1 of 32)", Mathf.Abs( systemTop - 983.04f ) < 0.5f, systemTop.ToString( "0.0" ) );
+		Check( "shipspeeds: its top speed in a star system is 983 (12 units of 20.48 a step, at the port's 4 steps a second)", Mathf.Abs( systemTop - 983.04f ) < 0.5f, systemTop.ToString( "0.0" ) );
 		Check( "shipspeeds: with no direction held it stops at once", systemStopped == 0.0f, systemStopped.ToString( "0.0" ) );
 
 		// ---- 2. hyperspace, in a quiet corner
@@ -40199,8 +40215,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "shipspeeds: in hyperspace: " + hyperspaceAtOnce.ToString( "0.0" ) + " 0.1 s after the engines went on, " + hyperspaceHalfEngines.ToString( "0.0" ) + " with the engines at half health, " + hyperspaceNoEngines.ToString( "0.0" ) + " with them destroyed" );
 
-		Check( "shipspeeds: in hyperspace the ship is at its top speed, 128, from the first step", Mathf.Abs( hyperspaceAtOnce - 128.0f ) < 0.01f, hyperspaceAtOnce.ToString( "0.0" ) );
-		Check( "shipspeeds: engines at half health do not slow the ship (the original's engine damage counts only in an encounter)", Mathf.Abs( hyperspaceHalfEngines - 128.0f ) < 0.01f, hyperspaceHalfEngines.ToString( "0.0" ) );
+		Check( "shipspeeds: in hyperspace the ship is at its top speed from the first step: the original's 11.6 steps of 32 a second at GOG's speed (371.2)", Mathf.Abs( hyperspaceAtOnce - 371.2f ) < 0.05f, hyperspaceAtOnce.ToString( "0.0" ) );
+		Check( "shipspeeds: engines at half health do not slow the ship (the original's engine damage counts only in an encounter)", Mathf.Abs( hyperspaceHalfEngines - 371.2f ) < 0.05f, hyperspaceHalfEngines.ToString( "0.0" ) );
 		Check( "shipspeeds: destroyed engines move nothing (DAMAGE-OV WF2AC; the old code left the ship at the speed it had)", hyperspaceNoEngines < 0.01f, hyperspaceNoEngines.ToString( "0.0" ) );
 
 		Finish( "scenario=shipspeeds checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
