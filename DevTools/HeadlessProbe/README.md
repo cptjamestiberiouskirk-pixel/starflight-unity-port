@@ -217,6 +217,7 @@ What the probe does:
 | `transmissions` | the races that transmit rather than talk, each once the comm link is up: a Minstrel (two verses, the second ending the link, and the next two at the next meeting), a Nomad probe (one planetary report, which ends the link, and the next at the next meeting) and the Noah 9 derelict in orbit 3 of 175,94 (its distress beacon, and once answered the two parts of its recorded message), and its first line of the game (the officer's beacon report) and then the report and the SOS taking turns across three meetings (about 60 s) |
 | `starstability` | the stability line of the star system scan: a star that flared before the game began (stable, post-flare) and one that flares on day 284 (its days to the flare, and 100 once the day is 100 before it); no star of the game data is more than 792 days from its flare, so "slightly unstable" is not shown (about 30 s) |
 | `alienshields` | the captain is told when the aliens raise or lower their shields or arm or disarm: in a Mechan encounter nothing is said at the start, turning hostile they arm, turning friendly they lower their shields and disarm, turning neutral they raise their shields (about 20 s) |
+| `alienreadings` | an alien ship's sensor readings fall with its damage, as the original's: a whole ship reads its vessel's Bio and Energy (a control), and at half its armor and shields it reads half, its energy at 75 to 85% of that when it carries life (about 25 s) |
 | `alienshieldhits` | what an alien ship's shields take of a hit, as the original's: an Uhlek ship's raised shields with 30 points take the whole hit of 50 and the armor nothing, and a Spemin ship (the Spemin never raise their shields) takes it all on the armor with its shields untouched (about 40 s) |
 | `alienanalysis` | the analysis of an alien ship in the original's words: in a Mechan encounter the scouts' shields read Class 2 equivalent raised when neutral or hostile and lowered when friendly or surrendering, the weapons Armed only when hostile; a Gazurtoid warship's shields Unknown, a Spemin scout's None apparent; and the size with no label, as a whole number or the decimals to the first that is not zero (about 20 s) |
 | `analysisheading` | the Analysis heading's colon on a Mechan scout's reading, and a planet's temperature with the same word at both ends given as the one word (and a range as a range) (about 25 s) |
@@ -292,7 +293,7 @@ What the probe does:
 | `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 | `combatmessages` | the combat messages are the original's: WEAPONS NOT ARMED, NO TARGET PRESENT, WEAPON NOT AVAILABLE and OUT OF FUEL! when a weapon cannot fire, nothing of the port's own when the player's shot hits, and LASER CLASS n (LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (243 scenarios, about 203 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (244 scenarios, about 204 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### The playthrough
 

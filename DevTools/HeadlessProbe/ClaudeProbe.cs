@@ -1126,6 +1126,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAlienShields();
 				break;
 
+			case "alienreadings":
+				yield return ScenarioAlienReadings();
+				break;
+
 			case "ancientsites":
 				yield return ScenarioAncientSites();
 				break;
@@ -26838,6 +26842,80 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "alienshields: turning neutral again, they raise their shields", toNeutral.Contains( "Captain, they've raised their shields." ) && !toNeutral.Contains( "weapons" ), toNeutral );
 
 		Finish( "scenario=alienshields", 0 );
+	}
+
+	// an alien ship's sensor readings fall with its damage, as the original's (SCIENCE WF39C, WF239): Bio and Energy read what is left of its armor and shields
+	// over its vessel's, at most 100, for a ship that carries life or has power, and a damaged ship with life gives 75 to 85% of that as its energy
+	IEnumerator ScenarioAlienReadings()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var sensors = controller.m_displayController.m_sensorsDisplay;
+		var bioField = typeof( SensorsDisplay ).GetField( "m_bioDensity", c_any );
+		var energyField = typeof( SensorsDisplay ).GetField( "m_mineralDensity", c_any );
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		var encounterId = FindEncounter( 1, 6, 3, 0 );
+
+		EnterEncounter( encounterId );
+		yield return Frames( 10 );
+
+		var alienIndex = FirstLivingAlien();
+
+		if ( alienIndex < 0 )
+		{
+			Finish( "scenario=alienreadings abort: no living alien ship in encounter " + encounterId, 2 );
+			yield break;
+		}
+
+		var alien = playerData.FindEncounter( encounterId ).GetAlienShipList()[ alienIndex ];
+		var vessel = gameData.m_vesselList[ alien.m_vesselId ];
+
+		// a scan of the ship: its Bio and Energy
+		Func<int[]> read = () =>
+		{
+			controller.m_displayController.ChangeDisplay( sensors );
+			controller.m_encounter.StartScanning( alienIndex + 1 );
+
+			return new[] { ( bioField != null ) ? (int) bioField.GetValue( sensors ) : -1, ( energyField != null ) ? (int) energyField.GetValue( sensors ) : -1 };
+		};
+
+		// ---- 1. the ship whole: the vessel's readings (a control)
+		alien.m_armorPoints = vessel.m_armor;
+		alien.m_shieldPoints = vessel.m_shields;
+
+		var whole = read();
+
+		yield return Frames( 5 );
+
+		// ---- 2. the ship at half its armor and shields: half the readings, and its energy at 75 to 85% of that if it carries life
+		alien.m_armorPoints = vessel.m_armor / 2;
+		alien.m_shieldPoints = vessel.m_shields / 2;
+
+		var share = Mathf.Min( 100, 100 * ( alien.m_armorPoints + alien.m_shieldPoints ) / Mathf.Max( 1, vessel.m_armor + vessel.m_shields ) );
+		var half = read();
+
+		yield return Frames( 5 );
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		var expectedBio = ( vessel.m_bioDensity != 0 ) ? share : 0;
+		var expectedEnergy = ( vessel.m_mineralDensity != 0 ) ? share : 0;
+		var energyRight = ( expectedBio > 0 ) ? ( ( half[ 1 ] >= expectedEnergy * 75 / 100 ) && ( half[ 1 ] <= expectedEnergy * 85 / 100 ) ) : ( half[ 1 ] == expectedEnergy );
+
+		Log( "alienreadings: " + vessel.m_object + " " + vessel.m_type + " (vessel " + alien.m_vesselId + ": armor " + vessel.m_armor + ", shields " + vessel.m_shields + ", bio " + vessel.m_bioDensity + ", energy " + vessel.m_mineralDensity + ") | whole: bio " + whole[ 0 ] + ", energy " + whole[ 1 ] + " | at half (" + share + "): bio " + half[ 0 ] + ", energy " + half[ 1 ] );
+
+		Check( "alienreadings: a whole ship reads its vessel's Bio and Energy (a control)", ( whole[ 0 ] == vessel.m_bioDensity ) && ( whole[ 1 ] == vessel.m_mineralDensity ), whole[ 0 ] + "/" + whole[ 1 ] );
+		Check( "alienreadings: at half its armor and shields the readings fall to half, its energy at 75 to 85% of that if it carries life", ( half[ 0 ] == expectedBio ) && energyRight && ( share < 100 ), "share " + share + ": bio " + half[ 0 ] + " (wanted " + expectedBio + "), energy " + half[ 1 ] + " (wanted " + expectedEnergy + ( ( expectedBio > 0 ) ? " x 75 to 85%" : "" ) + ")" );
+
+		Finish( "scenario=alienreadings checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 7: the ancient ruins STRINFO's editors place, with their Endurium
