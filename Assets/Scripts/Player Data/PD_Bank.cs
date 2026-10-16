@@ -63,10 +63,11 @@ public class PD_Bank
 	}
 
 	// the interest the balance has earned from the day it was last paid to this day, in whole M.U. as the original works it out (the balance times 12 over 100,
-	// then times the days over 300, each rounded down) - 0 for no days, and for a save file from before the interest, whose day is not known
+	// then times the days over 300, each rounded toward 0) - below 0 for a balance below 0, which is charged it (BANK-OV INT% works it out signed) - 0 for no
+	// days, and for a save file from before the interest, whose day is not known
 	public int GetInterestDue( int today )
 	{
-		if ( !m_interestDayIsSet || ( m_currentBalance <= 0 ) )
+		if ( !m_interestDayIsSet || ( m_currentBalance == 0 ) )
 		{
 			return 0;
 		}
@@ -80,6 +81,6 @@ public class PD_Bank
 
 		var interest = (long) m_currentBalance * c_interestPercent / 100 * days / PD_General.c_daysPerYear;
 
-		return (int) System.Math.Min( interest, int.MaxValue - (long) m_currentBalance );
+		return (int) System.Math.Max( System.Math.Min( interest, int.MaxValue - (long) m_currentBalance ), int.MinValue - (long) m_currentBalance );
 	}
 }
