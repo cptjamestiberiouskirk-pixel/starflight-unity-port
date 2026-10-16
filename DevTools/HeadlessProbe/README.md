@@ -4,6 +4,8 @@ A headless compile check and a play-mode probe for this project. They run Unity 
 
 Nothing in this folder is part of the game. It sits outside `Assets/`, so Unity neither compiles nor imports it. `probe.ps1` copies `ClaudeProbe.cs` into `Assets/` for one run and deletes it again, and `.gitignore` keeps that copy from ever being committed.
 
+Both scripts start Unity with `--burst-disable-compilation`. With Burst on, every run has Burst load an unsigned DLL it compiled into `Library/BurstCache/JIT/`, and on a computer where Smart App Control enforces its policy Windows blocks that DLL (Code Integrity event 3033, `error code 4551` in the Unity log) and shows a notice that is easily taken for the game being blocked. Burst only speeds up the experimental `TerrainJob` (used by `Test.unity`, not a build scene), so a scenario runs the same without it. The argument is used rather than the environment variable `UNITY_BURST_DISABLE_COMPILATION` because the variable also reaches the script compiler and switches off Burst's IL post-processing there, and the next Editor that runs the project with Burst on then recompiles every script assembly from scratch. Start any other headless Unity on this project with the argument too.
+
 ## Requirements
 
 - Windows with PowerShell 7.

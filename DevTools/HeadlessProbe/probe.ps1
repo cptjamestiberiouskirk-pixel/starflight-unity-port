@@ -43,7 +43,9 @@ Copy-Item -LiteralPath $probeSource -Destination $probeTarget -Force
 
 try {
 	$sw = [Diagnostics.Stopwatch]::StartNew()
-	$unityArgs = @('-batchmode')
+	# Burst stays off: its JIT writes unsigned DLLs to Library\BurstCache\JIT, which Smart App Control blocks
+	# (Code Integrity event 3033), and only the experimental TerrainJob of Test.unity uses it
+	$unityArgs = @('-batchmode', '--burst-disable-compilation')
 	if (-not $Graphics) { $unityArgs += '-nographics' }
 	$unityArgs += '-projectPath', "`"$proj`"", '-logFile', "`"$log`"", '-executeMethod', 'ClaudeProbe.Run', '-probeScenario', $Scenario
 	$p = Start-Process -FilePath $unity -ArgumentList $unityArgs -PassThru

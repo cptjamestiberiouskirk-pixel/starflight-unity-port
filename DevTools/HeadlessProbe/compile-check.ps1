@@ -28,7 +28,8 @@ New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 $log = Join-Path $logDir "$Name.log"
 
 $sw = [Diagnostics.Stopwatch]::StartNew()
-$p = Start-Process -FilePath $unity -ArgumentList '-batchmode', '-nographics', '-quit', '-projectPath', "`"$proj`"", '-logFile', "`"$log`"" -Wait -PassThru
+# Burst stays off, as in probe.ps1: Smart App Control blocks the unsigned DLLs its JIT writes to Library\BurstCache\JIT
+$p = Start-Process -FilePath $unity -ArgumentList '-batchmode', '-nographics', '--burst-disable-compilation', '-quit', '-projectPath', "`"$proj`"", '-logFile', "`"$log`"" -Wait -PassThru
 
 "unity exit=$($p.ExitCode) elapsed=$([int]$sw.Elapsed.TotalSeconds)s log=$log"
 
