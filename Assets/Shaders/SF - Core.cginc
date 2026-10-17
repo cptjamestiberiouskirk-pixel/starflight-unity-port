@@ -133,6 +133,37 @@ SF_VertexShaderOutput ComputeVertexShaderOutput( SF_VertexShaderInput v )
 	return o;
 }
 
+#if SF_GROUND_DETAIL
+
+// the grain of the ground up close, for the terrain grid only (GroundGrain, GroundDetail): a seamless grey texture laid over the planet's albedo map at two
+// scales in world space, fading out with distance from the camera and kept off water. x: strength (0 leaves the ground as it was), y and z: the fine and the
+// coarse scale (repeats a world unit), w: the distance it fades out at
+sampler2D SF_GroundGrainMap;
+float4 SF_GroundGrainParams;
+
+float ComputeGroundGrain( SF_VertexShaderOutput i )
+{
+	// full strength out to half the fade distance (the camera looks down on the vehicle from about 106 units), then fading out
+	float distanceToCamera = distance( i.positionWorld.xyz, _WorldSpaceCameraPos );
+	float fade = 1 - smoothstep( 0.5 * SF_GroundGrainParams.w, SF_GroundGrainParams.w, distanceToCamera );
+	float strength = SF_GroundGrainParams.x * fade;
+
+	#if SF_WATERMASKMAP_ON
+
+		strength *= 1 - tex2D( SF_WaterMaskMap, TRANSFORM_TEX( i.texCoord0, SF_WaterMaskMap ) ).r;
+
+	#endif // SF_WATERMASKMAP_ON
+
+	// grit (red) drawn small, pebbles with dark cracks between them (green) drawn larger
+	float grit = tex2D( SF_GroundGrainMap, i.positionWorld.xz * SF_GroundGrainParams.y ).r;
+	float pebbles = tex2D( SF_GroundGrainMap, i.positionWorld.xz * SF_GroundGrainParams.z + 0.37 ).g;
+
+	// about 1 on average, so the ground keeps its colour and brightness
+	return lerp( 1, ( 0.55 + 0.9 * grit ) * ( 0.35 + 0.8 * pebbles ) * 1.1, strength );
+}
+
+#endif // SF_GROUND_DETAIL
+
 float4 ComputeAlbedo( SF_VertexShaderOutput i, float4 albedoColor )
 {
 	#if SF_ALBEDOMAP_ON
@@ -180,6 +211,12 @@ float4 ComputeAlbedo( SF_VertexShaderOutput i, float4 albedoColor )
 		float depthFadeAmount = 1;
 
 	#endif // SF_DEPTHFADE_ON
+
+	#if SF_GROUND_DETAIL
+
+		albedoMap.rgb *= ComputeGroundGrain( i );
+
+	#endif // SF_GROUND_DETAIL
 
 	return i.color * albedoColor * albedoMap * detailAlbedoMap * float4( 1, 1, 1, depthFadeAmount );
 }

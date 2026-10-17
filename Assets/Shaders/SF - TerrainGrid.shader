@@ -25,6 +25,10 @@ Shader "Starflight/Terrain Grid"
 		SF_DetailNormalMap( "Detail Normal Map", 2D ) = "bump" {}
 		SF_DetailNormalMapStrength( "Detail Normal Map Strength", Range( 0, 10 ) ) = 1
 
+		// the grain of the ground up close (GroundGrain sets them; a material keeps only the textures its shader declares)
+		SF_GroundGrainMap( "Ground Grain Map", 2D ) = "gray" {}
+		SF_GroundGrainParams( "Ground Grain (strength, fine scale, coarse scale, fade distance)", Vector ) = ( 0, 0.1667, 0.0345, 1 )
+
 		SF_EmissiveMap( "Emissive Map", 2D ) = "black" {}
 		SF_EmissiveTint( "Emissive Tint", Color ) = ( 1, 1, 1, 1 )
 		SF_EmissiveColor( "Emissive Color", Color ) = ( 0, 0, 0, 1 )
@@ -135,6 +139,9 @@ Shader "Starflight/Terrain Grid"
 		
 				#define SF_WATER_ON 1
 
+				// the grain of the ground up close (GroundGrain)
+				#define SF_GROUND_DETAIL 1
+
 				#include "SF - TerrainGrid.cginc"
 				#include "SF - Deferred.cginc"
 
@@ -181,6 +188,9 @@ Shader "Starflight/Terrain Grid"
 				#pragma fragment fragForwardBase_SF
 			
 				#define SF_WATER_ON 1
+
+				// the grain of the ground up close (GroundGrain)
+				#define SF_GROUND_DETAIL 1
 
 				#include "SF - TerrainGrid.cginc"
 				#include "SF - ForwardBase.cginc"

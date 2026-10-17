@@ -58,6 +58,11 @@ public class Disembarked : MonoBehaviour
 		if ( m_terrainGrid != null )
 		{
 			m_terrainGrid.SetDetail( GroundDetail.GetGridDetail(), GroundDetail.GetGridRings() );
+
+			// the grain of the ground up close (none at Low)
+			var grainStrength = GroundGrain.GetStrength();
+
+			m_terrainGrid.SetGrain( ( grainStrength > 0.0f ) ? GroundGrain.Get() : null, grainStrength, GroundGrain.GetFadeDistance() );
 		}
 	}
 
