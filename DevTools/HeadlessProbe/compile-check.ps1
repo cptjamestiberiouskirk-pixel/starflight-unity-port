@@ -28,10 +28,17 @@ New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 $log = Join-Path $logDir "$Name.log"
 
 $sw = [Diagnostics.Stopwatch]::StartNew()
+# an earlier run's log of this name would be read as this run's if Unity wrote none, as in probe.ps1
+if (Test-Path -LiteralPath $log) { Remove-Item -LiteralPath $log -Force -ErrorAction Stop }
 # Burst stays off, as in probe.ps1: Smart App Control blocks the unsigned DLLs its JIT writes to Library\BurstCache\JIT
 $p = Start-Process -FilePath $unity -ArgumentList '-batchmode', '-nographics', '--burst-disable-compilation', '-quit', '-projectPath', "`"$proj`"", '-logFile', "`"$log`"" -Wait -PassThru
 
 "unity exit=$($p.ExitCode) elapsed=$([int]$sw.Elapsed.TotalSeconds)s log=$log"
+
+if (-not (Test-Path -LiteralPath $log)) {
+	"no log written: unity exit=$($p.ExitCode)"
+	exit 1
+}
 
 "--- compiler / package errors ---"
 $errs = Select-String -LiteralPath $log -Pattern 'error CS\d+|Scripts have compiler errors|Aborting batchmode|An error occurred while resolving packages|\[Package Manager\].*(error|cannot|failed)|Assembly with name .* already exists'
