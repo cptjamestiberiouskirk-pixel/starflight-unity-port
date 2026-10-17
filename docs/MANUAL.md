@@ -308,7 +308,7 @@ The vehicle's hold takes 50 cubic meters.
 
 ### Getting back
 
-Drive back to the ship and stop beside it, within half a kilometer. The vehicle is refuelled and everything in its hold moves into the ship's cargo pods. Then Command, **Launch**, **Yes** takes the ship back into orbit.
+Drive back to the ship and stop within 3 km of it. Right after you disembark, only a stop beside the ship (within half a kilometer) takes you back in, so you can stop near the ship on your way out without being pulled back aboard. The vehicle is refuelled and everything in its hold moves into the ship's cargo pods. Then Command, **Launch**, **Yes** takes the ship back into orbit.
 
 ### Hazards on the surface
 
