@@ -41270,14 +41270,15 @@ public class ClaudeProbe : MonoBehaviour
 	}
 
 	// holds a direction (turning round a circle, so the ship stays in the encounter) and samples the ship's path speed over the half seconds that end at the given
-	// times of game time
+	// times of game time: the path of the frames that end in the window over the time those frames took (a frame that began before the window counts its whole
+	// path and its whole time, so the speed is right whatever the frames' lengths)
 	static IEnumerator MeasurePlayerSpeeds( float[] times, float[] speeds )
 	{
 		var controller = SpaceflightController.m_instance;
 		var general = DataController.m_instance.m_playerData.m_general;
 		var start = Time.time;
 		var last = general.m_coordinates;
-		var window = new List<KeyValuePair<float, float>>();
+		var window = new List<KeyValuePair<float, Vector2>>();
 
 		controller.m_playerShip.TurnOnEngines();
 
@@ -41291,22 +41292,24 @@ public class ClaudeProbe : MonoBehaviour
 
 				yield return null;
 
-				window.Add( new KeyValuePair<float, float>( Time.time - start, Vector3.Distance( general.m_coordinates, last ) ) );
+				window.Add( new KeyValuePair<float, Vector2>( Time.time - start, new Vector2( Vector3.Distance( general.m_coordinates, last ), Time.deltaTime ) ) );
 				last = general.m_coordinates;
 			}
 
 			var path = 0.0f;
+			var took = 0.0f;
 			var from = times[ i ] - 0.5f;
 
 			foreach ( var kv in window )
 			{
 				if ( kv.Key > from )
 				{
-					path += kv.Value;
+					path += kv.Value.x;
+					took += kv.Value.y;
 				}
 			}
 
-			speeds[ i ] = path / 0.5f;
+			speeds[ i ] = ( took > 0.0f ) ? path / took : 0.0f;
 		}
 	}
 
