@@ -41324,6 +41324,10 @@ public class ClaudeProbe : MonoBehaviour
 		controller.m_encounterRange = 0.0f;
 		SetSystemHealth( 0, 100 );
 
+		// game time a sixtieth of a second a frame, however slowly the frames come: the speeds are measured over windows of game time, and one long frame under
+		// load (another Unity running, up to Time.maximumDeltaTime) counted its whole path in a window it only ended in (755 for 640 in a full run, 641 alone)
+		Time.captureDeltaTime = 1.0f / 60.0f;
+
 		// ---- 1. Spemin encounter 96, one ship
 		EnterEncounter( 96 );
 		yield return Frames( 5 );
@@ -41381,6 +41385,8 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "encounterspeeds: the player's ship moves a cell a pass at first and a cell more every 14 passes with 7 G (320, 640, 960: HYPER-OV ACCELERATE)", ( Mathf.Abs( oneShipSpeeds[ 0 ] - 320.0f ) < 25.0f ) && ( Mathf.Abs( oneShipSpeeds[ 1 ] - 640.0f ) < 40.0f ) && ( Mathf.Abs( oneShipSpeeds[ 2 ] - 960.0f ) < 60.0f ), oneShipSpeeds[ 0 ].ToString( "F0" ) + " / " + oneShipSpeeds[ 1 ].ToString( "F0" ) + " / " + oneShipSpeeds[ 2 ].ToString( "F0" ) );
 		Check( "encounterspeeds: with three alien ships the step stops at 2 cells (640: HYPER-OV #VES-SPEED)", Mathf.Abs( threeShipSpeeds[ 0 ] - 640.0f ) < 40.0f, threeShipSpeeds[ 0 ].ToString( "F0" ) );
 		Check( "encounterspeeds: with no direction held the ship stops at once", stopped < 0.1f, stopped.ToString( "F1" ) );
+
+		Time.captureDeltaTime = 0.0f;
 
 		Finish( "scenario=encounterspeeds alien=" + one[ 0 ].ToString( "F0" ) + "/" + three[ 0 ].ToString( "F0" ), 0 );
 	}
