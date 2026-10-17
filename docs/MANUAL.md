@@ -58,7 +58,7 @@ Read the notices in Operations before every launch. The first ones give your ord
 | Switch | Change to another slot. An empty slot starts a new game. |
 | Copy | Copy the active game into another slot. |
 | Reset | Start the active slot over as a new game. |
-| Colors | Pick one of 15 color schemes, each in a dark and a light mode, and whether the planets are drawn in natural colors (Natural) or as they first looked in this port (Original). The choice applies at once and is remembered on this computer. |
+| Colors | Pick one of 15 color schemes, each in a dark and a light mode, whether the planets are drawn in natural colors (Natural) or as they first looked in this port (Original), and how much detail the ground has when you are out in the terrain vehicle (Ground: Auto picks it for your graphics card; Low, Medium or High set it). The choices apply at once and are remembered on this computer. |
 | Resume | Close the panel and play on. |
 | Quit | Save and leave the game. |
 
