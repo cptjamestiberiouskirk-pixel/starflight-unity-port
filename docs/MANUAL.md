@@ -293,7 +293,7 @@ Once landed, Command, **Disembark** sends the crew out in the terrain vehicle, r
 | **Cargo** | Acts on what is next to the vehicle (see below); otherwise lists the vehicle's cargo, which you can **Drop**. |
 | **Look** | Describes the sky, temperature, gravity, atmosphere, water and terrain, and anything close by. |
 | **Scan** | Reads the mineral and life density, lists the planet's elements and labels the objects nearby. |
-| **Weapon** | **Fire** at the nearest lifeform, **Switch** between the laser and the stunner. Every shot uses some of the vehicle's fuel, the laser twice as much as the stunner. |
+| **Tools** | **Mine** cuts the nearest mineral deposit into the hold with the mining laser (see below). **Fire** at the nearest lifeform, **Switch** between the laser and the stunner. Every shot uses some of the vehicle's fuel, the laser twice as much as the stunner. |
 
 The vehicle's status display shows its fuel, its efficiency, how full its hold is, the crew's health and **the ship's distance and direction** from you.
 
@@ -302,7 +302,9 @@ The vehicle's status display shows its fuel, its efficiency, how full its hold i
 - **Ruins**: records any message they hold in the ship's log, and takes anything that can be carried.
 - **Cargo you dropped**: picks it up again.
 - **A lifeform**: **Capture** it into stasis, **Record** its data, or **Ignore** it.
-- **A mineral deposit**: loads it. A deposit holds between 1.0 and 9.9 cubic meters.
+- **A mineral deposit**: names it and how much it holds. To take it, use Tools, **Mine**.
+
+**Mine** aims the mining laser at the nearest deposit within reach and cuts it into the hold a tenth of a cubic meter at a time, on the vehicle's fuel. A deposit holds between 1.0 and 9.9 cubic meters, and the largest takes about seven seconds. The laser stops when the deposit is gone, when the hold is full or the fuel runs out, or when you press Enter; what is left of a deposit stays for your next visit.
 
 The vehicle's hold takes 50 cubic meters.
 

@@ -1590,6 +1590,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSurveySensor();
 				break;
 
+			case "mininglaser":
+				yield return ScenarioMiningLaser();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -4712,7 +4716,7 @@ public class ClaudeProbe : MonoBehaviour
 		return ( elementReference == null ) ? 0 : elementReference.m_volume;
 	}
 
-	// ---------------------------------------------------------------- M10: a deposit can only be picked up once
+	// ---------------------------------------------------------------- M10: a deposit can only be mined once
 
 	IEnumerator ScenarioM10()
 	{
@@ -4776,41 +4780,37 @@ public class ClaudeProbe : MonoBehaviour
 		var elementId = deposit.m_elementId;
 		var volume = deposit.m_volume;
 		var cargoBefore = TerrainVehicleCargo( elementId );
+		var started = new bool[ 1 ];
 
-		// first press: the deposit goes into the cargo hold
-		new TVCargoButton().Execute();
+		// the mining laser cuts the deposit into the cargo hold (TVMineButton: 15 tenths a second, so a deposit of up to 9.9 cubic meters in under 7 s)
+		yield return MineWithTheLaser( 12.0f, started );
 
-		var cargoAfterFirstPress = TerrainVehicleCargo( elementId );
+		var firstStarted = started[ 0 ];
+		var cargoAfterFirstMining = TerrainVehicleCargo( elementId );
 		var firstMessage = MessageList();
+		var depositGone = ( deposit != null ) && deposit.HasBeenPickedUp() && !deposit.gameObject.activeSelf;
 
-		// second press half a second later, while the transporter effect is still playing (it takes 1.5 s)
-		yield return new WaitForSecondsRealtime( 0.5f );
+		// Mine again: the deposit is gone, so nothing is in reach
+		yield return MineWithTheLaser( 3.0f, started );
 
-		var depositStillThere = ( deposit != null );
-
-		new TVCargoButton().Execute();
-
-		var cargoAfterSecondPress = TerrainVehicleCargo( elementId );
+		var secondStarted = started[ 0 ];
+		var cargoAfterSecondMining = TerrainVehicleCargo( elementId );
 		var secondMessage = MessageList();
 
-		// third press after the effect has finished and the deposit is gone
-		yield return new WaitForSecondsRealtime( 2.5f );
-
-		var depositGone = ( deposit == null );
-
+		// and Cargo takes nothing either
 		new TVCargoButton().Execute();
 
-		var cargoAfterThirdPress = TerrainVehicleCargo( elementId );
+		var cargoAfterCargo = TerrainVehicleCargo( elementId );
 
-		Log( "M10 " + deposits.Length + " deposits on the planet; the one next to the vehicle is " + volume + " cubic meters of element " + elementId + ". Cargo of that element: before " + cargoBefore + ", after the first press " + cargoAfterFirstPress + ", after a second press 0.5 s later " + cargoAfterSecondPress + " (deposit object still there: " + depositStillThere + "), after a third press 3 s later " + cargoAfterThirdPress + " (deposit object gone: " + depositGone + ")" );
-		Log( "M10 message after the first press: " + firstMessage );
-		Log( "M10 message after the second press: " + secondMessage );
+		Log( "M10 " + deposits.Length + " deposits on the planet; the one next to the vehicle is " + volume + " tenths of a cubic meter of element " + elementId + ". Cargo of that element: before " + cargoBefore + ", after mining it " + cargoAfterFirstMining + " (the laser ran " + firstStarted + ", deposit gone " + depositGone + "), after Mine again " + cargoAfterSecondMining + " (the laser ran " + secondStarted + "), after Cargo " + cargoAfterCargo );
+		Log( "M10 message after mining: " + firstMessage );
+		Log( "M10 message after Mine again: " + secondMessage );
 
-		Check( "M10 the first press picks the deposit up", cargoAfterFirstPress == cargoBefore + volume, "cargo " + cargoBefore + " -> " + cargoAfterFirstPress + " for a deposit of " + volume );
-		Check( "M10 a second press during the transporter effect does not pick it up again", depositStillThere && ( cargoAfterSecondPress == cargoAfterFirstPress ), "deposit object still there " + depositStillThere + ", cargo " + cargoAfterFirstPress + " -> " + cargoAfterSecondPress );
-		Check( "M10 the deposit is gone once the effect has finished", depositGone && ( cargoAfterThirdPress == cargoAfterSecondPress ), "deposit object gone " + depositGone + ", cargo " + cargoAfterSecondPress + " -> " + cargoAfterThirdPress );
+		Check( "M10 the mining laser takes the whole deposit into the hold", firstStarted && ( cargoAfterFirstMining == cargoBefore + volume ), "cargo " + cargoBefore + " -> " + cargoAfterFirstMining + " for a deposit of " + volume );
+		Check( "M10 Mine again does not take it again: nothing is in reach", !secondStarted && ( cargoAfterSecondMining == cargoAfterFirstMining ), "the laser ran " + secondStarted + ", cargo " + cargoAfterFirstMining + " -> " + cargoAfterSecondMining );
+		Check( "M10 the deposit is gone, and Cargo takes nothing", depositGone && ( cargoAfterCargo == cargoAfterSecondMining ), "deposit gone " + depositGone + ", cargo " + cargoAfterSecondMining + " -> " + cargoAfterCargo );
 
-		Finish( "scenario=m10 deposit=" + volume + " cargo=" + cargoBefore + "/" + cargoAfterFirstPress + "/" + cargoAfterSecondPress + "/" + cargoAfterThirdPress + " depositStillThereAtSecondPress=" + depositStillThere + " depositGoneAtThirdPress=" + depositGone + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+		Finish( "scenario=m10 deposit=" + volume + " cargo=" + cargoBefore + "/" + cargoAfterFirstMining + "/" + cargoAfterSecondMining + "/" + cargoAfterCargo + " depositGone=" + depositGone + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- M23: the console is locked while the ship is landing
@@ -8139,13 +8139,17 @@ public class ClaudeProbe : MonoBehaviour
 		first.m_volume = 3;
 		first.transform.position = BesideTheVehicle( terrainVehicle );
 
-		new TVCargoButton().Execute();
+		yield return Frames( 3 );
+
+		// the mining laser cuts it into the hold (TVMineButton)
+		var started = new bool[ 1 ];
+
+		yield return MineWithTheLaser( 5.0f, started );
 
 		var pickupMessage = MessageList();
 		var cargoAfterFirst = TerrainVehicleCargo( first.m_elementId );
 
-		// the transporter effect of the first deposit takes 1.5 seconds
-		yield return new WaitForSecondsRealtime( 2.5f );
+		yield return Frames( 3 );
 
 		messages.Clear();
 
@@ -8153,10 +8157,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		var contents = MessageList();
 
-		Log( "cargo: picking up a deposit of 3 tenths of a cubic meter: " + pickupMessage + " (in the hold now: " + cargoAfterFirst + " tenths)" );
+		Log( "cargo: mining a deposit of 3 tenths of a cubic meter: " + pickupMessage + " (in the hold now: " + cargoAfterFirst + " tenths)" );
 		Log( "cargo: the cargo list of the terrain vehicle: " + contents );
 
-		Check( "cargo: the pickup message gives the volume in cubic meters", ( cargoAfterFirst == 3 ) && pickupMessage.Contains( "Picked up 0.3 cubic meters" ), "in the hold " + cargoAfterFirst + " tenths | " + pickupMessage );
+		Check( "cargo: the mining message gives the volume in cubic meters", ( cargoAfterFirst == 3 ) && pickupMessage.Contains( "Mined 0.3 cubic meters" ), "in the hold " + cargoAfterFirst + " tenths | " + pickupMessage );
 		Check( "cargo: the terrain vehicle's cargo list shows cubic meters", contents.Contains( ": 0.3 m" ) && contents.Contains( "Capacity: 0.3/" + ( gameData.m_misc.m_terrainVehicleVolume / 10 ) + "." + ( gameData.m_misc.m_terrainVehicleVolume % 10 ) + " m" ), contents );
 
 		// ---- 4. a deposit that does not fit: fill the hold up to its last tenth of a cubic meter, then try a deposit of 4 tenths
@@ -8169,18 +8173,19 @@ public class ClaudeProbe : MonoBehaviour
 
 		var cargoBefore = TerrainVehicleCargo( second.m_elementId );
 
-		new TVCargoButton().Execute();
+		yield return Frames( 3 );
+		yield return MineWithTheLaser( 5.0f, started );
 
 		var partialMessage = MessageList();
 		var cargoAfterPartial = TerrainVehicleCargo( second.m_elementId );
 
-		yield return new WaitForSecondsRealtime( 2.5f );
+		yield return Frames( 3 );
 
-		var secondIsStillThere = ( second != null );
-		var secondVolume = secondIsStillThere ? second.m_volume : -1;
+		var secondIsStillThere = ( second != null ) && second.gameObject.activeSelf && !second.HasBeenPickedUp();
+		var secondVolume = ( second != null ) ? second.m_volume : -1;
 
 		// and once more with the hold full
-		new TVCargoButton().Execute();
+		yield return MineWithTheLaser( 5.0f, started );
 
 		var fullMessage = MessageList();
 		var cargoAfterFull = TerrainVehicleCargo( second.m_elementId );
@@ -9328,8 +9333,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		// ---- 3. an object at the very right edge of the map (Random.Range can return its upper limit, which is the width of the map)
 		var edge = Tools.MapToWorldCoordinates( planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight * 0.5f, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
-		var addToSpawnList = typeof( TerrainGridPopulator ).GetMethod( "AddToSpawnList", c_any );
-		var overlapsSomething = typeof( TerrainGridPopulator ).GetMethod( "OverlapsSomething", c_any );
+		// (the one taking only the position: the survey from orbit added overloads with the planet's generator and spawn lists, and a lookup by name alone threw)
+		var addToSpawnList = typeof( TerrainGridPopulator ).GetMethod( "AddToSpawnList", c_any, null, new Type[] { typeof( Vector3 ) }, null );
+		var overlapsSomething = typeof( TerrainGridPopulator ).GetMethod( "OverlapsSomething", c_any, null, new Type[] { typeof( Vector3 ) }, null );
 		var edgeResult = "added";
 
 		try
@@ -9381,8 +9387,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		var scanBefore = MessageList();
 
-		// pick the near one up (its transporter effect takes a second and a half) and scan again at once
-		new TVCargoButton().Execute();
+		// cut the near one into the hold with the mining laser (a small deposit, a third of a second) and scan again at once
+		near.m_volume = 5;
+
+		var started = new bool[ 1 ];
+
+		yield return MineWithTheLaser( 5.0f, started );
 
 		var pickupMessage = MessageList();
 
@@ -9395,12 +9405,12 @@ public class ClaudeProbe : MonoBehaviour
 		var labelsInTheVehicle = LabelsShowing();
 
 		Log( "terrain: scan with " + nearName + " 8 away and " + farName + " 20 away: " + scanBefore );
-		Log( "terrain: pickup: " + pickupMessage + " | scan right after it: " + scanDuring );
+		Log( "terrain: mined: " + pickupMessage + " | scan right after it: " + scanDuring );
 
 		var countedBefore = scanBefore.Contains( expectedBefore );
 		var countedDuring = ( nearName == farName ) ? !scanDuring.Contains( nearName + " deposit: 1" ) : scanDuring.Contains( nearName + " deposit" );
 
-		Check( "terrain: a scan does not count a deposit that has just been picked up", countedBefore && pickupMessage.Contains( "Picked up" ) && !countedDuring, "before: counted " + countedBefore + "; right after the pickup: still counted " + countedDuring );
+		Check( "terrain: a scan does not count a deposit that has just been mined out", countedBefore && pickupMessage.Contains( "Mined" ) && !countedDuring, "before: counted " + countedBefore + "; right after the mining: still counted " + countedDuring );
 
 		// back into the ship
 		controller.SwitchLocation( PD_General.Location.Planetside );
@@ -10785,10 +10795,11 @@ public class ClaudeProbe : MonoBehaviour
 			RenderWholeFramePicture( camera, System.IO.Path.Combine( folder, "t0000ms.png" ) );
 		}
 
-		// ---- pick it up: the transporter effect takes a second and a half, then the object is gone
+		// ---- beam it away: the transporter effect takes a second and a half, then the object is gone (Cargo played it on a deposit it picked up until the mining
+		// laser took over on 2026-10-17; the effect is played on the deposit here, as the game played it)
 		var errorsBefore = s_errorCount;
 
-		new TVCargoButton().Execute();
+		near.gameObject.AddComponent<TransporterEffect>().Play();
 
 		var start = Time.frameCount;
 		var pictures = 0;
@@ -13211,12 +13222,14 @@ public class ClaudeProbe : MonoBehaviour
 			yield break;
 		}
 
-		// ---- 1. the materials of a deposit that is picked up: its transporter effect used to make its own copies of them (and had to destroy them); it uses the shared effect materials now and copies none
+		// ---- 1. the materials of a transporter effect: it used to make its own copies of them (and had to destroy them); it uses the shared effect materials now and
+		// copies none (Cargo played it on a deposit it picked up until the mining laser took over on 2026-10-17, so it is played on the deposit here)
 		yield return Frames( 5 );
 
+		var deposits = SpaceflightController.m_instance.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true );
 		var materialsBefore = MaterialCount();
 
-		new TVCargoButton().Execute();
+		deposits[ 0 ].gameObject.AddComponent<TransporterEffect>().Play();
 
 		yield return Frames( 5 );
 
@@ -13230,6 +13243,35 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "leaks: materials in memory: " + materialsBefore + " before the pickup, " + materialsDuring + " during the transporter effect, " + materialsAfter + " after the deposit is gone" );
 
 		Check( "leaks: a transporter effect leaves no materials behind", materialsAfter <= materialsBefore, materialsBefore + " before, " + materialsDuring + " during, " + materialsAfter + " after" );
+
+		// ---- 1b. the mining laser's beam is drawn with the shared effect materials too, and cutting a deposit makes none
+		var materialsBeforeMining = MaterialCount();
+		var mined = false;
+
+		if ( deposits.Length > 1 )
+		{
+			deposits[ 1 ].m_volume = 5;
+			deposits[ 1 ].transform.position = BesideTheVehicle( SpaceflightController.m_instance.m_terrainVehicle );
+
+			yield return Frames( 3 );
+
+			var started = new bool[ 1 ];
+
+			yield return MineWithTheLaser( 5.0f, started );
+
+			mined = started[ 0 ];
+		}
+
+		yield return Frames( 5 );
+
+		var materialsAfterMining = MaterialCount();
+
+		Log( "leaks: materials in memory: " + materialsBeforeMining + " before the mining laser cut a deposit, " + materialsAfterMining + " after (the laser ran " + mined + ")" );
+
+		Check( "leaks: the mining laser leaves no materials behind", mined && ( materialsAfterMining <= materialsBeforeMining ), materialsBeforeMining + " before, " + materialsAfterMining + " after, the laser ran " + mined );
+
+		// (the scenario's own hold on the deposits goes, or it would keep the scene's objects in memory through them for the check below)
+		deposits = null;
 
 		// ---- 2. leaving the spaceflight scene. The save panel is opened and closed first, as a player who saves does (the panel lives in the persistent scene)
 		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.Planetside );
@@ -14106,7 +14148,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "deposits: the deposits are where they were (the placement checksum of the deposits of 1 to 5 cubic meters)", placement == 789127093L, placement.ToString() );
 		Check( "deposits: every deposit holds 1.0 to 9.9 cubic meters in tenths, as the original's", ( outside == 0 ) && ( largest > 50 ) && ( notWholeCubicMeters > 0 ), "from " + Tools.VolumeToText( smallest ) + " to " + Tools.VolumeToText( largest ) + " cubic meters, " + outside + " of " + deposits.Length + " outside 1.0 to 9.9, " + notWholeCubicMeters + " not whole cubic meters" );
 
-		// ---- 2. pick one up with the real button: what the message says and what arrives in the hold
+		// ---- 2. mine one with the real button (the mining laser, TVMineButton): what the message says and what arrives in the hold
 		foreach ( var other in deposits )
 		{
 			if ( Vector3.Distance( other.transform.position, terrainVehicle.transform.position ) < 50.0f )
@@ -14120,16 +14162,21 @@ public class ClaudeProbe : MonoBehaviour
 
 		first.transform.position = BesideTheVehicle( terrainVehicle );
 
-		new TVCargoButton().Execute();
+		yield return Frames( 3 );
+
+		var started = new bool[ 1 ];
+
+		yield return MineWithTheLaser( 12.0f, started );
 
 		var pickupMessage = MessageList();
 		var cargoAfterFirst = TerrainVehicleCargo( first.m_elementId );
 
-		Log( "deposits: picking up a deposit of " + firstVolume + " tenths: " + pickupMessage + " (in the hold now: " + cargoAfterFirst + " tenths)" );
+		Log( "deposits: mining a deposit of " + firstVolume + " tenths: " + pickupMessage + " (in the hold now: " + cargoAfterFirst + " tenths)" );
 
-		Check( "deposits: the pickup message and the hold agree on the deposit's volume", ( firstVolume >= 10 ) && ( cargoAfterFirst == firstVolume ) && pickupMessage.Contains( "Picked up " + Tools.VolumeToText( firstVolume ) + " cubic meters of " ), "deposit " + firstVolume + " tenths, hold " + cargoAfterFirst + " tenths | " + pickupMessage );
+		Check( "deposits: the mining message and the hold agree on the deposit's volume", ( firstVolume >= 10 ) && ( cargoAfterFirst == firstVolume ) && pickupMessage.Contains( "Mined " + Tools.VolumeToText( firstVolume ) + " cubic meters of " ), "deposit " + firstVolume + " tenths, hold " + cargoAfterFirst + " tenths | " + pickupMessage );
 
-		// ---- 3. how many deposits it takes to fill the terrain vehicle's hold (one deposit after the other next to the vehicle, real button)
+		// ---- 3. how many deposits it takes to fill the terrain vehicle's hold (one deposit after the other next to the vehicle, the real button; the laser cuts 15
+		// tenths a second, so the hold of 50 cubic meters takes about half a minute)
 		var holdSize = gameData.m_misc.m_terrainVehicleVolume;
 		var pickups = 1;
 		var lastMessage = "";
@@ -14138,7 +14185,8 @@ public class ClaudeProbe : MonoBehaviour
 		{
 			deposits[ i ].transform.position = BesideTheVehicle( terrainVehicle );
 
-			new TVCargoButton().Execute();
+			yield return Frames( 2 );
+			yield return MineWithTheLaser( 12.0f, started );
 
 			lastMessage = MessageList();
 
@@ -14153,14 +14201,15 @@ public class ClaudeProbe : MonoBehaviour
 		// one more press with the hold full and a fresh deposit in reach
 		deposits[ deposits.Length - 1 ].transform.position = BesideTheVehicle( terrainVehicle );
 
-		new TVCargoButton().Execute();
+		yield return Frames( 2 );
+		yield return MineWithTheLaser( 5.0f, started );
 
 		var fullMessage = MessageList();
 		var holdUsedAfterFull = holdSize - playerData.m_terrainVehicle.GetRemainingVolume();
 
 		deposits[ deposits.Length - 1 ].transform.position += Vector3.right * 1000.0f;
 
-		Log( "deposits: the hold of " + Tools.VolumeToText( holdSize ) + " cubic meters was full after " + pickups + " deposits (in it: " + Tools.VolumeToText( holdUsed ) + ") | last pickup: " + lastMessage + " | one more press: " + fullMessage );
+		Log( "deposits: the hold of " + Tools.VolumeToText( holdSize ) + " cubic meters was full after " + pickups + " deposits (in it: " + Tools.VolumeToText( holdUsed ) + ") | last mining: " + lastMessage + " | one more press: " + fullMessage );
 
 		Check( "deposits: the terrain vehicle's hold is full after 5 to 50 deposits, and never over full", ( holdUsed == holdSize ) && ( holdUsedAfterFull == holdSize ) && ( pickups >= 5 ) && ( pickups <= 50 ) && fullMessage.Contains( "full" ), pickups + " deposits, " + Tools.VolumeToText( holdUsed ) + " of " + Tools.VolumeToText( holdSize ) + " cubic meters, after one more press " + Tools.VolumeToText( holdUsedAfterFull ) );
 
@@ -16736,11 +16785,14 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		// ---- 1. all of the first deposit, through the real Cargo button
+		// ---- 1. all of the first deposit, through the real Mine button (the mining laser cuts it into the hold)
 		whole.transform.position = BesideTheVehicle( terrainVehicle );
 
-		new TVCargoButton().Execute();
+		yield return Frames( 3 );
 
+		var started = new bool[ 1 ];
+
+		yield return MineWithTheLaser( 12.0f, started );
 		yield return Frames( 5 );
 
 		var wholeTaken = whole.HasBeenPickedUp();
@@ -16752,8 +16804,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		part.transform.position = BesideTheVehicle( terrainVehicle );
 
-		new TVCargoButton().Execute();
-
+		yield return Frames( 3 );
+		yield return MineWithTheLaser( 12.0f, started );
 		yield return Frames( 5 );
 
 		var partLeft = part.m_volume;
@@ -31051,21 +31103,21 @@ public class ClaudeProbe : MonoBehaviour
 			PressButton( ButtonController.ButtonSet.TerrainVehicleLifeform, 2 );
 		}
 
-		// ---- Weapon: the weapon buttons, then a laser shot (starflt_185)
+		// ---- Weapon (Tools since the mining laser): the weapon buttons, then a laser shot (starflt_185); pressed by label, as Mine comes first since 2026-10-17
 		PressButton( ButtonController.ButtonSet.TerrainVehicle, 5 );
 
 		yield return Frames( 10 );
 
 		take( "weapon" );
 
-		PressButton( ButtonController.ButtonSet.TerrainVehicleWeapon, 0 );
+		PressButtonLabelled( ButtonController.ButtonSet.TerrainVehicleWeapon, "Fire" );
 
 		yield return Frames( 10 );
 
 		take( "weapon_fire" );
 
 		// Back
-		PressButton( ButtonController.ButtonSet.TerrainVehicleWeapon, 2 );
+		PressButtonLabelled( ButtonController.ButtonSet.TerrainVehicleWeapon, "Back" );
 
 		// ---- Cargo with 3 cubic meters of the planet's first element in the vehicle and nothing beside it: the cargo list (starflt_182, 189 to 191)
 		var terrainVehicle = controller.m_terrainVehicle;
@@ -36359,23 +36411,44 @@ public class ClaudeProbe : MonoBehaviour
 
 			yield return PtDrive( () => deposit.transform.position, 7.5f, 10.0f, driven );
 
-			// stop, and Cargo
+			// stop, then Tools and Mine: the mining laser cuts the deposit into the hold (TVMineButton, 15 tenths a second), and the stage waits while it runs
 			yield return Tap( Key.Enter );
 			yield return Frames( 5 );
 
 			var holdBefore = playerData.m_terrainVehicle.GetRemainingVolume();
 			var distance = Vector3.Distance( vehicle.transform.position, deposit.transform.position );
+			var depositVolume = deposit.m_volume;
 
 			controller.m_messages.Clear();
 
-			yield return PtPress( "Cargo" );
+			yield return PtPress( "Tools" );
+			yield return PtPress( "Mine" );
+
+			for ( var end = Time.realtimeSinceStartup + 9.0f; Time.realtimeSinceStartup < end; )
+			{
+				var current = GetField( controller.m_buttonController, "m_currentButton" );
+
+				if ( ( current == null ) || ( current.GetType().Name != "TVMineButton" ) )
+				{
+					break;
+				}
+
+				yield return null;
+			}
+
 			yield return Frames( 5 );
 
 			var said = PtMessages();
 
 			takenText.Add( said );
 
-			Log( "playthrough-3: drove " + driven[ 0 ].ToString( "F0" ) + " to a deposit of " + deposit.GetElementName() + " (" + deposit.m_volume + "), " + distance.ToString( "F1" ) + " away: Cargo says '" + said + "', the hold had " + holdBefore + " left, now " + playerData.m_terrainVehicle.GetRemainingVolume() + ", console " + PtLabels() );
+			// back to the vehicle's buttons
+			if ( PtIndexOf( "Back" ) >= 0 )
+			{
+				yield return PtPress( "Back" );
+			}
+
+			Log( "playthrough-3: drove " + driven[ 0 ].ToString( "F0" ) + " to a deposit of " + deposit.GetElementName() + " (" + depositVolume + "), " + distance.ToString( "F1" ) + " away: Mine says '" + said + "', the hold had " + holdBefore + " left, now " + playerData.m_terrainVehicle.GetRemainingVolume() + ", console " + PtLabels() );
 
 			if ( playerData.m_terrainVehicle.GetRemainingVolume() < holdBefore )
 			{
@@ -36395,7 +36468,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "playthrough-3: " + taken + " deposits taken, " + Vector3.Distance( startPlace, vehicle.transform.position ).ToString( "F0" ) + " from where the vehicle started; the terrain vehicle's hold: " + vehicleHold + " (" + vehicleVolume + " tenths), fuel " + playerData.m_terrainVehicle.GetPercentFuelRemaining() + "%" );
 
-		Check( "playthrough-3: the terrain vehicle drives to deposits and Cargo takes them", taken >= 2, taken + " taken: " + string.Join( " || ", takenText ) );
+		Check( "playthrough-3: the terrain vehicle drives to deposits and the mining laser takes them", taken >= 2, taken + " taken: " + string.Join( " || ", takenText ) );
 
 		// ---- 4. back to the ship: the cargo goes into the ship's hold
 		var mineralsBefore = PtMinerals();
@@ -41860,6 +41933,268 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "surveysensor: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=surveysensor strength=" + strengthBefore + "/" + strengthAfter + " gpu=" + ( withGraphics ? distanceWith.ToString( "F2" ) + "/" + distanceWithout.ToString( "F2" ) : "none" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the terrain vehicle's mining laser (TVMineButton, since 2026-10-17)
+
+	// cuts the deposit nearest the terrain vehicle into its hold with the mining laser, as the player does it: Tools, then Mine, waiting while the laser runs (at
+	// most limitSeconds of game time); started[ 0 ] tells whether the Mine button was there and began to cut (the code before the mining laser has none)
+	static IEnumerator MineWithTheLaser( float limitSeconds, bool[] started )
+	{
+		var buttonController = SpaceflightController.m_instance.m_buttonController;
+		var index = Array.IndexOf( ButtonSetLabels( ButtonController.ButtonSet.TerrainVehicleWeapon ).Split( ',' ), "Mine" );
+
+		started[ 0 ] = false;
+
+		if ( index < 0 )
+		{
+			yield break;
+		}
+
+		PressButton( ButtonController.ButtonSet.TerrainVehicleWeapon, index );
+
+		var mine = GetField( buttonController, "m_currentButton" );
+
+		started[ 0 ] = ( mine != null ) && ( mine.GetType().Name == "TVMineButton" );
+
+		for ( var end = Time.time + limitSeconds; started[ 0 ] && ( Time.time < end ) && ( GetField( buttonController, "m_currentButton" ) == mine ); )
+		{
+			yield return null;
+		}
+
+		// a laser still cutting at the limit is stopped, as the fire button stops it
+		if ( started[ 0 ] && ( GetField( buttonController, "m_currentButton" ) == mine ) )
+		{
+			Call( mine, "Stop", "the probe's time limit" );
+		}
+
+		// the vehicle's own buttons again, as Back gives them
+		buttonController.ChangeButtonSet( ButtonController.ButtonSet.TerrainVehicle );
+	}
+
+	// the beam of the mining laser being drawn, if it is (a LaserBeam under the disembarked location with its glow on), and how wide it is
+	static bool MiningBeamShows( out float width )
+	{
+		width = 0.0f;
+
+		foreach ( var beam in SpaceflightController.m_instance.m_disembarked.GetComponentsInChildren<LaserBeam>( false ) )
+		{
+			if ( beam.TryGetComponent<LineRenderer>( out var line ) && line.enabled && beam.IsActive() )
+			{
+				width = line.startWidth;
+
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	// on planet 90 (Arth's system, a mineral density of 43%): Cargo beside a deposit no longer takes it in one press but points to the mining laser; Tools has a
+	// Mine button whose laser cuts the deposit into the hold a tenth of a cubic meter at a time (gradually, on the vehicle's energy, the beam drawn at the ground's
+	// scale, the deposit shrinking) until it is gone (remembered on the planet, hidden, the button off); the fire button stops it with the rest remembered; no
+	// deposit in reach, a full hold and an empty tank are refused
+	IEnumerator ScenarioMiningLaser()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+
+		EnsureCrew();
+		ProbeKeyboard();
+
+		yield return EnterOrbit( 90 );
+
+		// land without the 35 second landing animation, then out in the terrain vehicle with the real button
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		PressButton( ButtonController.ButtonSet.CommandA, 1 );
+
+		yield return WaitForLocation( PD_General.Location.Disembarked, 15.0f );
+		yield return Frames( 10 );
+
+		if ( playerData.m_general.m_location != PD_General.Location.Disembarked )
+		{
+			Finish( "scenario=mininglaser abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		// Move is on when the vehicle comes out: stop it, as the player does before using the console
+		if ( GetField( buttonController, "m_currentButton" ) != null )
+		{
+			buttonController.DeactivateButton();
+		}
+
+		var terrainVehicle = controller.m_terrainVehicle;
+		var deposits = controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true );
+
+		if ( deposits.Length < 3 )
+		{
+			Finish( "scenario=mininglaser abort: the planet has " + deposits.Length + " deposits", 2 );
+			yield break;
+		}
+
+		// every deposit out of reach, then one at a time beside the vehicle
+		foreach ( var other in deposits )
+		{
+			if ( Vector3.Distance( other.transform.position, terrainVehicle.transform.position ) < 100.0f )
+			{
+				other.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		var deposit = deposits[ 0 ];
+
+		deposit.m_volume = 60;
+		deposit.transform.position = BesideTheVehicle( terrainVehicle );
+
+		var elementId = deposit.m_elementId;
+		var startScale = deposit.transform.localScale.x;
+
+		yield return Frames( 3 );
+
+		// ---- 1. Cargo beside the deposit takes nothing and points to the laser
+		var holdBefore = TerrainVehicleCargo( elementId );
+
+		new TVCargoButton().Execute();
+
+		var holdAfterCargo = TerrainVehicleCargo( elementId );
+		var cargoMessage = MessageList();
+
+		// ---- 2. Tools has Mine
+		var toolLabels = ButtonSetLabels( ButtonController.ButtonSet.TerrainVehicleWeapon );
+		var mainLabels = ButtonSetLabels( ButtonController.ButtonSet.TerrainVehicle );
+
+		// ---- 3. Mine: part way through the cut
+		var fuelBefore = playerData.m_terrainVehicle.m_fuelRemaining;
+		var mineIndex = Array.IndexOf( toolLabels.Split( ',' ), "Mine" );
+		var midHold = holdAfterCargo;
+		var midDeposit = deposit.m_volume;
+		var midScale = startScale;
+		var beamWidth = 0.0f;
+		var beamShows = false;
+		var mineRunning = false;
+
+		if ( mineIndex >= 0 )
+		{
+			PressButton( ButtonController.ButtonSet.TerrainVehicleWeapon, mineIndex );
+
+			for ( var end = Time.time + 1.5f; Time.time < end; )
+			{
+				yield return null;
+			}
+
+			var current = GetField( buttonController, "m_currentButton" );
+
+			mineRunning = ( current != null ) && ( current.GetType().Name == "TVMineButton" );
+			midHold = TerrainVehicleCargo( elementId );
+			midDeposit = deposit.m_volume;
+			midScale = deposit.transform.localScale.x;
+			beamShows = MiningBeamShows( out beamWidth );
+
+			// ---- 4. to the end of the cut
+			for ( var end = Time.time + 10.0f; ( Time.time < end ) && ( GetField( buttonController, "m_currentButton" ) == current ); )
+			{
+				yield return null;
+			}
+		}
+
+		var endHold = TerrainVehicleCargo( elementId );
+		var endMessage = MessageList();
+		var fuelUsed = fuelBefore - playerData.m_terrainVehicle.m_fuelRemaining;
+		var stillRunning = GetField( buttonController, "m_currentButton" ) != null;
+		var depositGone = ( deposit != null ) && deposit.HasBeenPickedUp() && !deposit.gameObject.activeSelf;
+		var remembered = playerData.m_planetSurfaces.GetDepositVolumeLeft( deposit.m_planetId, deposit.m_depositIndex );
+
+		// ---- 5. stopped with the fire button: the rest of the deposit is remembered
+		var second = deposits[ 1 ];
+
+		second.m_volume = 80;
+		second.transform.position = BesideTheVehicle( terrainVehicle );
+
+		yield return Frames( 3 );
+
+		var secondHoldBefore = TerrainVehicleCargo( second.m_elementId );
+		var stoppedLeft = -1;
+		var stoppedRemembered = -2;
+		var stoppedOff = false;
+
+		if ( mineIndex >= 0 )
+		{
+			PressButton( ButtonController.ButtonSet.TerrainVehicleWeapon, mineIndex );
+
+			for ( var end = Time.time + 0.6f; Time.time < end; )
+			{
+				yield return null;
+			}
+
+			yield return Tap( Key.Enter );
+			yield return Frames( 5 );
+
+			stoppedOff = GetField( buttonController, "m_currentButton" ) == null;
+			stoppedLeft = second.m_volume;
+			stoppedRemembered = playerData.m_planetSurfaces.GetDepositVolumeLeft( second.m_planetId, second.m_depositIndex );
+		}
+
+		var secondMined = TerrainVehicleCargo( second.m_elementId ) - secondHoldBefore;
+
+		second.transform.position += Vector3.right * 1000.0f;
+
+		yield return Frames( 3 );
+
+		// ---- 6. refused: no deposit in reach, a full hold, an empty tank
+		var holdBeforeRefusals = playerData.m_terrainVehicle.m_volumeUsed;
+		var started = new bool[ 1 ];
+
+		yield return MineWithTheLaser( 2.0f, started );
+
+		var noDepositRefused = !started[ 0 ] && MessageList().Contains( "no mineral deposit within reach" );
+
+		var third = deposits[ 2 ];
+
+		third.m_volume = 50;
+		third.transform.position = BesideTheVehicle( terrainVehicle );
+
+		yield return Frames( 3 );
+
+		var room = playerData.m_terrainVehicle.GetRemainingVolume();
+
+		playerData.m_terrainVehicle.AddElement( third.m_elementId, room );
+
+		yield return MineWithTheLaser( 2.0f, started );
+
+		var fullRefused = !started[ 0 ] && MessageList().Contains( "full" ) && ( third.m_volume == 50 );
+
+		playerData.m_terrainVehicle.RemoveElement( third.m_elementId, room );
+
+		var fuel = playerData.m_terrainVehicle.m_fuelRemaining;
+
+		// (the reserve below the display's 0% goes too, PD_TerrainVehicle.IsOutOfFuel)
+		playerData.m_terrainVehicle.m_fuelRemaining = -1.0f;
+
+		yield return MineWithTheLaser( 2.0f, started );
+
+		var emptyRefused = !started[ 0 ] && MessageList().Contains( "not enough energy" ) && ( third.m_volume == 50 );
+
+		playerData.m_terrainVehicle.m_fuelRemaining = fuel;
+
+		Log( "mininglaser: Cargo beside a deposit of 6.0: hold " + holdBefore + " -> " + holdAfterCargo + ", message [" + cargoMessage + "]; Tools [" + toolLabels + "], the vehicle's buttons [" + mainLabels + "]" );
+		Log( "mininglaser: after 1.5 s of Mine: running " + mineRunning + ", hold " + midHold + ", deposit " + midDeposit + ", scale " + startScale.ToString( "F2" ) + " -> " + midScale.ToString( "F2" ) + ", beam " + beamShows + " " + beamWidth.ToString( "F2" ) + " wide; at the end: hold " + endHold + ", energy used " + fuelUsed.ToString( "F4" ) + " of the tank, running " + stillRunning + ", deposit gone " + depositGone + ", remembered " + remembered + ", message [" + endMessage + "]" );
+		Log( "mininglaser: stopped with Enter after 0.6 s: off " + stoppedOff + ", mined " + secondMined + ", left " + stoppedLeft + ", remembered " + stoppedRemembered + "; refused with no deposit " + noDepositRefused + ", a full hold " + fullRefused + ", an empty tank " + emptyRefused + " (hold used " + holdBeforeRefusals + ")" );
+
+		Check( "mininglaser: Cargo beside a deposit takes nothing and points to Tools, Mine (it took the deposit in one press)", ( holdAfterCargo == holdBefore ) && cargoMessage.Contains( "Mine" ), holdBefore + " -> " + holdAfterCargo );
+		Check( "mininglaser: the vehicle's Weapon button is Tools, with Mine first", mainLabels.Contains( "Tools" ) && toolLabels.StartsWith( "Mine" ), mainLabels + " / " + toolLabels );
+		Check( "mininglaser: 1.5 s into the cut part of the deposit is in the hold and the rest still in the deposit (a tenth at a time, 15 a second), and it has shrunk", mineRunning && ( midHold > holdBefore + 10 ) && ( midHold < holdBefore + 60 ) && ( midHold - holdBefore + midDeposit == 60 ) && ( midScale < startScale ), "hold +" + ( midHold - holdBefore ) + ", deposit " + midDeposit + ", scale " + midScale.ToString( "F2" ) );
+		Check( "mininglaser: the beam is drawn while it cuts, at the ground's scale (not the 9 units of the ships' lasers)", beamShows && ( beamWidth > 0.2f ) && ( beamWidth < 3.0f ), beamWidth.ToString( "F2" ) );
+		Check( "mininglaser: the whole deposit ends up in the hold, the deposit is gone and remembered as empty, and the laser is off", ( endHold == holdBefore + 60 ) && depositGone && ( remembered == 0 ) && !stillRunning && endMessage.Contains( "Mined 6.0 cubic meters" ), "hold " + endHold + ", gone " + depositGone + ", remembered " + remembered + ", running " + stillRunning );
+		Check( "mininglaser: the cut takes the vehicle's energy, 10 of its tank a tenth (60 tenths)", Mathf.Abs( fuelUsed - 60.0f * 10.0f / TerrainVehicle.c_tankUnits ) < 0.0005f, fuelUsed.ToString( "F4" ) );
+		Check( "mininglaser: the fire button stops the laser, and what is left of the deposit is remembered", stoppedOff && ( secondMined > 0 ) && ( secondMined < 80 ) && ( stoppedLeft == 80 - secondMined ) && ( stoppedRemembered == stoppedLeft ), "mined " + secondMined + ", left " + stoppedLeft + ", remembered " + stoppedRemembered );
+		Check( "mininglaser: Mine with no deposit in reach, with a full hold and with an empty tank does nothing and says why", noDepositRefused && fullRefused && emptyRefused, noDepositRefused + "/" + fullRefused + "/" + emptyRefused );
+
+		Finish( "scenario=mininglaser checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
