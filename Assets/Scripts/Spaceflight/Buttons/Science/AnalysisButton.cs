@@ -44,6 +44,52 @@ public class AnalysisButton : ShipButton
 		return text;
 	}
 
+	// makes the science officer's survey of the planet the ship orbits (PlanetSurvey) and returns its lines of the analysis: the mineral fields and the
+	// lifeforms found (each line by the skill's chance, as every other line of a planet's analysis)
+	static string GetSurveyText( GD_Planet planet, int skill )
+	{
+		var controller = SpaceflightController.m_instance;
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var planetController = controller.m_starSystem.GetPlanetController( planet.m_id );
+
+		// (a survey is made from orbit, of a planet whose maps are there to work it out from)
+		if ( ( playerData.m_general.m_location != PD_General.Location.InOrbit ) || ( planetController == null ) || !planetController.HasMaps() || planet.IsGasGiant() )
+		{
+			return "";
+		}
+
+		var survey = PlanetSurvey.Make( planet, planetController.GetPlanetGenerator(), controller.m_disembarked.m_terrainGrid, skill, playerData.m_playerShip.GetSystemFactor( PD_PlayerShip.ShipSystem.Sensors ) );
+
+		if ( survey == null )
+		{
+			return "";
+		}
+
+		controller.m_planetSurvey = survey;
+
+		string minerals;
+
+		if ( survey.m_mineralFields == 0 )
+		{
+			minerals = "None";
+		}
+		else if ( survey.m_mineralFieldsFound == 0 )
+		{
+			minerals = "None found";
+		}
+		else
+		{
+			var element = ( ( survey.m_mainElementId >= 0 ) && ( survey.m_mainElementId < gameData.m_elementList.Length ) ) ? ", mostly " + gameData.m_elementList[ survey.m_mainElementId ].m_name : "";
+
+			minerals = survey.m_mineralFieldsFound + ( ( survey.m_mineralFieldsFound == 1 ) ? " field" : " fields" ) + element;
+		}
+
+		var life = ( survey.m_speciesCount == 0 ) ? "None" : ( survey.m_speciesCount + " species, " + survey.m_lifeformsFound + " found" );
+
+		return "\nMineral Fields: <color=white>" + Known( minerals, skill ) + "</color>\nLifeforms: <color=white>" + Known( life, skill ) + "</color>";
+	}
+
 	// a line of an alien ship's analysis, or the original's "NOT CERTAIN" when the science officer cannot tell (?.CERTAIN, rolled for each line)
 	static string Certain( string value, int scienceSkill )
 	{
@@ -160,6 +206,10 @@ public class AnalysisButton : ShipButton
 
 					// weather
 					text += "Global Weather: <color=white>" + Known( planet.GetGlobalWeatherText(), skill ) + "</color>";
+
+					// the survey: the mineral fields and the lifeforms the officer finds on the planet, as well as the officer's skill and the sensors allow
+					// (decided 2026-10-17, ROADMAP D6), marked on the sensor picture and the landing map
+					text += GetSurveyText( planet, skill );
 
 					break;
 				}

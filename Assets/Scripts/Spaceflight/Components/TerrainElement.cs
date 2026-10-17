@@ -39,7 +39,7 @@ public class TerrainElement : MonoBehaviour
 
 		// random volume for this deposit - 1.0 to 9.9 cubic meters, in tenths
 		// (still one random number per deposit - the objects of a planet are placed with random numbers seeded from the planet, and a second number here would move everything placed after it)
-		m_volume = Random.Range( c_minVolume, c_maxVolume + 1 );
+		m_volume = DrawVolume();
 
 		// has something been taken from this deposit before? (this comes after the random number, so that nothing placed after it moves)
 		var playerData = ( DataController.m_instance != null ) ? DataController.m_instance.m_playerData : null;
@@ -62,6 +62,12 @@ public class TerrainElement : MonoBehaviour
 				m_volume = Mathf.Min( m_volume, volumeLeft );
 			}
 		}
+	}
+
+	// draws the volume of a deposit (one random number: PlanetSurvey draws it the same way when it works out the deposits from orbit)
+	public static int DrawVolume()
+	{
+		return Random.Range( c_minVolume, c_maxVolume + 1 );
 	}
 
 	// check if this element is close enough to the terrain vehicle to pick up

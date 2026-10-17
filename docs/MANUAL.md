@@ -266,7 +266,7 @@ The clock runs whenever you are away from the Starport: a star hour passes every
 
 ### Sensors and analysis
 
-In orbit, Science, **Sensors** scans the planet, and **Analysis** tells you what the readings mean: its size, gravity, atmosphere, temperature, minerals and life. The better your science officer, the more an analysis reveals. Each reading can be analyzed once: scan again for another analysis.
+In orbit, Science, **Sensors** scans the planet, and **Analysis** tells you what the readings mean: its surface, gravity, atmosphere, temperature and weather, and a survey of where its mineral fields and its lifeforms are. The better your science officer, the more an analysis reveals: a skilled officer finds most of the mineral fields and lifeforms and places them closely, a novice finds a few and places them roughly, and damaged sensors find less. Each reading can be analyzed once: scan again for another analysis.
 
 ### Landing
 
