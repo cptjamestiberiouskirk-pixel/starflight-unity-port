@@ -40,14 +40,25 @@ public class Disembarked : MonoBehaviour
 	// unity awake
 	void Awake()
 	{
-		// the ground takes the look the player picks at once
+		// the ground takes the look and the detail the player picks at once
 		PlanetLook.Changed += ApplyLook;
+		GroundDetail.Changed += ApplyGroundDetail;
 	}
 
 	// unity on destroy
 	void OnDestroy()
 	{
 		PlanetLook.Changed -= ApplyLook;
+		GroundDetail.Changed -= ApplyGroundDetail;
+	}
+
+	// makes the terrain grid as finely as the ground detail in use asks (GroundDetail: the setting, or Auto by the graphics card)
+	void ApplyGroundDetail()
+	{
+		if ( m_terrainGrid != null )
+		{
+			m_terrainGrid.SetDetail( GroundDetail.GetGridDetail(), GroundDetail.GetGridRings() );
+		}
 	}
 
 	// puts the look the player has picked on the ground, while the terrain vehicle is out
@@ -218,6 +229,9 @@ public class Disembarked : MonoBehaviour
 
 		// save the planet generator
 		m_planetGenerator = planetController.GetPlanetGenerator();
+
+		// the grid as finely as the ground detail asks
+		ApplyGroundDetail();
 
 		// create the elevation texture
 		var elevationTexture = m_planetGenerator.CreateElevationTexture();

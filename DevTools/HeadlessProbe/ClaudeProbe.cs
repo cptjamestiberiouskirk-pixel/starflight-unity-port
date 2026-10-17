@@ -1602,6 +1602,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSendCargo();
 				break;
 
+			case "grounddetail":
+				yield return ScenarioGroundDetail();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -42662,6 +42666,146 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "sendcargo: with no room in the ship nothing goes, and it says so", ( vehicleAfterFull == 28 ) && fullMessage.Contains( "no room" ), vehicleAfterFull + " [" + fullMessage + "]" );
 
 		Finish( "scenario=sendcargo checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the ground detail setting (GroundDetail, since 2026-10-17)
+
+	// sets the ground detail for a test, leaving the player's setting as it is (looked up by name: the code before has no ground detail)
+	static void SetGroundDetailForTheTest( string setting )
+	{
+		var type = typeof( PlayerData ).Assembly.GetType( "GroundDetail" );
+
+		if ( type == null )
+		{
+			return;
+		}
+
+		type.GetMethod( "SetSetting" ).Invoke( null, new object[] { Enum.Parse( type.GetNestedType( "Setting" ), setting ), false } );
+	}
+
+	// on planet 94 in the terrain vehicle: the ground detail makes the terrain grid 129 vertices to a ring's side in 3 rings at Low (16 bit indices), 257 in 3 at
+	// Medium and 257 in 4 at High (more than 65535 vertices, 32 bit indices), at once when it changes; Auto takes Low without a graphics device; the save panel's
+	// Colors screen has a Ground row with Auto, Low, Medium and High that marks the setting in use and changes it; the player's own setting is put back
+	// afterwards; with -Graphics, a picture of the ground at each level and of the Colors screen in Logs/screen-pictures/ground-detail/
+	IEnumerator ScenarioGroundDetail()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+		var folder = ScreenPictureFolder( "ground-detail" );
+
+		EnsureCrew();
+
+		controller.m_encounterRange = 0.0f;
+
+		// the player's own setting, put back at the end (the probe runs in the editor, whose settings are the player's)
+		var key = "Ground Detail";
+		var savedSetting = PlayerPrefs.HasKey( key ) ? PlayerPrefs.GetString( key ) : null;
+
+		yield return LandOnPlanet94At( Tools.LatLongToWorldCoordinates( 4.3f, -16.0f ), done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=grounddetail abort: no landing (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var type = typeof( PlayerData ).Assembly.GetType( "GroundDetail" );
+		var autoLevel = ( type != null ) ? type.GetMethod( "DetectLevel" ).Invoke( null, null ).ToString() : "(none)";
+		var grid = controller.m_disembarked.m_terrainGrid;
+		var details = new Dictionary<string, int>();
+		var rings = new Dictionary<string, int>();
+		var vertices = new Dictionary<string, int>();
+		var formats = new Dictionary<string, string>();
+
+		// ---- 1. each level, the grid made again at once
+		foreach ( var level in new[] { "Low", "Medium", "High" } )
+		{
+			SetGroundDetailForTheTest( level );
+
+			yield return Frames( 5 );
+
+			var mesh = grid.GetComponent<MeshFilter>().sharedMesh;
+
+			details[ level ] = grid.m_detail;
+			rings[ level ] = grid.m_numLevels;
+			vertices[ level ] = ( mesh != null ) ? mesh.vertexCount : 0;
+			formats[ level ] = ( mesh != null ) ? mesh.indexFormat.ToString() : "(none)";
+
+			if ( hasGraphics )
+			{
+				RenderWholeFramePicture( Camera.main, System.IO.Path.Combine( folder, level.ToLowerInvariant() + ".png" ) );
+			}
+		}
+
+		// ---- 2. the Colors screen's Ground row, with Auto in use
+		SetGroundDetailForTheTest( "Auto" );
+
+		PressEscape();
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var savePanel = PanelController.m_instance.m_saveGamePanel;
+
+		Call( savePanel, "ColorsClicked" );
+
+		yield return Frames( 10 );
+
+		var groundButtons = FieldOrNull( savePanel, "m_groundDetailButtons" ) as UnityEngine.UI.Button[];
+		var groundMarkers = FieldOrNull( savePanel, "m_groundDetailMarkers" ) as UnityEngine.UI.Image[];
+		var groundLabels = ( groundButtons != null ) ? string.Join( ",", Array.ConvertAll( groundButtons, button => button.GetComponentInChildren<TMPro.TMP_Text>( true ).text ) ) : "(none)";
+		var markedBefore = ( groundMarkers != null ) ? Array.FindIndex( groundMarkers, marker => ( marker != null ) && marker.enabled ) : -1;
+
+		if ( hasGraphics )
+		{
+			RenderWholeFramePicture( Camera.main, System.IO.Path.Combine( folder, "colors.png" ) );
+		}
+
+		// its Medium button: the setting, the marker and the grid follow
+		var markedAfter = -1;
+		var detailAfter = 0;
+
+		if ( ( groundButtons != null ) && ( groundButtons.Length == 4 ) )
+		{
+			groundButtons[ 2 ].onClick.Invoke();
+
+			yield return Frames( 5 );
+
+			markedAfter = Array.FindIndex( groundMarkers, marker => ( marker != null ) && marker.enabled );
+			detailAfter = grid.m_detail;
+		}
+
+		var settingAfter = ( type != null ) ? type.GetMethod( "GetSetting" ).Invoke( null, null ).ToString() : "(none)";
+
+		// the player's own setting back, in the file and in the game
+		if ( savedSetting == null )
+		{
+			PlayerPrefs.DeleteKey( key );
+		}
+		else
+		{
+			PlayerPrefs.SetString( key, savedSetting );
+		}
+
+		PlayerPrefs.Save();
+
+		SetGroundDetailForTheTest( savedSetting ?? "Auto" );
+
+		Call( savePanel, "CancelClicked" );
+
+		Func<string, string> state = level => details[ level ] + " x " + rings[ level ] + " rings, " + vertices[ level ] + " vertices, " + formats[ level ];
+
+		Log( "grounddetail: Auto takes " + autoLevel + " here (graphics device " + hasGraphics + ", " + SystemInfo.graphicsMemorySize + " MB); Low " + state( "Low" ) + "; Medium " + state( "Medium" ) + "; High " + state( "High" ) );
+		Log( "grounddetail: the Colors screen's Ground row [" + groundLabels + "], marked " + markedBefore + " with Auto in use; after its Medium button: marked " + markedAfter + ", setting " + settingAfter + ", grid " + detailAfter + "; the player's setting put back: " + ( savedSetting ?? "(none)" ) );
+
+		Check( "grounddetail: Auto takes Low without a graphics device (a headless run)", hasGraphics || ( autoLevel == "Low" ), autoLevel );
+		Check( "grounddetail: at Low the terrain grid is 129 vertices to a ring's side in 3 rings, with 16 bit indices", ( details[ "Low" ] == 129 ) && ( rings[ "Low" ] == 3 ) && ( formats[ "Low" ] == "UInt16" ), state( "Low" ) );
+		Check( "grounddetail: at Medium it is 257 to a side in 3 rings, more than 65535 vertices with 32 bit indices", ( details[ "Medium" ] == 257 ) && ( rings[ "Medium" ] == 3 ) && ( vertices[ "Medium" ] > 65535 ) && ( formats[ "Medium" ] == "UInt32" ), state( "Medium" ) );
+		Check( "grounddetail: at High it is 257 to a side in 4 rings", ( details[ "High" ] == 257 ) && ( rings[ "High" ] == 4 ) && ( formats[ "High" ] == "UInt32" ), state( "High" ) );
+		Check( "grounddetail: the Colors screen has a Ground row of Auto, Low, Medium and High that marks the setting in use, and its Medium button sets Medium and remakes the grid", ( groundLabels == "Auto,Low,Medium,High" ) && ( markedBefore == 0 ) && ( markedAfter == 2 ) && ( settingAfter == "Medium" ) && ( detailAfter == 257 ), groundLabels + ", marked " + markedBefore + " -> " + markedAfter + ", " + settingAfter + ", grid " + detailAfter );
+
+		Finish( "scenario=grounddetail checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
