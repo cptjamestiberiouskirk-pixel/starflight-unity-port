@@ -37,6 +37,13 @@ public class Disembarked : MonoBehaviour
 	// the planet generator
 	PlanetGenerator m_planetGenerator;
 
+	// the project's shadows, kept while the terrain vehicle is out (the ground detail sets its own, GroundDetail.ApplyShadows) and put back when it comes in
+	bool m_shadowsKept;
+	ShadowQuality m_keptShadows;
+	ShadowResolution m_keptShadowResolution;
+	int m_keptShadowCascades;
+	float m_keptShadowDistance;
+
 	// unity awake
 	void Awake()
 	{
@@ -63,6 +70,15 @@ public class Disembarked : MonoBehaviour
 			var grainStrength = GroundGrain.GetStrength();
 
 			m_terrainGrid.SetGrain( ( grainStrength > 0.0f ) ? GroundGrain.Get() : null, grainStrength, GroundGrain.GetFadeDistance() );
+
+			// the shading of its curves (none at Low)
+			m_terrainGrid.SetCavity( GroundDetail.GetCavityStrength() );
+		}
+
+		// the shadows, while the terrain vehicle is out
+		if ( m_shadowsKept )
+		{
+			GroundDetail.ApplyShadows();
 		}
 	}
 
@@ -129,6 +145,17 @@ public class Disembarked : MonoBehaviour
 		// hide this location
 		gameObject.SetActive( false );
 
+		// the project's shadows back
+		if ( m_shadowsKept )
+		{
+			QualitySettings.shadows = m_keptShadows;
+			QualitySettings.shadowResolution = m_keptShadowResolution;
+			QualitySettings.shadowCascades = m_keptShadowCascades;
+			QualitySettings.shadowDistance = m_keptShadowDistance;
+
+			m_shadowsKept = false;
+		}
+
 		// back in the ship: no more weather
 		PlanetWeather.End();
 
@@ -151,6 +178,19 @@ public class Disembarked : MonoBehaviour
 
 		// show the planetside objects
 		gameObject.SetActive( true );
+
+		// the project's shadows kept, and the ground detail's set while the terrain vehicle is out
+		if ( !m_shadowsKept )
+		{
+			m_keptShadows = QualitySettings.shadows;
+			m_keptShadowResolution = QualitySettings.shadowResolution;
+			m_keptShadowCascades = QualitySettings.shadowCascades;
+			m_keptShadowDistance = QualitySettings.shadowDistance;
+
+			m_shadowsKept = true;
+		}
+
+		GroundDetail.ApplyShadows();
 
 		// get to the game data
 		var gameData = DataController.m_instance.m_gameData;

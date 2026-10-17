@@ -106,6 +106,15 @@ public class TerrainGrid : MonoBehaviour
 		m_material.SetVector( "SF_GroundGrainParams", new Vector4( strength, GroundGrain.c_fineScale, GroundGrain.c_coarseScale, fadeDistance ) );
 	}
 
+	// shades the ground where it curves in and out (GroundDetail): how strongly (0 leaves it as it was)
+	public void SetCavity( float strength )
+	{
+		// make sure the terrain grid mesh and its material are made
+		Initialize();
+
+		m_material.SetFloat( "SF_GroundCavityStrength", strength );
+	}
+
 	// puts the albedo map the ground is drawn with (the planet's natural one in the natural look: Planet.GetTerrainAlbedoMap) on the material, after the
 	// elevation map or the baked-in elevation have put the generator's there
 	public void SetAlbedoMap( Texture albedoMap )

@@ -29,6 +29,16 @@ public static class GroundDetail
 	static readonly int[] c_gridDetail = { 129, 257, 257 };
 	static readonly int[] c_gridRings = { 3, 3, 4 };
 
+	// how strongly the ground is darkened where it curves in and lightened where it curves out (SF - TerrainGrid.cginc): none at Low
+	static readonly float[] c_cavityStrength = { 0.0f, 0.6f, 0.9f };
+
+	// the shadows while the terrain vehicle is out: hard, at medium resolution, in 2 cascades out to 300 units at Low (for the cards Auto puts there); the
+	// project's own at Medium; and at very high resolution at High (Disembarked puts the project's back when the vehicle comes in)
+	static readonly ShadowQuality[] c_shadows = { ShadowQuality.HardOnly, ShadowQuality.All, ShadowQuality.All };
+	static readonly ShadowResolution[] c_shadowResolution = { ShadowResolution.Medium, ShadowResolution.High, ShadowResolution.VeryHigh };
+	static readonly int[] c_shadowCascades = { 2, 4, 4 };
+	static readonly float[] c_shadowDistance = { 300.0f, 768.0f, 768.0f };
+
 	// the setting in use (read the first time it is asked for)
 	static bool s_settingKnown;
 	static Setting s_setting;
@@ -112,6 +122,23 @@ public static class GroundDetail
 	public static int GetGridRings()
 	{
 		return c_gridRings[ (int) GetLevel() ];
+	}
+
+	// how strongly the ground's curves are shaded at the level in use
+	public static float GetCavityStrength()
+	{
+		return c_cavityStrength[ (int) GetLevel() ];
+	}
+
+	// sets the shadows for the ground at the level in use
+	public static void ApplyShadows()
+	{
+		var level = (int) GetLevel();
+
+		QualitySettings.shadows = c_shadows[ level ];
+		QualitySettings.shadowResolution = c_shadowResolution[ level ];
+		QualitySettings.shadowCascades = c_shadowCascades[ level ];
+		QualitySettings.shadowDistance = c_shadowDistance[ level ];
 	}
 
 	// changes the setting and lets the ground on screen know (remember false leaves the player's setting as it is, for a test)
