@@ -11,7 +11,7 @@ Both scripts start Unity with `--burst-disable-compilation`. With Burst on, ever
 - Windows with PowerShell 7.
 - The Unity version named in `ProjectSettings/ProjectVersion.txt`, installed by Unity Hub in its default place (`C:\Program Files\Unity\Hub\Editor\<version>`).
 - Python 3 for the two helper scripts.
-- Logs go to `%TEMP%\starflight-probe`.
+- Logs go to `%TEMP%\starflight-probe`, one file per run name, which each script deletes before it starts Unity (see "Play mode probe" for a run that writes none).
 
 Run everything from the project root.
 
@@ -30,6 +30,8 @@ Prints Unity's exit code, any `error CS`, the `Tundra build` line, the package c
 ```
 
 Copies `ClaudeProbe.cs` into `Assets/`, launches Unity with `-executeMethod ClaudeProbe.Run -probeScenario <name>`, prints the lines the probe logged (`[ClaudeProbe] ...`), then deletes the probe and its `.meta` again. A run takes 20 to 30 seconds. The copy in `Assets/` is ignored by git.
+
+The log is `%TEMP%\starflight-probe\<name>.log` (`-Name`, `probe-<scenario>` by default). It is deleted before Unity starts, so the lines shown are always this run's: a log that cannot be deleted is open in another Unity, and the run stops there. If Unity quits without writing a log, the script prints `CHECK FAIL no log written: unity exit=<code>` in place of the compiler errors and the probe's lines, gives no `RESULT` line and exits with 1. `run-all-scenarios.ps1` counts that as a failed check, and `run-playthrough.ps1` shows the stage as `FAILED: no RESULT line`. `compile-check.ps1` deletes its log the same way and prints `no log written: unity exit=<code>` and exits with 1 when there is none.
 
 Unity is stopped if it has not come back after 420 seconds. `-TimeoutSeconds 100` shortens that, for a scenario that is expected to hang on the old code: a hang on the main thread also stops the probe's own 120 second watchdog.
 
@@ -305,7 +307,7 @@ Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-la
 
 ### The playthrough
 
-`playthrough-1` to `playthrough-21` play the game from a new game to the win and Interstel's bonus, each stage from the save the one before left (in `$env:TEMP\starflight-probe\playthrough`), through the real console buttons, with real flight and real driving: the Starport (crew, training, ship configuration, the bank), Arth's system and planet 94 (sensors, analysis, landing, mining, back to the ship), selling the minerals, Sphexi (the Crystal Orb's and the Black Egg's ruins), the Crystal Cone, the Crystal Planet (the Orb against its field, the nexus, the egg armed, the explosion and the bonus) and the way home to the Starport. Run them in order with `& "DevTools\HeadlessProbe\run-playthrough.ps1"` (about 25 minutes; `-From n` goes on from the save of stage n - 1). They are not in `run-all-scenarios.ps1`, since each needs the save of the stage before. Where the game has a bug that would stop it, a stage logs `GAME BUG`, works round it so the later stages still run, and fails a check that names it.
+`playthrough-1` to `playthrough-21` play the game from a new game to the win and Interstel's bonus, each stage from the save the one before left (in `$env:TEMP\starflight-probe\playthrough`), through the real console buttons, with real flight and real driving: the Starport (crew, training, ship configuration, the bank), Arth's system and planet 94 (sensors, analysis, landing, mining, back to the ship), selling the minerals, Sphexi (the Crystal Orb's and the Black Egg's ruins), the Crystal Cone, the Crystal Planet (the Orb against its field, the nexus, the egg armed, the explosion and the bonus) and the way home to the Starport. Run them in order with `& "DevTools\HeadlessProbe\run-playthrough.ps1"` (about 25 minutes; `-From n` goes on from the save of stage n - 1). Each stage's save from an earlier run is deleted before the stage runs, so the chain stops at a stage that saves nothing, also with `-From`. They are not in `run-all-scenarios.ps1`, since each needs the save of the stage before. Where the game has a bug that would stop it, a stage logs `GAME BUG`, works round it so the later stages still run, and fails a check that names it.
 
 ### Before and after
 

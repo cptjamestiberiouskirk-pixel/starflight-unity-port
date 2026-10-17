@@ -48,6 +48,9 @@ try {
 	$unityArgs = @('-batchmode', '--burst-disable-compilation')
 	if (-not $Graphics) { $unityArgs += '-nographics' }
 	$unityArgs += '-projectPath', "`"$proj`"", '-logFile', "`"$log`"", '-executeMethod', 'ClaudeProbe.Run', '-probeScenario', $Scenario
+	# an earlier run's log of this name would be read as this run's if Unity wrote none, so it goes first
+	# (one that cannot be deleted is open in another Unity, and this run stops here)
+	if (Test-Path -LiteralPath $log) { Remove-Item -LiteralPath $log -Force -ErrorAction Stop }
 	$p = Start-Process -FilePath $unity -ArgumentList $unityArgs -PassThru
 
 	# the probe has its own 120 s watchdog; this is the outer limit
@@ -64,12 +67,23 @@ finally {
 	[IO.File]::Delete("$probeTarget.meta")
 }
 
-"--- compiler errors ---"
-$errs = Select-String -LiteralPath $log -Pattern 'error CS\d+|Scripts have compiler errors'
-if ($errs) { $errs | Select-Object -First 20 | ForEach-Object { $_.Line } } else { 'none' }
+$logWritten = Test-Path -LiteralPath $log
 
-"--- probe ---"
-Select-String -LiteralPath $log -Pattern '^\[ClaudeProbe\]' | ForEach-Object { if ($_.Line.Length -gt 600) { $_.Line.Substring(0, 600) } else { $_.Line } }
+if ($logWritten) {
+	"--- compiler errors ---"
+	$errs = Select-String -LiteralPath $log -Pattern 'error CS\d+|Scripts have compiler errors'
+	if ($errs) { $errs | Select-Object -First 20 | ForEach-Object { $_.Line } } else { 'none' }
+
+	"--- probe ---"
+	Select-String -LiteralPath $log -Pattern '^\[ClaudeProbe\]' | ForEach-Object { if ($_.Line.Length -gt 600) { $_.Line.Substring(0, 600) } else { $_.Line } }
+}
+else {
+	# Unity quit before it wrote a log, so this run has nothing to show: a failed check for the runners to count, and no RESULT line
+	$exitCode = if ($p) { $p.ExitCode } else { 'none, not started' }
+	"CHECK FAIL no log written: unity exit=$exitCode"
+}
 
 "--- git status ---"
 git status --short
+
+if (-not $logWritten) { exit 1 }
