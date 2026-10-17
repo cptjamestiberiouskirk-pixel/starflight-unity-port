@@ -115,6 +115,15 @@ public class TerrainGrid : MonoBehaviour
 		m_material.SetFloat( "SF_GroundCavityStrength", strength );
 	}
 
+	// the material the ground is drawn with (its maps: GroundClutter takes the ground's colour from it)
+	public Material GetMaterial()
+	{
+		// make sure the terrain grid mesh and its material are made
+		Initialize();
+
+		return m_material;
+	}
+
 	// puts the albedo map the ground is drawn with (the planet's natural one in the natural look: Planet.GetTerrainAlbedoMap) on the material, after the
 	// elevation map or the baked-in elevation have put the generator's there
 	public void SetAlbedoMap( Texture albedoMap )

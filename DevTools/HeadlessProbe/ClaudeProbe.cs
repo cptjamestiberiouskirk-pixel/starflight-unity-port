@@ -1606,6 +1606,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioGroundDetail();
 				break;
 
+			case "groundclutter":
+				yield return ScenarioGroundClutter();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -42866,6 +42870,206 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "grounddetail: the Colors screen has a Ground row of Auto, Low, Medium and High that marks the setting in use, and its Medium button sets Medium and remakes the grid", ( groundLabels == "Auto,Low,Medium,High" ) && ( markedBefore == 0 ) && ( markedAfter == 2 ) && ( settingAfter == "Medium" ) && ( detailAfter == 257 ), groundLabels + ", marked " + markedBefore + " -> " + markedAfter + ", " + settingAfter + ", grid " + detailAfter );
 
 		Finish( "scenario=grounddetail checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- grass and pebbles on the ground (GroundClutter, since 2026-10-17)
+
+	// how many grass tufts or pebbles the ground clutter drew in the last frame (looked up by name: the code before has none; -1 if there is no clutter)
+	static int ClutterDrawn( string method )
+	{
+		var clutter = FieldOrNull( SpaceflightController.m_instance.m_disembarked, "m_groundClutter" );
+
+		return ( clutter == null ) ? -1 : (int) Call( clutter, method );
+	}
+
+	// a cell's grass tufts and pebbles, as text of their places (empty if there is no clutter)
+	static string ClutterCell( Vector2Int cell, out Matrix4x4[] grass, out Matrix4x4[] pebbles )
+	{
+		grass = new Matrix4x4[ 0 ];
+		pebbles = new Matrix4x4[ 0 ];
+
+		var clutter = FieldOrNull( SpaceflightController.m_instance.m_disembarked, "m_groundClutter" );
+
+		if ( clutter == null )
+		{
+			return "";
+		}
+
+		var args = new object[] { cell, null, null };
+
+		clutter.GetType().GetMethod( "GetCell" ).Invoke( clutter, args );
+
+		grass = (Matrix4x4[]) args[ 1 ];
+		pebbles = (Matrix4x4[]) args[ 2 ];
+
+		var text = "";
+
+		foreach ( var matrix in grass )
+		{
+			text += matrix.GetColumn( 3 ).ToString( "F2" );
+		}
+
+		foreach ( var matrix in pebbles )
+		{
+			text += matrix.GetColumn( 3 ).ToString( "F2" );
+		}
+
+		return text;
+	}
+
+	// on planet 92 (life): no grass or pebbles at Low, and both at High about the terrain vehicle; a cell's grass and pebbles are where they were after the vehicle
+	// has driven far away and come back; filling the cells draws no random numbers; nothing stands in water or lava; on planet 94 (no life) pebbles and no grass;
+	// with -Graphics, pictures in Logs/screen-pictures/ground-clutter/
+	IEnumerator ScenarioGroundClutter()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+		var hasGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+		var folder = ScreenPictureFolder( "ground-clutter" );
+
+		EnsureCrew();
+
+		controller.m_encounterRange = 0.0f;
+
+		// the player's own setting, put back at the end
+		var key = "Ground Detail";
+		var savedSetting = PlayerPrefs.HasKey( key ) ? PlayerPrefs.GetString( key ) : null;
+
+		// ---- 1. planet 92, which has life
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=groundclutter abort: no landing on planet 92 (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		SetGroundDetailForTheTest( "Low" );
+
+		yield return Frames( 3 );
+
+		var grassLow = ClutterDrawn( "GetGrassDrawn" );
+		var pebblesLow = ClutterDrawn( "GetPebblesDrawn" );
+
+		SetGroundDetailForTheTest( "High" );
+
+		yield return Frames( 3 );
+
+		var grassHigh = ClutterDrawn( "GetGrassDrawn" );
+		var pebblesHigh = ClutterDrawn( "GetPebblesDrawn" );
+
+		if ( hasGraphics )
+		{
+			RenderWholeFramePicture( Camera.main, System.IO.Path.Combine( folder, "planet92_high.png" ) );
+		}
+
+		// the cells about the vehicle: nothing in water (or lava), and one cell's places, again after driving far away and back
+		var vehicle = controller.m_terrainVehicle.transform.position;
+		var generator = FieldOrNull( controller.m_disembarked, "m_planetGenerator" ) as PlanetGenerator;
+		var center = new Vector2Int( Mathf.FloorToInt( vehicle.x / 8.0f ), Mathf.FloorToInt( vehicle.z / 8.0f ) );
+		var inLiquid = 0;
+		var counted = 0;
+		var busiest = center;
+		var busiestCount = -1;
+
+		for ( var z = -4; z <= 4; z++ )
+		{
+			for ( var x = -4; x <= 4; x++ )
+			{
+				var cell = new Vector2Int( center.x + x, center.y + z );
+
+				ClutterCell( cell, out var grass, out var pebbles );
+
+				var both = new List<Matrix4x4>( grass );
+
+				both.AddRange( pebbles );
+
+				foreach ( var matrix in both )
+				{
+					var place = matrix.GetColumn( 3 );
+
+					Tools.WorldToMapCoordinates( place, out var mapX, out var mapY, generator.m_textureMapWidth, generator.m_textureMapHeight );
+
+					counted++;
+
+					if ( generator.GetBicubicSmoothedElevation( mapX, mapY ) <= generator.m_waterElevation )
+					{
+						inLiquid++;
+					}
+				}
+
+				if ( grass.Length + pebbles.Length > busiestCount )
+				{
+					busiestCount = grass.Length + pebbles.Length;
+					busiest = cell;
+				}
+			}
+		}
+
+		// filling a cell draws no random numbers (a cell far off, not filled yet, with no frame in between: the game draws its own as it runs)
+		var randomBefore = UnityEngine.Random.state;
+
+		ClutterCell( new Vector2Int( center.x + 500, center.y + 500 ), out _, out _ );
+
+		var randomUntouched = UnityEngine.Random.state.Equals( randomBefore );
+		var placesBefore = ClutterCell( busiest, out _, out _ );
+		var home = playerData.m_general.m_coordinates;
+		var away = home + new Vector3( 2000.0f, 0.0f, 0.0f );
+
+		playerData.m_general.m_coordinates = away;
+		playerData.m_general.m_lastDisembarkedCoordinates = away;
+		controller.m_terrainVehicle.transform.localPosition = away;
+
+		yield return Frames( 5 );
+
+		playerData.m_general.m_coordinates = home;
+		playerData.m_general.m_lastDisembarkedCoordinates = home;
+		controller.m_terrainVehicle.transform.localPosition = home;
+
+		yield return Frames( 5 );
+
+		var placesAfter = ClutterCell( busiest, out _, out _ );
+
+		// ---- 2. planet 94, which has no life
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandOnPlanet94At( Tools.LatLongToWorldCoordinates( 4.3f, -16.0f ), done );
+		yield return Frames( 3 );
+
+		var grass94 = ClutterDrawn( "GetGrassDrawn" );
+		var pebbles94 = ClutterDrawn( "GetPebblesDrawn" );
+
+		if ( hasGraphics )
+		{
+			RenderWholeFramePicture( Camera.main, System.IO.Path.Combine( folder, "planet94_high.png" ) );
+		}
+
+		// the player's own setting back
+		if ( savedSetting == null )
+		{
+			PlayerPrefs.DeleteKey( key );
+		}
+		else
+		{
+			PlayerPrefs.SetString( key, savedSetting );
+		}
+
+		PlayerPrefs.Save();
+
+		SetGroundDetailForTheTest( savedSetting ?? "Auto" );
+
+		Log( "groundclutter: planet 92 (bio " + DataController.m_instance.m_gameData.m_planetList[ 92 ].m_bioDensity + "): Low " + grassLow + " grass, " + pebblesLow + " pebbles; High " + grassHigh + " grass, " + pebblesHigh + " pebbles; random numbers untouched " + randomUntouched + "; " + inLiquid + " of " + counted + " in liquid; cell " + busiest + " (" + busiestCount + ") the same after driving away and back " + ( placesBefore == placesAfter ) + "; planet 94 (bio " + DataController.m_instance.m_gameData.m_planetList[ 94 ].m_bioDensity + "): " + grass94 + " grass, " + pebbles94 + " pebbles" );
+
+		Check( "groundclutter: at Low no grass or pebbles are drawn", ( grassLow == 0 ) && ( pebblesLow == 0 ), grassLow + " / " + pebblesLow );
+		Check( "groundclutter: at High grass and pebbles are drawn about the terrain vehicle on a planet with life", ( grassHigh > 50 ) && ( pebblesHigh > 50 ), grassHigh + " / " + pebblesHigh );
+		Check( "groundclutter: filling the cells draws no random numbers (everything on a planet is placed from them)", randomUntouched, randomUntouched.ToString() );
+		Check( "groundclutter: nothing stands in water or lava", ( counted > 0 ) && ( inLiquid == 0 ), inLiquid + " of " + counted );
+		Check( "groundclutter: a cell's grass and pebbles are in the same places after the vehicle has driven far away and come back", ( busiestCount > 0 ) && ( placesBefore == placesAfter ), busiest + ": " + busiestCount + ", same " + ( placesBefore == placesAfter ) );
+		Check( "groundclutter: on a planet with no life there are pebbles and no grass", ( grass94 == 0 ) && ( pebbles94 > 50 ), grass94 + " / " + pebbles94 );
+
+		Finish( "scenario=groundclutter checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

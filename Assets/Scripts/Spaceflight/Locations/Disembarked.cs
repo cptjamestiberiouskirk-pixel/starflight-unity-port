@@ -44,12 +44,17 @@ public class Disembarked : MonoBehaviour
 	int m_keptShadowCascades;
 	float m_keptShadowDistance;
 
+	// the grass and the pebbles about the terrain vehicle (made at run time; the scene has none)
+	[System.NonSerialized] public GroundClutter m_groundClutter;
+
 	// unity awake
 	void Awake()
 	{
 		// the ground takes the look and the detail the player picks at once
 		PlanetLook.Changed += ApplyLook;
 		GroundDetail.Changed += ApplyGroundDetail;
+
+		m_groundClutter = gameObject.AddComponent<GroundClutter>();
 	}
 
 	// unity on destroy
@@ -296,6 +301,9 @@ public class Disembarked : MonoBehaviour
 
 		// in the look the player has picked
 		m_terrainGrid.SetAlbedoMap( planetController.GetTerrainAlbedoMap() );
+
+		// the grass and the pebbles on it
+		m_groundClutter.Initialize( m_planetGenerator, m_terrainGrid.m_elevationScale, planetController.m_planet, m_terrainGrid.GetMaterial() );
 
 		// place the arth ship at the selected landing coordinates
 		var shipPosition = Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude );
