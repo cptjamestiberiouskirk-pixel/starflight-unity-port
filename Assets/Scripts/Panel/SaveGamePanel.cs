@@ -71,6 +71,11 @@ public class SaveGamePanel : Panel
 	Image[] m_planetLookMarkers;
 	TextMeshProUGUI m_planetLookLabel;
 
+	// the screen's buttons for the ground detail (GroundDetail: Auto, Low, Medium, High), the diamonds that mark the setting in use, and their label
+	Button[] m_groundDetailButtons;
+	Image[] m_groundDetailMarkers;
+	TextMeshProUGUI m_groundDetailLabel;
+
 	// the screen's heading, the schemes' names on their buttons, the line about the scheme in use, and the button that closes the screen
 	TextMeshProUGUI m_colorsHeadingText;
 	TMP_Text[] m_schemeLabels;
@@ -292,6 +297,19 @@ public class SaveGamePanel : Panel
 		SoundController.m_instance.PlaySound( SoundController.Sound.Update );
 	}
 
+	// called when the player picks a ground detail on the Colors screen
+	public void GroundDetailClicked( GroundDetail.Setting setting )
+	{
+		InputController.m_instance.Debounce();
+
+		GroundDetail.SetSetting( setting );
+
+		UpdateColorsPanel();
+
+		// play the update sound
+		SoundController.m_instance.PlaySound( SoundController.Sound.Update );
+	}
+
 	// called when the player picks the dark or the light mode on the Colors screen
 	public void ModeClicked( UIKitTheme.Mode mode )
 	{
@@ -476,6 +494,41 @@ public class SaveGamePanel : Panel
 
 			m_planetLookButtons[ i ] = button;
 			m_planetLookMarkers[ i ] = MakeMarker( button.transform );
+		}
+
+		// the ground detail, after the planets' looks, after its label
+		if ( heading != null )
+		{
+			m_groundDetailLabel = Instantiate( heading, content );
+			m_groundDetailLabel.name = "Ground Detail Label";
+			m_groundDetailLabel.text = "Ground";
+
+			PlaceAt( m_groundDetailLabel.rectTransform, Vector2.zero, Vector2.zero, new Vector2( 620.0f, 0.0f ), new Vector2( 760.0f, 64.0f ) );
+
+			if ( m_groundDetailLabel.TryGetComponent<UIKitStyle>( out var groundLabelStyle ) )
+			{
+				groundLabelStyle.m_textStyle = UIKitTheme.TextStyleRole.BodyM;
+				groundLabelStyle.m_color = UIKitTheme.ColorRole.TextSecondary;
+				groundLabelStyle.m_fontSize = 22.0f;
+				groundLabelStyle.Apply();
+			}
+		}
+
+		var groundSettings = (GroundDetail.Setting[]) System.Enum.GetValues( typeof( GroundDetail.Setting ) );
+
+		m_groundDetailButtons = new Button[ groundSettings.Length ];
+		m_groundDetailMarkers = new Image[ groundSettings.Length ];
+
+		for ( var i = 0; i < groundSettings.Length; i++ )
+		{
+			var setting = groundSettings[ i ];
+			var button = CopyButton( m_switchCancelButton, content, setting + " Ground Button", setting.ToString(), () => GroundDetailClicked( setting ) );
+
+			PlaceAt( (RectTransform) button.transform, Vector2.zero, Vector2.zero, new Vector2( 760.0f + i * 166.0f, 4.0f ), new Vector2( 910.0f + i * 166.0f, 60.0f ) );
+			CenterLabel( button );
+
+			m_groundDetailButtons[ i ] = button;
+			m_groundDetailMarkers[ i ] = MakeMarker( button.transform );
 		}
 
 		// the done button, at the bottom right
@@ -692,6 +745,7 @@ public class SaveGamePanel : Panel
 		SetAlignment( m_colorsHeadingText, HorizontalAlignmentOptions.Left, VerticalAlignmentOptions.Middle );
 		SetAlignment( m_schemeDescriptionText, HorizontalAlignmentOptions.Left, VerticalAlignmentOptions.Middle );
 		SetAlignment( m_planetLookLabel, HorizontalAlignmentOptions.Left, VerticalAlignmentOptions.Middle );
+		SetAlignment( m_groundDetailLabel, HorizontalAlignmentOptions.Left, VerticalAlignmentOptions.Middle );
 
 		foreach ( var label in m_schemeLabels )
 		{
@@ -731,6 +785,16 @@ public class SaveGamePanel : Panel
 			if ( m_planetLookMarkers[ i ] != null )
 			{
 				m_planetLookMarkers[ i ].enabled = ( ( i == 0 ) ? PlanetLook.Look.Original : PlanetLook.Look.Natural ) == lookInUse;
+			}
+		}
+
+		var groundDetailInUse = GroundDetail.GetSetting();
+
+		for ( var i = 0; ( m_groundDetailMarkers != null ) && ( i < m_groundDetailMarkers.Length ); i++ )
+		{
+			if ( m_groundDetailMarkers[ i ] != null )
+			{
+				m_groundDetailMarkers[ i ].enabled = (GroundDetail.Setting) i == groundDetailInUse;
 			}
 		}
 

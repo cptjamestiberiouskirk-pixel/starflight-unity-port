@@ -78,6 +78,23 @@ public class TerrainGrid : MonoBehaviour
 		m_initialized = true;
 	}
 
+	// changes how finely the grid is made (GroundDetail): the vertices along each ring's side and the number of rings, and makes the mesh again if they change
+	public void SetDetail( int detail, int numLevels )
+	{
+		if ( ( detail == m_detail ) && ( numLevels == m_numLevels ) )
+		{
+			return;
+		}
+
+		m_detail = detail;
+		m_numLevels = numLevels;
+
+		if ( m_initialized )
+		{
+			GenerateTerrain();
+		}
+	}
+
 	// puts the albedo map the ground is drawn with (the planet's natural one in the natural look: Planet.GetTerrainAlbedoMap) on the material, after the
 	// elevation map or the baked-in elevation have put the generator's there
 	public void SetAlbedoMap( Texture albedoMap )
@@ -378,6 +395,10 @@ public class TerrainGrid : MonoBehaviour
 
 			currentSize *= 2;
 		}
+
+		// (made again when the detail changes; more than 65535 vertices, at GroundDetail's Medium and High, need 32 bit indices)
+		m_mesh.Clear();
+		m_mesh.indexFormat = ( m_vertices.Count > 65535 ) ? UnityEngine.Rendering.IndexFormat.UInt32 : UnityEngine.Rendering.IndexFormat.UInt16;
 
 		// set the vertices on the mesh
 		m_mesh.SetVertices( m_vertices );
