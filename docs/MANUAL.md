@@ -222,7 +222,7 @@ Command, **Launch**, then **Yes**. The docking bay doors open and the ship leave
 
 ### Maneuver
 
-While Maneuver is active, hold a direction key and the ship turns to that heading and flies. Let go and it coasts to a stop. Enter ends Maneuver.
+While Maneuver is active, hold a direction key and the ship flies that way at once, faster the longer you hold it. Let go and it stops. Enter ends Maneuver.
 
 ### In a star system
 

@@ -1610,6 +1610,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioGroundClutter();
 				break;
 
+			case "steering":
+				yield return ScenarioSteering();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -43077,6 +43081,137 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "groundclutter: the clutter's materials come from a material asset with instancing on (or a build strips the instanced variants)", templateFits, ( clutterTemplate == null ) ? "no asset" : ( clutterTemplate.shader.name + ", instancing " + clutterTemplate.enableInstancing ) );
 
 		Finish( "scenario=groundclutter checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the ship's steering (ManeuverButton, since 2026-10-17)
+
+	// with Maneuver running and the ship flying east, hold the right arrow, then the up arrow, and measure how far the flight direction is from north three frames
+	// later; then up and right together, and how far it is from the diagonal; then how far the ship's model is from the flight direction half a second on (the code
+	// before the change has no model direction of its own, and its model faced the flight direction); then no key, and the speed
+	IEnumerator SteerAndMeasure( float[] measured )
+	{
+		var controller = SpaceflightController.m_instance;
+		var general = DataController.m_instance.m_playerData.m_general;
+
+		if ( !( GetField( controller.m_buttonController, "m_currentButton" ) is ManeuverButton ) )
+		{
+			PressButton( ButtonController.ButtonSet.NavigationA, 0 );
+
+			yield return Frames( 10 );
+		}
+
+		measured[ 4 ] = ( GetField( controller.m_buttonController, "m_currentButton" ) is ManeuverButton ) ? 1.0f : 0.0f;
+
+		// flying east already, so that the code before (which eased the heading round) is there too
+		general.m_currentDirection = Vector3.right;
+
+		HoldKeys( Key.RightArrow );
+
+		for ( var end = Time.time + 0.3f; Time.time < end; )
+		{
+			yield return null;
+		}
+
+		measured[ 5 ] = Vector3.Angle( general.m_currentDirection, Vector3.right );
+
+		HoldKeys( Key.UpArrow );
+
+		yield return Frames( 3 );
+
+		measured[ 0 ] = Vector3.Angle( general.m_currentDirection, Vector3.forward );
+
+		HoldKeys( Key.UpArrow, Key.RightArrow );
+
+		yield return Frames( 3 );
+
+		measured[ 1 ] = Vector3.Angle( general.m_currentDirection, new Vector3( 1.0f, 0.0f, 1.0f ) );
+
+		for ( var end = Time.time + 0.5f; Time.time < end; )
+		{
+			yield return null;
+		}
+
+		var model = FieldOrNull( controller.m_playerShip, "m_modelDirection" );
+		var modelDirection = ( model is Vector3 ) ? (Vector3) model : general.m_currentDirection;
+
+		measured[ 2 ] = Vector3.Angle( modelDirection, general.m_currentDirection );
+
+		HoldKeys();
+
+		yield return Frames( 3 );
+
+		measured[ 3 ] = general.m_currentSpeed;
+
+		if ( GetField( controller.m_buttonController, "m_currentButton" ) is ManeuverButton )
+		{
+			controller.m_buttonController.DeactivateButton();
+		}
+
+		yield return Frames( 3 );
+	}
+
+	// the ship flies the way the stick points at once, as the original's (each step goes the way of the key held, HYPER-OV (XYSCAN)): in a star system and in
+	// hyperspace the up arrow after the right turns the flight from east to north within three frames (the code before eased the heading round over a second,
+	// which swung the ship wide past the planets at the original's speed), up and right together fly the diagonal at once, the ship's model turns after the flight
+	// direction within half a second, and with no key held the ship stops at once
+	IEnumerator ScenarioSteering()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+		var starSystem = controller.m_starSystem;
+		var system = new float[ 6 ];
+		var hyperspace = new float[ 6 ];
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets, and no encounter able to begin
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		SetSystemHealth( 0, 100 );
+
+		// ---- 1. the star system of Arth, after launching from the Starport
+		controller.SwitchLocation( PD_General.Location.JustLaunched );
+
+		for ( var end = Time.realtimeSinceStartup + 60.0f; ( Time.realtimeSinceStartup < end ) && starSystem.GeneratingPlanets(); )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 10 );
+
+		yield return SteerAndMeasure( system );
+
+		var inStarSystem = general.m_location == PD_General.Location.StarSystem;
+
+		// ---- 2. hyperspace, in a quiet corner
+		general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 6.0f, 0.0f, 6.0f ) );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		yield return SteerAndMeasure( hyperspace );
+
+		var inHyperspace = general.m_location == PD_General.Location.Hyperspace;
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "steering: star system (" + inStarSystem + ", Maneuver " + system[ 4 ] + "): east " + system[ 5 ].ToString( "0.0" ) + " deg off after 0.3 s; north " + system[ 0 ].ToString( "0.0" ) + " deg off 3 frames after the up arrow; diagonal " + system[ 1 ].ToString( "0.0" ) + " off; model " + system[ 2 ].ToString( "0.0" ) + " off after 0.5 s; speed with no key " + system[ 3 ].ToString( "0.0" ) );
+		Log( "steering: hyperspace (" + inHyperspace + ", Maneuver " + hyperspace[ 4 ] + "): east " + hyperspace[ 5 ].ToString( "0.0" ) + " deg off after 0.3 s; north " + hyperspace[ 0 ].ToString( "0.0" ) + " deg off 3 frames after the up arrow; diagonal " + hyperspace[ 1 ].ToString( "0.0" ) + " off; model " + hyperspace[ 2 ].ToString( "0.0" ) + " off after 0.5 s; speed with no key " + hyperspace[ 3 ].ToString( "0.0" ) );
+
+		Check( "steering: Maneuver runs and the right arrow flies the ship east, in a star system and in hyperspace (control)", inStarSystem && inHyperspace && ( system[ 4 ] > 0.0f ) && ( hyperspace[ 4 ] > 0.0f ) && ( system[ 5 ] < 1.0f ) && ( hyperspace[ 5 ] < 1.0f ), system[ 5 ].ToString( "0.0" ) + " / " + hyperspace[ 5 ].ToString( "0.0" ) );
+		Check( "steering: in a star system the up arrow turns the ship from east to north at once (the code before eased it round over a second)", system[ 0 ] < 1.0f, system[ 0 ].ToString( "0.0" ) + " deg" );
+		Check( "steering: in hyperspace the up arrow turns the ship from east to north at once", hyperspace[ 0 ] < 1.0f, hyperspace[ 0 ].ToString( "0.0" ) + " deg" );
+		Check( "steering: up and right together fly the diagonal at once", ( system[ 1 ] < 1.0f ) && ( hyperspace[ 1 ] < 1.0f ), system[ 1 ].ToString( "0.0" ) + " / " + hyperspace[ 1 ].ToString( "0.0" ) + " deg" );
+		Check( "steering: the ship's model has turned after the flight direction within half a second", ( system[ 2 ] < 2.0f ) && ( hyperspace[ 2 ] < 2.0f ), system[ 2 ].ToString( "0.0" ) + " / " + hyperspace[ 2 ].ToString( "0.0" ) + " deg" );
+		Check( "steering: with no key held the ship stops at once", ( system[ 3 ] == 0.0f ) && ( hyperspace[ 3 ] == 0.0f ), system[ 3 ].ToString( "0.0" ) + " / " + hyperspace[ 3 ].ToString( "0.0" ) );
+
+		Finish( "scenario=steering checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

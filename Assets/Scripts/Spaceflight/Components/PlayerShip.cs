@@ -63,6 +63,11 @@ public class PlayerShip : MonoBehaviour
 	// keep track of the last direction (for banking the ship)
 	Vector3 m_lastDirection;
 
+	// the way the ship's model faces: it turns toward the way the ship flies in about a fifth of a second, so that the ship does not snap round when it changes
+	// course at once (as the original's does); only the model, the ship's path is the flight direction's
+	Vector3 m_modelDirection;
+	const float c_modelTurnRate = 12.0f;
+
 	// keep track of the last banking angle (for interpolation)
 	float m_currentBankingAngle;
 
@@ -110,6 +115,7 @@ public class PlayerShip : MonoBehaviour
 
 		// jump start the last direction
 		m_lastDirection = playerData.m_general.m_currentDirection;
+		m_modelDirection = playerData.m_general.m_currentDirection;
 	}
 
 	// unity update
@@ -273,11 +279,14 @@ public class PlayerShip : MonoBehaviour
 				SpaceflightController.m_instance.m_viewport.UpdateCoordinates();
 			}
 
+			// the model turns toward the way the ship flies (a model facing nowhere, as at the first frame, takes it at once)
+			m_modelDirection = ( m_modelDirection.sqrMagnitude > 0.0001f ) ? Vector3.Slerp( m_modelDirection, playerData.m_general.m_currentDirection, Mathf.Min( 1.0f, Time.deltaTime * c_modelTurnRate ) ) : playerData.m_general.m_currentDirection;
+
 			// set the rotation of the ship
-			m_ship.rotation = Quaternion.LookRotation( playerData.m_general.m_currentDirection, Vector3.up );
+			m_ship.rotation = Quaternion.LookRotation( m_modelDirection, Vector3.up );
 
 			// get the number of degrees we are turning the ship (compared to the last frame)
-			var bankingAngle = Vector3.SignedAngle( playerData.m_general.m_currentDirection, m_lastDirection, Vector3.up );
+			var bankingAngle = Vector3.SignedAngle( m_modelDirection, m_lastDirection, Vector3.up );
 
 			// scale the angle enough so we actually see the ship banking (but max it out at 60 degrees in either direction)
 			bankingAngle = Mathf.Max( -60.0f, Mathf.Min( 60.0f, bankingAngle * 12.0f ) );
@@ -286,10 +295,10 @@ public class PlayerShip : MonoBehaviour
 			m_currentBankingAngle = Mathf.Lerp( m_currentBankingAngle, bankingAngle, Time.deltaTime * 4.0f );
 
 			// bank the ship based on the calculated angle
-			m_ship.rotation = Quaternion.AngleAxis( m_currentBankingAngle, playerData.m_general.m_currentDirection ) * m_ship.rotation * Quaternion.Euler( -90.0f, 0.0f, 0.0f );
+			m_ship.rotation = Quaternion.AngleAxis( m_currentBankingAngle, m_modelDirection ) * m_ship.rotation * Quaternion.Euler( -90.0f, 0.0f, 0.0f );
 
 			// update the last direction
-			m_lastDirection = playerData.m_general.m_currentDirection;
+			m_lastDirection = m_modelDirection;
 		}
 
 		// adjust the engine exhaust glow opacity and scale based on the current speed

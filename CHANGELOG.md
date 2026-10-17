@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Steering as the Original's**: in a star system and in hyperspace, Maneuver eased the ship's heading round toward the direction held, over about a second, so at the original's speed the ship swung far past a planet before it pointed at it, and landing took luck. The original's ship has no turn: each step goes the way of the key held (HYPER-OV `(XYSCAN)`). The ship now flies the way the stick points at once; only its model turns smoothly, in about a fifth of a second, without changing its path. Probe scenario `steering`.
+
 ## [1.2.0] - 2026-10-17
 
 The ground game, natural planets and the original's flight. The terrain vehicle is easier to bring home and has more to do: a mining laser cuts a deposit into the hold (#456), Tools has Capture for a stunned lifeform (#459) and a Return order that drives the vehicle back to the ship (#457), Send beams its hold to the ship from within 20 km (#458), and a vehicle coming back can go aboard anywhere within 3 km of the ship (#452, #455). The ground up close has grain, depth and shadows, grass and pebbles, under a new ground detail setting (#461 to #464). The planets can be drawn in natural colors in space, on the console and on the ground (#443 to #448), and the science officer's analysis surveys a planet's mineral fields and lifeforms from orbit (#451, #453, #454). Flight, fuel, flux jumps and the alien groups' pursuit follow the original's code, and hyperspace and star system travel run at the pace measured in the GOG release (#442, #445). Alien ships call for help, and many smaller rules of trade, the crew, the sensors and Operations now match the original's.
