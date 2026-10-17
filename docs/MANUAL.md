@@ -290,7 +290,7 @@ Once landed, Command, **Disembark** sends the crew out in the terrain vehicle, r
 |---|---|
 | **Map** | An overhead map. Up and Down zoom; Enter closes it. |
 | **Move** | Drive with the direction keys. Enter stops. |
-| **Cargo** | Acts on what is next to the vehicle (see below); otherwise lists the vehicle's cargo, which you can **Drop**. |
+| **Cargo** | Acts on what is next to the vehicle (see below); otherwise lists the vehicle's cargo, which you can **Drop**, or **Send** to the ship by its transporter from within 20 km. |
 | **Look** | Describes the sky, temperature, gravity, atmosphere, water and terrain, and anything close by. |
 | **Scan** | Reads the mineral and life density, lists the planet's elements and labels the objects nearby. |
 | **Tools** | **Mine** cuts the nearest mineral deposit into the hold with the mining laser (see below). **Fire** at the nearest lifeform, **Switch** between the laser and the stunner. Every shot uses some of the vehicle's fuel, the laser twice as much as the stunner. **Return** drives the vehicle back to the ship by itself. |

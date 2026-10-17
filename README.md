@@ -209,6 +209,7 @@ Assets/
 - Planetary landings and terrain vehicle exploration
 - The terrain vehicle offers to go back into the ship when it stops within 3 km of it on the way back, and Tools, Return drives it back by itself
 - The terrain vehicle mines mineral deposits with a mining laser (Tools, Mine), a tenth of a cubic meter at a time on the vehicle's energy
+- The terrain vehicle's cargo list sends its cargo to the ship by transporter from within 20 km (Send)
 - Ruins on the planets where the original game left its messages, recorded in the ship's log by the terrain vehicle
 - The original's special artifacts in the ruins of their sites, picked up by the terrain vehicle, with the Most Magnificent Hexagon and the City of the Ancients around two of them
 - The terrain vehicle can drop cargo and pick it up again, with a cargo display while the cargo list is open

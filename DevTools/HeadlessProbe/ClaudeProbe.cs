@@ -1598,6 +1598,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioReturnOrder();
 				break;
 
+			case "sendcargo":
+				yield return ScenarioSendCargo();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -42477,6 +42481,154 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "returnorder: lava between the vehicle and the ship stops it short of the lava, and says so", lavaFound && !lavaRunning && !reachedLava && ( lavaLocation == PD_General.Location.Disembarked ) && lavaMessage.Contains( "lava" ), "found " + lavaFound + ", running " + lavaRunning + ", reached " + reachedLava + ", " + lavaLocation + " [" + lavaMessage + "]" );
 
 		Finish( "scenario=returnorder checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the terrain vehicle's Send button (TVSendCargoButton, since 2026-10-17)
+
+	// how much of an element the ship is carrying
+	static int ShipCargo( int elementId )
+	{
+		var elementStorage = DataController.m_instance.m_playerData.m_playerShip.m_elementStorage;
+		var elementReference = ( elementStorage == null ) ? null : elementStorage.Find( elementId );
+
+		return ( elementReference == null ) ? 0 : elementReference.m_volume;
+	}
+
+	// on planet 94: the terrain vehicle's cargo list has Send; 10 km from the ship it beams what the vehicle carries into the ship's hold (a crate shimmers away on
+	// the vehicle) and the list closes; 25 km out it refuses; with room for 0.2 cubic meters in the ship's hold it sends what fits and keeps the rest in the list,
+	// and with none it sends nothing
+	IEnumerator ScenarioSendCargo()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		controller.m_encounterRange = 0.0f;
+
+		yield return LandOnPlanet94At( Tools.LatLongToWorldCoordinates( 4.3f, -16.0f ), done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=sendcargo abort: no landing (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		// Move runs when the vehicle comes out: stop it, as the player does before using the console
+		if ( GetField( buttonController, "m_currentButton" ) != null )
+		{
+			buttonController.DeactivateButton();
+		}
+
+		var iron = gameData.FindElementId( "Iron" );
+		var ship = Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude );
+		var unitsPerKm = 2048.0f / 225.0f;
+		var vehicle = playerData.m_terrainVehicle;
+
+		// the vehicle at a distance from the ship (flat, as driving keeps it), with the cargo list open
+		Action<float> putTheVehicle = ( km ) =>
+		{
+			var place = new Vector3( ship.x + km * unitsPerKm, 0.0f, ship.z );
+
+			playerData.m_general.m_coordinates = place;
+			playerData.m_general.m_lastDisembarkedCoordinates = place;
+			controller.m_terrainVehicle.transform.localPosition = place;
+		};
+
+		var cargoLabels = ButtonSetLabels( ButtonController.ButtonSet.TerrainVehicleCargo );
+		var sendIndex = Array.IndexOf( cargoLabels.Split( ',' ), "Send" );
+
+		// ---- 1. 10 km out with 5.0 cubic meters of iron
+		putTheVehicle( 10.0f );
+		vehicle.AddElement( iron, 50 );
+
+		yield return Frames( 5 );
+
+		var shipIronBefore = ShipCargo( iron );
+
+		new TVCargoButton().Execute();
+
+		var listOpen = buttonController.GetCurrentButtonSet() == ButtonController.ButtonSet.TerrainVehicleCargo;
+		var crateShown = false;
+
+		if ( sendIndex >= 0 )
+		{
+			PressButton( ButtonController.ButtonSet.TerrainVehicleCargo, sendIndex );
+
+			yield return Frames( 3 );
+
+			crateShown = GameObject.Find( "Transported Cargo" ) != null;
+		}
+
+		var sentMessage = MessageList();
+		var vehicleAfterSend = vehicle.m_volumeUsed;
+		var shipIronAfterSend = ShipCargo( iron );
+		var setAfterSend = buttonController.GetCurrentButtonSet();
+
+		// ---- 2. 25 km out with 3.0 cubic meters: beyond the transporter's reach
+		putTheVehicle( 25.0f );
+		vehicle.AddElement( iron, 30 );
+
+		yield return Frames( 5 );
+
+		new TVCargoButton().Execute();
+
+		if ( sendIndex >= 0 )
+		{
+			PressButton( ButtonController.ButtonSet.TerrainVehicleCargo, sendIndex );
+		}
+
+		yield return Frames( 3 );
+
+		var farMessage = MessageList();
+		var vehicleAfterFar = vehicle.m_volumeUsed;
+
+		// ---- 3. back at 10 km, with room for 0.2 cubic meters in the ship's hold: what fits goes, the rest stays in the list
+		putTheVehicle( 10.0f );
+		playerData.m_playerShip.AddElement( iron, playerData.m_playerShip.GetRemainingVolume() - 2 );
+
+		yield return Frames( 5 );
+
+		if ( buttonController.GetCurrentButtonSet() != ButtonController.ButtonSet.TerrainVehicleCargo )
+		{
+			new TVCargoButton().Execute();
+		}
+
+		if ( sendIndex >= 0 )
+		{
+			PressButton( ButtonController.ButtonSet.TerrainVehicleCargo, sendIndex );
+		}
+
+		yield return Frames( 3 );
+
+		var partMessage = MessageList();
+		var vehicleAfterPart = vehicle.m_volumeUsed;
+		var setAfterPart = buttonController.GetCurrentButtonSet();
+
+		// ---- 4. and with no room at all, nothing goes
+		if ( sendIndex >= 0 )
+		{
+			PressButton( ButtonController.ButtonSet.TerrainVehicleCargo, sendIndex );
+		}
+
+		yield return Frames( 3 );
+
+		var fullMessage = MessageList();
+		var vehicleAfterFull = vehicle.m_volumeUsed;
+
+		Log( "sendcargo: the cargo list [" + cargoLabels + "] (open " + listOpen + "); from 10 km with 5.0 of iron: the vehicle " + vehicleAfterSend + ", the ship's iron " + shipIronBefore + " -> " + shipIronAfterSend + ", crate " + crateShown + ", then " + setAfterSend + " [" + sentMessage + "]" );
+		Log( "sendcargo: from 25 km with 3.0: the vehicle " + vehicleAfterFar + " [" + farMessage + "]; with room for 0.2: the vehicle " + vehicleAfterPart + ", " + setAfterPart + " [" + partMessage + "]; with none: " + vehicleAfterFull + " [" + fullMessage + "]" );
+
+		Check( "sendcargo: the terrain vehicle's cargo list has Send", listOpen && ( sendIndex >= 0 ), cargoLabels );
+		Check( "sendcargo: 10 km from the ship Send beams the vehicle's cargo into the ship's hold, a crate shimmers away on the vehicle, and the list closes", ( vehicleAfterSend == 0 ) && ( shipIronAfterSend == shipIronBefore + 50 ) && crateShown && ( setAfterSend == ButtonController.ButtonSet.TerrainVehicle ) && sentMessage.Contains( "5.0 cubic meters of cargo transported" ), "vehicle " + vehicleAfterSend + ", ship " + shipIronBefore + " -> " + shipIronAfterSend + ", crate " + crateShown + ", " + setAfterSend );
+		Check( "sendcargo: 25 km out it is beyond the transporter's reach and nothing goes", ( vehicleAfterFar == 30 ) && farMessage.Contains( "beyond the transporter" ), vehicleAfterFar + " [" + farMessage + "]" );
+		Check( "sendcargo: with room for 0.2 cubic meters in the ship, that much goes and the rest stays in the open list", ( vehicleAfterPart == 28 ) && ( setAfterPart == ButtonController.ButtonSet.TerrainVehicleCargo ) && partMessage.Contains( "did not fit" ), vehicleAfterPart + ", " + setAfterPart + " [" + partMessage + "]" );
+		Check( "sendcargo: with no room in the ship nothing goes, and it says so", ( vehicleAfterFull == 28 ) && fullMessage.Contains( "no room" ), vehicleAfterFull + " [" + fullMessage + "]" );
+
+		Finish( "scenario=sendcargo checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
