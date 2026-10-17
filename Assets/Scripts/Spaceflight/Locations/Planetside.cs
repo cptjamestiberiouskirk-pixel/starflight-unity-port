@@ -198,10 +198,23 @@ public class Planetside : MonoBehaviour
 	public void TransferTerrainVehicleCargo()
 	{
 		var playerData = DataController.m_instance.m_playerData;
-		var gameData = DataController.m_instance.m_gameData;
 
 		// refuel the terrain vehicle
 		playerData.m_terrainVehicle.Refuel();
+
+		// play transporter sound if anything was transferred
+		if ( MoveCargoToTheShip() > 0 )
+		{
+			SoundController.m_instance.PlaySound( SoundController.Sound.Transporter );
+		}
+	}
+
+	// moves what the terrain vehicle carries into the ship's hold, as far as there is room (on going back aboard, and from a distance with the vehicle's Send button,
+	// TVSendCargoButton) - returns how much moved, in tenths of a cubic meter
+	public int MoveCargoToTheShip()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
 
 		// transfer elements from TV to ship
 		var tvElements = playerData.m_terrainVehicle.m_elementStorage;
@@ -252,6 +265,8 @@ public class Planetside : MonoBehaviour
 					// remove from TV
 					playerData.m_terrainVehicle.RemoveArtifact( artifactRef.m_artifactId );
 
+					totalVolumeTransferred += artifactVolume;
+
 					Debug.Log( "Transferred artifact " + artifactRef.m_artifactId + " from TV to ship." );
 				}
 			}
@@ -276,14 +291,10 @@ public class Planetside : MonoBehaviour
 			}
 		}
 
-		// play transporter sound if anything was transferred
-		if ( totalVolumeTransferred > 0 )
-		{
-			SoundController.m_instance.PlaySound( SoundController.Sound.Transporter );
-		}
-
 		// recalculate volumes
 		playerData.m_terrainVehicle.RecalculateVolumeUsed();
 		playerData.m_playerShip.RecalculateVolumeUsed();
+
+		return totalVolumeTransferred;
 	}
 }
