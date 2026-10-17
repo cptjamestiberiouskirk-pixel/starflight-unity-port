@@ -110,6 +110,11 @@ public class GroundClutter : MonoBehaviour
 
 		MakeMeshesAndMaterials();
 
+		if ( m_grassMaterial == null )
+		{
+			return;
+		}
+
 		var vehicle = SpaceflightController.m_instance.m_terrainVehicle.transform.position;
 		var cellRange = Mathf.CeilToInt( radius / c_cellSize );
 		var centerCell = new Vector2Int( Mathf.FloorToInt( vehicle.x / c_cellSize ), Mathf.FloorToInt( vehicle.z / c_cellSize ) );
@@ -156,6 +161,20 @@ public class GroundClutter : MonoBehaviour
 
 		Draw( s_grassMesh, m_grassMaterial, m_grassDrawn, bounds, ShadowCastingMode.Off );
 		Draw( s_pebbleMesh, m_pebbleMaterial, m_pebblesDrawn, bounds, ( GroundDetail.GetLevel() == GroundDetail.Level.High ) ? ShadowCastingMode.On : ShadowCastingMode.Off );
+	}
+
+	// the materials are this clutter's own (the meshes are shared by the whole session); the scene is unloaded on every visit to the Starport
+	void OnDestroy()
+	{
+		if ( m_grassMaterial != null )
+		{
+			Destroy( m_grassMaterial );
+		}
+
+		if ( m_pebbleMaterial != null )
+		{
+			Destroy( m_pebbleMaterial );
+		}
 	}
 
 	// gives a clutter material the ground's albedo map and the way from the world to it (the terrain grid's: TRANSFORM_TEX of the world's XZ by the elevation
@@ -323,6 +342,12 @@ public class GroundClutter : MonoBehaviour
 		if ( m_grassMaterial == null )
 		{
 			var shader = Resources.Load<Shader>( "Shaders/Ground Clutter" );
+
+			// nothing to draw them with (Update draws nothing while the materials are missing)
+			if ( shader == null )
+			{
+				return;
+			}
 
 			m_grassMaterial = new Material( shader ) { name = "Ground Clutter Grass", enableInstancing = true, hideFlags = HideFlags.DontSave };
 			m_grassMaterial.SetColor( "_Tint", new Color( 0.95f, 1.15f, 0.8f, 1.0f ) );
