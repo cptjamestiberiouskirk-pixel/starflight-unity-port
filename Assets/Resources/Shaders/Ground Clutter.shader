@@ -8,6 +8,7 @@ Shader "Starflight/Ground Clutter"
 		_GroundMapTransform( "World XZ to the ground map's UV (scale xy, offset zw)", Vector ) = ( 1, 1, 0, 0 )
 		_Tint( "Tint", Color ) = ( 1, 1, 1, 1 )
 		_Variation( "Brightness variation", Range( 0, 1 ) ) = 0.3
+		_Desaturation( "Desaturation", Range( 0, 1 ) ) = 0
 		_Sway( "Sway", Range( 0, 1 ) ) = 0
 	}
 
@@ -41,6 +42,7 @@ Shader "Starflight/Ground Clutter"
 			float4 _GroundMapTransform;
 			float4 _Tint;
 			float _Variation;
+			float _Desaturation;
 			float _Sway;
 
 			struct appdata
@@ -98,6 +100,9 @@ Shader "Starflight/Ground Clutter"
 			float4 frag( v2f i ) : SV_Target
 			{
 				float3 ground = tex2D( _GroundMap, TRANSFORM_TEX( i.groundUV, _GroundMap ) ).rgb;
+
+				// stones are greyer than the soil about them (the map's colour is the soil's)
+				ground = lerp( ground, dot( ground, float3( 0.299, 0.587, 0.114 ) ), _Desaturation );
 				float3 albedo = ground * _Tint.rgb * i.color.rgb;
 				float3 normal = normalize( i.normal );
 

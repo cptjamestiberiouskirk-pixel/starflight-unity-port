@@ -95,7 +95,8 @@ public class GroundClutter : MonoBehaviour
 		pebbles = m_pebbleCells[ cell ];
 	}
 
-	void LateUpdate()
+	// (queued in Update, so that every camera that renders this frame draws them, a picture taken after the updates too)
+	void Update()
 	{
 		m_grassDrawn.Clear();
 		m_pebblesDrawn.Clear();
@@ -329,8 +330,9 @@ public class GroundClutter : MonoBehaviour
 			m_grassMaterial.SetFloat( "_Sway", 0.12f );
 
 			m_pebbleMaterial = new Material( shader ) { name = "Ground Clutter Pebbles", enableInstancing = true, hideFlags = HideFlags.DontSave };
-			m_pebbleMaterial.SetColor( "_Tint", new Color( 0.82f, 0.8f, 0.78f, 1.0f ) );
-			m_pebbleMaterial.SetFloat( "_Variation", 0.35f );
+			m_pebbleMaterial.SetColor( "_Tint", new Color( 0.62f, 0.6f, 0.58f, 1.0f ) );
+			m_pebbleMaterial.SetFloat( "_Variation", 0.5f );
+			m_pebbleMaterial.SetFloat( "_Desaturation", 0.45f );
 			m_pebbleMaterial.SetFloat( "_Sway", 0.0f );
 		}
 	}
