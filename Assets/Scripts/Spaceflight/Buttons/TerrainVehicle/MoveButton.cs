@@ -3,8 +3,13 @@ using UnityEngine;
 
 public class MoveButton : ShipButton
 {
-	// how near the ship (in kilometers along the ground) Move must stop for the vehicle to go back in: on the ship's own map cell, as the original's (a move is 1 km)
-	const float c_boardingDistanceKm = 0.5f;
+	// how near the ship (in kilometers along the ground) Move must stop for the vehicle to go back in. The original takes it in only on the ship's own map cell
+	// (BEHAV-OV ?EMBARK: the vehicle's grid position equal to the ship's, the console's "0 KM."), within half a move of 1 km; the port's vehicle drives smoothly
+	// rather than a cell at a time, so that spot was hard to stop on, and since 2026-10-17 a vehicle coming back stops anywhere within 3 km of the ship. Until the
+	// vehicle has been farther away than that it takes the original's half kilometer, or a stop on the way out (the vehicle disembarks 1.8 km behind the ship)
+	// would take it straight back in
+	public const float c_boardingDistanceKm = 3.0f;
+	public const float c_shipCellKm = 0.5f;
 
 	// if this is true we are transitioning to disembarked
 	bool m_isTransitioning;
@@ -68,23 +73,12 @@ public class MoveButton : ShipButton
 			// stop playing the diesel engine sound
 			SoundController.m_instance.StopSound( SoundController.Sound.DieselEngine );
 
-			// calculate ship coordinates
-			var shipCoordinates = Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude );
+			// how far is the vehicle from the ship, and how near must it be? (3 km on the way back, the ship's own cell before the vehicle has been away)
+			var distanceInKm = GetKmToShip();
+			var boardingKm = SpaceflightController.m_instance.m_disembarked.m_hasBeenAway ? c_boardingDistanceKm : c_shipCellKm;
 
-			shipCoordinates = SpaceflightController.m_instance.m_disembarked.ApplyElevation( shipCoordinates, false );
-
-			// calculate vector from TV to ship coordinates, along the ground: the vehicle's saved place is flat (the ground's height is only drawn) while the
-			// ship's has the ground's height, so measured with the height a ship on raised ground was never near enough to go back in
-			var vectorToShip = shipCoordinates - playerData.m_general.m_lastDisembarkedCoordinates;
-
-			vectorToShip.y = 0.0f;
-
-			// how far is it in kilometers?
-			var distanceInKm = vectorToShip.magnitude * 225.0f / 2048.0f;
-
-			// is the vehicle on the ship's map cell? the original takes it in only there (BEHAV-OV ?EMBARK: the vehicle's grid position equal to the ship's, the
-			// console's "0 KM."), and a move is 1 km, so within half a move
-			if ( distanceInKm <= c_boardingDistanceKm )
+			// is the vehicle near enough to the ship to go back in?
+			if ( distanceInKm <= boardingKm )
 			{
 				// yes - make sure the planetside terrain grid has been updated
 				SpaceflightController.m_instance.m_planetside.UpdateTerrainGridNow();
@@ -173,6 +167,14 @@ public class MoveButton : ShipButton
 				// create our 3d move vector from the controller position
 				var moveVector = new Vector3( x, 0.0f, z );
 
+				// once the vehicle has been farther from the ship than the boarding distance, a stop within it on the way back takes the vehicle in
+				var disembarked = SpaceflightController.m_instance.m_disembarked;
+
+				if ( !disembarked.m_hasBeenAway && ( GetKmToShip() > c_boardingDistanceKm ) )
+				{
+					disembarked.m_hasBeenAway = true;
+				}
+
 				// check if the move vector will actually move the ship (that the controller is not centered)
 				if ( moveVector.magnitude > 0.5f )
 				{
@@ -195,6 +197,18 @@ public class MoveButton : ShipButton
 
 		// returning true prevents the default spaceflight update from running
 		return true;
+	}
+
+	// how far the terrain vehicle is from the ship along the ground, in kilometers (2048 units are 225 km). The vehicle's saved place is flat (the ground's height
+	// is only drawn), so the ship's height is left out: measured with it, a ship on raised ground was never near enough to go back in
+	public static float GetKmToShip()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var vectorToShip = Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude ) - playerData.m_general.m_lastDisembarkedCoordinates;
+
+		vectorToShip.y = 0.0f;
+
+		return vectorToShip.magnitude * 225.0f / 2048.0f;
 	}
 
 	// the crew's walk from where the vehicle stopped to the ship, a cell (a kilometer) at a time: each cell a chance in five of an injury, by the E/M of the cell
