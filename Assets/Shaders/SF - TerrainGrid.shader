@@ -29,6 +29,9 @@ Shader "Starflight/Terrain Grid"
 		SF_GroundGrainMap( "Ground Grain Map", 2D ) = "gray" {}
 		SF_GroundGrainParams( "Ground Grain (strength, fine scale, coarse scale, fade distance)", Vector ) = ( 0, 0.1667, 0.0345, 1 )
 
+		// the darkening of the ground where it curves in (TerrainGrid.SetCavity)
+		SF_GroundCavityStrength( "Ground Cavity Strength", Range( 0, 2 ) ) = 0
+
 		SF_EmissiveMap( "Emissive Map", 2D ) = "black" {}
 		SF_EmissiveTint( "Emissive Tint", Color ) = ( 1, 1, 1, 1 )
 		SF_EmissiveColor( "Emissive Color", Color ) = ( 0, 0, 0, 1 )

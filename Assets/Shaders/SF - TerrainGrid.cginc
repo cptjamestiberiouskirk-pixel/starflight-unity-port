@@ -40,6 +40,41 @@ float getSmoothedElevation( float2 texCoord )
 	return catmullRomElevation( rows[ 0 ], rows[ 1 ], rows[ 2 ], rows[ 3 ], t.y );
 }
 
+float SF_GroundCavityStrength;
+
+// how much the ground about a place curves in (a valley, a crater's floor, a crease) or out (a ridge, a crown): the heights 2, 4 and 8 texels away on each side
+// (8, 16 and 32 world units) against the height here, as a change of slope. The ground is darkened where it curves in and lightened a little where it curves
+// out, so that the shape of the land reads from the camera (GroundDetail: none at Low)
+float getCavityOcclusion( float2 texCoord )
+{
+	if ( SF_GroundCavityStrength <= 0 )
+	{
+		return 1;
+	}
+
+	float center = tex2Dlod( SF_ElevationMap, float4( texCoord, 0, 0 ) ).r;
+	float cavity = 0;
+
+	[unroll]
+	for ( int s = 1; s <= 3; s++ )
+	{
+		float r = exp2( s );
+		float2 dx = float2( SF_ElevationMap_TexelSize.x * r, 0 );
+		float2 dy = float2( 0, SF_ElevationMap_TexelSize.y * r );
+
+		float around = tex2Dlod( SF_ElevationMap, float4( texCoord + dx, 0, 0 ) ).r + tex2Dlod( SF_ElevationMap, float4( texCoord - dx, 0, 0 ) ).r;
+
+		around += tex2Dlod( SF_ElevationMap, float4( texCoord + dy, 0, 0 ) ).r + tex2Dlod( SF_ElevationMap, float4( texCoord - dy, 0, 0 ) ).r;
+
+		// the rise of the ground about it, in world units over the distance (4 units a texel)
+		cavity += ( around * 0.25 - center ) * SF_ElevationScale / ( r * 4 );
+	}
+
+	cavity /= 3;
+
+	return 1 - SF_GroundCavityStrength * clamp( cavity * 4, -0.15, 0.6 );
+}
+
 float4 getTerrainGridWorldCoordinates( SF_VertexShaderInput v, out float2 texCoord )
 {
 	float4 positionWorld = mul( unity_ObjectToWorld, v.position );
@@ -64,6 +99,7 @@ SF_VertexShaderOutput vertTerrainGrid_SF( SF_VertexShaderInput v )
 
 	o.positionClip = mul( UNITY_MATRIX_VP, positionWorld );
 	o.color = v.color;
+	o.color.rgb *= getCavityOcclusion( texCoord );
 	o.texCoord0 = float4( texCoord, 0, 1 );
 	o.texCoord1 = float4( v.texCoord1, 0, 1 );
 	o.positionWorld = positionWorld;
