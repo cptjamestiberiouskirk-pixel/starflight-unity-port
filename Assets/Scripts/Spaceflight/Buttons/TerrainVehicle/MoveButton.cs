@@ -4,10 +4,10 @@ using UnityEngine;
 public class MoveButton : ShipButton
 {
 	// how near the ship (in kilometers along the ground) Move must stop for the vehicle to go back in. The original takes it in only on the ship's own map cell
-	// (BEHAV-OV ?EMBARK: the vehicle's grid position equal to the ship's, the console's "0 KM."), within half a move of 1 km; the port's vehicle drives smoothly
-	// rather than a cell at a time, so that spot was hard to stop on, and since 2026-10-17 a vehicle coming back stops anywhere within 3 km of the ship. Until the
-	// vehicle has been farther away than that it takes the original's half kilometer, or a stop on the way out (the vehicle disembarks 1.8 km behind the ship)
-	// would take it straight back in
+	// (BEHAV-OV ?EMBARK: the vehicle's grid position equal to the ship's, the console's "0 KM."), within half a move of 1 km, and so does a stop there here; the
+	// port's vehicle drives smoothly rather than a cell at a time, so that spot was hard to stop on, and since 2026-10-17 a vehicle coming back that stops
+	// anywhere within 3 km of the ship is asked whether to go back in (TVBoardYesButton, TVBoardNoButton). It is asked, not taken in, as a stop to mine or look
+	// near the ship must not end the trip; and only once it has been farther away than that, as the vehicle disembarks 1.8 km behind the ship
 	public const float c_boardingDistanceKm = 3.0f;
 	public const float c_shipCellKm = 0.5f;
 
@@ -73,31 +73,30 @@ public class MoveButton : ShipButton
 			// stop playing the diesel engine sound
 			SoundController.m_instance.StopSound( SoundController.Sound.DieselEngine );
 
-			// how far is the vehicle from the ship, and how near must it be? (3 km on the way back, the ship's own cell before the vehicle has been away)
+			// how far is the vehicle from the ship?
 			var distanceInKm = GetKmToShip();
-			var boardingKm = SpaceflightController.m_instance.m_disembarked.m_hasBeenAway ? c_boardingDistanceKm : c_shipCellKm;
 
-			// is the vehicle near enough to the ship to go back in?
-			if ( distanceInKm <= boardingKm )
+			// on the ship's own cell the vehicle goes back in at once, as the original's
+			if ( distanceInKm <= c_shipCellKm )
 			{
-				// yes - make sure the planetside terrain grid has been updated
-				SpaceflightController.m_instance.m_planetside.UpdateTerrainGridNow();
+				StartBoarding();
 
-				// fade the map to black
-				SpaceflightController.m_instance.m_viewport.StartFade( 0.0f, 2.0f );
-
-				// we are now transitioning
+				// we are now transitioning to planetside
 				m_isTransitioning = true;
-
-				// play the activate sound
-				SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
-
-				// transition to planetside
 				m_nextLocation = PD_General.Location.Planetside;
+			}
+			else if ( SpaceflightController.m_instance.m_disembarked.m_hasBeenAway && ( distanceInKm <= c_boardingDistanceKm ) )
+			{
+				// within 3 km on the way back the crew are asked first (a stop to mine or look near the ship must not end the trip)
+				var buttonController = SpaceflightController.m_instance.m_buttonController;
 
-				// display message
+				buttonController.DeactivateButton();
+				buttonController.ChangeButtonSet( ButtonController.ButtonSet.TerrainVehicleBoard );
+
 				SpaceflightController.m_instance.m_messages.Clear();
-				SpaceflightController.m_instance.m_messages.AddText( "<color=white>Refueling terrain vehicle and transferring all cargo...</color>" );
+				SpaceflightController.m_instance.m_messages.AddText( "<color=white>The ship is " + Mathf.Max( 1, Mathf.RoundToInt( distanceInKm ) ) + " km away. Return to the ship?</color>" );
+
+				return true;
 			}
 
 			if ( m_isTransitioning )
@@ -197,6 +196,24 @@ public class MoveButton : ShipButton
 
 		// returning true prevents the default spaceflight update from running
 		return true;
+	}
+
+	// the terrain vehicle goes back into the ship: the map fades to black while the vehicle is refuelled and its cargo moves into the ship (the caller switches
+	// to planetside once the fade is over)
+	public static void StartBoarding()
+	{
+		// make sure the planetside terrain grid has been updated
+		SpaceflightController.m_instance.m_planetside.UpdateTerrainGridNow();
+
+		// fade the map to black
+		SpaceflightController.m_instance.m_viewport.StartFade( 0.0f, 2.0f );
+
+		// play the activate sound
+		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+
+		// display message
+		SpaceflightController.m_instance.m_messages.Clear();
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Refueling terrain vehicle and transferring all cargo...</color>" );
 	}
 
 	// how far the terrain vehicle is from the ship along the ground, in kilometers (2048 units are 225 km). The vehicle's saved place is flat (the ground's height

@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Back Into the Ship Within 3 km**: the terrain vehicle went back into the ship only when Move was stopped within half a kilometer of it, the original's rule that the vehicle must be on the ship's own map cell. The original moves the vehicle a cell at a time, so that cell was easy to stop on, but the port drives smoothly, and the spot was a few meters across. A vehicle coming back now goes in when Move is stopped anywhere within 3 km of the ship. Until it has been farther away than that the half kilometer still holds, since the vehicle comes out 1.8 km behind the ship and a stop on the way out would otherwise take it straight back in. Probe scenario `reboard`.
+- **Back Into the Ship Within 3 km**: the terrain vehicle went back into the ship only when Move was stopped within half a kilometer of it, the original's rule that the vehicle must be on the ship's own map cell. The original moves the vehicle a cell at a time, so that cell was easy to stop on, but the port drives smoothly, and the spot was a few meters across. A stop within half a kilometer still takes the vehicle in at once. A vehicle coming back that stops anywhere else within 3 km of the ship is now asked "Return to the ship?", and Yes takes it in. It is asked rather than taken in, since a stop near the ship to mine or look would otherwise end the trip, and only once it has been farther away than 3 km, since the vehicle comes out 1.8 km behind the ship. Probe scenario `reboard`.
 
 ### Fixed
 
