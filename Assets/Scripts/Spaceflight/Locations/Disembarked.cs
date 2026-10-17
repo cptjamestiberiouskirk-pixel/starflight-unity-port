@@ -57,6 +57,25 @@ public class Disembarked : MonoBehaviour
 	{
 		PlanetLook.Changed -= ApplyLook;
 		GroundDetail.Changed -= ApplyGroundDetail;
+
+		// the scene unloaded while the terrain vehicle was out (game over, a save loaded): the project's shadows back
+		RestoreShadows();
+	}
+
+	// puts back the project's shadows, kept while the terrain vehicle was out
+	void RestoreShadows()
+	{
+		if ( !m_shadowsKept )
+		{
+			return;
+		}
+
+		QualitySettings.shadows = m_keptShadows;
+		QualitySettings.shadowResolution = m_keptShadowResolution;
+		QualitySettings.shadowCascades = m_keptShadowCascades;
+		QualitySettings.shadowDistance = m_keptShadowDistance;
+
+		m_shadowsKept = false;
 	}
 
 	// makes the terrain grid as finely as the ground detail in use asks (GroundDetail: the setting, or Auto by the graphics card)
@@ -146,15 +165,7 @@ public class Disembarked : MonoBehaviour
 		gameObject.SetActive( false );
 
 		// the project's shadows back
-		if ( m_shadowsKept )
-		{
-			QualitySettings.shadows = m_keptShadows;
-			QualitySettings.shadowResolution = m_keptShadowResolution;
-			QualitySettings.shadowCascades = m_keptShadowCascades;
-			QualitySettings.shadowDistance = m_keptShadowDistance;
-
-			m_shadowsKept = false;
-		}
+		RestoreShadows();
 
 		// back in the ship: no more weather
 		PlanetWeather.End();
