@@ -271,7 +271,7 @@ In orbit, Science, **Sensors** scans the planet, and **Analysis** tells you what
 ### Landing
 
 1. Command, **Land**.
-2. **Select Site**: move the crosshair over the planet's map with the direction keys. The coordinates show where it is. Enter sets the site.
+2. **Select Site**: move the crosshair over the planet's map with the direction keys. The coordinates show where it is. Enter sets the site. Once your science officer has analysed the planet, the map marks the mineral fields (crosses) and the lifeforms (dots) the survey found.
 3. **Descend**: the autopilot takes the ship down. **Abort** cancels.
 
 Gravity matters:

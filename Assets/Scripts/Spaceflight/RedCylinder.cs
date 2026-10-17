@@ -14,6 +14,9 @@ public static class RedCylinder
 	static int s_planetId = -1;
 	static List<Vector2> s_places;
 
+	// none (what GetAncientRuinPlaces returns without the Red Cylinder)
+	static readonly List<Vector2> s_none = new List<Vector2>();
+
 	// whether it was flashing at the last look (so that the message comes once each time the crosshair comes near)
 	static bool s_flashing;
 
@@ -41,39 +44,7 @@ public static class RedCylinder
 	// true if the ship carries the Red Cylinder and this place is near an ancient ruin of the planet it orbits
 	public static bool IsNearAncientRuin( float eastWest, float northSouth )
 	{
-		var gameData = DataController.m_instance.m_gameData;
-		var playerData = DataController.m_instance.m_playerData;
-
-		if ( !playerData.m_playerShip.HasArtifact( "Red Cylinder" ) || ( SpaceflightController.m_instance == null ) )
-		{
-			return false;
-		}
-
-		var planetId = playerData.m_general.m_currentPlanetId;
-
-		if ( ( planetId < 0 ) || ( planetId >= gameData.m_planetList.Length ) )
-		{
-			return false;
-		}
-
-		if ( ( s_places == null ) || ( s_planetId != planetId ) )
-		{
-			var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( planetId );
-
-			// (the random ruins are worked out from the planet's maps)
-			if ( ( planetController == null ) || !planetController.HasMaps() )
-			{
-				return false;
-			}
-
-			var terrainGrid = SpaceflightController.m_instance.m_disembarked.m_terrainGrid;
-			var elevationScale = ( terrainGrid != null ) ? terrainGrid.m_elevationScale : 100.0f;
-
-			s_places = TerrainRuins.GetAncientRuinPlaces( planetController.GetPlanetGenerator(), elevationScale, gameData.m_planetList[ planetId ] );
-			s_planetId = planetId;
-		}
-
-		foreach ( var place in s_places )
+		foreach ( var place in GetAncientRuinPlaces() )
 		{
 			// (east-west goes round the planet)
 			var eastWestApart = Mathf.Abs( Mathf.DeltaAngle( place.x, eastWest ) );
@@ -85,5 +56,46 @@ public static class RedCylinder
 		}
 
 		return false;
+	}
+
+	/// <summary>
+	/// The ancient ruins of the planet the ship orbits (east-west and north-south, in degrees) if the ship carries the Red Cylinder, none without it (the
+	/// landing map marks them, decided 2026-10-17, ROADMAP D6). The list is kept: do not change it.
+	/// </summary>
+	public static List<Vector2> GetAncientRuinPlaces()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+
+		if ( !playerData.m_playerShip.HasArtifact( "Red Cylinder" ) || ( SpaceflightController.m_instance == null ) )
+		{
+			return s_none;
+		}
+
+		var planetId = playerData.m_general.m_currentPlanetId;
+
+		if ( ( planetId < 0 ) || ( planetId >= gameData.m_planetList.Length ) )
+		{
+			return s_none;
+		}
+
+		if ( ( s_places == null ) || ( s_planetId != planetId ) )
+		{
+			var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( planetId );
+
+			// (the random ruins are worked out from the planet's maps)
+			if ( ( planetController == null ) || !planetController.HasMaps() )
+			{
+				return s_none;
+			}
+
+			var terrainGrid = SpaceflightController.m_instance.m_disembarked.m_terrainGrid;
+			var elevationScale = ( terrainGrid != null ) ? terrainGrid.m_elevationScale : 100.0f;
+
+			s_places = TerrainRuins.GetAncientRuinPlaces( planetController.GetPlanetGenerator(), elevationScale, gameData.m_planetList[ planetId ] );
+			s_planetId = planetId;
+		}
+
+		return s_places;
 	}
 }
