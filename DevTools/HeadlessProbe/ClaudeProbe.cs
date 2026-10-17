@@ -686,6 +686,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioNaturalPlanets();
 				break;
 
+			case "orbitsurvey":
+				yield return ScenarioOrbitSurvey();
+				break;
+
 			case "starfieldpictures":
 				yield return ScenarioStarfieldPictures();
 				break;
@@ -22570,6 +22574,119 @@ public class ClaudeProbe : MonoBehaviour
 		return count;
 	}
 
+	// ---------------------------------------------------------------- the science officer's survey from orbit (PlanetSurvey, decided 2026-10-17: ROADMAP D6)
+
+	IEnumerator ScenarioOrbitSurvey()
+	{
+		var controller = SpaceflightController.m_instance;
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+		var sensors = controller.m_displayController.m_sensorsDisplay;
+		var grid = controller.m_disembarked.m_terrainGrid;
+		var errorsBefore = s_errorCount;
+
+		EnsureCrew();
+
+		var scienceOfficer = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer );
+
+		// ---- 1. in orbit around planet 92 of Arth's system (minerals 15, life 7): the exact places the survey works out, and the analysis's survey
+		yield return GoIntoOrbit( 25, 92 );
+		yield return WaitForPlanetMaps( 90.0f );
+		yield return Frames( 5 );
+
+		var planet = gameData.m_planetList[ 92 ];
+		var planetController = controller.m_starSystem.GetPlanetController( 92 );
+		var generator = planetController.GetPlanetGenerator();
+
+		PlanetSurvey.Forget();
+
+		var depositPlaces = PlanetSurvey.GetDepositPlaces( planet, generator, grid );
+		var lifeformPlaces = PlanetSurvey.GetLifeformPlaces( planet, generator, grid );
+
+		controller.m_displayController.ChangeDisplay( sensors );
+
+		yield return Frames( 3 );
+
+		scienceOfficer.m_science = 250;
+
+		var analysis = AnalyzeNewReading( true );
+		var survey = controller.m_planetSurvey;
+
+		// a less skilled officer finds less, and more roughly; damaged sensors find less too
+		var low = PlanetSurvey.Make( planet, generator, grid, 20, 1.0f );
+		var high = PlanetSurvey.Make( planet, generator, grid, 250, 1.0f );
+		var damaged = PlanetSurvey.Make( planet, generator, grid, 250, 0.3f );
+		var lowAgain = PlanetSurvey.Make( planet, generator, grid, 20, 1.0f );
+
+		var sameEachTime = ( low != null ) && ( lowAgain != null ) && ( low.m_marks.Count == lowAgain.m_marks.Count );
+
+		for ( var i = 0; sameEachTime && ( i < low.m_marks.Count ); i++ )
+		{
+			sameEachTime = Mathf.Approximately( low.m_marks[ i ].m_eastWest, lowAgain.m_marks[ i ].m_eastWest ) && Mathf.Approximately( low.m_marks[ i ].m_northSouth, lowAgain.m_marks[ i ].m_northSouth );
+		}
+
+		Log( "orbitsurvey: planet 92 from orbit: " + depositPlaces.Count + " deposits, " + lifeformPlaces.Count + " lifeforms | skill 250: " + ( ( high != null ) ? high.m_mineralFieldsFound + "/" + high.m_mineralFields + " fields, " + high.m_lifeformsFound + "/" + high.m_lifeforms + " lifeforms" : "none" ) + " | skill 20: " + ( ( low != null ) ? low.m_mineralFieldsFound + " fields, " + low.m_lifeformsFound + " lifeforms" : "none" ) + " | sensors at 30%: " + ( ( damaged != null ) ? damaged.m_mineralFieldsFound + " fields" : "none" ) + " | analysis: " + analysis );
+
+		// ---- 2. on the surface of planet 92: the deposits and the lifeforms the survey worked out are where the surface puts them
+		var landed = new bool[ 1 ];
+
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, landed );
+		yield return Frames( 2 );
+
+		var elements = ( grid.m_terrainElements != null ) ? grid.m_terrainElements.GetComponentsInChildren<TerrainElement>( true ) : new TerrainElement[ 0 ];
+		var depositsWrong = new List<string>();
+
+		foreach ( var element in elements )
+		{
+			Tools.WorldToLatLongCoordinates( element.transform.position, out var eastWest, out var northSouth );
+
+			var index = element.m_depositIndex;
+			var place = ( ( index >= 0 ) && ( index < depositPlaces.Count ) ) ? depositPlaces[ index ] : new Vector3( float.NaN, float.NaN, -1 );
+
+			if ( ( Mathf.Abs( Mathf.DeltaAngle( place.x, eastWest ) ) > 0.01f ) || ( Mathf.Abs( place.y - northSouth ) > 0.01f ) || ( (int) place.z != element.m_elementId ) )
+			{
+				if ( depositsWrong.Count < 5 )
+				{
+					depositsWrong.Add( "#" + index + " at " + eastWest.ToString( "F2" ) + "," + northSouth.ToString( "F2" ) + " (" + element.m_elementId + ") worked out " + place.x.ToString( "F2" ) + "," + place.y.ToString( "F2" ) + " (" + (int) place.z + ")" );
+				}
+				else
+				{
+					depositsWrong.Add( "" );
+				}
+			}
+		}
+
+		var terrainLifeforms = FieldOrNull( grid, "m_terrainLifeforms" ) as TerrainLifeforms;
+		var lifeformsOnGround = ( terrainLifeforms != null ) ? terrainLifeforms.m_lifeformList : new List<TerrainLifeform>();
+		var lifeformsWrong = new List<string>();
+
+		for ( var i = 0; i < lifeformsOnGround.Count; i++ )
+		{
+			Tools.WorldToLatLongCoordinates( lifeformsOnGround[ i ].transform.position, out var eastWest, out var northSouth );
+
+			var place = ( i < lifeformPlaces.Count ) ? lifeformPlaces[ i ] : new Vector3( float.NaN, float.NaN, -1 );
+
+			// (a lifeform may have taken a few steps since it was placed)
+			if ( ( Mathf.Abs( Mathf.DeltaAngle( place.x, eastWest ) ) > 1.5f ) || ( Mathf.Abs( place.y - northSouth ) > 1.5f ) )
+			{
+				lifeformsWrong.Add( "#" + i + " at " + eastWest.ToString( "F2" ) + "," + northSouth.ToString( "F2" ) + " worked out " + place.x.ToString( "F2" ) + "," + place.y.ToString( "F2" ) );
+			}
+		}
+
+		Log( "orbitsurvey: on planet 92: " + elements.Length + " deposits on the ground (" + depositsWrong.Count + " not where worked out" + ( ( depositsWrong.Count > 0 ) ? ": " + string.Join( "; ", depositsWrong.FindAll( text => text.Length > 0 ) ) : "" ) + "), " + lifeformsOnGround.Count + " lifeforms (" + lifeformsWrong.Count + " not where worked out" + ( ( lifeformsWrong.Count > 0 ) ? ": " + string.Join( "; ", lifeformsWrong ) : "" ) + ")" );
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "orbitsurvey: from orbit, every deposit of planet 92 is worked out where the surface places it, of its element", ( elements.Length > 0 ) && ( elements.Length == depositPlaces.Count ) && ( depositsWrong.Count == 0 ), elements.Length + " on the ground, " + depositPlaces.Count + " worked out, " + depositsWrong.Count + " wrong" );
+		Check( "orbitsurvey: from orbit, every lifeform of planet 92 is worked out where the surface places it", ( lifeformsOnGround.Count > 0 ) && ( lifeformsOnGround.Count == lifeformPlaces.Count ) && ( lifeformsWrong.Count == 0 ), lifeformsOnGround.Count + " on the ground, " + lifeformPlaces.Count + " worked out, " + lifeformsWrong.Count + " wrong" );
+		Check( "orbitsurvey: the analysis of a planet reading in orbit reports its mineral fields and lifeforms, and keeps the survey for the planet", analysis.Contains( "Mineral Fields: <color=white>" ) && analysis.Contains( "Lifeforms: <color=white>" ) && ( survey != null ) && ( survey.m_planetId == 92 ), analysis );
+		Check( "orbitsurvey: a science officer of full skill with sound sensors finds every mineral field and lifeform; one of skill 20 finds fewer; sensors at 30% find fewer", ( high != null ) && ( low != null ) && ( damaged != null ) && ( high.m_mineralFields > 0 ) && ( high.m_mineralFieldsFound == high.m_mineralFields ) && ( high.m_lifeformsFound == high.m_lifeforms ) && ( low.m_mineralFieldsFound < high.m_mineralFieldsFound ) && ( damaged.m_mineralFieldsFound < high.m_mineralFieldsFound ), ( ( high != null ) ? high.m_mineralFieldsFound + "/" + high.m_mineralFields + " " + high.m_lifeformsFound + "/" + high.m_lifeforms : "none" ) + " | " + ( ( low != null ) ? low.m_mineralFieldsFound.ToString() : "none" ) + " | " + ( ( damaged != null ) ? damaged.m_mineralFieldsFound.ToString() : "none" ) );
+		Check( "orbitsurvey: the same officer finds the same marks every time", sameEachTime, sameEachTime.ToString() );
+		Check( "orbitsurvey: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=orbitsurvey deposits=" + elements.Length + "/" + depositPlaces.Count + " lifeforms=" + lifeformsOnGround.Count + "/" + lifeformPlaces.Count + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
 	IEnumerator ScenarioAnalysisSkill()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -22598,7 +22715,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		var none = AnalyzeNewReading( true );
 
-		// ---- 4. a skill of 100: about half of 100 lines in 20 readings (5 a reading: the orbit number is always given)
+		// ---- 4. a skill of 100: about half of 140 lines in 20 readings (7 a reading: the orbit number is always given; 2 of the 7 are the survey's, the mineral
+		// fields and the lifeforms, since 2026-10-17)
 		scienceOfficer.m_science = 100;
 
 		var unknownOfHalf = 0;
@@ -22623,12 +22741,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 3 );
 
-		Log( "analysisskill: skill 250: " + full + " || again: " + again + " || skill 0: " + none + " || skill 100: " + unknownOfHalf + " of 100 lines not certain || a ship twice: " + shipTwice );
+		Log( "analysisskill: skill 250: " + full + " || again: " + again + " || skill 0: " + none + " || skill 100: " + unknownOfHalf + " of 140 lines not certain || a ship twice: " + shipTwice );
 
 		Check( "analysisskill: a science officer of full skill gives every line (control)", full.Contains( "Object: <color=white>Planet" ) && ( UnknownLines( full ) == 0 ), full );
 		Check( "analysisskill: an analysis uses up the reading: the same reading again needs a new one (the original's \"I need a current sensor reading.\")", again.Contains( "I need a current sensor reading." ), again );
-		Check( "analysisskill: with no skill only the object's class and the orbit number are given, and the other 5 lines are \"Not certain\"", none.Contains( "Object: <color=white>Planet" ) && none.Contains( "Orbit Number: <color=white>" + DataController.m_instance.m_gameData.m_planetList[ playerData.m_general.m_currentPlanetId ].m_orbitPosition + "<" ) && ( UnknownLines( none ) == 5 ), none );
-		Check( "analysisskill: with a skill of 100 about half the lines are given (skill / 2 percent each)", ( unknownOfHalf >= 30 ) && ( unknownOfHalf <= 70 ), unknownOfHalf + " of 100" );
+		Check( "analysisskill: with no skill only the object's class and the orbit number are given, and the other 7 lines are \"Not certain\" (the survey's two among them)", none.Contains( "Object: <color=white>Planet" ) && none.Contains( "Orbit Number: <color=white>" + DataController.m_instance.m_gameData.m_planetList[ playerData.m_general.m_currentPlanetId ].m_orbitPosition + "<" ) && ( UnknownLines( none ) == 7 ), none );
+		Check( "analysisskill: with a skill of 100 about half the lines are given (skill / 2 percent each)", ( unknownOfHalf >= 42 ) && ( unknownOfHalf <= 98 ), unknownOfHalf + " of 140" );
 		Check( "analysisskill: an alien ship's reading is used up too: its second analysis needs a new reading", ( shipTwice == "<color=white>I need a current sensor reading.</color>" ), shipTwice );
 
 		Finish( "scenario=analysisskill unknown100=" + unknownOfHalf, 0 );

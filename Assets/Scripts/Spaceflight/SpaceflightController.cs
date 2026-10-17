@@ -511,6 +511,10 @@ public class SpaceflightController : MonoBehaviour
 	// the planet whose gravity the science officer has analysed (the original's ?G-AWARE: only then does Land warn), and the planet Land has warned about once
 	// (the original's GWF: a second Land goes down anyway) - neither is saved
 	public int m_gravityAnalysedPlanetId = -1;
+
+	// the science officer's survey of the planet last analysed from orbit: its mineral fields and lifeforms
+	// (PlanetSurvey; the sensor picture and the landing map show its marks; not saved, as the gravity's analysis is not)
+	public PlanetSurvey m_planetSurvey;
 	public int m_landingWarnedPlanetId = -1;
 
 	// what the landing that is under way will end in (LAND-OV WF430): a crash for want of fuel, or the hull crushed by the gravity

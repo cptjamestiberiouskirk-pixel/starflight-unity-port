@@ -111,6 +111,71 @@ public class TerrainLifeforms : TerrainGridPopulator
 		Random.state = randomState;
 	}
 
+	/// <summary>
+	/// Works out where Initialize places the lifeforms of a planet, without placing any (PlanetSurvey: the science officer's survey from orbit): the same random
+	/// numbers in the same order, so the same places (keep the two loops the same; the probe's orbitsurvey compares them with the lifeforms on the surface).
+	/// Each place is its species' index in GD_Species.ForPlanet and its place on the planet's map. The game's random numbers are put back afterwards.
+	/// </summary>
+	public static List<KeyValuePair<int, Vector2>> ReplayPlaces( PlanetGenerator planetGenerator, int randomSeed )
+	{
+		var places = new List<KeyValuePair<int, Vector2>>();
+
+		if ( ( planetGenerator == null ) || ( planetGenerator.m_elevation == null ) )
+		{
+			return places;
+		}
+
+		var speciesList = GD_Species.ForPlanet( planetGenerator.GetPlanet() );
+
+		if ( speciesList.Count == 0 )
+		{
+			return places;
+		}
+
+		var randomState = Random.state;
+
+		Random.InitState( randomSeed );
+
+		var minimumElevation = ( planetGenerator.m_maximumElevation - planetGenerator.m_waterElevation ) * 0.05f + planetGenerator.m_waterElevation;
+
+		for ( var speciesIndex = 0; speciesIndex < speciesList.Count; speciesIndex++ )
+		{
+			var count = Random.Range( c_fewestOfASpecies, c_mostOfASpecies + 1 );
+
+			for ( var i = 0; i < count; i++ )
+			{
+				var found = false;
+				var bestX = 0.0f;
+				var bestY = 0.0f;
+				var bestElevation = float.MaxValue;
+
+				for ( var j = 0; j < c_tries; j++ )
+				{
+					var mapX = Random.Range( 0.0f, planetGenerator.m_textureMapWidth );
+					var mapY = Random.Range( planetGenerator.m_textureMapHeight * 0.35f, planetGenerator.m_textureMapHeight * 0.65f );
+					var elevation = planetGenerator.GetBilinearSmoothedElevation( mapX, mapY );
+
+					if ( ( elevation >= minimumElevation ) && ( elevation < bestElevation ) )
+					{
+						found = true;
+						bestX = mapX;
+						bestY = mapY;
+						bestElevation = elevation;
+					}
+				}
+
+				if ( found )
+				{
+					places.Add( new KeyValuePair<int, Vector2>( speciesIndex, new Vector2( bestX, bestY ) ) );
+				}
+			}
+		}
+
+		Random.state = randomState;
+
+		return places;
+	}
+
 	// the height of the ground at this place, and whether it is dry ground a lifeform can walk on (planet.txt: lifeforms on the ground never move onto "liquid" or
 	// "lava") - false off the planet's maps - over a liquid the height is that of its surface, where the terrain grid draws it
 	public bool GetGround( Vector3 worldPosition, out float height )

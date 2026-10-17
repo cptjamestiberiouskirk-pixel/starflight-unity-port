@@ -223,6 +223,116 @@ public class TerrainGridPopulator : MonoBehaviour
 		Random.state = randomState;
 	}
 
+	// ---- the same placing, worked out without placing anything (PlanetSurvey: the science officer's survey from orbit)
+
+	// one object the placing would put on the planet: where, its template, and the volume a deposit's callback draws for it (0 for anything else)
+	public struct ReplayedPlace
+	{
+		public Vector3 m_position;
+		public int m_templateIndex;
+		public int m_volume;
+	}
+
+	// makes empty spawn lists for a replay (a replay keeps its own, so that it never disturbs the surface's)
+	public static List<Vector3>[,] MakeSpawnLists()
+	{
+		var spawnLists = new List<Vector3>[ c_spawnListHeight, c_spawnListWidth ];
+
+		for ( var y = 0; y < c_spawnListHeight; y++ )
+		{
+			for ( var x = 0; x < c_spawnListWidth; x++ )
+			{
+				spawnLists[ y, x ] = new List<Vector3>();
+			}
+		}
+
+		return spawnLists;
+	}
+
+	/// <summary>
+	/// Works out where Initialize places its objects on a planet, without placing any: the same random numbers in the same order, so the same places
+	/// (keep the two loops the same; the probe's orbitsurvey compares them with the objects on the surface). The objects placed before it go in the
+	/// spawn lists, which this adds to. drawVolume is a deposit's callback (it draws one random number for each deposit placed); null for objects whose
+	/// callback draws none. The game's random numbers are put back afterwards, as Initialize does.
+	/// </summary>
+	public static List<ReplayedPlace> ReplayPlaces( PlanetGenerator planetGenerator, List<Vector3>[,] spawnLists, float elevationScale, int numTemplates, int numObjects, int randomSeed, bool favorHigherElevations, float minScale, float maxScale, System.Func<int> drawVolume )
+	{
+		var places = new List<ReplayedPlace>();
+
+		if ( ( numObjects <= 0 ) || ( numTemplates <= 0 ) || ( planetGenerator == null ) || ( planetGenerator.m_elevation == null ) )
+		{
+			return places;
+		}
+
+		var randomState = Random.state;
+
+		Random.InitState( randomSeed );
+
+		var minimumElevation = ( planetGenerator.m_maximumElevation - planetGenerator.m_waterElevation ) * 0.05f + planetGenerator.m_waterElevation;
+		var position = Vector3.zero;
+
+		for ( var i = 0; i < numObjects; i++ )
+		{
+			var spotFound = false;
+
+			for ( var j = 0; j < 10; j++ )
+			{
+				var mapX = Random.Range( 0.0f, planetGenerator.m_textureMapWidth );
+				var mapY = Random.Range( planetGenerator.m_textureMapHeight * 0.125f, planetGenerator.m_textureMapHeight * 0.875f );
+
+				var normal = planetGenerator.GetBilinearSmoothedNormal( mapX, mapY, elevationScale * 0.125f );
+
+				if ( normal.y < 0.707f )
+				{
+					continue;
+				}
+
+				var elevation = planetGenerator.GetBilinearSmoothedElevation( mapX, mapY );
+
+				if ( elevation < minimumElevation )
+				{
+					continue;
+				}
+
+				var randomElevation = Random.Range( minimumElevation, planetGenerator.m_maximumElevation );
+
+				if ( favorHigherElevations ? ( elevation <= randomElevation ) : ( elevation >= randomElevation ) )
+				{
+					continue;
+				}
+
+				position = Tools.MapToWorldCoordinates( mapX, mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
+
+				position.y = elevation * elevationScale;
+
+				if ( OverlapsSomething( planetGenerator, spawnLists, position ) )
+				{
+					continue;
+				}
+
+				spotFound = true;
+				break;
+			}
+
+			if ( !spotFound )
+			{
+				continue;
+			}
+
+			// the rotation's and the scale's random numbers, as Initialize draws them, then the callback's
+			Random.Range( 0.0f, 360.0f );
+			Random.Range( minScale, maxScale );
+
+			AddToSpawnList( planetGenerator, spawnLists, position );
+
+			places.Add( new ReplayedPlace { m_position = position, m_templateIndex = i % numTemplates, m_volume = ( drawVolume != null ) ? drawVolume() : 0 } );
+		}
+
+		Random.state = randomState;
+
+		return places;
+	}
+
 	// populate the planet with a callback for each spawned object
 	protected void InitializeWithCallback( float elevationScale, GameObject[] templates, int numObjects, int randomSeed, bool favorHigherElevations, float minScale, float maxScale, ObjectSpawnedCallback callback )
 	{
@@ -232,10 +342,15 @@ public class TerrainGridPopulator : MonoBehaviour
 	// figure out which of the spawn lists a position on the planet belongs to
 	static void GetSpawnList( Vector3 position, out int listX, out int listY )
 	{
-		Tools.WorldToMapCoordinates( position, out var mapX, out var mapY, m_planetGenerator.m_textureMapWidth, m_planetGenerator.m_textureMapHeight );
+		GetSpawnList( m_planetGenerator, position, out listX, out listY );
+	}
 
-		listX = Mathf.FloorToInt( (float) mapX / (float) m_planetGenerator.m_textureMapWidth * (float) c_spawnListWidth );
-		listY = Mathf.FloorToInt( (float) mapY / (float) m_planetGenerator.m_textureMapHeight * (float) c_spawnListHeight );
+	static void GetSpawnList( PlanetGenerator planetGenerator, Vector3 position, out int listX, out int listY )
+	{
+		Tools.WorldToMapCoordinates( position, out var mapX, out var mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
+
+		listX = Mathf.FloorToInt( (float) mapX / (float) planetGenerator.m_textureMapWidth * (float) c_spawnListWidth );
+		listY = Mathf.FloorToInt( (float) mapY / (float) planetGenerator.m_textureMapHeight * (float) c_spawnListHeight );
 
 		// a position on the very edge of the map belongs to the last list, not to one past it (Random.Range can
 		// return its upper limit, which is the width of the map, and that is one list too far)
@@ -245,14 +360,24 @@ public class TerrainGridPopulator : MonoBehaviour
 
 	static void AddToSpawnList( Vector3 position )
 	{
-		GetSpawnList( position, out var listX, out var listY );
+		AddToSpawnList( m_planetGenerator, m_spawnLists, position );
+	}
 
-		m_spawnLists[ listY, listX ].Add( position );
+	static void AddToSpawnList( PlanetGenerator planetGenerator, List<Vector3>[,] spawnLists, Vector3 position )
+	{
+		GetSpawnList( planetGenerator, position, out var listX, out var listY );
+
+		spawnLists[ listY, listX ].Add( position );
 	}
 
 	static bool OverlapsSomething( Vector3 position )
 	{
-		GetSpawnList( position, out var listX, out var listY );
+		return OverlapsSomething( m_planetGenerator, m_spawnLists, position );
+	}
+
+	static bool OverlapsSomething( PlanetGenerator planetGenerator, List<Vector3>[,] spawnLists, Vector3 position )
+	{
+		GetSpawnList( planetGenerator, position, out var listX, out var listY );
 
 		for ( var y = -1; y <= 1; y++ )
 		{
@@ -268,7 +393,7 @@ public class TerrainGridPopulator : MonoBehaviour
 			{
 				var listXOffset = ( listX + x + c_spawnListWidth ) & ( c_spawnListWidth - 1 );
 
-				foreach ( var otherPosition in m_spawnLists[ listYOffset, listXOffset ] )
+				foreach ( var otherPosition in spawnLists[ listYOffset, listXOffset ] )
 				{
 					var distance = Vector3.Magnitude( otherPosition - position );
 
