@@ -1,12 +1,19 @@
 using UnityEngine;
 
-// the terrain vehicle's Return order (since 2026-10-17): the vehicle drives itself back to the ship, on the fuel the trip takes, and goes aboard on the ship's own
-// cell. It is Move with the steering done for the player: the fire button stops it as it stops Move, and out of fuel the crew walks back. It stops short of lava
+// the terrain vehicle's Return order (since 2026-10-17): the vehicle drives itself back to the ship, on the fuel the trip takes, and goes aboard once it is beside
+// it. It is Move with the steering done for the player: the fire button stops it as it stops Move, and out of fuel the crew walks back. It stops short of lava
 // ahead, and when the vehicle makes no headway (a cliff or a rock in the way), and says why
 public class TVReturnButton : MoveButton
 {
 	// how far ahead of the vehicle, toward the ship, lava stops it (world units; 9.1 are a kilometer)
 	public const float c_lavaLookAhead = 12.0f;
+
+	// how near the ship the vehicle stops turning gradually and heads straight for it (turning at Move's rate, it circles a point it drives at)
+	public const float c_straightKm = 2.0f;
+
+	// how near the ship the vehicle goes aboard: beside it (the ship's hull keeps the vehicle about 0.9 km from its middle on some sides, inside which the
+	// original's own cell, half a kilometer, lies)
+	public const float c_besideTheShipKm = 1.5f;
 
 	// how long the vehicle may go without getting nearer to the ship before it stops, and how much nearer counts as headway
 	public const float c_stuckSeconds = 4.0f;
@@ -41,8 +48,8 @@ public class TVReturnButton : MoveButton
 		{
 			var distanceInKm = GetKmToShip();
 
-			// on the ship's own cell: aboard, as Move stopped there takes the vehicle in
-			if ( distanceInKm <= c_shipCellKm )
+			// beside the ship: aboard
+			if ( distanceInKm <= c_besideTheShipKm )
 			{
 				GoAboard();
 
@@ -79,7 +86,20 @@ public class TVReturnButton : MoveButton
 			}
 		}
 
-		return base.Update();
+		var result = base.Update();
+
+		// near the ship it heads straight for it, or it would circle it
+		if ( !m_isTransitioning && ( GetKmToShip() < c_straightKm ) )
+		{
+			var toShip = GetVectorToShip();
+
+			if ( toShip.sqrMagnitude > 0.0001f )
+			{
+				DataController.m_instance.m_playerData.m_general.m_currentDirection = toShip.normalized;
+			}
+		}
+
+		return result;
 	}
 
 	// Return steers toward the ship, whatever the stick does

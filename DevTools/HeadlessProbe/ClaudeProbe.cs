@@ -42213,7 +42213,7 @@ public class ClaudeProbe : MonoBehaviour
 		SpaceflightController.m_instance.m_terrainVehicle.transform.localPosition = place;
 	}
 
-	// a place on solid ground with the liquid 32 units east of it (8 pixels of the planet's map), and that place in the liquid; false if the planet has none
+	// a place in the liquid and the nearest place on solid ground to it (within 10 pixels of the planet's map, 40 units, in one of eight directions); false if there is none
 	static bool FindSolidGroundByTheLiquid( out Vector3 solid, out Vector3 liquid )
 	{
 		solid = Vector3.zero;
@@ -42230,19 +42230,37 @@ public class ClaudeProbe : MonoBehaviour
 		var height = planetGenerator.m_textureMapHeight;
 		var water = planetGenerator.m_waterElevation;
 
-		for ( var y = height / 4; y < height * 3 / 4; y += 4 )
-		{
-			for ( var x = 0; x < width - 8; x += 2 )
-			{
-				if ( ( planetGenerator.GetBicubicSmoothedElevation( x, y ) > water * 1.1f + 0.01f ) && ( planetGenerator.GetBicubicSmoothedElevation( x + 8, y ) < water * 0.9f ) )
-				{
-					solid = new Vector3( ( x + 0.5f - width * 0.5f ) * 4.0f, 0.0f, ( y + 0.5f - height * 0.5f ) * 4.0f );
-					liquid = solid + new Vector3( 32.0f, 0.0f, 0.0f );
+		var directions = new Vector2Int[] { new Vector2Int( 1, 0 ), new Vector2Int( -1, 0 ), new Vector2Int( 0, 1 ), new Vector2Int( 0, -1 ), new Vector2Int( 1, 1 ), new Vector2Int( -1, 1 ), new Vector2Int( 1, -1 ), new Vector2Int( -1, -1 ) };
 
-					return true;
+		for ( var y = height / 4; y < height * 3 / 4; y += 8 )
+		{
+			for ( var x = 48; x < width - 48; x += 8 )
+			{
+				if ( planetGenerator.GetBicubicSmoothedElevation( x, y ) >= water - 0.005f )
+				{
+					continue;
+				}
+
+				for ( var r = 3; r <= 10; r++ )
+				{
+					foreach ( var d in directions )
+					{
+						var sx = x + d.x * r;
+						var sy = Mathf.Clamp( y + d.y * r, 0, height - 1 );
+
+						if ( planetGenerator.GetBicubicSmoothedElevation( sx, sy ) > water + 0.005f )
+						{
+							solid = new Vector3( ( sx + 0.5f - width * 0.5f ) * 4.0f, 0.0f, ( sy + 0.5f - height * 0.5f ) * 4.0f );
+							liquid = new Vector3( ( x + 0.5f - width * 0.5f ) * 4.0f, 0.0f, ( y + 0.5f - height * 0.5f ) * 4.0f );
+
+							return true;
+						}
+					}
 				}
 			}
 		}
+
+		Log( "returnorder: no solid ground by the liquid; the liquid's level is " + water.ToString( "F3" ) );
 
 		return false;
 	}
@@ -42297,6 +42315,7 @@ public class ClaudeProbe : MonoBehaviour
 			PressButton( ButtonController.ButtonSet.TerrainVehicleWeapon, returnIndex );
 
 			var start = Time.time;
+			var nextTrace = Time.time;
 
 			for ( var end = Time.time + 40.0f; ( Time.time < end ) && ( playerData.m_general.m_location == PD_General.Location.Disembarked ); )
 			{
@@ -42306,6 +42325,15 @@ public class ClaudeProbe : MonoBehaviour
 
 				toShip.y = 0.0f;
 				nearestKm = Mathf.Min( nearestKm, toShip.magnitude / unitsPerKm );
+
+				if ( Time.time >= nextTrace )
+				{
+					nextTrace = Time.time + 3.0f;
+
+					var current = GetField( buttonController, "m_currentButton" );
+
+					Log( "returnorder: at " + ( Time.time - start ).ToString( "F1" ) + " s, " + ( toShip.magnitude / unitsPerKm ).ToString( "F2" ) + " km, speed " + playerData.m_general.m_currentSpeed.ToString( "F2" ) + ", direction " + playerData.m_general.m_currentDirection.ToString( "F2" ) + ", running " + ( ( current == null ) ? "nothing" : current.GetType().Name ) + ", message [" + MessageList() + "]" );
+				}
 
 				yield return null;
 			}
@@ -42353,18 +42381,23 @@ public class ClaudeProbe : MonoBehaviour
 			stoppedLocation = playerData.m_general.m_location;
 		}
 
-		// ---- 3. no headway (the vehicle cannot move): it stops and says the way is blocked
+		// ---- 3. no headway (the vehicle cannot move): it stops and says the way is blocked (once it has stopped coasting from the stop before)
 		var speedMultiplier = controller.m_terrainVehicle.m_speedMultiplier;
 		var blockedMessage = "";
 		var blockedRunning = true;
 
 		controller.m_terrainVehicle.m_speedMultiplier = 0.0f;
 
+		for ( var end = Time.time + 5.0f; ( Time.time < end ) && ( playerData.m_general.m_currentSpeed >= 0.1f ); )
+		{
+			yield return null;
+		}
+
 		if ( returnIndex >= 0 )
 		{
 			PressButtonLabelled( ButtonController.ButtonSet.TerrainVehicleWeapon, "Return" );
 
-			for ( var end = Time.time + 6.0f; ( Time.time < end ) && ( GetField( buttonController, "m_currentButton" ) != null ); )
+			for ( var end = Time.time + 10.0f; ( Time.time < end ) && ( GetField( buttonController, "m_currentButton" ) != null ); )
 			{
 				yield return null;
 			}
@@ -42405,10 +42438,11 @@ public class ClaudeProbe : MonoBehaviour
 
 		if ( lavaFound && ( returnIndex >= 0 ) )
 		{
-			// the ship beyond the lava, 80 units east of the vehicle
+			// the ship beyond the lava, 50 units past it on the line from the vehicle
+			var across = lava - solid;
 			float longitude, latitude;
 
-			Tools.WorldToLatLongCoordinates( solid + new Vector3( 80.0f, 0.0f, 0.0f ), out longitude, out latitude );
+			Tools.WorldToLatLongCoordinates( lava + across.normalized * 50.0f, out longitude, out latitude );
 
 			playerData.m_general.m_selectedLatitude = latitude;
 			playerData.m_general.m_selectedLongitude = longitude;
@@ -42421,7 +42455,9 @@ public class ClaudeProbe : MonoBehaviour
 
 			for ( var end = Time.time + 10.0f; ( Time.time < end ) && ( GetField( buttonController, "m_currentButton" ) != null ); )
 			{
-				reachedLava |= playerData.m_general.m_lastDisembarkedCoordinates.x >= lava.x - 2.0f;
+				var driven = playerData.m_general.m_lastDisembarkedCoordinates - solid;
+
+				reachedLava |= Vector3.Dot( driven, across.normalized ) >= across.magnitude - 2.0f;
 
 				yield return null;
 			}
@@ -42435,7 +42471,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "returnorder: from 8 km, Enter after 2 s: " + stoppedLocation + " at " + stoppedKm.ToString( "F2" ) + " km, still running " + stoppedRunning + "; no headway: running " + blockedRunning + " [" + blockedMessage + "]; lava (found " + lavaFound + " at " + solid + "): " + lavaLocation + ", running " + lavaRunning + ", reached the lava " + reachedLava + " [" + lavaMessage + "]" );
 
 		Check( "returnorder: the vehicle's Tools have Return", returnIndex >= 0, toolLabels );
-		Check( "returnorder: from 6 km Return drives the vehicle back by itself and takes it aboard on the ship's cell, on its fuel", ( locationAfterReturn == PD_General.Location.Planetside ) && ( nearestKm <= MoveButton.c_shipCellKm + 0.05f ) && ( lowestFuel < fuelBefore - 0.001f ), locationAfterReturn + ", nearest " + nearestKm.ToString( "F2" ) + " km, fuel " + fuelBefore.ToString( "F4" ) + " -> " + lowestFuel.ToString( "F4" ) );
+		Check( "returnorder: from 6 km Return drives the vehicle back by itself and takes it aboard beside the ship (within 1.5 km), on its fuel", ( locationAfterReturn == PD_General.Location.Planetside ) && ( nearestKm <= 1.55f ) && ( seconds < 20.0f ) && ( lowestFuel < fuelBefore - 0.001f ), locationAfterReturn + ", nearest " + nearestKm.ToString( "F2" ) + " km, fuel " + fuelBefore.ToString( "F4" ) + " -> " + lowestFuel.ToString( "F4" ) );
 		Check( "returnorder: the fire button stops it on the way, nearer than it started", ( stoppedLocation == PD_General.Location.Disembarked ) && !stoppedRunning && ( stoppedKm < 7.5f ) && ( stoppedKm > MoveButton.c_boardingDistanceKm ), stoppedLocation + " at " + stoppedKm.ToString( "F2" ) + " km, running " + stoppedRunning );
 		Check( "returnorder: a vehicle that makes no headway stops and says the way is blocked", !blockedRunning && blockedMessage.Contains( "blocked" ), "running " + blockedRunning + " [" + blockedMessage + "]" );
 		Check( "returnorder: lava between the vehicle and the ship stops it short of the lava, and says so", lavaFound && !lavaRunning && !reachedLava && ( lavaLocation == PD_General.Location.Disembarked ) && lavaMessage.Contains( "lava" ), "found " + lavaFound + ", running " + lavaRunning + ", reached " + reachedLava + ", " + lavaLocation + " [" + lavaMessage + "]" );
