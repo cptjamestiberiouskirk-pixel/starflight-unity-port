@@ -34653,69 +34653,49 @@ public class ClaudeProbe : MonoBehaviour
 
 		var ship = controller.m_disembarked.ApplyElevation( Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude ), false );
 
-		// the control: 5 km from the ship along the ground, Move and Enter leave the crew outside (2048 units are 225 km)
-		var far = new Vector3( ship.x + 5.0f * 2048.0f / 225.0f, 0.0f, ship.z );
+		// the vehicle at a distance from the ship along the ground, kept as driving keeps it (flat: the ground's height is only drawn), then Move and Enter there as
+		// the player stops; going back in fades for 2 s before the location changes, so wait long enough to see it if it comes (2048 units are 225 km)
+		var locations = new PD_General.Location[ 4 ];
+		var away = new object[ 4 ];
+		var distances = new float[] { 2.0f, 5.0f, 3.5f, 2.8f };
 
-		playerData.m_general.m_coordinates = far;
-		playerData.m_general.m_lastDisembarkedCoordinates = far;
-		controller.m_terrainVehicle.transform.localPosition = far;
+		for ( var i = 0; i < distances.Length; i++ )
+		{
+			var place = new Vector3( ship.x + distances[ i ] * 2048.0f / 225.0f, 0.0f, ship.z );
 
-		yield return Frames( 5 );
+			playerData.m_general.m_coordinates = place;
+			playerData.m_general.m_lastDisembarkedCoordinates = place;
+			controller.m_terrainVehicle.transform.localPosition = place;
 
-		PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
+			yield return Frames( 5 );
 
-		yield return Frames( 5 );
-		yield return Tap( Key.Enter );
+			PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
 
-		// going back in fades for 2 s before the location changes: wait long enough to see it if it comes
-		yield return WaitForLocation( PD_General.Location.Planetside, 4.0f );
+			yield return Frames( 5 );
 
-		var locationWhenFar = playerData.m_general.m_location;
+			// (read by name: the code before 2026-10-17 has no such field)
+			away[ i ] = controller.m_disembarked.GetType().GetField( "m_hasBeenAway", c_any )?.GetValue( controller.m_disembarked );
 
-		// 1 km from the ship, the next map cell: the original takes the vehicle in only on the ship's own cell (BEHAV-OV ?EMBARK), so the crew stay outside
-		var oneCell = new Vector3( ship.x + 2048.0f / 225.0f, 0.0f, ship.z );
+			yield return Tap( Key.Enter );
+			yield return WaitForLocation( PD_General.Location.Planetside, ( i == distances.Length - 1 ) ? 10.0f : 4.0f );
 
-		playerData.m_general.m_coordinates = oneCell;
-		playerData.m_general.m_lastDisembarkedCoordinates = oneCell;
-		controller.m_terrainVehicle.transform.localPosition = oneCell;
+			locations[ i ] = playerData.m_general.m_location;
 
-		yield return Frames( 5 );
+			if ( locations[ i ] != PD_General.Location.Disembarked )
+			{
+				break;
+			}
+		}
 
-		PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
-
-		yield return Frames( 5 );
-		yield return Tap( Key.Enter );
-
-		// going back in fades for 2 s before the location changes: wait long enough to see it if it comes
-		yield return WaitForLocation( PD_General.Location.Planetside, 4.0f );
-
-		var locationWhenOneCell = playerData.m_general.m_location;
-
-		// the vehicle on the ship's cell, 0.3 km from it along the ground, kept as driving keeps it (flat: the ground's height is only drawn)
-		var near = new Vector3( ship.x + 0.3f * 2048.0f / 225.0f, 0.0f, ship.z );
-
-		playerData.m_general.m_coordinates = near;
-		playerData.m_general.m_lastDisembarkedCoordinates = near;
-		controller.m_terrainVehicle.transform.localPosition = near;
-
-		yield return Frames( 5 );
-
-		// Move, then Enter beside the ship, as the player goes back in
-		PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
-
-		yield return Frames( 5 );
-		yield return Tap( Key.Enter );
-		yield return WaitForLocation( PD_General.Location.Planetside, 10.0f );
 		yield return Frames( 10 );
 
-		var location = playerData.m_general.m_location;
-
-		Log( "reboard: the ship stands at height " + ship.y.ToString( "F1" ) + "; after Move and Enter 5 km away " + locationWhenFar + ", 1 km away " + locationWhenOneCell + ", 0.3 km away " + location );
+		Log( "reboard: the ship stands at height " + ship.y.ToString( "F1" ) + "; after Move and Enter on the way out 2 km away " + locations[ 0 ] + " (away " + away[ 0 ] + "), 5 km away " + locations[ 1 ] + " (away " + away[ 1 ] + "), back at 3.5 km " + locations[ 2 ] + ", at 2.8 km " + locations[ 3 ] + " (away " + away[ 3 ] + ")" );
 
 		Check( "reboard: the ship stands on raised ground (the setup is the case)", ship.y > 10.0f, ship.y.ToString( "F1" ) );
-		Check( "reboard: Move and Enter 5 km from the ship leave the crew outside (control)", locationWhenFar == PD_General.Location.Disembarked, locationWhenFar.ToString() );
-		Check( "reboard: Move and Enter 1 km from the ship (the next map cell) leave the crew outside, as the original's", locationWhenOneCell == PD_General.Location.Disembarked, locationWhenOneCell.ToString() );
-		Check( "reboard: Move and Enter on the ship's cell (0.3 km along the ground) take the vehicle back in, however high the ground", location == PD_General.Location.Planetside, location.ToString() );
+		Check( "reboard: on the way out, Move and Enter 2 km from the ship leave the crew outside (only the ship's own cell, 0.5 km, takes the vehicle in before it has been away)", locations[ 0 ] == PD_General.Location.Disembarked, locations[ 0 ].ToString() );
+		Check( "reboard: Move and Enter 5 km from the ship leave the crew outside (control)", locations[ 1 ] == PD_General.Location.Disembarked, locations[ 1 ].ToString() );
+		Check( "reboard: back from there, Move and Enter 3.5 km from the ship leave the crew outside (beyond the 3 km)", locations[ 2 ] == PD_General.Location.Disembarked, locations[ 2 ].ToString() );
+		Check( "reboard: back from there, Move and Enter 2.8 km from the ship along the ground take the vehicle back in, however high the ground (the original's ship's cell was hard to stop on with smooth driving)", locations[ 3 ] == PD_General.Location.Planetside, locations[ 3 ].ToString() );
 
 		Finish( "scenario=reboard checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
@@ -36130,8 +36110,9 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		// within 2 km of the ship (2048 units are 225 km)
-		// onto the ship's map cell: Move stopped there takes the vehicle in (0.5 km, 4.5 units) - most of the way with the stick held, the last stretch in short
-		// pushes, as the vehicle turns too slowly to come to a point it drives straight at (it circles it)
+		// onto the ship's map cell (Move stopped within 3 km takes a vehicle that has been away in, but the stage drives all the way, as it did when only the ship's
+		// cell would do) - most of the way with the stick held, the last stretch in short pushes, as the vehicle turns too slowly to come to a point it drives
+		// straight at (it circles it)
 		yield return PtDrive( shipPlace, 12.0f, 25.0f, driven );
 		yield return PtCreep( shipPlace, 2.5f, 25.0f );
 

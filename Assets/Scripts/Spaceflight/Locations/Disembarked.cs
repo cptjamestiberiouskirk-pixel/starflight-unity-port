@@ -30,6 +30,10 @@ public class Disembarked : MonoBehaviour
 	public float m_arthShipGroundScanHeight;
 	public float m_arthShipGroundScanInterval;
 
+	// whether the terrain vehicle has been farther from the ship than MoveButton.c_boardingDistanceKm since it went out: only then does Move stopped within that
+	// distance take it back in (not saved: a game loaded with the vehicle that far out counts as away)
+	[System.NonSerialized] public bool m_hasBeenAway;
+
 	// the planet generator
 	PlanetGenerator m_planetGenerator;
 
@@ -143,6 +147,9 @@ public class Disembarked : MonoBehaviour
 
 		// move the player to where we are in this location
 		playerData.m_general.m_coordinates = playerData.m_general.m_lastDisembarkedCoordinates;
+
+		// a vehicle that comes out beside the ship has not been away yet; one loaded far out has
+		m_hasBeenAway = MoveButton.GetKmToShip() > MoveButton.c_boardingDistanceKm;
 
 		// follow the terrain vehicle
 		SpaceflightController.m_instance.m_playerCamera.SetCameraFollow( m_terrainVehicle.gameObject, new Vector3( 0.0f, 75.0f, -75.0f ) );
