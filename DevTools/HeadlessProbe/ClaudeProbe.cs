@@ -42759,7 +42759,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		if ( hasGraphics )
 		{
-			RenderWholeFramePicture( Camera.main, System.IO.Path.Combine( folder, "colors.png" ) );
+			RenderScreenPicture( System.IO.Path.Combine( folder, "colors.png" ) );
 		}
 
 		// its Medium button: the setting, the marker and the grid follow
