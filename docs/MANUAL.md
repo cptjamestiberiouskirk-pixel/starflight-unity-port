@@ -1,6 +1,6 @@
 # Starflight Player's Manual
 
-For the Unity 6 port of *Starflight*, version 1.1.0.
+For the Unity 6 port of *Starflight*, version 1.2.0.
 
 This manual explains how to play: the Starport, your crew and ship, flying, planets, aliens, combat and money. It tells you the story you are given at the start, and no more. What the galaxy holds, where things are and how the game is won are for you to find out.
 
@@ -414,12 +414,14 @@ This is a faithful remake of *Starflight* (Binary Systems, Electronic Arts, 1986
 
 - 3D views: real planets and stars (the planets in natural colors with skies and clouds, if you like), a 3D Starport and terrain;
 - a new console and Starport design, in 15 color schemes;
-- lifeforms on the planets' surfaces rebuilt from the game's 1984 design notes.
+- lifeforms on the planets' surfaces rebuilt from the game's 1984 design notes;
+- a survey from orbit: the science officer's analysis marks a planet's mineral fields and lifeforms on the landing map and the sensor picture, and its ruins with the Red Cylinder aboard;
+- an easier terrain vehicle: a mining laser in place of the original's one-press pickup of a deposit, a Return order, a transporter for its hold, and boarding anywhere within 3 km of the ship;
+- grass, pebbles and finer ground around the terrain vehicle, as much as the Colors screen's ground detail asks for.
 
 Known differences:
 
 - **Combat**: shields recharge at the port's own pace during a fight.
-- Smaller details of hyperspace flight (aliens' pursuit, speeds) are simplified.
 
 ---
 
