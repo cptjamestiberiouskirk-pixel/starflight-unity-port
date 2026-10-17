@@ -42703,6 +42703,10 @@ public class ClaudeProbe : MonoBehaviour
 		var key = "Ground Detail";
 		var savedSetting = PlayerPrefs.HasKey( key ) ? PlayerPrefs.GetString( key ) : null;
 
+		// the project's shadows, before the terrain vehicle goes out
+		Func<string> shadowsNow = () => QualitySettings.shadows + "/" + QualitySettings.shadowResolution + "/" + QualitySettings.shadowCascades + "/" + QualitySettings.shadowDistance.ToString( "F0" );
+		var projectShadows = shadowsNow();
+
 		yield return LandOnPlanet94At( Tools.LatLongToWorldCoordinates( 4.3f, -16.0f ), done );
 
 		if ( !done[ 0 ] )
@@ -42716,6 +42720,8 @@ public class ClaudeProbe : MonoBehaviour
 		var grid = controller.m_disembarked.m_terrainGrid;
 		var details = new Dictionary<string, int>();
 		var grains = new Dictionary<string, string>();
+		var cavities = new Dictionary<string, float>();
+		var shadows = new Dictionary<string, string>();
 		var randomStateBefore = UnityEngine.Random.state;
 		var rings = new Dictionary<string, int>();
 		var vertices = new Dictionary<string, int>();
@@ -42733,6 +42739,8 @@ public class ClaudeProbe : MonoBehaviour
 			// (the grain laid over the ground at this level, as the material has it: GroundGrain)
 			var groundMaterial = FieldOrNull( grid, "m_material" ) as Material;
 
+			cavities[ level ] = ( groundMaterial == null ) ? -1.0f : groundMaterial.GetFloat( "SF_GroundCavityStrength" );
+			shadows[ level ] = shadowsNow();
 			grains[ level ] = ( groundMaterial == null ) ? "(no material)" : groundMaterial.GetVector( "SF_GroundGrainParams" ).x.ToString( "F2" ) + " " + ( ( groundMaterial.GetTexture( "SF_GroundGrainMap" ) is Texture grainMapOf ) ? grainMapOf.name : "none" );
 
 			if ( groundMaterial != null )
@@ -42832,6 +42840,15 @@ public class ClaudeProbe : MonoBehaviour
 
 		Call( savePanel, "CancelClicked" );
 
+		// back in the ship: the project's shadows again
+		yield return Frames( 5 );
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+
+		var shadowsInTheShip = shadowsNow();
+
 		Func<string, string> state = level => details[ level ] + " x " + rings[ level ] + " rings, " + vertices[ level ] + " vertices, " + formats[ level ];
 
 		Log( "grounddetail: Auto takes " + autoLevel + " here (graphics device " + hasGraphics + ", " + SystemInfo.graphicsMemorySize + " MB); Low " + state( "Low" ) + "; Medium " + state( "Medium" ) + "; High " + state( "High" ) );
@@ -42844,6 +42861,8 @@ public class ClaudeProbe : MonoBehaviour
 		var randomUntouched = UnityEngine.Random.state.Equals( randomStateBefore );
 
 		Check( "grounddetail: the grain of the ground up close is laid over it at Medium and High and not at Low, and making it draws no random numbers (everything on a planet is placed from them)", grains[ "Low" ].StartsWith( "0.00" ) && grains[ "Medium" ].StartsWith( "0.60 Ground Grain" ) && grains[ "High" ].StartsWith( "0.80 Ground Grain" ) && randomUntouched, "Low " + grains[ "Low" ] + ", Medium " + grains[ "Medium" ] + ", High " + grains[ "High" ] + ", random numbers untouched " + randomUntouched );
+		Check( "grounddetail: the ground's curves are shaded at Medium (0.6) and High (0.9) and not at Low", ( cavities[ "Low" ] == 0.0f ) && ( Mathf.Abs( cavities[ "Medium" ] - 0.6f ) < 0.01f ) && ( Mathf.Abs( cavities[ "High" ] - 0.9f ) < 0.01f ), cavities[ "Low" ].ToString( "F2" ) + " / " + cavities[ "Medium" ].ToString( "F2" ) + " / " + cavities[ "High" ].ToString( "F2" ) );
+		Check( "grounddetail: out in the terrain vehicle the shadows are hard, medium, 2 cascades to 300 at Low and very high, 4 cascades to 768 at High, and the project's are back in the ship", ( shadows[ "Low" ] == "HardOnly/Medium/2/300" ) && ( shadows[ "High" ] == "All/VeryHigh/4/768" ) && ( shadowsInTheShip == projectShadows ), "Low " + shadows[ "Low" ] + ", Medium " + shadows[ "Medium" ] + ", High " + shadows[ "High" ] + "; project " + projectShadows + ", in the ship " + shadowsInTheShip );
 		Check( "grounddetail: the Colors screen has a Ground row of Auto, Low, Medium and High that marks the setting in use, and its Medium button sets Medium and remakes the grid", ( groundLabels == "Auto,Low,Medium,High" ) && ( markedBefore == 0 ) && ( markedAfter == 2 ) && ( settingAfter == "Medium" ) && ( detailAfter == 257 ), groundLabels + ", marked " + markedBefore + " -> " + markedAfter + ", " + settingAfter + ", grid " + detailAfter );
 
 		Finish( "scenario=grounddetail checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
