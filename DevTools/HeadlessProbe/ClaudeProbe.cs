@@ -1582,6 +1582,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioEncounterSpeeds();
 				break;
 
+			case "surveymap":
+				yield return ScenarioSurveyMap();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -41222,6 +41226,395 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "encounterspeeds: with no direction held the ship stops at once", stopped < 0.1f, stopped.ToString( "F1" ) );
 
 		Finish( "scenario=encounterspeeds alien=" + one[ 0 ].ToString( "F0" ) + "/" + three[ 0 ].ToString( "F0" ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the survey's marks on the landing map (TerrainMapDisplay, SurveyMarks: ROADMAP D6)
+
+	// the image of the survey's marks over the landing map (null if it has not been made)
+	static UnityEngine.UI.RawImage SurveyMarksImage()
+	{
+		var map = SpaceflightController.m_instance.m_displayController.m_terrainMapDisplay;
+		var marks = ( map.m_map != null ) ? map.m_map.transform.Find( "Survey Marks" ) : null;
+
+		return ( marks != null ) ? marks.GetComponent<UnityEngine.UI.RawImage>() : null;
+	}
+
+	// whether the marks show on the landing map
+	static bool SurveyMarksShown()
+	{
+		var image = SurveyMarksImage();
+
+		return ( image != null ) && image.enabled && image.gameObject.activeInHierarchy && ( image.texture != null );
+	}
+
+	// the colours drawn around this place of the planet on the marks (offset by pixels of their texture): for each of the 9 pixels about it (a mark's middle
+	// falls between pixels), the index of the colour of these it is nearest to, -1 if nothing is drawn on it and -2 if what is drawn is faint
+	static HashSet<int> SurveyMarkColors( float eastWest, float northSouth, float offsetX, float offsetY, params Color[] colors )
+	{
+		var found = new HashSet<int>();
+		var image = SurveyMarksImage();
+		var texture = ( image != null ) ? image.texture as Texture2D : null;
+
+		if ( texture == null )
+		{
+			found.Add( -1 );
+
+			return found;
+		}
+
+		var pixel = SurveyMarks.GetPixel( texture.width, texture.height, eastWest, northSouth );
+		var centerX = Mathf.FloorToInt( pixel.x + offsetX );
+		var centerY = Mathf.FloorToInt( pixel.y + offsetY );
+
+		for ( var y = centerY - 1; y <= centerY + 1; y++ )
+		{
+			for ( var x = centerX - 1; x <= centerX + 1; x++ )
+			{
+				var color = texture.GetPixel( ( x + texture.width ) % texture.width, Mathf.Clamp( y, 0, texture.height - 1 ) );
+
+				if ( color.a <= 0.0f )
+				{
+					found.Add( -1 );
+
+					continue;
+				}
+
+				if ( color.a <= 0.5f )
+				{
+					found.Add( -2 );
+
+					continue;
+				}
+
+				var nearestIndex = -1;
+				var nearest = float.MaxValue;
+
+				for ( var i = 0; i < colors.Length; i++ )
+				{
+					var distance = Mathf.Abs( color.r - colors[ i ].r ) + Mathf.Abs( color.g - colors[ i ].g ) + Mathf.Abs( color.b - colors[ i ].b );
+
+					if ( distance < nearest )
+					{
+						nearest = distance;
+						nearestIndex = i;
+					}
+				}
+
+				found.Add( nearestIndex );
+			}
+		}
+
+		return found;
+	}
+
+	// which of these colours is drawn around this place of the planet on the marks: the one a pixel of the 9 about it comes nearest to (-1 if nothing is
+	// drawn there), and how near (the sum of the channels' differences)
+	static int SurveyMarkNearest( float eastWest, float northSouth, out float nearest, params Color[] colors )
+	{
+		var image = SurveyMarksImage();
+		var texture = ( image != null ) ? image.texture as Texture2D : null;
+		var nearestIndex = -1;
+
+		nearest = float.MaxValue;
+
+		if ( texture == null )
+		{
+			return -1;
+		}
+
+		var pixel = SurveyMarks.GetPixel( texture.width, texture.height, eastWest, northSouth );
+
+		for ( var y = Mathf.FloorToInt( pixel.y ) - 1; y <= Mathf.FloorToInt( pixel.y ) + 1; y++ )
+		{
+			for ( var x = Mathf.FloorToInt( pixel.x ) - 1; x <= Mathf.FloorToInt( pixel.x ) + 1; x++ )
+			{
+				var color = texture.GetPixel( ( x + texture.width ) % texture.width, Mathf.Clamp( y, 0, texture.height - 1 ) );
+
+				if ( color.a <= 0.5f )
+				{
+					continue;
+				}
+
+				for ( var i = 0; i < colors.Length; i++ )
+				{
+					var distance = Mathf.Abs( color.r - colors[ i ].r ) + Mathf.Abs( color.g - colors[ i ].g ) + Mathf.Abs( color.b - colors[ i ].b );
+
+					if ( distance < nearest )
+					{
+						nearest = distance;
+						nearestIndex = i;
+					}
+				}
+			}
+		}
+
+		return nearestIndex;
+	}
+
+	// whether this place shows a mark of this kind in this theme's colours (0 minerals, 1 life, 2 a ruin)
+	static bool SurveyMarkIs( int kind, float eastWest, float northSouth, float offsetX, float offsetY, UIKitTheme theme )
+	{
+		return SurveyMarkColors( eastWest, northSouth, offsetX, offsetY, theme.m_statusArmor, theme.m_statusFuel, theme.m_statusDanger, theme.m_backgroundApp ).Contains( kind );
+	}
+
+	IEnumerator ScenarioSurveyMap()
+	{
+		var controller = SpaceflightController.m_instance;
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+		var displays = controller.m_displayController;
+		var grid = controller.m_disembarked.m_terrainGrid;
+		var errorsBefore = s_errorCount;
+
+		EnsureCrew();
+
+		UIKitTheme.SetScheme( 0, false );
+		UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+		var classic = UIKitTheme.GetViewTheme();
+		var scienceOfficer = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer );
+
+		// ---- 1. in orbit around planet 92 of Arth's system, not analysed yet: no marks (the control)
+		yield return GoIntoOrbit( 25, 92 );
+		yield return WaitForPlanetMaps( 90.0f );
+		yield return Frames( 5 );
+
+		controller.m_planetSurvey = null;
+
+		displays.ChangeDisplay( displays.m_terrainMapDisplay );
+
+		yield return Frames( 2 );
+
+		var shownBeforeAnalysis = SurveyMarksShown();
+
+		// ---- 2. analysed by a science officer of full skill: every mark found is on the map, in its colour
+		displays.ChangeDisplay( displays.m_sensorsDisplay );
+
+		yield return Frames( 3 );
+
+		scienceOfficer.m_science = 250;
+
+		AnalyzeNewReading( true );
+
+		var survey = controller.m_planetSurvey;
+
+		displays.ChangeDisplay( displays.m_terrainMapDisplay );
+
+		yield return Frames( 2 );
+
+		var shownAfterAnalysis = SurveyMarksShown();
+
+		// (with -Graphics, a picture of the landing map with its marks)
+		if ( SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null )
+		{
+			RenderScreenPicture( System.IO.Path.Combine( System.IO.Path.GetTempPath(), "starflight-probe", "surveymap-planet-92.png" ) );
+		}
+
+		var minerals = 0;
+		var mineralsMarked = 0;
+		var lifeforms = 0;
+		var lifeformsMarked = 0;
+		var notMarked = new List<string>();
+
+		if ( survey != null )
+		{
+			foreach ( var mark in survey.m_marks )
+			{
+				// (a mineral field's cross under a lifeform's dot is not looked at)
+				var underDot = ( mark.m_kind == PlanetSurvey.Kind.Minerals ) && survey.m_marks.Exists( other => ( other.m_kind == PlanetSurvey.Kind.Life ) && ( Mathf.Abs( Mathf.DeltaAngle( other.m_eastWest, mark.m_eastWest ) ) < 4.0f ) && ( Mathf.Abs( other.m_northSouth - mark.m_northSouth ) < 4.0f ) );
+
+				if ( underDot )
+				{
+					continue;
+				}
+
+				var kind = ( mark.m_kind == PlanetSurvey.Kind.Minerals ) ? 0 : 1;
+				var marked = SurveyMarkIs( kind, mark.m_eastWest, mark.m_northSouth, 0.0f, 0.0f, classic );
+
+				if ( mark.m_kind == PlanetSurvey.Kind.Minerals )
+				{
+					minerals++;
+					mineralsMarked += marked ? 1 : 0;
+				}
+				else
+				{
+					lifeforms++;
+					lifeformsMarked += marked ? 1 : 0;
+				}
+
+				if ( !marked && ( notMarked.Count < 5 ) )
+				{
+					notMarked.Add( ( ( kind == 0 ) ? "minerals" : "life" ) + " at " + mark.m_eastWest.ToString( "F1" ) + "," + mark.m_northSouth.ToString( "F1" ) );
+				}
+			}
+		}
+
+		// a place far from every mark is clear (the control)
+		var clearPlace = new Vector2( float.NaN, float.NaN );
+
+		for ( var eastWest = -170.0f; ( eastWest < 180.0f ) && float.IsNaN( clearPlace.x ); eastWest += 10.0f )
+		{
+			for ( var northSouth = -80.0f; ( northSouth <= 80.0f ) && float.IsNaN( clearPlace.x ); northSouth += 10.0f )
+			{
+				var ew = eastWest;
+				var ns = northSouth;
+
+				if ( ( survey != null ) && !survey.m_marks.Exists( mark => ( Mathf.Abs( Mathf.DeltaAngle( mark.m_eastWest, ew ) ) < 10.0f ) && ( Mathf.Abs( mark.m_northSouth - ns ) < 10.0f ) ) )
+				{
+					clearPlace = new Vector2( ew, ns );
+				}
+			}
+		}
+
+		var clearColors = float.IsNaN( clearPlace.x ) ? null : SurveyMarkColors( clearPlace.x, clearPlace.y, 0.0f, 0.0f, classic.m_statusArmor );
+		var clearAway = ( clearColors != null ) && ( clearColors.Count == 1 ) && clearColors.Contains( -1 );
+
+		Log( "surveymap: planet 92: before the analysis shown " + shownBeforeAnalysis + "; after it shown " + shownAfterAnalysis + ", minerals " + mineralsMarked + "/" + minerals + ", lifeforms " + lifeformsMarked + "/" + lifeforms + ( ( notMarked.Count > 0 ) ? " (not marked: " + string.Join( "; ", notMarked ) + ")" : "" ) + ", clear at " + clearPlace + ": " + clearAway );
+
+		// ---- 3. another scheme picked while the map is open: the marks take its colours; the light mode keeps the views' (dark) colours
+		var otherScheme = -1;
+
+		for ( var scheme = 1; ( scheme < UIKitTheme.c_schemes.Length ) && ( otherScheme < 0 ); scheme++ )
+		{
+			var theme = UIKitTheme.LoadScheme( scheme, UIKitTheme.Mode.Dark );
+
+			if ( ( theme != null ) && ( Mathf.Abs( theme.m_statusArmor.r - classic.m_statusArmor.r ) + Mathf.Abs( theme.m_statusArmor.g - classic.m_statusArmor.g ) + Mathf.Abs( theme.m_statusArmor.b - classic.m_statusArmor.b ) > 0.3f ) )
+			{
+				otherScheme = scheme;
+			}
+		}
+
+		var firstField = ( survey != null ) ? survey.m_marks.Find( mark => mark.m_kind == PlanetSurvey.Kind.Minerals ) : default( PlanetSurvey.Mark );
+		var inOtherScheme = false;
+		var inLightMode = false;
+		var otherSchemeDetail = "";
+		var lightModeDetail = "";
+
+		if ( otherScheme > 0 )
+		{
+			UIKitTheme.SetScheme( otherScheme, false );
+
+			yield return Frames( 2 );
+
+			var other = UIKitTheme.GetViewTheme();
+
+			// (the cross's middle in the other scheme's mineral colour, not the classic one's)
+			var inOther = SurveyMarkNearest( firstField.m_eastWest, firstField.m_northSouth, out var otherNearest, other.m_statusArmor, classic.m_statusArmor );
+
+			inOtherScheme = ( other != classic ) && ( inOther == 0 ) && ( otherNearest < 0.05f );
+			otherSchemeDetail = inOther + " at " + otherNearest.ToString( "F3" );
+
+			UIKitTheme.SetMode( UIKitTheme.Mode.Light, false );
+
+			yield return Frames( 2 );
+
+			// (the views' colours are the scheme's dark theme's, not its light theme's)
+			var light = UIKitTheme.LoadScheme( otherScheme, UIKitTheme.Mode.Light );
+			var inLight = SurveyMarkNearest( firstField.m_eastWest, firstField.m_northSouth, out var lightNearest, other.m_statusArmor, ( light != null ) ? light.m_statusArmor : other.m_statusArmor );
+
+			inLightMode = ( inLight == 0 ) && ( lightNearest < 0.05f );
+			lightModeDetail = inLight + " at " + lightNearest.ToString( "F3" ) + ( ( light != null ) ? " (light " + ColorUtility.ToHtmlStringRGB( light.m_statusArmor ) + ")" : "" );
+
+			UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+			UIKitTheme.SetScheme( 0, false );
+
+			yield return Frames( 2 );
+		}
+
+		Log( "surveymap: in scheme " + otherScheme + " (" + ( ( otherScheme > 0 ) ? ColorUtility.ToHtmlStringRGB( UIKitTheme.LoadScheme( otherScheme, UIKitTheme.Mode.Dark ).m_statusArmor ) : "" ) + ", classic " + ColorUtility.ToHtmlStringRGB( classic.m_statusArmor ) + ") the first field's cross in its colours " + inOtherScheme + " (" + otherSchemeDetail + "), in the light mode in the views' colours " + inLightMode + " (" + lightModeDetail + ")" );
+
+		// ---- 4. the Red Cylinder at 145,107, around the planet of the documented ancient ruins (not analysed): no marks without it, the ruins with it
+		var ruinPlaces = new List<Vector2>();
+		var shownWithout = true;
+		var shownWith = false;
+		var shownAfter = true;
+		var ruinsMarked = 0;
+		var ruinStar = System.Array.Find( gameData.m_starList, star => ( star.m_xCoordinate == 145 ) && ( star.m_yCoordinate == 107 ) );
+
+		if ( ruinStar != null )
+		{
+			var firstPlanet = System.Array.Find( ruinStar.GetPlanetList(), p => ( p != null ) && ( p.m_id >= 0 ) );
+
+			if ( firstPlanet != null )
+			{
+				yield return GoIntoOrbit( ruinStar.m_id, firstPlanet.m_id );
+				yield return WaitForPlanetMaps( 90.0f );
+				yield return Frames( 5 );
+
+				GD_Planet ruinPlanet = null;
+
+				foreach ( var candidate in ruinStar.GetPlanetList() )
+				{
+					var candidateController = ( ( candidate != null ) && ( candidate.m_id >= 0 ) ) ? controller.m_starSystem.GetPlanetController( candidate.m_id ) : null;
+
+					if ( ( candidateController != null ) && candidateController.HasMaps() && !candidate.IsGasGiant() && ( TerrainRuins.GetAncientRuinPlaces( candidateController.GetPlanetGenerator(), grid.m_elevationScale, candidate ).Count > 0 ) )
+					{
+						ruinPlanet = candidate;
+						break;
+					}
+				}
+
+				if ( ruinPlanet != null )
+				{
+					if ( ruinPlanet.m_id != firstPlanet.m_id )
+					{
+						yield return GoIntoOrbit( ruinStar.m_id, ruinPlanet.m_id );
+						yield return WaitForPlanetMaps( 90.0f );
+						yield return Frames( 5 );
+					}
+
+					var redCylinder = gameData.FindArtifactId( "Red Cylinder" );
+
+					displays.ChangeDisplay( displays.m_terrainMapDisplay );
+
+					yield return Frames( 2 );
+
+					shownWithout = SurveyMarksShown();
+
+					playerData.m_playerShip.AddArtifact( redCylinder );
+
+					displays.ChangeDisplay( displays.m_sensorsDisplay );
+					displays.ChangeDisplay( displays.m_terrainMapDisplay );
+
+					yield return Frames( 2 );
+
+					shownWith = SurveyMarksShown();
+					ruinPlaces = new List<Vector2>( RedCylinder.GetAncientRuinPlaces() );
+
+					if ( SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null )
+					{
+						RenderScreenPicture( System.IO.Path.Combine( System.IO.Path.GetTempPath(), "starflight-probe", "surveymap-ruins.png" ) );
+					}
+
+					// (a box is hollow: its right side is SurveyMarks.c_boxHalfSize pixels of the texture east of its middle)
+					foreach ( var place in ruinPlaces )
+					{
+						ruinsMarked += SurveyMarkIs( 2, place.x, place.y, SurveyMarks.c_boxHalfSize, 0.0f, classic ) ? 1 : 0;
+					}
+
+					playerData.m_playerShip.RemoveArtifact( redCylinder );
+
+					displays.ChangeDisplay( displays.m_sensorsDisplay );
+					displays.ChangeDisplay( displays.m_terrainMapDisplay );
+
+					yield return Frames( 2 );
+
+					shownAfter = SurveyMarksShown();
+				}
+			}
+		}
+
+		Log( "surveymap: at 145,107: without the Red Cylinder shown " + shownWithout + ", with it shown " + shownWith + " and " + ruinsMarked + " of " + ruinPlaces.Count + " ruins marked, after it is gone shown " + shownAfter );
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "surveymap: before the planet is analysed from orbit, the landing map has no marks", !shownBeforeAnalysis, shownBeforeAnalysis.ToString() );
+		Check( "surveymap: after the analysis, every mineral field and lifeform found is marked on the landing map in its colour, and the map is clear away from them", shownAfterAnalysis && ( survey != null ) && ( minerals > 0 ) && ( mineralsMarked == minerals ) && ( lifeforms > 0 ) && ( lifeformsMarked == lifeforms ) && clearAway, shownAfterAnalysis + " " + mineralsMarked + "/" + minerals + " " + lifeformsMarked + "/" + lifeforms + " " + clearAway );
+		Check( "surveymap: the marks take the colours of another scheme picked while the map is open, and the views' colours in the light mode", ( otherScheme > 0 ) && inOtherScheme && inLightMode, otherScheme + " " + inOtherScheme + " " + inLightMode );
+		Check( "surveymap: with the Red Cylinder aboard every ancient ruin is marked on the landing map; without it a planet not analysed has no marks", !shownWithout && shownWith && ( ruinPlaces.Count > 0 ) && ( ruinsMarked == ruinPlaces.Count ) && !shownAfter, shownWithout + " " + shownWith + " " + ruinsMarked + "/" + ruinPlaces.Count + " " + shownAfter );
+		Check( "surveymap: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=surveymap minerals=" + mineralsMarked + "/" + minerals + " lifeforms=" + lifeformsMarked + "/" + lifeforms + " ruins=" + ruinsMarked + "/" + ruinPlaces.Count + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

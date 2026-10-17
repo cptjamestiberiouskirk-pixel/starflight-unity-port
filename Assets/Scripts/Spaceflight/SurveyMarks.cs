@@ -1,0 +1,230 @@
+
+using System.Collections.Generic;
+using UnityEngine;
+
+// draws the marks of the science officer's survey (PlanetSurvey) and the ancient ruins the Red Cylinder finds into a texture laid over a map of the planet:
+// a mineral field is a cross, a lifeform a dot and an ancient ruin a box, each with a dark edge so that it reads on any ground. The texture covers the
+// planet's map as the landing map shows it: east-west -180 to 180 across, north-south -90 to 90 up (decided 2026-10-17, ROADMAP D6)
+public static class SurveyMarks
+{
+	// the size of the texture (twice the landing map's 448 by 224, so that the marks stay sharp)
+	public const int c_width = 896;
+	public const int c_height = 448;
+
+	// the sizes of the marks, in pixels of the texture: the half length of a cross's arms (the larger the field, the longer, up to the most), the
+	// radius of a dot, the half size of a box, the width of their lines, and the width of their dark edge
+	const float c_fewestArm = 6.0f;
+	const float c_mostArm = 11.0f;
+	const float c_dotRadius = 6.0f;
+	public const float c_boxHalfSize = 11.0f;
+	const float c_lineWidth = 2.5f;
+	const float c_edgeWidth = 2.0f;
+
+	// how opaque the dark edge is
+	const float c_edgeAlpha = 0.85f;
+
+	// the pixels drawn into (kept, so that a new drawing does not make garbage)
+	static Color32[] s_pixels;
+
+	/// <summary>
+	/// Draws the survey's marks (none if the survey is null) and the ancient ruins (east-west and north-south, in degrees) into the texture, in the
+	/// colours of this theme (the minerals in its armor colour, the life in its fuel colour, the ruins in its danger colour).
+	/// </summary>
+	public static void Draw( Texture2D texture, PlanetSurvey survey, List<Vector2> ruins, UIKitTheme theme )
+	{
+		if ( ( texture == null ) || ( theme == null ) )
+		{
+			return;
+		}
+
+		var width = texture.width;
+		var height = texture.height;
+
+		if ( ( s_pixels == null ) || ( s_pixels.Length != width * height ) )
+		{
+			s_pixels = new Color32[ width * height ];
+		}
+
+		System.Array.Clear( s_pixels, 0, s_pixels.Length );
+
+		var edge = theme.m_backgroundApp;
+
+		edge.a = c_edgeAlpha;
+
+		if ( survey != null )
+		{
+			// the largest field (the crosses are as long as their fields are large, next to it)
+			var largestField = 1;
+
+			foreach ( var mark in survey.m_marks )
+			{
+				if ( mark.m_kind == PlanetSurvey.Kind.Minerals )
+				{
+					largestField = Mathf.Max( largestField, mark.m_size );
+				}
+			}
+
+			// the mineral fields first, then the lifeforms over them
+			foreach ( var mark in survey.m_marks )
+			{
+				if ( mark.m_kind == PlanetSurvey.Kind.Minerals )
+				{
+					var arm = Mathf.Lerp( c_fewestArm, c_mostArm, Mathf.Clamp01( mark.m_size / (float) largestField ) );
+
+					DrawCross( width, height, mark.m_eastWest, mark.m_northSouth, arm, edge, theme.m_statusArmor );
+				}
+			}
+
+			foreach ( var mark in survey.m_marks )
+			{
+				if ( mark.m_kind == PlanetSurvey.Kind.Life )
+				{
+					DrawDot( width, height, mark.m_eastWest, mark.m_northSouth, edge, theme.m_statusFuel );
+				}
+			}
+		}
+
+		// the ancient ruins over everything
+		if ( ruins != null )
+		{
+			foreach ( var ruin in ruins )
+			{
+				DrawBox( width, height, ruin.x, ruin.y, edge, theme.m_statusDanger );
+			}
+		}
+
+		texture.SetPixels32( s_pixels );
+		texture.Apply( false );
+	}
+
+	// where a place of the planet is on the texture (pixels from its left and bottom edges)
+	public static Vector2 GetPixel( int width, int height, float eastWest, float northSouth )
+	{
+		return new Vector2( ( eastWest + 180.0f ) / 360.0f * width, ( northSouth + 90.0f ) / 180.0f * height );
+	}
+
+	// a cross (two lines, the dark edge first)
+	static void DrawCross( int width, int height, float eastWest, float northSouth, float arm, Color edge, Color color )
+	{
+		var center = GetPixel( width, height, eastWest, northSouth );
+		var a = new Vector2( arm, arm );
+		var b = new Vector2( arm, -arm );
+
+		DrawLine( width, height, center - a, center + a, c_lineWidth + c_edgeWidth * 2.0f, edge );
+		DrawLine( width, height, center - b, center + b, c_lineWidth + c_edgeWidth * 2.0f, edge );
+		DrawLine( width, height, center - a, center + a, c_lineWidth, color );
+		DrawLine( width, height, center - b, center + b, c_lineWidth, color );
+	}
+
+	// a dot
+	static void DrawDot( int width, int height, float eastWest, float northSouth, Color edge, Color color )
+	{
+		var center = GetPixel( width, height, eastWest, northSouth );
+
+		DrawLine( width, height, center, center, ( c_dotRadius + c_edgeWidth ) * 2.0f, edge );
+		DrawLine( width, height, center, center, c_dotRadius * 2.0f, color );
+	}
+
+	// a box (four lines)
+	static void DrawBox( int width, int height, float eastWest, float northSouth, Color edge, Color color )
+	{
+		var center = GetPixel( width, height, eastWest, northSouth );
+		var corners = new[] { new Vector2( -1, -1 ), new Vector2( 1, -1 ), new Vector2( 1, 1 ), new Vector2( -1, 1 ) };
+
+		for ( var pass = 0; pass < 2; pass++ )
+		{
+			for ( var i = 0; i < 4; i++ )
+			{
+				var from = center + corners[ i ] * c_boxHalfSize;
+				var to = center + corners[ ( i + 1 ) % 4 ] * c_boxHalfSize;
+
+				if ( pass == 0 )
+				{
+					DrawLine( width, height, from, to, c_lineWidth + c_edgeWidth * 2.0f, edge );
+				}
+				else
+				{
+					DrawLine( width, height, from, to, c_lineWidth, color );
+				}
+			}
+		}
+	}
+
+	// a line of this width from one point to the other (a dot if they are the same), smoothed at its edge, and drawn again a planet's width either way
+	// where it crosses the map's east or west edge (east-west goes round the planet)
+	static void DrawLine( int width, int height, Vector2 from, Vector2 to, float lineWidth, Color color )
+	{
+		var reach = lineWidth * 0.5f + 1.0f;
+		var left = Mathf.Min( from.x, to.x ) - reach;
+		var right = Mathf.Max( from.x, to.x ) + reach;
+
+		for ( var wrap = -1; wrap <= 1; wrap++ )
+		{
+			var shift = wrap * width;
+
+			if ( ( right + shift < 0.0f ) || ( left + shift >= width ) )
+			{
+				continue;
+			}
+
+			var shiftedFrom = new Vector2( from.x + shift, from.y );
+			var shiftedTo = new Vector2( to.x + shift, to.y );
+
+			var minimumX = Mathf.Max( 0, Mathf.FloorToInt( left + shift ) );
+			var maximumX = Mathf.Min( width - 1, Mathf.CeilToInt( right + shift ) );
+			var minimumY = Mathf.Max( 0, Mathf.FloorToInt( Mathf.Min( from.y, to.y ) - reach ) );
+			var maximumY = Mathf.Min( height - 1, Mathf.CeilToInt( Mathf.Max( from.y, to.y ) + reach ) );
+
+			for ( var y = minimumY; y <= maximumY; y++ )
+			{
+				for ( var x = minimumX; x <= maximumX; x++ )
+				{
+					// how much of this pixel the line covers (its middle against the line's distance, softened over one pixel)
+					var distance = DistanceToSegment( new Vector2( x + 0.5f, y + 0.5f ), shiftedFrom, shiftedTo );
+					var coverage = Mathf.Clamp01( lineWidth * 0.5f + 0.5f - distance );
+
+					if ( coverage > 0.0f )
+					{
+						Blend( y * width + x, color, coverage );
+					}
+				}
+			}
+		}
+	}
+
+	// how far a point is from a line between two points
+	static float DistanceToSegment( Vector2 point, Vector2 from, Vector2 to )
+	{
+		var along = to - from;
+		var lengthSquared = along.sqrMagnitude;
+
+		if ( lengthSquared < 0.0001f )
+		{
+			return Vector2.Distance( point, from );
+		}
+
+		var t = Mathf.Clamp01( Vector2.Dot( point - from, along ) / lengthSquared );
+
+		return Vector2.Distance( point, from + along * t );
+	}
+
+	// lays a colour over a pixel ("over", with straight alpha, as the UI draws the texture)
+	static void Blend( int index, Color color, float coverage )
+	{
+		Color below = s_pixels[ index ];
+
+		var alpha = color.a * coverage;
+		var outAlpha = alpha + below.a * ( 1.0f - alpha );
+
+		if ( outAlpha <= 0.0f )
+		{
+			return;
+		}
+
+		var blended = ( color * alpha + below * ( below.a * ( 1.0f - alpha ) ) ) / outAlpha;
+
+		blended.a = outAlpha;
+
+		s_pixels[ index ] = blended;
+	}
+}
