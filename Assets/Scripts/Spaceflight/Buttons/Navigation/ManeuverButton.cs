@@ -230,8 +230,9 @@ public class ManeuverButton : ShipButton
 				// normalize the move vector to a length of 1.0
 				moveVector.Normalize();
 
-				// update the direction
-				playerData.m_general.m_currentDirection = Vector3.Slerp( playerData.m_general.m_currentDirection, moveVector, Time.deltaTime * 2.0f );
+				// the ship flies the way the stick points at once, as the original's: each step goes the way of the key held (HYPER-OV (XYSCAN)), with no turn
+				// (easing the heading round over a second swung the ship wide past the planets at the original's speed; the model still turns smoothly, PlayerShip)
+				playerData.m_general.m_currentDirection = moveVector;
 
 				// turn the engines on
 				SpaceflightController.m_instance.m_playerShip.TurnOnEngines();
