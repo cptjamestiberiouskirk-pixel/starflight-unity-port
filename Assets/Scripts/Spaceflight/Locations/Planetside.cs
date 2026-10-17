@@ -143,6 +143,38 @@ public class Planetside : MonoBehaviour
 
 		// tell the terrain grid to bake in the elevation
 		m_terrainGrid.BakeInElevation( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude, planetGenerator );
+
+		// in the look the player has picked
+		m_terrainGrid.SetAlbedoMap( planetController.GetTerrainAlbedoMap() );
+	}
+
+	// unity awake
+	void Awake()
+	{
+		// the ground takes the look the player picks at once
+		PlanetLook.Changed += ApplyLook;
+	}
+
+	// unity on destroy
+	void OnDestroy()
+	{
+		PlanetLook.Changed -= ApplyLook;
+	}
+
+	// puts the look the player has picked on the ground, while the ship is on it
+	void ApplyLook()
+	{
+		if ( !gameObject.activeInHierarchy || ( SpaceflightController.m_instance == null ) )
+		{
+			return;
+		}
+
+		var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( DataController.m_instance.m_playerData.m_general.m_currentPlanetId );
+
+		if ( ( planetController != null ) && planetController.HasMaps() )
+		{
+			m_terrainGrid.SetAlbedoMap( planetController.GetTerrainAlbedoMap() );
+		}
 	}
 
 	// call this to start the launch animation

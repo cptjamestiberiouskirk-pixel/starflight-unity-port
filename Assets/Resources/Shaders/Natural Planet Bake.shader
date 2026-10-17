@@ -495,7 +495,11 @@ Shader "Starflight/Natural Planet Bake"
 		float seams = saturate( seam ) * saturate( seam );
 		float glow = max( lava * seams, crack * 0.8 * ( 1.0 - lava ) );
 
-		float3 color = lerp( crust, Srgb( float3( 0.09, 0.05, 0.04 ) ), max( lava, crack ) );
+		// (the colours as well as the glow: the terrain draws the ground with the colours alone, so the lava has to read as lava in them, dark red plates
+		// with orange seams)
+		float3 color = lerp( crust, Srgb( float3( 0.30, 0.08, 0.03 ) ), lava );
+
+		color = lerp( color, Srgb( float3( 0.95, 0.42, 0.10 ) ), saturate( seams * lava + crack * 0.7 * ( 1.0 - lava ) ) );
 
 		return float4( color, saturate( glow ) );
 	}
