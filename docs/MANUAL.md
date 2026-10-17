@@ -293,7 +293,7 @@ Once landed, Command, **Disembark** sends the crew out in the terrain vehicle, r
 | **Cargo** | Acts on what is next to the vehicle (see below); otherwise lists the vehicle's cargo, which you can **Drop**. |
 | **Look** | Describes the sky, temperature, gravity, atmosphere, water and terrain, and anything close by. |
 | **Scan** | Reads the mineral and life density, lists the planet's elements and labels the objects nearby. |
-| **Tools** | **Mine** cuts the nearest mineral deposit into the hold with the mining laser (see below). **Fire** at the nearest lifeform, **Switch** between the laser and the stunner. Every shot uses some of the vehicle's fuel, the laser twice as much as the stunner. |
+| **Tools** | **Mine** cuts the nearest mineral deposit into the hold with the mining laser (see below). **Fire** at the nearest lifeform, **Switch** between the laser and the stunner. Every shot uses some of the vehicle's fuel, the laser twice as much as the stunner. **Return** drives the vehicle back to the ship by itself. |
 
 The vehicle's status display shows its fuel, its efficiency, how full its hold is, the crew's health and **the ship's distance and direction** from you.
 
@@ -310,7 +310,7 @@ The vehicle's hold takes 50 cubic meters.
 
 ### Getting back
 
-Drive back to the ship and stop beside it, within half a kilometer, to go back in at once. Stop anywhere else within 3 km of it on your way back and the crew asks "Return to the ship?": **Yes** takes you in, **No** keeps you out to go on exploring. The vehicle is refuelled and everything in its hold moves into the ship's cargo pods. Then Command, **Launch**, **Yes** takes the ship back into orbit.
+Drive back to the ship and stop beside it, within half a kilometer, to go back in at once. Stop anywhere else within 3 km of it on your way back and the crew asks "Return to the ship?": **Yes** takes you in, **No** keeps you out to go on exploring. Or use Tools, **Return**: the vehicle drives itself back and goes aboard beside the ship. It stops short of lava in the way, or when something blocks it, and Enter stops it too. The vehicle is refuelled and everything in its hold moves into the ship's cargo pods. Then Command, **Launch**, **Yes** takes the ship back into orbit.
 
 ### Hazards on the surface
 

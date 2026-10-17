@@ -207,7 +207,7 @@ Assets/
 - Full Starport operations: Personnel, Crew Assignment, Ship Configuration, the Trade Depot, the Bank and Operations
 - Hyperspace navigation and star system exploration
 - Planetary landings and terrain vehicle exploration
-- The terrain vehicle offers to go back into the ship when it stops within 3 km of it on the way back
+- The terrain vehicle offers to go back into the ship when it stops within 3 km of it on the way back, and Tools, Return drives it back by itself
 - The terrain vehicle mines mineral deposits with a mining laser (Tools, Mine), a tenth of a cubic meter at a time on the vehicle's energy
 - Ruins on the planets where the original game left its messages, recorded in the ship's log by the terrain vehicle
 - The original's special artifacts in the ruins of their sites, picked up by the terrain vehicle, with the Most Magnificent Hexagon and the City of the Ancients around two of them

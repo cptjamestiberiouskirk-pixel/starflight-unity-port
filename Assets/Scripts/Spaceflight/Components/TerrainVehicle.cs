@@ -415,8 +415,8 @@ public class TerrainVehicle : MonoBehaviour
 		m_timeInLava = 0.0f;
 	}
 
-	// true if this place of a molten planet is under its liquid, which is lava
-	bool IsInLava( Vector3 worldCoordinates )
+	// true if this place of a molten planet is under its liquid, which is lava (the Return order looks ahead with it, TVReturnButton)
+	public bool IsInLava( Vector3 worldCoordinates )
 	{
 		if ( ( m_planetGenerator == null ) || ( m_planetGenerator.GetPlanet() == null ) || !m_planetGenerator.GetPlanet().IsMolten() )
 		{
