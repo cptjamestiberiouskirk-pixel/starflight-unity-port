@@ -135,6 +135,9 @@ Shader "Starflight/Terrain Grid"
 		
 				#define SF_WATER_ON 1
 
+				// the grain of the ground up close (GroundGrain)
+				#define SF_GROUND_DETAIL 1
+
 				#include "SF - TerrainGrid.cginc"
 				#include "SF - Deferred.cginc"
 
@@ -181,6 +184,9 @@ Shader "Starflight/Terrain Grid"
 				#pragma fragment fragForwardBase_SF
 			
 				#define SF_WATER_ON 1
+
+				// the grain of the ground up close (GroundGrain)
+				#define SF_GROUND_DETAIL 1
 
 				#include "SF - TerrainGrid.cginc"
 				#include "SF - ForwardBase.cginc"
