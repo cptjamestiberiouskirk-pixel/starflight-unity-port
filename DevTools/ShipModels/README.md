@@ -16,6 +16,7 @@ Decisions of 2026-10-09:
 | `previews/<race>.png` | The review sheets: the original game's screenshot, then top, side and three-quarter views (nose to the left) |
 | `import_meshy.py`, `meshy-<race>.json` | Imports a race's textured models: see "Textured models" below |
 | `import_meshy_arth.py`, `meshy-arth.json` | Imports the player's Arth ship, with its equipment parts kept separate: see "The player's Arth ship" below |
+| `import_meshy_tv.py`, `meshy-terrain-vehicle.json` | Imports the terrain vehicle, its six wheels kept separate: see "The terrain vehicle" below |
 
 ## Wrecks, wiring and the probe
 
@@ -76,7 +77,32 @@ blender --background --factory-startup --python process_ship_debris.py -- -s 198
 & "DevTools\ShipModels\wire.ps1" -Manifest "DevTools\ShipModels\manifest-arth.json"
 ```
 
-The probe scenarios `shipmodels`, `debrispictures`, `encounterviewscale`, `systemviewpictures` (the engine glow) and `shippictures` (every mesh of the ship drawn with its maps, with pictures under `-Graphics`) cover it. `Arth Ship Barrel.mat` stays, since the terrain vehicle's barrel uses it.
+The probe scenarios `shipmodels`, `debrispictures`, `encounterviewscale`, `systemviewpictures` (the engine glow) and `shippictures` (every mesh of the ship drawn with its maps, with pictures under `-Graphics`) cover it. `Arth Ship Barrel.mat` stays, although the terrain vehicle's old barrel was the last thing that used it.
+
+### The terrain vehicle
+
+`TerrainVehicle` spins and steers the six wheels through the nodes of `Assets/Game Objects/Terrain Vehicle/Terrain Vehicle.fbx` (the scene's copy references them by name: the root, `Suspension - FL` to `RR`, `Steering - FL` to `RR`, `Wheel 1` to `6`, `Laser` and `Radar`, which the scene gives a rotator). So the vehicle is built from two textured models, a body made with its wheels left off and one wheel, and `import_meshy_tv.py` (with `meshy-terrain-vehicle.json`) assembles them in the old file's node tree:
+
+- it reads that tree from a copy of the original file taken from git (`--old`), never from the file it overwrites, and keeps every node's name and transform: Unity keeps each node's file id by its name, so the scene's references survive. The old file is in metres, and the new one is written in metres in the file's own unit scale (`FBX_SCALE_UNITS`): the scene overrides the root's scale (0.5), so a unit scale on the root's transform (`FBX_SCALE_NONE`, the Arth ship's setting) would be lost and the model would come in a hundred times too small;
+- the body is turned front first by its gold cowl (to -Y, as the old body) and scaled so that its six axle hubs (the outermost low geometry, in three groups a side) are as far apart, front to back, as the old wheels (9 units). Its front hubs sit lower than the other four, so it rides at their average height;
+- each `Suspension` node moves (the scene overrides none of their transforms) so that its wheel is at its hub sideways and along, and at the old wheels' height: the wheels meet the ground where the old ones did. The wheel keeps the old wheel's diameter (4.227) and lies along the node's Z, which `TerrainVehicle` spins it about;
+- the radar bar standing above the roof is cut out of the body into the `Radar` node's mesh, with the node at the mast's foot, so the scene's rotator turns it as it turned the old radar. The laser turret stays part of the body; nothing moves the `Laser` node, which stays as an empty node;
+- the scene gives the root a capsule collider made for the old body (19 long, radius 4): the manifest carries one for the new size, with the old one's proportions to the vehicle kept, computed from those fixed old values so that a second run gives the same capsule;
+- it writes `manifest-terrain-vehicle.json` with a `terrainVehicle` section. `ShipModelWiring.cs` then sets up the import, removes the scene copies' material overrides (the vehicle's own copy, and three placeholders in `Test.unity`) and sizes the vehicle's capsule.
+
+```powershell
+git show "bfd3a590:Assets/Game Objects/Terrain Vehicle/Terrain Vehicle.fbx" > old-terrain-vehicle.fbx
+```
+
+```bash
+blender --background --factory-startup --python DevTools/ShipModels/import_meshy_tv.py -- DevTools/ShipModels/meshy-terrain-vehicle.json --source <folder with the GLB files> --old old-terrain-vehicle.fbx --preview DevTools/ShipModels/previews/terrain-vehicle.png
+```
+
+```powershell
+& "DevTools\ShipModels\wire.ps1" -Manifest "DevTools\ShipModels\manifest-terrain-vehicle.json"
+```
+
+The probe scenario `tvmodel` covers it (the materials, the wheels on their steering joints, the triangle counts, the wheels level on the ground with the body clear of it, the capsule against the model, the radar turning; a picture under `-Graphics`).
 
 ## Conventions
 

@@ -1,0 +1,22 @@
+{
+	"textureSize": 1024,
+	"wheelInset": 0.35,
+	"body": {
+		"glb": "terrain-vehicle-body.glb",
+		"meshy": {
+			"concept": "01a14bb9-b2cc-77a6-aceb-5c1bd5d5fd15",
+			"conceptEdit": "01a14bbd-ef57-7793-a4d3-597e2d62244a",
+			"model": "01a14bbf-fdeb-7122-a650-6299d1b5ec31",
+			"remesh": "01a14bc1-8ea0-710d-9a98-2707c044df5e"
+		}
+	},
+	"wheel": {
+		"glb": "terrain-vehicle-wheel.glb",
+		"meshy": {
+			"concept": "01a14bb9-b2cc-77a6-aceb-5c1bd5d5fd15",
+			"conceptEdit": "01a14bbe-573b-74a4-8030-c18b8d599573",
+			"model": "01a14bc0-0376-77af-8764-b4cb637ba26f",
+			"remesh": "01a14bc1-907d-72e1-ba75-8c09fdf23ed3"
+		}
+	}
+}
