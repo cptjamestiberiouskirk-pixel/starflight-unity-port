@@ -1,6 +1,6 @@
-
-// captures the lifeform Cargo offered and puts it in stasis (planet.txt: "If the response is capture then there is a suspenseful noise. Capturing takes about 6
-// seconds") - a stunned one "will not run away or attack"
+// captures the lifeform beside the terrain vehicle into stasis, from Tools (since 2026-10-17; Cargo offered it before) and only once it is stunned: the 1984
+// notes (planet.txt) have it that a stunned lifeform "will not run away or attack", and "Capturing takes about 6 seconds" - a capture beam holds it meanwhile
+// (TerrainLifeforms). A dead lifeform is recorded with Cargo instead
 public class TVCaptureButton : ShipButton
 {
 	public override string GetLabel()
@@ -10,30 +10,54 @@ public class TVCaptureButton : ShipButton
 
 	public override bool Execute()
 	{
-		var terrainGrid = SpaceflightController.m_instance.m_disembarked.m_terrainGrid;
+		var controller = SpaceflightController.m_instance;
+		var terrainGrid = controller.m_disembarked.m_terrainGrid;
 		var lifeforms = ( terrainGrid != null ) ? terrainGrid.m_terrainLifeforms : null;
-
-		TVCargoButton.BackToTerrainVehicle();
 
 		if ( lifeforms == null )
 		{
+			return Refuse( "There is no lifeform beside the vehicle." );
+		}
+
+		// one recording or capture at a time
+		if ( lifeforms.IsRecording() )
+		{
+			controller.m_messages.Clear();
+			controller.m_messages.AddText( lifeforms.IsCapturing() ? "<color=white>Capturing...</color>" : "<color=white>Recording...</color>" );
+
 			return false;
 		}
 
-		var lifeform = lifeforms.m_offeredLifeform;
+		var lifeform = lifeforms.FindLifeformBeside( controller.m_terrainVehicle.transform.position );
 
-		lifeforms.m_offeredLifeform = null;
-
-		// eaten since it was offered
-		if ( ( lifeform == null ) || ( lifeform.m_status == TerrainLifeform.Status.Dead ) )
+		if ( lifeform == null )
 		{
-			SpaceflightController.m_instance.m_messages.Clear();
-			SpaceflightController.m_instance.m_messages.AddText( "<color=yellow>It got away.</color>" );
+			return Refuse( "There is no lifeform beside the vehicle." );
+		}
 
-			return false;
+		if ( lifeform.m_status == TerrainLifeform.Status.Dead )
+		{
+			return Refuse( "A dead lifeform cannot be captured. Cargo records its data." );
+		}
+
+		if ( lifeform.m_status != TerrainLifeform.Status.Stunned )
+		{
+			return Refuse( "The lifeform must be stunned first." );
 		}
 
 		lifeforms.StartCapture( lifeform );
+
+		return false;
+	}
+
+	// the capture cannot start
+	static bool Refuse( string reason )
+	{
+		SpaceflightController.m_instance.m_messages.Clear();
+		SpaceflightController.m_instance.m_messages.AddText( "<color=red>" + reason + "</color>" );
+
+		SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+		SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
 
 		return false;
 	}

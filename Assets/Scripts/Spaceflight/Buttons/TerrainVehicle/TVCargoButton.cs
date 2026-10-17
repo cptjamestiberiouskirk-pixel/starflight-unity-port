@@ -113,7 +113,7 @@ public class TVCargoButton : ShipButton
 		lifeforms.m_offeredLifeform = lifeform;
 
 		messages.Clear();
-		messages.AddText( ( lifeform.m_status == TerrainLifeform.Status.Dead ) ? "<color=white>A dead lifeform. Shall we record it in our data banks?</color>" : "<color=white>A lifeform.</color>" );
+		messages.AddText( ( lifeform.m_status == TerrainLifeform.Status.Dead ) ? "<color=white>A dead lifeform. Shall we record it in our data banks?</color>" : "<color=white>A lifeform.</color>\n<color=#808080>Stunned, it can be captured with Tools, Capture.</color>" );
 
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 

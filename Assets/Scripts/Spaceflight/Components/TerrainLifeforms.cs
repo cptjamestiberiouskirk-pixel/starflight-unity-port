@@ -37,6 +37,18 @@ public class TerrainLifeforms : TerrainGridPopulator
 	const float c_captureTime = 6.0f;
 	const int c_captureValueFactor = 5;
 
+	// the capture beam that holds the lifeform while a capture runs (since 2026-10-17, TVCaptureButton): pulses of the combat lasers' beam, drawn small and pale
+	// blue, renewed before each fades
+	const float c_capturePulseSeconds = 0.15f;
+	const float c_capturePulseLifetime = 0.25f;
+	const float c_captureBeamScale = 0.12f;
+	const float c_vehicleBeamHeight = 3.0f;
+	const float c_lifeformBeamHeight = 1.0f;
+	static readonly Color c_captureBeamColor = new Color( 0.45f, 0.85f, 1.0f, 1.0f );
+
+	LaserBeam m_captureBeam;
+	float m_capturePulseTimer;
+
 	// the lifeform Cargo offered (the console shows Record and Ignore for it)
 	public TerrainLifeform m_offeredLifeform;
 
@@ -451,6 +463,12 @@ public class TerrainLifeforms : TerrainGridPopulator
 			return;
 		}
 
+		// the capture beam holds it while a capture runs
+		if ( m_capturing )
+		{
+			PulseCaptureBeam( vehicle.transform.position );
+		}
+
 		// an attack delays it
 		if ( Time.time - m_recordingTarget.m_lastAttackTime < c_attackDelay )
 		{
@@ -480,6 +498,32 @@ public class TerrainLifeforms : TerrainGridPopulator
 		messages.AddText( "<color=white>Data collection completed, sir.</color>" );
 
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+	}
+
+	// a pulse of the capture beam from the terrain vehicle to the lifeform being captured
+	void PulseCaptureBeam( Vector3 vehiclePosition )
+	{
+		m_capturePulseTimer -= Time.deltaTime;
+
+		if ( m_capturePulseTimer > 0.0f )
+		{
+			return;
+		}
+
+		m_capturePulseTimer = c_capturePulseSeconds;
+
+		if ( m_captureBeam == null )
+		{
+			var beamObject = new GameObject( "Capture Beam" );
+
+			beamObject.transform.SetParent( transform, false );
+
+			m_captureBeam = beamObject.AddComponent<LaserBeam>();
+			m_captureBeam.SetScale( c_captureBeamScale );
+			m_captureBeam.SetColor( c_captureBeamColor );
+		}
+
+		m_captureBeam.Fire( vehiclePosition + Vector3.up * c_vehicleBeamHeight, m_recordingTarget.transform.position + Vector3.up * c_lifeformBeamHeight, c_capturePulseLifetime );
 	}
 
 	// a capture is done: "The alien lifeform has been captured and put in stasis. Now loading into T.V." and, "If there is enough room in cargo", "The lifeform is
