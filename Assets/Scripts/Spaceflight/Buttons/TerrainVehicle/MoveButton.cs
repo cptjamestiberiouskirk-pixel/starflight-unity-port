@@ -12,13 +12,13 @@ public class MoveButton : ShipButton
 	public const float c_shipCellKm = 0.5f;
 
 	// if this is true we are transitioning to disembarked
-	bool m_isTransitioning;
+	protected bool m_isTransitioning;
 
 	// this is set to true if we are out of fuel
 	bool m_outOfFuel;
 
 	// what are we transitioning to?
-	PD_General.Location m_nextLocation;
+	protected PD_General.Location m_nextLocation;
 
 	public override string GetLabel()
 	{
@@ -159,13 +159,6 @@ public class MoveButton : ShipButton
 			}
 			else
 			{
-				// get the controller stick position
-				var x = InputController.m_instance.m_x;
-				var z = InputController.m_instance.m_y;
-
-				// create our 3d move vector from the controller position
-				var moveVector = new Vector3( x, 0.0f, z );
-
 				// once the vehicle has been farther from the ship than the boarding distance, a stop within it on the way back takes the vehicle in
 				var disembarked = SpaceflightController.m_instance.m_disembarked;
 
@@ -174,8 +167,8 @@ public class MoveButton : ShipButton
 					disembarked.m_hasBeenAway = true;
 				}
 
-				// check if the move vector will actually move the ship (that the controller is not centered)
-				if ( moveVector.magnitude > 0.5f )
+				// where to steer: the stick for Move, the ship for Return (TVReturnButton) - nowhere when the stick is centered
+				if ( GetSteering( out var moveVector ) )
 				{
 					// normalize the move vector to a length of 1.0
 					moveVector.Normalize();
@@ -196,6 +189,37 @@ public class MoveButton : ShipButton
 
 		// returning true prevents the default spaceflight update from running
 		return true;
+	}
+
+	// where the vehicle steers while the button runs: Move goes where the stick points, and only while it is pushed
+	protected virtual bool GetSteering( out Vector3 moveVector )
+	{
+		// get the controller stick position
+		var x = InputController.m_instance.m_x;
+		var z = InputController.m_instance.m_y;
+
+		// create our 3d move vector from the controller position
+		moveVector = new Vector3( x, 0.0f, z );
+
+		// check if the move vector will actually move the vehicle (that the controller is not centered)
+		return moveVector.magnitude > 0.5f;
+	}
+
+	// the vehicle has reached the ship's own cell while the button runs: it stops and goes aboard, as Move stopped there takes it in
+	protected void GoAboard()
+	{
+		SpaceflightController.m_instance.m_terrainVehicle.TurnOffEngines();
+		SoundController.m_instance.StopSound( SoundController.Sound.DieselEngine );
+
+		StartBoarding();
+
+		m_isTransitioning = true;
+		m_nextLocation = PD_General.Location.Planetside;
+
+		// remove the "active" dot from the current button
+		SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
+		SoundController.m_instance.PlaySound( SoundController.Sound.Deactivate );
 	}
 
 	// the terrain vehicle goes back into the ship: the map fades to black while the vehicle is refuelled and its cargo moves into the ship (the caller switches
@@ -220,13 +244,31 @@ public class MoveButton : ShipButton
 	// is only drawn), so the ship's height is left out: measured with it, a ship on raised ground was never near enough to go back in
 	public static float GetKmToShip()
 	{
+		return GetVectorToShip().magnitude * 225.0f / 2048.0f;
+	}
+
+	// the way from the terrain vehicle to the ship along the ground, the short way round the planet (the ground wraps east to west every 8192 units)
+	public static Vector3 GetVectorToShip()
+	{
 		var playerData = DataController.m_instance.m_playerData;
 		var vectorToShip = Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude ) - playerData.m_general.m_lastDisembarkedCoordinates;
 
 		vectorToShip.y = 0.0f;
 
-		return vectorToShip.magnitude * 225.0f / 2048.0f;
+		if ( vectorToShip.x > c_planetWidth * 0.5f )
+		{
+			vectorToShip.x -= c_planetWidth;
+		}
+		else if ( vectorToShip.x < c_planetWidth * -0.5f )
+		{
+			vectorToShip.x += c_planetWidth;
+		}
+
+		return vectorToShip;
 	}
+
+	// the width of a planet's ground in world units (4 to a pixel of its 2048 wide maps, as TerrainVehicle wraps it)
+	const float c_planetWidth = 2048.0f * 4.0f;
 
 	// the crew's walk from where the vehicle stopped to the ship, a cell (a kilometer) at a time: each cell a chance in five of an injury, by the E/M of the cell
 	static void WalkBackToTheShip()

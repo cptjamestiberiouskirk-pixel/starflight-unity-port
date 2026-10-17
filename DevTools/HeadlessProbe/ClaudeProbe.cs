@@ -1594,6 +1594,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioMiningLaser();
 				break;
 
+			case "returnorder":
+				yield return ScenarioReturnOrder();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -42195,6 +42199,248 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "mininglaser: Mine with no deposit in reach, with a full hold and with an empty tank does nothing and says why", noDepositRefused && fullRefused && emptyRefused, noDepositRefused + "/" + fullRefused + "/" + emptyRefused );
 
 		Finish( "scenario=mininglaser checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the terrain vehicle's Return order (TVReturnButton, since 2026-10-17)
+
+	// puts the terrain vehicle at a place on the ground, as driving keeps it (flat: the ground's height is only drawn)
+	static void PutTheVehicleAt( Vector3 place )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		playerData.m_general.m_coordinates = place;
+		playerData.m_general.m_lastDisembarkedCoordinates = place;
+		SpaceflightController.m_instance.m_terrainVehicle.transform.localPosition = place;
+	}
+
+	// a place on solid ground with the liquid 32 units east of it (8 pixels of the planet's map), and that place in the liquid; false if the planet has none
+	static bool FindSolidGroundByTheLiquid( out Vector3 solid, out Vector3 liquid )
+	{
+		solid = Vector3.zero;
+		liquid = Vector3.zero;
+
+		var planetGenerator = FieldOrNull( SpaceflightController.m_instance.m_terrainVehicle, "m_planetGenerator" ) as PlanetGenerator;
+
+		if ( planetGenerator == null )
+		{
+			return false;
+		}
+
+		var width = planetGenerator.m_textureMapWidth;
+		var height = planetGenerator.m_textureMapHeight;
+		var water = planetGenerator.m_waterElevation;
+
+		for ( var y = height / 4; y < height * 3 / 4; y += 4 )
+		{
+			for ( var x = 0; x < width - 8; x += 2 )
+			{
+				if ( ( planetGenerator.GetBicubicSmoothedElevation( x, y ) > water * 1.1f + 0.01f ) && ( planetGenerator.GetBicubicSmoothedElevation( x + 8, y ) < water * 0.9f ) )
+				{
+					solid = new Vector3( ( x + 0.5f - width * 0.5f ) * 4.0f, 0.0f, ( y + 0.5f - height * 0.5f ) * 4.0f );
+					liquid = solid + new Vector3( 32.0f, 0.0f, 0.0f );
+
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	// on planet 94 with the ship on raised ground: Tools has Return; from 6 km out it drives the vehicle back by itself (the stick never touched), on the vehicle's
+	// fuel, and takes it aboard on the ship's own cell; the fire button stops it on the way, nearer than it was; a vehicle that makes no headway stops and says the
+	// way is blocked; and on planet 29 (molten) it stops short of lava between the vehicle and the ship
+	IEnumerator ScenarioReturnOrder()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+		ProbeKeyboard();
+
+		// no encounter may begin on the way
+		controller.m_encounterRange = 0.0f;
+
+		yield return LandOnPlanet94At( Tools.LatLongToWorldCoordinates( 4.3f, -16.0f ), done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=returnorder abort: no landing (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var toolLabels = ButtonSetLabels( ButtonController.ButtonSet.TerrainVehicleWeapon );
+		var returnIndex = Array.IndexOf( toolLabels.Split( ',' ), "Return" );
+		var ship = Tools.LatLongToWorldCoordinates( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude );
+		var unitsPerKm = 2048.0f / 225.0f;
+
+		// Move runs when the vehicle comes out: stop it, as the player does before using the console
+		if ( GetField( buttonController, "m_currentButton" ) != null )
+		{
+			buttonController.DeactivateButton();
+		}
+
+		// ---- 1. Return from 6 km out
+		PutTheVehicleAt( new Vector3( ship.x + 6.0f * unitsPerKm, 0.0f, ship.z ) );
+
+		yield return Frames( 5 );
+
+		var fuelBefore = playerData.m_terrainVehicle.m_fuelRemaining;
+		var lowestFuel = fuelBefore;
+		var nearestKm = 6.0f;
+		var seconds = -1.0f;
+
+		if ( returnIndex >= 0 )
+		{
+			PressButton( ButtonController.ButtonSet.TerrainVehicleWeapon, returnIndex );
+
+			var start = Time.time;
+
+			for ( var end = Time.time + 40.0f; ( Time.time < end ) && ( playerData.m_general.m_location == PD_General.Location.Disembarked ); )
+			{
+				lowestFuel = Mathf.Min( lowestFuel, playerData.m_terrainVehicle.m_fuelRemaining );
+
+				var toShip = ship - playerData.m_general.m_lastDisembarkedCoordinates;
+
+				toShip.y = 0.0f;
+				nearestKm = Mathf.Min( nearestKm, toShip.magnitude / unitsPerKm );
+
+				yield return null;
+			}
+
+			seconds = Time.time - start;
+		}
+
+		yield return Frames( 10 );
+
+		var locationAfterReturn = playerData.m_general.m_location;
+
+		// ---- 2. out again, from 8 km: the fire button stops it on the way
+		yield return DisembarkNow( done );
+
+		if ( GetField( buttonController, "m_currentButton" ) != null )
+		{
+			buttonController.DeactivateButton();
+		}
+
+		PutTheVehicleAt( new Vector3( ship.x, 0.0f, ship.z + 8.0f * unitsPerKm ) );
+
+		yield return Frames( 5 );
+
+		var stoppedKm = 8.0f;
+		var stoppedRunning = true;
+		var stoppedLocation = playerData.m_general.m_location;
+
+		if ( returnIndex >= 0 )
+		{
+			PressButton( ButtonController.ButtonSet.TerrainVehicleWeapon, returnIndex );
+
+			for ( var end = Time.time + 2.0f; Time.time < end; )
+			{
+				yield return null;
+			}
+
+			yield return Tap( Key.Enter );
+			yield return Frames( 30 );
+
+			var toShip = ship - playerData.m_general.m_lastDisembarkedCoordinates;
+
+			toShip.y = 0.0f;
+			stoppedKm = toShip.magnitude / unitsPerKm;
+			stoppedRunning = GetField( buttonController, "m_currentButton" ) != null;
+			stoppedLocation = playerData.m_general.m_location;
+		}
+
+		// ---- 3. no headway (the vehicle cannot move): it stops and says the way is blocked
+		var speedMultiplier = controller.m_terrainVehicle.m_speedMultiplier;
+		var blockedMessage = "";
+		var blockedRunning = true;
+
+		controller.m_terrainVehicle.m_speedMultiplier = 0.0f;
+
+		if ( returnIndex >= 0 )
+		{
+			PressButtonLabelled( ButtonController.ButtonSet.TerrainVehicleWeapon, "Return" );
+
+			for ( var end = Time.time + 6.0f; ( Time.time < end ) && ( GetField( buttonController, "m_currentButton" ) != null ); )
+			{
+				yield return null;
+			}
+
+			blockedMessage = MessageList();
+			blockedRunning = GetField( buttonController, "m_currentButton" ) != null;
+		}
+
+		controller.m_terrainVehicle.m_speedMultiplier = speedMultiplier;
+
+		if ( blockedRunning )
+		{
+			buttonController.DeactivateButton();
+		}
+
+		// ---- 4. planet 29 (molten): lava between the vehicle and the ship
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return GoIntoOrbit( 7, 29 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		if ( GetField( buttonController, "m_currentButton" ) != null )
+		{
+			buttonController.DeactivateButton();
+		}
+
+		var lavaFound = FindSolidGroundByTheLiquid( out var solid, out var lava );
+		var lavaMessage = "";
+		var lavaRunning = true;
+		var reachedLava = false;
+		var lavaLocation = playerData.m_general.m_location;
+
+		if ( lavaFound && ( returnIndex >= 0 ) )
+		{
+			// the ship beyond the lava, 80 units east of the vehicle
+			float longitude, latitude;
+
+			Tools.WorldToLatLongCoordinates( solid + new Vector3( 80.0f, 0.0f, 0.0f ), out longitude, out latitude );
+
+			playerData.m_general.m_selectedLatitude = latitude;
+			playerData.m_general.m_selectedLongitude = longitude;
+
+			PutTheVehicleAt( solid );
+
+			yield return Frames( 5 );
+
+			PressButtonLabelled( ButtonController.ButtonSet.TerrainVehicleWeapon, "Return" );
+
+			for ( var end = Time.time + 10.0f; ( Time.time < end ) && ( GetField( buttonController, "m_currentButton" ) != null ); )
+			{
+				reachedLava |= playerData.m_general.m_lastDisembarkedCoordinates.x >= lava.x - 2.0f;
+
+				yield return null;
+			}
+
+			lavaMessage = MessageList();
+			lavaRunning = GetField( buttonController, "m_currentButton" ) != null;
+			lavaLocation = playerData.m_general.m_location;
+		}
+
+		Log( "returnorder: Tools [" + toolLabels + "]; Return from 6 km: " + locationAfterReturn + " after " + seconds.ToString( "F1" ) + " s, nearest " + nearestKm.ToString( "F2" ) + " km, fuel " + fuelBefore.ToString( "F4" ) + " -> " + lowestFuel.ToString( "F4" ) + " at the lowest" );
+		Log( "returnorder: from 8 km, Enter after 2 s: " + stoppedLocation + " at " + stoppedKm.ToString( "F2" ) + " km, still running " + stoppedRunning + "; no headway: running " + blockedRunning + " [" + blockedMessage + "]; lava (found " + lavaFound + " at " + solid + "): " + lavaLocation + ", running " + lavaRunning + ", reached the lava " + reachedLava + " [" + lavaMessage + "]" );
+
+		Check( "returnorder: the vehicle's Tools have Return", returnIndex >= 0, toolLabels );
+		Check( "returnorder: from 6 km Return drives the vehicle back by itself and takes it aboard on the ship's cell, on its fuel", ( locationAfterReturn == PD_General.Location.Planetside ) && ( nearestKm <= MoveButton.c_shipCellKm + 0.05f ) && ( lowestFuel < fuelBefore - 0.001f ), locationAfterReturn + ", nearest " + nearestKm.ToString( "F2" ) + " km, fuel " + fuelBefore.ToString( "F4" ) + " -> " + lowestFuel.ToString( "F4" ) );
+		Check( "returnorder: the fire button stops it on the way, nearer than it started", ( stoppedLocation == PD_General.Location.Disembarked ) && !stoppedRunning && ( stoppedKm < 7.5f ) && ( stoppedKm > MoveButton.c_boardingDistanceKm ), stoppedLocation + " at " + stoppedKm.ToString( "F2" ) + " km, running " + stoppedRunning );
+		Check( "returnorder: a vehicle that makes no headway stops and says the way is blocked", !blockedRunning && blockedMessage.Contains( "blocked" ), "running " + blockedRunning + " [" + blockedMessage + "]" );
+		Check( "returnorder: lava between the vehicle and the ship stops it short of the lava, and says so", lavaFound && !lavaRunning && !reachedLava && ( lavaLocation == PD_General.Location.Disembarked ) && lavaMessage.Contains( "lava" ), "found " + lavaFound + ", running " + lavaRunning + ", reached " + reachedLava + ", " + lavaLocation + " [" + lavaMessage + "]" );
+
+		Finish( "scenario=returnorder checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
