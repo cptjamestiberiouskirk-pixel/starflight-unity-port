@@ -42715,6 +42715,8 @@ public class ClaudeProbe : MonoBehaviour
 		var autoLevel = ( type != null ) ? type.GetMethod( "DetectLevel" ).Invoke( null, null ).ToString() : "(none)";
 		var grid = controller.m_disembarked.m_terrainGrid;
 		var details = new Dictionary<string, int>();
+		var grains = new Dictionary<string, string>();
+		var randomStateBefore = UnityEngine.Random.state;
 		var rings = new Dictionary<string, int>();
 		var vertices = new Dictionary<string, int>();
 		var formats = new Dictionary<string, string>();
@@ -42727,6 +42729,42 @@ public class ClaudeProbe : MonoBehaviour
 			yield return Frames( 5 );
 
 			var mesh = grid.GetComponent<MeshFilter>().sharedMesh;
+
+			// (the grain laid over the ground at this level, as the material has it: GroundGrain)
+			var groundMaterial = FieldOrNull( grid, "m_material" ) as Material;
+
+			grains[ level ] = ( groundMaterial == null ) ? "(no material)" : groundMaterial.GetVector( "SF_GroundGrainParams" ).x.ToString( "F2" ) + " " + ( ( groundMaterial.GetTexture( "SF_GroundGrainMap" ) is Texture grainMapOf ) ? grainMapOf.name : "none" );
+
+			if ( groundMaterial != null )
+			{
+				var grainMap = groundMaterial.GetTexture( "SF_GroundGrainMap" );
+
+				if ( hasGraphics && ( grainMap is Texture2D grainTexture ) && ( level == "High" ) )
+				{
+					// the grain texture itself, as a picture (copied through a render texture, as the texture is not readable)
+					var copy = RenderTexture.GetTemporary( grainTexture.width, grainTexture.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear );
+
+					Graphics.Blit( grainTexture, copy );
+
+					var previous = RenderTexture.active;
+
+					RenderTexture.active = copy;
+
+					var readable = new Texture2D( grainTexture.width, grainTexture.height, TextureFormat.RGBA32, false, true );
+
+					readable.ReadPixels( new Rect( 0, 0, grainTexture.width, grainTexture.height ), 0, 0 );
+					readable.Apply();
+
+					RenderTexture.active = previous;
+					RenderTexture.ReleaseTemporary( copy );
+
+					System.IO.File.WriteAllBytes( System.IO.Path.Combine( folder, "grain.png" ), readable.EncodeToPNG() );
+					UnityEngine.Object.Destroy( readable );
+				}
+
+				Log( "grounddetail: the camera is " + Vector3.Distance( Camera.main.transform.position, controller.m_terrainVehicle.transform.position ).ToString( "F0" ) + " from the vehicle, field of view " + Camera.main.fieldOfView.ToString( "F1" ) + ", far plane " + Camera.main.farClipPlane.ToString( "F0" ) );
+				Log( "grounddetail: at " + level + " the ground's grain " + groundMaterial.GetVector( "SF_GroundGrainParams" ).ToString( "F3" ) + ", map " + ( ( grainMap != null ) ? grainMap.name : "none" ) + ", shader " + groundMaterial.shader.name + ", renderer's material is it " + ( grid.GetComponent<MeshRenderer>().sharedMaterial == groundMaterial ) );
+			}
 
 			details[ level ] = grid.m_detail;
 			rings[ level ] = grid.m_numLevels;
@@ -42803,6 +42841,9 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "grounddetail: at Low the terrain grid is 129 vertices to a ring's side in 3 rings, with 16 bit indices", ( details[ "Low" ] == 129 ) && ( rings[ "Low" ] == 3 ) && ( formats[ "Low" ] == "UInt16" ), state( "Low" ) );
 		Check( "grounddetail: at Medium it is 257 to a side in 3 rings, more than 65535 vertices with 32 bit indices", ( details[ "Medium" ] == 257 ) && ( rings[ "Medium" ] == 3 ) && ( vertices[ "Medium" ] > 65535 ) && ( formats[ "Medium" ] == "UInt32" ), state( "Medium" ) );
 		Check( "grounddetail: at High it is 257 to a side in 4 rings", ( details[ "High" ] == 257 ) && ( rings[ "High" ] == 4 ) && ( formats[ "High" ] == "UInt32" ), state( "High" ) );
+		var randomUntouched = UnityEngine.Random.state.Equals( randomStateBefore );
+
+		Check( "grounddetail: the grain of the ground up close is laid over it at Medium and High and not at Low, and making it draws no random numbers (everything on a planet is placed from them)", grains[ "Low" ].StartsWith( "0.00" ) && grains[ "Medium" ].StartsWith( "0.60 Ground Grain" ) && grains[ "High" ].StartsWith( "0.80 Ground Grain" ) && randomUntouched, "Low " + grains[ "Low" ] + ", Medium " + grains[ "Medium" ] + ", High " + grains[ "High" ] + ", random numbers untouched " + randomUntouched );
 		Check( "grounddetail: the Colors screen has a Ground row of Auto, Low, Medium and High that marks the setting in use, and its Medium button sets Medium and remakes the grid", ( groundLabels == "Auto,Low,Medium,High" ) && ( markedBefore == 0 ) && ( markedAfter == 2 ) && ( settingAfter == "Medium" ) && ( detailAfter == 257 ), groundLabels + ", marked " + markedBefore + " -> " + markedAfter + ", " + settingAfter + ", grid " + detailAfter );
 
 		Finish( "scenario=grounddetail checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );

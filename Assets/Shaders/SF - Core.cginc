@@ -143,7 +143,9 @@ float4 SF_GroundGrainParams;
 
 float ComputeGroundGrain( SF_VertexShaderOutput i )
 {
-	float fade = saturate( 1 - distance( i.positionWorld.xyz, _WorldSpaceCameraPos ) / max( SF_GroundGrainParams.w, 1 ) );
+	// full strength out to half the fade distance (the camera looks down on the vehicle from about 106 units), then fading out
+	float distanceToCamera = distance( i.positionWorld.xyz, _WorldSpaceCameraPos );
+	float fade = 1 - smoothstep( 0.5 * SF_GroundGrainParams.w, SF_GroundGrainParams.w, distanceToCamera );
 	float strength = SF_GroundGrainParams.x * fade;
 
 	#if SF_WATERMASKMAP_ON
@@ -152,11 +154,12 @@ float ComputeGroundGrain( SF_VertexShaderOutput i )
 
 	#endif // SF_WATERMASKMAP_ON
 
-	float fine = tex2D( SF_GroundGrainMap, i.positionWorld.xz * SF_GroundGrainParams.y ).r;
-	float coarse = tex2D( SF_GroundGrainMap, i.positionWorld.xz * SF_GroundGrainParams.z + 0.37 ).r;
+	// grit (red) drawn small, pebbles with dark cracks between them (green) drawn larger
+	float grit = tex2D( SF_GroundGrainMap, i.positionWorld.xz * SF_GroundGrainParams.y ).r;
+	float pebbles = tex2D( SF_GroundGrainMap, i.positionWorld.xz * SF_GroundGrainParams.z + 0.37 ).g;
 
 	// about 1 on average, so the ground keeps its colour and brightness
-	return lerp( 1, 0.55 + 0.9 * ( fine * 0.6 + coarse * 0.4 ), strength );
+	return lerp( 1, ( 0.55 + 0.9 * grit ) * ( 0.35 + 0.8 * pebbles ) * 1.1, strength );
 }
 
 #endif // SF_GROUND_DETAIL
