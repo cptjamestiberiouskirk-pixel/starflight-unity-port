@@ -60,7 +60,7 @@ New to *Starflight*? Read the notices in Operations, create and assign a crew of
 
 The whole game is playable, from a new game to the ending. Every item on the [roadmap to parity with the original](ROADMAP.md) is done or decided (59 of 59), and every screen has been compared side by side with the original's.
 
-Every change is compile-checked in CI and exercised by a headless test harness that plays the real game scenes: 260 scenarios with 1,360 checks, all passing on this release, plus an automated playthrough that plays a new game all the way to the ending and Interstel's bonus.
+Every change is compile-checked in CI and exercised by a headless test harness that plays the real game scenes: 260 scenarios with 1,361 checks, all passing on this release, plus an automated playthrough that plays a new game all the way to the ending and Interstel's bonus.
 
 The known differences from the original are listed at the end of the [manual](docs/MANUAL.md#13-this-port-and-the-1986-original). The biggest one left is that shields recharge at the port's own pace during a fight. Found a bug? Please [open an issue](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port/issues).
 
