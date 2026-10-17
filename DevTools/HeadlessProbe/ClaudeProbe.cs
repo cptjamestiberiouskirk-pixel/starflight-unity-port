@@ -9333,8 +9333,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		// ---- 3. an object at the very right edge of the map (Random.Range can return its upper limit, which is the width of the map)
 		var edge = Tools.MapToWorldCoordinates( planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight * 0.5f, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
-		var addToSpawnList = typeof( TerrainGridPopulator ).GetMethod( "AddToSpawnList", c_any );
-		var overlapsSomething = typeof( TerrainGridPopulator ).GetMethod( "OverlapsSomething", c_any );
+		// (the one taking only the position: the survey from orbit added overloads with the planet's generator and spawn lists, and a lookup by name alone threw)
+		var addToSpawnList = typeof( TerrainGridPopulator ).GetMethod( "AddToSpawnList", c_any, null, new Type[] { typeof( Vector3 ) }, null );
+		var overlapsSomething = typeof( TerrainGridPopulator ).GetMethod( "OverlapsSomething", c_any, null, new Type[] { typeof( Vector3 ) }, null );
 		var edgeResult = "added";
 
 		try
