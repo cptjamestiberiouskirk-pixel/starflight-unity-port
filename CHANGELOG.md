@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Textured Model for the Terrain Vehicle**: the terrain vehicle is a new textured model in the look of the Arth ship that carries it: light grey and dull white plating with navy trim, the gold front cowl with its headlights, the twin laser on the nose, a rear door with a blue window, and six chunky tires on their own suspension arms. It keeps the old model's layout and every part the game moves: the six wheels still turn and steer, and the radar on the roof still turns on its mast. The wheels meet the ground where the old ones did, and the body now clears it. The vehicle is shorter than before (about 13 units long against 20) and a little wider, so its collision capsule was resized to match. It has 11,900 triangles and its wheels 4,200 each, where each old wheel had 10,700. Probe scenario `tvmodel`.
+- **Textured Models for the Ancient Ruins**: the five ancient ruins, plain grey pyramids of about 60 triangles drawn in Unity's default material, are new textured models: the crumbling remains of pyramids of huge dark stone blocks, with fallen blocks at their feet and carved glyph lines along their faces that glow a faint cyan. Each keeps its old ruin's square of 24 units, its broken shape and its place on the ground. They have about 8,000 triangles each. Probe scenario `ruinmodels`.
 
 ## [1.3.0] - 2026-10-17
 

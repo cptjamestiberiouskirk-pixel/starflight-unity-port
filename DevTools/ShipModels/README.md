@@ -17,6 +17,7 @@ Decisions of 2026-10-09:
 | `import_meshy.py`, `meshy-<race>.json` | Imports a race's textured models: see "Textured models" below |
 | `import_meshy_arth.py`, `meshy-arth.json` | Imports the player's Arth ship, with its equipment parts kept separate: see "The player's Arth ship" below |
 | `import_meshy_tv.py`, `meshy-terrain-vehicle.json` | Imports the terrain vehicle, its six wheels kept separate: see "The terrain vehicle" below |
+| `import_meshy_props.py`, `meshy-ruins.json` | Imports single-mesh ground props (the ancient ruins): see "Ground props" below |
 
 ## Wrecks, wiring and the probe
 
@@ -101,6 +102,30 @@ blender --background --factory-startup --python DevTools/ShipModels/import_meshy
 ```powershell
 & "DevTools\ShipModels\wire.ps1" -Manifest "DevTools\ShipModels\manifest-terrain-vehicle.json"
 ```
+
+### Ground props
+
+The ancient ruins are one mesh node each, and the game uses them through that node: the ruins' templates in `TerrainRuins` are the model files themselves. `import_meshy_props.py` (with `meshy-ruins.json`) replaces each prop's mesh and keeps the rest:
+
+- it reads each original from a folder of copies taken from git (`--old`), never from the files it overwrites, and keeps the node's name and transform. The node's origin is where placing a prop sets it down and turns it, and it is off the geometry's middle in most of the old files;
+- the new mesh goes into the node's frame so that it stands where the old one stood: its middle over the old middle, its bottom at the old bottom, and its size as the old one's. A `footprint` prop (the ruins) has its widest side as the old one's, and a square base turned to the axes; a `volume` prop has its bounding volume as the old one's, and its long axis turned as the old one's;
+- it writes each FBX in metres in the file's own unit scale (`FBX_SCALE_UNITS`), the maps for SF - Standard (the ruins' glyph lines, a pale cyan, glow through their own `glow` settings: hues 150 to 210 from a saturation of 0.12), and `manifest-ruins.json` with a `models` section. `ShipModelWiring.cs` then makes the materials and sets up each model's import with its own (the old ruins had none, and were drawn in Unity's default material).
+
+```powershell
+git show "bfd3a590:Assets/Game Objects/Ancient Ruins/Ancient Ruins 1.fbx" > old/"Ancient Ruins 1.fbx"
+```
+
+(and the same for the other four), then:
+
+```bash
+blender --background --factory-startup --python DevTools/ShipModels/import_meshy_props.py -- DevTools/ShipModels/meshy-ruins.json --source <folder with the GLB files> --old old --preview DevTools/ShipModels/previews/ancient-ruins.png
+```
+
+```powershell
+& "DevTools\ShipModels\wire.ps1" -Manifest "DevTools\ShipModels\manifest-ruins.json"
+```
+
+The probe scenario `ruinmodels` covers them (each ruin in its own textured material with the glow, its triangles, its square of 24, a ruin placed on the ground; a picture under `-Graphics`).
 
 The probe scenario `tvmodel` covers it (the materials, the wheels on their steering joints, the triangle counts, the wheels level on the ground with the body clear of it, the capsule against the model, the radar turning; a picture under `-Graphics`).
 
