@@ -25,8 +25,9 @@ public class TVMineButton : ShipButton
 	const float c_vehicleBeamHeight = 3.0f;
 	const float c_depositBeamHeight = 0.5f;
 
-	// the beam, made the first time it is needed and kept with the disembarked location
-	static LaserBeam s_beam;
+	// the beam, made the first time it is needed and kept with the disembarked location (not static: the button belongs to the scene's button controller, so
+	// nothing of the scene outlives it)
+	LaserBeam m_beam;
 
 	// the deposit being cut, its size when the cutting began, and its volume then
 	TerrainElement m_target;
@@ -214,21 +215,21 @@ public class TVMineButton : ShipButton
 	// a pulse of the beam from the vehicle to the deposit
 	void FireBeam()
 	{
-		if ( s_beam == null )
+		if ( m_beam == null )
 		{
 			var beamObject = new GameObject( "Mining Laser" );
 
 			beamObject.transform.SetParent( SpaceflightController.m_instance.m_disembarked.transform, false );
 
-			s_beam = beamObject.AddComponent<LaserBeam>();
-			s_beam.SetScale( c_beamScale );
-			s_beam.SetColor( c_beamColor );
+			m_beam = beamObject.AddComponent<LaserBeam>();
+			m_beam.SetScale( c_beamScale );
+			m_beam.SetColor( c_beamColor );
 		}
 
 		var from = SpaceflightController.m_instance.m_terrainVehicle.transform.position + Vector3.up * c_vehicleBeamHeight;
 		var to = m_target.transform.position + Vector3.up * c_depositBeamHeight;
 
-		s_beam.Fire( from, to, c_pulseLifetime );
+		m_beam.Fire( from, to, c_pulseLifetime );
 	}
 
 	// the laser stops: how much came aboard, and why it stopped

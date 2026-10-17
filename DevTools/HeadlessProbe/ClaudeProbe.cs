@@ -13269,6 +13269,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "leaks: the mining laser leaves no materials behind", mined && ( materialsAfterMining <= materialsBeforeMining ), materialsBeforeMining + " before, " + materialsAfterMining + " after, the laser ran " + mined );
 
+		// (the scenario's own hold on the deposits goes, or it would keep the scene's objects in memory through them for the check below)
+		deposits = null;
+
 		// ---- 2. leaving the spaceflight scene. The save panel is opened and closed first, as a player who saves does (the panel lives in the persistent scene)
 		SpaceflightController.m_instance.SwitchLocation( PD_General.Location.Planetside );
 
