@@ -39,19 +39,19 @@ public class TVCargoButton : ShipButton
 			return false;
 		}
 
+		// does the terrain vehicle carry anything? then list it, with the option of dropping it (the manual, page 21)
+		if ( BuildCargoItems().Count > 0 )
+		{
+			OpenCargoList();
+
+			return false;
+		}
+
 		// find all elements in pickup range
 		var elementsInRange = FindElementsInRange();
 
 		if ( elementsInRange.Count == 0 )
 		{
-			// does the terrain vehicle carry anything? then list it, with the option of dropping it (the manual, page 21)
-			if ( BuildCargoItems().Count > 0 )
-			{
-				OpenCargoList();
-
-				return false;
-			}
-
 			// check if there's a non-pickable object nearby and provide feedback
 			var nearbyObjectName = FindNearbyNonPickableObject();
 
@@ -69,24 +69,12 @@ public class TVCargoButton : ShipButton
 			return false;
 		}
 
-		// check if we have cargo space
-		var remainingVolume = playerData.m_terrainVehicle.GetRemainingVolume();
-
-		if ( remainingVolume <= 0 )
-		{
-			SpaceflightController.m_instance.m_messages.Clear();
-			SpaceflightController.m_instance.m_messages.AddText( "<color=red>Terrain vehicle cargo hold is full!</color>" );
-			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
-			return false;
-		}
-
-		// pick up the closest element
+		// a deposit beside the vehicle is cut into the hold with the mining laser (since 2026-10-17 Cargo no longer takes it in one press: TVMineButton)
 		var closestElement = GetClosestElement( elementsInRange );
 
-		if ( closestElement != null )
-		{
-			PickupElement( closestElement, remainingVolume );
-		}
+		SpaceflightController.m_instance.m_messages.Clear();
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>A deposit of " + closestElement.GetElementName() + ", " + Tools.VolumeToText( closestElement.m_volume ) + " cubic meters.</color>\n<color=#808080>Tools, Mine cuts it into the cargo hold with the mining laser.</color>" );
+		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 
 		return false;
 	}
@@ -420,75 +408,6 @@ public class TVCargoButton : ShipButton
 		}
 
 		return closestElement;
-	}
-
-	// pick up an element
-	void PickupElement( TerrainElement element, int remainingVolume )
-	{
-		var gameData = DataController.m_instance.m_gameData;
-		var playerData = DataController.m_instance.m_playerData;
-
-		// get the element info
-		var elementId = element.m_elementId;
-		var elementName = element.GetElementName();
-		var volumeAvailable = element.m_volume;
-
-		// clamp to available cargo space
-		var volumeToPickup = Mathf.Min( volumeAvailable, remainingVolume );
-
-		// DEBUG: Log pickup attempt
-		Debug.Log($"[PickupElement] Attempting pickup: elementId={elementId}, name={elementName}, volumeAvailable={volumeAvailable}, volumeToPickup={volumeToPickup}, remainingCargo={remainingVolume}");
-
-		// add to terrain vehicle cargo
-		playerData.m_terrainVehicle.AddElement( elementId, volumeToPickup );
-
-		// DEBUG: Log cargo state after pickup
-		var cargoList = playerData.m_terrainVehicle.m_elementStorage?.m_elementList;
-		if (cargoList != null)
-		{
-			foreach (var elem in cargoList)
-			{
-				Debug.Log($"[PickupElement] Cargo: elementId={elem.m_elementId}, volume={elem.m_volume}");
-			}
-		}
-
-		// the volumes are in tenths of a cubic meter, as the cargo holds count them
-		var pickupText = "<color=green>Picked up " + Tools.VolumeToText( volumeToPickup ) + " cubic meters of " + elementName + ".</color>";
-
-		// did all of the deposit fit into the cargo hold?
-		if ( volumeToPickup < volumeAvailable )
-		{
-			// no - the rest of the deposit stays where it is
-			element.m_volume = volumeAvailable - volumeToPickup;
-
-			pickupText += "\n<color=yellow>The cargo hold is full. " + Tools.VolumeToText( element.m_volume ) + " cubic meters are left behind.</color>";
-		}
-		else
-		{
-			// yes - remove the element from the planet
-			element.Pickup();
-
-			element.m_volume = 0;
-		}
-
-		// remember what is left of the deposit, so that it is not back the next time the terrain vehicle goes out on this planet
-		if ( playerData.m_planetSurfaces != null )
-		{
-			playerData.m_planetSurfaces.SetDepositVolumeLeft( element.m_planetId, element.m_depositIndex, element.m_volume );
-		}
-
-		// show pickup message
-		SpaceflightController.m_instance.m_messages.Clear();
-		SpaceflightController.m_instance.m_messages.AddText( pickupText );
-
-		// play transporter sound for cargo pickup
-		SoundController.m_instance.PlaySound( SoundController.Sound.Transporter );
-
-		// update button sprites
-		SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
-
-		// update the terrain vehicle display
-		SpaceflightController.m_instance.m_displayController.m_terrainVehicleDisplay.Show();
 	}
 
 	// show the current cargo contents

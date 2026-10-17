@@ -32,9 +32,18 @@ public class LaserBeam : MonoBehaviour
 	// beam colors
 	Color m_startColor = new Color( 1.0f, 0.2f, 0.2f, 1.0f ); // red laser
 
-	// beam width (the glow; the core is a share of it)
-	float m_startWidth = 9.0f;
-	float m_endWidth = 7.0f;
+	// beam width (the glow; the core is a share of it), and the sizes of the flash, the flare and the sparks, at the scale of the ships' lasers in space
+	const float c_startWidth = 9.0f;
+	const float c_endWidth = 7.0f;
+	const float c_muzzleSize = 18.0f;
+	const float c_flareSize = 32.0f;
+	const float c_sparkMinSpeed = 60.0f;
+	const float c_sparkMaxSpeed = 160.0f;
+	const float c_sparkMinSize = 0.6f;
+	const float c_sparkMaxSize = 1.2f;
+
+	float m_startWidth = c_startWidth;
+	float m_endWidth = c_endWidth;
 
 	// how wide the core is next to the glow, and how much of the way to white its colour is
 	const float c_coreWidth = 0.22f;
@@ -93,7 +102,7 @@ public class LaserBeam : MonoBehaviour
 		var main = m_muzzleParticles.main;
 		main.startLifetime = 0.12f;
 		main.startSpeed = 0.0f;
-		main.startSize = 18.0f;
+		main.startSize = c_muzzleSize;
 
 		var emission = m_muzzleParticles.emission;
 		emission.SetBursts( new ParticleSystem.Burst[] { new ParticleSystem.Burst( 0.0f, 1 ) } );
@@ -118,7 +127,7 @@ public class LaserBeam : MonoBehaviour
 		var flareMain = m_impactParticles.main;
 		flareMain.startLifetime = 0.2f;
 		flareMain.startSpeed = 0.0f;
-		flareMain.startSize = 32.0f;
+		flareMain.startSize = c_flareSize;
 
 		var flareEmission = m_impactParticles.emission;
 		flareEmission.SetBursts( new ParticleSystem.Burst[] { new ParticleSystem.Burst( 0.0f, 1 ) } );
@@ -139,8 +148,8 @@ public class LaserBeam : MonoBehaviour
 
 		var main = m_sparkParticles.main;
 		main.startLifetime = new ParticleSystem.MinMaxCurve( 0.1f, 0.25f );
-		main.startSpeed = new ParticleSystem.MinMaxCurve( 60.0f, 160.0f );
-		main.startSize = new ParticleSystem.MinMaxCurve( 0.6f, 1.2f );
+		main.startSpeed = new ParticleSystem.MinMaxCurve( c_sparkMinSpeed, c_sparkMaxSpeed );
+		main.startSize = new ParticleSystem.MinMaxCurve( c_sparkMinSize, c_sparkMaxSize );
 
 		var emission = m_sparkParticles.emission;
 		emission.SetBursts( new ParticleSystem.Burst[] { new ParticleSystem.Burst( 0.0f, 10 ) } );
@@ -224,6 +233,28 @@ public class LaserBeam : MonoBehaviour
 		m_impactParticles.Play();
 		m_sparkParticles.Stop( true, ParticleSystemStopBehavior.StopEmittingAndClear );
 		m_sparkParticles.Play();
+	}
+
+	/// <summary>
+	/// Set the size the beam is drawn at: 1 for the ships' lasers in space, less for the terrain vehicle's mining laser on the ground.
+	/// </summary>
+	public void SetScale( float scale )
+	{
+		m_startWidth = c_startWidth * scale;
+		m_endWidth = c_endWidth * scale;
+
+		var muzzleMain = m_muzzleParticles.main;
+		muzzleMain.startSize = c_muzzleSize * scale;
+
+		var flareMain = m_impactParticles.main;
+		flareMain.startSize = c_flareSize * scale;
+
+		var sparkMain = m_sparkParticles.main;
+		sparkMain.startSpeed = new ParticleSystem.MinMaxCurve( c_sparkMinSpeed * scale, c_sparkMaxSpeed * scale );
+		sparkMain.startSize = new ParticleSystem.MinMaxCurve( c_sparkMinSize * scale, c_sparkMaxSize * scale );
+
+		var sparkShape = m_sparkParticles.shape;
+		sparkShape.radius = scale;
 	}
 
 	/// <summary>

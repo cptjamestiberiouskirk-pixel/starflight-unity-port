@@ -141,4 +141,25 @@ public class TerrainElement : MonoBehaviour
 
 		return volumePickedUp;
 	}
+
+	// call this when the mining laser has cut the last of the deposit away (TVMineButton): the deposit is gone, with no transporter effect
+	public void MineOut()
+	{
+		if ( m_pickedUp )
+		{
+			return;
+		}
+
+		m_pickedUp = true;
+		m_volume = 0;
+
+		var label = GetComponent<TerrainObjectLabel>();
+
+		if ( label != null )
+		{
+			label.HideLabel();
+		}
+
+		gameObject.SetActive( false );
+	}
 }
