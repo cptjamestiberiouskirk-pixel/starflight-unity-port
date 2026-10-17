@@ -26,6 +26,69 @@ public static class SurveyMarks
 	// the pixels drawn into (kept, so that a new drawing does not make garbage)
 	static Color32[] s_pixels;
 
+	// the marks of the planet the ship orbits, shared by the landing map and the sensor picture, and what they were last drawn for (they are drawn again
+	// only when one of these changes)
+	static Texture2D s_texture;
+	static PlanetSurvey s_drawnSurvey;
+	static int s_drawnPlanetId = -1;
+	static int s_drawnRuinCount = -1;
+	static UIKitTheme s_drawnTheme;
+
+	/// <summary>
+	/// The marks of the planet the ship orbits: the science officer's survey of it (none if the survey kept is of another planet) and its ancient ruins
+	/// with the Red Cylinder aboard, in the colours drawn over the views in the scheme in use (the planet's ground is dark in either mode). Null if there
+	/// is nothing to mark. The texture is shared and kept: do not change or destroy it.
+	/// </summary>
+	public static Texture2D GetTexture()
+	{
+		var controller = SpaceflightController.m_instance;
+
+		if ( ( controller == null ) || ( DataController.m_instance == null ) )
+		{
+			return null;
+		}
+
+		var planetId = DataController.m_instance.m_playerData.m_general.m_currentPlanetId;
+
+		// (the survey kept is of the planet analysed last, which may be another)
+		var survey = ( ( controller.m_planetSurvey != null ) && ( controller.m_planetSurvey.m_planetId == planetId ) ) ? controller.m_planetSurvey : null;
+		var ruins = RedCylinder.GetAncientRuinPlaces();
+
+		if ( ( ( survey == null ) || ( survey.m_marks.Count == 0 ) ) && ( ruins.Count == 0 ) )
+		{
+			return null;
+		}
+
+		var theme = UIKitTheme.GetViewTheme();
+
+		// (a destroyed texture compares equal to null)
+		if ( s_texture == null )
+		{
+			// mipmapped, since both pictures show it smaller than it is; it goes round the planet east to west, and stops at the poles
+			s_texture = new Texture2D( c_width, c_height, TextureFormat.RGBA32, true );
+
+			s_texture.name = "Survey Marks";
+			s_texture.wrapModeU = TextureWrapMode.Repeat;
+			s_texture.wrapModeV = TextureWrapMode.Clamp;
+			s_texture.filterMode = FilterMode.Trilinear;
+
+			s_drawnTheme = null;
+		}
+		else if ( ( survey == s_drawnSurvey ) && ( planetId == s_drawnPlanetId ) && ( ruins.Count == s_drawnRuinCount ) && ( theme == s_drawnTheme ) )
+		{
+			return s_texture;
+		}
+
+		Draw( s_texture, survey, ruins, theme );
+
+		s_drawnSurvey = survey;
+		s_drawnPlanetId = planetId;
+		s_drawnRuinCount = ruins.Count;
+		s_drawnTheme = theme;
+
+		return s_texture;
+	}
+
 	/// <summary>
 	/// Draws the survey's marks (none if the survey is null) and the ancient ruins (east-west and north-south, in degrees) into the texture, in the
 	/// colours of this theme (the minerals in its armor colour, the life in its fuel colour, the ruins in its danger colour).
@@ -94,7 +157,7 @@ public static class SurveyMarks
 		}
 
 		texture.SetPixels32( s_pixels );
-		texture.Apply( false );
+		texture.Apply( texture.mipmapCount > 1 );
 	}
 
 	// where a place of the planet is on the texture (pixels from its left and bottom edges)

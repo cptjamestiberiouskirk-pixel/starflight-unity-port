@@ -142,6 +142,9 @@ public class SensorsDisplay : ShipDisplay
 	// how far the planet in the picture has turned (in turns)
 	float m_planetSpin;
 
+	// the science officer's survey whose marks the planet in the picture shows (they are put on it again when another survey is made)
+	PlanetSurvey m_shownSurvey;
+
 	// the inside of the window when a scan has no picture: black inside a magenta border, as the original shows an unidentified object
 	// (a copy of the panel, made the first time the display is shown)
 	Image m_emptyImage;
@@ -648,6 +651,48 @@ public class SensorsDisplay : ShipDisplay
 
 		m_planetAlbedoTexture = albedoMap;
 		m_pictureMaterial = m_planetSurfaceMaterial;
+
+		// and the marks of what has been found on it
+		ShowSurveyMarks();
+	}
+
+	// puts the marks of the science officer's survey of the planet in the picture, and of the ancient ruins the Red Cylinder finds on it, on the planet:
+	// the landing map's marks (decided 2026-10-17, ROADMAP D6), none before the planet has been analysed from orbit
+	void ShowSurveyMarks()
+	{
+		if ( ( m_planetSurfaceMaterial == null ) || ( SpaceflightController.m_instance == null ) )
+		{
+			return;
+		}
+
+		m_shownSurvey = SpaceflightController.m_instance.m_planetSurvey;
+
+		var texture = SurveyMarks.GetTexture();
+
+		m_planetSurfaceMaterial.SetTexture( "_SurveyTex", ( texture != null ) ? texture : Texture2D.whiteTexture );
+		m_planetSurfaceMaterial.SetFloat( "_SurveyStrength", ( texture != null ) ? 1.0f : 0.0f );
+	}
+
+	// another scheme or mode was picked: the marks on the planet in the picture are drawn again in its colours
+	void ThemeChanged()
+	{
+		if ( ( m_pictureMaterial != null ) && ( m_pictureMaterial == m_planetSurfaceMaterial ) )
+		{
+			ShowSurveyMarks();
+		}
+	}
+
+	// unity on enable
+	void OnEnable()
+	{
+		UIKitTheme.Changed -= ThemeChanged;
+		UIKitTheme.Changed += ThemeChanged;
+	}
+
+	// unity on disable
+	void OnDisable()
+	{
+		UIKitTheme.Changed -= ThemeChanged;
 	}
 
 	// turns the planet in the picture, and goes back to the noise if its maps have been destroyed (the ship has left the star system)
@@ -665,6 +710,12 @@ public class SensorsDisplay : ShipDisplay
 			m_maskImage.material = m_maskMaterial;
 
 			return;
+		}
+
+		// the planet in the picture has just been analysed: its marks go on it
+		if ( ( SpaceflightController.m_instance != null ) && ( SpaceflightController.m_instance.m_planetSurvey != m_shownSurvey ) )
+		{
+			ShowSurveyMarks();
 		}
 
 		// the planet stands still while the game is paused

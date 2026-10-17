@@ -1586,6 +1586,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSurveyMap();
 				break;
 
+			case "surveysensor":
+				yield return ScenarioSurveySensor();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -41312,7 +41316,12 @@ public class ClaudeProbe : MonoBehaviour
 	static int SurveyMarkNearest( float eastWest, float northSouth, out float nearest, params Color[] colors )
 	{
 		var image = SurveyMarksImage();
-		var texture = ( image != null ) ? image.texture as Texture2D : null;
+
+		return SurveyMarkNearest( ( image != null ) ? image.texture as Texture2D : null, eastWest, northSouth, out nearest, colors );
+	}
+
+	static int SurveyMarkNearest( Texture2D texture, float eastWest, float northSouth, out float nearest, params Color[] colors )
+	{
 		var nearestIndex = -1;
 
 		nearest = float.MaxValue;
@@ -41615,6 +41624,194 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "surveymap: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=surveymap minerals=" + mineralsMarked + "/" + minerals + " lifeforms=" + lifeformsMarked + "/" + lifeforms + " ruins=" + ruinsMarked + "/" + ruinPlaces.Count + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the survey's marks on the sensor picture (SensorsDisplay, Sensor Planet shader: ROADMAP D6)
+
+	// the colour the sensor picture's planet material draws at the middle of its disc, turned and tilted so that this place of the planet is there, with the
+	// survey's marks at this strength and their pulse held still (on the graphics card; clear without graphics)
+	static Color SensorPlanetPixelAt( Material material, float eastWest, float northSouth, float surveyStrength )
+	{
+		if ( ( material == null ) || ( SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null ) )
+		{
+			return Color.clear;
+		}
+
+		var copy = new Material( material );
+
+		// the middle of the disc shows longitude 0 at the latitude of the tilt; the marks' texture runs up the planet's maps from 0.125 to 0.875
+		var mapV = 0.125f + 0.75f * ( northSouth + 90.0f ) / 180.0f;
+
+		copy.SetFloat( "_Spin", 0.5f - ( eastWest + 180.0f ) / 360.0f );
+		copy.SetFloat( "_Tilt", ( mapV - 0.5f ) * Mathf.PI );
+		copy.SetFloat( "_Reveal", 1.0f );
+		copy.SetFloat( "_SurveyStrength", surveyStrength );
+		copy.SetFloat( "_SurveyPulse", 0.0f );
+		copy.SetTexture( "_MaskTex", Texture2D.whiteTexture );
+
+		// (2 to 1, as the picture is, so that the disc is round; odd, so that the middle pixel is its middle)
+		var renderTexture = new RenderTexture( 257, 129, 0, RenderTextureFormat.ARGB32 );
+		var picture = new Texture2D( 257, 129, TextureFormat.RGBA32, false );
+		var active = RenderTexture.active;
+
+		Graphics.Blit( Texture2D.whiteTexture, renderTexture, copy );
+
+		RenderTexture.active = renderTexture;
+		picture.ReadPixels( new Rect( 0, 0, 257, 129 ), 0, 0 );
+		picture.Apply();
+		RenderTexture.active = active;
+
+		var pixel = picture.GetPixel( 128, 64 );
+
+		renderTexture.Release();
+		UnityEngine.Object.DestroyImmediate( renderTexture );
+		UnityEngine.Object.DestroyImmediate( picture );
+		UnityEngine.Object.DestroyImmediate( copy );
+
+		return pixel;
+	}
+
+	// how far apart two colours are (the sum of their channels' differences)
+	static float ColorDistance( Color a, Color b )
+	{
+		return Mathf.Abs( a.r - b.r ) + Mathf.Abs( a.g - b.g ) + Mathf.Abs( a.b - b.b );
+	}
+
+	IEnumerator ScenarioSurveySensor()
+	{
+		var controller = SpaceflightController.m_instance;
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+		var displays = controller.m_displayController;
+		var sensors = displays.m_sensorsDisplay;
+		var errorsBefore = s_errorCount;
+
+		EnsureCrew();
+
+		UIKitTheme.SetScheme( 0, false );
+		UIKitTheme.SetMode( UIKitTheme.Mode.Dark, false );
+
+		var classic = UIKitTheme.GetViewTheme();
+		var scienceOfficer = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer );
+
+		scienceOfficer.m_science = 250;
+
+		// ---- 1. in orbit around planet 92 of Arth's system, a scan of the planet before any analysis: no marks on it (the control)
+		yield return GoIntoOrbit( 25, 92 );
+		yield return WaitForPlanetMaps( 90.0f );
+		yield return Frames( 5 );
+
+		var planet = gameData.m_planetList[ 92 ];
+
+		controller.m_planetSurvey = null;
+
+		displays.ChangeDisplay( sensors );
+
+		yield return Frames( 3 );
+
+		sensors.m_hasSensorData = false;
+		sensors.StartScanning( SensorsDisplay.ScanType.Planet, 18, planet.m_mass, planet.m_bioDensity, planet.m_mineralDensity );
+
+		var until = Time.realtimeSinceStartup + sensors.m_maxDuration + 5.0f;
+
+		while ( !sensors.m_hasSensorData && ( Time.realtimeSinceStartup < until ) )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 2 );
+
+		var material = sensors.m_maskImage.material;
+		var showsPlanet = ShowsPlanetSurface( sensors );
+		var strengthBefore = showsPlanet ? material.GetFloat( "_SurveyStrength" ) : -1.0f;
+
+		// ---- 2. the reading analysed: the survey's marks go on the planet in the picture
+		AnalyzeNewReading( false );
+
+		var survey = controller.m_planetSurvey;
+
+		yield return Frames( 3 );
+
+		var strengthAfter = ShowsPlanetSurface( sensors ) ? material.GetFloat( "_SurveyStrength" ) : -1.0f;
+		var sensorMarks = ShowsPlanetSurface( sensors ) ? material.GetTexture( "_SurveyTex" ) as Texture2D : null;
+
+		// ---- 3. on the graphics card (with -Graphics): a lifeform's mark shows on the sphere where the lifeform is, and not without the marks
+		var lifeform = ( survey != null ) ? survey.m_marks.Find( mark => mark.m_kind == PlanetSurvey.Kind.Life ) : default( PlanetSurvey.Mark );
+		var hasLifeform = ( survey != null ) && survey.m_marks.Exists( mark => mark.m_kind == PlanetSurvey.Kind.Life );
+		var withGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
+		var withMarks = hasLifeform ? SensorPlanetPixelAt( material, lifeform.m_eastWest, lifeform.m_northSouth, 1.0f ) : Color.clear;
+		var withoutMarks = hasLifeform ? SensorPlanetPixelAt( material, lifeform.m_eastWest, lifeform.m_northSouth, 0.0f ) : Color.clear;
+		var distanceWith = ColorDistance( withMarks, classic.m_statusFuel );
+		var distanceWithout = ColorDistance( withoutMarks, classic.m_statusFuel );
+
+		// (with -Graphics, a picture of the sensor window with the marks on the planet)
+		if ( withGraphics )
+		{
+			RenderScreenPicture( System.IO.Path.Combine( System.IO.Path.GetTempPath(), "starflight-probe", "surveysensor-planet-92.png" ) );
+		}
+
+		Log( "surveysensor: planet 92: before the analysis strength " + strengthBefore + " (planet shown " + showsPlanet + "); after it strength " + strengthAfter + " | the lifeform at " + lifeform.m_eastWest.ToString( "F1" ) + "," + lifeform.m_northSouth.ToString( "F1" ) + " on the graphics card: with the marks " + ColorUtility.ToHtmlStringRGB( withMarks ) + " (" + distanceWith.ToString( "F2" ) + " from " + ColorUtility.ToHtmlStringRGB( classic.m_statusFuel ) + "), without " + ColorUtility.ToHtmlStringRGB( withoutMarks ) + " (" + distanceWithout.ToString( "F2" ) + ")" + ( withGraphics ? "" : " (no graphics)" ) );
+
+		// ---- 4. another scheme picked while the picture shows the planet: its marks are drawn again in that scheme's colours
+		var otherScheme = -1;
+
+		for ( var scheme = 1; ( scheme < UIKitTheme.c_schemes.Length ) && ( otherScheme < 0 ); scheme++ )
+		{
+			var theme = UIKitTheme.LoadScheme( scheme, UIKitTheme.Mode.Dark );
+
+			if ( ( theme != null ) && ( ColorDistance( theme.m_statusFuel, classic.m_statusFuel ) > 0.3f ) )
+			{
+				otherScheme = scheme;
+			}
+		}
+
+		var inOtherScheme = false;
+		var otherDetail = "";
+
+		if ( ( otherScheme > 0 ) && hasLifeform )
+		{
+			UIKitTheme.SetScheme( otherScheme, false );
+
+			yield return Frames( 2 );
+
+			var other = UIKitTheme.GetViewTheme();
+			var shown = ShowsPlanetSurface( sensors ) ? material.GetTexture( "_SurveyTex" ) as Texture2D : null;
+			var nearest = SurveyMarkNearest( shown, lifeform.m_eastWest, lifeform.m_northSouth, out var nearness, other.m_statusFuel, classic.m_statusFuel );
+
+			inOtherScheme = ( shown != null ) && ( material.GetFloat( "_SurveyStrength" ) > 0.5f ) && ( nearest == 0 ) && ( nearness < 0.05f );
+			otherDetail = nearest + " at " + nearness.ToString( "F3" );
+
+			UIKitTheme.SetScheme( 0, false );
+
+			yield return Frames( 2 );
+		}
+
+		Log( "surveysensor: in scheme " + otherScheme + " the lifeform's dot in its colours " + inOtherScheme + " (" + otherDetail + ")" );
+
+		// ---- 5. the landing map shows the very same marks
+		displays.ChangeDisplay( displays.m_terrainMapDisplay );
+
+		yield return Frames( 2 );
+
+		var mapImage = SurveyMarksImage();
+		var sameMarks = ( sensorMarks != null ) && ( mapImage != null ) && ( mapImage.texture == sensorMarks ) && ( sensorMarks == SurveyMarks.GetTexture() );
+
+		Log( "surveysensor: the landing map's marks are the sensor picture's " + sameMarks );
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "surveysensor: before the planet is analysed, the planet in the sensor picture has no marks", showsPlanet && Mathf.Approximately( strengthBefore, 0.0f ), showsPlanet + " " + strengthBefore );
+		Check( "surveysensor: once the reading is analysed, the planet in the sensor picture shows the survey's marks, the landing map's", ( survey != null ) && Mathf.Approximately( strengthAfter, 1.0f ) && sameMarks, ( survey != null ) + " " + strengthAfter + " " + sameMarks );
+
+		if ( withGraphics )
+		{
+			Check( "surveysensor: on the graphics card a lifeform's mark shows on the turning planet where the lifeform is, and not without the marks", hasLifeform && ( distanceWith < distanceWithout * 0.5f ) && ( distanceWithout - distanceWith > 0.3f ), distanceWith.ToString( "F2" ) + " with, " + distanceWithout.ToString( "F2" ) + " without" );
+		}
+
+		Check( "surveysensor: another scheme picked while the picture shows the planet draws its marks again in that scheme's colours", ( otherScheme > 0 ) && inOtherScheme, otherScheme + " " + inOtherScheme + " " + otherDetail );
+		Check( "surveysensor: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=surveysensor strength=" + strengthBefore + "/" + strengthAfter + " gpu=" + ( withGraphics ? distanceWith.ToString( "F2" ) + "/" + distanceWithout.ToString( "F2" ) : "none" ) + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

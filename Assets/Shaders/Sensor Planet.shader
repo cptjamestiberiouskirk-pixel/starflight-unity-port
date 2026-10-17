@@ -1,5 +1,6 @@
 // the picture of a planet in the sensor window: the planet's own maps on a lit sphere that turns slowly, inside the disc of the planet mask
-// (while the scan runs the sensor noise of the masked image shader fades into the planet; _Reveal goes from 0 to 1)
+// (while the scan runs the sensor noise of the masked image shader fades into the planet; _Reveal goes from 0 to 1), with the marks of the science
+// officer's survey pulsing on it once the planet has been analysed (SurveyMarks; _SurveyStrength 0 without them)
 Shader "Custom/UI/Sensor Planet"
 {
 	Properties
@@ -22,6 +23,10 @@ Shader "Custom/UI/Sensor Planet"
 		_Relief( "Relief", Range( 0, 2 ) ) = 1
 		_WaterGloss( "Water Gloss", Range( 0, 2 ) ) = 0.6
 		_AtmosphereColor( "Atmosphere Color", Color ) = ( 0, 0, 0, 1 )
+
+		_SurveyTex( "Survey Marks", 2D ) = "white" {}
+		_SurveyStrength( "Survey Marks Strength", Range( 0, 1 ) ) = 0
+		_SurveyPulse( "Survey Marks Pulses per Second", Float ) = 0.8
 
 		_StencilComp( "Stencil Comparison", Float ) = 8
 		_Stencil( "Stencil ID", Float ) = 0
@@ -117,6 +122,10 @@ Shader "Custom/UI/Sensor Planet"
 				float _WaterGloss;
 				fixed4 _AtmosphereColor;
 
+				sampler2D _SurveyTex;
+				float _SurveyStrength;
+				float _SurveyPulse;
+
 				float4 _ClipRect;
 				fixed4 _TextureSampleAdd;
 
@@ -194,6 +203,24 @@ Shader "Custom/UI/Sensor Planet"
 					float rim = pow( 1.0 - normal.z, 3.0 ) * saturate( dot( normal, lightDirection ) + 0.3 ) * 1.2;
 
 					float3 planet = albedo * ( diffuse + _Ambient ) + specular + rim * _AtmosphereColor.rgb;
+
+					// the survey's marks, unlit and pulsing: their texture runs from north-south -90 to 90 as the landing map does, which is 0.125 to 0.875
+					// up the planet's maps (nothing nearer the poles)
+					if ( _SurveyStrength > 0.0 )
+					{
+						float surveyV = ( mapCoordinates.y - 0.125 ) / 0.75;
+
+						if ( ( surveyV >= 0.0 ) && ( surveyV <= 1.0 ) )
+						{
+							// (the gradients go along with the texture's v, stretched as it is)
+							float2 surveyDx = float2( dx.x, dx.y / 0.75 );
+							float2 surveyDy = float2( dy.x, dy.y / 0.75 );
+							half4 marks = tex2Dgrad( _SurveyTex, float2( mapCoordinates.x, surveyV ), surveyDx, surveyDy );
+							float pulse = 0.7 + 0.3 * sin( _Time.y * _SurveyPulse * 2.0 * UNITY_PI );
+
+							planet = lerp( planet, marks.rgb, marks.a * _SurveyStrength * pulse );
+						}
+					}
 
 					// the noise fades into the planet as the scan goes on
 					half4 color;
