@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-17
+
+The ground game, natural planets and the original's flight. The terrain vehicle is easier to bring home and has more to do: a mining laser cuts a deposit into the hold (#456), Tools has Capture for a stunned lifeform (#459) and a Return order that drives the vehicle back to the ship (#457), Send beams its hold to the ship from within 20 km (#458), and a vehicle coming back can go aboard anywhere within 3 km of the ship (#452, #455). The ground up close has grain, depth and shadows, grass and pebbles, under a new ground detail setting (#461 to #464). The planets can be drawn in natural colors in space, on the console and on the ground (#443 to #448), and the science officer's analysis surveys a planet's mineral fields and lifeforms from orbit (#451, #453, #454). Flight, fuel, flux jumps and the alien groups' pursuit follow the original's code, and hyperspace and star system travel run at the pace measured in the GOG release (#442, #445). Alien ships call for help, and many smaller rules of trade, the crew, the sensors and Operations now match the original's.
+
 ### Added
 
 - **Grass and Pebbles on the Ground**: at the Medium and High ground detail, small tufts of grass and pebbles stand on the ground around the terrain vehicle, out to 70 units at Medium and 110 at High, shrinking away toward that edge. They take the colour of the ground under them from the planet's own map, in either look, the pebbles greyer and darker than the soil. Grass grows in patches and only on a planet with life, thicker the more life it has; pebbles lie on every planet, more on one rich in minerals; nothing stands in water or lava. Each 8 unit cell of the ground is filled from a hash of the cell and the planet, so everything is in the same place every time and no random numbers are drawn (the rest of a planet is placed from them). They are drawn with GPU instancing, the grass swaying in the wind and the pebbles casting shadows at High, and nothing collides with them. Probe scenario `groundclutter`.
