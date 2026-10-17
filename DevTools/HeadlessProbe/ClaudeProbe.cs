@@ -34685,7 +34685,7 @@ public class ClaudeProbe : MonoBehaviour
 			away[ i ] = controller.m_disembarked.GetType().GetField( "m_hasBeenAway", c_any )?.GetValue( controller.m_disembarked );
 
 			yield return Tap( Key.Enter );
-			yield return WaitForLocation( PD_General.Location.Planetside, ( i == distances.Length - 1 ) ? 10.0f : 4.0f );
+			yield return WaitForLocation( PD_General.Location.Planetside, 4.0f );
 
 			locations[ i ] = playerData.m_general.m_location;
 
@@ -34697,13 +34697,49 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 10 );
 
-		Log( "reboard: the ship stands at height " + ship.y.ToString( "F1" ) + "; after Move and Enter on the way out 2 km away " + locations[ 0 ] + " (away " + away[ 0 ] + "), 5 km away " + locations[ 1 ] + " (away " + away[ 1 ] + "), back at 3.5 km " + locations[ 2 ] + ", at 2.8 km " + locations[ 3 ] + " (away " + away[ 3 ] + ")" );
+		// the stop at 2.8 km on the way back asks first (since a stop near the ship to mine or look took the vehicle straight in): No keeps the crew out, and a
+		// second stop there and Yes takes the vehicle in
+		var buttonController = controller.m_buttonController;
+		var question = buttonController.GetCurrentButtonSet() + "[" + ButtonSetLabels( buttonController.GetCurrentButtonSet() ) + "] " + MessageList();
+		var asked = ( locations[ 3 ] == PD_General.Location.Disembarked ) && question.Contains( "[No,Yes]" ) && question.Contains( "Return to the ship?" );
+		var afterNo = playerData.m_general.m_location;
+		var labelsAfterNo = "";
+
+		if ( asked )
+		{
+			PressButtonLabelled( buttonController.GetCurrentButtonSet(), "No" );
+
+			yield return WaitForLocation( PD_General.Location.Planetside, 4.0f );
+
+			afterNo = playerData.m_general.m_location;
+			labelsAfterNo = ButtonSetLabels( buttonController.GetCurrentButtonSet() );
+
+			PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
+
+			yield return Frames( 5 );
+			yield return Tap( Key.Enter );
+			yield return Frames( 5 );
+
+			if ( ButtonSetLabels( buttonController.GetCurrentButtonSet() ) == "No,Yes" )
+			{
+				PressButtonLabelled( buttonController.GetCurrentButtonSet(), "Yes" );
+			}
+
+			yield return WaitForLocation( PD_General.Location.Planetside, 10.0f );
+			yield return Frames( 10 );
+		}
+
+		var afterYes = playerData.m_general.m_location;
+
+		Log( "reboard: the ship stands at height " + ship.y.ToString( "F1" ) + "; after Move and Enter on the way out 2 km away " + locations[ 0 ] + " (away " + away[ 0 ] + "), 5 km away " + locations[ 1 ] + " (away " + away[ 1 ] + "), back at 3.5 km " + locations[ 2 ] + ", at 2.8 km " + locations[ 3 ] + " (away " + away[ 3 ] + "): " + question + "; after No " + afterNo + " [" + labelsAfterNo + "], after a second stop and Yes " + afterYes );
 
 		Check( "reboard: the ship stands on raised ground (the setup is the case)", ship.y > 10.0f, ship.y.ToString( "F1" ) );
 		Check( "reboard: on the way out, Move and Enter 2 km from the ship leave the crew outside (only the ship's own cell, 0.5 km, takes the vehicle in before it has been away)", locations[ 0 ] == PD_General.Location.Disembarked, locations[ 0 ].ToString() );
 		Check( "reboard: Move and Enter 5 km from the ship leave the crew outside (control)", locations[ 1 ] == PD_General.Location.Disembarked, locations[ 1 ].ToString() );
 		Check( "reboard: back from there, Move and Enter 3.5 km from the ship leave the crew outside (beyond the 3 km)", locations[ 2 ] == PD_General.Location.Disembarked, locations[ 2 ].ToString() );
-		Check( "reboard: back from there, Move and Enter 2.8 km from the ship along the ground take the vehicle back in, however high the ground (the original's ship's cell was hard to stop on with smooth driving)", locations[ 3 ] == PD_General.Location.Planetside, locations[ 3 ].ToString() );
+		Check( "reboard: back from there, Move and Enter 2.8 km from the ship ask \"Return to the ship?\" with No and Yes and leave the crew out meanwhile (a stop near the ship took the vehicle straight in)", asked, question );
+		Check( "reboard: No keeps the crew out, with the vehicle's buttons back", ( afterNo == PD_General.Location.Disembarked ) && labelsAfterNo.StartsWith( "Map,Move" ), afterNo + " [" + labelsAfterNo + "]" );
+		Check( "reboard: Yes takes the vehicle back in, however high the ground", afterYes == PD_General.Location.Planetside, afterYes.ToString() );
 
 		Finish( "scenario=reboard checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
@@ -35495,6 +35531,18 @@ public class ClaudeProbe : MonoBehaviour
 	IEnumerator PtPress( string label, bool[] pressed = null )
 	{
 		var buttonController = SpaceflightController.m_instance.m_buttonController;
+
+		// "Return to the ship?" comes up when the terrain vehicle stops within 3 km of the ship on its way back (MoveButton); a stage that asks for another button
+		// wants to go on exploring, so it answers No first, as a player would
+		if ( ( label != "Yes" ) && ( label != "No" ) && PtLabels().StartsWith( "TerrainVehicleBoard[" ) )
+		{
+			Log( "playthrough: Return to the ship? No (the stage goes on with " + label + ")" );
+
+			PressButtonLabelled( buttonController.GetCurrentButtonSet(), "No" );
+
+			yield return Frames( 5 );
+		}
+
 		var index = PtIndexOf( label );
 
 		if ( pressed != null )
