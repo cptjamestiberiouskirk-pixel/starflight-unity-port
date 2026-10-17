@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Capture Needs a Stunned Lifeform**: Cargo beside a living lifeform offered Capture, which put it in stasis whatever its state. Capture is now in the terrain vehicle's Tools, and only a stunned lifeform beside the vehicle can be captured, as the 1984 design notes have it that a stunned lifeform will not run away or attack; a capture beam holds it during the 6 seconds the capture takes. Cargo offers Record and Ignore, and a dead lifeform can only be recorded. Probe scenario `capture`.
 - **Back Into the Ship Within 3 km**: the terrain vehicle went back into the ship only when Move was stopped within half a kilometer of it, the original's rule that the vehicle must be on the ship's own map cell. The original moves the vehicle a cell at a time, so that cell was easy to stop on, but the port drives smoothly, and the spot was a few meters across. A stop within half a kilometer still takes the vehicle in at once. A vehicle coming back that stops anywhere else within 3 km of the ship is now asked "Return to the ship?", and Yes takes it in. It is asked rather than taken in, since a stop near the ship to mine or look would otherwise end the trip, and only once it has been farther away than 3 km, since the vehicle comes out 1.8 km behind the ship. Probe scenario `reboard`.
 
 ### Fixed

@@ -24425,25 +24425,47 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 2 );
 
-		// ---- 1. Cargo beside a living plant offers Capture, and the capture puts it in stasis in the terrain vehicle, worth five times its data
+		// ---- 1. Cargo beside a living plant offers Record and Ignore (Capture is in Tools since 2026-10-17, for a stunned lifeform)
 		var expected = DataValue( plant.m_species, 50 ) * 5;
 		var offer = Press( "TVCargoButton" );
 		var buttons = controller.m_buttonController.GetCurrentButtonSet().ToString();
-		var labels = "";
+		var offerLabels = ButtonSetLabels( controller.m_buttonController.GetCurrentButtonSet() );
+		var toolLabels = ButtonSetLabels( ButtonController.ButtonSet.TerrainVehicleWeapon );
 
-		foreach ( var label in new[] { "TVCaptureButton", "TVRecordButton", "TVIgnoreButton" } )
+		Press( "TVIgnoreButton" );
+
+		// ---- 2. Capture on the living plant that is not stunned: refused
+		var lifeforms = controller.m_disembarked.m_terrainGrid.m_terrainLifeforms;
+		var unstunned = Press( "TVCaptureButton" );
+		var capturingUnstunned = ( lifeforms != null ) && lifeforms.IsCapturing();
+
+		// (the code before let the capture of an unstunned lifeform start: let it run out, so the rest can go on)
+		var end = Time.realtimeSinceStartup + 9.0f;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( lifeforms != null ) && lifeforms.IsRecording() )
 		{
-			var button = MakeButton( label );
+			yield return null;
+		}
 
-			labels += ( ( button == null ) ? "missing" : button.GetLabel() ) + " ";
+		// ---- 3. stunned, it is captured: a capture beam while it runs, then stasis in the vehicle, worth five times its data
+		var plantStillThere = plant != null;
+
+		if ( plantStillThere )
+		{
+			plant.m_status = TerrainLifeform.Status.Stunned;
+			plant.m_stuns = 0;
 		}
 
 		Press( "TVCaptureButton" );
 
-		var end = Time.realtimeSinceStartup + 9.0f;
+		var beamShown = false;
+
+		end = Time.realtimeSinceStartup + 9.0f;
 
 		while ( ( Time.realtimeSinceStartup < end ) && !MessageList().Contains( "stored as item" ) )
 		{
+			beamShown |= ( GameObject.Find( "Capture Beam" ) is GameObject beam ) && beam.TryGetComponent<LaserBeam>( out var laser ) && laser.IsActive();
+
 			yield return null;
 		}
 
@@ -24455,12 +24477,13 @@ public class ClaudeProbe : MonoBehaviour
 		var value = FirstSpecimenField( playerData.m_terrainVehicle, "m_value" );
 		var plantGone = plant == null;
 
-		// ---- 2. Cargo beside a dead lifeform offers only Record
+		// ---- 4. a dead lifeform: Capture refuses it, and Cargo beside it offers only Record
 		corpse.m_status = TerrainLifeform.Status.Dead;
 		corpse.transform.position = new Vector3( vehicle.x + 6.0f, corpse.transform.position.y, vehicle.z );
 
 		yield return Frames( 2 );
 
+		var deadCapture = Press( "TVCaptureButton" );
 		var deadOffer = Press( "TVCargoButton" );
 		var deadButtons = controller.m_buttonController.GetCurrentButtonSet().ToString();
 
@@ -24472,12 +24495,13 @@ public class ClaudeProbe : MonoBehaviour
 		var inShip = SpecimenCount( playerData.m_playerShip );
 		var leftInVehicle = SpecimenCount( playerData.m_terrainVehicle );
 
-		Log( "capture: offer " + offer + " [" + buttons + "] (" + labels + ") -> " + captured + " | in vehicle " + inVehicle + ", value " + value + " (expected " + expected + "), plant gone " + plantGone + " || dead: " + deadOffer + " [" + deadButtons + "] || in ship " + inShip + ", left in vehicle " + leftInVehicle );
+		Log( "capture: offer " + offer + " [" + buttons + ": " + offerLabels + "], Tools [" + toolLabels + "]; Capture unstunned: " + unstunned + " (capturing " + capturingUnstunned + "); stunned: beam " + beamShown + " -> " + captured + " | in vehicle " + inVehicle + ", value " + value + " (expected " + expected + "), plant gone " + plantGone + " | dead: Capture " + deadCapture + ", Cargo " + deadOffer + " [" + deadButtons + "] | ship " + inShip + ", vehicle " + leftInVehicle );
 
-		Check( "capture: Cargo beside a living lifeform offers Capture, Record and Ignore", offer.Contains( "A lifeform" ) && ( buttons == "TerrainVehicleLifeform" ) && ( labels == "Capture Record Ignore " ), offer + " [" + buttons + "] " + labels );
-		Check( "capture: the capture puts it in stasis in the terrain vehicle, off the surface", captured.Contains( "captured and put in stasis" ) && captured.Contains( "stored as item" ) && ( inVehicle == 1 ) && plantGone, inVehicle + ", gone " + plantGone + " | " + captured );
+		Check( "capture: Cargo beside a living lifeform offers Record and Ignore, and Capture is in Tools", offer.Contains( "A lifeform" ) && ( buttons == "TerrainVehicleLifeform" ) && ( offerLabels == "Record,Ignore" ) && toolLabels.Contains( "Capture" ), offer + " [" + buttons + ": " + offerLabels + "], Tools [" + toolLabels + "]" );
+		Check( "capture: Capture refuses a lifeform that is not stunned (it started the capture)", unstunned.Contains( "stunned first" ) && !capturingUnstunned, unstunned + " (capturing " + capturingUnstunned + ")" );
+		Check( "capture: a stunned lifeform is captured into stasis in the terrain vehicle, off the surface, with a capture beam while it runs", beamShown && captured.Contains( "captured and put in stasis" ) && captured.Contains( "stored as item" ) && ( inVehicle == 1 ) && plantGone, inVehicle + ", gone " + plantGone + " | " + captured );
 		Check( "capture: a captured specimen is worth five times its data", ( expected > 0 ) && ( value == expected.ToString() ), value + " (expected " + expected + ")" );
-		Check( "capture: Cargo beside a dead lifeform offers only Record", deadOffer.Contains( "A dead lifeform" ) && ( deadButtons == "TerrainVehicleDeadLifeform" ), deadOffer + " [" + deadButtons + "]" );
+		Check( "capture: Capture refuses a dead lifeform, and Cargo beside it offers only Record", deadCapture.Contains( "dead lifeform cannot be captured" ) && deadOffer.Contains( "A dead lifeform" ) && ( deadButtons == "TerrainVehicleDeadLifeform" ), deadCapture + " | " + deadOffer + " [" + deadButtons + "]" );
 		Check( "capture: back in the ship, the specimen goes into the ship's hold", ( inShip == 1 ) && ( leftInVehicle == 0 ), inShip + " / " + leftInVehicle );
 
 		Finish( "scenario=capture inVehicle=" + inVehicle + " value=" + value + " inShip=" + inShip, 0 );
