@@ -341,20 +341,22 @@ public class GroundClutter : MonoBehaviour
 
 		if ( m_grassMaterial == null )
 		{
-			var shader = Resources.Load<Shader>( "Shaders/Ground Clutter" );
+			// made from the material asset, not from the shader: a build keeps a shader's instanced variants only for the materials in it that have instancing on, and
+			// the shader alone, loaded from Resources, would come without them (RenderMeshInstanced then has nothing to draw the instances with)
+			var template = Resources.Load<Material>( "Materials/Ground Clutter" );
 
 			// nothing to draw them with (Update draws nothing while the materials are missing)
-			if ( shader == null )
+			if ( template == null )
 			{
 				return;
 			}
 
-			m_grassMaterial = new Material( shader ) { name = "Ground Clutter Grass", enableInstancing = true, hideFlags = HideFlags.DontSave };
+			m_grassMaterial = new Material( template ) { name = "Ground Clutter Grass", enableInstancing = true, hideFlags = HideFlags.DontSave };
 			m_grassMaterial.SetColor( "_Tint", new Color( 0.95f, 1.15f, 0.8f, 1.0f ) );
 			m_grassMaterial.SetFloat( "_Variation", 0.25f );
 			m_grassMaterial.SetFloat( "_Sway", 0.12f );
 
-			m_pebbleMaterial = new Material( shader ) { name = "Ground Clutter Pebbles", enableInstancing = true, hideFlags = HideFlags.DontSave };
+			m_pebbleMaterial = new Material( template ) { name = "Ground Clutter Pebbles", enableInstancing = true, hideFlags = HideFlags.DontSave };
 			m_pebbleMaterial.SetColor( "_Tint", new Color( 0.62f, 0.6f, 0.58f, 1.0f ) );
 			m_pebbleMaterial.SetFloat( "_Variation", 0.5f );
 			m_pebbleMaterial.SetFloat( "_Desaturation", 0.45f );

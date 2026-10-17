@@ -43069,6 +43069,13 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "groundclutter: a cell's grass and pebbles are in the same places after the vehicle has driven far away and come back", ( busiestCount > 0 ) && ( placesBefore == placesAfter ), busiest + ": " + busiestCount + ", same " + ( placesBefore == placesAfter ) );
 		Check( "groundclutter: on a planet with no life there are pebbles and no grass", ( grass94 == 0 ) && ( pebbles94 > 50 ), grass94 + " / " + pebbles94 );
 
+		// a build keeps the shader's instanced variants only for the materials in it that have instancing on: the clutter's materials are made from such an asset
+		// (made from the shader alone, a build drew none of them; the probe runs in the Editor, which never strips, so this checks what the build relies on)
+		var clutterTemplate = Resources.Load<Material>( "Materials/Ground Clutter" );
+		var templateFits = ( clutterTemplate != null ) && clutterTemplate.enableInstancing && ( clutterTemplate.shader != null ) && ( clutterTemplate.shader.name == "Starflight/Ground Clutter" );
+
+		Check( "groundclutter: the clutter's materials come from a material asset with instancing on (or a build strips the instanced variants)", templateFits, ( clutterTemplate == null ) ? "no asset" : ( clutterTemplate.shader.name + ", instancing " + clutterTemplate.enableInstancing ) );
+
 		Finish( "scenario=groundclutter checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
