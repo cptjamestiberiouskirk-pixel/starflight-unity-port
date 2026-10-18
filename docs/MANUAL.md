@@ -346,6 +346,7 @@ Aliens may ask you questions too. The console then offers **Yes**, **No** and **
 Some things to know:
 
 - Every race has its own temper. Your posture, your shields and weapons, the strength of your ship and what you say all change how they treat you. A stronger ship gets more respect.
+- Races remember. A race you leave angry meets you angrier next time, and one you leave calm meets you calmer.
 - Aliens hold their fire while a comm link is up.
 - Fire on aliens and they will not talk to you again in that encounter.
 - How much you understand depends on your communications officer.
