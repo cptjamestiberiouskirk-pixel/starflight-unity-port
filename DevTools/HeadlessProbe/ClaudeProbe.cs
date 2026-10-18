@@ -1678,6 +1678,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioDisembarkShields();
 				break;
 
+			case "eggarming":
+				yield return ScenarioEggArming();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -17948,6 +17952,14 @@ public class ClaudeProbe : MonoBehaviour
 			PressButton( (ButtonController.ButtonSet) cargoListSet, 1 );
 
 			yield return Frames( 2 );
+
+			// the original asks "ARM THIS DEVICE?" on the drop (ITEMS-OV WE9AA, roadmap 8.31): Yes
+			if ( PtIndexOf( "Yes" ) >= 0 )
+			{
+				PressButtonLabelled( controller.m_buttonController.GetCurrentButtonSet(), "Yes" );
+
+				yield return Frames( 2 );
+			}
 		}
 
 		var dropText = MessageList();
@@ -18170,6 +18182,14 @@ public class ClaudeProbe : MonoBehaviour
 			TVCargoButton.DropMarkedItem();
 
 			yield return Frames( 2 );
+
+			// the original asks "ARM THIS DEVICE?" on the drop (ITEMS-OV WE9AA, roadmap 8.31): Yes
+			if ( PtIndexOf( "Yes" ) >= 0 )
+			{
+				PressButtonLabelled( controller.m_buttonController.GetCurrentButtonSet(), "Yes" );
+
+				yield return Frames( 2 );
+			}
 
 			dropText = MessageList();
 
@@ -38666,6 +38686,13 @@ public class ClaudeProbe : MonoBehaviour
 			yield return PtPress( "Drop" );
 			yield return Frames( 5 );
 
+			// the original asks "ARM THIS DEVICE?" on the drop (ITEMS-OV WE9AA, roadmap 8.31): Yes
+			if ( PtIndexOf( "Yes" ) >= 0 )
+			{
+				yield return PtPress( "Yes" );
+				yield return Frames( 5 );
+			}
+
 			dropSaid = PtMessages();
 
 			if ( PtIndexOf( "Back" ) >= 0 )
@@ -45759,6 +45786,158 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "disembarkshields: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=disembarkshields checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: the Black Egg is armed only if the crew says so (roadmap 8.31)
+
+	// the Black Eggs lying on a planet
+	static int EggsLyingOn( int planetId, int blackEggId )
+	{
+		var count = 0;
+
+		foreach ( var droppedCargo in DataController.m_instance.m_playerData.m_planetSurfaces.m_droppedCargoList )
+		{
+			if ( ( droppedCargo.m_planetId == planetId ) && ( droppedCargo.m_artifactId == blackEggId ) )
+			{
+				count++;
+			}
+		}
+
+		return count;
+	}
+
+	IEnumerator ScenarioEggArming()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+		var blackEggId = gameData.FindArtifactId( "Black Egg" );
+		var starId = gameData.m_planetList[ 90 ].m_starId;
+		var errorsBefore = s_errorCount;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// out on planet 90 with a Black Egg in the terrain vehicle, nothing else within reach
+		yield return GoIntoOrbit( starId, 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=eggarming abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var terrainVehicle = controller.m_terrainVehicle;
+
+		foreach ( var deposit in controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true ) )
+		{
+			if ( Vector3.Distance( deposit.transform.position, terrainVehicle.transform.position ) < 50.0f )
+			{
+				deposit.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		playerData.m_terrainVehicle.AddArtifact( blackEggId );
+
+		var cargoListSet = CargoListButtonSet();
+
+		// ---- 1. the cargo list drops it: the original asks "ARM THIS DEVICE? NO [  ] YES" (ITEMS-OV WE9AA)
+		controller.m_messages.Clear();
+
+		new TVCargoButton().Execute();
+
+		yield return Frames( 2 );
+
+		if ( cargoListSet >= 0 )
+		{
+			PressButton( (ButtonController.ButtonSet) cargoListSet, 1 );
+
+			yield return Frames( 2 );
+		}
+
+		var askText = MessageList();
+		var askLabels = ButtonSetLabels( buttonController.GetCurrentButtonSet() );
+		var asked = askText.Contains( "Arm this device?" ) && ( PtIndexOf( "No" ) >= 0 ) && ( PtIndexOf( "Yes" ) >= 0 );
+		var eggsAfterDrop = EggsLyingOn( 90, blackEggId );
+		var armedBeforeAnswer = BlackEgg.IsArmedEggInStarSystem( starId );
+
+		// ---- 2. No: the egg lies there unarmed
+		var answeredNo = false;
+
+		if ( PtIndexOf( "No" ) >= 0 )
+		{
+			PressButtonLabelled( buttonController.GetCurrentButtonSet(), "No" );
+
+			answeredNo = true;
+
+			yield return Frames( 2 );
+		}
+
+		var armedAfterNo = BlackEgg.IsArmedEggInStarSystem( starId );
+		var eggsAfterNo = EggsLyingOn( 90, blackEggId );
+
+		// ---- 3. Cargo picks the unarmed egg up again: nothing to disarm
+		controller.m_messages.Clear();
+
+		new TVCargoButton().Execute();
+
+		yield return Frames( 2 );
+
+		var pickupUnarmedText = MessageList();
+
+		// ---- 4. dropped again, and Yes: it is armed
+		controller.m_messages.Clear();
+
+		new TVCargoButton().Execute();
+
+		yield return Frames( 2 );
+
+		if ( cargoListSet >= 0 )
+		{
+			PressButton( (ButtonController.ButtonSet) cargoListSet, 1 );
+
+			yield return Frames( 2 );
+		}
+
+		if ( PtIndexOf( "Yes" ) >= 0 )
+		{
+			PressButtonLabelled( buttonController.GetCurrentButtonSet(), "Yes" );
+
+			yield return Frames( 2 );
+		}
+
+		var yesText = MessageList();
+		var armedAfterYes = BlackEgg.IsArmedEggInStarSystem( starId );
+
+		// ---- 5. Cargo picks the armed egg up: "DISARMING DEVICE" (ITEMS-OV WE9FA), and it is no longer armed
+		controller.m_messages.Clear();
+
+		new TVCargoButton().Execute();
+
+		yield return Frames( 2 );
+
+		var pickupArmedText = MessageList();
+		var armedAfterPickup = BlackEgg.IsArmedEggInStarSystem( starId );
+
+		Log( "eggarming: drop: '" + askText + "' [" + askLabels + "], eggs " + eggsAfterDrop + ", armed " + armedBeforeAnswer + " | No " + answeredNo + ": armed " + armedAfterNo + ", eggs " + eggsAfterNo + " | pickup: '" + pickupUnarmedText + "' | Yes: '" + yesText + "', armed " + armedAfterYes + " | pickup: '" + pickupArmedText + "', armed " + armedAfterPickup );
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "eggarming: dropping the Black Egg asks Arm this device? with No and Yes, and it is not armed before the answer", asked && ( eggsAfterDrop == 1 ) && !armedBeforeAnswer, askText + " [" + askLabels + "] eggs " + eggsAfterDrop + ", armed " + armedBeforeAnswer );
+		Check( "eggarming: No leaves the egg lying there unarmed", answeredNo && !armedAfterNo && ( eggsAfterNo == 1 ), answeredNo + " " + armedAfterNo + " " + eggsAfterNo );
+		Check( "eggarming: Yes arms it, and the messages say so", armedAfterYes && yesText.Contains( "The Black Egg is armed." ), armedAfterYes + " | " + yesText );
+		Check( "eggarming: picking up the armed egg says Disarming device. and disarms it, picking up an unarmed one does not", pickupArmedText.Contains( "Disarming device." ) && !pickupUnarmedText.Contains( "Disarming device." ) && !armedAfterPickup, pickupArmedText + " | " + pickupUnarmedText + " | " + armedAfterPickup );
+		Check( "eggarming: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=eggarming checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
