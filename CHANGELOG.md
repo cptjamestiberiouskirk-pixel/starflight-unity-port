@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Artifacts on the Ground**: the 15 special artifacts had no models: the game knew them only by name, as the original did, and a ruin looked the same with its artifact as without it. Each now has a textured model of its own, drawn from its name and the science officer's analysis (the cracked Black Egg, the Tesseract's cube in its frame, the Hypercube's chain of cubes, the jewelled Dodecahedron, the rest), and it shows beside the ruin that holds it, hovering over the ground, rising and sinking a little and turning slowly under a soft light, until the terrain vehicle takes it. The curios have no models and show nothing, as before. Probe scenario `artifactmodels`.
+- **Artifacts in the Trade Depot**: on the Trade Depot's Buy, Sell and Analyze lists a selected special artifact turns slowly in a window beside the list, in the item column's free room right of the names, so you can see what you are buying, selling or having analysed. The window is a small 3D view, dark in every colour scheme and mode, and shows nothing for an element, a curio or a specimen. Probe scenario `starport-artifactview`.
 
 ### Changed
 

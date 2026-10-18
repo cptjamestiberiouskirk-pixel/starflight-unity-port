@@ -99,6 +99,16 @@ public class TradeDepotPanel : Panel
 	int m_rowCount;
 	int m_currentRowOffset;
 
+	// the window in which the selected artifact turns (made the first time the list is shown, once the canvas has its layout)
+	ArtifactPreview m_artifactPreview;
+
+	// how big the window is against the list (a share of the list's height, and of the room between its left side and the Volume column) and how far it
+	// keeps from the Volume column (a share of its own size), and how many pixels across its texture is
+	const float c_previewShareOfHeight = 0.6f;
+	const float c_previewShareOfWidth = 0.4f;
+	const float c_previewGap = 0.12f;
+	const int c_previewTextureSize = 512;
+
 	// unity awake
 	void Awake()
 	{
@@ -881,6 +891,9 @@ public class TradeDepotPanel : Panel
 				m_volumeListText.rectTransform.offsetMax = new Vector3( 0.0f, -textOffset, 0.0f );
 				m_unitValueListText.rectTransform.offsetMax = new Vector3( 0.0f, -textOffset, 0.0f );
 
+				// the selected artifact turns in its window
+				UpdateArtifactPreview();
+
 				// update bank balance amount
 				m_currentBalanceText.text = "Your account balance is: " + string.Format( "{0:n0}", playerData.m_bank.m_currentBalance ) + " M.U.";
 			}
@@ -893,6 +906,103 @@ public class TradeDepotPanel : Panel
 		m_sellButton.interactable = enableButtons;
 		m_analyzeButton.interactable = enableButtons;
 		m_exitButton.interactable = enableButtons;
+	}
+
+	// shows the selected item in the artifact window if it is an artifact with a model (the window is under the trade screen, so it goes with it)
+	void UpdateArtifactPreview()
+	{
+		if ( m_artifactPreview == null )
+		{
+			m_artifactPreview = MakeArtifactPreview();
+
+			if ( m_artifactPreview == null )
+			{
+				return;
+			}
+		}
+
+		var artifactIds = new List<int>();
+
+		if ( ( m_itemList != null ) && ( m_currentItemIndex >= 0 ) && ( m_currentItemIndex < m_itemList.Count ) && ( m_itemList[ m_currentItemIndex ].m_type == 1 ) )
+		{
+			artifactIds.Add( m_itemList[ m_currentItemIndex ].m_id );
+		}
+
+		m_artifactPreview.Show( artifactIds );
+	}
+
+	// makes the artifact window in the item column's free room: right of the names (the longest is about a third of the column), left of the Volume column,
+	// halfway down the list (null if the screen has no list to place it by)
+	ArtifactPreview MakeArtifactPreview()
+	{
+		if ( ( m_tradeGameObject == null ) || ( m_itemListMask == null ) || ( m_volumeListText == null ) )
+		{
+			return null;
+		}
+
+		var parent = m_tradeGameObject.GetComponent<RectTransform>();
+		var mask = m_itemListMask.GetComponent<RectTransform>();
+
+		if ( ( parent == null ) || ( mask == null ) )
+		{
+			return null;
+		}
+
+		// the list's corners and the Volume column's left side, in the trade screen's own units (from its middle)
+		var corners = new Vector3[ 4 ];
+
+		mask.GetWorldCorners( corners );
+
+		var middle = (Vector3) parent.rect.center;
+		var listLow = parent.InverseTransformPoint( corners[ 0 ] ) - middle;
+		var listHigh = parent.InverseTransformPoint( corners[ 2 ] ) - middle;
+
+		m_volumeListText.rectTransform.GetWorldCorners( corners );
+
+		var volumeLeft = parent.InverseTransformPoint( corners[ 0 ] ).x - middle.x;
+
+		var side = Mathf.Min( ( listHigh.y - listLow.y ) * c_previewShareOfHeight, ( volumeLeft - listLow.x ) * c_previewShareOfWidth );
+
+		if ( side <= 0.0f )
+		{
+			return null;
+		}
+
+		var centre = new Vector2( volumeLeft - side * ( c_previewGap + 0.5f ), ( listLow.y + listHigh.y ) * 0.5f );
+
+		var preview = ArtifactPreview.Make( parent, "Artifact Preview", new Rect( centre - new Vector2( side, side ) * 0.5f, new Vector2( side, side ) ), c_previewTextureSize, c_previewTextureSize );
+
+		// drawn over the list, its selection bar and its arrows, and under the popups and their overlay that come after them on the trade screen
+		var lastListPart = -1;
+		var listParts = new Component[] { mask, m_selectionXform != null ? m_selectionXform.transform : null, m_itemListText, m_volumeListText, m_unitValueListText, m_upArrowImage, m_downArrowImage };
+
+		foreach ( var listPart in listParts )
+		{
+			if ( listPart == null )
+			{
+				continue;
+			}
+
+			// the part's ancestor that is on the trade screen itself
+			var child = listPart.transform;
+
+			for ( var depth = 0; ( depth < 32 ) && ( child != null ) && ( child.parent != parent ); depth++ )
+			{
+				child = child.parent;
+			}
+
+			if ( ( child != null ) && ( child.parent == parent ) )
+			{
+				lastListPart = Mathf.Max( lastListPart, child.GetSiblingIndex() );
+			}
+		}
+
+		if ( lastListPart >= 0 )
+		{
+			preview.transform.SetSiblingIndex( lastListPart + 1 );
+		}
+
+		return preview;
 	}
 
 	// this is called if we clicked on the buy button

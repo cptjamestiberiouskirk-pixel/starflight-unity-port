@@ -133,7 +133,7 @@ The probe scenarios `ruinmodels` (each ruin in its own textured material with th
 
 ### Artifacts
 
-The original game showed no artifact at all: it knew them only by name. The original's 15 special artifacts (`GD_Artifact.IsSpecial`, the ones the story turns on) each have a model made from a concept picture drawn from the artifact's name and its analysis; the curios have none. The game loads a model by its artifact's name from `Assets/Resources/Artifacts` (`ArtifactModels`), and `TerrainRuins.ShowArtifacts` shows each special artifact a ruin still holds beside it (16 units from its middle, 4 across, hovering 2.5 over the ground, `ArtifactDisplay` turning it and raising and lowering it a little, under a point light of its own), again whenever the terrain vehicle takes something from the ruin. It draws no random numbers, so nothing on the planet moves.
+The original game showed no artifact at all: it knew them only by name. The original's 15 special artifacts (`GD_Artifact.IsSpecial`, the ones the story turns on) each have a model made from a concept picture drawn from the artifact's name and its analysis; the curios have none. The game loads a model by its artifact's name from `Assets/Resources/Artifacts` (`ArtifactModels`), and `TerrainRuins.ShowArtifacts` shows each special artifact a ruin still holds beside it (16 units from its middle, 4 across, hovering 2.5 over the ground, `ArtifactDisplay` turning it and raising and lowering it a little, under a point light of its own), again whenever the terrain vehicle takes something from the ruin. It draws no random numbers, so nothing on the planet moves. `ArtifactPreview` shows them in a turning window in a panel (the Trade Depot's selected artifact): a texture drawn by a camera of its own, in forward rendering so that the edges stay smooth, from a stage 20,000 units below the scene on the Artifact Preview layer (16), which no scene camera draws; one directional light, since the SF shaders have no pass for a second one in forward rendering.
 
 `import_meshy_artifacts.py` (with `meshy-artifacts.json`) centres each model on its origin and scales it to one unit across at its widest, so the game sizes it where it shows it; it writes it as one mesh node named for its artifact, in metres in the file's unit scale (`FBX_SCALE_UNITS`), with its maps for SF - Standard in `Assets/Game Objects/Artifacts` (the Black Egg's red cracks, the Crystal Orb's pale swirls, the Rod Device's blue crystals, the Flat Device's green screen and the Tesseract's inner cube glow through their `glow` settings; the others have thresholds no colour reaches), and a manifest with a `models` section for `wire.ps1`. The review sheet has each artifact on its own tile, five to a row.
 
@@ -145,7 +145,7 @@ blender --background --factory-startup --python DevTools/ShipModels/import_meshy
 & "DevTools\ShipModels\wire.ps1" -Manifest "DevTools\ShipModels\manifest-artifacts.json"
 ```
 
-The probe scenario `artifactmodels` covers them (each special artifact's material, maps, triangles and size, no curio with a model, an artifact shown beside its ruin, hovering and turning, and gone once the terrain vehicle takes it; a picture under `-Graphics`).
+The probe scenarios `artifactmodels` (each special artifact's material, maps, triangles and size, no curio with a model, an artifact shown beside its ruin, hovering and turning, and gone once the terrain vehicle takes it; a picture under `-Graphics`) and `starport-artifactview` (the Trade Depot's window) cover them.
 
 ## Conventions
 

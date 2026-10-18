@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // the models of the original's 15 special artifacts (Resources/Artifacts, made by DevTools/ShipModels/import_meshy_artifacts.py): one for each, named
-// for its artifact, centred on its origin and one unit across at its widest; the curios have none, as the original showed no artifact at all
+// for its artifact, centred on its origin and one unit across at its widest; the curios have none, as the original showed no artifact at all (shown beside
+// the ruins, TerrainRuins.ShowArtifacts, and in panels, ArtifactPreview)
 public static class ArtifactModels
 {
 	// the models loaded so far, by artifact name (null for an artifact without one)

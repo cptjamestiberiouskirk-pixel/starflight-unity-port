@@ -1634,6 +1634,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioArtifactModels();
 				break;
 
+			case "starport-artifactview":
+				yield return ScenarioStarportArtifactView();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -44067,6 +44071,214 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "artifactmodels: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=artifactmodels modelled=" + modelled + "/" + special + " shown=" + shownBeside + " gone=" + goneAfter + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the Trade Depot's artifact window (ArtifactPreview, TradeDepotPanel.UpdateArtifactPreview)
+
+	// the window of the depot, or null (read without naming its type, so that the scenario also runs on the code before the window)
+	static Component GetArtifactPreview( TradeDepotPanel depot )
+	{
+		var field = depot.GetType().GetField( "m_artifactPreview", c_any );
+
+		return ( field != null ) ? field.GetValue( depot ) as Component : null;
+	}
+
+	// what the depot's window shows: "" when it is hidden, else the names of its artifacts
+	static string ArtifactPreviewShows( TradeDepotPanel depot )
+	{
+		var preview = GetArtifactPreview( depot );
+
+		if ( ( preview == null ) || !( Call( preview, "IsShowing" ) is bool showing ) || !showing )
+		{
+			return "";
+		}
+
+		var gameData = DataController.m_instance.m_gameData;
+		var names = new List<string>();
+
+		foreach ( var id in (IList<int>) Call( preview, "GetShownIds" ) )
+		{
+			names.Add( gameData.m_artifactList[ id ].m_name );
+		}
+
+		return string.Join( ", ", names );
+	}
+
+	// selects the depot's item of this type and id on the list it shows (false if it is not on it)
+	static bool SelectDepotItem( TradeDepotPanel depot, int type, int id )
+	{
+		var items = GetField( depot, "m_itemList" ) as IList;
+
+		for ( var index = 0; ( items != null ) && ( index < items.Count ); index++ )
+		{
+			if ( ( (int) GetField( items[ index ], "m_type" ) == type ) && ( (int) GetField( items[ index ], "m_id" ) == id ) )
+			{
+				SetField( depot, "m_currentItemIndex", index );
+				Call( depot, "UpdateScreen" );
+
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	IEnumerator ScenarioStarportArtifactView()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var depot = FindPanel<TradeDepotPanel>();
+		var errorsBefore = s_errorCount;
+
+		var whiningOrb = gameData.FindArtifactId( "Whining Orb" );
+		var rodDevice = gameData.FindArtifactId( "Rod Device" );
+		var redHerring = gameData.FindArtifactId( "Red Herring" );
+
+		// the Rod Device and a curio in the hold (the Starport has the Whining Orb and the Flat Device of a new game)
+		playerData.m_playerShip.m_artifactStorage.m_artifactList.Clear();
+		playerData.m_playerShip.m_artifactStorage.Add( rodDevice );
+		playerData.m_playerShip.m_artifactStorage.Add( redHerring );
+
+		yield return OpenPanel( depot, "trade depot" );
+
+		// ---- 1. Buy: the Whining Orb turns in the window; an element shows nothing
+		Call( depot, "SwitchToBuyItemState", true );
+
+		yield return Frames( 2 );
+
+		var buyElement = ArtifactPreviewShows( depot );
+		var foundOrb = SelectDepotItem( depot, 1, whiningOrb );
+
+		yield return Frames( 2 );
+
+		var buyOrb = ArtifactPreviewShows( depot );
+
+		// it turns
+		var preview = GetArtifactPreview( depot );
+		var stage = ( preview != null ) ? GetField( preview, "m_stage" ) as Transform : null;
+		var model = ( ( stage != null ) && ( stage.childCount > 0 ) ) ? stage.GetChild( stage.childCount - 1 ) : null;
+		var turnBefore = ( model != null ) ? model.localRotation : Quaternion.identity;
+
+		yield return new WaitForSecondsRealtime( 0.5f );
+
+		var turned = ( model != null ) ? Quaternion.Angle( turnBefore, model.localRotation ) : 0.0f;
+
+		// the window: in the item column's free room (right of the longest artifact name of the game, left of the Volume column, inside the list), and drawn
+		// over the list and under the popups and their overlay
+		var longestName = "";
+
+		foreach ( var artifact in gameData.m_artifactList )
+		{
+			if ( depot.m_itemListText.GetPreferredValues( artifact.m_name ).x > depot.m_itemListText.GetPreferredValues( longestName ).x )
+			{
+				longestName = artifact.m_name;
+			}
+		}
+
+		var placed = false;
+		var drawnRight = false;
+		var placement = "no window";
+
+		if ( preview != null )
+		{
+			var corners = new Vector3[ 4 ];
+
+			( (RectTransform) preview.transform ).GetWorldCorners( corners );
+
+			var window = new Rect( corners[ 0 ].x, corners[ 0 ].y, corners[ 2 ].x - corners[ 0 ].x, corners[ 2 ].y - corners[ 0 ].y );
+
+			depot.m_itemListText.rectTransform.GetWorldCorners( corners );
+
+			// (the names start at the item text's left side; its scale turns the preferred width into world units)
+			var namesRight = corners[ 0 ].x + depot.m_itemListText.GetPreferredValues( longestName ).x * depot.m_itemListText.rectTransform.lossyScale.x;
+
+			depot.m_volumeListText.rectTransform.GetWorldCorners( corners );
+
+			var volumeLeft = corners[ 0 ].x;
+
+			depot.m_itemListMask.GetComponent<RectTransform>().GetWorldCorners( corners );
+
+			placed = ( window.xMin > namesRight ) && ( window.xMax < volumeLeft ) && ( window.yMin > corners[ 0 ].y ) && ( window.yMax < corners[ 2 ].y ) && ( window.width > 0.0f );
+			placement = "window x " + window.xMin.ToString( "F1" ) + " to " + window.xMax.ToString( "F1" ) + " (names to " + namesRight.ToString( "F1" ) + ", \"" + longestName + "\"; Volume from " + volumeLeft.ToString( "F1" ) + "), y " + window.yMin.ToString( "F1" ) + " to " + window.yMax.ToString( "F1" ) + " (list " + corners[ 0 ].y.ToString( "F1" ) + " to " + corners[ 2 ].y.ToString( "F1" ) + ")";
+
+			// every popup on the trade screen comes after the window, and the list after none of them
+			drawnRight = true;
+
+			foreach ( var popup in new[] { depot.m_overlayPanel, depot.m_amountGameObject, depot.m_analyzePanel, depot.m_confirmAnalyzePanel, depot.m_errorPanel } )
+			{
+				if ( ( popup != null ) && ( popup.transform.parent == preview.transform.parent ) && ( popup.transform.GetSiblingIndex() < preview.transform.GetSiblingIndex() ) )
+				{
+					drawnRight = false;
+				}
+			}
+
+			var listChild = depot.m_itemListMask.transform;
+
+			for ( var depth = 0; ( depth < 32 ) && ( listChild != null ) && ( listChild.parent != preview.transform.parent ); depth++ )
+			{
+				listChild = listChild.parent;
+			}
+
+			drawnRight = drawnRight && ( listChild != null ) && ( listChild.GetSiblingIndex() < preview.transform.GetSiblingIndex() );
+		}
+
+		// (with -Graphics, a picture of the Buy list with the Whining Orb turning)
+		if ( SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null )
+		{
+			RenderScreenPicture( System.IO.Path.Combine( System.IO.Path.GetTempPath(), "starflight-probe", "starport-artifactview.png" ) );
+		}
+
+		// ---- 2. Sell: the Rod Device turns; the curio shows nothing
+		Call( depot, "SwitchToSellItemState", true );
+
+		SelectDepotItem( depot, 1, rodDevice );
+
+		yield return Frames( 2 );
+
+		var sellRod = ArtifactPreviewShows( depot );
+
+		SelectDepotItem( depot, 1, redHerring );
+
+		yield return Frames( 2 );
+
+		var sellCurio = ArtifactPreviewShows( depot );
+
+		// ---- 3. Analyze: the Rod Device turns
+		Call( depot, "SwitchToAnalyzeItemState", true );
+
+		SelectDepotItem( depot, 1, rodDevice );
+
+		yield return Frames( 2 );
+
+		var analyzeRod = ArtifactPreviewShows( depot );
+
+		// ---- 4. the menu bar and a closed panel show nothing, and the window's camera stops drawing
+		Call( depot, "SwitchToMenuBarState" );
+
+		yield return Frames( 2 );
+
+		var menuBar = ArtifactPreviewShows( depot );
+
+		yield return ClosePanel( depot, "trade depot" );
+		yield return Frames( 2 );
+
+		var closed = ArtifactPreviewShows( depot );
+		var previewCamera = ( preview != null ) ? GetField( preview, "m_camera" ) as Camera : null;
+		var cameraOff = ( previewCamera != null ) && !previewCamera.enabled;
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Log( "starport-artifactview: Buy: an element \"" + buyElement + "\", the Whining Orb (" + ( foundOrb ? "listed" : "not listed" ) + ") \"" + buyOrb + "\", turned " + turned.ToString( "F1" ) + " degrees in 0.5 s; Sell: the Rod Device \"" + sellRod + "\", the Red Herring \"" + sellCurio + "\"; Analyze: the Rod Device \"" + analyzeRod + "\"; menu bar \"" + menuBar + "\", closed \"" + closed + "\", its camera off " + cameraOff + "; " + placement + ", drawn over the list and under the popups " + drawnRight );
+
+		Check( "starport-artifactview: on the Buy list the selected Whining Orb turns in the window, and an element shows nothing", foundOrb && ( buyOrb == "Whining Orb" ) && ( buyElement == "" ) && ( turned > 5.0f ), buyOrb + " / " + buyElement + " / " + turned.ToString( "F1" ) );
+		Check( "starport-artifactview: on the Sell list the Rod Device shows and the curio does not", ( sellRod == "Rod Device" ) && ( sellCurio == "" ), sellRod + " / " + sellCurio );
+		Check( "starport-artifactview: on the Analyze list the Rod Device shows", analyzeRod == "Rod Device", analyzeRod );
+		Check( "starport-artifactview: the window is in the item column's free room, right of the longest artifact name and left of the Volume column, inside the list", placed, placement );
+		Check( "starport-artifactview: the window is drawn over the list and under the popups and their overlay", drawnRight, drawnRight.ToString() );
+		Check( "starport-artifactview: with the menu bar up and the panel closed the window shows nothing and its camera is off", ( menuBar == "" ) && ( closed == "" ) && cameraOff, menuBar + " / " + closed + " / " + cameraOff );
+		Check( "starport-artifactview: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=starport-artifactview checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
