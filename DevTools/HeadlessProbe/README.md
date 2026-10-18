@@ -70,7 +70,8 @@ What the probe does:
 | `starport-m22` | panel close guard |
 | `starport-ship` | armor sale (M5) and cargo pod sale (M21) |
 | `h5` | alien ship hit points (100 per class, shields first, old saves, save round trip) |
-| `m19` | shield charge kept when lowered, slow recharge |
+| `m19` | shield charge kept when lowered (no recharge outside an encounter since `shieldturns`) |
+| `shieldturns` | the shields' recharge as the original's, with class 2 shielding (1000): none in 6 s of hyperspace outside an encounter (the code before gave 1% of the full charge every 5 s anywhere); in Spemin group 135, 20 points on each of the ship's turns, every (ships + 1) passes of 0.25 s: 160 in 4 s with one alien ship, 80 with three; and the whole charge when the encounter ends (about 35 s) |
 | `h7` | game over reloads the last save, a destroyed ship is never saved, copied or carried through a slot switch (goes through the Intro, Spaceflight and Starport scenes) |
 | `m12` | hostile when fired on, until the encounter is left; Uhlek hostile on sight; the Enterprise shoots back (about 60 s) |
 | `m20` | repair and treat take time; the crew heals in the original's ticks, one every (260 - the doctor's medicine) / 4 s: nothing in 39 s at medicine 100, then the patient +2 and the others on board +1 (nobody ashore), the treatment ends with "<name> is healed.", 10 ticks in 25 s at medicine 250, the patient +1 a tick on a planet's surface, and the dead are not treated |
@@ -327,7 +328,7 @@ What the probe does:
 | `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 | `combatmessages` | the combat messages are the original's: WEAPONS NOT ARMED, NO TARGET PRESENT, WEAPON NOT AVAILABLE and OUT OF FUEL! when a weapon cannot fire, nothing of the port's own when the player's shot hits, and LASER CLASS n (LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (269 scenarios, about 226 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (270 scenarios, about 227 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### The playthrough
 

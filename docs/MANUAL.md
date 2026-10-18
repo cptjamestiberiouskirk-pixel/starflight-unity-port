@@ -352,7 +352,7 @@ Some things to know:
 
 ### Combat
 
-1. Navigation, **Raise Shields** (you need shielding, and fuel). Shields keep their charge when dropped and recharge slowly.
+1. Navigation, **Raise Shields** (you need shielding, and fuel). Shields keep their charge when dropped. In an encounter they regain 20 points on each of your ship's turns (the more alien ships, the longer between turns), whether raised or not, and they are full again when the encounter ends.
 2. Navigation, **Arm Weapon** (you need a laser cannon or a missile launcher).
 3. Navigation, **Combat**: **Target** picks the next ship and shows its range; **Laser** and **Missile** fire at it; **Status** shows your shields and armor.
 
@@ -423,7 +423,6 @@ This is a faithful remake of *Starflight* (Binary Systems, Electronic Arts, 1986
 
 Known differences:
 
-- **Combat**: shields recharge at the port's own pace during a fight.
 - **Flight**: the ship's top speed follows its engines (class 1 at a third of the original's, class 5 at all of it); in the original every ship flew at the same speed.
 
 ---
