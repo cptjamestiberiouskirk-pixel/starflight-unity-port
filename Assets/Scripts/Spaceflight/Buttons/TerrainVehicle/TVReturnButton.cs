@@ -2,7 +2,8 @@ using UnityEngine;
 
 // the terrain vehicle's Return order (since 2026-10-17): the vehicle drives itself back to the ship, on the fuel the trip takes, and goes aboard once it is beside
 // it. It is Move with the steering done for the player: the fire button stops it as it stops Move, and out of fuel the crew walks back. It stops short of lava
-// ahead, and when the vehicle makes no headway (a cliff or a rock in the way), and says why
+// ahead, and when the vehicle makes no headway (a rock, a tree, a ruin or the ship in the way: the ground itself never stops the vehicle, which goes up any
+// slope), and says why
 public class TVReturnButton : MoveButton
 {
 	// how far ahead of the vehicle, toward the ship, lava stops it (world units; 9.1 are a kilometer)
