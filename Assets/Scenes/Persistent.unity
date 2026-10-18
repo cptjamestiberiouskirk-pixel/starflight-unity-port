@@ -7165,6 +7165,10 @@ MonoBehaviour:
   m_shieldHit: {fileID: 8300000, guid: 97acf3791a963844ca840c98158cbf14, type: 3}
   m_energyWeapon: {fileID: 8300000, guid: 05b9387e5f8f5584cabcc98325c999a8, type: 3}
   m_redAlert: {fileID: 8300000, guid: 92c207bfa5f146f46b632c8c42538a1e, type: 3}
+  m_miningLaser: {fileID: 8300000, guid: 3d97d1b9ef4442ca9becb23c744b9149, type: 3}
+  m_captureBeam: {fileID: 8300000, guid: d903a9f5276c4a3c8a14a2111d744a14, type: 3}
+  m_artifactHum: {fileID: 8300000, guid: 5b94fcf828b14724acc11b4338feca1c, type: 3}
+  m_depositCrumble: {fileID: 8300000, guid: 45144113c06f4e02b093b32a4f2670ab, type: 3}
 --- !u!114 &919755016
 MonoBehaviour:
   m_ObjectHideFlags: 0

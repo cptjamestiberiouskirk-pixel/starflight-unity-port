@@ -382,10 +382,22 @@ public class TerrainLifeforms : TerrainGridPopulator
 
 		lifeform.m_aggression = Mathf.Clamp( lifeform.m_aggression + Random.Range( 1, 21 ), 1, 100 );
 
-		// "If the response is capture then there is a suspenseful noise"
+		// "If the response is capture then there is a suspenseful noise": the capture beam's hum, for as long as the beam holds the lifeform
 		messages.AddText( "<color=white>Capturing...</color>" );
 
-		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+		SoundController.m_instance.PlaySound( SoundController.Sound.CaptureBeam, c_captureBeamVolume, 1.0f, true );
+	}
+
+	// how loud the capture beam's hum plays
+	const float c_captureBeamVolume = 0.7f;
+
+	// the capture beam's hum stops (the capture has ended, one way or another)
+	void StopCaptureBeam()
+	{
+		if ( m_capturing && ( SoundController.m_instance != null ) )
+		{
+			SoundController.m_instance.StopSound( SoundController.Sound.CaptureBeam );
+		}
 	}
 
 	// starts recording this lifeform's data, if the terrain vehicle has the energy for it - returns true if it started
@@ -437,6 +449,8 @@ public class TerrainLifeforms : TerrainGridPopulator
 		{
 			m_recording = false;
 
+			StopCaptureBeam();
+
 			return;
 		}
 
@@ -455,6 +469,8 @@ public class TerrainLifeforms : TerrainGridPopulator
 		if ( gotAway )
 		{
 			m_recording = false;
+
+			StopCaptureBeam();
 
 			messages.AddText( "<color=yellow>It got away.</color>" );
 
@@ -487,6 +503,8 @@ public class TerrainLifeforms : TerrainGridPopulator
 		// a capture: the lifeform goes into the terrain vehicle's hold, if there is room for it
 		if ( m_capturing )
 		{
+			StopCaptureBeam();
+
 			FinishCapture( playerData, messages );
 
 			return;

@@ -44,6 +44,10 @@ public class SoundController : MonoBehaviour
 		ShieldHit,
 		EnergyWeapon,
 		RedAlert,
+		MiningLaser,
+		CaptureBeam,
+		ArtifactHum,
+		DepositCrumble,
 		Count
 	};
 
@@ -93,6 +97,13 @@ public class SoundController : MonoBehaviour
 	public AudioClip m_shieldHit;
 	public AudioClip m_energyWeapon;
 	public AudioClip m_redAlert;
+
+	// the ground tools' sounds (since 2026-10-18): the mining laser's beam and the capture beam (loops), the hum of a floating artifact (a
+	// loop each ArtifactDisplay plays itself), and a deposit crumbling when the laser has cut it all
+	public AudioClip m_miningLaser;
+	public AudioClip m_captureBeam;
+	public AudioClip m_artifactHum;
+	public AudioClip m_depositCrumble;
 
 	// the sound list (to use with the enum)
 	AudioClip[] m_soundList;
@@ -156,6 +167,21 @@ public class SoundController : MonoBehaviour
 		m_soundList[ (int) Sound.ShieldHit ] = m_shieldHit;
 		m_soundList[ (int) Sound.EnergyWeapon ] = m_energyWeapon;
 		m_soundList[ (int) Sound.RedAlert ] = m_redAlert;
+		m_soundList[ (int) Sound.MiningLaser ] = m_miningLaser;
+		m_soundList[ (int) Sound.CaptureBeam ] = m_captureBeam;
+		m_soundList[ (int) Sound.ArtifactHum ] = m_artifactHum;
+		m_soundList[ (int) Sound.DepositCrumble ] = m_depositCrumble;
+	}
+
+	// the clip of a sound, for something that plays it on an audio source of its own (an artifact's hum)
+	public AudioClip GetClip( Sound sound )
+	{
+		if ( ( m_soundList == null ) || ( (int) sound < 0 ) || ( (int) sound >= m_soundList.Length ) )
+		{
+			return null;
+		}
+
+		return m_soundList[ (int) sound ];
 	}
 
 	// unity fixed update

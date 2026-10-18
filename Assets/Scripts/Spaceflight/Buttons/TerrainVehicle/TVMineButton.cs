@@ -77,7 +77,7 @@ public class TVMineButton : ShipButton
 
 		messages.AddText( "<color=white>Mining " + target.GetElementName() + " (" + Tools.VolumeToText( target.m_volume ) + " cubic meters)...</color>" );
 
-		SoundController.m_instance.PlaySound( SoundController.Sound.Scanning, 0.6f, 1.0f, true );
+		SoundController.m_instance.PlaySound( SoundController.Sound.MiningLaser, 0.6f, 1.0f, true );
 
 		// keep the button lit while the laser cuts
 		return true;
@@ -237,7 +237,7 @@ public class TVMineButton : ShipButton
 	{
 		var controller = SpaceflightController.m_instance;
 
-		SoundController.m_instance.StopSound( SoundController.Sound.Scanning );
+		SoundController.m_instance.StopSound( SoundController.Sound.MiningLaser );
 
 		if ( m_target != null )
 		{
