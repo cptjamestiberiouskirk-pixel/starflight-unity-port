@@ -46081,7 +46081,11 @@ public class ClaudeProbe : MonoBehaviour
 
 		var drawnAfter = DrawnFluxCount();
 
-		RenderScreenPicture( System.IO.Path.Combine( folder, "01_starmap_with_flux_0.png" ) );
+		// a picture of it, in a run with a graphics device (probe.ps1 -Graphics): without one, rendering the cameras just after a flux jump crashes Unity
+		if ( SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null )
+		{
+			RenderScreenPicture( System.IO.Path.Combine( folder, "01_starmap_with_flux_0.png" ) );
+		}
 
 		controller.m_starmap.Hide();
 		controller.m_buttonController.DeactivateButton();
