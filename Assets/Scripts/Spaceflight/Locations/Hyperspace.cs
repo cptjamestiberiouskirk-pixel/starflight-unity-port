@@ -232,6 +232,9 @@ public class Hyperspace : MonoBehaviour
 					// and the navigator loses the ship's bearings for a while
 					SpaceflightController.m_instance.LoseBearings();
 
+					// the flux is known from now on, and the starmap draws it (HYPER-OV >FLUX-NODE, SET-FLUX-STATE)
+					playerData.m_general.LearnFlux( flux );
+
 					// start the warp cinematics
 					m_travelingThroughFlux = true;
 
