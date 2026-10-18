@@ -45841,10 +45841,13 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=music checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
-	// waits until the MusicController is not fading between tracks (it ignores a ChangeToTrack meanwhile), at most 600 frames
+	// waits until the MusicController is not fading between tracks (it ignores a ChangeToTrack meanwhile), at most 10 s of real time: a fade takes
+	// m_trackChangeTime (2 s) of game time, and headless frames are far shorter than a rendered game's
 	static IEnumerator WaitForMusicTransition( MusicController musicController )
 	{
-		for ( var frame = 0; frame < 600; frame++ )
+		var until = Time.realtimeSinceStartup + 10.0f;
+
+		while ( Time.realtimeSinceStartup < until )
 		{
 			var phase = GetField( musicController, "m_phase" );
 
