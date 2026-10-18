@@ -1674,6 +1674,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAboutScreen();
 				break;
 
+			case "music":
+				yield return ScenarioMusic();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -45682,12 +45686,175 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "aboutscreen: the save panel has an About button, which opens the About screen (the code before had none)", buttonShown && aboutShown, buttonShown + " " + aboutShown );
 		Check( "aboutscreen: it credits the port's author and the remake it is built on, released into the public domain", aboutText.Contains( "cptjamestiberiouskirk-pixel" ) && aboutText.Contains( "Built on the Starflight Remake Project by Marvin Herbold, released into the public domain." ), aboutText );
-		Check( "aboutscreen: it thanks the remake's contributors and names Starflight's makers and the licences of the music and sounds", aboutText.Contains( "Jeff Graw" ) && aboutText.Contains( "Planet Map Project" ) && aboutText.Contains( "Binary Systems" ) && aboutText.Contains( "Tabletop Audio" ) && aboutText.Contains( "bubaproducer" ), aboutText );
+		Check( "aboutscreen: it thanks the remake's contributors and names Starflight's makers, the music made for this port and the licences of the sounds", aboutText.Contains( "Jeff Graw" ) && aboutText.Contains( "Planet Map Project" ) && aboutText.Contains( "Binary Systems" ) && aboutText.Contains( "Music: made for this port." ) && !aboutText.Contains( "Tabletop Audio" ) && aboutText.Contains( "bubaproducer" ), aboutText );
 		Check( "aboutscreen: Escape closes it, back to the save panel's menu", closedByEscape, closedByEscape.ToString() );
 		Check( "aboutscreen: the intro credits the port and its author's GitHub account, and no longer BraveArmy.com or the 2017 team", intro.Contains( "Starflight: The Remaking of a Legend" ) && intro.Contains( "github.com/cptjamestiberiouskirk-pixel" ) && !intro.Contains( "BraveArmy" ) && !intro.Contains( "Marvin" ), intro );
 		Check( "aboutscreen: the original's credits stay on the intro (Binary Systems, Electronic Arts)", intro.Contains( "Binary Systems" ) && intro.Contains( "Electronic Arts" ), intro );
 
 		Finish( "scenario=aboutscreen checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the music made for this port (since 2026-10-18)
+
+	// every MusicController track holds the track made for it, by name and length, streamed from disk; no Tabletop Audio file (under Attribution
+	// NonCommercial NoDerivatives) is left on a MusicController field or in the project; and ChangeToTrack puts each track's clip on the music source,
+	// looping all but the intro. The code before had the 15 Tabletop Audio ambiences, 8 of them played, each decompressed into memory when loaded
+	IEnumerator ScenarioMusic()
+	{
+		var errorsBefore = s_errorCount;
+		var musicController = MusicController.m_instance;
+
+		yield return Frames( 5 );
+
+		if ( musicController == null )
+		{
+			Finish( "scenario=music abort: no MusicController", 2 );
+			yield break;
+		}
+
+		// each track's field, its new clip and that clip's length in seconds (a loop is its generated take less the 6 s crossfaded into its start)
+		var expected = new[]
+		{
+			new { field = "m_intro", track = MusicController.Track.Intro, clip = "Title Theme", seconds = 40.05f },
+			new { field = "m_starport", track = MusicController.Track.Starport, clip = "Starport Theme", seconds = 248.67f },
+			new { field = "m_dockingBay", track = MusicController.Track.DockingBay, clip = "Docking Bay Theme", seconds = 108.41f },
+			new { field = "m_starSystem", track = MusicController.Track.StarSystem, clip = "Star System Theme", seconds = 347.87f },
+			new { field = "m_inOrbit", track = MusicController.Track.InOrbit, clip = "Orbit Theme", seconds = 246.95f },
+			new { field = "m_hyperspace", track = MusicController.Track.Hyperspace, clip = "Hyperspace Theme", seconds = 335.69f },
+			new { field = "m_encounter", track = MusicController.Track.Encounter, clip = "Encounter Theme", seconds = 228.81f },
+			new { field = "m_planetside", track = MusicController.Track.Planetside, clip = "Planetside Theme", seconds = 342.96f },
+		};
+
+		var trackList = GetField( musicController, "m_trackList" ) as AudioClip[];
+
+		// ---- 1. each field holds its new clip, as long as the file made for it, under its track in the list the controller plays from, and streamed
+		foreach ( var entry in expected )
+		{
+			var clip = GetField( musicController, entry.field ) as AudioClip;
+			var clipName = ( clip != null ) ? clip.name : "(none)";
+			var length = ( clip != null ) ? clip.length : 0.0f;
+
+			Check( "music: " + entry.field + " holds " + entry.clip, clipName == entry.clip, clipName + ", " + length.ToString( "0.000" ) + " s" + ( ( clip != null ) ? ", " + clip.frequency + " Hz, " + clip.channels + " channel(s), " + clip.loadType : "" ) );
+			Check( "music: " + entry.clip + " is " + entry.seconds + " s long", Mathf.Abs( length - entry.seconds ) < 0.05f, length.ToString( "0.000" ) + " s" );
+			Check( "music: " + entry.clip + " streams from disk", ( clip != null ) && ( clip.loadType == AudioClipLoadType.Streaming ), ( clip != null ) ? clip.loadType.ToString() : "(none)" );
+
+			var index = (int) entry.track;
+			var listed = ( ( trackList != null ) && ( index < trackList.Length ) ) ? trackList[ index ] : null;
+
+			Check( "music: Track." + entry.track + " plays " + entry.clip, ( listed != null ) && ( listed.name == entry.clip ), ( listed != null ) ? listed.name : "(none)" );
+		}
+
+		// ---- 2. no MusicController clip is a Tabletop Audio file, every one is in Assets/Music, and no Tabletop Audio file is left in the project
+		var tabletop = new[] { "103_testing_chamber", "106_lunar_outpost", "112_ethereal_plane", "113_astral_plane", "126_endless_voyage", "155_outpost_31", "16_busy_space_port", "17_alien_night_club", "21_derelict_freighter", "24_forbidden_galaxy", "25_deep_space_eva", "28_nephilim_labs_fe", "33_far_above_the_world", "93_starship_medical" };
+		var onFields = new List<string>();
+		var outside = new List<string>();
+
+		foreach ( var field in typeof( MusicController ).GetFields( BindingFlags.Public | BindingFlags.Instance ) )
+		{
+			if ( field.FieldType != typeof( AudioClip ) )
+			{
+				continue;
+			}
+
+			var clip = field.GetValue( musicController ) as AudioClip;
+			var path = ( clip != null ) ? AssetDatabase.GetAssetPath( clip ) : "";
+			var file = System.IO.Path.GetFileNameWithoutExtension( path ).ToLowerInvariant();
+
+			if ( ( Array.IndexOf( tabletop, file ) >= 0 ) || ( path == "Assets/Music/Intro.wav" ) )
+			{
+				onFields.Add( field.Name + "=" + path );
+			}
+			else if ( !path.StartsWith( "Assets/Music/" ) )
+			{
+				outside.Add( field.Name + "=" + path );
+			}
+		}
+
+		Check( "music: no MusicController track is a Tabletop Audio file", onFields.Count == 0, ( onFields.Count > 0 ) ? string.Join( ", ", onFields ) : "none" );
+		Check( "music: every MusicController track is a file in Assets/Music", outside.Count == 0, ( outside.Count > 0 ) ? string.Join( ", ", outside ) : "all" );
+
+		var leftOver = new List<string>();
+
+		foreach ( var guid in AssetDatabase.FindAssets( "t:AudioClip", new[] { "Assets" } ) )
+		{
+			var path = AssetDatabase.GUIDToAssetPath( guid );
+			var file = System.IO.Path.GetFileNameWithoutExtension( path ).ToLowerInvariant();
+
+			if ( ( Array.IndexOf( tabletop, file ) >= 0 ) || ( path == "Assets/Music/Intro.wav" ) )
+			{
+				leftOver.Add( path );
+			}
+		}
+
+		Check( "music: no Tabletop Audio file is left in the project", leftOver.Count == 0, ( leftOver.Count > 0 ) ? leftOver.Count + ": " + string.Join( ", ", leftOver ) : "none" );
+
+		// ---- 3. ChangeToTrack puts each track's clip on the music source: the loops looping, then, from silence as when the game starts, the intro once
+		var audioSource = GetField( musicController, "m_audioSource" ) as AudioSource;
+		var notPlayed = new List<string>();
+
+		foreach ( var entry in expected )
+		{
+			if ( entry.track == MusicController.Track.Intro )
+			{
+				continue;
+			}
+
+			yield return WaitForMusicTransition( musicController );
+
+			musicController.ChangeToTrack( entry.track );
+
+			yield return WaitForMusicTransition( musicController );
+
+			var held = ( ( audioSource != null ) && ( audioSource.clip != null ) ) ? audioSource.clip.name : "(none)";
+			var loops = ( audioSource != null ) && audioSource.loop;
+
+			if ( ( held != entry.clip ) || !loops )
+			{
+				notPlayed.Add( entry.track + " -> " + held + ( loops ? "" : " (not looping)" ) );
+			}
+		}
+
+		yield return WaitForMusicTransition( musicController );
+
+		musicController.ChangeToTrack( MusicController.Track.None );
+
+		yield return WaitForMusicTransition( musicController );
+
+		musicController.ChangeToTrack( MusicController.Track.Intro );
+
+		yield return WaitForMusicTransition( musicController );
+
+		var introHeld = ( ( audioSource != null ) && ( audioSource.clip != null ) ) ? audioSource.clip.name : "(none)";
+		var introLoops = ( audioSource != null ) && audioSource.loop;
+
+		if ( ( introHeld != "Title Theme" ) || introLoops )
+		{
+			notPlayed.Add( "Intro -> " + introHeld + ( introLoops ? " (looping)" : "" ) );
+		}
+
+		Check( "music: ChangeToTrack plays each new track, the loops looping and the intro once", notPlayed.Count == 0, ( notPlayed.Count > 0 ) ? string.Join( "; ", notPlayed ) : "all " + expected.Length );
+
+		yield return Frames( 3 );
+
+		Check( "music: no errors", s_errorCount == errorsBefore, ( s_errorCount - errorsBefore ) + " error(s)" + ( ( s_errorCount > errorsBefore ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=music checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// waits until the MusicController is not fading between tracks (it ignores a ChangeToTrack meanwhile), at most 600 frames
+	static IEnumerator WaitForMusicTransition( MusicController musicController )
+	{
+		for ( var frame = 0; frame < 600; frame++ )
+		{
+			var phase = GetField( musicController, "m_phase" );
+
+			if ( ( phase == null ) || ( (MusicController.Phase) phase == MusicController.Phase.None ) )
+			{
+				yield break;
+			}
+
+			yield return null;
+		}
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
