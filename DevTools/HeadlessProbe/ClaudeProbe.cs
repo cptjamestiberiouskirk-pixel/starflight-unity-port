@@ -47194,12 +47194,12 @@ public class ClaudeProbe : MonoBehaviour
 		// ---- 2. aliens that fight open fire at once, with a missile from beyond a laser's 5 cells
 		yield return EnterWithPosture( thrynn, 90.0f, true, false, missileVessel );
 
-		var missilesBefore = controller.m_combatController.GetAlienMissilesInFlight();
+		var missilesBefore = IntFieldOrMin( controller.m_combatController, "m_alienMissilesInFlight" );
 		var nearestWhenFiring = NearestAlienCells();
 
 		yield return StayInEncounter( 2.5f );
 
-		var missilesFired = controller.m_combatController.GetAlienMissilesInFlight() - missilesBefore;
+		var missilesFired = IntFieldOrMin( controller.m_combatController, "m_alienMissilesInFlight" ) - missilesBefore;
 
 		// ---- 3. hostile aliens (their mood in the hostile band, not fighting) close in to within 11 cells
 		yield return EnterWithPosture( thrynn, 70.0f, false, false, missileVessel );
