@@ -184,8 +184,8 @@ def export(obj, path):
     )
 
 
-def render_preview(objects, path):
-    """Each prop on its own, three-quarter from above, side by side."""
+def render_preview(objects, path, columns=None):
+    """Each prop on its own, three-quarter from above, side by side (in rows of that many columns, if given)."""
     scene = bpy.context.scene
     import_meshy.add_preview_lights()
     scene.render.engine = "CYCLES"
@@ -216,7 +216,13 @@ def render_preview(objects, path):
         tiles.append(tile)
 
     images = [bpy.data.images.load(t) for t in tiles]
-    sheet = numpy.concatenate([import_meshy.image_pixels(i) for i in images], axis=1)
+    pixels = [import_meshy.image_pixels(i) for i in images]
+    columns = columns or len(pixels)
+
+    # a short last row is filled with transparent tiles; the rows go bottom first, as Blender keeps an image's rows
+    pixels += [numpy.zeros_like(pixels[0])] * (-len(pixels) % columns)
+    rows = [numpy.concatenate(pixels[i:i + columns], axis=1) for i in range(0, len(pixels), columns)]
+    sheet = numpy.concatenate(rows[::-1], axis=0)
     import_meshy.save_image(sheet, path)
 
     for image, tile in zip(images, tiles):
@@ -315,4 +321,6 @@ def main():
     print("MANIFEST " + manifest_path)
 
 
-main()
+# import_meshy_artifacts.py imports this module for its helpers
+if __name__ == "__main__":
+    main()

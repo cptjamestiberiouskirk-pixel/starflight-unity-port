@@ -288,6 +288,9 @@ public class TVCargoButton : ShipButton
 					anythingTaken = true;
 				}
 			}
+
+			// what was taken no longer shows beside the ruin
+			terrainGrid.m_terrainRuins.ShowArtifacts( ruin );
 		}
 
 		if ( text == "" )

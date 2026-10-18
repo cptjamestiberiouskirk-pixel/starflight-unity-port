@@ -18,6 +18,7 @@ Decisions of 2026-10-09:
 | `import_meshy_arth.py`, `meshy-arth.json` | Imports the player's Arth ship, with its equipment parts kept separate: see "The player's Arth ship" below |
 | `import_meshy_tv.py`, `meshy-terrain-vehicle.json` | Imports the terrain vehicle, its six wheels kept separate: see "The terrain vehicle" below |
 | `import_meshy_props.py`, `meshy-ruins.json`, `meshy-rocks.json` | Imports single-mesh ground props (the ancient ruins, the rocks and the two deposits with shapes of their own): see "Ground props" below |
+| `import_meshy_artifacts.py`, `meshy-artifacts.json` | Imports the 15 special artifacts: see "Artifacts" below |
 
 ## Wrecks, wiring and the probe
 
@@ -103,6 +104,8 @@ blender --background --factory-startup --python DevTools/ShipModels/import_meshy
 & "DevTools\ShipModels\wire.ps1" -Manifest "DevTools\ShipModels\manifest-terrain-vehicle.json"
 ```
 
+The probe scenario `tvmodel` covers it (the materials, the wheels on their steering joints, the triangle counts, the wheels level on the ground with the body clear of it, the capsule against the model, the radar turning; a picture under `-Graphics`).
+
 ### Ground props
 
 The ancient ruins, the rocks and the Endurium and mercury deposits are one mesh node each, and the game uses them through that node: the ruins' templates in `TerrainRuins` are the model files themselves, and the templates of `TerrainRocks` and `TerrainElements` are scene copies of the models whose material overrides find the mesh by its node. `import_meshy_props.py` (with `meshy-ruins.json` or `meshy-rocks.json`) replaces each prop's mesh and keeps the rest:
@@ -128,7 +131,21 @@ blender --background --factory-startup --python DevTools/ShipModels/import_meshy
 
 The probe scenarios `ruinmodels` (each ruin in its own textured material with the glow, its triangles, its square of 24, a ruin placed on the ground; a picture under `-Graphics`) and `rockmodels` (each rock in its material with the new maps, its triangles and the old rock's bounding volume, every rock-shaped deposit on its rock's grey map, Endurium's and mercury's own maps and sizes, the rocks and deposits placed on planet 92) cover them.
 
-The probe scenario `tvmodel` covers it (the materials, the wheels on their steering joints, the triangle counts, the wheels level on the ground with the body clear of it, the capsule against the model, the radar turning; a picture under `-Graphics`).
+### Artifacts
+
+The original game showed no artifact at all: it knew them only by name. The original's 15 special artifacts (`GD_Artifact.IsSpecial`, the ones the story turns on) each have a model made from a concept picture drawn from the artifact's name and its analysis; the curios have none. The game loads a model by its artifact's name from `Assets/Resources/Artifacts` (`ArtifactModels`), and `TerrainRuins.ShowArtifacts` shows each special artifact a ruin still holds beside it (16 units from its middle, 4 across, hovering 2.5 over the ground, `ArtifactDisplay` turning it and raising and lowering it a little, under a point light of its own), again whenever the terrain vehicle takes something from the ruin. It draws no random numbers, so nothing on the planet moves.
+
+`import_meshy_artifacts.py` (with `meshy-artifacts.json`) centres each model on its origin and scales it to one unit across at its widest, so the game sizes it where it shows it; it writes it as one mesh node named for its artifact, in metres in the file's unit scale (`FBX_SCALE_UNITS`), with its maps for SF - Standard in `Assets/Game Objects/Artifacts` (the Black Egg's red cracks, the Crystal Orb's pale swirls, the Rod Device's blue crystals, the Flat Device's green screen and the Tesseract's inner cube glow through their `glow` settings; the others have thresholds no colour reaches), and a manifest with a `models` section for `wire.ps1`. The review sheet has each artifact on its own tile, five to a row.
+
+```bash
+blender --background --factory-startup --python DevTools/ShipModels/import_meshy_artifacts.py -- DevTools/ShipModels/meshy-artifacts.json --source <folder with the GLB files> --preview DevTools/ShipModels/previews/artifacts.png
+```
+
+```powershell
+& "DevTools\ShipModels\wire.ps1" -Manifest "DevTools\ShipModels\manifest-artifacts.json"
+```
+
+The probe scenario `artifactmodels` covers them (each special artifact's material, maps, triangles and size, no curio with a model, an artifact shown beside its ruin, hovering and turning, and gone once the terrain vehicle takes it; a picture under `-Graphics`).
 
 ## Conventions
 

@@ -225,6 +225,12 @@ public class TerrainRuins : TerrainGridPopulator
 		// the random ruins (their random numbers come after everything else, so nothing above moves)
 		PlaceRandomRuins( planetGenerator, elevationScale, planet );
 
+		// the special artifacts beside the ruins that hold them (no random numbers)
+		foreach ( var ruin in GetComponentsInChildren<TerrainRuin>( true ) )
+		{
+			ShowArtifacts( ruin );
+		}
+
 		// what the terrain vehicle has dropped on this planet (no random numbers either)
 		var playerData = DataController.m_instance.m_playerData;
 
@@ -243,6 +249,109 @@ public class TerrainRuins : TerrainGridPopulator
 
 		// give the game its random numbers back
 		Random.state = randomState;
+	}
+
+	// how far from the middle of its ruin a special artifact shows (a ruin stands on a square of 24), how big it shows, and how high over the ground it hovers
+	const float c_artifactDistance = 16.0f;
+	const float c_artifactSize = 4.0f;
+	const float c_artifactHover = 2.5f;
+
+	// the soft light over an artifact, which lights it and the ground about it, so that it catches the eye (its colour, brightness and reach)
+	static readonly Color c_artifactLightColor = new Color( 0.75f, 0.9f, 1.0f );
+	const float c_artifactLightIntensity = 3.0f;
+	const float c_artifactLightRange = 28.0f;
+
+	// shows each special artifact the ruin still holds beside it, turning and hovering (ArtifactDisplay) - no random numbers: it is called once the ruins are
+	// placed, and again when the terrain vehicle takes something from the ruin; the curios have no model, as the original showed no artifact at all
+	public void ShowArtifacts( TerrainRuin ruin )
+	{
+		if ( ruin == null )
+		{
+			return;
+		}
+
+		foreach ( var display in ruin.m_artifactDisplays )
+		{
+			if ( display != null )
+			{
+				Destroy( display );
+			}
+		}
+
+		ruin.m_artifactDisplays.Clear();
+
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+
+		if ( ( playerData.m_planetSurfaces == null ) || ( GetPlanetGenerator() == null ) )
+		{
+			return;
+		}
+
+		foreach ( var artifactSiteId in ruin.m_artifactSiteIds )
+		{
+			if ( ( artifactSiteId < 0 ) || ( artifactSiteId >= gameData.m_artifactSiteList.Length ) || playerData.m_planetSurfaces.IsArtifactSiteTaken( artifactSiteId ) )
+			{
+				continue;
+			}
+
+			ShowArtifact( ruin, gameData.m_artifactSiteList[ artifactSiteId ].m_artifactId );
+		}
+
+		foreach ( var item in ruin.m_randomItems )
+		{
+			if ( ( item.m_artifactId >= 0 ) && !playerData.m_planetSurfaces.IsRandomRuinItemTaken( item.m_key ) )
+			{
+				ShowArtifact( ruin, item.m_artifactId );
+			}
+		}
+	}
+
+	// one artifact beside its ruin, on the ground there and hovering over it (each further one of the same ruin a sixth of the way round)
+	void ShowArtifact( TerrainRuin ruin, int artifactId )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		if ( ( artifactId < 0 ) || ( artifactId >= gameData.m_artifactList.Length ) || ( ArtifactModels.Get( gameData.m_artifactList[ artifactId ] ) == null ) )
+		{
+			return;
+		}
+
+		// beside the ruin, by the ruin's own turn about the vertical
+		var planetGenerator = GetPlanetGenerator();
+		var yaw = ruin.transform.eulerAngles.y;
+		var angle = yaw + 30.0f + ruin.m_artifactDisplays.Count * 60.0f;
+		var position = ruin.transform.position + Quaternion.Euler( 0.0f, angle, 0.0f ) * Vector3.forward * c_artifactDistance;
+
+		// on the ground there (over water, at its surface)
+		Tools.WorldToMapCoordinates( position, out var mapX, out var mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
+
+		position.y = Mathf.Max( planetGenerator.GetBilinearSmoothedElevation( mapX, mapY ), planetGenerator.m_waterElevation ) * m_elevationScale + c_artifactHover + c_artifactSize * 0.5f;
+
+		var holder = new GameObject( "Artifact " + gameData.m_artifactList[ artifactId ].m_name );
+
+		holder.layer = gameObject.layer;
+		holder.transform.SetParent( transform, false );
+		holder.transform.position = position;
+		holder.AddComponent<ArtifactDisplay>().m_artifactId = artifactId;
+
+		ArtifactModels.Make( gameData.m_artifactList[ artifactId ], holder.transform, c_artifactSize, gameObject.layer );
+
+		// the light, a little above it
+		var lightObject = new GameObject( "Artifact Light" );
+
+		lightObject.layer = gameObject.layer;
+		lightObject.transform.SetParent( holder.transform, false );
+		lightObject.transform.localPosition = Vector3.up * c_artifactSize * 1.5f;
+
+		var light = lightObject.AddComponent<Light>();
+
+		light.type = LightType.Point;
+		light.color = c_artifactLightColor;
+		light.intensity = c_artifactLightIntensity;
+		light.range = c_artifactLightRange;
+
+		ruin.m_artifactDisplays.Add( holder );
 	}
 
 	// places something the terrain vehicle has dropped where it lies (call it when it is dropped, and the ruins place everything dropped on a planet again on every visit)
