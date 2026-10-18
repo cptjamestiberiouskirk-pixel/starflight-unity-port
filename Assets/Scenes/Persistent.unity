@@ -7103,14 +7103,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_volume: 0.35
   m_trackChangeTime: 2
-  m_intro: {fileID: 8300000, guid: d73a1a6617309ec4b9dd1f0a53f0b376, type: 3}
-  m_starport: {fileID: 8300000, guid: 186ade1022c824e49aba735ea3e41c26, type: 3}
-  m_dockingBay: {fileID: 8300000, guid: 44bd4a334b0cdb248a533cd504e255ae, type: 3}
-  m_starSystem: {fileID: 8300000, guid: 138540bda05e7994197f371b5c05d27e, type: 3}
-  m_inOrbit: {fileID: 8300000, guid: a1f3c9a830a24074c93e9e7cacd1192f, type: 3}
-  m_hyperspace: {fileID: 8300000, guid: 0fe40983d45856d47b6e7ca2a7f49185, type: 3}
-  m_encounter: {fileID: 8300000, guid: d7b6082dd0fba8e41a989d357e8c79be, type: 3}
-  m_planetside: {fileID: 8300000, guid: aa46890c3120a4b41974d14383d6e6c0, type: 3}
+  m_intro: {fileID: 8300000, guid: 6b36e4a8be5d484882591318249ad7e9, type: 3}
+  m_starport: {fileID: 8300000, guid: b5ac0b4e2da34d079fdf448ed7b93e15, type: 3}
+  m_dockingBay: {fileID: 8300000, guid: 50bfcdce44fc4ec0a85b4fe783c87d72, type: 3}
+  m_starSystem: {fileID: 8300000, guid: e2203f60fa1e4cc9ab4650504994550c, type: 3}
+  m_inOrbit: {fileID: 8300000, guid: 89e043c309c747c890f87940ed98fe40, type: 3}
+  m_hyperspace: {fileID: 8300000, guid: 5224daedc08f4a5b8f9c86fb0e91d918, type: 3}
+  m_encounter: {fileID: 8300000, guid: 67b240ad9e274422b5005d43f1666cae, type: 3}
+  m_planetside: {fileID: 8300000, guid: 4144a8d80afb4debb11d8d0e7ee07e48, type: 3}
 --- !u!114 &919755015
 MonoBehaviour:
   m_ObjectHideFlags: 0
