@@ -4,7 +4,7 @@ blender --background --factory-startup --python DevTools/ShipModels/import_meshy
 
 The artifacts had no models: the game knew them only by name, as the original did. Each model is made from a concept picture
 drawn from the artifact's name and analysis, and the game loads it by the artifact's name from Resources/Artifacts
-(ArtifactModels), to show it beside the ruin that holds it. So each model is one mesh node named for its artifact, centred on its origin and one unit across at its
+(ArtifactModels), to show it beside the ruin that holds it and in the Trade Depot's turning window (ArtifactPreview). So each model is one mesh node named for its artifact, centred on its origin and one unit across at its
 widest (the game sizes it where it shows it), written in metres in the file's own unit scale, with its maps for SF - Standard.
 It writes manifest-artifacts.json for wire.ps1: the materials and the models whose import takes them.
 """
