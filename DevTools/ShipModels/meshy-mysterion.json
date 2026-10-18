@@ -1,0 +1,32 @@
+{
+	"race": "Mysterion",
+	"textureSize": 1024,
+	"engines": false,
+	"glow": {
+		"hue": [
+			0,
+			360
+		],
+		"saturation": 0.3,
+		"value": 0.55
+	},
+	"vessels": [
+		{
+			"id": 20,
+			"name": "Mysterion",
+			"strinfo": 124.0,
+			"glb": "mysterion.glb",
+			"nose": "-X",
+			"screenshot": "Mysterion Analysis.png",
+			"round": true,
+			"replaceTemplate": true,
+			"roll": 90,
+			"core": 0.8,
+			"meshy": {
+				"concept": "01a14d28-6c75-773b-b3a5-598fef39e3f4",
+				"model": "01a14d8e-6a7f-718a-b37e-91fdffc76534",
+				"remesh": "01a14d91-d49d-74c7-b87a-1bc40f6f099b"
+			}
+		}
+	]
+}

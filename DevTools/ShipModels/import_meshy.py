@@ -175,8 +175,64 @@ def glow_mask(base, glow=None):
     return in_hue * numpy.clip((saturation - glow_saturation) / 0.2, 0.0, 1.0) * numpy.clip((high - glow_value) / 0.2, 0.0, 1.0)
 
 
-def convert_maps(obj, folder, prefix, size, glow=None):
-    """Write the SF - Standard maps of the model's glTF material; returns their asset paths (relative to the project)."""
+# the colours of a glowing core's points of light (the Mysterion's: the many coloured pixels in the middle of its sensor picture)
+CORE_COLOURS = numpy.array([[0.2, 0.4, 1.0], [0.2, 0.9, 1.0], [1.0, 0.25, 0.9], [1.0, 0.45, 0.6], [1.0, 0.2, 0.2], [1.0, 1.0, 1.0]], dtype=numpy.float32)
+
+
+def core_mask(obj, size, fraction):
+    """The pixels of a size x size map (rows bottom first) that the model's faces within this fraction of its half size from its middle
+    use, and how many triangles those are: where a glowing core is drawn (a model whose core came out as plain grey panels)."""
+    mesh = obj.data
+    mesh.calc_loop_triangles()
+    co = numpy.empty(len(mesh.vertices) * 3, dtype=numpy.float64)
+    mesh.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3)
+    middle = (co.max(axis=0) + co.min(axis=0)) / 2.0
+    reach = fraction * 0.5 * float((co.max(axis=0) - co.min(axis=0)).max())
+    uv = numpy.empty(len(mesh.loops) * 2, dtype=numpy.float64)
+    mesh.uv_layers.active.data.foreach_get("uv", uv)
+    uv = uv.reshape(-1, 2)
+    triangle_vertices = numpy.empty(len(mesh.loop_triangles) * 3, dtype=numpy.int64)
+    mesh.loop_triangles.foreach_get("vertices", triangle_vertices)
+    triangle_loops = numpy.empty(len(mesh.loop_triangles) * 3, dtype=numpy.int64)
+    mesh.loop_triangles.foreach_get("loops", triangle_loops)
+    inside = numpy.linalg.norm(co[triangle_vertices.reshape(-1, 3)].mean(axis=1) - middle, axis=1) < reach
+    mask = numpy.zeros((size, size), dtype=bool)
+
+    for loops in triangle_loops.reshape(-1, 3)[inside]:
+        # each triangle's pixels in the map, by their barycentric weights (a little over its edges, so that no seam shows)
+        p = uv[loops] * size
+        x0, y0 = (numpy.floor(p.min(axis=0)) - 1).astype(int)
+        x1, y1 = (numpy.ceil(p.max(axis=0)) + 1).astype(int)
+        x0, y0, x1, y1 = max(x0, 0), max(y0, 0), min(x1, size), min(y1, size)
+        (ax, ay), (bx, by), (cx, cy) = p
+        d = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
+
+        if (x1 <= x0) or (y1 <= y0) or (abs(d) < 1e-9):
+            continue
+
+        xs, ys = numpy.meshgrid(numpy.arange(x0, x1) + 0.5, numpy.arange(y0, y1) + 0.5)
+        w1 = ((by - cy) * (xs - cx) + (cx - bx) * (ys - cy)) / d
+        w2 = ((cy - ay) * (xs - cx) + (ax - cx) * (ys - cy)) / d
+        mask[y0:y1, x0:x1] |= (w1 >= -0.05) & (w2 >= -0.05) & (1.0 - w1 - w2 >= -0.05)
+
+    return mask, int(inside.sum())
+
+
+def core_speckles(size, seed=1986):
+    """Points of light of the core's colours on black, two pixels each, the same every time."""
+    rng = numpy.random.default_rng(seed)
+    half = size // 2
+    dots = rng.random((half, half)) < 0.12
+    colours = CORE_COLOURS[rng.integers(0, len(CORE_COLOURS), (half, half))] * rng.uniform(0.6, 1.0, (half, half, 1)).astype(numpy.float32)
+    image = numpy.where(dots[..., None], colours, 0.0).astype(numpy.float32)
+
+    return image.repeat(2, axis=0).repeat(2, axis=1)
+
+
+def convert_maps(obj, folder, prefix, size, glow=None, core=None):
+    """Write the SF - Standard maps of the model's glTF material; returns their asset paths (relative to the project). With a core mask
+    (core_mask), its pixels get the core's points of light, dark in the albedo map and glowing in the emissive map."""
     material = obj.data.materials[0]
     bsdf = next(n for n in material.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
     base_image = upstream_image(bsdf.inputs["Base Color"])
@@ -202,6 +258,13 @@ def convert_maps(obj, folder, prefix, size, glow=None):
     albedo = linear_to_srgb(base_linear * (1.0 - metal))
     specular = linear_to_srgb(0.04 * (1.0 - metal) + base_linear * metal)
     glow = glow_mask(base[..., :3], glow)[..., None]
+    emissive = base[..., :3] * glow
+
+    if core is not None:
+        speckles = core_speckles(base.shape[0])[: base.shape[0], : base.shape[1]]
+        albedo = numpy.where(core[..., None], 0.03 + speckles * 0.5, albedo)
+        emissive = numpy.where(core[..., None], speckles, emissive)
+        glow = numpy.maximum(glow, core[..., None].astype(numpy.float32))
 
     maps = {}
     stem = os.path.join(folder, prefix)
@@ -213,7 +276,7 @@ def convert_maps(obj, folder, prefix, size, glow=None):
 
     write("Albedo", numpy.concatenate([albedo, opaque], axis=2), ".jpg")
     write("Specular", shrink(numpy.concatenate([specular, 1.0 - rough], axis=2), size // SPECULAR_SHRINK), ".png")
-    write("Emissive", numpy.concatenate([base[..., :3] * glow, opaque], axis=2), ".jpg")
+    write("Emissive", numpy.concatenate([emissive, opaque], axis=2), ".jpg")
 
     if normal_image is not None:
         write("Normal", shrink(image_pixels(normal_image), size), ".jpg")
@@ -304,15 +367,23 @@ def main():
         high = Vector((max(c.x for c in corners), max(c.y for c in corners), max(c.z for c in corners)))
         extent = high - low
         length = ship_kit.target_length(vessel["strinfo"])
-        scale = length / extent.y
+        # a round ship (a sphere, a ring, a spiral) has no length of its own: its size is across its widest side
+        scale = length / (max(extent.x, extent.y, extent.z) if vessel.get("round") else extent.y)
         obj.data.transform(Matrix.Diagonal((scale, scale, scale, 1.0)) @ Matrix.Translation(-(low + high) / 2.0))
         obj.data.update()
         bpy.context.view_layer.update()
 
-        if extent.y < max(extent.x, extent.z):
+        if (extent.y < max(extent.x, extent.z)) and not vessel.get("round"):
             print("WARNING %s is not longest along its nose: %s" % (name, tuple(round(e * scale, 1) for e in extent)))
 
-        maps = convert_maps(obj, folder, name, size, race_file_data.get("glow")) if export else {}
+        # a core that came out as plain panels glows with points of light (the Mysterion's)
+        core = None
+
+        if export and vessel.get("core"):
+            core, core_triangles = core_mask(obj, size, vessel["core"])
+            print("CORE %s: %d triangles, %.1f%% of the map" % (name, core_triangles, 100.0 * float(core.mean())))
+
+        maps = convert_maps(obj, folder, name, size, race_file_data.get("glow"), core) if export else {}
 
         # the preview shows the glTF material as it came; the export gets the materials the Unity side makes
         built.append((obj, vessel.get("screenshot")))
@@ -327,6 +398,8 @@ def main():
             "debris": "Assets/Game Objects/Ships Debris/%s/%s.fbx" % (race, name),
             "materials": [hull, engine],
             "meshy": vessel.get("meshy", {}),
+            "replaceTemplate": bool(vessel.get("replaceTemplate", False)),
+            "round": bool(vessel.get("round", False)),
         })
 
         for material_name, emissive in ((hull, [0.0, 0.0, 0.0]), (engine, ENGINE_GLOW)):

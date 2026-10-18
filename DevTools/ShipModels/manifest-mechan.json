@@ -1,0 +1,76 @@
+{
+	"race": "Mechan",
+	"vessels": [
+		{
+			"id": 4,
+			"name": "Mechan Scout",
+			"strinfoSize": 0.4,
+			"length": 20.424,
+			"model": "Assets/Game Objects/Ships/Mechan/Mechan Scout.fbx",
+			"debris": "Assets/Game Objects/Ships Debris/Mechan/Mechan Scout.fbx",
+			"materials": [
+				"Mechan Scout Hull",
+				"Mechan Scout Engine"
+			],
+			"meshy": {
+				"concept": "01a14d28-6a04-7205-91f1-0e9a539d6e89",
+				"conceptEdit": "01a14d87-91f5-7544-a570-3b9e86217d38",
+				"conceptEdit2": "01a14d8a-f524-70bc-aaed-b8482cd44acf",
+				"model": "01a14d8e-63e1-7305-8c7b-3aebfada26c4",
+				"remesh": "01a14d8f-50cb-756d-81bd-9c0d298edaa5"
+			},
+			"replaceTemplate": true,
+			"round": false
+		}
+	],
+	"materials": [
+		{
+			"name": "Mechan Scout Hull",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Mechan",
+			"albedoMap": "Assets/Game Objects/Ships/Mechan/Textures/Mechan Scout - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Mechan/Textures/Mechan Scout - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Mechan/Textures/Mechan Scout - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Mechan/Textures/Mechan Scout - Emissive.jpg"
+		},
+		{
+			"name": "Mechan Scout Engine",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.9,
+				0.35,
+				0.12
+			],
+			"folder": "Assets/Game Objects/Ships/Mechan",
+			"albedoMap": "Assets/Game Objects/Ships/Mechan/Textures/Mechan Scout - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Mechan/Textures/Mechan Scout - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Mechan/Textures/Mechan Scout - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Mechan/Textures/Mechan Scout - Emissive.jpg"
+		}
+	]
+}
