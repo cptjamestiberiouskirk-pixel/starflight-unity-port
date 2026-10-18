@@ -1682,6 +1682,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioEggArming();
 				break;
 
+			case "cargodescribe":
+				yield return ScenarioCargoDescribe();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -44587,7 +44591,15 @@ public class ClaudeProbe : MonoBehaviour
 				continue;
 			}
 
-			rows.Add( items[ i ].Trim() + "|" + ( ( i < volumes.Length ) ? volumes[ i ] : "" ) + "|" + ( ( i < values.Length ) ? values[ i ] : "" ) );
+			// (without the marked item's colour and marker, since the list has one: roadmap 8.33)
+			var item = System.Text.RegularExpressions.Regex.Replace( items[ i ], "<[^>]*>", "" ).Trim();
+
+			if ( item.StartsWith( "> " ) )
+			{
+				item = item.Substring( 2 ).Trim();
+			}
+
+			rows.Add( item + "|" + ( ( i < volumes.Length ) ? volumes[ i ] : "" ) + "|" + ( ( i < values.Length ) ? values[ i ] : "" ) );
 		}
 
 		return rows;
@@ -45938,6 +45950,144 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "eggarming: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=eggarming checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: the ship's cargo list describes an artifact or a specimen (roadmap 8.33)
+
+	// presses the console button with this label if the console has one (the buttons of the ship's cargo list exist only in the new code) - returns whether it did
+	static bool PressIfThere( string label )
+	{
+		if ( PtIndexOf( label ) < 0 )
+		{
+			return false;
+		}
+
+		PressButtonLabelled( SpaceflightController.m_instance.m_buttonController.GetCurrentButtonSet(), label );
+
+		return true;
+	}
+
+	IEnumerator ScenarioCargoDescribe()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+		var ship = playerData.m_playerShip;
+		var errorsBefore = s_errorCount;
+
+		EnsureCrew();
+
+		yield return Frames( 5 );
+
+		// the hold: Endurium, the Bladed Toy (its kind analysed) and the Blue Bauble (not), a specimen from a save before the capture place and one captured at 12N
+		// x 34W - so the list runs Endurium, Blue Bauble, Bladed Toy, the captured specimen, the older one (each kind the one put in last first)
+		var enduriumId = gameData.m_misc.m_enduriumElementId;
+		var knownId = Array.FindIndex( gameData.m_artifactList, artifact => artifact.m_name == "Bladed Toy" );
+		var unknownId = Array.FindIndex( gameData.m_artifactList, artifact => artifact.m_name == "Blue Bauble" );
+
+		if ( ( enduriumId < 0 ) || ( knownId < 0 ) || ( unknownId < 0 ) )
+		{
+			Finish( "scenario=cargodescribe abort: missing game data (" + enduriumId + " " + knownId + " " + unknownId + ")", 2 );
+			yield break;
+		}
+
+		if ( !playerData.m_knownArtifacts.IsKnown( knownId ) )
+		{
+			playerData.m_knownArtifacts.Add( knownId );
+		}
+
+		for ( var attempt = 0; ( attempt < 10 ) && playerData.m_knownArtifacts.IsKnown( unknownId ); attempt++ )
+		{
+			playerData.m_knownArtifacts.Remove( unknownId );
+		}
+
+		ship.m_elementStorage.Reset();
+		ship.m_artifactStorage.Reset();
+		ship.GetSpecimenStorage().m_specimenList.Clear();
+
+		ship.m_elementStorage.Add( enduriumId, 200 );
+		ship.m_artifactStorage.Add( knownId );
+		ship.m_artifactStorage.Add( unknownId );
+
+		var olderSpecimen = new PD_Specimen { m_planetId = 90, m_speciesIndex = 0, m_name = "Older Specimen", m_volume = 20, m_value = 400 };
+		var capturedSpecimen = new PD_Specimen { m_planetId = 90, m_speciesIndex = 1, m_name = "Captured Specimen", m_volume = 15, m_value = 300 };
+
+		// (set by name, so that this runs on the code before the capture place too)
+		SetFieldIfThere( capturedSpecimen, "m_hasCapturePlace", true );
+		SetFieldIfThere( capturedSpecimen, "m_capturedNorthSouth", 12 );
+		SetFieldIfThere( capturedSpecimen, "m_capturedEastWest", -34 );
+		SetFieldIfThere( capturedSpecimen, "m_capturedStardateYMD", "4620-03-26" );
+
+		ship.GetSpecimenStorage().Add( olderSpecimen );
+		ship.GetSpecimenStorage().Add( capturedSpecimen );
+
+		// ---- 1. Cargo opens the list with its first item marked, and the console's buttons for it
+		PressButtonLabelled( ButtonController.ButtonSet.CommandB, "Cargo" );
+
+		yield return Frames( 5 );
+
+		var labels = ButtonSetLabels( buttonController.GetCurrentButtonSet() );
+		var columns = ShipCargoTableColumns();
+		var itemLines = ( columns.Length > 0 ) ? columns[ 0 ].Split( '\n' ) : new string[ 0 ];
+		var firstItemMarked = Array.FindIndex( itemLines, line => line.Contains( "> " ) ) == Array.FindIndex( itemLines, line => line.Contains( gameData.m_elementList[ enduriumId ].m_name ) );
+		var opened = labels.Contains( "Next" ) && labels.Contains( "Describe" ) && labels.Contains( "Back" ) && ( itemLines.Length > 0 ) && firstItemMarked && string.Join( "", itemLines ).Contains( "> " );
+
+		// ---- 2. Describe on each item in turn: Endurium (nothing), the Blue Bauble, the Bladed Toy, the captured specimen, the older one
+		var described = new List<string>();
+
+		for ( var item = 0; item < 5; item++ )
+		{
+			if ( item > 0 )
+			{
+				PressIfThere( "Next" );
+
+				yield return Frames( 2 );
+			}
+
+			controller.m_messages.Clear();
+
+			var pressed = PressIfThere( "Describe" );
+
+			yield return Frames( 2 );
+
+			described.Add( pressed ? MessageList() : "(no Describe)" );
+		}
+
+		// ---- 3. Back: the command buttons again
+		PressIfThere( "Back" );
+
+		yield return Frames( 2 );
+
+		var setAfterBack = buttonController.GetCurrentButtonSet();
+		var planet = gameData.m_planetList[ 90 ];
+		var star = gameData.m_starList[ planet.m_starId ];
+		var systemLine = "System " + star.m_xCoordinate + "," + star.m_yCoordinate;
+		var planetLine = "Planet " + planet.m_orbitPosition;
+		var knownText = gameData.m_artifactList[ knownId ].m_analysisText;
+		var knownStart = knownText.Substring( 0, Mathf.Min( 24, knownText.Length ) );
+
+		Log( "cargodescribe: console [" + labels + "], first item marked " + firstItemMarked + ", list '" + string.Join( "/", itemLines ) + "'" );
+
+		for ( var i = 0; i < described.Count; i++ )
+		{
+			Log( "cargodescribe: Describe on item " + i + ": '" + described[ i ] + "'" );
+		}
+
+		Log( "cargodescribe: after Back the console is " + setAfterBack );
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "cargodescribe: the ship's Cargo opens the list with Next, Describe and Back, its first item marked", opened, "[" + labels + "] " + firstItemMarked + " | " + string.Join( "/", itemLines ) );
+		Check( "cargodescribe: an element has no description", ( described[ 0 ] != "(no Describe)" ) && !described[ 0 ].Contains( "analyzed" ) && !described[ 0 ].Contains( "System" ), described[ 0 ] );
+		Check( "cargodescribe: an artifact of a kind not analysed: This artifact has not been analyzed.", described[ 1 ].Contains( gameData.m_artifactList[ unknownId ].m_name ) && described[ 1 ].Contains( "This artifact has not been analyzed." ), described[ 1 ] );
+		Check( "cargodescribe: an artifact of an analysed kind: its analysis", described[ 2 ].Contains( gameData.m_artifactList[ knownId ].m_name ) && described[ 2 ].Contains( knownStart ), described[ 2 ] );
+		Check( "cargodescribe: a captured specimen: its system, planet, location and date", described[ 3 ].Contains( "Captured Specimen" ) && described[ 3 ].Contains( systemLine ) && described[ 3 ].Contains( planetLine ) && described[ 3 ].Contains( "Location 12N x 34W" ) && described[ 3 ].Contains( "Date " + PD_General.GetDisplayStardate( "4620-03-26" ) ), described[ 3 ] );
+		Check( "cargodescribe: a specimen from an older save: its system and planet only", described[ 4 ].Contains( "Older Specimen" ) && described[ 4 ].Contains( systemLine ) && !described[ 4 ].Contains( "Location" ), described[ 4 ] );
+		Check( "cargodescribe: Back closes the list, back to the command buttons", setAfterBack == ButtonController.ButtonSet.CommandB, setAfterBack.ToString() );
+		Check( "cargodescribe: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=cargodescribe checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

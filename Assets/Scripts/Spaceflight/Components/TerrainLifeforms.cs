@@ -572,6 +572,14 @@ public class TerrainLifeforms : TerrainGridPopulator
 			m_value = playerData.m_general.LearnLifeform( species, playerData.m_general.m_currentPlanetId, false ) * c_captureValueFactor
 		};
 
+		// where and when it was captured (the terrain vehicle's latitude and longitude, as the coordinates above the main view read them, and the stardate)
+		Tools.WorldToLatLongCoordinates( playerData.m_general.m_lastDisembarkedCoordinates, out var eastWest, out var northSouth );
+
+		specimen.m_hasCapturePlace = true;
+		specimen.m_capturedNorthSouth = Mathf.RoundToInt( northSouth );
+		specimen.m_capturedEastWest = Mathf.RoundToInt( eastWest );
+		specimen.m_capturedStardateYMD = playerData.m_general.m_currentStardateYMD;
+
 		playerData.m_terrainVehicle.AddSpecimen( specimen );
 
 		var terrainVehicle = playerData.m_terrainVehicle;

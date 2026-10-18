@@ -41,6 +41,7 @@ public class ButtonController : MonoBehaviour
 		Distress,
 		TerrainVehicleBoard,
 		TerrainVehicleArmEgg,
+		ShipCargo,
 		Count
 	};
 
@@ -136,6 +137,7 @@ public class ButtonController : MonoBehaviour
 		m_buttonSets[ (int) ButtonSet.Distress ] = new ShipButton[] { new DistressNoButton(), new DistressYesButton() };
 		m_buttonSets[ (int) ButtonSet.TerrainVehicleBoard ] = new ShipButton[] { new TVBoardNoButton(), new TVBoardYesButton() };
 		m_buttonSets[ (int) ButtonSet.TerrainVehicleArmEgg ] = new ShipButton[] { new ArmEggNoButton(), new ArmEggYesButton() };
+		m_buttonSets[ (int) ButtonSet.ShipCargo ] = new ShipButton[] { new ShipCargoNextButton(), new ShipCargoDescribeButton(), new ShipCargoBackButton() };
 		m_buttonSets[ (int) ButtonSet.ShipsLog ] = new ShipButton[] { new StarportNoticesButton(), new AlienCommsButton(), new MessagesButton(), bridgeButton };
 		m_buttonSets[ (int) ButtonSet.AlienComms ] = new ShipButton[] { new ACThemselvesButton(), new ACOtherRacesButton(), new ACOldEmpireButton(), new ACTheAncientsButton(), new ACGeneralInfoButton(), new ChangeMenuButton( "Cancel", ButtonSet.ShipsLog ) };
 		m_buttonSets[ (int) ButtonSet.Combat ] = new ShipButton[] { new TargetButton(), new FireLaserButton(), new FireMissileButton(), new StatusButton(), new NavigationButton() };
