@@ -37,13 +37,24 @@ public class PlayerShip : MonoBehaviour
 	// system's top speed in a step is 12 * 20.48 / 32 = 7.68 times hyperspace's. The original takes a step each pass of its main loop, as fast as the computer
 	// runs it, and the port takes the original's pace at GOG's speed (DOSBox at 1500 cycles): in hyperspace 1.45 coordinates a second in open space, 11.6 steps
 	// of 32 of the port's units (371 a second); in a star system 400 units from the sun to the edge in 2.72 s at the top step, 12.2 steps of 12 units of 20.48
-	// (2998 a second), the step growing from 1 to 12 in about a second
+	// (2998 a second), the step growing from 1 to 12 in about a second. These are the top speeds of class 5 engines here, and the speed grows in hyperspace as well,
+	// as the ship's acceleration allows (D8, below)
 	public const float c_starSystemSpeedFactor = 12.0f * ( 8192.0f / 400.0f ) / 32.0f;
 	const int c_starSystemSteps = 12;
 	public const float c_hyperspaceStepsPerSecond = 11.6f;
 	const float c_hyperspaceUnit = 32.0f;
 	public const float c_starSystemStepsPerSecond = 12.2f;
 	const float c_starSystemUnit = 8192.0f / 400.0f;
+
+	// the speed by the engines (a ruling of 2026-10-17, ROADMAP.md D8: the original's ship flies at the same speed whatever its engines, which made a new ship too fast
+	// to land with): in hyperspace and in a star system the top speed above is class 5 engines'; class 1 engines give a third of it, each class a sixth more (the
+	// port's speeds before GOG's pace were about class 1's). The ship gets there from a twelfth of it (the original's first step of 12) in 5 s over its acceleration in
+	// G (engines against mass, the original's SHIPGRPH-OV (.ACC)): 1 s for a new ship's 5 G, as the original's 12 steps at GOG's pace, 5 s at 1 G, a quarter of
+	// a second at most 20 G and more
+	const float c_slowestEnginesShare = 1.0f / 3.0f;
+	const float c_rampSecondsAtOneG = 5.0f;
+	const float c_shortestRampSeconds = 0.25f;
+	const float c_longestRampSeconds = 5.0f;
 
 	// the ship's steps in an encounter, as the original's (HYPER-OV #VES-SPEED, ACCELERATE, !S/A): each pass of its main loop (Encounter.c_passSeconds) with a
 	// direction held the ship moves its step, in cells (CombatController.c_unitsPerCell); the step starts at 1 and grows by one every 96 / ESPEED + 1 passes, where
@@ -118,6 +129,21 @@ public class PlayerShip : MonoBehaviour
 		m_modelDirection = playerData.m_general.m_currentDirection;
 	}
 
+	// the ship's top speed in hyperspace or in a star system with engines of this class (D8): class 5's is the original's at GOG's pace, class 1's a third of it
+	public static float GetTopSpeed( PD_General.Location location, int enginesClass )
+	{
+		var originalTopSpeed = ( location == PD_General.Location.StarSystem ) ? c_starSystemStepsPerSecond * c_starSystemSteps * c_starSystemUnit : c_hyperspaceStepsPerSecond * c_hyperspaceUnit;
+		var share = c_slowestEnginesShare + ( 1.0f - c_slowestEnginesShare ) * ( Mathf.Clamp( enginesClass, 1, 5 ) - 1 ) / 4.0f;
+
+		return originalTopSpeed * share;
+	}
+
+	// how long the ship takes to reach its top speed from a twelfth of it, with this acceleration in G (D8)
+	public static float GetRampSeconds( int accelerationG )
+	{
+		return ( accelerationG > 0 ) ? Mathf.Clamp( c_rampSecondsAtOneG / accelerationG, c_shortestRampSeconds, c_longestRampSeconds ) : c_longestRampSeconds;
+	}
+
 	// unity update
 	void Update()
 	{
@@ -186,23 +212,16 @@ public class PlayerShip : MonoBehaviour
 				}
 				else
 				{
-					// in hyperspace and in a star system the engines' health does not change the speed, but destroyed engines move nothing (DAMAGE-OV WF2AC)
-					var topSpeed = ( enginesFactor > 0.0f ) ? ( ( location == PD_General.Location.StarSystem ) ? c_starSystemStepsPerSecond * c_starSystemSteps * c_starSystemUnit : c_hyperspaceStepsPerSecond * c_hyperspaceUnit ) : 0.0f;
+					// in hyperspace and in a star system the top speed is the engines' class's (D8, GetTopSpeed); the engines' health does not change it, but destroyed
+					// engines move nothing (DAMAGE-OV WF2AC)
+					var topSpeed = ( enginesFactor > 0.0f ) ? GetTopSpeed( location, playerData.m_playerShip.m_enginesClass ) : 0.0f;
 
 					playerData.m_general.m_currentMaximumSpeed = topSpeed;
 
-					if ( location == PD_General.Location.StarSystem )
-					{
-						// a step more each step, from 1 of the 12 to all of them (at least the first step's at once)
-						var rampedSpeed = Mathf.Max( playerData.m_general.m_currentSpeed, topSpeed / c_starSystemSteps ) + topSpeed / c_starSystemSteps * Time.deltaTime * c_starSystemStepsPerSecond;
+					// from a twelfth of the top speed (at least that at once) to all of it, in the time the ship's acceleration takes (GetRampSeconds)
+					var rampedSpeed = Mathf.Max( playerData.m_general.m_currentSpeed, topSpeed / c_starSystemSteps ) + topSpeed * ( c_starSystemSteps - 1 ) / c_starSystemSteps * Time.deltaTime / GetRampSeconds( playerData.m_playerShip.m_acceleration );
 
-						playerData.m_general.m_currentSpeed = Mathf.Min( rampedSpeed, topSpeed );
-					}
-					else
-					{
-						// at the top speed from the first step
-						playerData.m_general.m_currentSpeed = topSpeed;
-					}
+					playerData.m_general.m_currentSpeed = Mathf.Min( rampedSpeed, topSpeed );
 				}
 
 				// are we in hyperspace?

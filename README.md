@@ -62,7 +62,7 @@ The whole game is playable, from a new game to the ending. Every item on the [ro
 
 Every change is compile-checked in CI and exercised by a headless test harness that plays the real game scenes: 260 scenarios with 1,361 checks, all passing on this release, plus an automated playthrough that plays a new game all the way to the ending and Interstel's bonus.
 
-The known differences from the original are listed at the end of the [manual](docs/MANUAL.md#13-this-port-and-the-1986-original). The biggest one left is that shields recharge at the port's own pace during a fight. Found a bug? Please [open an issue](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port/issues).
+The known differences from the original are listed at the end of the [manual](docs/MANUAL.md#13-this-port-and-the-1986-original). The biggest one left is that shields recharge at the port's own pace during a fight. One is by design: the ship's speed follows its engines, where every ship in the original flew at the same speed. Found a bug? Please [open an issue](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port/issues).
 
 The full history is in [CHANGELOG.md](CHANGELOG.md).
 
@@ -90,6 +90,7 @@ The port runs on **Unity 6 (6000.3.13f1)** and has been modernized throughout:
 
 - **Combat**: laser cannons, missile launchers, shields and armor, with alien tactics and victory and defeat detection. Alien ships have their own armor and shield points, any race turns hostile when fired on (the Uhlek attack on sight), aliens hold their fire while a comm link is up, and every shot burns a little Endurium.
 - **Encounters in orbit**: home fleets, drones and a derelict wait in orbit around their planets and meet the ship when it arrives. Leaving the encounter returns the ship to the star system, as in the original.
+- **Speed by the engines**: the ship steers the moment you press a direction and stops when you let go, as in the original. Its top speed in hyperspace and in a star system follows its engines: class 1 flies at a third of the original's top speed, class 5 at all of it, and the ship's acceleration (engines against mass) sets how quickly it gets there, so a heavily loaded ship is sluggish.
 - **Ship systems over time**: shields keep their charge and recharge slowly, and the engineer's repairs and the crew's healing take time, going faster with higher skill: everyone on board heals slowly, and the doctor's patient twice as fast. The doctor asks which crew member to examine or treat, just like the original.
 - **Living suns**: each star system's sun churns, its corona flickers and small flares rise from its rim and fall back, all in the color of real stars of its class.
 - **Planets lit by their star**: in the 3D star system view every planet is lit by its own star, in that star's color, with a day side, a night side and an atmosphere that glows along the sunlit edge.
@@ -221,7 +222,7 @@ Assets/
 - The Whining Orb translates the Spemin
 - The Rod Device cuts the damage of alien lasers to a quarter
 - The Crystal Pearl warps a critically damaged ship out of an encounter
-- Hyperspace and star system travel at the original's pace, as measured in GOG's version of the game
+- The ship steers the moment you press a direction and stops when you let go, as in the original, and its top speed follows its engines: class 5 engines fly at the original's pace in hyperspace and in star systems, as measured in GOG's version of the game, class 1 at a third of it, and the ship's acceleration (engines against mass) sets how quickly it gets there
 - Alien ships come after you as in the original: every two star hours they jump toward your ship, half the way in hyperspace and three quarters in a star system, and in hyperspace they stay near their home ground; the Dodecahedron draws them farther and faster
 - The Shimmering Ball cloaks the ship in combat until it fires
 - The Flat Device shields the terrain vehicle: lifeforms hit its crew half as often

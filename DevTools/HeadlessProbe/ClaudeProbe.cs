@@ -1614,6 +1614,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSteering();
 				break;
 
+			case "enginespeeds":
+				yield return ScenarioEngineSpeeds();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -41026,10 +41030,10 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=alienpursuit checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
-	// the ship's speeds in flight as the original's (HYPER-OV CSPEED, !MAXSPEED, ACCELERATE): in a star system the step grows from 1 to 12 of the system's units,
-	// to a top speed of 12 units a step at the original's 12.2 steps a second at GOG's speed (2998 of the port's units a second); in hyperspace the top speed is
-	// there from the first step; with no direction held the ship stops at once; and the engines' health does not change the speed, though destroyed engines move nothing
-	// (DAMAGE-OV WF2AC)
+	// the ship's speeds in flight as the original's (HYPER-OV CSPEED, !MAXSPEED, ACCELERATE), for class 5 engines (D8 gives lower classes less): in a star system the
+	// step grows from 1 to 12 of the system's units, to a top speed of 12 units a step at the original's 12.2 steps a second at GOG's speed (2998 of the port's units
+	// a second); in hyperspace 371.2; with no direction held the ship stops at once; and the engines' health does not change the speed, though destroyed engines move
+	// nothing (DAMAGE-OV WF2AC)
 	IEnumerator ScenarioShipSpeeds()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -41047,6 +41051,10 @@ public class ClaudeProbe : MonoBehaviour
 		controller.m_encounterRange = 0.0f;
 
 		SetSystemHealth( 0, 100 );
+
+		// class 5 engines, whose top speeds are the original's at GOG's pace (D8), in a ship of 5 G (16 pods, class 5 armor), which gets there in a second as the
+		// original's 12 steps do
+		FitShip( 5, 16, 5 );
 
 		// ---- 1. the star system of Arth, after Maneuver from the Starport
 		controller.SwitchLocation( PD_General.Location.JustLaunched );
@@ -41116,7 +41124,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		controller.m_playerShip.TurnOnEngines();
 
-		for ( var end = Time.time + 0.1f; Time.time < end; )
+		// (the speed grows in hyperspace too since D8, here in a second)
+		for ( var end = Time.time + 1.5f; Time.time < end; )
 		{
 			yield return null;
 		}
@@ -41140,9 +41149,9 @@ public class ClaudeProbe : MonoBehaviour
 		controller.m_playerShip.TurnOffEngines();
 		controller.m_encounterRange = encounterRange;
 
-		Log( "shipspeeds: in hyperspace: " + hyperspaceAtOnce.ToString( "0.0" ) + " 0.1 s after the engines went on, " + hyperspaceHalfEngines.ToString( "0.0" ) + " with the engines at half health, " + hyperspaceNoEngines.ToString( "0.0" ) + " with them destroyed" );
+		Log( "shipspeeds: in hyperspace: " + hyperspaceAtOnce.ToString( "0.0" ) + " 1.5 s after the engines went on, " + hyperspaceHalfEngines.ToString( "0.0" ) + " with the engines at half health, " + hyperspaceNoEngines.ToString( "0.0" ) + " with them destroyed" );
 
-		Check( "shipspeeds: in hyperspace the ship is at its top speed from the first step: the original's 11.6 steps of 32 a second at GOG's speed (371.2)", Mathf.Abs( hyperspaceAtOnce - 371.2f ) < 0.05f, hyperspaceAtOnce.ToString( "0.0" ) );
+		Check( "shipspeeds: in hyperspace class 5 engines' top speed is the original's 11.6 steps of 32 a second at GOG's speed (371.2)", Mathf.Abs( hyperspaceAtOnce - 371.2f ) < 0.05f, hyperspaceAtOnce.ToString( "0.0" ) );
 		Check( "shipspeeds: engines at half health do not slow the ship (the original's engine damage counts only in an encounter)", Mathf.Abs( hyperspaceHalfEngines - 371.2f ) < 0.05f, hyperspaceHalfEngines.ToString( "0.0" ) );
 		Check( "shipspeeds: destroyed engines move nothing (DAMAGE-OV WF2AC; the old code left the ship at the speed it had)", hyperspaceNoEngines < 0.01f, hyperspaceNoEngines.ToString( "0.0" ) );
 
@@ -43360,6 +43369,175 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "steering: with no key held the ship stops at once", ( system[ 3 ] == 0.0f ) && ( hyperspace[ 3 ] == 0.0f ), system[ 3 ].ToString( "0.0" ) + " / " + hyperspace[ 3 ].ToString( "0.0" ) );
 
 		Finish( "scenario=steering checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the speed by the engines (ROADMAP D8, since 2026-10-17)
+
+	// fits the ship with these engines, cargo pods and armor and nothing else, and works out its mass and acceleration as the Starport does
+	static void FitShip( int enginesClass, int cargoPods, int armorClass )
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+
+		ship.m_enginesClass = enginesClass;
+		ship.m_numCargoPods = cargoPods;
+		ship.m_armorClass = armorClass;
+		ship.m_shieldingClass = 0;
+		ship.m_missileLauncherClass = 0;
+		ship.m_laserCannonClass = 0;
+		ship.RecalculateMass();
+		ship.RecalculateVolume();
+		ship.RecalculateAcceleration();
+	}
+
+	// from a standstill over Arth's sun, held there (or where the ship is in hyperspace), flies east or west and gives back the speed after a second and after six
+	IEnumerator FlyFromStandstill( Vector3 direction, float[] speeds )
+	{
+		var controller = SpaceflightController.m_instance;
+		var general = DataController.m_instance.m_playerData.m_general;
+
+		if ( general.m_location == PD_General.Location.StarSystem )
+		{
+			general.m_coordinates = Vector3.zero;
+			general.m_lastStarSystemCoordinates = Vector3.zero;
+			controller.m_playerShip.transform.position = Vector3.zero;
+		}
+
+		general.m_currentSpeed = 0.0f;
+		general.m_currentDirection = direction;
+
+		controller.m_playerShip.TurnOnEngines();
+
+		var start = Time.time;
+
+		speeds[ 0 ] = -1.0f;
+
+		var inStarSystem = general.m_location == PD_General.Location.StarSystem;
+
+		while ( Time.time < start + 6.0f )
+		{
+			general.m_currentDirection = direction;
+
+			// (held over the sun, or six seconds at class 5's speed would carry the ship out of the system: the speed is the engines', wherever the ship is)
+			if ( inStarSystem )
+			{
+				general.m_coordinates = Vector3.zero;
+				general.m_lastStarSystemCoordinates = Vector3.zero;
+				controller.m_playerShip.transform.position = Vector3.zero;
+			}
+
+			if ( ( speeds[ 0 ] < 0.0f ) && ( Time.time >= start + 1.0f ) )
+			{
+				speeds[ 0 ] = general.m_currentSpeed;
+			}
+
+			yield return null;
+		}
+
+		speeds[ 1 ] = general.m_currentSpeed;
+
+		controller.m_playerShip.TurnOffEngines();
+
+		yield return Frames( 3 );
+	}
+
+	// the speed by the engines (D8: the original's ship flies at one speed whatever its engines): in a star system the top speed of class 1 engines is a third of
+	// the original's at GOG's pace (999.4), class 3's two thirds (1998.8) and class 5's all of it (2998.3), and in hyperspace class 1's a third of 371.2 (123.7); a new
+	// ship (class 1, 5 G) is all but at its top speed after a second, a ship of 1 G (class 1 engines, 16 pods, class 5 armor) far from it, and one of 25 G (class 5,
+	// a bare hull) at it
+	IEnumerator ScenarioEngineSpeeds()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+		var starSystem = controller.m_starSystem;
+		var classOne = new float[ 2 ];
+		var classThree = new float[ 2 ];
+		var classFive = new float[ 2 ];
+		var heavy = new float[ 2 ];
+		var hyperspaceClassOne = new float[ 2 ];
+
+		EnsureCrew();
+
+		// a ship that survives whatever it meets, and no encounter able to begin
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		SetSystemHealth( 0, 100 );
+
+		// ---- 1. the star system of Arth
+		controller.SwitchLocation( PD_General.Location.JustLaunched );
+
+		for ( var end = Time.realtimeSinceStartup + 60.0f; ( Time.realtimeSinceStartup < end ) && starSystem.GeneratingPlanets(); )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 10 );
+
+		PressButton( ButtonController.ButtonSet.NavigationA, 0 );
+
+		yield return Frames( 10 );
+
+		// (Maneuver, while it runs, turns the engines off when no direction is held)
+		if ( GetField( controller.m_buttonController, "m_currentButton" ) is ManeuverButton )
+		{
+			controller.m_buttonController.DeactivateButton();
+		}
+
+		yield return Frames( 3 );
+
+		var inStarSystem = general.m_location == PD_General.Location.StarSystem;
+
+		FitShip( 1, 0, 0 );
+
+		var newShipG = playerData.m_playerShip.m_acceleration;
+
+		yield return FlyFromStandstill( Vector3.right, classOne );
+
+		FitShip( 3, 0, 0 );
+
+		yield return FlyFromStandstill( Vector3.left, classThree );
+
+		FitShip( 5, 0, 0 );
+
+		var bareG = playerData.m_playerShip.m_acceleration;
+
+		yield return FlyFromStandstill( Vector3.right, classFive );
+
+		FitShip( 1, 16, 5 );
+
+		var heavyG = playerData.m_playerShip.m_acceleration;
+
+		yield return FlyFromStandstill( Vector3.left, heavy );
+
+		var stillInStarSystem = general.m_location == PD_General.Location.StarSystem;
+
+		// ---- 2. hyperspace, in a quiet corner, with a new ship
+		FitShip( 1, 0, 0 );
+
+		general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 6.0f, 0.0f, 6.0f ) );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		yield return FlyFromStandstill( Vector3.right, hyperspaceClassOne );
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "enginespeeds: star system (" + inStarSystem + ", still " + stillInStarSystem + "): class 1 (" + newShipG + " G) " + classOne[ 0 ].ToString( "0.0" ) + " after 1 s, " + classOne[ 1 ].ToString( "0.0" ) + " after 6 s; class 3 " + classThree[ 0 ].ToString( "0.0" ) + " / " + classThree[ 1 ].ToString( "0.0" ) + "; class 5 bare (" + bareG + " G) " + classFive[ 0 ].ToString( "0.0" ) + " / " + classFive[ 1 ].ToString( "0.0" ) + "; class 1 heavy (" + heavyG + " G) " + heavy[ 0 ].ToString( "0.0" ) + " / " + heavy[ 1 ].ToString( "0.0" ) + "; hyperspace class 1 " + hyperspaceClassOne[ 0 ].ToString( "0.0" ) + " / " + hyperspaceClassOne[ 1 ].ToString( "0.0" ) );
+
+		Check( "enginespeeds: the ship flies in Arth's star system throughout, and the fits give 5 G for a new ship, 25 G for class 5 engines in a bare hull and 1 G for class 1 engines with 16 pods and class 5 armor (control)", inStarSystem && stillInStarSystem && ( newShipG == 5 ) && ( bareG == 25 ) && ( heavyG == 1 ), newShipG + " / " + bareG + " / " + heavyG + " G" );
+		Check( "enginespeeds: class 1 engines' top speed in a star system is a third of the original's at GOG's pace (999.4; the code before gave every ship 2998.3)", Mathf.Abs( classOne[ 1 ] - 2998.272f / 3.0f ) < 0.5f, classOne[ 1 ].ToString( "0.0" ) );
+		Check( "enginespeeds: class 3 engines' is two thirds of it (1998.8) and class 5 engines' all of it (2998.3)", ( Mathf.Abs( classThree[ 1 ] - 2998.272f * 2.0f / 3.0f ) < 0.5f ) && ( Mathf.Abs( classFive[ 1 ] - 2998.272f ) < 0.5f ), classThree[ 1 ].ToString( "0.0" ) + " / " + classFive[ 1 ].ToString( "0.0" ) );
+		Check( "enginespeeds: in hyperspace class 1 engines' top speed is a third of the original's (123.7)", Mathf.Abs( hyperspaceClassOne[ 1 ] - 371.2f / 3.0f ) < 0.1f, hyperspaceClassOne[ 1 ].ToString( "0.0" ) );
+		Check( "enginespeeds: a new ship (5 G) is at its top speed a second after it starts, as the original's 12 steps at GOG's pace", classOne[ 0 ] >= classOne[ 1 ] * 0.95f, classOne[ 0 ].ToString( "0.0" ) + " of " + classOne[ 1 ].ToString( "0.0" ) );
+		Check( "enginespeeds: a ship of 1 G is far from its top speed a second after it starts (it takes 5 s), and one of 25 G is at it", ( heavy[ 0 ] < heavy[ 1 ] * 0.4f ) && ( classFive[ 0 ] >= classFive[ 1 ] * 0.999f ), heavy[ 0 ].ToString( "0.0" ) + " of " + heavy[ 1 ].ToString( "0.0" ) + "; " + classFive[ 0 ].ToString( "0.0" ) + " of " + classFive[ 1 ].ToString( "0.0" ) );
+
+		Finish( "scenario=enginespeeds checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

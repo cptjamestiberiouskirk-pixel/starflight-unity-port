@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Ship Speed by the Engines**: the ship flew at the original's speed whatever its engines, 2998 units a second in a star system and 371 in hyperspace, which made a new ship too fast to stop at a planet. Its top speed in hyperspace and in a star system now follows its engines' class: a third of those speeds with class 1 engines, each class a sixth more, and all of them with class 5. The ship gets there from a twelfth of its top speed in 5 seconds over its acceleration in G (engines against mass): a second for a new ship of 5 G, as the original's 12 steps, five for a heavily loaded one of 1 G, a quarter of a second for the lightest and fastest. Fuel still goes by the distance flown, and an encounter keeps the original's rules. A ruling of 2026-10-17 (`ROADMAP.md` D8), a departure from the original, whose speed is the same for every ship. Probe scenario `enginespeeds`; `shipspeeds` now flies class 5 engines.
+
 ### Fixed
 
 - **Steering as the Original's**: in a star system and in hyperspace, Maneuver eased the ship's heading round toward the direction held, over about a second, so at the original's speed the ship swung far past a planet before it pointed at it, and landing took luck. The original's ship has no turn: each step goes the way of the key held (HYPER-OV `(XYSCAN)`). The ship now flies the way the stick points at once; only its model turns smoothly, in about a fifth of a second, without changing its path. Probe scenario `steering`.

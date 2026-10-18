@@ -224,6 +224,8 @@ Command, **Launch**, then **Yes**. The docking bay doors open and the ship leave
 
 While Maneuver is active, hold a direction key and the ship flies that way at once, faster the longer you hold it. Let go and it stops. Enter ends Maneuver.
 
+How fast the ship flies depends on its engines. Class 1 engines reach a third of the top speed of class 5 engines, and each class in between a sixth more. The ship's acceleration, shown in Ship Configuration (engines against the ship's mass), sets how quickly it gets up to that speed: a new ship takes about a second, a heavily armored one with many cargo pods several seconds. Better engines also burn less fuel (below). The game's clock keeps running while you fly, so a slow ship spends more days on a trip.
+
 ### In a star system
 
 The main view shows the system from above and the System Map shows its star and planets. The coordinates at the top left are the system's place on the starmap.
@@ -422,6 +424,7 @@ This is a faithful remake of *Starflight* (Binary Systems, Electronic Arts, 1986
 Known differences:
 
 - **Combat**: shields recharge at the port's own pace during a fight.
+- **Flight**: the ship's top speed follows its engines (class 1 at a third of the original's, class 5 at all of it); in the original every ship flew at the same speed.
 
 ---
 
