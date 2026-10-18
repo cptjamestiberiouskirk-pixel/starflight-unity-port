@@ -90,8 +90,9 @@ public class AnalysisButton : ShipButton
 		return "\nMineral Fields: <color=white>" + Known( minerals, skill ) + "</color>\nLifeforms: <color=white>" + Known( life, skill ) + "</color>";
 	}
 
-	// a line of an alien ship's analysis, or the original's "NOT CERTAIN" when the science officer cannot tell (?.CERTAIN, rolled for each line)
-	static string Certain( string value, int scienceSkill )
+	// a line of an analysis (an alien ship's, a planet's, a star's state), or the original's "NOT CERTAIN" when the science officer cannot tell (?.CERTAIN, rolled
+	// for each line: certain when the skill beats RRND 0 to 200, or with a creature file loaded, PLHI, which is never so in space: DEPART and OSET reset it)
+	public static string Certain( string value, int scienceSkill )
 	{
 		return ( UnityEngine.Random.Range( 0.0f, 100.0f ) < scienceSkill / 2.0f ) ? value : "Not certain";
 	}

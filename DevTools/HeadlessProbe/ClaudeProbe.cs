@@ -1650,6 +1650,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioShieldTurns();
 				break;
 
+			case "starstate":
+				yield return ScenarioStarState();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -22582,6 +22586,9 @@ public class ClaudeProbe : MonoBehaviour
 		var controller = SpaceflightController.m_instance;
 
 		EnsureCrew();
+
+		// a science officer who can always tell the star's state (since 2026-10-18 the scan gives it only when the officer can: starstate)
+		DataController.m_instance.m_playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer ).m_science = 250;
 
 		var encounterRange = controller.m_encounterRange;
 
@@ -44762,6 +44769,90 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "shieldturns: the encounter's end refills the shields (HYPER-OV ENCCLEANUP, CHARGE-D)", afterLeaving == full, "100 -> " + afterLeaving );
 
 		Finish( "scenario=shieldturns checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- a star's state, the science officer's call (since 2026-10-18)
+
+	// how many of this many star system scans give the star's stability as "Not certain", with the science officer at this skill
+	static int UncertainStarScans( int skill, int scans )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var scienceOfficer = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer );
+		var uncertain = 0;
+
+		scienceOfficer.m_science = skill;
+
+		for ( var i = 0; i < scans; i++ )
+		{
+			SpaceflightController.m_instance.m_messages.Clear();
+
+			new SensorsButton().Execute();
+
+			if ( MessageList().Contains( "Stability: <color=white>Not certain" ) )
+			{
+				uncertain++;
+			}
+		}
+
+		return uncertain;
+	}
+
+	// the star system scan gives the star's stability only when the science officer can tell, as the original's analysis of a star (ANALYZE-OV WF31E: " STATE: "
+	// then ?.CERTAIN, certain when the skill beats RRND 0 to 200; the creature file that would make it certain is never loaded in space): a science officer of no
+	// skill never can (the code before always gave it), one of 250 always can, one of 100 half the time
+	IEnumerator ScenarioStarState()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var starSystem = controller.m_starSystem;
+
+		EnsureCrew();
+
+		controller.m_encounterRange = 0.0f;
+
+		// the star system of Arth, after Maneuver from the Starport (Sensors scans a star system only there)
+		controller.SwitchLocation( PD_General.Location.JustLaunched );
+
+		for ( var end = Time.realtimeSinceStartup + 60.0f; ( Time.realtimeSinceStartup < end ) && starSystem.GeneratingPlanets(); )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 10 );
+
+		PressButton( ButtonController.ButtonSet.NavigationA, 0 );
+
+		yield return Frames( 10 );
+
+		if ( GetField( controller.m_buttonController, "m_currentButton" ) is ManeuverButton )
+		{
+			controller.m_buttonController.DeactivateButton();
+		}
+
+		yield return Frames( 3 );
+
+		var inStarSystem = playerData.m_general.m_location == PD_General.Location.StarSystem;
+		var scienceOfficer = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer );
+		var skillBefore = scienceOfficer.m_science;
+
+		controller.m_messages.Clear();
+		new SensorsButton().Execute();
+
+		var sample = MessageList();
+		var noSkill = UncertainStarScans( 0, 10 );
+		var fullSkill = UncertainStarScans( 250, 10 );
+		var halfSkill = UncertainStarScans( 100, 40 );
+
+		scienceOfficer.m_science = skillBefore;
+
+		Log( "starstate: in the star system " + inStarSystem + "; a scan: '" + sample.Replace( "\n", " / " ) + "'; uncertain: skill 0 " + noSkill + " of 10, skill 250 " + fullSkill + " of 10, skill 100 " + halfSkill + " of 40" );
+
+		Check( "starstate: the star system scan gives the star's stability line (control)", inStarSystem && sample.Contains( "Stability:" ), sample.Replace( "\n", " / " ) );
+		Check( "starstate: a science officer of no skill cannot tell the star's state (the code before always gave it)", noSkill == 10, noSkill + " of 10 not certain" );
+		Check( "starstate: a science officer of skill 250 always can", fullSkill == 0, fullSkill + " of 10 not certain" );
+		Check( "starstate: one of skill 100 can about half the time (skill / 200)", ( halfSkill >= 8 ) && ( halfSkill <= 32 ), halfSkill + " of 40 not certain" );
+
+		Finish( "scenario=starstate checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
