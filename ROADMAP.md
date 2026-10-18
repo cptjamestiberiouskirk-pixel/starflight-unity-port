@@ -4,6 +4,8 @@
 
 This roadmap took the Unity port of *Starflight* to parity with the 1986 original, and every item on it is finished: all 59 items of Phases 0 to 7 are done or decided, and version 1.0.0 is built on them. The goal from the start was a port that does everything the original game does before anything new or different is added. The port now does exactly that, from the Starport, flight and combat through the comm system and its moods, the ruins and artifacts and the lifeforms, to the full story and the win.
 
+A second reading of the shipped game's own code (the decompiled overlays of s-macke/starflight-reverse) on 2026-10-18 found 39 more differences that the research sources of 2026-10-05 could not show. They are Phase 8, decided the same day (D9), and under way.
+
 This document is that plan as it was carried out. Each item gives the original behaviour, the research source that documents it and how the port delivers it, usually with the PR that did the work. The decisions taken along the way are collected under [Decisions](#decisions), and the few points still open are listed under [Where the port stands](#where-the-port-stands).
 
 The plan was first written on 2026-10-05 against `master` at `bf6a2910` and adopted as the plan of record on 2026-10-09. It remains the plan of record: pick parity work from it, and when a PR for an item merges, record its number in the item's row, in the same docs change that updates `CHANGELOG.md`. An item's description changes only when the sources or a decision change it.
@@ -66,7 +68,7 @@ These set how much of the roadmap could go ahead without a separate decision for
 
 Decided later:
 
-- **D3. Lifeforms. Decided 2026-10-11: (a), rebuild from the notes, with procedural stand-in models made by script (as the ship models are) for the body plans in the notes.** The original game did not store lifeforms as a table. The STARB.COM map in the xls shows the overlays that created them per planet: VITA-OV (ecosystem), HP-OV and LP-OV (lifeform classes and species), SEED-OV (minerals, lifeforms and ruins) and BEHAV-OV (behaviour), plus text tables of lifeform descriptions. None of that code or text is in the repository. The sources available are the 1984 notes (`planet.txt`, `lf-behav.txt`, `lf-words.txt`, 874 lines in total). The options were:
+- **D3. Lifeforms. Decided 2026-10-11: (a), rebuild from the notes, with procedural stand-in models made by script (as the ship models are) for the body plans in the notes.** The original game did not store lifeforms as a table. The STARB.COM map in the xls shows the overlays that created them per planet: VITA-OV (ecosystem), HP-OV and LP-OV (lifeform classes and species), SEED-OV (minerals, lifeforms and ruins) and BEHAV-OV (behaviour), plus text tables of lifeform descriptions. None of that code or text is in the repository. The sources available are the 1984 notes (`planet.txt`, `lf-behav.txt`, `lf-words.txt`, 874 lines in total). The options were: Reopened 2026-10-18 by D9: the shipped game's lifeform code (HP-OV, VITA-OV, ITEMS-OV) can now be read, and item 8.18 builds the lifeforms from it.
   - (a) Rebuild the lifeforms from the notes. This is a reconstruction, not a copy.
   - (b) Work from a copy of the original game files, if you own one.
   - (c) Leave lifeforms out.
@@ -83,6 +85,7 @@ Decided later:
   - Mining: a mining laser replaces the Cargo button's one-press pickup of a deposit. The Weapon button becomes Tools, with Mine (a beam cuts the deposit into the hold in tenths of a cubic meter while it runs, on the vehicle's energy), Capture (only a stunned lifeform), the weapons and Back. Cargo keeps ruins, artifacts, dropped cargo and the cargo list.
   - Ground graphics: grass and small clutter, sharper close-up ground, a denser terrain mesh near the vehicle, and shadows and depth, under a detail setting picked by the graphics card (Auto, with Low, Medium and High to override).
 - **D8. Ship speed by the engines. Decided 2026-10-17: the top speed in hyperspace and in a star system follows the engines' class, in both.** The original's ship flies at one speed whatever its engines (HYPER-OV `CSPEED`: 12 units a step in a star system, 1 in hyperspace, the step growing by one each pass; the engines and the ship's mass count only in an encounter's acceleration, `!S/A`). At the original's pace in the GOG release a new ship was too fast to stop at a planet in the port's 3D view. Class 5 engines now have the original's top speeds (2998 units a second in a star system, 371 in hyperspace), class 1 a third of them, each class a sixth more; and the ship reaches its top speed from a twelfth of it in 5 seconds over its acceleration in G (engines against mass), so a new ship of 5 G takes a second, as the original's 12 steps. Fuel still goes by the distance flown, and an encounter keeps the original's rules. A slower ship takes longer on a trip, and the game's clock runs in real time, so a trip with class 1 engines takes more game days than with class 5.
+- **D9. The gap list. Decided 2026-10-18: build the shipped game's behaviour for 37 of the 39 differences of Phase 8, and leave two as they are.** Four readings of the decompiled overlays against the port (flight and fluxes, encounters and comms, planets and the surface, the Starport, crew and ship) listed every behaviour of the shipped game the port lacks, each with the overlay words that do it. Built as the shipped game does: every item of Phase 8. This reopens and replaces earlier calls that were made before the shipped code could be read: D3 (lifeforms come from the shipped game's generator and values, item 8.18), item 3.0 (a planet's minerals, lifeforms and curios come back after the ship leaves, as the shipped game seeds them afresh, item 8.19), item 3.5 (random ruins by the shipped game's rule, item 8.32), the translation rule of 2026-10-11 (item 8.9), the Veloxi drone's three numbers of item 0.2 (six, item 8.36), the Shimmering Ball of 2026-10-10 (the aliens' aim jitters, item 8.37), the Crystal Pearl's trigger of #128 (item 8.10), the Crystal Planet's damage rate of item 5.2 (item 8.1), and the artifact that draws the aliens (the Crystal Pearl, as the shipped code has it, item 8.11). Left as they are: the player's aiming (target cycling and separate laser and missile buttons) and the port's earlier departures (the Ship's Log menu, the Messages log, five automatic save slots, D4, music, salvage by flying over a wreck, D8).
 
 A note on reading STRINFO: its "PLANET N OF SYSTEM X, Y" is the N-th planet from the sun, not the orbit number. This holds in 17 of the 18 entries that also print an orbit number; the 18th is Koann (see D5). To find the JSON's `m_orbitPosition`, sort the star's planets by orbit.
 
@@ -135,7 +138,7 @@ Decided 2026-10-09: place only what the sources document (the 14 artifact sites 
 
 | # | Item | Original (source) | Port today |
 |---|---|---|---|
-| 3.0 | What has been taken from a planet stays taken: deposits now, the artifacts and messages with 3.2 and 3.3 | the manual (page 21) | #100: every disembark had placed the planet again from its seed, so a deposit that had been picked up was back |
+| 3.0 | What has been taken from a planet stays taken: deposits now, the artifacts and messages with 3.2 and 3.3 | the manual (page 21) | #100: every disembark had placed the planet again from its seed, so a deposit that had been picked up was back. Replaced 2026-10-18 (D9, item 8.19): the shipped game deletes a planet's minerals, lifeforms and curios when the ship leaves and seeds them afresh |
 | 3.1 | Ruins at the sites of the recovered data: a ruin at each artifact site and at each message, and the two formations (the Most Magnificent Hexagon of 6 ancient ruins on Sphexi, the City of the Ancients of 15) | planet.txt, dir.txt SEED-OV, data from 0.4 | the messages: #102, 12 ruins on Earth; the artifact sites: #108; the two formations: #109 |
 | 3.2 | The 12 special artifacts at their 14 sites, taken with the Cargo button | STRINFO 4.1 | #108: in the ruins of their sites, taken once and saved, carried to the ship; the Black Box, the Flat Device and the Whining Orb are bought, not found |
 | 3.3 | The 38 messages go to the ship's log under Messages, recorded with the Cargo button beside their ruin and dated the day they were found | STRINFO 3.1; the manual (page 21) | #102 |
@@ -154,10 +157,10 @@ Only the effects that matter for winning had to come before Phase 5. The others 
 | Ring Device | shows nearby fluxes (alpha.txt: fluxes are hidden without it and navigation skill) | Mars, 90N 0 | no; decided 2026-10-10: fluxes are hidden without it (#132); since 2026-10-15 also shown to a navigator of skill above 150, as the released game's HYPER-OV .FLUX-ICON |
 | Whining Orb | translates Spemin: #126 | Starport, 6000 MU | no |
 | Flat Device | shields the terrain vehicle from lifeforms: a lifeform hits half as often with the device in the ship or the terrain vehicle (the half is the port's choice) | Starport, 30,000 MU | no |
-| Shimmering Ball | automatic cloak in combat; decided 2026-10-10: the aliens cannot fire at the ship until it fires. #130 (3 s uncloaked after each shot) | 68,66 planet 1 | no |
+| Shimmering Ball | automatic cloak in combat; decided 2026-10-10: the aliens cannot fire at the ship until it fires (replaced 2026-10-18 by item 8.37: the aliens' aim jitters, as the shipped game's). #130 (3 s uncloaked after each shot) | 68,66 planet 1 | no |
 | Rod Device | stronger laser shield: #127 (half of every alien laser hit; the amount is the port's choice) | New Scotland (site: D5) | no |
 | Tesseract | doubles engine efficiency: #124 (half the engines' fuel in hyperspace) | 18,50 planet 5 | no |
-| Crystal Pearl | warps a badly damaged ship away: #128 (out of an encounter below a tenth of the armor; the tenth is the port's choice) | City of the Ancients | no |
+| Crystal Pearl | warps a badly damaged ship away: #128 (out of an encounter below a tenth of the armor; the tenth is the port's choice; replaced 2026-10-18 by item 8.10, the shipped game's trigger and destination) | City of the Ancients | no |
 | Red Cylinder | finds ancient ruins from orbit: flashes on the landing map near an ancient ruin (the shipped game's "THE RED CYLINDER IS FLASHING" is in its landing map code; how near is the port's choice) | Koann (planet: D5) | no |
 | Dodecahedron | attracts every ship nearby: #129 (twice the alien radar distance), replaced on 2026-10-15 by the released game's rule (HYPERMSG-OV TRAK-E: groups come four fifths of the way at each move instead of half, and are not held near home) | 118,146 planet 4 | no |
 | Black Box, Hypercube, Ellipsoid | none beyond their documented roles (D5, decided 2026-10-11) | Thrynn trade, Earth, 81,98 | no |
@@ -169,7 +172,7 @@ After this phase the game can be played from start to win.
 | # | Item | Original (source) |
 |---|---|---|
 | 5.1 | Arth's sun flares on its date: the Starport is destroyed and the game goes on (distress gets no answer; the win message can still arrive). #121: day 300 unless the game is won; a ship in Arth's system is incinerated; no Starport model, no docking, no answer to distress | STRINFO 2.12, 2.14, Elowan comm, data (D5); disys.txt `?FLARE` |
-| 5.2 | The Crystal Planet (192,152 planet 1): its field damages a ship without the Orb. #115: 5 points a second in orbit without the Orb (the rate is the port's choice) | STRINFO 5.1; disys.txt `'HEAT` (crystal planet heating routine) |
+| 5.2 | The Crystal Planet (192,152 planet 1): its field damages a ship without the Orb. #115: 5 points a second in orbit without the Orb (the rate is the port's choice; replaced 2026-10-18 by item 8.1, the shipped game's heat sequence and landing lock) | STRINFO 5.1; disys.txt `'HEAT` (crystal planet heating routine) |
 | 5.3 | Drop the armed Black Egg at 47N 45E to win. Anywhere else on the Crystal Planet: "damaged but not destroyed". On the Uhlek brain world (55,32 planet 2) the Uhlek fall silent. On Elan the Elowan young die. #117: the egg, the nexus, the damaged planet and the crew's two reports; #123: the Uhlek harmless, the Elowan mortal enemies | STRINFO 2.12, 5.1, SS Story; disys.txt `?BOMB` |
 | 5.4 | Win sequence: the message, 500,000 MU, the Interstel medal, a supplemental evaluation; no more flares after the win. #120: the win saved, no flares, the bonus paid on docking, the evaluation in Operations | STRINFO 1.2, 2.12; disys.txt `?WIN`, `?FLARE`, `WMSG` |
 | 5.5 | Every way to lose (flare, ship destroyed, all crew dead) ends through the same game over. #122: one destruction path, and the game over names the cause; all crew dead waited for Phase 6 (crew death is only in the 1984 drafts). With Phase 6's crew death, all crew dead ends through the same game over (`CombatController.EndGame`) | STRINFO, disys.txt |
@@ -196,6 +199,50 @@ Depended on D3. This was the largest piece of the roadmap and not on the path to
 - Draw the planet in encounters that begin in orbit (decision 5, a later step). Done: the planet's own surface lies under the encounter, below the ships.
 - Alien captain and ship names (`%` and `+` in 15 greetings): made of the race's syllables (the garble words), as STRINFO's own names are (Fi-noc-tzi, To-chu-pu, Yrh-ey). Done 2026-10-11.
 - Crew learn by using their skills: DRAFT only. Left out by decision (2026-10-11): the shipped game trains crew at the Starport (the Personnel office, which uses the race's learning rate).
+
+## Phase 8: The shipped game's code
+
+Found on 2026-10-18 by reading the shipped game's decompiled overlays against the port, and decided the same day (D9). The items are in the order they are built: what the story and the win depend on, then the aliens, then the rest by how much they matter. Each is one PR with its own probe scenario. The damaged equipment malfunctions (MISC-OV `(?.EQ`), found in the same reading, were built first (#486).
+
+| # | Item | Original (decompiled overlays) | Port today |
+|---|---|---|---|
+| 8.1 | The Crystal Planet without the Crystal Orb: the ship shakes, the armor drops to 0, a random system loses 3 points a tick, the hull warns three times and melts at the 280th tick; Land answers "COMPUTER NOT RESPONDING!", a distress call is jammed; with the Orb aboard it glows and none of this happens | HYPERMSG-OV `OSET`, `WED4B`, `HEAT`, `HCASE`; LAND-OV `?LAND`; COMM-OV `WEFC3` | MISSING |
+| 8.2 | The Crystal Orb goes back to its site when the Veloxi take it, unless its planet has been destroyed | COMMSPEC-OV `CRYSTAL-ORB`, `-ARTIFACT`, `WEB3F`; SEED-OV `WF143`; DPART-OV `?DELETEPLANET` | MISSING |
+| 8.3 | Alien ships move by their posture: hostile ones close to 11 cells (3 with lasers only), others leave once talking is over, grovelling ones flee, an idle ship leaves after 2 minutes; the encounter ends when the nearest alien is over 22 cells away | COMBAT-OV `<COMBAT>`, `WED86`, `WED72`, `WEDCE`; HYPER-OV `?UNNEST` | MISSING |
+| 8.4 | Armed aliens in the hostile posture open fire (2% a ship's turn, then at their vessel's rate) | COMBAT-OV `<COMBAT>` rules 2 and 5, `WDF72` | MISSING |
+| 8.5 | Each race remembers how it was treated: its base mood moves toward the mood an encounter ended in | HYPER-OV `ENCCLEANUP`, `BASE-EDL` | MISSING |
+| 8.6 | The Veloxi demands have lasting effects (a refused Orb is war; the Ellipsoid given or refused) | COMMSPEC-OV `CRYSTAL-ORB`, `WEF36` | MISSING |
+| 8.7 | Friendship with a rival race leads the Elowan or the Thrynn to end the link and fight | COMMSPEC-OV `WEDA7`, `WEE3F`, `WEDDB`, `WEE73` | MISSING |
+| 8.8 | When races make their own offers: by posture, the tribute's size, lying to the Elowan, the Thrynn's offers in turn, plutonium at 84% | COMMSPEC-OV `WF174`, `WF1D2`, `NEED-ENERGY` | MISSING |
+| 8.9 | The comm officer's translation strength: 16.7 x the square root of skill and the bonuses, at most 250 | COMM-OV `INIT-MCOMM` | MISSING |
+| 8.10 | The Crystal Pearl fires when the ship is heavily damaged and the aliens are armed, and puts the ship at a random place in hyperspace | HYPERMSG-OV `?PRL`; SCIENCE `?HEAVY` | MISSING |
+| 8.11 | The artifact that makes the aliens chase harder is the Crystal Pearl | HYPERMSG-OV `(!'EXT)`, COMMSPEC-OV `WEA50` (`?12`) | MISSING |
+| 8.12 | Fluxes the ship has been through are remembered and drawn on the starmap | HYPER-OV `SET-FLUX-STATE`; MAP-OV `WEA70`, `WEA4C` | MISSING |
+| 8.13 | Back into orbit after the Noah 9 derelict or a destroyed orbit fleet | HYPER-OV `?DOUBLE-UNNEST`, `SKIP2NEST`; HYPERMSG-OV `WE84B` | MISSING |
+| 8.14 | A terrain vehicle that runs out of fuel is lost: the crew walk back, the vehicle stays as debris, the Starport fines its loss | MOVE-OV `WF16E`, `WEF48`; SHIPBUTTONS `WF095`; OP-OV `WF045` | MISSING |
+| 8.15 | The Red Cylinder flashes the planet's message and artifact sites when the landing map opens | SITE-OV `.MERCATOR`, `WF389`, `WF290` | MISSING |
+| 8.16 | A deposit's mineral: the planet's first element half the time, the second a quarter, the third 15%, any other element 10% | SEED-OV `WF0F7`, `WF0C7` | MISSING |
+| 8.17 | Jettison from the ship's hold | CAPTAIN `(/ITEMS)`, `TOSS` | MISSING |
+| 8.18 | Lifeforms as the shipped game makes and values them (replaces D3) | HP-OV, VITA-OV, LP-OV, ITEMS-OV `valuate` | MISSING |
+| 8.19 | A planet's minerals, lifeforms and curios come back after the ship leaves (replaces 3.0) | DPART-OV `WF166`, `WF0D6`; MOVE-OV `?POPULA` | MISSING |
+| 8.20 | A navigator above 150 sees a flux as 1 to 7 dots by skill, 16 with the Ring Device | HYPER-OV `.FLUX-ICON` | MISSING |
+| 8.21 | The edge of hyperspace holds the ship | HYPER-OV `FLY`, `WEE53` | MISSING |
+| 8.22 | Alien groups in a star system are placed afresh on each visit | HYPER-OV `SYSSETUP`, `SETRNDXY` | MISSING |
+| 8.23 | The Mysterions, Nomad probes and Minstrels move on after an encounter | HYPER-OV `ENCCLEANUP`, `WDC19` | MISSING |
+| 8.24 | "OUT OF FUEL! CRASH IMMINENT!" and the motion report's coordinates | ORBIT-OV `DESCEND`; HYPERMSG-OV `WF28B` | MISSING |
+| 8.25 | Questions about the Old Empire and the Ancients can be shut off | COMM-OV `?LOCKED-OUT` | MISSING |
+| 8.26 | Impatience, and a fighting race calming down | COMM-OV `>IMPATIENT`, `<EDL>` | MISSING |
+| 8.27 | The terrain vehicle's icon key | LISTICONS `ICONS` | MISSING |
+| 8.28 | The Flat Device: lifeform attacks hit a tenth as often | BEHAV-OV `WE8C2` | MISSING |
+| 8.29 | A flare sterilises its system | ANALYZE-OV `WEC26` | MISSING |
+| 8.30 | Look describes the land, its colours and the region's temperature | PLSET-OV `(TERRAIN`; MAPS-OV `.SURFACE`, `.CARPET` | MISSING |
+| 8.31 | Arming the Black Egg is asked on the drop, and picking it up disarms it | ITEMS-OV `WE9AA`, `WE9FA`; DPART-OV | MISSING |
+| 8.32 | Random ruins by the shipped game's rule (replaces 3.5; needs two planet bytes from the original's data) | SEED-OV `WF492`, `WF468`, `WF26B` | MISSING |
+| 8.33 | Describe an artifact or a specimen from the cargo list | CAPTAIN `WEA62`, `WEC73` | MISSING |
+| 8.34 | The Starport asks before repairing | CONFIG-OV `WF346`, `WF2C5` | MISSING |
+| 8.35 | Disembark lowers the shields and disarms | SHIPBUTTONS `WEDEC` | MISSING |
+| 8.36 | The Veloxi drone asks up to six numbers | `VPROBE#` | MISSING |
+| 8.37 | The Shimmering Ball makes the aliens' aim jitter | `WE911` | MISSING |
 
 ## Order
 
