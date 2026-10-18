@@ -7137,9 +7137,9 @@ MonoBehaviour:
     type: 3}
   m_dockingBayDoorOpen: {fileID: 8300000, guid: 1f8de080d28303944b8c17f8b9c82ef4,
     type: 3}
-  m_enterWarp: {fileID: 8300000, guid: bf440e7ca9adb2346a27dc1af083a9d1, type: 3}
+  m_enterWarp: {fileID: 8300000, guid: f35f7270f7af4257be566bac96d0c53c, type: 3}
   m_error: {fileID: 8300000, guid: 430b5f6dce7bfd544b2532f571b21136, type: 3}
-  m_exitWarp: {fileID: 8300000, guid: b745fa44499525c4f8af29d4c8a758be, type: 3}
+  m_exitWarp: {fileID: 8300000, guid: c24f1349c9db40cca7ed79cb8c047b04, type: 3}
   m_launch: {fileID: 8300000, guid: e244c9a0dd490124eab576ca9d50eefc, type: 3}
   m_open: {fileID: 8300000, guid: 3b7493701efb42142b7d9afd62780c9a, type: 3}
   m_planetLanding: {fileID: 8300000, guid: 733d7c0eaa6a7be41a5bfe79db6236b9, type: 3}
@@ -7154,17 +7154,17 @@ MonoBehaviour:
   m_warbleShort: {fileID: 8300000, guid: 7b1a9fefa380b844e8a6523d1cbe8a48, type: 3}
   m_laserFire: {fileID: 8300000, guid: e08593d12290e2147bf0edb195cc098d, type: 3}
   m_laserFireAlt: {fileID: 8300000, guid: 1c8407c15c5ad38409c597a1015e55bf, type: 3}
-  m_missileLaunch: {fileID: 8300000, guid: 32bc9eef6b9727a47b856d3cfa21eccd, type: 3}
+  m_missileLaunch: {fileID: 8300000, guid: ba641c7bbd5243b9969a2e1fba9268a2, type: 3}
   m_explosion: {fileID: 8300000, guid: 47f7378110695c943bc52154556d3712, type: 3}
-  m_torpedoFire: {fileID: 8300000, guid: 25038aaa4bdc5914685c657651d3a01f, type: 3}
-  m_phaserFire: {fileID: 8300000, guid: 92c52630f431f794b8e62c919cded99b, type: 3}
-  m_commChirp: {fileID: 8300000, guid: 4155574d6f981824183ba8df106b5114, type: 3}
+  m_torpedoFire: {fileID: 8300000, guid: ba641c7bbd5243b9969a2e1fba9268a2, type: 3}
+  m_phaserFire: {fileID: 8300000, guid: ca12d178b590485492e11388d48a9c33, type: 3}
+  m_commChirp: {fileID: 8300000, guid: 1f43aa2905f64943ae45a4a02e48217c, type: 3}
   m_torpedoExplosion: {fileID: 8300000, guid: 1e4e3e936ab292c48b7bcf1497b11ff0, type: 3}
-  m_transporter: {fileID: 8300000, guid: 908e2b185f3acbc4684e97cd3f3b645c, type: 3}
+  m_transporter: {fileID: 8300000, guid: d551475551054d1bba54ea6c667f9aee, type: 3}
   m_shipExplosion: {fileID: 8300000, guid: 3ea3a34bdf053f844adefbacd8ea435a, type: 3}
   m_shieldHit: {fileID: 8300000, guid: 97acf3791a963844ca840c98158cbf14, type: 3}
-  m_energyWeapon: {fileID: 8300000, guid: 05b9387e5f8f5584cabcc98325c999a8, type: 3}
-  m_redAlert: {fileID: 8300000, guid: 92c207bfa5f146f46b632c8c42538a1e, type: 3}
+  m_energyWeapon: {fileID: 8300000, guid: c1897cf890e44b48b4fc5e0ca8611e43, type: 3}
+  m_redAlert: {fileID: 8300000, guid: 25b1b315908f4b3b95c4890672d1bb2c, type: 3}
   m_miningLaser: {fileID: 8300000, guid: 3d97d1b9ef4442ca9becb23c744b9149, type: 3}
   m_captureBeam: {fileID: 8300000, guid: d903a9f5276c4a3c8a14a2111d744a14, type: 3}
   m_artifactHum: {fileID: 8300000, guid: 5b94fcf828b14724acc11b4338feca1c, type: 3}
