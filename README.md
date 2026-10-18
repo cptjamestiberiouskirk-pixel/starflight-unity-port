@@ -225,7 +225,7 @@ Assets/
 - Ruins on the planets where the original game left its messages, recorded in the ship's log by the terrain vehicle
 - The original's special artifacts in the ruins of their sites, picked up by the terrain vehicle, with the Most Magnificent Hexagon and the City of the Ancients around two of them
 - The terrain vehicle can drop cargo and pick it up again, with a cargo display while the cargo list is open
-- The Crystal Planet's field damages any ship in orbit that does not carry the Crystal Orb
+- Without the Crystal Orb a ship in orbit around the Crystal Planet begins to vibrate and loses its armor, its systems wear down, its hull warns three times and halves each time, and it melts unless it leaves first; its landing computer does not respond and a distress call is jammed. With the orb aboard, the orb glows and none of this happens
 - The Black Egg: the terrain vehicle takes it from the ship's hold when it heads out (as it does the Flat Device); dropped on the surface it arms itself, and once the ship is back in orbit it counts down and destroys the planet (the Crystal Planet only at its control nexus)
 - The Crystal Cone locates the Crystal Planet's control nexus from orbit
 - The Tesseract halves the fuel the engines burn in hyperspace
