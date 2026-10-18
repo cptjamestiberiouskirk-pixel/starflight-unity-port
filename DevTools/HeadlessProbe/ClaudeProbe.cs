@@ -30459,14 +30459,17 @@ public class ClaudeProbe : MonoBehaviour
 			eyeStartScales[ i ] = eyes[ i ].localScale;
 		}
 
-		// watch for 8 s: the largest turn each moving part makes from where it started, and the smallest an eye gets along any of its axes
+		// watch for 8 s of game time at a steady 30 frames a second: the largest turn each moving part makes from where it started, and the smallest an
+		// eye gets along any of its axes. A blink keeps an eye under half its size for about 54 ms, which a frame of real time could step over when the
+		// computer is busy (a full run once saw 0.72); a frame of 33 ms cannot, and 8 s always hold a blink (they come 2 to 6 s apart)
+		const int c_watchFrames = 240;
 		var largestTurns = new float[ moving.Count ];
 		var smallestEye = 1.0f;
 		var pictures = 0;
-		var watchStart = Time.realtimeSinceStartup;
-		var nextPicture = watchStart;
 
-		while ( Time.realtimeSinceStartup < watchStart + 8.0f )
+		Time.captureDeltaTime = 1.0f / 30.0f;
+
+		for ( var watchFrame = 0; watchFrame < c_watchFrames; watchFrame++ )
 		{
 			for ( var i = 0; i < moving.Count; i++ )
 			{
@@ -30482,7 +30485,7 @@ public class ClaudeProbe : MonoBehaviour
 			}
 
 			// a portrait every quarter of a second for the first 3 s: the frames of the animation
-			if ( hasGraphics && ( pictures < 12 ) && ( Time.realtimeSinceStartup >= nextPicture ) )
+			if ( hasGraphics && ( pictures < 12 ) && ( watchFrame >= pictures * 7.5f ) )
 			{
 				var rect = camera.rect;
 
@@ -30491,11 +30494,12 @@ public class ClaudeProbe : MonoBehaviour
 				camera.rect = rect;
 
 				pictures++;
-				nextPicture += 0.25f;
 			}
 
 			yield return null;
 		}
+
+		Time.captureDeltaTime = 0.0f;
 
 		// then 5 s at a steady 30 frames a second: how far each moving part turns in each frame, and each eye's smallest axis; a jump is a
 		// frame whose change stands out from the changes of the frames on either side of it (steady motion changes about as much from one
