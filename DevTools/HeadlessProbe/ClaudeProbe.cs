@@ -1658,6 +1658,14 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioMalfunctions();
 				break;
 
+			case "groundsounds":
+				yield return ScenarioGroundSounds();
+				break;
+
+			case "artifacthum":
+				yield return ScenarioArtifactHum();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -45115,6 +45123,319 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "malfunctions: a breakdown is saved, and the Starport's repairs end it", savedBreakdown && starportFixes, savedBreakdown + " " + starportFixes );
 
 		Finish( "scenario=malfunctions checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the ground tools' sounds (since 2026-10-18)
+
+	// what the pool of SoundController's audio sources holds: one entry per source with a clip, "name[/loop][/fading][/playing]" (read by reflection, so
+	// that the scenario also runs on the code before the new sounds)
+	static List<string> PoolSounds()
+	{
+		var list = new List<string>();
+		var controllers = ( SoundController.m_instance != null ) ? GetField( SoundController.m_instance, "m_audioSourceControllerList" ) as Array : null;
+
+		if ( controllers == null )
+		{
+			return list;
+		}
+
+		foreach ( var controller in controllers )
+		{
+			var source = GetField( controller, "m_audioSource" ) as AudioSource;
+
+			if ( ( source == null ) || ( source.clip == null ) )
+			{
+				continue;
+			}
+
+			list.Add( source.clip.name + ( source.loop ? "/loop" : "" ) + ( ( GetField( controller, "m_isFadingOut" ) is bool fading ) && fading ? "/fading" : "" ) + ( source.isPlaying ? "/playing" : "" ) );
+		}
+
+		return list;
+	}
+
+	// a source of the pool holds this clip, looping or not, and not fading out
+	static bool PoolHolds( List<string> pool, string clipName, bool loop )
+	{
+		return pool.Exists( entry => entry.StartsWith( clipName + ( loop ? "/loop" : "" ) ) && ( loop || !entry.StartsWith( clipName + "/loop" ) ) && !entry.Contains( "/fading" ) );
+	}
+
+	// takes every clip out of the pool, so that what it holds next is what was played since
+	static void ClearPool()
+	{
+		var controllers = ( SoundController.m_instance != null ) ? GetField( SoundController.m_instance, "m_audioSourceControllerList" ) as Array : null;
+
+		if ( controllers == null )
+		{
+			return;
+		}
+
+		foreach ( var controller in controllers )
+		{
+			if ( GetField( controller, "m_audioSource" ) is AudioSource source )
+			{
+				source.Stop();
+				source.clip = null;
+			}
+
+			SetField( controller, "m_isFadingOut", false );
+		}
+	}
+
+	IEnumerator ScenarioGroundSounds()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+		var errorsBefore = s_errorCount;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+		ProbeKeyboard();
+
+		// ---- 1. the mining laser: its own beam while it cuts, and a crumble when the deposit is gone (planet 90, as mininglaser)
+		yield return EnterOrbit( 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		PressButton( ButtonController.ButtonSet.CommandA, 1 );
+
+		yield return WaitForLocation( PD_General.Location.Disembarked, 15.0f );
+		yield return Frames( 10 );
+
+		if ( playerData.m_general.m_location != PD_General.Location.Disembarked )
+		{
+			Finish( "scenario=groundsounds abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		if ( GetField( buttonController, "m_currentButton" ) != null )
+		{
+			buttonController.DeactivateButton();
+		}
+
+		var terrainVehicle = controller.m_terrainVehicle;
+		var deposits = controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true );
+
+		foreach ( var other in deposits )
+		{
+			if ( Vector3.Distance( other.transform.position, terrainVehicle.transform.position ) < 100.0f )
+			{
+				other.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		var deposit = ( deposits.Length > 0 ) ? deposits[ 0 ] : null;
+		var whileMining = new List<string>();
+		var afterMinedOut = new List<string>();
+		var minedOut = false;
+
+		if ( deposit != null )
+		{
+			// a small deposit, cut in about a second
+			deposit.m_volume = 12;
+			deposit.transform.position = BesideTheVehicle( terrainVehicle );
+
+			yield return Frames( 3 );
+
+			ClearPool();
+
+			var toolLabels = ButtonSetLabels( ButtonController.ButtonSet.TerrainVehicleWeapon );
+			var mineIndex = Array.IndexOf( toolLabels.Split( ',' ), "Mine" );
+
+			if ( mineIndex >= 0 )
+			{
+				PressButton( ButtonController.ButtonSet.TerrainVehicleWeapon, mineIndex );
+
+				for ( var end = Time.time + 0.4f; Time.time < end; )
+				{
+					yield return null;
+				}
+
+				whileMining = PoolSounds();
+
+				for ( var end = Time.time + 6.0f; ( Time.time < end ) && !deposit.HasBeenPickedUp(); )
+				{
+					yield return null;
+				}
+
+				yield return Frames( 2 );
+
+				minedOut = deposit.HasBeenPickedUp();
+				afterMinedOut = PoolSounds();
+			}
+		}
+
+		Log( "groundsounds: mining pool " + string.Join( ", ", whileMining ) + " | mined out " + minedOut + ", pool " + string.Join( ", ", afterMinedOut ) );
+
+		var laserPlays = PoolHolds( whileMining, "Mining Laser", true ) && !PoolHolds( whileMining, "Scanner", true );
+		var crumblePlays = minedOut && PoolHolds( afterMinedOut, "Deposit Crumble", false );
+		var laserStops = minedOut && !PoolHolds( afterMinedOut, "Mining Laser", true );
+
+		// ---- 2. the capture beam: its hum while it holds a stunned lifeform, stopped when the lifeform gets away (planet 92, as capture)
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var firstPlace = ( LifeformsOnTheGround().Count > 0 ) ? LifeformsOnTheGround()[ 0 ].position : Vector3.zero;
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 5 );
+		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
+
+		var all = LifeformsOnTheGround();
+		var whileCapturing = new List<string>();
+		var afterGotAway = new List<string>();
+
+		if ( all.Count > 0 )
+		{
+			var vehicle = controller.m_terrainVehicle.transform.position;
+			var target = all[ 0 ].GetComponent<TerrainLifeform>();
+
+			for ( var i = 1; i < all.Count; i++ )
+			{
+				all[ i ].position = vehicle + Vector3.right * 600.0f + Vector3.forward * ( i * 10.0f );
+			}
+
+			target.transform.position = new Vector3( vehicle.x + 6.0f, target.transform.position.y, vehicle.z );
+			target.m_status = TerrainLifeform.Status.Stunned;
+			target.m_stuns = 0;
+
+			yield return Frames( 2 );
+
+			ClearPool();
+			Press( "TVCaptureButton" );
+
+			for ( var end = Time.time + 0.4f; Time.time < end; )
+			{
+				yield return null;
+			}
+
+			whileCapturing = PoolSounds();
+
+			// it gets away
+			target.transform.position = vehicle + Vector3.left * 600.0f;
+
+			yield return Frames( 5 );
+
+			afterGotAway = PoolSounds();
+		}
+
+		Log( "groundsounds: capturing pool " + string.Join( ", ", whileCapturing ) + " | after it got away " + string.Join( ", ", afterGotAway ) );
+
+		var beamPlays = PoolHolds( whileCapturing, "Capture Beam", true );
+		var beamStops = ( whileCapturing.Count > 0 ) && !PoolHolds( afterGotAway, "Capture Beam", true );
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "groundsounds: the mining laser plays its own looping beam, not the scanner's sound", laserPlays, string.Join( ", ", whileMining ) );
+		Check( "groundsounds: when the deposit is mined out it crumbles, and the beam stops", crumblePlays && laserStops, minedOut + " | " + string.Join( ", ", afterMinedOut ) );
+		Check( "groundsounds: a capture plays the capture beam's looping hum, which stops when the lifeform gets away", beamPlays && beamStops, string.Join( ", ", whileCapturing ) + " | " + string.Join( ", ", afterGotAway ) );
+		Check( "groundsounds: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=groundsounds checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	IEnumerator ScenarioArtifactHum()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var errorsBefore = s_errorCount;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// the artifact hum: on Earth at 11N x 104W beside the Hypercube's ruin, loud near it, fading with distance, silent far off, paused with the game
+		yield return GoIntoOrbit( 0, 5 );
+
+		playerData.m_general.m_selectedLatitude = -104.0f;
+		playerData.m_general.m_selectedLongitude = 11.0f;
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		var sitePosition = Tools.LatLongToWorldCoordinates( -104.0f, 11.0f );
+		GameObject display = null;
+
+		foreach ( var ruin in controller.m_disembarked.m_terrainGrid.m_terrainRuins.GetComponentsInChildren<TerrainRuin>( false ) )
+		{
+			var delta = ruin.transform.position - sitePosition;
+
+			if ( ( Mathf.Abs( delta.x ) < 0.5f ) && ( Mathf.Abs( delta.z ) < 0.5f ) && ( ruin.m_artifactDisplays.Count > 0 ) )
+			{
+				display = ruin.m_artifactDisplays[ 0 ];
+			}
+		}
+
+		var hum = ( display != null ) ? display.GetComponent<AudioSource>() : null;
+		var humClip = ( ( hum != null ) && ( hum.clip != null ) ) ? hum.clip.name : "none";
+		var humLoops = ( hum != null ) && hum.loop;
+		var volumes = new float[ 3 ];
+		var distances = new[] { 5.0f, 25.0f, 100.0f };
+		var pausedHum = false;
+		var pausedVolume = -1.0f;
+
+		if ( display != null )
+		{
+			// the vehicle stands still, and is put down at each distance through its saved coordinates (local to its parent), which it follows every frame
+			if ( GetField( controller.m_buttonController, "m_currentButton" ) != null )
+			{
+				controller.m_buttonController.DeactivateButton();
+			}
+
+			playerData.m_general.m_currentSpeed = 0.0f;
+
+			var vehicleParent = controller.m_terrainVehicle.transform.parent;
+
+			for ( var i = 0; i < distances.Length; i++ )
+			{
+				var place = display.transform.position + Vector3.back * distances[ i ];
+				var local = ( vehicleParent != null ) ? vehicleParent.InverseTransformPoint( place ) : place;
+
+				playerData.m_general.m_coordinates = new Vector3( local.x, playerData.m_general.m_coordinates.y, local.z );
+				controller.m_terrainVehicle.transform.localPosition = playerData.m_general.m_coordinates;
+
+				yield return Frames( 3 );
+
+				volumes[ i ] = ( hum != null ) ? hum.volume : -1.0f;
+			}
+
+			// paused: the hum pauses, and it does not follow the vehicle
+			controller.m_gameIsPaused = true;
+
+			var place2 = display.transform.position + Vector3.back * 5.0f;
+			var local2 = ( vehicleParent != null ) ? vehicleParent.InverseTransformPoint( place2 ) : place2;
+
+			playerData.m_general.m_coordinates = new Vector3( local2.x, playerData.m_general.m_coordinates.y, local2.z );
+			controller.m_terrainVehicle.transform.localPosition = playerData.m_general.m_coordinates;
+
+			yield return Frames( 3 );
+
+			var displayScript = display.GetComponent<ArtifactDisplay>();
+
+			pausedHum = ( displayScript != null ) && ( FieldOrNull( displayScript, "m_humPaused" ) is bool paused ) && paused;
+			pausedVolume = ( hum != null ) ? hum.volume : -1.0f;
+
+			controller.m_gameIsPaused = false;
+
+			yield return Frames( 2 );
+		}
+
+		Log( "artifacthum: artifact " + ( ( display != null ) ? display.name : "not found" ) + ", hum clip " + humClip + " (loop " + humLoops + ", playing " + ( ( hum != null ) && hum.isPlaying ) + "), volume at 5, 25 and 100 units " + volumes[ 0 ].ToString( "F2" ) + ", " + volumes[ 1 ].ToString( "F2" ) + ", " + volumes[ 2 ].ToString( "F2" ) + "; paused " + pausedHum + " (volume " + pausedVolume.ToString( "F2" ) + ")" );
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "artifacthum: a floating artifact hums (its own looping clip)", ( humClip == "Artifact Hum" ) && humLoops, humClip + " " + humLoops );
+		Check( "artifacthum: the hum is loud near the artifact, fades with distance and is silent far off", ( Mathf.Abs( volumes[ 0 ] - 0.5f ) < 0.01f ) && ( Mathf.Abs( volumes[ 1 ] - 0.25f ) < 0.02f ) && ( volumes[ 2 ] == 0.0f ), volumes[ 0 ].ToString( "F2" ) + " " + volumes[ 1 ].ToString( "F2" ) + " " + volumes[ 2 ].ToString( "F2" ) );
+		Check( "artifacthum: the hum pauses with the game and does not follow the vehicle meanwhile", pausedHum && ( Mathf.Abs( pausedVolume ) < 0.001f ), pausedHum + " " + pausedVolume.ToString( "F2" ) );
+		Check( "artifacthum: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=artifacthum checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

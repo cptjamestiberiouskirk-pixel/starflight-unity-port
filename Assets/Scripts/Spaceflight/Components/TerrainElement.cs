@@ -153,6 +153,12 @@ public class TerrainElement : MonoBehaviour
 		m_pickedUp = true;
 		m_volume = 0;
 
+		// the last of it crumbles away under the laser
+		if ( SoundController.m_instance != null )
+		{
+			SoundController.m_instance.PlaySound( SoundController.Sound.DepositCrumble, 0.8f );
+		}
+
 		var label = GetComponent<TerrainObjectLabel>();
 
 		if ( label != null )

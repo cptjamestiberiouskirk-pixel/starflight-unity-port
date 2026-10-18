@@ -101,6 +101,7 @@ The port runs on **Unity 6 (6000.3.13f1)** and has been modernized throughout:
 - **Ship destruction**: full death sequences with explosions, debris and salvage.
 - **Game over**: losing the ship brings up the game over screen, and returning to the title screen restores the last save.
 - **Terrain scanning**: world-space labels on the terrain, mineral detection and a transporter-style beam effect.
+- **Ground sounds**: the mining laser hums and crackles as it cuts, a mined-out deposit crumbles, a capture plays the stasis beam's pulsing hum, and a floating artifact hums softly beside its ruin, louder as the terrain vehicle comes near.
 - **Survey from orbit**: the science officer's analysis of a planet in orbit reports its mineral fields and lifeforms, as many as the officer's skill and the sensors find, and the sensor picture and the landing map mark them where the officer placed them. Their places are worked out from the planet's own seeds exactly as the surface places its deposits and lifeforms (`PlanetSurvey`, `SurveyMarks`).
 - **Cargo management**: real-time volume tracking for minerals and elements, with automatic transfer to the ship. A mineral deposit holds 1.0 to 9.9 cubic meters, as in the original.
 - **The original economy**: a new game in a build starts with the original 12,000 MU (the Editor starts with 1,000,000 for testing), and the bank and the notices show stardates in the original's format (`26-03-4620`).

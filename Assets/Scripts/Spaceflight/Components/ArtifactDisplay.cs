@@ -17,18 +17,83 @@ public class ArtifactDisplay : MonoBehaviour
 	Vector3 m_restPosition;
 	float m_time;
 
+	// its hum (SoundController.Sound.ArtifactHum, on an audio source of its own): at full loudness within c_humNear of the terrain vehicle, fading out by
+	// c_humFar (it follows the vehicle, not the camera, which hangs high above the ground), and paused while the game is
+	public const float c_humVolume = 0.5f;
+	public const float c_humNear = 10.0f;
+	public const float c_humFar = 40.0f;
+	AudioSource m_hum;
+	bool m_humPaused;
+
+	// how loud the hum is at this distance from the terrain vehicle (along the ground)
+	public static float HumVolumeAt( float distance )
+	{
+		return c_humVolume * Mathf.Clamp01( ( c_humFar - distance ) / ( c_humFar - c_humNear ) );
+	}
+
 	// unity start
 	void Start()
 	{
 		m_restPosition = transform.localPosition;
+
+		var clip = ( SoundController.m_instance != null ) ? SoundController.m_instance.GetClip( SoundController.Sound.ArtifactHum ) : null;
+
+		if ( clip != null )
+		{
+			m_hum = gameObject.AddComponent<AudioSource>();
+			m_hum.clip = clip;
+			m_hum.loop = true;
+			m_hum.playOnAwake = false;
+			m_hum.spatialBlend = 0.0f;
+			m_hum.volume = HumVolumeAt( DistanceToTerrainVehicle() );
+			m_hum.Play();
+		}
+	}
+
+	// how far the terrain vehicle is, along the ground (as far as the hum reaches when there is none)
+	float DistanceToTerrainVehicle()
+	{
+		var controller = SpaceflightController.m_instance;
+
+		if ( ( controller == null ) || ( controller.m_terrainVehicle == null ) )
+		{
+			return c_humFar;
+		}
+
+		var delta = controller.m_terrainVehicle.transform.position - transform.position;
+
+		delta.y = 0.0f;
+
+		return delta.magnitude;
 	}
 
 	// unity update
 	void Update()
 	{
-		if ( ( SpaceflightController.m_instance != null ) && SpaceflightController.m_instance.m_gameIsPaused )
+		var paused = ( SpaceflightController.m_instance != null ) && SpaceflightController.m_instance.m_gameIsPaused;
+
+		if ( ( m_hum != null ) && ( paused != m_humPaused ) )
+		{
+			if ( paused )
+			{
+				m_hum.Pause();
+			}
+			else
+			{
+				m_hum.UnPause();
+			}
+
+			m_humPaused = paused;
+		}
+
+		if ( paused )
 		{
 			return;
+		}
+
+		if ( m_hum != null )
+		{
+			m_hum.volume = HumVolumeAt( DistanceToTerrainVehicle() );
 		}
 
 		m_time += Time.deltaTime;
