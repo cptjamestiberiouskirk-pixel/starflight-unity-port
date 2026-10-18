@@ -1706,6 +1706,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLookLand();
 				break;
 
+			case "alienpostures":
+				yield return ScenarioAlienPostures();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -1776,13 +1780,15 @@ public class ClaudeProbe : MonoBehaviour
 				continue;
 			}
 
-			// on the circle around the player, facing the middle, as Encounter.AddAlienShips puts a later ship
-			var randomPosition = UnityEngine.Random.insideUnitCircle;
-			var coordinates = Vector3.Normalize( new Vector3( randomPosition.x, 0.0f, randomPosition.y ) ) * 4096.0f;
+			// on the square 15 cells round the player, facing the player, as Encounter.AddAlienShips puts a later ship (HYPERMSG-OV WE616); on code from before the
+			// original's combat turns a later ship came on a circle 4096 units out
+			var side = UnityEngine.Random.Range( -15, 16 );
+			var edge = ( UnityEngine.Random.Range( 0, 2 ) == 0 ) ? -15 : 15;
+			var coordinates = ( ( UnityEngine.Random.Range( 0, 2 ) == 0 ) ? new Vector3( side, 0.0f, edge ) : new Vector3( edge, 0.0f, side ) ) * CombatController.c_unitsPerCell;
 			var direction = -Vector3.Normalize( coordinates );
 
 			alienShip.m_coordinates = coordinates;
-			alienShip.m_targetCoordinates = Vector3.zero;
+			alienShip.m_targetCoordinates = coordinates;
 			alienShip.m_currentDirection = direction;
 			alienShip.m_lastDirection = direction;
 			alienShip.m_currentBankingAngle = 0.0f;
@@ -47052,6 +47058,237 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=lookland checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
+	// ---------------------------------------------------------------- phase 8: aliens move and fire by their posture (since 2026-10-18)
+
+	// the farthest an alien ship of the encounter is from the player's across or along, in cells (the living ones, or all that have come in)
+	static float FarthestAlienCells( bool wrecksToo )
+	{
+		var player = DataController.m_instance.m_playerData.m_general.m_coordinates;
+		var farthest = 0.0f;
+
+		foreach ( var alienShip in SpaceflightController.m_instance.m_encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			if ( !alienShip.m_addedToEncounter || ( alienShip.m_isDead && !wrecksToo ) )
+			{
+				continue;
+			}
+
+			var offset = alienShip.m_coordinates - player;
+
+			farthest = Mathf.Max( farthest, Mathf.Max( Mathf.Abs( offset.x ), Mathf.Abs( offset.z ) ) / CombatController.c_unitsPerCell );
+		}
+
+		return farthest;
+	}
+
+	// the nearest living alien ship's distance across or along, in cells
+	static float NearestAlienCells()
+	{
+		var player = DataController.m_instance.m_playerData.m_general.m_coordinates;
+		var nearest = float.MaxValue;
+
+		foreach ( var alienShip in SpaceflightController.m_instance.m_encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			if ( !alienShip.m_addedToEncounter || alienShip.m_isDead )
+			{
+				continue;
+			}
+
+			var offset = alienShip.m_coordinates - player;
+
+			nearest = Mathf.Min( nearest, Mathf.Max( Mathf.Abs( offset.x ), Mathf.Abs( offset.z ) ) / CombatController.c_unitsPerCell );
+		}
+
+		return nearest;
+	}
+
+	// gives every alien ship of the encounter this vessel, whole
+	static void GiveAlienShipsVessel( int vesselId )
+	{
+		foreach ( var alienShip in SpaceflightController.m_instance.m_encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			alienShip.m_vesselId = vesselId;
+		}
+	}
+
+	// enters the encounter afresh, as the game does, with the aliens' mood set and the comm link terminated or not
+	static IEnumerator EnterWithPosture( int encounterId, float mood, bool fight, bool commTerminated, int vesselId )
+	{
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 5 );
+
+		EnterEncounterRaw( encounterId );
+
+		yield return Frames( 3 );
+
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		if ( vesselId >= 0 )
+		{
+			GiveAlienShipsVessel( vesselId );
+		}
+
+		Call( encounter, "GetAlienTalkStance" );
+
+		encounter.m_pdEncounter.m_mood = mood;
+		encounter.m_pdEncounter.m_attackedByPlayer = fight;
+		encounter.m_pdEncounter.m_alienStance = fight ? GD_Comm.Stance.Hostile : GD_Comm.Stance.Neutral;
+
+		if ( typeof( PD_Encounter ).GetField( "m_commTerminated" ) != null )
+		{
+			SetField( encounter.m_pdEncounter, "m_commTerminated", commTerminated );
+		}
+	}
+
+	// waits in the encounter for a while, or until it ends
+	static IEnumerator StayInEncounter( float seconds )
+	{
+		var end = Time.realtimeSinceStartup + seconds;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( DataController.m_instance.m_playerData.m_general.m_location == PD_General.Location.Encounter ) )
+		{
+			yield return null;
+		}
+	}
+
+	// the aliens move and fire by their posture, as the original's combat rules (COMBAT-OV <COMBAT>, a turn of each icon every pass of the main loop): they arrive
+	// about 21 cells ahead; fighting aliens open fire at once, with missiles at any range; hostile ones close in to within 11 cells; once the comm link is over
+	// the others move away, and the encounter ends when every ship is more than 22 cells away, unless the player is in combat; with nothing to do they wander;
+	// and the rule that fires moves up in the rules' order, which is saved. The code before had every alien close in on the player, fire only within 5 cells on
+	// a timer while hostile, and ended the encounter when the player was 4096 units from its centre
+	IEnumerator ScenarioAlienPostures()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+
+		// a ship that survives whatever comes, standing still, and no other encounter able to begin
+		ship.m_armorPoints = 1000000;
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+		controller.m_encounterRange = 0.0f;
+
+		var thrynn = FindEncounterOfRace( GameData.Race.Thrynn );
+		var missileVessel = -1;
+
+		for ( var vesselId = 0; vesselId < gameData.m_vesselList.Length; vesselId++ )
+		{
+			var vessel = gameData.m_vesselList[ vesselId ];
+
+			if ( ( vessel.m_race == GameData.Race.Thrynn ) && ( vessel.m_missileClass > 0 ) && ( vessel.m_laserClass > 0 ) && ( vessel.GetSpeedFactor() > 0.0f ) && ( missileVessel < 0 ) )
+			{
+				missileVessel = vesselId;
+			}
+		}
+
+		// ---- 1. the aliens arrive about 21 cells ahead (as the game places them: a neutral mood, nothing else changed)
+		yield return EnterWithPosture( thrynn, 44.0f, false, false, -1 );
+
+		var arrivalFarthest = FarthestAlienCells( false );
+		var arrivalNearest = NearestAlienCells();
+
+		// ---- 2. aliens that fight open fire at once, with a missile from beyond a laser's 5 cells
+		yield return EnterWithPosture( thrynn, 90.0f, true, false, missileVessel );
+
+		var missilesBefore = controller.m_combatController.GetAlienMissilesInFlight();
+		var nearestWhenFiring = NearestAlienCells();
+
+		yield return StayInEncounter( 2.5f );
+
+		var missilesFired = controller.m_combatController.GetAlienMissilesInFlight() - missilesBefore;
+
+		// ---- 3. hostile aliens (their mood in the hostile band, not fighting) close in to within 11 cells
+		yield return EnterWithPosture( thrynn, 70.0f, false, false, missileVessel );
+
+		var hostileStart = NearestAlienCells();
+		var hostilePosture = ( typeof( Encounter ).GetMethod( "GetCombatPosture" ) != null ) ? (int) Call( controller.m_encounter, "GetCombatPosture" ) : -1;
+
+		for ( var end = Time.realtimeSinceStartup + 20.0f; ( Time.realtimeSinceStartup < end ) && ( FarthestAlienCells( false ) > 11.5f ) && ( playerData.m_general.m_location == PD_General.Location.Encounter ); )
+		{
+			yield return null;
+		}
+
+		var hostileFarthest = FarthestAlienCells( false );
+
+		// ---- 4. with the comm link over, neutral aliens move away, and the encounter ends once they are all more than 22 cells away
+		yield return EnterWithPosture( thrynn, 44.0f, false, true, missileVessel );
+
+		var endedStart = FarthestAlienCells( true );
+
+		yield return StayInEncounter( 15.0f );
+
+		var endedByThemselves = playerData.m_general.m_location != PD_General.Location.Encounter;
+
+		// ---- 5. not while the player is in combat
+		yield return EnterWithPosture( thrynn, 44.0f, false, true, missileVessel );
+
+		controller.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Combat );
+
+		yield return StayInEncounter( 8.0f );
+
+		var stillInCombat = playerData.m_general.m_location == PD_General.Location.Encounter;
+		var farthestInCombat = FarthestAlienCells( true );
+
+		controller.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Bridge );
+
+		yield return StayInEncounter( 6.0f );
+
+		var endedAfterCombat = playerData.m_general.m_location != PD_General.Location.Encounter;
+
+		// ---- 6. with nothing to do (neutral, the link not ended) they wander: they move, but do not close in
+		yield return EnterWithPosture( thrynn, 44.0f, false, false, missileVessel );
+
+		var wanderStart = new List<Vector3>();
+
+		foreach ( var alienShip in controller.m_encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			wanderStart.Add( alienShip.m_coordinates );
+		}
+
+		var wanderNearestStart = NearestAlienCells();
+
+		yield return StayInEncounter( 5.0f );
+
+		var moved = 0;
+		var list = controller.m_encounter.m_pdEncounter.GetAlienShipList();
+
+		for ( var i = 0; i < list.Length; i++ )
+		{
+			if ( list[ i ].m_addedToEncounter && ( Vector3.Distance( list[ i ].m_coordinates, wanderStart[ i ] ) > 40.0f ) )
+			{
+				moved++;
+			}
+		}
+
+		var wanderNearestEnd = NearestAlienCells();
+
+		LeaveEncounter();
+
+		yield return Frames( 5 );
+
+		// ---- 7. the rules that fired moved up in their order, and the order is saved
+		var order = FieldOrNull( playerData.m_general, "m_combatRuleOrder" ) as int[];
+		var copy = JsonUtility.FromJson<PD_General>( JsonUtility.ToJson( playerData.m_general ) );
+		var savedOrder = FieldOrNull( copy, "m_combatRuleOrder" ) as int[];
+		var reordered = ( order != null ) && ( order.Length == 11 ) && ( order[ 0 ] != 1 || order[ 1 ] != 2 || order[ 2 ] != 3 );
+		var orderSaved = ( savedOrder != null ) && ( order != null ) && ( string.Join( ",", savedOrder ) == string.Join( ",", order ) );
+
+		Log( "alienpostures: Thrynn encounter " + thrynn + ", missile vessel " + missileVessel + " | arrival " + arrivalNearest.ToString( "0.0" ) + " to " + arrivalFarthest.ToString( "0.0" ) + " cells | fight: " + missilesFired + " missiles in 2.5 s, nearest " + nearestWhenFiring.ToString( "0.0" ) + " cells | hostile (posture " + hostilePosture + "): from " + hostileStart.ToString( "0.0" ) + " to farthest " + hostileFarthest.ToString( "0.0" ) + " cells | link over: from " + endedStart.ToString( "0.0" ) + ", ended " + endedByThemselves + " | combat: held " + stillInCombat + " at " + farthestInCombat.ToString( "0.0" ) + ", ended after " + endedAfterCombat + " | wander: " + moved + " moved, nearest " + wanderNearestStart.ToString( "0.0" ) + " to " + wanderNearestEnd.ToString( "0.0" ) + " | order " + ( ( order != null ) ? string.Join( ",", order ) : "none" ) + " saved " + orderSaved );
+
+		Check( "alienpostures: the aliens arrive about 21 cells ahead, none farther than 21 across or along (the code before brought them 51 cells out)", ( arrivalFarthest <= 21.5f ) && ( arrivalNearest >= 14.0f ), arrivalNearest.ToString( "0.0" ) + " to " + arrivalFarthest.ToString( "0.0" ) );
+		Check( "alienpostures: aliens that fight open fire at once, with missiles from beyond 5 cells (the code before fired only within 5)", ( missileVessel >= 0 ) && ( missilesFired > 0 ) && ( nearestWhenFiring > 5.0f ), missilesFired + " missiles, nearest " + nearestWhenFiring.ToString( "0.0" ) );
+		Check( "alienpostures: hostile aliens close in to within 11 cells", ( hostilePosture == 8 ) && ( hostileStart > 12.0f ) && ( hostileFarthest <= 11.5f ), hostilePosture + ": " + hostileStart.ToString( "0.0" ) + " to " + hostileFarthest.ToString( "0.0" ) );
+		Check( "alienpostures: with the comm link over, neutral aliens move away and the encounter ends by itself once they are more than 22 cells away", endedByThemselves, endedStart.ToString( "0.0" ) + " " + endedByThemselves );
+		Check( "alienpostures: the encounter does not end while the player is in combat, and does once out of it", stillInCombat && ( farthestInCombat > 22.0f ) && endedAfterCombat, stillInCombat + " " + farthestInCombat.ToString( "0.0" ) + " " + endedAfterCombat );
+		Check( "alienpostures: with nothing to do they wander, and do not close in", ( moved >= 1 ) && ( wanderNearestEnd >= wanderNearestStart - 6.0f ), moved + " moved, " + wanderNearestStart.ToString( "0.0" ) + " to " + wanderNearestEnd.ToString( "0.0" ) );
+		Check( "alienpostures: the rules that fired moved up in their order, and the order is saved", reordered && orderSaved, ( ( order != null ) ? string.Join( ",", order ) : "none" ) + " " + orderSaved );
+
+		Finish( "scenario=alienpostures checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
 	// ---------------------------------------------------------------- batch 1 (starport side)
 
 	struct SellResult
