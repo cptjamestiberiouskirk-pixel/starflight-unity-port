@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-17
+
+Easier flight. The ship steers the moment you press a direction and stops when you let go, as the original's does; before, its heading swung round over about a second and carried it wide past planets (#467). Its top speed in hyperspace and in a star system now follows its engines' class, a third of the original's with class 1 engines and all of it with class 5, and its acceleration sets how quickly it gets there (#468, `ROADMAP.md` D8, a departure from the original, whose ships all fly at one speed).
+
 ### Changed
 
 - **Ship Speed by the Engines**: the ship flew at the original's speed whatever its engines, 2998 units a second in a star system and 371 in hyperspace, which made a new ship too fast to stop at a planet. Its top speed in hyperspace and in a star system now follows its engines' class: a third of those speeds with class 1 engines, each class a sixth more, and all of them with class 5. The ship gets there from a twelfth of its top speed in 5 seconds over its acceleration in G (engines against mass): a second for a new ship of 5 G, as the original's 12 steps, five for a heavily loaded one of 1 G, a quarter of a second for the lightest and fastest. Fuel still goes by the distance flown, and an encounter keeps the original's rules. A ruling of 2026-10-17 (`ROADMAP.md` D8), a departure from the original, whose speed is the same for every ship. Probe scenario `enginespeeds`; `shipspeeds` now flies class 5 engines.
