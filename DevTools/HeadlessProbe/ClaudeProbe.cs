@@ -1618,6 +1618,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioEngineSpeeds();
 				break;
 
+			case "tvmodel":
+				yield return ScenarioTvModel();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -43538,6 +43542,165 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "enginespeeds: a ship of 1 G is far from its top speed a second after it starts (it takes 5 s), and one of 25 G is at it", ( heavy[ 0 ] < heavy[ 1 ] * 0.4f ) && ( classFive[ 0 ] >= classFive[ 1 ] * 0.999f ), heavy[ 0 ].ToString( "0.0" ) + " of " + heavy[ 1 ].ToString( "0.0" ) + "; " + classFive[ 0 ].ToString( "0.0" ) + " of " + classFive[ 1 ].ToString( "0.0" ) );
 
 		Finish( "scenario=enginespeeds checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the terrain vehicle's model (Terrain Vehicle.fbx, made by DevTools/ShipModels/import_meshy_tv.py)
+
+	// the triangles of a mesh, from its index counts (the model's meshes are not readable)
+	static int TriangleCount( Mesh mesh )
+	{
+		if ( mesh == null )
+		{
+			return 0;
+		}
+
+		var indices = 0L;
+
+		for ( var i = 0; i < mesh.subMeshCount; i++ )
+		{
+			indices += mesh.GetIndexCount( i );
+		}
+
+		return (int) ( indices / 3 );
+	}
+
+	IEnumerator ScenarioTvModel()
+	{
+		var controller = SpaceflightController.m_instance;
+		var vehicle = controller.m_terrainVehicle;
+		var errorsBefore = s_errorCount;
+
+		EnsureCrew();
+
+		// ---- 1. the model as the scene holds it: the body, the radar and the six wheels, each on its steering joint, in the textured materials
+		var model = vehicle.m_terrainVehicleModel;
+		var bodyRenderer = ( model != null ) ? model.GetComponent<MeshRenderer>() : null;
+		var bodyFilter = ( model != null ) ? model.GetComponent<MeshFilter>() : null;
+		var radar = ( model != null ) ? model.transform.Find( "Radar" ) : null;
+		var radarRenderer = ( radar != null ) ? radar.GetComponent<MeshRenderer>() : null;
+		var radarFilter = ( radar != null ) ? radar.GetComponent<MeshFilter>() : null;
+		var bodyMaterial = ( bodyRenderer != null ) ? bodyRenderer.sharedMaterial : null;
+		var bodyTextured = ( bodyMaterial != null ) && ( bodyMaterial.name == "Terrain Vehicle Meshy Body" ) && ( bodyMaterial.GetTexture( "_MainTex" ) != null ) && ( bodyRenderer.sharedMaterials.Length == 1 );
+		var radarTextured = ( radarRenderer != null ) && ( radarRenderer.sharedMaterial == bodyMaterial );
+		var wheelsTextured = 0;
+		var wheelsOnJoints = 0;
+		var wheelTriangles = 0;
+
+		for ( var i = 0; i < vehicle.m_wheels.Length; i++ )
+		{
+			var wheel = vehicle.m_wheels[ i ];
+			var renderer = ( wheel != null ) ? wheel.GetComponent<MeshRenderer>() : null;
+			var material = ( renderer != null ) ? renderer.sharedMaterial : null;
+
+			if ( ( material != null ) && ( material.name == "Terrain Vehicle Meshy Wheel" ) && ( material.GetTexture( "_MainTex" ) != null ) && ( renderer.sharedMaterials.Length == 1 ) )
+			{
+				wheelsTextured++;
+			}
+
+			if ( ( wheel != null ) && System.Array.Exists( vehicle.m_steeringJoints, joint => ( joint != null ) && ( wheel.transform.parent == joint.transform ) ) )
+			{
+				wheelsOnJoints++;
+			}
+
+			var filter = ( wheel != null ) ? wheel.GetComponent<MeshFilter>() : null;
+
+			wheelTriangles = Mathf.Max( wheelTriangles, TriangleCount( ( filter != null ) ? filter.sharedMesh : null ) );
+		}
+
+		var bodyTriangles = TriangleCount( ( bodyFilter != null ) ? bodyFilter.sharedMesh : null ) + TriangleCount( ( radarFilter != null ) ? radarFilter.sharedMesh : null );
+
+		Log( "tvmodel: body " + ( ( bodyMaterial != null ) ? bodyMaterial.name : "none" ) + " (" + ( ( bodyRenderer != null ) ? bodyRenderer.sharedMaterials.Length : 0 ) + " materials, textured " + bodyTextured + "), radar " + ( ( radar != null ) ? "found" : "none" ) + " textured " + radarTextured + ", wheels textured " + wheelsTextured + "/" + vehicle.m_wheels.Length + " on joints " + wheelsOnJoints + " | triangles: body " + bodyTriangles + ", a wheel " + wheelTriangles );
+
+		// ---- 2. on the ground of planet 94 (rock): the wheels meet the ground level with each other, the body clears it, the capsule covers the model, the radar turns
+		var landed = new bool[ 1 ];
+
+		yield return LandInTheArthSystemAt( 94, Vector3.zero, landed );
+		yield return Frames( 10 );
+
+		// each wheel's bottom against the ground under its middle, as the vehicle reads the ground (ApplyElevation)
+		var wheelBottoms = new List<float>();
+		var wheelGaps = new List<float>();
+		var wheelSize = 0.0f;
+
+		foreach ( var wheel in vehicle.m_wheels )
+		{
+			var renderer = ( wheel != null ) ? wheel.GetComponent<MeshRenderer>() : null;
+
+			if ( renderer == null )
+			{
+				continue;
+			}
+
+			var ground = Call( vehicle, "ApplyElevation", renderer.bounds.center, false );
+			var groundHeight = ( ground is Vector3 groundPoint ) ? groundPoint.y : float.NaN;
+
+			wheelBottoms.Add( renderer.bounds.min.y );
+			wheelGaps.Add( renderer.bounds.min.y - groundHeight );
+			wheelSize = Mathf.Max( wheelSize, renderer.bounds.size.y );
+		}
+
+		var lowestWheel = ( wheelBottoms.Count > 0 ) ? Mathf.Min( wheelBottoms.ToArray() ) : 0.0f;
+		var bodyBottom = ( bodyRenderer != null ) ? bodyRenderer.bounds.min.y : 0.0f;
+		var wheelsLevel = ( wheelGaps.Count == 6 ) && ( wheelSize > 0.0f ) && wheelGaps.TrueForAll( gap => Mathf.Abs( gap ) < 0.3f * wheelSize );
+		var bodyClears = ( bodyRenderer != null ) && ( bodyBottom > lowestWheel );
+
+		// the capsule against the model's meshes, in the root's frame (Y along the vehicle, as the capsule lies)
+		var root = model.transform;
+		var low = Vector3.positiveInfinity;
+		var high = Vector3.negativeInfinity;
+
+		foreach ( var filter in model.GetComponentsInChildren<MeshFilter>( false ) )
+		{
+			if ( filter.sharedMesh == null )
+			{
+				continue;
+			}
+
+			var meshBounds = filter.sharedMesh.bounds;
+
+			for ( var corner = 0; corner < 8; corner++ )
+			{
+				var local = meshBounds.center + Vector3.Scale( meshBounds.extents, new Vector3( ( corner & 1 ) * 2 - 1, ( ( corner >> 1 ) & 1 ) * 2 - 1, ( ( corner >> 2 ) & 1 ) * 2 - 1 ) );
+				var point = root.InverseTransformPoint( filter.transform.TransformPoint( local ) );
+
+				low = Vector3.Min( low, point );
+				high = Vector3.Max( high, point );
+			}
+		}
+
+		var capsule = model.GetComponent<CapsuleCollider>();
+		var modelLength = high.y - low.y;
+		var modelMiddle = ( low + high ) * 0.5f;
+		var capsuleLength = ( capsule != null ) ? capsule.height : 0.0f;
+		var centreApart = ( capsule != null ) ? new Vector2( capsule.center.x - modelMiddle.x, capsule.center.y - modelMiddle.y ).magnitude : float.MaxValue;
+		var capsuleFits = ( capsule != null ) && ( capsule.direction == 1 ) && ( modelLength > 0.0f ) && ( Mathf.Abs( capsuleLength - modelLength ) < 0.2f * modelLength ) && ( centreApart < 0.15f * modelLength );
+
+		// the radar turns on its mast
+		var radarBefore = ( radar != null ) ? radar.localRotation : Quaternion.identity;
+
+		yield return Frames( 20 );
+
+		var radarTurned = ( radar != null ) && ( Quaternion.Angle( radarBefore, radar.localRotation ) > 1.0f );
+
+		// (with -Graphics, a picture of the vehicle on the ground)
+		if ( SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null )
+		{
+			RenderScreenPicture( System.IO.Path.Combine( System.IO.Path.GetTempPath(), "starflight-probe", "tvmodel-on-94.png" ) );
+		}
+
+		Log( "tvmodel: on planet 94 (landed " + landed[ 0 ] + "): wheel bottoms " + string.Join( " ", wheelBottoms.ConvertAll( b => b.ToString( "F2" ) ) ) + ", each above the ground under it by " + string.Join( " ", wheelGaps.ConvertAll( g => g.ToString( "F2" ) ) ) + " (a wheel " + wheelSize.ToString( "F2" ) + " high), body bottom " + bodyBottom.ToString( "F2" ) + " | model " + modelLength.ToString( "F2" ) + " long, capsule " + capsuleLength.ToString( "F2" ) + " (centres " + centreApart.ToString( "F2" ) + " apart) | radar turned " + radarTurned );
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "tvmodel: the terrain vehicle is the textured model: the body and its radar in the body's material, all six wheels in the wheel's, one material each", bodyTextured && radarTextured && ( wheelsTextured == 6 ), bodyTextured + " " + radarTextured + " " + wheelsTextured );
+		Check( "tvmodel: every wheel is on a steering joint, as TerrainVehicle turns and steers it", ( vehicle.m_wheels.Length == 6 ) && ( wheelsOnJoints == 6 ), wheelsOnJoints.ToString() );
+		Check( "tvmodel: the model is light enough: the body under 15,000 triangles, a wheel under 6,000", ( bodyTriangles > 1000 ) && ( bodyTriangles < 15000 ) && ( wheelTriangles > 500 ) && ( wheelTriangles < 6000 ), bodyTriangles + " " + wheelTriangles );
+		Check( "tvmodel: on the ground every wheel meets the ground under it and the body clears it", landed[ 0 ] && wheelsLevel && bodyClears, landed[ 0 ] + " " + wheelsLevel + " " + bodyClears );
+		Check( "tvmodel: the capsule collider covers the model, as long as it and around its middle", capsuleFits, modelLength.ToString( "F2" ) + " " + capsuleLength.ToString( "F2" ) + " " + centreApart.ToString( "F2" ) );
+		Check( "tvmodel: the radar turns on its mast", radarTurned, radarTurned.ToString() );
+		Check( "tvmodel: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=tvmodel textured=" + bodyTextured + "/" + wheelsTextured + " triangles=" + bodyTriangles + "/" + wheelTriangles + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

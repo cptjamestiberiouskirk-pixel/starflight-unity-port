@@ -6,7 +6,9 @@
 // the models, of flat colours or with the maps the manifest names (a textured model, import_meshy.py); for every vessel it sets up the import of its model and debris FBX (scale 1, materials remapped to those
 // materials), puts an inactive instance of the model under the other model templates of the Encounter location
 // (layer Encounter), and points the vessel's slots of Encounter.m_alienShipModelTemplate and m_alienShipDebrisTemplate
-// at the instance and the debris model. Running it again replaces what an earlier run made.
+// at the instance and the debris model. The player's ship and the terrain vehicle keep their old node names (their manifests
+// have a playerShip or a terrainVehicle section): their scene copies lose the old models' material overrides instead. Running
+// it again replaces what an earlier run made.
 
 using System;
 using System.Collections.Generic;
@@ -61,6 +63,21 @@ public static class ShipModelWiring
 		public float debrisScale;
 	}
 
+	// the terrain vehicle (import_meshy_tv.py): its model keeps the old node names the scene references (TerrainVehicle turns and
+	// steers the wheels through them), so only its materials, the scene copies' material overrides and the capsule collider the
+	// scene gives the model's root (sized for the old model) change
+	[Serializable]
+	public class TerrainVehicleEntry
+	{
+		public string model;
+		public string[] materials;
+
+		// the capsule for the new model, in the root's frame (x, y, z), its height and its radius
+		public float[] colliderCentre;
+		public float colliderHeight;
+		public float colliderRadius;
+	}
+
 	[Serializable]
 	public class Manifest
 	{
@@ -68,10 +85,12 @@ public static class ShipModelWiring
 		public VesselEntry[] vessels;
 		public MaterialEntry[] materials;
 		public PlayerShipEntry playerShip;
+		public TerrainVehicleEntry terrainVehicle;
 	}
 
-	// the scenes with copies of the player ship's model
+	// the scenes with copies of the player ship's model, and of the terrain vehicle's
 	static readonly string[] c_playerShipScenes = { "Assets/Scenes/Spaceflight.unity", "Assets/Scenes/Starport.unity", "Assets/Scenes/Test.unity" };
+	static readonly string[] c_terrainVehicleScenes = { "Assets/Scenes/Spaceflight.unity", "Assets/Scenes/Test.unity" };
 
 	const string c_scenePath = "Assets/Scenes/Spaceflight.unity";
 
@@ -124,6 +143,11 @@ public static class ShipModelWiring
 			if ( ( manifest.playerShip != null ) && !string.IsNullOrEmpty( manifest.playerShip.model ) )
 			{
 				WirePlayerShip( manifest.playerShip, materials );
+			}
+
+			if ( ( manifest.terrainVehicle != null ) && !string.IsNullOrEmpty( manifest.terrainVehicle.model ) )
+			{
+				WireTerrainVehicle( manifest.terrainVehicle, materials );
 			}
 		}
 		catch ( Exception exception )
@@ -481,41 +505,7 @@ public static class ShipModelWiring
 			}
 
 			var scene = EditorSceneManager.OpenScene( scenePath, OpenSceneMode.Single );
-			var copies = 0;
-			var removed = 0;
-
-			foreach ( var root in scene.GetRootGameObjects() )
-			{
-				foreach ( var node in root.GetComponentsInChildren<Transform>( true ) )
-				{
-					var gameObject = node.gameObject;
-
-					if ( !PrefabUtility.IsAnyPrefabInstanceRoot( gameObject ) || ( PrefabUtility.GetCorrespondingObjectFromSource( gameObject ) != modelAsset ) )
-					{
-						continue;
-					}
-
-					var modifications = PrefabUtility.GetPropertyModifications( gameObject );
-					var kept = new List<PropertyModification>();
-
-					foreach ( var modification in modifications )
-					{
-						if ( modification.propertyPath.StartsWith( "m_Materials" ) )
-						{
-							removed++;
-						}
-						else
-						{
-							kept.Add( modification );
-						}
-					}
-
-					PrefabUtility.SetPropertyModifications( gameObject, kept.ToArray() );
-					copies++;
-
-					Log( scenePath + ": copy " + gameObject.name + " under " + ( ( node.parent != null ) ? node.parent.name : "the scene" ) + ", " + ( modifications.Length - kept.Count ) + " material overrides removed" );
-				}
-			}
+			var copies = RemoveMaterialOverrides( scene, scenePath, modelAsset, out var removed );
 
 			// the contrails of the flying ship, each to the nozzle on its own side
 			var player = UnityEngine.Object.FindFirstObjectByType<PlayerShip>( FindObjectsInactive.Include );
@@ -555,6 +545,112 @@ public static class ShipModelWiring
 			}
 
 			Log( scenePath + ": " + copies + " copies of the player ship, " + removed + " material overrides removed" );
+		}
+	}
+
+	// takes the material overrides off every copy of the model in the scene (each copy set the old model's materials by hand);
+	// returns how many copies there are
+	static int RemoveMaterialOverrides( UnityEngine.SceneManagement.Scene scene, string scenePath, GameObject modelAsset, out int removed )
+	{
+		var copies = 0;
+
+		removed = 0;
+
+		foreach ( var root in scene.GetRootGameObjects() )
+		{
+			foreach ( var node in root.GetComponentsInChildren<Transform>( true ) )
+			{
+				var gameObject = node.gameObject;
+
+				if ( !PrefabUtility.IsAnyPrefabInstanceRoot( gameObject ) || ( PrefabUtility.GetCorrespondingObjectFromSource( gameObject ) != modelAsset ) )
+				{
+					continue;
+				}
+
+				var modifications = PrefabUtility.GetPropertyModifications( gameObject );
+				var kept = new List<PropertyModification>();
+
+				foreach ( var modification in modifications )
+				{
+					if ( modification.propertyPath.StartsWith( "m_Materials" ) )
+					{
+						removed++;
+					}
+					else
+					{
+						kept.Add( modification );
+					}
+				}
+
+				PrefabUtility.SetPropertyModifications( gameObject, kept.ToArray() );
+				copies++;
+
+				Log( scenePath + ": copy " + gameObject.name + " under " + ( ( node.parent != null ) ? node.parent.name : "the scene" ) + ", " + ( modifications.Length - kept.Count ) + " material overrides removed" );
+			}
+		}
+
+		return copies;
+	}
+
+	// the terrain vehicle: its import, then in every scene with a copy of it the copy's material overrides go and the vehicle's
+	// capsule collider (on the copy's root) takes the new model's size
+	static void WireTerrainVehicle( TerrainVehicleEntry terrainVehicle, Dictionary<string, Material> materials )
+	{
+		SetUpImport( terrainVehicle.model, new VesselEntry { name = "Terrain Vehicle", materials = terrainVehicle.materials }, materials, 1.0f );
+
+		var modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>( terrainVehicle.model );
+
+		if ( modelAsset == null )
+		{
+			throw new Exception( "model missing: " + terrainVehicle.model );
+		}
+
+		foreach ( var scenePath in c_terrainVehicleScenes )
+		{
+			if ( !File.Exists( scenePath ) )
+			{
+				continue;
+			}
+
+			var scene = EditorSceneManager.OpenScene( scenePath, OpenSceneMode.Single );
+			var copies = RemoveMaterialOverrides( scene, scenePath, modelAsset, out var removed );
+			var colliders = 0;
+
+			// the capsule on the root of the vehicle's own copy (the one under the TerrainVehicle; other copies have none)
+			foreach ( var vehicle in UnityEngine.Object.FindObjectsByType<TerrainVehicle>( FindObjectsInactive.Include, FindObjectsSortMode.None ) )
+			{
+				var model = vehicle.m_terrainVehicleModel;
+
+				if ( ( model == null ) || ( terrainVehicle.colliderCentre == null ) || ( terrainVehicle.colliderCentre.Length < 3 ) || ( terrainVehicle.colliderHeight <= 0.0f ) )
+				{
+					continue;
+				}
+
+				foreach ( var capsule in model.GetComponentsInChildren<CapsuleCollider>( true ) )
+				{
+					var before = "centre " + capsule.center + " height " + capsule.height + " radius " + capsule.radius;
+
+					capsule.center = new Vector3( terrainVehicle.colliderCentre[ 0 ], terrainVehicle.colliderCentre[ 1 ], terrainVehicle.colliderCentre[ 2 ] );
+					capsule.height = terrainVehicle.colliderHeight;
+					capsule.radius = terrainVehicle.colliderRadius;
+					EditorUtility.SetDirty( capsule );
+					colliders++;
+
+					Log( scenePath + ": capsule on " + capsule.gameObject.name + " from " + before + " to centre " + capsule.center + " height " + capsule.height + " radius " + capsule.radius );
+				}
+			}
+
+			if ( ( copies > 0 ) || ( colliders > 0 ) )
+			{
+				EditorSceneManager.MarkSceneDirty( scene );
+
+				if ( !EditorSceneManager.SaveScene( scene ) )
+				{
+					throw new Exception( "the scene could not be saved: " + scenePath );
+				}
+			}
+
+			Log( scenePath + ": " + copies + " copies of the terrain vehicle, " + removed + " material overrides removed, " + colliders + " capsules sized" );
 		}
 	}
 }

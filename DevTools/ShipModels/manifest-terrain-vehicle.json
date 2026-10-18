@@ -1,0 +1,82 @@
+{
+	"race": "Terrain Vehicle",
+	"vessels": [],
+	"materials": [
+		{
+			"name": "Terrain Vehicle Meshy Body",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Terrain Vehicle",
+			"albedoMap": "Assets/Game Objects/Terrain Vehicle/Textures/Terrain Vehicle Body - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Terrain Vehicle/Textures/Terrain Vehicle Body - Specular.png",
+			"normalMap": "Assets/Game Objects/Terrain Vehicle/Textures/Terrain Vehicle Body - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Terrain Vehicle/Textures/Terrain Vehicle Body - Emissive.jpg"
+		},
+		{
+			"name": "Terrain Vehicle Meshy Wheel",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Terrain Vehicle",
+			"albedoMap": "Assets/Game Objects/Terrain Vehicle/Textures/Terrain Vehicle Wheel - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Terrain Vehicle/Textures/Terrain Vehicle Wheel - Specular.png",
+			"normalMap": "Assets/Game Objects/Terrain Vehicle/Textures/Terrain Vehicle Wheel - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Terrain Vehicle/Textures/Terrain Vehicle Wheel - Emissive.jpg"
+		}
+	],
+	"terrainVehicle": {
+		"model": "Assets/Game Objects/Terrain Vehicle/Terrain Vehicle.fbx",
+		"materials": [
+			"Terrain Vehicle Meshy Body",
+			"Terrain Vehicle Meshy Wheel"
+		],
+		"colliderCentre": [
+			0.0,
+			0.242,
+			5.136
+		],
+		"colliderHeight": 12.921,
+		"colliderRadius": 4.465,
+		"meshy": {
+			"body": {
+				"concept": "01a14bb9-b2cc-77a6-aceb-5c1bd5d5fd15",
+				"conceptEdit": "01a14bbd-ef57-7793-a4d3-597e2d62244a",
+				"model": "01a14bbf-fdeb-7122-a650-6299d1b5ec31",
+				"remesh": "01a14bc1-8ea0-710d-9a98-2707c044df5e"
+			},
+			"wheel": {
+				"concept": "01a14bb9-b2cc-77a6-aceb-5c1bd5d5fd15",
+				"conceptEdit": "01a14bbe-573b-74a4-8030-c18b8d599573",
+				"model": "01a14bc0-0376-77af-8764-b4cb637ba26f",
+				"remesh": "01a14bc1-907d-72e1-ba75-8c09fdf23ed3"
+			}
+		}
+	}
+}
