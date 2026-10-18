@@ -1682,6 +1682,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioDisembarkShields();
 				break;
 
+			case "orbreturns":
+				yield return ScenarioOrbReturns();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -46066,6 +46070,90 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=disembarkshields checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
+	// ---------------------------------------------------------------- phase 8: the Crystal Orb goes back to its site (since 2026-10-18)
+
+	// the index of the recovered data's artifact site of this artifact (-1 if there is none)
+	static int ArtifactSiteOf( string artifactName )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var artifactId = gameData.FindArtifactId( artifactName );
+
+		for ( var siteId = 0; siteId < gameData.m_artifactSiteList.Length; siteId++ )
+		{
+			if ( gameData.m_artifactSiteList[ siteId ].m_artifactId == artifactId )
+			{
+				return siteId;
+			}
+		}
+
+		return -1;
+	}
+
+	// the Crystal Orb the Veloxi take goes back to its site (COMMSPEC-OV -ARTIFACT, WEB3F), unless its planet has been destroyed (?SPHEXI); the Ellipsoid they take
+	// is gone. The code before kept the orb's site empty for good, and a game could no longer be won
+	IEnumerator ScenarioOrbReturns()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var surfaces = playerData.m_planetSurfaces;
+
+		EnsureCrew();
+
+		// an officer who understands every word, and a ship that survives an attack
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		controller.m_encounterRange = 0.0f;
+
+		var veloxId = FindEncounter( 1, 6, 3, 0, GameData.Race.Velox );
+		var orbSite = ArtifactSiteOf( "Crystal Orb" );
+		var ellipsoidSite = ArtifactSiteOf( "Ellipsoid" );
+		var orbPlanet = ( orbSite >= 0 ) ? gameData.m_artifactSiteList[ orbSite ].m_planetId : -1;
+
+		// ---- 1. the orb taken from its site, then handed to the Veloxi: it is back at its site
+		surfaces.TakeArtifactSite( orbSite );
+
+		var takenBefore = surfaces.IsArtifactSiteTaken( orbSite );
+		var handover = new List<string>();
+
+		yield return AnswerTheVeloxi( veloxId, 50, "Crystal Orb", new AnswerYesButton(), handover );
+
+		var backAtSite = !surfaces.IsArtifactSiteTaken( orbSite );
+
+		// ---- 2. the Ellipsoid handed over stays gone (the control)
+		var ellipsoidReturned = false;
+
+		if ( ellipsoidSite >= 0 )
+		{
+			surfaces.TakeArtifactSite( ellipsoidSite );
+
+			var ellipsoid = new List<string>();
+
+			yield return AnswerTheVeloxi( veloxId, 50, "Ellipsoid", new AnswerYesButton(), ellipsoid );
+
+			ellipsoidReturned = !surfaces.IsArtifactSiteTaken( ellipsoidSite );
+		}
+
+		// ---- 3. with the orb's planet destroyed, the orb handed over is gone
+		surfaces.TakeArtifactSite( orbSite );
+		surfaces.DestroyPlanet( orbPlanet );
+
+		var destroyedHandover = new List<string>();
+
+		yield return AnswerTheVeloxi( veloxId, 50, "Crystal Orb", new AnswerYesButton(), destroyedHandover );
+
+		var backOnDestroyedPlanet = !surfaces.IsArtifactSiteTaken( orbSite );
+
+		Log( "orbreturns: orb site " + orbSite + " on planet " + orbPlanet + " taken before " + takenBefore + " | handover [" + string.Join( " | ", handover ) + "] back " + backAtSite + " | ellipsoid site " + ellipsoidSite + " returned " + ellipsoidReturned + " | destroyed planet: back " + backOnDestroyedPlanet );
+
+		Check( "orbreturns: the orb's site is known and taken before the handover (control)", ( orbSite >= 0 ) && ( orbPlanet >= 0 ) && takenBefore, orbSite + " " + orbPlanet + " " + takenBefore );
+		Check( "orbreturns: the Veloxi take the orb, and it is back at its site (the code before kept the site empty)", ( handover.Count > 3 ) && ( handover[ 3 ] == "gone" ) && backAtSite, string.Join( " | ", handover ) + " | back " + backAtSite );
+		Check( "orbreturns: the Ellipsoid they take does not come back (control)", ( ellipsoidSite < 0 ) || !ellipsoidReturned, ellipsoidSite + " " + ellipsoidReturned );
+		Check( "orbreturns: with the orb's planet destroyed, the orb they take is gone", ( destroyedHandover.Count > 3 ) && ( destroyedHandover[ 3 ] == "gone" ) && !backOnDestroyedPlanet, string.Join( " | ", destroyedHandover ) + " | back " + backOnDestroyedPlanet );
+
+		Finish( "scenario=orbreturns checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
 	// ---------------------------------------------------------------- batch 1 (starport side)
 
 	struct SellResult
