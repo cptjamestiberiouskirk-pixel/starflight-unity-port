@@ -20,6 +20,15 @@ public class ManeuverButton : ShipButton
 		// get to the player data
 		PlayerData playerData = DataController.m_instance.m_playerData;
 
+		// engines that have broken down, or malfunction now, do not move the ship (HYPER-OV CHK-MOV: the equipment check with part 5, before it looks at where
+		// the ship is)
+		if ( !playerData.m_playerShip.UseEquipment( PD_PlayerShip.ShipSystem.Engines ) )
+		{
+			SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
+			return false;
+		}
+
 		// where are we?
 		switch ( playerData.m_general.m_location )
 		{

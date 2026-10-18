@@ -3844,6 +3844,15 @@ public class Encounter : MonoBehaviour
 		// remember what the player said last (looking for an outgoing comm changes it)
 		var lastSubjectFromPlayer = m_pdEncounter.m_lastSubjectFromPlayer;
 
+		// once the link is up, each phrase of the player's goes through the comm's equipment check, and comm equipment that has broken down or malfunctions ends
+		// the link (COMM-OV CL1: the equipment check with part 2 once phrases have been exchanged, then COMMUNICATIONS HAVE BEEN TERMINATED)
+		if ( outgoing && m_pdEncounter.m_connected && ( subject != GD_Comm.Subject.Terminate ) && !playerData.m_playerShip.UseEquipment( PD_PlayerShip.ShipSystem.Comm ) )
+		{
+			Disconnect();
+
+			return;
+		}
+
 		// find a comm (or say the one the caller wants said)
 		var comm = ( forcedComm != null ) ? forcedComm : FindComm( subject, outgoing );
 

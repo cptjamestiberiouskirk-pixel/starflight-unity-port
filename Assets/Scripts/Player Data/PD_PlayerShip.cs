@@ -75,6 +75,10 @@ public class PD_PlayerShip
 	// those from before the hull had an integrity of its own)
 	public int[] m_systemHealth;
 
+	// which systems have broken down, by ShipSystem: a damaged system can malfunction when it is used, and then stays inoperative until it is repaired (the
+	// original's bit 0x80 of the system's class, MISC-OV WF383) - null in save files from before it, where nothing has broken down
+	public bool[] m_systemInoperative;
+
 	// what the engineer is repairing, in the order of the original's Repair (REPAIR-OV >FIELD): the hull, or a system by its ShipSystem plus 1 (0, the hull, in
 	// save files from before the systems could be damaged). The hull is its integrity: the engineer never repairs the armor, which only the Starport restores, as
 	// in the original (REPAIR-OV has the armor's field and never uses it)
@@ -106,8 +110,9 @@ public class PD_PlayerShip
 		// reset fuel used to zero
 		m_fuelUsed = 0.0f;
 
-		// every system is whole
+		// every system is whole and works
 		m_systemHealth = null;
+		m_systemInoperative = null;
 
 		EnsureSystemHealth();
 
@@ -320,12 +325,174 @@ public class PD_PlayerShip
 		return m_systemHealth[ (int) system ];
 	}
 
-	// set how whole a system is (kept between 0 and 100)
+	// set how whole a system is (kept between 0 and 100) - a system made whole works again (REPAIR-OV DO-REPA and WF449: the repair that reaches 100 clears the
+	// inoperative bit, and the Starport makes the whole ship new)
 	public void SetSystemHealth( ShipSystem system, int health )
 	{
 		EnsureSystemHealth();
 
 		m_systemHealth[ (int) system ] = Mathf.Clamp( health, 0, 100 );
+
+		if ( m_systemHealth[ (int) system ] >= 100 )
+		{
+			SetInoperative( system, false );
+		}
+	}
+
+	// make sure there is a flag for every system (save files from before the systems could break down have none: they all work)
+	void EnsureSystemInoperative()
+	{
+		if ( ( m_systemInoperative != null ) && ( m_systemInoperative.Length == (int) ShipSystem.Count ) )
+		{
+			return;
+		}
+
+		var inoperative = new bool[ (int) ShipSystem.Count ];
+
+		for ( var system = 0; ( m_systemInoperative != null ) && ( system < m_systemInoperative.Length ) && ( system < inoperative.Length ); system++ )
+		{
+			inoperative[ system ] = m_systemInoperative[ system ];
+		}
+
+		m_systemInoperative = inoperative;
+	}
+
+	// true if a system has broken down (it malfunctioned when it was used, and has not been repaired since)
+	public bool IsInoperative( ShipSystem system )
+	{
+		if ( ( system < 0 ) || ( system >= ShipSystem.Count ) )
+		{
+			return false;
+		}
+
+		EnsureSystemInoperative();
+
+		return m_systemInoperative[ (int) system ];
+	}
+
+	// mark a system as broken down, or as working again
+	public void SetInoperative( ShipSystem system, bool inoperative )
+	{
+		if ( ( system < 0 ) || ( system >= ShipSystem.Count ) )
+		{
+			return;
+		}
+
+		EnsureSystemInoperative();
+
+		m_systemInoperative[ (int) system ] = inoperative;
+	}
+
+	// the health above which a system that has broken down may work again while it is being repaired (REPAIR-OV WF45F: 0x49)
+	public const int c_inoperativeMayWorkAbove = 73;
+
+	// what the equipment check found (MISC-OV (?.EQ)
+	public enum EquipmentCheck
+	{
+		Works,
+		NotEquipped,
+		Inoperative,
+		Malfunction
+	}
+
+	// the original's equipment check, made before a system is used (MISC-OV (?.EQ, through OV?.EQUIP-OK: the sensors before a scan, the comm before a hail or a
+	// reply, the engines before maneuvering, landing and launching from a planet, the shields before they are raised and each weapon before it is armed): a system
+	// the ship does not have, or one that has broken down, refuses; a damaged one malfunctions with a chance of its damage in percent (WF39F: |health - 100| >
+	// RRND 0 to 100, so never when whole and always at 0) and is then inoperative until it is repaired (WF383)
+	public EquipmentCheck CheckEquipment( ShipSystem system )
+	{
+		if ( !HasSystem( system ) )
+		{
+			return EquipmentCheck.NotEquipped;
+		}
+
+		if ( IsInoperative( system ) )
+		{
+			return EquipmentCheck.Inoperative;
+		}
+
+		if ( UnityEngine.Random.Range( 0, 100 ) < 100 - GetSystemHealth( system ) )
+		{
+			SetInoperative( system, true );
+
+			return EquipmentCheck.Malfunction;
+		}
+
+		return EquipmentCheck.Works;
+	}
+
+	// a system's name as the equipment check says it (MISC-OV .ERR: SENSORS, COMMUNICATIONS, LASERS, MISSILES, ENGINES, SHIELDS)
+	public static string GetEquipmentName( ShipSystem system )
+	{
+		switch ( system )
+		{
+			case ShipSystem.Engines: return "Engines";
+			case ShipSystem.Sensors: return "Sensors";
+			case ShipSystem.Comm: return "Communications";
+			case ShipSystem.Shields: return "Shields";
+			case ShipSystem.Missiles: return "Missiles";
+			case ShipSystem.Lasers: return "Lasers";
+			default: return GetSystemName( system );
+		}
+	}
+
+	// what the equipment check says when a system cannot be used, in the original's words ("SHIP IS NOT EQUIPPED WITH ...", "...: INOPERATIVE", and MALFUNCTION
+	// flashed with beeps, WF319) - null when it works
+	public static string GetEquipmentCheckText( ShipSystem system, EquipmentCheck check )
+	{
+		var name = GetEquipmentName( system );
+
+		switch ( check )
+		{
+			case EquipmentCheck.NotEquipped: return "<color=white>Ship is not equipped with " + name.ToLowerInvariant() + ".</color>";
+			case EquipmentCheck.Inoperative: return "<color=white>" + name + ": inoperative.</color>";
+			case EquipmentCheck.Malfunction: return "<color=red>" + name + ": MALFUNCTION</color>";
+			default: return null;
+		}
+	}
+
+	// makes the equipment check before a system is used, and when the system cannot be used says why on the console (the messages before are cleared, as the
+	// original clears its text window, CTINIT) - true if the system works
+	public bool UseEquipment( ShipSystem system )
+	{
+		var check = CheckEquipment( system );
+
+		if ( check == EquipmentCheck.Works )
+		{
+			return true;
+		}
+
+		SayEquipmentCheck( system, check, true );
+
+		return false;
+	}
+
+	// says on the console why a system cannot be used, with the error sound (the alarm for a malfunction, as the original beeps it)
+	public static void SayEquipmentCheck( ShipSystem system, EquipmentCheck check, bool clearMessages )
+	{
+		var text = GetEquipmentCheckText( system, check );
+
+		if ( text == null )
+		{
+			return;
+		}
+
+		if ( SoundController.m_instance != null )
+		{
+			SoundController.m_instance.PlaySound( ( check == EquipmentCheck.Malfunction ) ? SoundController.Sound.Alarm : SoundController.Sound.Error );
+		}
+
+		if ( ( SpaceflightController.m_instance == null ) || ( SpaceflightController.m_instance.m_messages == null ) )
+		{
+			return;
+		}
+
+		if ( clearMessages )
+		{
+			SpaceflightController.m_instance.m_messages.Clear();
+		}
+
+		SpaceflightController.m_instance.m_messages.AddText( text );
 	}
 
 	// how much of its work a system does, from 0 to 1: a damaged system works in proportion to its health (decided 2026-10-11 for roadmap 1.2)
@@ -371,9 +538,6 @@ public class PD_PlayerShip
 
 		return ( GetHullIntegrity() > 19 ) ? total / Mathf.Max( 1, counted ) : 0;
 	}
-
-	// the health below which the sensors give no readings (decided 2026-10-11)
-	public const int c_sensorsNeedHealth = 25;
 
 	// true if the ship has this system (the engines, the sensors and the comm always; the shields, the missiles and the lasers once they are installed)
 	public bool HasSystem( ShipSystem system )
@@ -456,6 +620,15 @@ public class PD_PlayerShip
 		var before = GetSystemHealth( system );
 
 		SetSystemHealth( system, before - GetSystemDamage( chunk ) );
+
+		// engines shot down to nothing break down at once, with the malfunction's alarm (DAMAGE-OV WF2AC: at 0 the equipment check of the engines, then their
+		// inoperative bit)
+		if ( ( system == ShipSystem.Engines ) && ( GetSystemHealth( system ) <= 0 ) && !IsInoperative( system ) )
+		{
+			SetInoperative( system, true );
+
+			SayEquipmentCheck( system, EquipmentCheck.Malfunction, false );
+		}
 
 		return before - GetSystemHealth( system );
 	}
@@ -862,9 +1035,8 @@ public class PD_PlayerShip
 		return GetSystemHealth( GetRepairItemSystem( item ) );
 	}
 
-	// true if a repair item works at all (the original's Repair shows "CURRENT FUNCTIONALITY: OPERATIVE" or "INOPERATIVE"): a system works in proportion to its
-	// health, and not at all at 0, and the sensors give no readings below c_sensorsNeedHealth (decided 2026-10-11); the hull while it has any
-	// integrity
+	// true if a repair item works (the original's Repair shows "CURRENT FUNCTIONALITY: OPERATIVE" or "INOPERATIVE" by the system's inoperative bit, ENGINEER
+	// WF080): a system until it has broken down, the hull while it has any integrity
 	public bool IsRepairItemOperative( int item )
 	{
 		if ( ( item < 0 ) || ( item >= c_repairItemCount ) )
@@ -873,9 +1045,8 @@ public class PD_PlayerShip
 		}
 
 		var system = GetRepairItemSystem( item );
-		var health = GetSystemHealth( system );
 
-		return ( system == ShipSystem.Sensors ) ? ( health >= c_sensorsNeedHealth ) : ( health > 0 );
+		return ( system == ShipSystem.Hull ) ? ( GetHullIntegrity() > 0 ) : !IsInoperative( system );
 	}
 
 	// call this when the engineer stops repairing (the original's "CEASING REPAIRS ON ...")
@@ -994,7 +1165,19 @@ public class PD_PlayerShip
 
 		m_repairProgress -= pointsRepaired;
 
-		SetSystemHealth( system, GetSystemHealth( system ) + pointsRepaired );
+		// a point at a time: once a system that has broken down is past 73, each point repaired has a chance of 1 in 5 to make it work again before it is whole
+		// (REPAIR-OV WF4A9 and WF45F: health > 0x49 and RRND 0 to 5 is 0, ITEM OPERATIONAL)
+		for ( var point = 0; ( point < pointsRepaired ) && ( GetSystemHealth( system ) < 100 ); point++ )
+		{
+			SetSystemHealth( system, GetSystemHealth( system ) + 1 );
+
+			if ( IsInoperative( system ) && ( GetSystemHealth( system ) < 100 ) && ( GetSystemHealth( system ) > c_inoperativeMayWorkAbove ) && ( UnityEngine.Random.Range( 0, 5 ) == 0 ) )
+			{
+				SetInoperative( system, false );
+
+				SpaceflightController.m_instance.m_messages.AddText( "<color=white>Item operational.</color>" );
+			}
+		}
 
 		if ( GetSystemHealth( system ) >= 100 )
 		{
@@ -1006,28 +1189,43 @@ public class PD_PlayerShip
 		}
 	}
 
-	// arms the weapons that work, saying which (NAVIGATR WF3FB: ARMING MISSILES, ARMING LASERS) - a ship whose weapons are all destroyed arms nothing
-	public void ArmWeapons()
+	// arms the weapons that pass the equipment check, missiles first, saying which (NAVIGATR WF3FB: ARMING MISSILES, ARMING LASERS) - a weapon that has broken
+	// down or malfunctions now is not armed, and with none armed the weapons stay disarmed; returns true if any is armed
+	public bool ArmWeapons()
 	{
 		if ( m_weaponsAreArmed )
 		{
-			return;
+			return true;
 		}
 
-		var missiles = ( m_missileLauncherClass > 0 ) && ( GetSystemHealth( ShipSystem.Missiles ) > 0 );
-		var lasers = ( m_laserCannonClass > 0 ) && ( GetSystemHealth( ShipSystem.Lasers ) > 0 );
-
-		if ( missiles )
-		{
-			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Arming missiles.</color>" );
-		}
-
-		if ( lasers )
-		{
-			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Arming lasers.</color>" );
-		}
+		var missiles = ArmWeapon( ShipSystem.Missiles, m_missileLauncherClass, "Arming missiles." );
+		var lasers = ArmWeapon( ShipSystem.Lasers, m_laserCannonClass, "Arming lasers." );
 
 		m_weaponsAreArmed = missiles || lasers;
+
+		return m_weaponsAreArmed;
+	}
+
+	// one weapon of ArmWeapons: a weapon the ship has goes through the equipment check (NAVIGATR WF22A with part 4 or 3), and says it is armed if it works
+	bool ArmWeapon( ShipSystem weapon, int weaponClass, string armingText )
+	{
+		if ( weaponClass <= 0 )
+		{
+			return false;
+		}
+
+		var check = CheckEquipment( weapon );
+
+		if ( check != EquipmentCheck.Works )
+		{
+			SayEquipmentCheck( weapon, check, false );
+
+			return false;
+		}
+
+		SpaceflightController.m_instance.m_messages.AddText( "<color=white>" + armingText + "</color>" );
+
+		return true;
 	}
 
 	public void DisarmWeapons()

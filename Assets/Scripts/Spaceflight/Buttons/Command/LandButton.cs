@@ -27,6 +27,14 @@ public class LandButton : ShipButton
 
 			case PD_General.Location.InOrbit:
 
+				// engines that have broken down, or malfunction now, cannot take the ship down (CAPTAIN /LAUNCH/LAND: the equipment check with part 5 in orbit)
+				if ( !playerData.m_playerShip.UseEquipment( PD_PlayerShip.ShipSystem.Engines ) )
+				{
+					SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
+					break;
+				}
+
 				// a planet whose maps could not be generated has no surface we could go down to (the planet generator has aborted it and logged why)
 				var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( playerData.m_general.m_currentPlanetId );
 

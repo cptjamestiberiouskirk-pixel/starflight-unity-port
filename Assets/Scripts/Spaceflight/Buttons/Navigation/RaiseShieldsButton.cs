@@ -32,6 +32,11 @@ public class RaiseShieldsButton : ShipButton
 
 			SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
 		}
+		else if ( !playerData.m_playerShip.UseEquipment( PD_PlayerShip.ShipSystem.Shields ) )
+		{
+			// a shield generator that has broken down, or malfunctions now, raises nothing (NAVIGATR WF359: the equipment check with part 6)
+			SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+		}
 		else
 		{
 			playerData.m_playerShip.RaiseShields();

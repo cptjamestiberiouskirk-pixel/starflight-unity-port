@@ -13,6 +13,14 @@ public class DescendButton : ShipButton
 		// get to the player data
 		var playerData = DataController.m_instance.m_playerData;
 
+		// engines that have broken down, or malfunction now, cannot take the ship down (SHIPBUTTONS WEFFC: the equipment check with part 5 before TRY-LAND)
+		if ( !playerData.m_playerShip.UseEquipment( PD_PlayerShip.ShipSystem.Engines ) )
+		{
+			SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
+			return false;
+		}
+
 		// update the messages display
 		SpaceflightController.m_instance.m_messages.Clear();
 

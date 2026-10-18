@@ -17,6 +17,14 @@ public class HailButton : ShipButton
 			// yes - are there living alien ships in the encounter?
 			if ( SpaceflightController.m_instance.m_encounter.HasLivingAlienShips() )
 			{
+				// comm equipment that has broken down, or malfunctions now, hails no one (COMM-OV COMMUNICATE: the equipment check with part 2)
+				if ( !playerData.m_playerShip.UseEquipment( PD_PlayerShip.ShipSystem.Comm ) )
+				{
+					SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
+					return false;
+				}
+
 				// yes - change the buttons
 				SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Hail );
 
