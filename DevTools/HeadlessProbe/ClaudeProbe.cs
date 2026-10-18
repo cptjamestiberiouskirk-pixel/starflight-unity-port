@@ -1638,6 +1638,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarportArtifactView();
 				break;
 
+			case "artifactcargo":
+				yield return ScenarioArtifactCargo();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -44279,6 +44283,175 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starport-artifactview: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=starport-artifactview checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the cargo display's artifact window (TerrainVehicleCargoDisplay, TVCargoButton.GetMarkedArtifactId)
+
+	// what the cargo display's artifact window shows: "" when it is hidden, else the names of its artifacts (read without naming its type, so that the
+	// scenario also runs on the code before the window)
+	static string CargoArtifactWindowShows( TerrainVehicleCargoDisplay cargoDisplay )
+	{
+		var field = ( cargoDisplay != null ) ? cargoDisplay.GetType().GetField( "m_artifactPreview", c_any ) : null;
+		var preview = ( field != null ) ? field.GetValue( cargoDisplay ) as Component : null;
+
+		if ( ( preview == null ) || !( Call( preview, "IsShowing" ) is bool showing ) || !showing )
+		{
+			return "";
+		}
+
+		var gameData = DataController.m_instance.m_gameData;
+		var names = new List<string>();
+
+		foreach ( var id in (IList<int>) Call( preview, "GetShownIds" ) )
+		{
+			names.Add( gameData.m_artifactList[ id ].m_name );
+		}
+
+		return string.Join( ", ", names );
+	}
+
+	IEnumerator ScenarioArtifactCargo()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var displayController = controller.m_displayController;
+		var errorsBefore = s_errorCount;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// ---- out on planet 90 with 3 cubic meters of an element, a Hypercube and a curio, nothing within reach
+		yield return EnterOrbit( 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=artifactcargo abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var terrainVehicle = controller.m_terrainVehicle;
+
+		foreach ( var deposit in controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true ) )
+		{
+			if ( Vector3.Distance( deposit.transform.position, terrainVehicle.transform.position ) < 50.0f )
+			{
+				deposit.transform.position += Vector3.right * 1000.0f;
+			}
+		}
+
+		var elementId = gameData.m_planetList[ 90 ].m_elementIdA;
+		var hypercubeId = gameData.FindArtifactId( "Hypercube" );
+		var redHerringId = gameData.FindArtifactId( "Red Herring" );
+
+		playerData.m_terrainVehicle.AddElement( elementId, 30 );
+		playerData.m_terrainVehicle.AddArtifact( hypercubeId );
+		playerData.m_terrainVehicle.AddArtifact( redHerringId );
+
+		var cargoDisplay = displayController.m_terrainVehicleCargoDisplay;
+		var cargoListSet = CargoListButtonSet();
+
+		// ---- 1. the cargo list opens with the element marked: nothing turns
+		new TVCargoButton().Execute();
+
+		yield return Frames( 3 );
+
+		var element = CargoArtifactWindowShows( cargoDisplay );
+
+		// ---- 2. Next: the Hypercube turns under the list
+		PressButton( (ButtonController.ButtonSet) cargoListSet, 0 );
+
+		yield return Frames( 3 );
+
+		var hypercube = CargoArtifactWindowShows( cargoDisplay );
+
+		// the window: under the list's text and inside the display, and turning
+		var field = cargoDisplay.GetType().GetField( "m_artifactPreview", c_any );
+		var preview = ( field != null ) ? field.GetValue( cargoDisplay ) as Component : null;
+		var placed = false;
+		var placement = "no window";
+
+		if ( preview != null )
+		{
+			var corners = new Vector3[ 4 ];
+
+			( (RectTransform) preview.transform ).GetWorldCorners( corners );
+
+			var windowLow = corners[ 0 ];
+			var windowHigh = corners[ 2 ];
+
+			cargoDisplay.m_labelsText.ForceMeshUpdate();
+
+			var textBottom = cargoDisplay.m_labelsText.rectTransform.TransformPoint( new Vector3( 0.0f, cargoDisplay.m_labelsText.textBounds.min.y, 0.0f ) ).y;
+
+			( (RectTransform) cargoDisplay.m_labelsText.rectTransform.parent ).GetWorldCorners( corners );
+
+			placed = ( windowHigh.y < textBottom ) && ( windowLow.y > corners[ 0 ].y ) && ( windowLow.x > corners[ 0 ].x ) && ( windowHigh.x < corners[ 2 ].x );
+			placement = "window y " + windowLow.y.ToString( "F2" ) + " to " + windowHigh.y.ToString( "F2" ) + " (text down to " + textBottom.ToString( "F2" ) + ", display " + corners[ 0 ].y.ToString( "F2" ) + " to " + corners[ 2 ].y.ToString( "F2" ) + "), x " + windowLow.x.ToString( "F2" ) + " to " + windowHigh.x.ToString( "F2" ) + " (display " + corners[ 0 ].x.ToString( "F2" ) + " to " + corners[ 2 ].x.ToString( "F2" ) + ")";
+		}
+
+		var stage = ( preview != null ) ? GetField( preview, "m_stage" ) as Transform : null;
+		var model = ( ( stage != null ) && ( stage.childCount > 0 ) ) ? stage.GetChild( stage.childCount - 1 ) : null;
+		var turnBefore = ( model != null ) ? model.localRotation : Quaternion.identity;
+
+		yield return new WaitForSecondsRealtime( 0.5f );
+
+		var turned = ( model != null ) ? Quaternion.Angle( turnBefore, model.localRotation ) : 0.0f;
+
+		// an update of the display with nothing changed takes no memory with the Hypercube showing either
+		var updateBytes = Allocated( () => cargoDisplay.Update(), c_meterCalls ) / c_meterCalls;
+
+		// (with -Graphics, a picture of the cargo display with the Hypercube turning)
+		if ( SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null )
+		{
+			RenderScreenPicture( System.IO.Path.Combine( System.IO.Path.GetTempPath(), "starflight-probe", "artifactcargo.png" ) );
+		}
+
+		// ---- 3. Next: the curio, nothing turns
+		PressButton( (ButtonController.ButtonSet) cargoListSet, 0 );
+
+		yield return Frames( 3 );
+
+		var curio = CargoArtifactWindowShows( cargoDisplay );
+
+		// ---- 4. Next again (round to the element and on to the Hypercube), then Back: the list is closed, nothing shows, and the window's camera is off
+		PressButton( (ButtonController.ButtonSet) cargoListSet, 0 );
+
+		yield return Frames( 2 );
+
+		PressButton( (ButtonController.ButtonSet) cargoListSet, 0 );
+
+		yield return Frames( 2 );
+
+		var hypercubeAgain = CargoArtifactWindowShows( cargoDisplay );
+
+		PressButton( (ButtonController.ButtonSet) cargoListSet, 2 );
+
+		yield return Frames( 3 );
+
+		var afterBack = CargoArtifactWindowShows( cargoDisplay );
+		var previewCamera = ( preview != null ) ? GetField( preview, "m_camera" ) as Camera : null;
+		var cameraOff = ( previewCamera != null ) && !previewCamera.enabled;
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Log( "artifactcargo: marked the element \"" + element + "\", the Hypercube \"" + hypercube + "\" (turned " + turned.ToString( "F1" ) + " degrees in 0.5 s, an update with nothing changed " + updateBytes + " bytes), the Red Herring \"" + curio + "\", the Hypercube again \"" + hypercubeAgain + "\"; after Back \"" + afterBack + "\", its camera off " + cameraOff + "; " + placement );
+
+		Check( "artifactcargo: with the element marked on the cargo list nothing turns, with the Hypercube marked it turns in the cargo display's window", ( element == "" ) && ( hypercube == "Hypercube" ) && ( turned > 5.0f ), element + " / " + hypercube + " / " + turned.ToString( "F1" ) );
+		Check( "artifactcargo: a marked curio shows nothing, and the Hypercube shows again when it is marked again", ( curio == "" ) && ( hypercubeAgain == "Hypercube" ), curio + " / " + hypercubeAgain );
+		Check( "artifactcargo: the window is under the list's text and inside the display", placed, placement );
+		Check( "artifactcargo: an update of the cargo display with nothing changed takes no memory with the window showing", updateBytes == 0, updateBytes + " bytes per call" );
+		Check( "artifactcargo: with the list closed nothing shows and the window's camera is off", ( afterBack == "" ) && cameraOff, afterBack + " / " + cameraOff );
+		Check( "artifactcargo: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=artifactcargo checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

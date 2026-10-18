@@ -500,8 +500,22 @@ public class TVCargoButton : ShipButton
 		public int m_artifactId;
 	}
 
-	// the item of the cargo list that is marked (the Next and Drop buttons work on it)
+	// the item of the cargo list that is marked (the Next and Drop buttons work on it), and the artifact it is (-1 for an element)
 	static int s_markedItem;
+	static int s_markedArtifactId = -1;
+
+	// the artifact marked on the cargo list while the list is open (-1 for an element, an empty hold or a closed list: the cargo display shows it turning)
+	public static int GetMarkedArtifactId()
+	{
+		var controller = SpaceflightController.m_instance;
+
+		if ( ( controller == null ) || ( controller.m_buttonController == null ) || ( controller.m_buttonController.GetCurrentButtonSet() != ButtonController.ButtonSet.TerrainVehicleCargo ) )
+		{
+			return -1;
+		}
+
+		return s_markedArtifactId;
+	}
 
 	// what the terrain vehicle carries, elements first, then artifacts
 	public static List<CargoItem> BuildCargoItems()
@@ -579,6 +593,7 @@ public class TVCargoButton : ShipButton
 		var items = BuildCargoItems();
 
 		s_markedItem = ( items.Count == 0 ) ? 0 : Mathf.Clamp( s_markedItem, 0, items.Count - 1 );
+		s_markedArtifactId = ( items.Count == 0 ) ? -1 : items[ s_markedItem ].m_artifactId;
 
 		var text = ( firstLine == "" ) ? "" : ( firstLine + "\n" );
 
