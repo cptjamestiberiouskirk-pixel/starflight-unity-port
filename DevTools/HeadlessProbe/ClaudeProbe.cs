@@ -35174,6 +35174,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 5 );
 
+		// where the vehicle stops for good (its wreck lies there, roadmap 8.14)
+		var stopPlace = controller.m_terrainVehicle.transform.position;
+
 		// Move, as the player drives on
 		PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
 
@@ -35185,9 +35188,63 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 10 );
 
 		var location = playerData.m_general.m_location;
-		var droppedAfter = ( playerData.m_planetSurfaces != null ) ? playerData.m_planetSurfaces.m_droppedCargoList.Count : 0;
+		// what lies on the ground: the cargo, and the vehicle's wreck, counted apart (read by name: the code before left no wreck)
+		var droppedAfter = 0;
+		var wrecks = 0;
+		var wreckWhereItStopped = false;
+
+		if ( playerData.m_planetSurfaces != null )
+		{
+			foreach ( var droppedCargo in playerData.m_planetSurfaces.m_droppedCargoList )
+			{
+				if ( ( FieldOrNull( droppedCargo, "m_isVehicleWreck" ) is bool isWreck ) && isWreck )
+				{
+					wrecks++;
+					wreckWhereItStopped |= ( Mathf.Abs( droppedCargo.m_x - stopPlace.x ) < 30.0f ) && ( Mathf.Abs( droppedCargo.m_z - stopPlace.z ) < 30.0f );
+				}
+				else
+				{
+					droppedAfter++;
+				}
+			}
+		}
+
 		var ironInShip = playerData.m_playerShip.m_elementStorage.Find( ironId );
 		var ironShipAfter = ( ironInShip != null ) ? ironInShip.m_volume : 0;
+
+		// the wreck as a later visit places it: the terrain vehicle's meshes, with nothing of the vehicle that runs
+		var wreckMeshes = 0;
+		var wreckOthers = new List<string>();
+
+		if ( ( playerData.m_planetSurfaces != null ) && ( controller.m_disembarked.m_terrainGrid.m_terrainRuins != null ) )
+		{
+			foreach ( var droppedCargo in playerData.m_planetSurfaces.m_droppedCargoList )
+			{
+				if ( !( ( FieldOrNull( droppedCargo, "m_isVehicleWreck" ) is bool isWreck ) && isWreck ) )
+				{
+					continue;
+				}
+
+				var wreckObject = controller.m_disembarked.m_terrainGrid.m_terrainRuins.PlaceDroppedCargo( droppedCargo );
+
+				if ( wreckObject != null )
+				{
+					foreach ( var component in wreckObject.GetComponentsInChildren<Component>( true ) )
+					{
+						if ( component is MeshRenderer )
+						{
+							wreckMeshes++;
+						}
+						else if ( !( component is Transform ) && !( component is MeshFilter ) && !( component is TerrainDroppedCargo ) )
+						{
+							wreckOthers.Add( component.GetType().Name );
+						}
+					}
+
+					UnityEngine.Object.Destroy( wreckObject );
+				}
+			}
+		}
 
 		var vitalityAfter = 0.0f;
 
@@ -35207,7 +35264,36 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "outoffuel: an empty tank says so, in the original's words (OUT OF FUEL, RETURNING TO SHIP ON FOOT)", messages.Contains( "Out of fuel." ) && messages.Contains( "Returning to ship on foot." ), messages );
 		Check( "outoffuel: the crew are back in the ship, not stranded on the planet", location == PD_General.Location.Planetside, location.ToString() );
 		Check( "outoffuel: the vehicle's cargo is left on the ground where it stopped (the original's >DEBRIS), not carried into the ship", ( droppedAfter == droppedBefore + 1 ) && ( ironShipAfter == ironShipBefore ), droppedBefore + " / " + droppedAfter + ", iron in the ship " + ironShipBefore + " / " + ironShipAfter );
-		Check( "outoffuel: back in the ship the vehicle is refuelled", vehicle.GetPercentFuelRemaining() == 100, vehicle.GetPercentFuelRemaining().ToString() );
+		// the vehicle is lost (MOVE-OV WEF48 leaves it as a wreck; the port refuelled it before): Disembark finds none, and at the Starport a new one is
+		// installed for a fine of 10,000 MU (OP-OV WF045)
+		var lostAfterWalk = TerrainVehicleIsLost();
+
+		controller.m_messages.Clear();
+
+		new DisembarkButton().Execute();
+
+		yield return Frames( 3 );
+
+		var disembarkMessage = MessageList();
+		var afterDisembark = playerData.m_general.m_location;
+		var balanceBefore = playerData.m_bank.m_currentBalance;
+
+		controller.SwitchLocation( PD_General.Location.DockingBay );
+
+		yield return Frames( 10 );
+
+		// (the fine is booked when Interstel's evaluation is shown in Operations)
+		BookSupplementalFines();
+
+		var balanceAfter = playerData.m_bank.m_currentBalance;
+		var lostAfterDocking = TerrainVehicleIsLost();
+
+		Log( "outoffuel: lost " + lostAfterWalk + ", wrecks " + wrecks + " (where it stopped " + wreckWhereItStopped + ") | disembark: " + disembarkMessage + " (" + afterDisembark + ") | balance " + balanceBefore + " -> " + balanceAfter + ", lost after docking " + lostAfterDocking );
+
+		Check( "outoffuel: the vehicle is lost, left as a wreck where it stopped (MOVE-OV WEF48)", lostAfterWalk && ( wrecks == 1 ) && wreckWhereItStopped, lostAfterWalk + " " + wrecks + " " + wreckWhereItStopped );
+		Check( "outoffuel: the wreck looks like the terrain vehicle, its meshes and nothing that runs", ( wreckMeshes > 0 ) && ( wreckOthers.Count == 0 ), wreckMeshes + " meshes, others: " + string.Join( ",", wreckOthers ) );
+		Check( "outoffuel: with the vehicle lost there is no disembarking", disembarkMessage.Contains( "no terrain vehicle" ) && ( afterDisembark == PD_General.Location.Planetside ), afterDisembark + " | " + disembarkMessage );
+		Check( "outoffuel: at the Starport a new terrain vehicle is installed for a fine of 10,000 MU (OP-OV WF045)", !lostAfterDocking && ( balanceBefore - balanceAfter == 10000 ), lostAfterDocking + " " + ( balanceBefore - balanceAfter ) );
 
 		Finish( "scenario=outoffuel checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}

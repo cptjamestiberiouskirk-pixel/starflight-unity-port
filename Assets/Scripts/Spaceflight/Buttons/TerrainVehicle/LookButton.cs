@@ -124,7 +124,11 @@ public class LookButton : ShipButton
 
 				if ( ( dropped != null ) && dropped.IsInReach( vehiclePosition ) )
 				{
-					text += "\n\n<color=white>Ex-Cargo (good with garlic and butter sauce).</color>";
+					var surfaces = DataController.m_instance.m_playerData.m_planetSurfaces;
+					var droppedCargo = ( surfaces != null ) ? surfaces.FindDroppedCargo( dropped.m_droppedCargoId ) : null;
+
+					// (the wreck of a terrain vehicle that ran out of fuel here: the port's words)
+					text += ( ( droppedCargo != null ) && droppedCargo.m_isVehicleWreck ) ? "\n\n<color=white>The wreck of a terrain vehicle, its tank empty.</color>" : "\n\n<color=white>Ex-Cargo (good with garlic and butter sauce).</color>";
 				}
 			}
 		}

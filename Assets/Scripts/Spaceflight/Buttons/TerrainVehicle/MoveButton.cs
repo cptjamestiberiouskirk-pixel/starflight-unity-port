@@ -136,8 +136,12 @@ public class MoveButton : ShipButton
 					// refuelled - so no crew is stranded on a planet with an empty tank
 					var dropped = TVCargoButton.DropAllCargo();
 
+					// and the vehicle is lost: it stays where it stopped as a wreck, and the ship has no terrain vehicle until the Starport installs a new one and fines
+					// the crew 10,000 MU (MOVE-OV WEF48, OP-OV WF045, DockingBay.Show)
+					LeaveTheWreck( playerData );
+
 					SpaceflightController.m_instance.m_messages.Clear();
-					SpaceflightController.m_instance.m_messages.AddText( "<color=red>Out of fuel.</color>\n<color=white>Returning to ship on foot.</color>" + ( ( dropped > 0 ) ? "\n<color=yellow>The cargo is left where the vehicle stopped.</color>" : "" ) );
+					SpaceflightController.m_instance.m_messages.AddText( "<color=red>Out of fuel.</color>\n<color=white>Returning to ship on foot.</color>\n<color=yellow>The terrain vehicle is left where it stopped" + ( ( dropped > 0 ) ? ", with its cargo." : "." ) + "</color>" );
 
 					// the walk is a map cell at a time, and each cell has a chance in five of injuring one of the crew, by the ground walked over (MOVE-OV WF16E
 					// walks the cells to the ship and WF122 rolls RRND(0,5) for 'INJURE at each)
@@ -269,6 +273,24 @@ public class MoveButton : ShipButton
 
 	// the width of a planet's ground in world units (4 to a pixel of its 2048 wide maps, as TerrainVehicle wraps it)
 	const float c_planetWidth = 2048.0f * 4.0f;
+
+	// the terrain vehicle that ran out of fuel stays where it stopped, as a wreck saved with the planet (MOVE-OV WEF48), and the ship has lost it
+	static void LeaveTheWreck( PlayerData playerData )
+	{
+		if ( playerData.m_planetSurfaces != null )
+		{
+			var position = SpaceflightController.m_instance.m_terrainVehicle.transform.position;
+			var wreck = playerData.m_planetSurfaces.AddDroppedCargo( playerData.m_general.m_currentPlanetId, position.x, position.y, position.z, -1, 0, -1 );
+
+			if ( wreck != null )
+			{
+				wreck.m_isVehicleWreck = true;
+			}
+		}
+
+		playerData.m_terrainVehicle.Reset();
+		playerData.m_terrainVehicle.m_isLost = true;
+	}
 
 	// the crew's walk from where the vehicle stopped to the ship, a cell (a kilometer) at a time: each cell a chance in five of an injury, by the E/M of the cell
 	static void WalkBackToTheShip()
