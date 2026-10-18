@@ -12,7 +12,7 @@
 
 The galaxy is the original's, down to the last detail: every star, planet, price and line of alien dialogue comes straight from the 1986 game, and the rules follow the original code. What's new is the way it looks, with fully 3D planets, stars and terrain, a redesigned ship's console and 15 color schemes to choose from.
 
-Version 1.0.0 was the first complete release, playable from the first launch to the final ending. Version 1.1.0 brings the original's combat: hits that wear down the shields, the armor and then the hull, the original's weapon damage, and a navigator whose skill decides whether your shots hit. Version 1.2.0 brings a richer ground game: a mining laser, a Return order and a cargo transporter for the terrain vehicle, and grass and finer ground up close. The planets can now be drawn in natural colors, the science officer surveys a planet from orbit, and the ship flies at the original's pace. Version 1.3.0 makes the ship easier to fly: it steers the moment you press a direction, as in the original, and its speed follows its engines.
+Version 1.0.0 was the first complete release, playable from the first launch to the final ending. Version 1.1.0 brings the original's combat: hits that wear down the shields, the armor and then the hull, the original's weapon damage, and a navigator whose skill decides whether your shots hit. Version 1.2.0 brings a richer ground game: a mining laser, a Return order and a cargo transporter for the terrain vehicle, and grass and finer ground up close. The planets can now be drawn in natural colors, the science officer surveys a planet from orbit, and the ship flies at the original's pace. Version 1.3.0 makes the ship easier to fly: it steers the moment you press a direction, as in the original, and its speed follows its engines. Version 1.4.0 gives every ship, the terrain vehicle, the ruins, the rocks and the artifacts textured models, brings new sound effects made for this port, and adds the original's equipment malfunctions and shield recharge.
 
 <p align="center">
   <img src="docs/images/orbit.jpg" width="49%" alt="A planet seen from orbit, with the System Map and the ship's console">
@@ -26,20 +26,20 @@ Version 1.0.0 was the first complete release, playable from the first launch to 
 
 ## 🎮 Download and play
 
-1. Download **Starflight-1.3.0-win64.zip** (600 MB) from the [latest release](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port/releases/latest).
+1. Download **Starflight-1.4.0-win64.zip** (670 MB) from the [latest release](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port/releases/latest).
 2. Unzip it anywhere, for example into `Documents\Games`. Keep the files together: `Starflight.exe` needs the folders next to it.
 3. Run `Starflight.exe`.
 
 There is no installer. To uninstall, delete the folder, along with the saved games in `%USERPROFILE%\AppData\LocalLow\DefaultCompany\Starflight\` if you want those gone too.
 
-**Requirements:** Windows 10 or 11 (64-bit), a DirectX 11 graphics card and 1.1 GB of free disk space.
+**Requirements:** Windows 10 or 11 (64-bit), a DirectX 11 graphics card and 1.2 GB of free disk space.
 
 **If Windows blocks the game.** The game is not code-signed, so Windows treats it as an unknown program:
 
 - *"Windows protected your PC"* (Microsoft Defender SmartScreen): choose **More info**, then **Run anyway**.
 - *"An Application Control policy has blocked this file"* (Smart App Control, Windows 11): Smart App Control does not allow exceptions for individual programs, so the game cannot start while it is switched on. You can still play it in the Unity Editor (see [Build from source](#-build-from-source)).
 
-The release page lists the zip's SHA-256 checksum. To verify your download, run `Get-FileHash Starflight-1.3.0-win64.zip` in PowerShell and compare the two.
+The release page lists the zip's SHA-256 checksum. To verify your download, run `Get-FileHash Starflight-1.4.0-win64.zip` in PowerShell and compare the two.
 
 ## 📖 How to play
 
@@ -56,11 +56,11 @@ The game saves automatically. On the Escape panel, **Copy** keeps a spare copy o
 
 New to *Starflight*? Read the notices in Operations, create and assign a crew of six, name your ship, buy a few cargo pods and launch. Your first few trips should be about making money.
 
-## ✅ Status: version 1.3.0
+## ✅ Status: version 1.4.0
 
 The whole game is playable, from a new game to the ending. Every item of the first seven phases of the [roadmap to parity with the original](ROADMAP.md) is done or decided (59 of 59), and every screen has been compared side by side with the original's. A reading of the shipped game's own code in October 2026 found 37 more of its behaviours to build (Phase 8), and they are under way.
 
-Every change is compile-checked in CI and exercised by a headless test harness that plays the real game scenes: 262 scenarios with 1,373 checks, all passing on this release, plus an automated playthrough that plays a new game all the way to the ending and Interstel's bonus.
+Every change is compile-checked in CI and exercised by a headless test harness that plays the real game scenes: 276 scenarios with 1,513 checks, all passing on this release, plus an automated playthrough that plays a new game all the way to the ending and Interstel's bonus.
 
 The known differences from the original are listed at the end of the [manual](docs/MANUAL.md#13-this-port-and-the-1986-original). The biggest one is by design: the ship's speed follows its engines, where every ship in the original flew at the same speed. Found a bug? Please [open an issue](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port/issues).
 
@@ -208,7 +208,7 @@ Assets/
 └── Unity Player/          # Build assets (icons and splash screens)
 ```
 
-## 🎯 Everything in version 1.3.0
+## 🎯 Everything in version 1.4.0
 
 **Spoiler warning.** This list names the game's secrets, its artifacts and its ending. Skip it if you'd rather discover them yourself.
 
