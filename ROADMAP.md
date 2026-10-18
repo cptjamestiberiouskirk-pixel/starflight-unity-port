@@ -233,7 +233,7 @@ Found on 2026-10-18 by reading the shipped game's decompiled overlays against th
 | 8.25 | Questions about the Old Empire and the Ancients can be shut off | COMM-OV `?LOCKED-OUT` | MISSING |
 | 8.26 | Impatience, and a fighting race calming down | COMM-OV `>IMPATIENT`, `<EDL>` | MISSING |
 | 8.27 | The terrain vehicle's icon key | LISTICONS `ICONS` | MISSING |
-| 8.28 | The Flat Device: lifeform attacks hit a tenth as often | BEHAV-OV `WE8C2` | MISSING |
+| 8.28 | The Flat Device: lifeform attacks hit a tenth as often | BEHAV-OV `WE8C2` | the hit roll times 10 with the Flat Device (`TerrainLifeform.AttackPlayer`; probe `flatdevice`) |
 | 8.29 | A flare sterilises its system | ANALYZE-OV `WEC26` | MISSING |
 | 8.30 | Look describes the land, its colours and the region's temperature | PLSET-OV `(TERRAIN`; MAPS-OV `.SURFACE`, `.CARPET` | MISSING |
 | 8.31 | Arming the Black Egg is asked on the drop, and picking it up disarms it | ITEMS-OV `WE9AA`, `WE9FA`; DPART-OV | the drop asks "Arm this device?" (`ArmEggYesButton`, `ArmEggNoButton`, `PD_PlanetSurfaces.DroppedCargo.m_leftUnarmed`), and picking up an armed egg says "Disarming device." (probe `eggarming`) |

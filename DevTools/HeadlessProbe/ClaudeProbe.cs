@@ -25261,7 +25261,9 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "flatdevice: of 200 attacks (a chance of 96%) " + hurtWithout + " hurt without the Flat Device, " + hurtWith + " with it | " + ( messages.Length > 300 ? messages.Substring( 0, 300 ) : messages ) );
 
 		Check( "flatdevice: without the Flat Device nearly every attack hurts (control)", hurtWithout >= 170, hurtWithout + " of 200" );
-		Check( "flatdevice: with the Flat Device about half of the attacks hurt, and the shield turns the others away", ( hurtWith >= 80 ) && ( hurtWith <= 140 ) && messages.Contains( "the shield turns it away" ), hurtWith + " of 200" );
+		// the original multiplies the hit roll of 0 to 99 by 10 with the Flat Device (BEHAV-OV WE8C2, roadmap 8.28): at a chance of 96 a tenth of the attacks hit,
+		// about 20 of 200 (the port halved the chance before, about 100)
+		Check( "flatdevice: with the Flat Device about a tenth of the attacks hurt, and the shield turns the others away", ( hurtWith >= 5 ) && ( hurtWith <= 40 ) && messages.Contains( "the shield turns it away" ), hurtWith + " of 200" );
 
 		Finish( "scenario=flatdevice without=" + hurtWithout + " with=" + hurtWith, 0 );
 	}
