@@ -47,7 +47,7 @@ Read the notices in Operations before every launch. The first ones give your ord
 
 ## 2. Starting, saving and quitting
 
-**The first launch.** The game opens with Interstel's warning and the credits. Enter skips a page. After the last page you are in the Starport, or wherever your saved game left you.
+**The first launch.** The game opens with Interstel's warning and the credits (the full credits are on the About screen of the Escape panel). Enter skips a page. After the last page you are in the Starport, or wherever your saved game left you.
 
 **Save slots.** There are five save slots, A to E. The game always continues the active slot; there is no title menu. An empty slot starts a new game.
 
@@ -59,6 +59,7 @@ Read the notices in Operations before every launch. The first ones give your ord
 | Copy | Copy the active game into another slot. |
 | Reset | Start the active slot over as a new game. |
 | Colors | Pick one of 15 color schemes, each in a dark and a light mode, whether the planets are drawn in natural colors (Natural) or as they first looked in this port (Original), and how much detail the ground has when you are out in the terrain vehicle (Ground: Auto picks it for your graphics card; Low, Medium or High set it). The choices apply at once and are remembered on this computer. |
+| About | Who made this game, what it is built on, and the credits of its music, sounds and fonts. |
 | Resume | Close the panel and play on. |
 | Quit | Save and leave the game. |
 
