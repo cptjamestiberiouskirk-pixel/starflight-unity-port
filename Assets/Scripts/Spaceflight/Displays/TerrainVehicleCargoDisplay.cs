@@ -1,4 +1,5 @@
 ﻿
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -14,6 +15,20 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 	// what the hold held when the text was made last (the text is made again only when it changes)
 	int m_shownVolumeUsed = -1;
 	int m_shownItemCount = -1;
+
+	// the window in which the artifact marked on the cargo list turns (made the first time it is needed), the artifact it was last given (-2 before the
+	// first), whether it is placed for the text as it is, and the ids it is given (kept, so that nothing is made while nothing changes)
+	ArtifactPreview m_artifactPreview;
+	int m_shownArtifactId = -2;
+	bool m_artifactWindowPlaced;
+	readonly List<int> m_artifactWindowIds = new List<int>();
+
+	// the window goes under the list, this far from it and from the display's bottom, at most and at least this big (smaller, it is not shown), with a
+	// texture this many pixels across
+	const float c_artifactWindowMargin = 12.0f;
+	const float c_artifactWindowLargest = 220.0f;
+	const float c_artifactWindowSmallest = 90.0f;
+	const int c_artifactWindowTextureSize = 384;
 
 	TerrainVehicleCargoDisplay()
 	{
@@ -33,11 +48,88 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 		m_shownVolumeUsed = -1;
 
 		UpdateCargoDisplay();
+
+		// and place the artifact window for it
+		m_artifactWindowPlaced = false;
+
+		UpdateArtifactWindow();
 	}
 
 	public override void Update()
 	{
 		UpdateCargoDisplay();
+		UpdateArtifactWindow();
+	}
+
+	// shows the artifact marked on the cargo list turning in a window under the list, where there is room for it (nothing is made while nothing changes)
+	void UpdateArtifactWindow()
+	{
+		var artifactId = TVCargoButton.GetMarkedArtifactId();
+
+		if ( m_artifactWindowPlaced && ( artifactId == m_shownArtifactId ) )
+		{
+			return;
+		}
+
+		var fits = PlaceArtifactWindow();
+
+		if ( m_artifactPreview == null )
+		{
+			return;
+		}
+
+		m_artifactWindowPlaced = true;
+		m_shownArtifactId = artifactId;
+
+		m_artifactWindowIds.Clear();
+
+		if ( fits && ( artifactId >= 0 ) )
+		{
+			m_artifactWindowIds.Add( artifactId );
+		}
+
+		m_artifactPreview.Show( m_artifactWindowIds );
+	}
+
+	// puts the artifact window under the list's text, in the middle of the display (making it the first time) - false if there is too little room
+	bool PlaceArtifactWindow()
+	{
+		if ( m_labelsText == null )
+		{
+			return false;
+		}
+
+		var display = m_labelsText.rectTransform.parent as RectTransform;
+
+		if ( display == null )
+		{
+			return false;
+		}
+
+		// the bottom of the list's text and of the display, in the display's own units (from its middle)
+		m_labelsText.ForceMeshUpdate();
+
+		var middle = display.rect.center;
+		var textBottom = display.InverseTransformPoint( m_labelsText.rectTransform.TransformPoint( new Vector3( 0.0f, m_labelsText.textBounds.min.y, 0.0f ) ) ).y - middle.y;
+		var displayBottom = display.rect.yMin - middle.y;
+
+		var side = Mathf.Min( c_artifactWindowLargest, Mathf.Min( display.rect.width * 0.6f, textBottom - displayBottom - c_artifactWindowMargin * 2.0f ) );
+		var fits = side >= c_artifactWindowSmallest;
+
+		side = Mathf.Max( side, c_artifactWindowSmallest );
+
+		var rect = new Rect( -side * 0.5f, displayBottom + c_artifactWindowMargin, side, side );
+
+		if ( m_artifactPreview == null )
+		{
+			m_artifactPreview = ArtifactPreview.Make( display, "Artifact Preview", rect, c_artifactWindowTextureSize, c_artifactWindowTextureSize );
+		}
+		else
+		{
+			m_artifactPreview.SetRect( rect );
+		}
+
+		return fits;
 	}
 
 	void UpdateCargoDisplay()
@@ -129,5 +221,8 @@ public class TerrainVehicleCargoDisplay : ShipDisplay
 
 		m_labelsText.text = labels;
 		m_valuesText.text = values;
+
+		// the artifact window goes under the new text
+		m_artifactWindowPlaced = false;
 	}
 }

@@ -121,6 +121,9 @@ public class ArtifactPreview : MonoBehaviour
 		light.intensity = 1.6f;
 		light.cullingMask = 1 << c_layer;
 
+		// (the scene's own directional lights reach the stage too: this one is the one the models are drawn in)
+		light.renderMode = LightRenderMode.ForcePixel;
+
 		preview.ApplyTheme();
 		preview.UpdateVisibility();
 
@@ -184,6 +187,15 @@ public class ArtifactPreview : MonoBehaviour
 		}
 
 		UpdateVisibility();
+	}
+
+	// moves the window to this rect of its panel (in the panel's own units, from its middle)
+	public void SetRect( Rect rect )
+	{
+		var frameTransform = (RectTransform) transform;
+
+		frameTransform.anchoredPosition = rect.center;
+		frameTransform.sizeDelta = rect.size;
 	}
 
 	// the artifacts shown (ids into the game data's artifact list)
