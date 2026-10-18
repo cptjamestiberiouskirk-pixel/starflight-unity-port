@@ -1,6 +1,6 @@
 # Starflight Player's Manual
 
-For the Unity 6 port of *Starflight*, version 1.3.0.
+For the Unity 6 port of *Starflight*, version 1.4.0.
 
 This manual explains how to play: the Starport, your crew and ship, flying, planets, aliens, combat and money. It tells you the story you are given at the start, and no more. What the galaxy holds, where things are and how the game is won are for you to find out.
 

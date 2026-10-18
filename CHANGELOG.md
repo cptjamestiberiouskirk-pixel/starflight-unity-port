@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-18
+
+New looks, new sounds and more of the original's rules. The last seven ships with simple models get textured ones, so every vessel of the game has one (#480), and so do the terrain vehicle, the ancient ruins, the rocks and the mineral deposits (#470 to #472); the special artifacts hover beside their ruins and turn in a window on the Trade Depot's lists and the terrain vehicle's cargo list (#473, #474, #477). The terrain vehicle's tools have sounds of their own, and the combat and flight sounds are new ones made for this port in place of clips from Star Trek: The Next Generation (#489, #490). A damaged system can malfunction when it is used, as the original's equipment check has it (#486), the shields regain their charge on the ship's turns in a fight (#481), the science officer can be unsure of a star's state (#483), and the ship's Cargo list shows everything in the hold (#478). The intro credits this port, and the Escape panel has an About screen with the full credits (#492).
+
 ### Added
 
 - **Artifacts on the Ground**: the 15 special artifacts had no models: the game knew them only by name, as the original did, and a ruin looked the same with its artifact as without it. Each now has a textured model of its own, drawn from its name and the science officer's analysis (the cracked Black Egg, the Tesseract's cube in its frame, the Hypercube's chain of cubes, the jewelled Dodecahedron, the rest), and it shows beside the ruin that holds it, hovering over the ground, rising and sinking a little and turning slowly under a soft light, until the terrain vehicle takes it. The curios have no models and show nothing, as before. Probe scenario `artifactmodels`.
