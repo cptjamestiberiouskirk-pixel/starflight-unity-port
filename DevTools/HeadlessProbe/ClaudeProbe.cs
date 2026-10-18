@@ -1630,6 +1630,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioRockModels();
 				break;
 
+			case "artifactmodels":
+				yield return ScenarioArtifactModels();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -43936,6 +43940,133 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "rockmodels: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=rockmodels rocks=" + rocksTextured + "/" + rocksLight + "/" + rocksSized + " deposits=" + depositsGrey + "/" + depositsRockShaped + " own=" + ownShapes + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the special artifacts' models (Resources/Artifacts, DevTools/ShipModels/import_meshy_artifacts.py)
+
+	IEnumerator ScenarioArtifactModels()
+	{
+		var controller = SpaceflightController.m_instance;
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+		var errorsBefore = s_errorCount;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// ---- 1. every special artifact has its model, textured, light enough and one unit across; no curio has one
+		var special = 0;
+		var modelled = 0;
+		var curiosWithModels = new List<string>();
+		var details = new List<string>();
+
+		foreach ( var artifact in gameData.m_artifactList )
+		{
+			var model = ArtifactModels.Get( artifact );
+
+			if ( !artifact.IsSpecial() )
+			{
+				if ( model != null )
+				{
+					curiosWithModels.Add( artifact.m_name );
+				}
+
+				continue;
+			}
+
+			special++;
+
+			var renderer = ( model != null ) ? model.GetComponentInChildren<MeshRenderer>( true ) : null;
+			var filter = ( model != null ) ? model.GetComponentInChildren<MeshFilter>( true ) : null;
+			var material = ( renderer != null ) ? renderer.sharedMaterial : null;
+			var triangles = TriangleCount( ( filter != null ) ? filter.sharedMesh : null );
+			var size = ( ( filter != null ) && ( filter.sharedMesh != null ) ) ? Vector3.Scale( filter.sharedMesh.bounds.size, filter.transform.lossyScale ) : Vector3.zero;
+			var widest = Mathf.Max( size.x, Mathf.Max( size.y, size.z ) );
+			var good = ( material != null ) && ( material.name == "Artifact " + artifact.m_name ) && ( material.GetTexture( "_MainTex" ) != null ) && ( triangles > 500 ) && ( triangles < 6000 ) && ( Mathf.Abs( widest - 1.0f ) < 0.1f );
+
+			modelled += good ? 1 : 0;
+
+			if ( !good )
+			{
+				details.Add( artifact.m_name + ": " + ( ( material != null ) ? material.name : "no model" ) + ", " + triangles + " triangles, " + widest.ToString( "F2" ) + " across" );
+			}
+		}
+
+		Log( "artifactmodels: " + modelled + " of " + special + " special artifacts modelled" + ( ( details.Count > 0 ) ? " (" + string.Join( "; ", details ) + ")" : "" ) + ", curios with models: " + curiosWithModels.Count );
+
+		// ---- 2. on Earth at 11N x 104W the Hypercube shows beside the ruin that holds it, hovering and turning
+		yield return GoIntoOrbit( 0, 5 );
+
+		playerData.m_general.m_selectedLatitude = -104.0f;
+		playerData.m_general.m_selectedLongitude = 11.0f;
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		var sitePosition = Tools.LatLongToWorldCoordinates( -104.0f, 11.0f );
+		TerrainRuin siteRuin = null;
+
+		foreach ( var ruin in controller.m_disembarked.m_terrainGrid.m_terrainRuins.GetComponentsInChildren<TerrainRuin>( false ) )
+		{
+			var delta = ruin.transform.position - sitePosition;
+
+			if ( ( Mathf.Abs( delta.x ) < 0.5f ) && ( Mathf.Abs( delta.z ) < 0.5f ) )
+			{
+				siteRuin = ruin;
+			}
+		}
+
+		var displays = ( siteRuin != null ) ? siteRuin.m_artifactDisplays.FindAll( display => display != null ) : new List<GameObject>();
+		var display = ( displays.Count > 0 ) ? displays[ 0 ] : null;
+		var shownBeside = ( display != null ) && ( display.name == "Artifact Hypercube" ) && ( display.GetComponent<ArtifactDisplay>() != null ) && ( display.GetComponentInChildren<MeshRenderer>() != null );
+		var apart = ( display != null ) ? Vector3.Distance( new Vector3( display.transform.position.x, 0.0f, display.transform.position.z ), new Vector3( siteRuin.transform.position.x, 0.0f, siteRuin.transform.position.z ) ) : -1.0f;
+		var positionBefore = ( display != null ) ? display.transform.position : Vector3.zero;
+		var rotationBefore = ( display != null ) ? display.transform.rotation : Quaternion.identity;
+
+		// (with -Graphics, a picture of the vehicle near the Hypercube)
+		if ( ( siteRuin != null ) && ( display != null ) )
+		{
+			controller.m_terrainVehicle.transform.position = display.transform.position + ( siteRuin.transform.position - display.transform.position ).normalized * -12.0f;
+		}
+
+		yield return Frames( 30 );
+
+		var moves = ( display != null ) && ( ( Vector3.Distance( positionBefore, display.transform.position ) > 0.01f ) || ( Quaternion.Angle( rotationBefore, display.transform.rotation ) > 1.0f ) );
+
+		if ( SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null )
+		{
+			RenderScreenPicture( System.IO.Path.Combine( System.IO.Path.GetTempPath(), "starflight-probe", "artifactmodels-hypercube.png" ) );
+		}
+
+		// ---- 3. beside the ruin, the cargo button takes the Hypercube, and it no longer shows
+		if ( siteRuin != null )
+		{
+			controller.m_terrainVehicle.transform.position = siteRuin.transform.position + Vector3.forward * 5.0f;
+		}
+
+		yield return Frames( 2 );
+
+		new TVCargoButton().Execute();
+
+		yield return Frames( 3 );
+
+		var taken = ArtifactsHeld( playerData.m_terrainVehicle.m_artifactStorage, gameData.FindArtifactId( "Hypercube" ) ) == 1;
+		var goneAfter = ( siteRuin != null ) && ( siteRuin.m_artifactDisplays.FindAll( d => d != null ).Count == 0 ) && ( display == null );
+
+		Log( "artifactmodels: Earth (in the vehicle " + done[ 0 ] + "): the ruin of 11N x 104W " + ( ( siteRuin != null ) ? "found" : "not found" ) + ", " + displays.Count + " artifacts shown beside it" + ( ( display != null ) ? " (" + display.name + ", " + apart.ToString( "F1" ) + " from its middle)" : "" ) + ", moving " + moves + "; taken " + taken + ", shown after " + !goneAfter );
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "artifactmodels: each of the 15 special artifacts has its own textured model, between 500 and 6,000 triangles, one unit across", ( special == 15 ) && ( modelled == 15 ), modelled + "/" + special );
+		Check( "artifactmodels: no curio has a model", curiosWithModels.Count == 0, string.Join( ", ", curiosWithModels ) );
+		Check( "artifactmodels: the Hypercube shows beside the ruin that holds it, hovering and turning", done[ 0 ] && shownBeside && ( apart > 8.0f ) && ( apart < 30.0f ) && moves, done[ 0 ] + " " + shownBeside + " " + apart.ToString( "F1" ) + " " + moves );
+		Check( "artifactmodels: once the terrain vehicle takes it, it no longer shows", taken && goneAfter, taken + " " + goneAfter );
+		Check( "artifactmodels: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=artifactmodels modelled=" + modelled + "/" + special + " shown=" + shownBeside + " gone=" + goneAfter + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

@@ -1,0 +1,266 @@
+{
+	"textureSize": 1024,
+	"artifacts": [
+		{
+			"name": "Crystal Orb",
+			"glb": "crystal-orb.glb",
+			"glow": {
+				"hue": [
+					185.0,
+					225.0
+				],
+				"saturation": 0.35,
+				"value": 0.8
+			},
+			"meshy": {
+				"concept": "01a14c5c-ed6d-749d-9ce3-314428feaefa",
+				"model": "01a14c61-bde6-7356-b150-3f26080514a1",
+				"remesh": "01a14c62-fdeb-71e3-af10-29c4c00e6052"
+			}
+		},
+		{
+			"name": "Crystal Cone",
+			"glb": "crystal-cone.glb",
+			"glow": {
+				"hue": [
+					0.0,
+					0.0
+				],
+				"saturation": 2.0,
+				"value": 2.0
+			},
+			"meshy": {
+				"concept": "01a14c5c-ef71-7208-b7e5-077dc1855b60",
+				"model": "01a14c61-c2a1-7136-a293-dec067068dbe",
+				"remesh": "01a14c63-032a-75c4-9e65-fecb060da797"
+			}
+		},
+		{
+			"name": "Black Egg",
+			"glb": "black-egg.glb",
+			"glow": {
+				"hue": [
+					[
+						0.0,
+						20.0
+					],
+					[
+						340.0,
+						360.0
+					]
+				],
+				"saturation": 0.5,
+				"value": 0.3
+			},
+			"meshy": {
+				"concept": "01a14c5c-f142-7250-95e4-80361740fc01",
+				"model": "01a14c61-c7a9-75fc-befd-5d3aa4dd9202",
+				"remesh": "01a14c63-0781-76d5-bbaf-c69b8b18ba19"
+			}
+		},
+		{
+			"name": "Whining Orb",
+			"glb": "whining-orb.glb",
+			"glow": {
+				"hue": [
+					0.0,
+					0.0
+				],
+				"saturation": 2.0,
+				"value": 2.0
+			},
+			"meshy": {
+				"concept": "01a14c5c-f2f1-72ff-aab5-ced99c808eea",
+				"model": "01a14c61-cc4f-748e-b4ed-5fd4993646a8",
+				"remesh": "01a14c63-0ba3-7532-b549-75dc4bdeb48d"
+			}
+		},
+		{
+			"name": "Flat Device",
+			"glb": "flat-device.glb",
+			"glow": {
+				"hue": [
+					80.0,
+					160.0
+				],
+				"saturation": 0.3,
+				"value": 0.4
+			},
+			"meshy": {
+				"concept": "01a14c5c-f496-72ba-9547-793893a6ddf6",
+				"model": "01a14c61-d20a-70ef-968e-1ae1edd29973",
+				"remesh": "01a14c63-0f84-71a7-b793-3e936ce6c21a"
+			}
+		},
+		{
+			"name": "Rod Device",
+			"glb": "rod-device.glb",
+			"glow": {
+				"hue": [
+					180.0,
+					240.0
+				],
+				"saturation": 0.3,
+				"value": 0.5
+			},
+			"meshy": {
+				"concept": "01a14c5c-f64c-718b-8e43-33de2364f5aa",
+				"model": "01a14c61-d6e1-7728-9f31-68b57c9733a5",
+				"remesh": "01a14c63-139a-7324-a9ae-892455764be4"
+			}
+		},
+		{
+			"name": "Tesseract",
+			"glb": "tesseract.glb",
+			"glow": {
+				"hue": [
+					20.0,
+					50.0
+				],
+				"saturation": 0.4,
+				"value": 0.5
+			},
+			"meshy": {
+				"concept": "01a14c5c-f823-72ee-83e5-1e76f993b42b",
+				"model": "01a14c61-dd2e-7401-ae63-e09cc22ea867",
+				"remesh": "01a14c64-f2b1-759b-a758-abfb6763ca52"
+			}
+		},
+		{
+			"name": "Ring Device",
+			"glb": "ring-device.glb",
+			"glow": {
+				"hue": [
+					0.0,
+					0.0
+				],
+				"saturation": 2.0,
+				"value": 2.0
+			},
+			"meshy": {
+				"concept": "01a14c5c-f9db-715d-8497-4af88e452d12",
+				"model": "01a14c61-e22e-77f8-a37f-8da963b533ef",
+				"remesh": "01a14c64-f658-75c2-8d06-edbb78398deb"
+			}
+		},
+		{
+			"name": "Hypercube",
+			"glb": "hypercube.glb",
+			"glow": {
+				"hue": [
+					0.0,
+					0.0
+				],
+				"saturation": 2.0,
+				"value": 2.0
+			},
+			"meshy": {
+				"concept": "01a14c5c-fb95-70e6-b999-3e7c7636917a",
+				"model": "01a14c61-e729-7392-b64e-ac836682dca4",
+				"remesh": "01a14c64-fa26-73d1-958e-00f5ac2620cf"
+			}
+		},
+		{
+			"name": "Shimmering Ball",
+			"glb": "shimmering-ball.glb",
+			"glow": {
+				"hue": [
+					0.0,
+					0.0
+				],
+				"saturation": 2.0,
+				"value": 2.0
+			},
+			"meshy": {
+				"concept": "01a14c5c-fd44-73fb-9eb5-5aff3767b6e8",
+				"model": "01a14c61-ec67-75a9-b924-09061bbb1222",
+				"remesh": "01a14c64-ffe0-7430-94c6-fb6cd7376411"
+			}
+		},
+		{
+			"name": "Red Cylinder",
+			"glb": "red-cylinder.glb",
+			"glow": {
+				"hue": [
+					0.0,
+					0.0
+				],
+				"saturation": 2.0,
+				"value": 2.0
+			},
+			"meshy": {
+				"concept": "01a14c5c-fef9-75e7-9973-4a051ce4f0bf",
+				"model": "01a14c61-f2c7-76f8-a3b9-4e6bf7f5c450",
+				"remesh": "01a14c65-042f-7679-898c-e031b4b9d562"
+			}
+		},
+		{
+			"name": "Dodecahedron",
+			"glb": "dodecahedron.glb",
+			"glow": {
+				"hue": [
+					0.0,
+					0.0
+				],
+				"saturation": 2.0,
+				"value": 2.0
+			},
+			"meshy": {
+				"concept": "01a14c5d-00a4-7730-95ba-0f40ba300b0e",
+				"model": "01a14c61-f7cd-7091-a39b-7ef665b71fa7",
+				"remesh": "01a14c65-0854-746a-92aa-0de225e16311"
+			}
+		},
+		{
+			"name": "Crystal Pearl",
+			"glb": "crystal-pearl.glb",
+			"glow": {
+				"hue": [
+					0.0,
+					0.0
+				],
+				"saturation": 2.0,
+				"value": 2.0
+			},
+			"meshy": {
+				"concept": "01a14c5d-0252-74ca-a11e-06e4f94ed4c9",
+				"model": "01a14c61-ff6d-74bc-a30d-37c9c509b80e",
+				"remesh": "01a14c65-0c59-72ed-abe7-1351f849b464"
+			}
+		},
+		{
+			"name": "Ellipsoid",
+			"glb": "ellipsoid.glb",
+			"glow": {
+				"hue": [
+					0.0,
+					0.0
+				],
+				"saturation": 2.0,
+				"value": 2.0
+			},
+			"meshy": {
+				"concept": "01a14c5d-0408-7445-8f0c-e90503358c33",
+				"model": "01a14c62-04c0-73e3-a92f-74066ee6edb2",
+				"remesh": "01a14c65-10e0-732f-976c-ee21252a4963"
+			}
+		},
+		{
+			"name": "Black Box",
+			"glb": "black-box.glb",
+			"glow": {
+				"hue": [
+					0.0,
+					0.0
+				],
+				"saturation": 2.0,
+				"value": 2.0
+			},
+			"meshy": {
+				"concept": "01a14c5d-05da-71fe-8e97-4bbabd188056",
+				"model": "01a14c62-09b0-731f-8fb9-5d2c66650700",
+				"remesh": "01a14c65-14b7-769f-a4d3-a3cf0a098c00"
+			}
+		}
+	]
+}

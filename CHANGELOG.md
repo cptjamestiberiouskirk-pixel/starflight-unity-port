@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Artifacts on the Ground**: the 15 special artifacts had no models: the game knew them only by name, as the original did, and a ruin looked the same with its artifact as without it. Each now has a textured model of its own, drawn from its name and the science officer's analysis (the cracked Black Egg, the Tesseract's cube in its frame, the Hypercube's chain of cubes, the jewelled Dodecahedron, the rest), and it shows beside the ruin that holds it, hovering over the ground, rising and sinking a little and turning slowly under a soft light, until the terrain vehicle takes it. The curios have no models and show nothing, as before. Probe scenario `artifactmodels`.
+
 ### Changed
 
 - **Textured Model for the Terrain Vehicle**: the terrain vehicle is a new textured model in the look of the Arth ship that carries it: light grey and dull white plating with navy trim, the gold front cowl with its headlights, the twin laser on the nose, a rear door with a blue window, and six chunky tires on their own suspension arms. It keeps the old model's layout and every part the game moves: the six wheels still turn and steer, and the radar on the roof still turns on its mast. The wheels meet the ground where the old ones did, and the body now clears it. The vehicle is shorter than before (about 13 units long against 20) and a little wider, so its collision capsule was resized to match. It has 11,900 triangles and its wheels 4,200 each, where each old wheel had 10,700. Probe scenario `tvmodel`.

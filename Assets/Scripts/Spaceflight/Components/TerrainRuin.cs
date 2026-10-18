@@ -27,6 +27,9 @@ public class TerrainRuin : MonoBehaviour
 	// a random ruin is ancient (crystal, with Endurium or "truly amazing" artifacts) or of the Old Empire (with "amazing" artifacts)
 	public bool m_isAncient;
 
+	// the special artifacts shown beside the ruin while it holds them (TerrainRuins.ShowArtifacts)
+	public List<GameObject> m_artifactDisplays = new List<GameObject>();
+
 	// the key of an item of a random ruin: the planet, the ruin's place among the planet's random ruins and the item's place in the ruin
 	public static int GetRandomItemKey( int planetId, int ruinIndex, int itemIndex )
 	{
