@@ -74,8 +74,8 @@ Decided later:
   - (c) Leave lifeforms out.
 - **D4. Interstel Police** (the copy protection arrest). Decided 2026-10-12: left out. The arrest was the original game's copy protection (a wrong security code at launch, read from the code wheel), not part of the game itself, and the port has no code wheel. The launch asks for no code, and the police's lines are not used.
 - **D5. Conflicts in the sources.**
-  - The Rod Device site: STRINFO gives two different coordinates. Decided 2026-10-09: 54N x 13E, Harrison's base 2, as New Scotland's own entry says.
-  - The Red Cylinder and Koann 3: STRINFO prints planet 4 of 112,200 three times (1.2, 4.1, 5.1), but the name Koann 3, the orbit number 5 in its 5.1 entry (the third planet from that sun) and the Elowan message (3.1, "planet 3") all point to orbit 5. Decided 2026-10-09: the third planet (orbit 5).
+  - The Rod Device site: STRINFO gives two different coordinates. Decided 2026-10-09: Harrison's base 2, as New Scotland's own entry says.
+  - The Red Cylinder's planet: STRINFO prints it as planet 4 of its star three times (1.2, 4.1, 5.1), but the planet's name, the orbit number 5 in its 5.1 entry (the third planet from that sun) and the Elowan message (3.1, "planet 3") all point to orbit 5. Decided 2026-10-09: the third planet (orbit 5).
   - The real effects of the Black Box, the Hypercube and the Ellipsoid. Decided 2026-10-11: none beyond their documented roles. STRINFO 4.1 gives no effect, and their analyses read as curios ("It slices, it dices", "decorative", "a 4-dimensional puzzle"); the Black Box is the Thrynn's sale (#156) and the Ellipsoid a Veloxi demand (#155).
   - The flare deadline. Decided 2026-10-09: the data does not disagree with itself. The year, month and day fields of every star still to flare give its flare day in the original calendar of 10 months of 30 days (234 of 234), so Arth's day 300 is 01-01-4621. The original checks for a flare as each day ends, so Arth's flare comes as 30-10-4620, the last day of the year, ends: the Elowan's "final week of your Ten-month". See item 0.7.
 
