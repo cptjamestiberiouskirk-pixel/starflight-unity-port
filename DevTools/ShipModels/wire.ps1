@@ -10,6 +10,9 @@ param(
 	[int]$TimeoutSeconds = 600
 )
 
+# Unity is launched through the probe's unity-batch.ps1: one launch at a time on this PC, none while the licensing client is stuck (exit code 3)
+. (Join-Path $PSScriptRoot '..\HeadlessProbe\unity-batch.ps1')
+
 $proj = (Get-Location).Path
 $versionFile = Join-Path $proj 'ProjectSettings\ProjectVersion.txt'
 
@@ -37,20 +40,21 @@ $toolTarget = Join-Path $proj 'Assets\ShipModelWiring.cs'
 Copy-Item -LiteralPath $toolSource -Destination $toolTarget -Force
 
 try {
-	$sw = [Diagnostics.Stopwatch]::StartNew()
-	$p = Start-Process -FilePath $unity -ArgumentList '-batchmode', '-nographics', '-projectPath', "`"$proj`"", '-logFile', "`"$log`"", '-executeMethod', 'ShipModelWiring.Run', '-shipManifest', "`"$manifestPath`"" -PassThru
+	# an earlier run's log would be read as this run's (the licensing guard reads it too), so it goes first; Burst stays off, as in the probe
+	if (Test-Path -LiteralPath $log) { Remove-Item -LiteralPath $log -Force -ErrorAction Stop }
 
-	if (-not $p.WaitForExit($TimeoutSeconds * 1000)) {
-		"unity still running after ${TimeoutSeconds}s, stopping pid $($p.Id)"
-		Stop-Process -Id $p.Id -Force
-		$p.WaitForExit(30000) | Out-Null
-	}
+	$run = Invoke-UnityBatch -Unity $unity -Arguments @('-batchmode', '-nographics', '--burst-disable-compilation', '-projectPath', "`"$proj`"", '-logFile', "`"$log`"", '-executeMethod', 'ShipModelWiring.Run', '-shipManifest', "`"$manifestPath`"") -Log $log -TimeoutSeconds $TimeoutSeconds
 
-	"unity exit=$($p.ExitCode) elapsed=$([int]$sw.Elapsed.TotalSeconds)s log=$log"
+	$run.Messages
+	"unity exit=$($run.ExitCode) elapsed=$($run.Seconds)s log=$log"
 }
 finally {
 	[IO.File]::Delete($toolTarget)
 	[IO.File]::Delete("$toolTarget.meta")
+}
+
+if ($run.LicensingStuck) {
+	exit 3
 }
 
 "--- compiler errors ---"
