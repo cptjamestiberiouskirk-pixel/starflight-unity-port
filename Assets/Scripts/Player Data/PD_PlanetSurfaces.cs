@@ -44,6 +44,10 @@ public class PD_PlanetSurfaces
 		public int m_elementId = -1;
 		public int m_volume;
 		public int m_artifactId = -1;
+
+		// a Black Egg the crew chose not to arm when it was dropped ("ARM THIS DEVICE?", ITEMS-OV WE9AA) - false for an egg in a save from before the question,
+		// which was armed by being dropped
+		public bool m_leftUnarmed;
 	}
 
 	// what the terrain vehicle has dropped on the planets ("when an object is dropped on a planet's surface it can be picked up again" - the manual, page 21)

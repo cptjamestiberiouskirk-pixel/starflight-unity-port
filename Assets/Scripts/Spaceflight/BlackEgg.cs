@@ -155,7 +155,8 @@ public class BlackEgg
 
 		foreach ( var droppedCargo in playerData.m_planetSurfaces.m_droppedCargoList )
 		{
-			if ( ( droppedCargo.m_artifactId != blackEggId ) || ( droppedCargo.m_planetId < 0 ) || ( droppedCargo.m_planetId >= gameData.m_planetList.Length ) )
+			// (an egg the crew chose not to arm when they dropped it does nothing)
+			if ( ( droppedCargo.m_artifactId != blackEggId ) || droppedCargo.m_leftUnarmed || ( droppedCargo.m_planetId < 0 ) || ( droppedCargo.m_planetId >= gameData.m_planetList.Length ) )
 			{
 				continue;
 			}
