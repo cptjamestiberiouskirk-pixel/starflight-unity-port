@@ -374,7 +374,7 @@ Some things to know:
 
 ## 10. Damage, repairs and medicine
 
-**Damage** (Engineering): a bar for the hull's integrity and for each system: engines, sensors, communications, shields, missile launcher and laser cannon. A damaged system works only as well as its health.
+**Damage** (Engineering): a bar for the hull's integrity and for each system: engines, sensors, communications, shields, missile launcher and laser cannon. A damaged system works only as well as its health, and it can break down when you use it: each time you scan, hail, talk, maneuver, land, launch from a planet, raise the shields or arm the weapons, a damaged system can malfunction, with a chance as large as its damage (a system at 70% fails 3 times in 10, one at 0 every time). A system that has malfunctioned is inoperative until it is repaired: the engineer's repair ends it when the system is whole, and past 73% each repaired point may bring it back sooner. Repair's report on a system says whether it is operative. Engines shot down to nothing break down at once, so keep the engineer and some minerals aboard.
 
 **Repair** (Engineering): pick what to repair with Up and Down, and Enter. The engineer asks for the minerals the repair needs, taken from your cargo. Repairs take time, faster with a better engineer. The engineer repairs the hull and the systems, never the armor: only the Starport restores the armor. A destroyed system cannot be repaired in space: the Starport's Ship Configuration room can.
 

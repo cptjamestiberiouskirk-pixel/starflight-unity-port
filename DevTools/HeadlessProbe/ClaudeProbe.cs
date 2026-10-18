@@ -1654,6 +1654,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioStarState();
 				break;
 
+			case "malfunctions":
+				yield return ScenarioMalfunctions();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -20811,6 +20815,12 @@ public class ClaudeProbe : MonoBehaviour
 		values[ system ] = health;
 
 		field.SetValue( ship, values );
+
+		// a system made whole works again, as the game's own SetSystemHealth has it (a malfunction leaves it inoperative until then)
+		if ( health >= 100 )
+		{
+			ProbeSetInoperative( ship, (PD_PlayerShip.ShipSystem) system, false );
+		}
 	}
 
 	IEnumerator ScenarioSystemEffects()
@@ -20930,7 +20940,7 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 5. the sensors: no readings below a quarter of their health (in a star system)
+		// ---- 5. the sensors: no readings once they malfunction, as they always do at 0 (in a star system; MISC-OV (?.EQ)
 		EnterStarSystem( StarThatNeverFlares() );
 
 		var end = Time.realtimeSinceStartup + 40.0f;
@@ -20949,7 +20959,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var sensorsWhole = MessageList();
 
-		SetSystemHealth( 1, 20 );
+		SetSystemHealth( 1, 0 );
 		controller.m_messages.Clear();
 
 		new SensorsButton().Execute();
@@ -20960,13 +20970,13 @@ public class ClaudeProbe : MonoBehaviour
 
 		controller.m_encounterRange = encounterRange;
 
-		Log( "systemeffects: maximum shields " + shieldsWhole + " whole, " + shieldsHalf + " at half | top speed " + speedWhole + " whole, " + speedHalf + " at half | laser hit " + laserHits[ 0 ] + " whole, " + laserHits[ 1 ] + " at half, can fire when destroyed " + firesDestroyed + " | comm whole: " + commWhole + " | destroyed: " + commDestroyed + " | sensors whole: " + sensorsWhole + " | at 20: " + sensorsBroken );
+		Log( "systemeffects: maximum shields " + shieldsWhole + " whole, " + shieldsHalf + " at half | top speed " + speedWhole + " whole, " + speedHalf + " at half | laser hit " + laserHits[ 0 ] + " whole, " + laserHits[ 1 ] + " at half, can fire when destroyed " + firesDestroyed + " | comm whole: " + commWhole + " | destroyed: " + commDestroyed + " | sensors whole: " + sensorsWhole + " | at 0: " + sensorsBroken );
 
 		Check( "systemeffects: a damaged shield generator holds less charge (half of it at half its health)", ( shieldsWhole > 0 ) && ( shieldsHalf == shieldsWhole / 2 ), shieldsWhole + " -> " + shieldsHalf );
 		Check( "systemeffects: in hyperspace engines at half health keep the top speed (the original's engine damage counts only in an encounter's acceleration, HYPER-OV !S/A)", ( speedWhole > 0.0f ) && Mathf.Abs( speedHalf - speedWhole ) < 0.01f, speedWhole + " -> " + speedHalf );
 		Check( "systemeffects: a damaged laser cannon does less damage, and a destroyed one does not fire", ( laserHits[ 0 ] > 0 ) && ( laserHits[ 1 ] == Mathf.RoundToInt( laserHits[ 0 ] / 2.0f ) ) && !firesDestroyed, laserHits[ 0 ] + " -> " + laserHits[ 1 ] + ", " + firesDestroyed );
 		Check( "systemeffects: destroyed comm equipment garbles what a fully trained officer understands", commWhole.Contains( speminComm.m_text ) && !commDestroyed.Contains( speminComm.m_text ), commDestroyed );
-		Check( "systemeffects: badly damaged sensors give no readings", sensorsWhole.Contains( "Star System Scan" ) && sensorsBroken.Contains( "too badly damaged" ), sensorsBroken );
+		Check( "systemeffects: destroyed sensors malfunction and give no readings", sensorsWhole.Contains( "Star System Scan" ) && sensorsBroken.Contains( "Sensors: MALFUNCTION" ) && !sensorsBroken.Contains( "Star System Scan" ), sensorsBroken );
 
 		Finish( "scenario=systemeffects shields=" + shieldsWhole + "/" + shieldsHalf + " speed=" + speedWhole + "/" + speedHalf + " laser=" + laserHits[ 0 ] + "/" + laserHits[ 1 ], 0 );
 	}
@@ -21129,6 +21139,9 @@ public class ClaudeProbe : MonoBehaviour
 		SetSystemHealth( 1, 10 );
 		SetSystemHealth( 5, 100 );
 
+		// the sensors have broken down (the functionality line reads the breakdown, ENGINEER WF080)
+		ProbeSetInoperative( DataController.m_instance.m_playerData.m_playerShip, PD_PlayerShip.ShipSystem.Sensors, true );
+
 		const int molybdenum = 11;
 
 		ship.AddElement( molybdenum, 100 );
@@ -21167,7 +21180,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "repairchoice: display shown " + displayShown + ", first row " + firstRow + " | hull: " + hullText + " | engines: " + enginesText + " | sensors: " + sensorsText + " | missiles (row " + cursorOnMissiles + "): " + missileText + " -> fire: '" + afterMissiles + "', cursor " + cursorAfterChoice + ", under way " + underWayAfterMissiles );
 
 		Check( "repairchoice: Repair puts up the DAMAGE display with its cursor on the hull, which it tells about (moderately damaged at half, its efficiency and the time a complete repair takes, no functionality line for the hull)", displayShown && ( firstRow == 0 ) && hullText.Contains( "Hull: Moderately damaged/Efficiency: 50%/Estimated time for complete repairs:/" ) && System.Text.RegularExpressions.Regex.IsMatch( hullText, @"repairs:/\d+ (minute|hour|day)s?\." ) && !hullText.Contains( "functionality" ), displayShown + ", row " + firstRow + " | " + hullText );
-		Check( "repairchoice: the stick moves the cursor down the rows, and each tells its damage in the original's words and whether it works (the engines at 30 heavily damaged and operative, the sensors at 10 critically damaged and inoperative below 25)", enginesText.StartsWith( "<color=white>Engines: Heavily damaged/Efficiency: 30%/Current functionality: Operative/" ) && sensorsText.StartsWith( "<color=white>Sensors: Critically damaged/Efficiency: 10%/Current functionality: Inoperative/" ), enginesText + " | " + sensorsText );
+		Check( "repairchoice: the stick moves the cursor down the rows, and each tells its damage in the original's words and whether it works (the engines at 30 heavily damaged and operative, the sensors at 10 critically damaged and inoperative, as they have broken down)", enginesText.StartsWith( "<color=white>Engines: Heavily damaged/Efficiency: 30%/Current functionality: Operative/" ) && sensorsText.StartsWith( "<color=white>Sensors: Critically damaged/Efficiency: 10%/Current functionality: Inoperative/" ), enginesText + " | " + sensorsText );
 		Check( "repairchoice: a row the ship has not got says NONE, and the fire button on it ends the choice and does nothing else", ( cursorOnMissiles == 5 ) && ( missileText == "<color=white>Missile launcher: None</color>" ) && ( cursorAfterChoice == -1 ) && !underWayAfterMissiles, "row " + cursorOnMissiles + ", '" + missileText + "', cursor after " + cursorAfterChoice + ", under way " + underWayAfterMissiles );
 
 		// ---- 2. the fire button on the engines: the repair begins, and the engineer asks for its mineral
@@ -44856,6 +44869,252 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "starstate: one of skill 100 can about half the time (skill / 200)", ( halfSkill >= 8 ) && ( halfSkill <= 32 ), halfSkill + " of 40 not certain" );
 
 		Finish( "scenario=starstate checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- damaged equipment malfunctions (since 2026-10-18)
+
+	// whether a system has broken down, read by reflection so that the scenario also compiles on the code from before the rule (where nothing ever breaks down)
+	static bool ProbeIsInoperative( PD_PlayerShip ship, PD_PlayerShip.ShipSystem system )
+	{
+		var method = typeof( PD_PlayerShip ).GetMethod( "IsInoperative", c_any );
+
+		return ( method != null ) && (bool) method.Invoke( ship, new object[] { system } );
+	}
+
+	static void ProbeSetInoperative( PD_PlayerShip ship, PD_PlayerShip.ShipSystem system, bool inoperative )
+	{
+		var method = typeof( PD_PlayerShip ).GetMethod( "SetInoperative", c_any );
+
+		if ( method != null )
+		{
+			method.Invoke( ship, new object[] { system, inoperative } );
+		}
+	}
+
+	// repairs exactly one point of a system, as the engineer's repairs do once a point's work is done
+	static void RepairOnePoint( PD_PlayerShip ship, PD_PlayerShip.ShipSystem system )
+	{
+		ship.m_repairItem = (int) system + 1;
+		ship.m_repairsAreUnderWay = true;
+		ship.m_repairProgress = 1.0f;
+
+		Call( ship, "UpdateSystemRepairs", 0.0f );
+	}
+
+	// the original's equipment check (MISC-OV (?.EQ through OV?.EQUIP-OK): a damaged system malfunctions when it is used with a chance of its damage in percent, and
+	// then stays inoperative until it is repaired; the sensors, the comm, the engines, the shields and each weapon are checked before they are used, engines shot
+	// down to nothing break down at once, a repair that makes a system whole makes it work, and past 73 each repaired point has a chance of 1 in 5 to (REPAIR-OV).
+	// The code before had no malfunctions: a damaged system always worked, and the sensors refused only below a quarter of their health
+	IEnumerator ScenarioMalfunctions()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var sensors = PD_PlayerShip.ShipSystem.Sensors;
+		var engines = PD_PlayerShip.ShipSystem.Engines;
+
+		EnsureCrew();
+
+		controller.m_encounterRange = 0.0f;
+
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
+
+		for ( var end = Time.realtimeSinceStartup + 60.0f; ( Time.realtimeSinceStartup < end ) && controller.m_starSystem.GeneratingPlanets(); )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 10 );
+
+		// a ship with shields, missiles and lasers, all whole, and fuel
+		ship.m_shieldingClass = Mathf.Max( 1, ship.m_shieldingClass );
+		ship.m_missileLauncherClass = Mathf.Max( 1, ship.m_missileLauncherClass );
+		ship.m_laserCannonClass = Mathf.Max( 1, ship.m_laserCannonClass );
+		ship.RestoreSystems();
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+
+		if ( ship.m_elementStorage.Find( 5 ) == null )
+		{
+			ship.AddElement( 5, 50 );
+		}
+
+		// ---- 1. whole systems never malfunction (control)
+		var wholeFailures = 0;
+
+		for ( var i = 0; i < 20; i++ )
+		{
+			if ( !PressAndRead( new SensorsButton() ).Contains( "Star System Scan" ) )
+			{
+				wholeFailures++;
+			}
+
+			PressAndRead( new RaiseShieldsButton() );
+
+			if ( !ship.m_shieldsAreUp )
+			{
+				wholeFailures++;
+			}
+
+			ship.DropShields();
+
+			if ( PressAndRead( new ArmWeaponButton() ).Contains( "MALFUNCTION" ) || !ship.m_weaponsAreArmed )
+			{
+				wholeFailures++;
+			}
+
+			ship.m_weaponsAreArmed = false;
+		}
+
+		// ---- 2. sensors at 0 always malfunction, and then say they are inoperative even once they are better (no roll)
+		ship.SetSystemHealth( sensors, 0 );
+
+		var sensorsAtZero = PressAndRead( new SensorsButton() );
+		var sensorsBrokeDown = ProbeIsInoperative( ship, sensors );
+
+		ship.SetSystemHealth( sensors, 90 );
+
+		var sensorsInoperative = PressAndRead( new SensorsButton() );
+
+		// ---- 3. at half health they malfunction about half the time
+		var halfMalfunctions = 0;
+
+		ship.SetSystemHealth( sensors, 50 );
+
+		for ( var i = 0; i < 100; i++ )
+		{
+			ProbeSetInoperative( ship, sensors, false );
+
+			if ( PressAndRead( new SensorsButton() ).Contains( "Sensors: MALFUNCTION" ) )
+			{
+				halfMalfunctions++;
+			}
+		}
+
+		ProbeSetInoperative( ship, sensors, false );
+		ship.SetSystemHealth( sensors, 100 );
+
+		// ---- 4. engines at 0: Maneuver malfunctions and then is refused
+		ship.SetSystemHealth( engines, 0 );
+
+		var maneuverFirst = new ManeuverButton();
+		controller.m_messages.Clear();
+		var maneuverFirstStarted = maneuverFirst.Execute();
+		var maneuverFirstText = MessageList();
+
+		var maneuverSecond = new ManeuverButton();
+		controller.m_messages.Clear();
+		var maneuverSecondStarted = maneuverSecond.Execute();
+		var maneuverSecondText = MessageList();
+
+		playerData.m_general.m_currentSpeed = 0.0f;
+		controller.m_playerShip.TurnOffEngines();
+
+		// ---- 5. engines shot down to nothing break down at once
+		ship.SetSystemHealth( engines, 100 );
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Hull, 100 );
+
+		controller.m_messages.Clear();
+
+		ship.DamageSystem( engines, 1000 );
+
+		var enginesShotDown = ( ship.GetSystemHealth( engines ) == 0 ) && ProbeIsInoperative( ship, engines );
+		var enginesShotText = MessageList();
+
+		ship.RestoreSystems();
+
+		// ---- 6. the shield generator at 0 raises nothing
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Shields, 0 );
+
+		var shieldsText = PressAndRead( new RaiseShieldsButton() );
+		var shieldsUp = ship.m_shieldsAreUp;
+
+		ship.DropShields();
+		ship.RestoreSystems();
+
+		// ---- 7. the missile launcher at 0 is not armed, the lasers are
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Missiles, 0 );
+
+		var armText = PressAndRead( new ArmWeaponButton() );
+		var armedAfter = ship.m_weaponsAreArmed;
+
+		ship.m_weaponsAreArmed = false;
+		ship.RestoreSystems();
+
+		// ---- 8. the comm at 0 cannot answer a hail
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Comm, 0 );
+
+		var respondStarted = new RespondButton().Execute();
+		var respondText = MessageList();
+
+		controller.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Bridge );
+
+		var commBrokeDown = ProbeIsInoperative( ship, PD_PlayerShip.ShipSystem.Comm );
+
+		// ---- 9. the damage report reads the breakdown, and a repair that makes the comm whole makes it work
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Comm, 99 );
+
+		var commItem = (int) PD_PlayerShip.ShipSystem.Comm + 1;
+		var reportInoperative = !ship.IsRepairItemOperative( commItem );
+
+		RepairOnePoint( ship, PD_PlayerShip.ShipSystem.Comm );
+
+		var repairedWorks = ( ship.GetSystemHealth( PD_PlayerShip.ShipSystem.Comm ) == 100 ) && !ProbeIsInoperative( ship, PD_PlayerShip.ShipSystem.Comm ) && ship.IsRepairItemOperative( commItem );
+
+		// ---- 10. past 73 each repaired point makes a broken system work with a chance of 1 in 5, and below it never
+		var earlyHigh = 0;
+		var earlyLow = 0;
+
+		for ( var i = 0; i < 200; i++ )
+		{
+			ship.SetSystemHealth( sensors, 80 );
+			ProbeSetInoperative( ship, sensors, true );
+			RepairOnePoint( ship, sensors );
+
+			if ( ProbeIsInoperative( ship, sensors ) == false )
+			{
+				earlyHigh++;
+			}
+
+			ship.SetSystemHealth( sensors, 50 );
+			ProbeSetInoperative( ship, sensors, true );
+			RepairOnePoint( ship, sensors );
+
+			if ( ProbeIsInoperative( ship, sensors ) == false )
+			{
+				earlyLow++;
+			}
+		}
+
+		ship.m_repairsAreUnderWay = false;
+
+		// ---- 11. a breakdown is saved, and the Starport's repairs end it
+		ship.SetSystemHealth( sensors, 60 );
+		ProbeSetInoperative( ship, sensors, true );
+
+		var copy = JsonUtility.FromJson<PD_PlayerShip>( JsonUtility.ToJson( ship ) );
+		var savedBreakdown = ProbeIsInoperative( copy, sensors );
+
+		ship.RestoreSystems();
+
+		var starportFixes = !ProbeIsInoperative( ship, sensors );
+
+		Log( "malfunctions: whole failures " + wholeFailures + " | sensors at 0 '" + sensorsAtZero + "' broke down " + sensorsBrokeDown + " | at 90 after '" + sensorsInoperative + "' | at 50: " + halfMalfunctions + " of 100 | maneuver " + maneuverFirstStarted + " '" + maneuverFirstText + "' then " + maneuverSecondStarted + " '" + maneuverSecondText + "' | engines shot " + enginesShotDown + " '" + enginesShotText + "' | shields '" + shieldsText + "' up " + shieldsUp + " | arm '" + armText + "' armed " + armedAfter + " | respond " + respondStarted + " '" + respondText + "' broke down " + commBrokeDown + " | report inoperative " + reportInoperative + ", repaired works " + repairedWorks + " | early at 80: " + earlyHigh + " of 200, at 50: " + earlyLow + " | saved " + savedBreakdown + ", Starport " + starportFixes );
+
+		Check( "malfunctions: whole systems never malfunction (control)", wholeFailures == 0, wholeFailures + " failures in 20 rounds" );
+		Check( "malfunctions: sensors at 0 malfunction, give no reading and break down (the code before refused them as too badly damaged)", sensorsAtZero.Contains( "Sensors: MALFUNCTION" ) && !sensorsAtZero.Contains( "Star System Scan" ) && sensorsBrokeDown, sensorsAtZero );
+		Check( "malfunctions: sensors that have broken down say so with no roll, though now at 90", sensorsInoperative.Contains( "Sensors: inoperative." ) && !sensorsInoperative.Contains( "Star System Scan" ), sensorsInoperative );
+		Check( "malfunctions: at half health the sensors malfunction about half the time", ( halfMalfunctions >= 30 ) && ( halfMalfunctions <= 70 ), halfMalfunctions + " of 100" );
+		Check( "malfunctions: engines at 0 malfunction on Maneuver, which then says they are inoperative, and the ship does not maneuver", !maneuverFirstStarted && maneuverFirstText.Contains( "Engines: MALFUNCTION" ) && !maneuverSecondStarted && maneuverSecondText.Contains( "Engines: inoperative." ), maneuverFirstStarted + " " + maneuverFirstText + " | " + maneuverSecondStarted + " " + maneuverSecondText );
+		Check( "malfunctions: engines shot down to nothing break down at once, with the malfunction's line", enginesShotDown && enginesShotText.Contains( "Engines: MALFUNCTION" ), enginesShotText );
+		Check( "malfunctions: a shield generator at 0 malfunctions and the shields stay down", shieldsText.Contains( "Shields: MALFUNCTION" ) && !shieldsUp, shieldsText );
+		Check( "malfunctions: a missile launcher at 0 malfunctions and only the lasers arm", armText.Contains( "Missiles: MALFUNCTION" ) && armText.Contains( "Arming lasers." ) && !armText.Contains( "Arming missiles." ) && armedAfter, armText );
+		Check( "malfunctions: comm equipment at 0 malfunctions and cannot answer a hail", !respondStarted && respondText.Contains( "Communications: MALFUNCTION" ) && commBrokeDown, respondStarted + " " + respondText );
+		Check( "malfunctions: the damage report says a broken down system is inoperative, and the repair that makes it whole makes it work", reportInoperative && repairedWorks, reportInoperative + " " + repairedWorks );
+		Check( "malfunctions: past 73 a repaired point makes a broken system work about one time in 5, and below it never", ( earlyHigh >= 20 ) && ( earlyHigh <= 65 ) && ( earlyLow == 0 ), earlyHigh + " of 200 at 80, " + earlyLow + " at 50" );
+		Check( "malfunctions: a breakdown is saved, and the Starport's repairs end it", savedBreakdown && starportFixes, savedBreakdown + " " + starportFixes );
+
+		Finish( "scenario=malfunctions checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

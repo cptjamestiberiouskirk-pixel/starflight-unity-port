@@ -22,9 +22,11 @@ public class ArmWeaponButton : ShipButton
 		}
 		else
 		{
-			playerData.m_playerShip.ArmWeapons();
-
-			SoundController.m_instance.PlaySound( SoundController.Sound.Update );
+			// each weapon goes through the equipment check, and one that has broken down or malfunctions now is not armed (NAVIGATR WF3FB)
+			if ( playerData.m_playerShip.ArmWeapons() )
+			{
+				SoundController.m_instance.PlaySound( SoundController.Sound.Update );
+			}
 
 			SpaceflightController.m_instance.m_buttonController.SetManeuverButtons();
 		}
