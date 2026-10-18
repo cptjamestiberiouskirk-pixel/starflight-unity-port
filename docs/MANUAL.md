@@ -424,6 +424,7 @@ This is a faithful remake of *Starflight* (Binary Systems, Electronic Arts, 1986
 Known differences:
 
 - **Combat**: shields recharge at the port's own pace during a fight.
+- **Flight**: the ship's top speed follows its engines (class 1 at a third of the original's, class 5 at all of it); in the original every ship flew at the same speed.
 
 ---
 
