@@ -42236,7 +42236,8 @@ public class ClaudeProbe : MonoBehaviour
 		buttonController.ChangeButtonSet( ButtonController.ButtonSet.TerrainVehicle );
 	}
 
-	// the beam of the mining laser being drawn, if it is (a LaserBeam under the disembarked location with its glow on), and how wide it is
+	// the beam of the mining laser being drawn, if it is (a LaserBeam under the disembarked location with its glow on), and how wide it is drawn: the width it is set
+	// to (LaserBeam.SetScale), not the line's in this frame, which fades with each pulse of the beam (a frame late in a pulse read 0.10 on a busy PC)
 	static bool MiningBeamShows( out float width )
 	{
 		width = 0.0f;
@@ -42245,7 +42246,9 @@ public class ClaudeProbe : MonoBehaviour
 		{
 			if ( beam.TryGetComponent<LineRenderer>( out var line ) && line.enabled && beam.IsActive() )
 			{
-				width = line.startWidth;
+				var setWidth = FieldOrNull( beam, "m_startWidth" );
+
+				width = ( setWidth is float ) ? (float) setWidth : line.startWidth;
 
 				return true;
 			}
