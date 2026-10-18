@@ -144,6 +144,90 @@ public class ShipCargoButton : ShipButton
 		return true;
 	}
 
+	// true if the marked item is an element, with its volume in tenths of a cubic meter (the original asks how much of an element to jettison)
+	public static bool MarkedItemIsElement( out int volume )
+	{
+		var items = BuildCargoItems();
+
+		volume = 0;
+
+		if ( items.Count == 0 )
+		{
+			return false;
+		}
+
+		var item = items[ UnityEngine.Mathf.Clamp( s_markedItem, 0, items.Count - 1 ) ];
+
+		if ( item.m_kind != ItemKind.Element )
+		{
+			return false;
+		}
+
+		volume = DataController.m_instance.m_playerData.m_playerShip.m_elementStorage.m_elementList[ item.m_index ].m_volume;
+
+		return true;
+	}
+
+	// jettisons the marked item, as the original's JETTISON (CAPTAIN WECDF: TOSS, the Trade Depot's SELL-IT with no depot, so nothing is paid): an artifact or a
+	// specimen goes whole, an element by this volume in tenths of a cubic meter (0 jettisons nothing); then the list again, or back to the command buttons with
+	// the hold empty - returns false if nothing was jettisoned
+	public static bool JettisonMarkedItem( int elementVolume )
+	{
+		var playerShip = DataController.m_instance.m_playerData.m_playerShip;
+		var items = BuildCargoItems();
+
+		if ( items.Count == 0 )
+		{
+			return false;
+		}
+
+		var item = items[ UnityEngine.Mathf.Clamp( s_markedItem, 0, items.Count - 1 ) ];
+
+		switch ( item.m_kind )
+		{
+			case ItemKind.Element:
+			{
+				var elementReference = playerShip.m_elementStorage.m_elementList[ item.m_index ];
+				var volume = UnityEngine.Mathf.Clamp( elementVolume, 0, elementReference.m_volume );
+
+				if ( volume <= 0 )
+				{
+					ShowCargoList();
+
+					return false;
+				}
+
+				playerShip.RemoveElement( elementReference.m_elementId, volume );
+
+				break;
+			}
+
+			case ItemKind.Artifact:
+				playerShip.RemoveArtifact( playerShip.m_artifactStorage.m_artifactList[ item.m_index ].m_artifactId );
+				break;
+
+			case ItemKind.Specimen:
+				playerShip.RemoveSpecimen( playerShip.GetSpecimenStorage().m_specimenList[ item.m_index ] );
+				break;
+		}
+
+		// the hold empty: back to the command buttons, as the original's list ends
+		if ( IsHoldEmpty() )
+		{
+			CloseCargoList();
+
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Starship hold is empty.</color>" );
+
+			return true;
+		}
+
+		s_markedItem = UnityEngine.Mathf.Clamp( s_markedItem, 0, BuildCargoItems().Count - 1 );
+
+		ShowCargoList();
+
+		return true;
+	}
+
 	// everything in the ship's hold that can be marked, in the order of the list (each kind's items the one put in last first)
 	public static System.Collections.Generic.List<CargoItem> BuildCargoItems()
 	{

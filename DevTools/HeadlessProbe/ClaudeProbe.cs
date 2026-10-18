@@ -1686,6 +1686,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCargoDescribe();
 				break;
 
+			case "jettison":
+				yield return ScenarioJettison();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -46090,6 +46094,147 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "cargodescribe: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=cargodescribe checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: jettison from the ship's hold (roadmap 8.17)
+
+	// the tenths of a cubic meter of this element in the ship's hold
+	static int ShipElementVolume( int elementId )
+	{
+		var storage = DataController.m_instance.m_playerData.m_playerShip.m_elementStorage;
+		var volume = 0;
+
+		if ( ( storage != null ) && ( storage.m_elementList != null ) )
+		{
+			foreach ( var reference in storage.m_elementList )
+			{
+				if ( reference.m_elementId == elementId )
+				{
+					volume += reference.m_volume;
+				}
+			}
+		}
+
+		return volume;
+	}
+
+	IEnumerator ScenarioJettison()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var errorsBefore = s_errorCount;
+
+		EnsureCrew();
+		ProbeKeyboard();
+
+		yield return Frames( 5 );
+
+		// the hold: 20.0 cubic meters of Endurium, the Blue Bauble and a specimen - the list runs Endurium, Blue Bauble, the specimen
+		var enduriumId = gameData.m_misc.m_enduriumElementId;
+		var baubleId = Array.FindIndex( gameData.m_artifactList, artifact => artifact.m_name == "Blue Bauble" );
+
+		if ( ( enduriumId < 0 ) || ( baubleId < 0 ) )
+		{
+			Finish( "scenario=jettison abort: missing game data (" + enduriumId + " " + baubleId + ")", 2 );
+			yield break;
+		}
+
+		ship.m_elementStorage.Reset();
+		ship.m_artifactStorage.Reset();
+		ship.GetSpecimenStorage().m_specimenList.Clear();
+
+		ship.AddElement( enduriumId, 200 );
+		ship.AddArtifact( baubleId );
+		ship.AddSpecimen( new PD_Specimen { m_planetId = 90, m_speciesIndex = 0, m_name = "Jettison Specimen", m_volume = 20, m_value = 400 } );
+
+		PressButtonLabelled( ButtonController.ButtonSet.CommandB, "Cargo" );
+
+		yield return Frames( 5 );
+
+		var labels = ButtonSetLabels( controller.m_buttonController.GetCurrentButtonSet() );
+
+		// ---- 1. Jettison on the Endurium: "JETTISON HOW MANY CUBIC METERS? ENTER VOLUME (0-20.0)" (TDEPOT-OV KEY-ELEM-AMT), the stick and the number keys set it,
+		// Enter jettisons it (every key only once the question is up: before the change Enter would press a command button)
+		var asked = "";
+		var afterStick = "";
+		var afterTyping = "";
+
+		if ( PressIfThere( "Jettison" ) )
+		{
+			yield return Frames( 3 );
+
+			asked = MessageList();
+
+			if ( asked.Contains( "Jettison how many cubic meters?" ) )
+			{
+				yield return Tap( Key.DownArrow );
+				yield return Tap( Key.LeftArrow );
+
+				afterStick = MessageList();
+
+				yield return Tap( Key.Digit5 );
+				yield return Tap( Key.Period );
+				yield return Tap( Key.Digit5 );
+
+				afterTyping = MessageList();
+
+				yield return Tap( Key.Enter );
+				yield return Frames( 3 );
+			}
+		}
+
+		var enduriumAfterJettison = ShipElementVolume( enduriumId );
+
+		// ---- 2. the Blue Bauble (Next) and then the specimen (the marker stays on the second item) go at once
+		PressIfThere( "Next" );
+
+		yield return Frames( 2 );
+
+		PressIfThere( "Jettison" );
+
+		yield return Frames( 3 );
+
+		var baubleGone = !ship.m_artifactStorage.m_artifactList.Exists( artifact => artifact.m_artifactId == baubleId );
+
+		PressIfThere( "Jettison" );
+
+		yield return Frames( 3 );
+
+		var specimenGone = ship.GetSpecimenStorage().m_specimenList.Count == 0;
+
+		// ---- 3. Jettison on the Endurium with 0: nothing goes
+		var zeroAsked = false;
+
+		if ( PressIfThere( "Jettison" ) )
+		{
+			yield return Frames( 3 );
+
+			if ( MessageList().Contains( "Jettison how many cubic meters?" ) )
+			{
+				zeroAsked = true;
+
+				yield return Tap( Key.Digit0 );
+				yield return Tap( Key.Enter );
+				yield return Frames( 3 );
+			}
+		}
+
+		var enduriumAfterZero = ShipElementVolume( enduriumId );
+
+		Log( "jettison: console [" + labels + "] | asked '" + asked + "' | after the stick '" + afterStick + "' | after typing '" + afterTyping + "' | Endurium " + enduriumAfterJettison + " | Blue Bauble gone " + baubleGone + ", specimen gone " + specimenGone + " | 0 asked " + zeroAsked + ", Endurium " + enduriumAfterZero + " | used " + ship.m_volumeUsed );
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "jettison: Jettison on an element asks how many cubic meters, offering all of it", asked.Contains( "Jettison how many cubic meters?" ) && asked.Contains( "(0-20.0): 20.0" ), asked );
+		Check( "jettison: the stick steps the volume, down a cubic meter and left a tenth", afterStick.Contains( "): 18.9" ), afterStick );
+		Check( "jettison: the number keys type the volume, and Enter jettisons that much", afterTyping.Contains( "): 5.5" ) && ( enduriumAfterJettison == 145 ), afterTyping + " | " + enduriumAfterJettison );
+		Check( "jettison: an artifact and a specimen go at once", baubleGone && specimenGone, baubleGone + " " + specimenGone );
+		Check( "jettison: 0 jettisons nothing", zeroAsked && ( enduriumAfterZero == 145 ), zeroAsked + " " + enduriumAfterZero );
+		Check( "jettison: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=jettison checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
