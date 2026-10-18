@@ -1622,6 +1622,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioTvModel();
 				break;
 
+			case "ruinmodels":
+				yield return ScenarioRuinModels();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -43701,6 +43705,98 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "tvmodel: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=tvmodel textured=" + bodyTextured + "/" + wheelsTextured + " triangles=" + bodyTriangles + "/" + wheelTriangles + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the ancient ruins' models (DevTools/ShipModels/import_meshy_props.py)
+
+	IEnumerator ScenarioRuinModels()
+	{
+		var controller = SpaceflightController.m_instance;
+		var ruins = controller.m_disembarked.m_terrainGrid.m_terrainRuins;
+		var errorsBefore = s_errorCount;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// ---- 1. the five templates (the model files themselves): each in its own textured material with the glyphs' glow, light enough, the old ruins' size
+		var textured = 0;
+		var light = 0;
+		var sized = 0;
+		var details = new List<string>();
+
+		for ( var i = 0; i < ruins.m_ruinTemplates.Length; i++ )
+		{
+			var template = ruins.m_ruinTemplates[ i ];
+			var renderer = ( template != null ) ? template.GetComponentInChildren<MeshRenderer>( true ) : null;
+			var filter = ( template != null ) ? template.GetComponentInChildren<MeshFilter>( true ) : null;
+			var material = ( renderer != null ) ? renderer.sharedMaterial : null;
+			var mesh = ( filter != null ) ? filter.sharedMesh : null;
+
+			if ( ( material != null ) && ( material.name == "Ancient Ruins " + ( i + 1 ) ) && ( material.GetTexture( "_MainTex" ) != null ) && ( material.GetTexture( "SF_EmissiveMap" ) != null ) && ( renderer.sharedMaterials.Length == 1 ) )
+			{
+				textured++;
+			}
+
+			var triangles = TriangleCount( mesh );
+
+			if ( ( triangles > 1000 ) && ( triangles < 10000 ) )
+			{
+				light++;
+			}
+
+			// (the old ruins stand on a square of 24, and the new ones on the same square)
+			var size = ( mesh != null ) ? Vector3.Scale( mesh.bounds.size, filter.transform.lossyScale ) : Vector3.zero;
+			var footprint = Mathf.Max( size.x, Mathf.Max( size.y, size.z ) );
+
+			if ( Mathf.Abs( footprint - 24.0f ) < 2.4f )
+			{
+				sized++;
+			}
+
+			details.Add( ( ( template != null ) ? template.name : "none" ) + ": " + ( ( material != null ) ? material.name : "no material" ) + ", " + triangles + " triangles, " + size.ToString( "F1" ) );
+		}
+
+		Log( "ruinmodels: " + ruins.m_ruinTemplates.Length + " templates: " + string.Join( " | ", details ) );
+
+		// ---- 2. on the ground of planet 94 (one random ruin): the placed ruin is in its textured material
+		yield return LandOnPlanet94At( Vector3.zero, done );
+
+		var randomRuins = RandomRuinsOnTheGround();
+		var placedTextured = randomRuins.Count > 0;
+
+		foreach ( var ruin in randomRuins )
+		{
+			var renderer = ruin.GetComponentInChildren<MeshRenderer>( true );
+			var material = ( renderer != null ) ? renderer.sharedMaterial : null;
+
+			placedTextured &= ( material != null ) && material.name.StartsWith( "Ancient Ruins " ) && ( material.GetTexture( "_MainTex" ) != null );
+		}
+
+		// (with -Graphics, a picture of the vehicle beside the ruin)
+		if ( ( SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null ) && ( randomRuins.Count > 0 ) )
+		{
+			var place = randomRuins[ 0 ].transform.position;
+
+			controller.SwitchLocation( PD_General.Location.Planetside );
+
+			yield return Frames( 5 );
+			yield return LandOnPlanet94At( place + Vector3.forward * 40.0f, done );
+			yield return Frames( 10 );
+
+			RenderScreenPicture( System.IO.Path.Combine( System.IO.Path.GetTempPath(), "starflight-probe", "ruinmodels-on-94.png" ) );
+		}
+
+		Log( "ruinmodels: planet 94: " + randomRuins.Count + " random ruins on the ground, in their textured materials " + placedTextured );
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "ruinmodels: each of the five ancient ruins is in its own textured material, with the glyphs' glow", ( ruins.m_ruinTemplates.Length == 5 ) && ( textured == 5 ), textured + "/" + ruins.m_ruinTemplates.Length );
+		Check( "ruinmodels: each ruin is light enough, under 10,000 triangles", light == 5, light.ToString() );
+		Check( "ruinmodels: each ruin stands on the old ruins' square of 24", sized == 5, sized.ToString() );
+		Check( "ruinmodels: a ruin placed on the ground is in its textured material", placedTextured, randomRuins.Count + " " + placedTextured );
+		Check( "ruinmodels: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=ruinmodels textured=" + textured + " light=" + light + " sized=" + sized + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

@@ -1,0 +1,111 @@
+{
+	"name": "Ancient Ruins",
+	"textureSize": 1024,
+	"props": [
+		{
+			"glb": "ruin-1.glb",
+			"fbx": "Assets/Game Objects/Ancient Ruins/Ancient Ruins 1.fbx",
+			"material": "Ancient Ruins 1",
+			"materialFolder": "Assets/Game Objects/Ancient Ruins",
+			"textures": "Assets/Game Objects/Ancient Ruins/Textures",
+			"fit": "footprint",
+			"glow": {
+				"hue": [
+					150.0,
+					210.0
+				],
+				"saturation": 0.12,
+				"value": 0.3
+			},
+			"meshy": {
+				"concept": "01a14bfd-2a91-7055-a4ce-043183b30794",
+				"model": "01a14c0e-1bf8-7445-8ea6-d57ce877f7aa",
+				"remesh": "01a14c0f-8148-73d2-a721-4f4ab749b107"
+			}
+		},
+		{
+			"glb": "ruin-2.glb",
+			"fbx": "Assets/Game Objects/Ancient Ruins/Ancient Ruins 2.fbx",
+			"material": "Ancient Ruins 2",
+			"materialFolder": "Assets/Game Objects/Ancient Ruins",
+			"textures": "Assets/Game Objects/Ancient Ruins/Textures",
+			"fit": "footprint",
+			"glow": {
+				"hue": [
+					150.0,
+					210.0
+				],
+				"saturation": 0.12,
+				"value": 0.3
+			},
+			"meshy": {
+				"concept": "01a14bfd-cc7c-768d-8a89-f24ef6716910",
+				"model": "01a14c0e-2127-73ba-b181-c575055c82d4",
+				"remesh": "01a14c0f-8505-7326-881a-c6f38070cb7d"
+			}
+		},
+		{
+			"glb": "ruin-3.glb",
+			"fbx": "Assets/Game Objects/Ancient Ruins/Ancient Ruins 3.fbx",
+			"material": "Ancient Ruins 3",
+			"materialFolder": "Assets/Game Objects/Ancient Ruins",
+			"textures": "Assets/Game Objects/Ancient Ruins/Textures",
+			"fit": "footprint",
+			"glow": {
+				"hue": [
+					150.0,
+					210.0
+				],
+				"saturation": 0.12,
+				"value": 0.3
+			},
+			"meshy": {
+				"concept": "01a14bfe-326f-7103-89c7-fe7cb106ce7f",
+				"model": "01a14c0e-262e-776c-b471-1f61caf97c2c",
+				"remesh": "01a14c0f-8982-7700-8a7c-5b7ea66663d6"
+			}
+		},
+		{
+			"glb": "ruin-4.glb",
+			"fbx": "Assets/Game Objects/Ancient Ruins/Ancient Ruins 4.fbx",
+			"material": "Ancient Ruins 4",
+			"materialFolder": "Assets/Game Objects/Ancient Ruins",
+			"textures": "Assets/Game Objects/Ancient Ruins/Textures",
+			"fit": "footprint",
+			"glow": {
+				"hue": [
+					150.0,
+					210.0
+				],
+				"saturation": 0.12,
+				"value": 0.3
+			},
+			"meshy": {
+				"concept": "01a14bff-2411-7240-a21c-340b6eefd56c",
+				"model": "01a14c0e-2b4f-70e8-a1ce-d29eef0d9749",
+				"remesh": "01a14c0f-8ece-751e-8477-014f542501be"
+			}
+		},
+		{
+			"glb": "ruin-5.glb",
+			"fbx": "Assets/Game Objects/Ancient Ruins/Ancient Ruins 5.fbx",
+			"material": "Ancient Ruins 5",
+			"materialFolder": "Assets/Game Objects/Ancient Ruins",
+			"textures": "Assets/Game Objects/Ancient Ruins/Textures",
+			"fit": "footprint",
+			"glow": {
+				"hue": [
+					150.0,
+					210.0
+				],
+				"saturation": 0.12,
+				"value": 0.3
+			},
+			"meshy": {
+				"concept": "01a14bff-89f9-7767-bdf1-cb8c594b2483",
+				"model": "01a14c0e-3044-751e-9ccb-66c6367e019e",
+				"remesh": "01a14c0f-9410-71cd-9d29-3babeab4e381"
+			}
+		}
+	]
+}

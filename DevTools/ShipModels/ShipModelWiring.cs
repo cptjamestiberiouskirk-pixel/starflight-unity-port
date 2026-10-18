@@ -7,8 +7,9 @@
 // materials), puts an inactive instance of the model under the other model templates of the Encounter location
 // (layer Encounter), and points the vessel's slots of Encounter.m_alienShipModelTemplate and m_alienShipDebrisTemplate
 // at the instance and the debris model. The player's ship and the terrain vehicle keep their old node names (their manifests
-// have a playerShip or a terrainVehicle section): their scene copies lose the old models' material overrides instead. Running
-// it again replaces what an earlier run made.
+// have a playerShip or a terrainVehicle section): their scene copies lose the old models' material overrides instead. The
+// models of a models section (ground props) only have their import set up with their materials. Running it again replaces
+// what an earlier run made.
 
 using System;
 using System.Collections.Generic;
@@ -78,6 +79,15 @@ public static class ShipModelWiring
 		public float colliderRadius;
 	}
 
+	// a model whose import alone takes the manifest's materials (import_meshy_props.py: the ancient ruins, the rocks and the deposits
+	// with shapes of their own, which keep their old node names and are placed by the game as they were)
+	[Serializable]
+	public class ModelEntry
+	{
+		public string model;
+		public string[] materials;
+	}
+
 	[Serializable]
 	public class Manifest
 	{
@@ -86,6 +96,7 @@ public static class ShipModelWiring
 		public MaterialEntry[] materials;
 		public PlayerShipEntry playerShip;
 		public TerrainVehicleEntry terrainVehicle;
+		public ModelEntry[] models;
 	}
 
 	// the scenes with copies of the player ship's model, and of the terrain vehicle's
@@ -148,6 +159,11 @@ public static class ShipModelWiring
 			if ( ( manifest.terrainVehicle != null ) && !string.IsNullOrEmpty( manifest.terrainVehicle.model ) )
 			{
 				WireTerrainVehicle( manifest.terrainVehicle, materials );
+			}
+
+			foreach ( var model in manifest.models ?? new ModelEntry[ 0 ] )
+			{
+				SetUpImport( model.model, new VesselEntry { name = Path.GetFileNameWithoutExtension( model.model ), materials = model.materials }, materials, 1.0f );
 			}
 		}
 		catch ( Exception exception )

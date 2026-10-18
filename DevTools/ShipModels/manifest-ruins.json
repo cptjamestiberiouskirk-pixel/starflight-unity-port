@@ -1,0 +1,184 @@
+{
+	"race": "Ancient Ruins",
+	"vessels": [],
+	"materials": [
+		{
+			"name": "Ancient Ruins 1",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ancient Ruins",
+			"albedoMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 1 - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 1 - Specular.png",
+			"normalMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 1 - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 1 - Emissive.jpg"
+		},
+		{
+			"name": "Ancient Ruins 2",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ancient Ruins",
+			"albedoMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 2 - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 2 - Specular.png",
+			"normalMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 2 - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 2 - Emissive.jpg"
+		},
+		{
+			"name": "Ancient Ruins 3",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ancient Ruins",
+			"albedoMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 3 - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 3 - Specular.png",
+			"normalMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 3 - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 3 - Emissive.jpg"
+		},
+		{
+			"name": "Ancient Ruins 4",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ancient Ruins",
+			"albedoMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 4 - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 4 - Specular.png",
+			"normalMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 4 - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 4 - Emissive.jpg"
+		},
+		{
+			"name": "Ancient Ruins 5",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ancient Ruins",
+			"albedoMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 5 - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 5 - Specular.png",
+			"normalMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 5 - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ancient Ruins/Textures/Ancient Ruins 5 - Emissive.jpg"
+		}
+	],
+	"models": [
+		{
+			"model": "Assets/Game Objects/Ancient Ruins/Ancient Ruins 1.fbx",
+			"materials": [
+				"Ancient Ruins 1"
+			],
+			"meshy": {
+				"concept": "01a14bfd-2a91-7055-a4ce-043183b30794",
+				"model": "01a14c0e-1bf8-7445-8ea6-d57ce877f7aa",
+				"remesh": "01a14c0f-8148-73d2-a721-4f4ab749b107"
+			}
+		},
+		{
+			"model": "Assets/Game Objects/Ancient Ruins/Ancient Ruins 2.fbx",
+			"materials": [
+				"Ancient Ruins 2"
+			],
+			"meshy": {
+				"concept": "01a14bfd-cc7c-768d-8a89-f24ef6716910",
+				"model": "01a14c0e-2127-73ba-b181-c575055c82d4",
+				"remesh": "01a14c0f-8505-7326-881a-c6f38070cb7d"
+			}
+		},
+		{
+			"model": "Assets/Game Objects/Ancient Ruins/Ancient Ruins 3.fbx",
+			"materials": [
+				"Ancient Ruins 3"
+			],
+			"meshy": {
+				"concept": "01a14bfe-326f-7103-89c7-fe7cb106ce7f",
+				"model": "01a14c0e-262e-776c-b471-1f61caf97c2c",
+				"remesh": "01a14c0f-8982-7700-8a7c-5b7ea66663d6"
+			}
+		},
+		{
+			"model": "Assets/Game Objects/Ancient Ruins/Ancient Ruins 4.fbx",
+			"materials": [
+				"Ancient Ruins 4"
+			],
+			"meshy": {
+				"concept": "01a14bff-2411-7240-a21c-340b6eefd56c",
+				"model": "01a14c0e-2b4f-70e8-a1ce-d29eef0d9749",
+				"remesh": "01a14c0f-8ece-751e-8477-014f542501be"
+			}
+		},
+		{
+			"model": "Assets/Game Objects/Ancient Ruins/Ancient Ruins 5.fbx",
+			"materials": [
+				"Ancient Ruins 5"
+			],
+			"meshy": {
+				"concept": "01a14bff-89f9-7767-bdf1-cb8c594b2483",
+				"model": "01a14c0e-3044-751e-9ccb-66c6367e019e",
+				"remesh": "01a14c0f-9410-71cd-9d29-3babeab4e381"
+			}
+		}
+	],
+	"rockMaps": []
+}
