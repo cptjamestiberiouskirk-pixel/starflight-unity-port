@@ -238,7 +238,7 @@ Assets/
 - The Flat Device shields the terrain vehicle: lifeforms hit its crew half as often
 - The Red Cylinder flashes on the landing map near a planet's ancient ruins
 - The ancient ruins placed by STRINFO's editors, on the Mechans' ice planet and deep in Elowan space, hold their Endurium
-- Continuum fluxes show on the screen to a navigator trained beyond 150, or with the Ring Device aboard
+- Continuum fluxes show on the screen to a navigator trained beyond 150, or with the Ring Device aboard; a flux the ship has been through is remembered, and the starmap draws it as a line between its ends
 - The price of Endurium rises with the notices of 20-02 and 15-05, and the Starport buys it back at its selling price
 - Nebulae keep the shields down
 - The Starport repairs the hull and damaged systems at the original's prices, and buys parts back according to their condition
