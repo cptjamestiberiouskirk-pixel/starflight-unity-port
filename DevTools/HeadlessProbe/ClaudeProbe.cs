@@ -1666,6 +1666,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioArtifactHum();
 				break;
 
+			case "soundclips":
+				yield return ScenarioSoundClips();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -45436,6 +45440,150 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "artifacthum: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=artifacthum checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the sounds that replaced the Star Trek clips (since 2026-10-18)
+
+	IEnumerator ScenarioSoundClips()
+	{
+		var errorsBefore = s_errorCount;
+		var soundController = SoundController.m_instance;
+
+		yield return Frames( 5 );
+
+		if ( soundController == null )
+		{
+			Finish( "scenario=soundclips abort: no SoundController", 2 );
+			yield break;
+		}
+
+		// the fields that held a Star Trek clip, the clip each holds now, the Sound value the game plays it by and its length in seconds; the
+		// space missile (Attribution NonCommercial) was never played and shares the new missile launch, and the aliens' energy weapon (no
+		// traceable source) has its own
+		var expected = new[]
+		{
+			new { field = "m_redAlert", clip = "Hull Alarm", sound = "RedAlert", seconds = 2.5f },
+			new { field = "m_transporter", clip = "Cargo Transfer", sound = "Transporter", seconds = 3.0f },
+			new { field = "m_commChirp", clip = "Comm Hail", sound = "CommChirp", seconds = 0.5f },
+			new { field = "m_phaserFire", clip = "Laser Cannon", sound = "PhaserFire", seconds = 1.5f },
+			new { field = "m_enterWarp", clip = "Flux Enter", sound = "EnterWarp", seconds = 2.0f },
+			new { field = "m_exitWarp", clip = "Flux Exit", sound = "ExitWarp", seconds = 3.0f },
+			new { field = "m_torpedoFire", clip = "Missile Launch", sound = "TorpedoFire", seconds = 1.5f },
+			new { field = "m_missileLaunch", clip = "Missile Launch", sound = "MissileLaunch", seconds = 1.5f },
+			new { field = "m_energyWeapon", clip = "Alien Laser", sound = "EnergyWeapon", seconds = 2.0f },
+		};
+
+		var soundList = GetField( soundController, "m_soundList" ) as AudioClip[];
+
+		// ---- 1. each of those fields holds its new clip, the sound list the game plays from has it under the field's Sound value, and the clip is
+		// as long as the file that was made for it
+		foreach ( var entry in expected )
+		{
+			var clip = GetField( soundController, entry.field ) as AudioClip;
+			var clipName = ( clip != null ) ? clip.name : "(none)";
+			var length = ( clip != null ) ? clip.length : 0.0f;
+
+			Check( "soundclips: " + entry.field + " holds " + entry.clip, clipName == entry.clip, clipName + ", " + length.ToString( "0.000" ) + " s" + ( ( clip != null ) ? ", " + clip.frequency + " Hz, " + clip.channels + " channel(s)" : "" ) );
+			Check( "soundclips: " + entry.clip + " is " + entry.seconds + " s long", Mathf.Abs( length - entry.seconds ) < 0.02f, length.ToString( "0.000" ) + " s" );
+
+			AudioClip listed = null;
+
+			if ( ( soundList != null ) && Enum.IsDefined( typeof( SoundController.Sound ), entry.sound ) )
+			{
+				var index = (int) Enum.Parse( typeof( SoundController.Sound ), entry.sound );
+
+				listed = ( index < soundList.Length ) ? soundList[ index ] : null;
+			}
+
+			Check( "soundclips: Sound." + entry.sound + " plays " + entry.clip, ( listed != null ) && ( listed.name == entry.clip ), ( listed != null ) ? listed.name : "(none)" );
+		}
+
+		// ---- 2. no clip of the SoundController is a Star Trek one, and every one of its clip fields holds a clip (none was left empty by the removal)
+		var startrek = new List<string>();
+		var empty = new List<string>();
+		var count = 0;
+
+		foreach ( var field in typeof( SoundController ).GetFields( BindingFlags.Public | BindingFlags.Instance ) )
+		{
+			if ( field.FieldType != typeof( AudioClip ) )
+			{
+				continue;
+			}
+
+			count++;
+
+			var clip = field.GetValue( soundController ) as AudioClip;
+
+			if ( clip == null )
+			{
+				empty.Add( field.Name );
+			}
+			else if ( clip.name.ToLowerInvariant().Contains( "tng" ) )
+			{
+				startrek.Add( field.Name + "=" + clip.name );
+			}
+		}
+
+		Check( "soundclips: no SoundController clip has tng in its name", startrek.Count == 0, count + " clip fields; " + ( ( startrek.Count > 0 ) ? string.Join( ", ", startrek ) : "none" ) );
+		Check( "soundclips: every SoundController clip field holds a clip", ( count > 0 ) && ( empty.Count == 0 ), count + " clip fields; empty: " + ( ( empty.Count > 0 ) ? string.Join( ", ", empty ) : "none" ) );
+
+		// ---- 3. no audio file of the project is a Star Trek clip or one of the two removed for their licence (the space missile and the untraced energy
+		// weapon)
+		var leftOver = new List<string>();
+
+		foreach ( var guid in AssetDatabase.FindAssets( "t:AudioClip", new[] { "Assets" } ) )
+		{
+			var path = AssetDatabase.GUIDToAssetPath( guid );
+			var file = System.IO.Path.GetFileName( path ).ToLowerInvariant();
+
+			if ( file.Contains( "tng" ) || file.Contains( "robinhood76" ) || file.Contains( "sci-fi_energy_weapon" ) )
+			{
+				leftOver.Add( path );
+			}
+		}
+
+		Check( "soundclips: no Star Trek, Attribution NonCommercial or untraced clip is left in the project", leftOver.Count == 0, ( leftOver.Count > 0 ) ? string.Join( ", ", leftOver ) : "none" );
+
+		// ---- 4. PlaySound puts each new clip on an audio source of the pool (the path every call site takes), read right after each play
+		var notPlayed = new List<string>();
+
+		ClearPool();
+
+		foreach ( var entry in expected )
+		{
+			if ( !Enum.IsDefined( typeof( SoundController.Sound ), entry.sound ) )
+			{
+				notPlayed.Add( entry.sound + " (no such Sound)" );
+				continue;
+			}
+
+			try
+			{
+				soundController.PlaySound( (SoundController.Sound) Enum.Parse( typeof( SoundController.Sound ), entry.sound ), 0.0f );
+			}
+			catch ( Exception exception )
+			{
+				notPlayed.Add( entry.sound + " (" + exception.GetType().Name + ")" );
+				continue;
+			}
+
+			var pool = PoolSounds();
+
+			if ( !pool.Exists( held => held.StartsWith( entry.clip ) ) )
+			{
+				notPlayed.Add( entry.sound + " -> " + string.Join( ", ", pool ) );
+			}
+		}
+
+		ClearPool();
+
+		Check( "soundclips: PlaySound plays each new clip", notPlayed.Count == 0, ( notPlayed.Count > 0 ) ? string.Join( "; ", notPlayed ) : "all " + expected.Length );
+
+		yield return Frames( 3 );
+
+		Check( "soundclips: no errors", s_errorCount == errorsBefore, ( s_errorCount - errorsBefore ) + " error(s)" );
+
+		Finish( "scenario=soundclips checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
