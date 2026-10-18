@@ -1,0 +1,49 @@
+{
+	"race": "Mysterion",
+	"vessels": [
+		{
+			"id": 20,
+			"name": "Mysterion",
+			"strinfoSize": 124.0,
+			"length": 399.02,
+			"model": "Assets/Game Objects/Ships/Mysterion/Mysterion.fbx",
+			"debris": "Assets/Game Objects/Ships Debris/Mysterion/Mysterion.fbx",
+			"materials": [
+				"Mysterion Hull"
+			],
+			"meshy": {
+				"concept": "01a14d28-6c75-773b-b3a5-598fef39e3f4",
+				"model": "01a14d8e-6a7f-718a-b37e-91fdffc76534",
+				"remesh": "01a14d91-d49d-74c7-b87a-1bc40f6f099b"
+			},
+			"replaceTemplate": true,
+			"round": true
+		}
+	],
+	"materials": [
+		{
+			"name": "Mysterion Hull",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Mysterion",
+			"albedoMap": "Assets/Game Objects/Ships/Mysterion/Textures/Mysterion - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Mysterion/Textures/Mysterion - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Mysterion/Textures/Mysterion - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Mysterion/Textures/Mysterion - Emissive.jpg"
+		}
+	]
+}

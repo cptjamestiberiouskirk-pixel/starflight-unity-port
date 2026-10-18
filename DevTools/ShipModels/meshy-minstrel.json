@@ -1,0 +1,31 @@
+{
+	"race": "Minstrel",
+	"textureSize": 1024,
+	"engines": false,
+	"glow": {
+		"hue": [
+			170,
+			250
+		],
+		"saturation": 0.25,
+		"value": 0.6
+	},
+	"vessels": [
+		{
+			"id": 22,
+			"name": "Minstrel",
+			"strinfo": 0.004,
+			"glb": "minstrel.glb",
+			"nose": "-X",
+			"screenshot": "Minstrel Analysis.png",
+			"round": true,
+			"replaceTemplate": true,
+			"roll": 90,
+			"meshy": {
+				"concept": "01a14d28-7175-7518-8d38-13e9912f8412",
+				"model": "01a14d8e-7768-769f-8b5c-201732aee817",
+				"remesh": "01a14d91-e47c-75e0-b2a7-6e6c62f45228"
+			}
+		}
+	]
+}

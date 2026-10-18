@@ -1,0 +1,35 @@
+{
+	"race": "Nomad",
+	"textureSize": 1024,
+	"glow": {
+		"hue": [
+			[
+				320,
+				360
+			],
+			[
+				0,
+				15
+			]
+		],
+		"saturation": 0.5,
+		"value": 0.4
+	},
+	"vessels": [
+		{
+			"id": 19,
+			"name": "Nomad Probe",
+			"strinfo": 0.04,
+			"glb": "nomad-probe.glb",
+			"nose": "+X",
+			"screenshot": "Nomad Analysis.png",
+			"replaceTemplate": true,
+			"roll": 90,
+			"meshy": {
+				"concept": "01a14d28-6f1b-753d-bcde-a19071283dd2",
+				"model": "01a14d8e-7161-7552-9d90-b002a16d690e",
+				"remesh": "01a14d91-dce6-75fa-9c2a-38fc1fd04f6c"
+			}
+		}
+	]
+}

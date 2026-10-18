@@ -46,6 +46,8 @@ public static class ShipModelWiring
 		public string debris;
 		public float scale;
 		public string[] materials;
+		// the slot's template was not made by these tools (a hand-made model, or a comm screen model standing in): it is replaced
+		public bool replaceTemplate;
 	}
 
 	// the player's ship (import_meshy_arth.py): its model keeps the old node names the scenes reference, so only its materials,
@@ -453,15 +455,37 @@ public static class ShipModelWiring
 				throw new Exception( "model missing: " + vessel.model );
 			}
 
+			// a vessel whose manifest says so has the template its slot holds replaced, though these tools did not make it (a hand-made model, or a comm
+			// screen model standing in): the template goes, along with a hand-made object of the vessel's name, and their models stay in the project for
+			// whatever else uses them (the comm screens keep theirs)
+			if ( vessel.replaceTemplate )
+			{
+				var old = encounter.m_alienShipModelTemplate[ vessel.id ];
+
+				if ( ( old != null ) && ( old.transform.parent == parent ) && ( old.name != c_placeholderName ) && ( PrefabUtility.GetCorrespondingObjectFromOriginalSource( old ) != modelAsset ) )
+				{
+					Log( "vessel " + vessel.id + ": its template " + old.name + " goes" );
+					UnityEngine.Object.DestroyImmediate( old );
+				}
+
+				var namesake = parent.Find( vessel.name );
+
+				if ( ( namesake != null ) && ( PrefabUtility.GetCorrespondingObjectFromOriginalSource( namesake.gameObject ) != modelAsset ) )
+				{
+					Log( "vessel " + vessel.id + ": the hand-made " + namesake.name + " under the templates goes" );
+					UnityEngine.Object.DestroyImmediate( namesake.gameObject );
+				}
+			}
+
 			// replace what an earlier run put there: an instance of the same model with the vessel's name. Anything else of that
-			// name was made by hand and stays (Spaceflight.unity had a hand-made Mechan Scout template that no slot used)
+			// name was made by hand and stays, unless the manifest says to replace it (above)
 			var previous = parent.Find( vessel.name );
 
 			if ( previous != null )
 			{
 				if ( PrefabUtility.GetCorrespondingObjectFromOriginalSource( previous.gameObject ) != modelAsset )
 				{
-					throw new Exception( "a hand-made object named " + vessel.name + " is already under the model templates; rename it or wire it by hand" );
+					throw new Exception( "a hand-made object named " + vessel.name + " is already under the model templates; rename it, wire it by hand or set replaceTemplate" );
 				}
 
 				UnityEngine.Object.DestroyImmediate( previous.gameObject );

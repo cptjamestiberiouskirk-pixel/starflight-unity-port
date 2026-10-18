@@ -1,0 +1,36 @@
+{
+	"race": "Mechan",
+	"textureSize": 1024,
+	"glow": {
+		"hue": [
+			[
+				320,
+				360
+			],
+			[
+				0,
+				15
+			]
+		],
+		"saturation": 0.5,
+		"value": 0.4
+	},
+	"vessels": [
+		{
+			"id": 4,
+			"name": "Mechan Scout",
+			"strinfo": 0.4,
+			"glb": "mechan-scout.glb",
+			"nose": "+X",
+			"screenshot": "Mechan Scout Analysis.png",
+			"replaceTemplate": true,
+			"meshy": {
+				"concept": "01a14d28-6a04-7205-91f1-0e9a539d6e89",
+				"conceptEdit": "01a14d87-91f5-7544-a570-3b9e86217d38",
+				"conceptEdit2": "01a14d8a-f524-70bc-aaed-b8482cd44acf",
+				"model": "01a14d8e-63e1-7305-8c7b-3aebfada26c4",
+				"remesh": "01a14d8f-50cb-756d-81bd-9c0d298edaa5"
+			}
+		}
+	]
+}

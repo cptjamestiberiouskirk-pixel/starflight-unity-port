@@ -11156,10 +11156,10 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- Low: ship pictures (the textured ship models, the aliens' and the player's Arth ship, are drawn with their maps, and pictures of them when the run has a graphics device: probe.ps1 -Graphics)
 
-	// the vessels with textured models (DevTools/ShipModels/import_meshy.py, meshy-<race>.json): the Elowan and the Thrynn
-	// transport, scout and warship, the four Veloxi vessels, the Gazurtoid and Uhlek scouts and warships, the Enterprise and the
-	// Noah 9 derelict
-	static readonly int[] c_meshyVessels = { 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21, 23 };
+	// the vessels with textured models (DevTools/ShipModels/import_meshy.py, meshy-<race>.json): every vessel of the game data since
+	// 2026-10-18 (the Spemin, Elowan and Thrynn transport, scout and warship, the Mechan scout, the four Veloxi vessels, the Gazurtoid
+	// and Uhlek scouts and warships, the Nomad probe, the Mysterion, the Enterprise, the Minstrel and the Noah 9 derelict)
+	static readonly int[] c_meshyVessels = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23 };
 
 	// the materials of a model that are drawn without an albedo map (a flat colour, as the procedural stand-ins are)
 	static List<string> UnmappedMaterials( GameObject root )
@@ -15917,7 +15917,15 @@ public class ClaudeProbe : MonoBehaviour
 		{ 14, 357.844f }, { 15, 380.843f },
 		// the noah 9 derelict (4) and the enterprise (38, shown at 6.5)
 		{ 23, 204.24f }, { 21, 331.936f },
+		// spemin transport, scout and warship (1.6, 0.8 and 1.4; the transport and the warship are round, their size across their widest side)
+		{ 1, 81.696f }, { 2, 40.848f }, { 3, 71.484f },
+		// the mechan scout (0.4), the nomad probe (0.04 shown at 0.3), the mysterion (124, shown at 7.8, round) and the minstrel (0.004 shown at 0.3, round)
+		{ 4, 20.424f }, { 19, 15.318f }, { 20, 399.02f }, { 22, 15.318f },
 	};
+
+	// the round ships, which have no length of their own: a ring of pods wider than it is long, and a sphere (their length is across their widest side,
+	// and they are not checked for being longest along the nose)
+	static readonly HashSet<int> c_roundShipModels = new HashSet<int>() { 3, 20 };
 
 	// the size of the meshes under model, measured along the axes of container (the ship's own frame: +Z is its nose)
 	static Vector3 SizeInFrameOf( Transform container, GameObject model )
@@ -16144,7 +16152,10 @@ public class ClaudeProbe : MonoBehaviour
 				expectedLength *= Encounter.c_shipViewScale;
 
 				Check( "vessel " + vesselId + " is " + expectedLength.ToString( "F1" ) + " units long", Mathf.Abs( longest - expectedLength ) <= expectedLength * 0.05f, "size=" + size.ToString( "F1" ) );
-				Check( "vessel " + vesselId + " is longest along its nose", size.z >= Mathf.Max( size.x, size.y ) * 0.999f, "size=" + size.ToString( "F1" ) );
+				if ( !c_roundShipModels.Contains( vesselId ) )
+				{
+					Check( "vessel " + vesselId + " is longest along its nose", size.z >= Mathf.Max( size.x, size.y ) * 0.999f, "size=" + size.ToString( "F1" ) );
+				}
 
 				// the ship flies along +Z of its model container, so its engines have to be behind the middle of the bounds
 				var engines = EngineCenterAlongNose( model.transform, model );

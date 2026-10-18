@@ -1,0 +1,135 @@
+{
+	"race": "Spemin",
+	"vessels": [
+		{
+			"id": 1,
+			"name": "Spemin Transport",
+			"strinfoSize": 1.6,
+			"length": 81.696,
+			"model": "Assets/Game Objects/Ships/Spemin/Spemin Transport.fbx",
+			"debris": "Assets/Game Objects/Ships Debris/Spemin/Spemin Transport.fbx",
+			"materials": [
+				"Spemin Transport Hull"
+			],
+			"meshy": {
+				"concept": "01a14d28-6554-706a-a2ff-209533454c6a",
+				"model": "01a14d8e-55e6-71cf-a443-43b7a678622c",
+				"remesh": "01a14d8f-269b-77ff-8542-76547371a001"
+			},
+			"replaceTemplate": false,
+			"round": true
+		},
+		{
+			"id": 2,
+			"name": "Spemin Scout",
+			"strinfoSize": 0.8,
+			"length": 40.848,
+			"model": "Assets/Game Objects/Ships/Spemin/Spemin Scout.fbx",
+			"debris": "Assets/Game Objects/Ships Debris/Spemin/Spemin Scout.fbx",
+			"materials": [
+				"Spemin Scout Hull"
+			],
+			"meshy": {
+				"concept": "01a14d28-619c-72d4-927c-db16959b727e",
+				"model": "01a14d8e-4f39-74f7-b273-9b92141f311d",
+				"remesh": "01a14d8f-1fdd-76f6-b139-fa740c69d8da"
+			},
+			"replaceTemplate": false,
+			"round": false
+		},
+		{
+			"id": 3,
+			"name": "Spemin Warship",
+			"strinfoSize": 1.4,
+			"length": 71.484,
+			"model": "Assets/Game Objects/Ships/Spemin/Spemin Warship.fbx",
+			"debris": "Assets/Game Objects/Ships Debris/Spemin/Spemin Warship.fbx",
+			"materials": [
+				"Spemin Warship Hull"
+			],
+			"meshy": {
+				"concept": "01a14d28-679c-75ff-8ddf-f95445eee5c4",
+				"conceptEdit": "01a14d87-97a6-76fd-875f-841432709f2d",
+				"conceptEdit2": "01a14d8a-faf7-7721-8c25-13c1b6b463d1",
+				"model": "01a14d8e-5caf-75f1-8d7b-5df6a1c2697a",
+				"remesh": "01a14d8f-4b09-74d4-90ab-25f0f1c2f452"
+			},
+			"replaceTemplate": false,
+			"round": true
+		}
+	],
+	"materials": [
+		{
+			"name": "Spemin Transport Hull",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Spemin",
+			"albedoMap": "Assets/Game Objects/Ships/Spemin/Textures/Spemin Transport - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Spemin/Textures/Spemin Transport - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Spemin/Textures/Spemin Transport - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Spemin/Textures/Spemin Transport - Emissive.jpg"
+		},
+		{
+			"name": "Spemin Scout Hull",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Spemin",
+			"albedoMap": "Assets/Game Objects/Ships/Spemin/Textures/Spemin Scout - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Spemin/Textures/Spemin Scout - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Spemin/Textures/Spemin Scout - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Spemin/Textures/Spemin Scout - Emissive.jpg"
+		},
+		{
+			"name": "Spemin Warship Hull",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Spemin",
+			"albedoMap": "Assets/Game Objects/Ships/Spemin/Textures/Spemin Warship - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Spemin/Textures/Spemin Warship - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Spemin/Textures/Spemin Warship - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Spemin/Textures/Spemin Warship - Emissive.jpg"
+		}
+	]
+}

@@ -1,0 +1,49 @@
+{
+	"race": "Minstrel",
+	"vessels": [
+		{
+			"id": 22,
+			"name": "Minstrel",
+			"strinfoSize": 0.004,
+			"length": 15.318,
+			"model": "Assets/Game Objects/Ships/Minstrel/Minstrel.fbx",
+			"debris": "Assets/Game Objects/Ships Debris/Minstrel/Minstrel.fbx",
+			"materials": [
+				"Minstrel Hull"
+			],
+			"meshy": {
+				"concept": "01a14d28-7175-7518-8d38-13e9912f8412",
+				"model": "01a14d8e-7768-769f-8b5c-201732aee817",
+				"remesh": "01a14d91-e47c-75e0-b2a7-6e6c62f45228"
+			},
+			"replaceTemplate": true,
+			"round": true
+		}
+	],
+	"materials": [
+		{
+			"name": "Minstrel Hull",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Ships/Minstrel",
+			"albedoMap": "Assets/Game Objects/Ships/Minstrel/Textures/Minstrel - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Ships/Minstrel/Textures/Minstrel - Specular.png",
+			"normalMap": "Assets/Game Objects/Ships/Minstrel/Textures/Minstrel - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Ships/Minstrel/Textures/Minstrel - Emissive.jpg"
+		}
+	]
+}
