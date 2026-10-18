@@ -58,7 +58,7 @@ New to *Starflight*? Read the notices in Operations, create and assign a crew of
 
 ## ✅ Status: version 1.3.0
 
-The whole game is playable, from a new game to the ending. Every item on the [roadmap to parity with the original](ROADMAP.md) is done or decided (59 of 59), and every screen has been compared side by side with the original's.
+The whole game is playable, from a new game to the ending. Every item of the first seven phases of the [roadmap to parity with the original](ROADMAP.md) is done or decided (59 of 59), and every screen has been compared side by side with the original's. A reading of the shipped game's own code in October 2026 found 37 more of its behaviours to build (Phase 8), and they are under way.
 
 Every change is compile-checked in CI and exercised by a headless test harness that plays the real game scenes: 262 scenarios with 1,373 checks, all passing on this release, plus an automated playthrough that plays a new game all the way to the ending and Interstel's bonus.
 
@@ -271,9 +271,9 @@ Assets/
 
 </details>
 
-### 📊 Completion: 59 of 59 roadmap items
+### 📊 Completion: 59 of 96 roadmap items
 
-Every item in [ROADMAP.md](ROADMAP.md) is done or decided, and so is every item in the screen-by-screen comparison with the original (`Research/Screen comparison.md`), the UI kit included. The headless test harness covers every one of them, and its playthrough plays a new game through to the win. A full playthrough of 1.0.0 by hand is still to come.
+Every item of Phases 0 to 7 in [ROADMAP.md](ROADMAP.md) is done or decided, and so is every item in the screen-by-screen comparison with the original (`Research/Screen comparison.md`), the UI kit included. The headless test harness covers every one of them, and its playthrough plays a new game through to the win. A full playthrough of 1.0.0 by hand is still to come.
 
 Nothing is open from the comparison with the original's code: its last two items, the speeds in an encounter and the aliens' distress calls, were measured in the original game.
 
