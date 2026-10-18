@@ -62,7 +62,7 @@ The whole game is playable, from a new game to the ending. Every item on the [ro
 
 Every change is compile-checked in CI and exercised by a headless test harness that plays the real game scenes: 260 scenarios with 1,361 checks, all passing on this release, plus an automated playthrough that plays a new game all the way to the ending and Interstel's bonus.
 
-The known differences from the original are listed at the end of the [manual](docs/MANUAL.md#13-this-port-and-the-1986-original). The biggest one left is that shields recharge at the port's own pace during a fight. Found a bug? Please [open an issue](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port/issues).
+The known differences from the original are listed at the end of the [manual](docs/MANUAL.md#13-this-port-and-the-1986-original). The biggest one left is that shields recharge at the port's own pace during a fight. One is by design: the ship's speed follows its engines, where every ship in the original flew at the same speed. Found a bug? Please [open an issue](https://github.com/cptjamestiberiouskirk-pixel/starflight-unity-port/issues).
 
 The full history is in [CHANGELOG.md](CHANGELOG.md).
 
@@ -222,7 +222,7 @@ Assets/
 - The Whining Orb translates the Spemin
 - The Rod Device cuts the damage of alien lasers to a quarter
 - The Crystal Pearl warps a critically damaged ship out of an encounter
-- Hyperspace and star system travel at the original's pace, as measured in GOG's version of the game
+- The ship steers the moment you press a direction and stops when you let go, as in the original, and its top speed follows its engines: class 5 engines fly at the original's pace in hyperspace and in star systems, as measured in GOG's version of the game, class 1 at a third of it, and the ship's acceleration (engines against mass) sets how quickly it gets there
 - Alien ships come after you as in the original: every two star hours they jump toward your ship, half the way in hyperspace and three quarters in a star system, and in hyperspace they stay near their home ground; the Dodecahedron draws them farther and faster
 - The Shimmering Ball cloaks the ship in combat until it fires
 - The Flat Device shields the terrain vehicle: lifeforms hit its crew half as often
