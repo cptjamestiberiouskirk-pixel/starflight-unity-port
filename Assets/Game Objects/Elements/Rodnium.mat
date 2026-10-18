@@ -2,21 +2,31 @@
 %TAG !u! tag:unity3d.com,2011:
 --- !u!21 &2100000
 Material:
-  serializedVersion: 6
+  serializedVersion: 8
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Rodnium
   m_Shader: {fileID: 4800000, guid: f67073489be24934c9032d00068b6661, type: 3}
-  m_ShaderKeywords: SF_ALBEDOMAP_ON SF_ALBEDOOCCLUSIONON_ON SF_ALBEDOOCCLUSION_ON
-    SF_NORMALMAP_ISCOMPRESSED SF_NORMALMAP_ON SF_SPECULAR_ON SF_ZWRITEON_ON
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - SF_ALBEDOMAP_ON
+  - SF_ALBEDOOCCLUSION_ON
+  - SF_NORMALMAP_ISCOMPRESSED
+  - SF_NORMALMAP_ON
+  - SF_SPECULAR_ON
+  m_InvalidKeywords:
+  - SF_ALBEDOOCCLUSIONON_ON
+  - SF_ZWRITEON_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses: []
+  m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -29,10 +39,14 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - SF_NormalMap:
-        m_Texture: {fileID: 2800000, guid: 1daeda76afc787c4caf946cdf9c0534a, type: 3}
+        m_Texture: {fileID: 2800000, guid: 197fd26466259f74da46bf000d4fb110, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - SF_OcclusionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - SF_ReflectionMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
@@ -61,7 +75,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: f6655d3171c665241a0528c2dd14033a, type: 3}
+        m_Texture: {fileID: 2800000, guid: 027395035236d0f4891c2210505a03be, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
@@ -76,6 +90,7 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    m_Ints: []
     m_Floats:
     - SF_AlbedoOcclusionOn: 1
     - SF_AlphaTestValue: 0
@@ -110,6 +125,16 @@ Material:
     m_Colors:
     - SF_AlbedoColor: {r: 0.7019608, g: 0.20000002, b: 0.1137255, a: 1}
     - SF_EmissiveColor: {r: 0, g: 0, b: 0, a: 1}
+    - SF_EmissiveColorTint: {r: 1, g: 1, b: 1, a: 1}
+    - SF_EmissiveTint: {r: 1, g: 1, b: 1, a: 1}
+    - SF_PaletteColor0: {r: 1, g: 1, b: 1, a: 1}
+    - SF_PaletteColor1: {r: 1, g: 1, b: 1, a: 1}
+    - SF_PaletteColor2: {r: 1, g: 1, b: 1, a: 1}
+    - SF_PaletteColor3: {r: 1, g: 1, b: 1, a: 1}
+    - SF_PaletteColor4: {r: 1, g: 1, b: 1, a: 1}
+    - SF_ReflectionColor: {r: 1, g: 1, b: 1, a: 1}
     - SF_SpecularColor: {r: 0.77199996, g: 0.3167876, b: 0.238548, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

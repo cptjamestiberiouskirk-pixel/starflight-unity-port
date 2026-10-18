@@ -8,8 +8,8 @@
 // (layer Encounter), and points the vessel's slots of Encounter.m_alienShipModelTemplate and m_alienShipDebrisTemplate
 // at the instance and the debris model. The player's ship and the terrain vehicle keep their old node names (their manifests
 // have a playerShip or a terrainVehicle section): their scene copies lose the old models' material overrides instead. The
-// models of a models section (ground props) only have their import set up with their materials. Running it again replaces
-// what an earlier run made.
+// models of a models section (ground props) only have their import set up with their materials, and the deposits made in a
+// rock's shape (a rockMaps section) take the rock's grey and normal maps. Running it again replaces what an earlier run made.
 
 using System;
 using System.Collections.Generic;
@@ -88,6 +88,15 @@ public static class ShipModelWiring
 		public string[] materials;
 	}
 
+	// a rock's grey colour map and its normal map (import_meshy_props.py), which the deposits made in the rock's shape take
+	[Serializable]
+	public class RockMapEntry
+	{
+		public string model;
+		public string grey;
+		public string normal;
+	}
+
 	[Serializable]
 	public class Manifest
 	{
@@ -97,6 +106,7 @@ public static class ShipModelWiring
 		public PlayerShipEntry playerShip;
 		public TerrainVehicleEntry terrainVehicle;
 		public ModelEntry[] models;
+		public RockMapEntry[] rockMaps;
 	}
 
 	// the scenes with copies of the player ship's model, and of the terrain vehicle's
@@ -164,6 +174,11 @@ public static class ShipModelWiring
 			foreach ( var model in manifest.models ?? new ModelEntry[ 0 ] )
 			{
 				SetUpImport( model.model, new VesselEntry { name = Path.GetFileNameWithoutExtension( model.model ), materials = model.materials }, materials, 1.0f );
+			}
+
+			if ( ( manifest.rockMaps != null ) && ( manifest.rockMaps.Length > 0 ) )
+			{
+				WireDeposits( manifest.rockMaps, materials );
 			}
 		}
 		catch ( Exception exception )
@@ -606,6 +621,62 @@ public static class ShipModelWiring
 		}
 
 		return copies;
+	}
+
+	// the deposits made in a rock's shape (the element templates of TerrainElements whose model is one of the rocks): each element's
+	// own material takes the rock's grey colour map and its normal map, its colour (the element's) staying over them, as it stood
+	// over the old rock's colour map
+	static void WireDeposits( RockMapEntry[] rockMaps, Dictionary<string, Material> ownMaterials )
+	{
+		var scene = EditorSceneManager.OpenScene( c_scenePath, OpenSceneMode.Single );
+		var elements = UnityEngine.Object.FindFirstObjectByType<TerrainElements>( FindObjectsInactive.Include );
+
+		if ( elements == null )
+		{
+			throw new Exception( "no TerrainElements in " + c_scenePath );
+		}
+
+		var done = new HashSet<Material>();
+
+		foreach ( var template in elements.m_elementTemplates )
+		{
+			if ( template == null )
+			{
+				continue;
+			}
+
+			// (the model a template is a copy of, by its mesh)
+			var filter = template.GetComponentInChildren<MeshFilter>( true );
+			var modelPath = ( ( filter != null ) && ( filter.sharedMesh != null ) ) ? AssetDatabase.GetAssetPath( filter.sharedMesh ) : "";
+			var entry = Array.Find( rockMaps, rock => rock.model == modelPath );
+			var renderer = template.GetComponentInChildren<MeshRenderer>( true );
+			var material = ( renderer != null ) ? renderer.sharedMaterial : null;
+
+			// (a deposit drawn in one of the manifest's own materials, a rock's, keeps that material's maps)
+			if ( ( entry == null ) || ( material == null ) || done.Contains( material ) || ownMaterials.ContainsValue( material ) )
+			{
+				continue;
+			}
+
+			SetMap( material, "_MainTex", "SF_ALBEDOMAP_ON", LoadMap( entry.grey, false ) );
+
+			var normalMap = LoadMap( entry.normal, true );
+
+			if ( normalMap != null )
+			{
+				SetMap( material, "SF_NormalMap", "SF_NORMALMAP_ON", normalMap );
+				material.EnableKeyword( "SF_NORMALMAP_ISCOMPRESSED" );
+			}
+
+			EditorUtility.SetDirty( material );
+			done.Add( material );
+
+			Log( "deposit " + template.name + ": " + material.name + " takes the maps of " + Path.GetFileNameWithoutExtension( modelPath ) );
+		}
+
+		AssetDatabase.SaveAssets();
+
+		Log( done.Count + " deposit materials take their rocks' maps" );
 	}
 
 	// the terrain vehicle: its import, then in every scene with a copy of it the copy's material overrides go and the vehicle's

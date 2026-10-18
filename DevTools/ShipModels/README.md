@@ -17,7 +17,7 @@ Decisions of 2026-10-09:
 | `import_meshy.py`, `meshy-<race>.json` | Imports a race's textured models: see "Textured models" below |
 | `import_meshy_arth.py`, `meshy-arth.json` | Imports the player's Arth ship, with its equipment parts kept separate: see "The player's Arth ship" below |
 | `import_meshy_tv.py`, `meshy-terrain-vehicle.json` | Imports the terrain vehicle, its six wheels kept separate: see "The terrain vehicle" below |
-| `import_meshy_props.py`, `meshy-ruins.json` | Imports single-mesh ground props (the ancient ruins): see "Ground props" below |
+| `import_meshy_props.py`, `meshy-ruins.json`, `meshy-rocks.json` | Imports single-mesh ground props (the ancient ruins, the rocks and the two deposits with shapes of their own): see "Ground props" below |
 
 ## Wrecks, wiring and the probe
 
@@ -105,17 +105,18 @@ blender --background --factory-startup --python DevTools/ShipModels/import_meshy
 
 ### Ground props
 
-The ancient ruins are one mesh node each, and the game uses them through that node: the ruins' templates in `TerrainRuins` are the model files themselves. `import_meshy_props.py` (with `meshy-ruins.json`) replaces each prop's mesh and keeps the rest:
+The ancient ruins, the rocks and the Endurium and mercury deposits are one mesh node each, and the game uses them through that node: the ruins' templates in `TerrainRuins` are the model files themselves, and the templates of `TerrainRocks` and `TerrainElements` are scene copies of the models whose material overrides find the mesh by its node. `import_meshy_props.py` (with `meshy-ruins.json` or `meshy-rocks.json`) replaces each prop's mesh and keeps the rest:
 
 - it reads each original from a folder of copies taken from git (`--old`), never from the files it overwrites, and keeps the node's name and transform. The node's origin is where placing a prop sets it down and turns it, and it is off the geometry's middle in most of the old files;
 - the new mesh goes into the node's frame so that it stands where the old one stood: its middle over the old middle, its bottom at the old bottom, and its size as the old one's. A `footprint` prop (the ruins) has its widest side as the old one's, and a square base turned to the axes; a `volume` prop has its bounding volume as the old one's, and its long axis turned as the old one's;
-- it writes each FBX in metres in the file's own unit scale (`FBX_SCALE_UNITS`), the maps for SF - Standard (the ruins' glyph lines, a pale cyan, glow through their own `glow` settings: hues 150 to 210 from a saturation of 0.12), and `manifest-ruins.json` with a `models` section. `ShipModelWiring.cs` then makes the materials and sets up each model's import with its own (the old ruins had none, and were drawn in Unity's default material).
+- it writes each FBX in metres in the file's own unit scale (`FBX_SCALE_UNITS`), the maps for SF - Standard (the ruins' glyph lines, a pale cyan, glow through their own `glow` settings: hues 150 to 210 from a saturation of 0.12; Endurium's crystals through hues 260 to 335), and a manifest with a `models` section. `ShipModelWiring.cs` then makes the materials and sets up each model's import with its own (the old ruins had none, and were drawn in Unity's default material). The rocks' and the deposits' materials keep their assets (`Rock N.mat`, `Endurium.mat`, `Mercury.mat`), so every scene override that points at them stays; the rocks' new maps go into `Rocks/Textures`, beside the old ones, and the scenery rocks take a colour of 0.55 over them, since the new stone is paler than the old;
+- twenty of the 22 kinds of deposit are scene copies of the rocks in their element's own material, which laid the element's colour over the old rock's colour map. A rock also gets a grey copy of its new colour map (`Rock N - Grey.jpg`, brought to a brightness of 0.62 on average), and the manifest's `rockMaps` section has `ShipModelWiring.cs` give each such element material its rock's grey and normal maps, the element's colour staying over them. A deposit drawn in a rock's own material (one is, in `Rock 1.mat`) keeps that material's new maps.
 
 ```powershell
 git show "bfd3a590:Assets/Game Objects/Ancient Ruins/Ancient Ruins 1.fbx" > old/"Ancient Ruins 1.fbx"
 ```
 
-(and the same for the other four), then:
+(and the same for the other four ruins, the nine rocks, `Endurium.fbx` and `Mercury.fbx`), then, for each manifest:
 
 ```bash
 blender --background --factory-startup --python DevTools/ShipModels/import_meshy_props.py -- DevTools/ShipModels/meshy-ruins.json --source <folder with the GLB files> --old old --preview DevTools/ShipModels/previews/ancient-ruins.png
@@ -125,7 +126,7 @@ blender --background --factory-startup --python DevTools/ShipModels/import_meshy
 & "DevTools\ShipModels\wire.ps1" -Manifest "DevTools\ShipModels\manifest-ruins.json"
 ```
 
-The probe scenario `ruinmodels` covers them (each ruin in its own textured material with the glow, its triangles, its square of 24, a ruin placed on the ground; a picture under `-Graphics`).
+The probe scenarios `ruinmodels` (each ruin in its own textured material with the glow, its triangles, its square of 24, a ruin placed on the ground; a picture under `-Graphics`) and `rockmodels` (each rock in its material with the new maps, its triangles and the old rock's bounding volume, every rock-shaped deposit on its rock's grey map, Endurium's and mercury's own maps and sizes, the rocks and deposits placed on planet 92) cover them.
 
 The probe scenario `tvmodel` covers it (the materials, the wheels on their steering joints, the triangle counts, the wheels level on the ground with the body clear of it, the capsule against the model, the radar turning; a picture under `-Graphics`).
 

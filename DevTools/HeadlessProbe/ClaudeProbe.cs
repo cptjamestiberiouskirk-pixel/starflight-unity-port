@@ -1626,6 +1626,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioRuinModels();
 				break;
 
+			case "rockmodels":
+				yield return ScenarioRockModels();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -43797,6 +43801,141 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "ruinmodels: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=ruinmodels textured=" + textured + " light=" + light + " sized=" + sized + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the rocks' and the deposits' models (DevTools/ShipModels/import_meshy_props.py)
+
+	// the bounding volume of the old rocks and deposits as Unity measured them (their meshes' bounds, in their nodes' frames), by model
+	static readonly Dictionary<string, float> c_oldPropVolumes = new Dictionary<string, float>
+	{
+		{ "Assets/Game Objects/Rocks/Rock 1.fbx", 104.493f }, { "Assets/Game Objects/Rocks/Rock 2.fbx", 153.443f }, { "Assets/Game Objects/Rocks/Rock 3.fbx", 153.564f },
+		{ "Assets/Game Objects/Rocks/Rock 4.fbx", 162.890f }, { "Assets/Game Objects/Rocks/Rock 5.fbx", 64.001f }, { "Assets/Game Objects/Rocks/Rock 6.fbx", 141.581f },
+		{ "Assets/Game Objects/Rocks/Rock 7.fbx", 99.067f }, { "Assets/Game Objects/Rocks/Rock 8.fbx", 83.338f }, { "Assets/Game Objects/Rocks/Rock 9.fbx", 87.171f },
+		{ "Assets/Game Objects/Elements/Endurium.fbx", 127.706f }, { "Assets/Game Objects/Elements/Mercury.fbx", 66.320f }
+	};
+
+	// the model file a template of the scene is a copy of, by its mesh ("" if none: in play mode a copy no longer knows its prefab)
+	static string TemplateModelPath( GameObject template )
+	{
+		var filter = ( template != null ) ? template.GetComponentInChildren<MeshFilter>( true ) : null;
+
+		return ( ( filter != null ) && ( filter.sharedMesh != null ) ) ? AssetDatabase.GetAssetPath( filter.sharedMesh ) : "";
+	}
+
+	// a mesh's bounding volume in its node's frame, and its size
+	static float MeshVolume( MeshFilter filter, out Vector3 size )
+	{
+		size = ( ( filter != null ) && ( filter.sharedMesh != null ) ) ? Vector3.Scale( filter.sharedMesh.bounds.size, filter.transform.localScale ) : Vector3.zero;
+
+		return size.x * size.y * size.z;
+	}
+
+	IEnumerator ScenarioRockModels()
+	{
+		var controller = SpaceflightController.m_instance;
+		var grid = controller.m_disembarked.m_terrainGrid;
+		var errorsBefore = s_errorCount;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// ---- 1. the nine rock templates: each in its own material with the new maps (Rocks/Textures), light enough, the old rock's size
+		var rocks = grid.m_terrainRocks.m_rockTemplates;
+		var rocksTextured = 0;
+		var rocksLight = 0;
+		var rocksSized = 0;
+		var rockDetails = new List<string>();
+		var measured = new List<string>();
+
+		foreach ( var template in rocks )
+		{
+			var model = TemplateModelPath( template );
+			var name = System.IO.Path.GetFileNameWithoutExtension( model );
+			var renderer = ( template != null ) ? template.GetComponentInChildren<MeshRenderer>( true ) : null;
+			var filter = ( template != null ) ? template.GetComponentInChildren<MeshFilter>( true ) : null;
+			var material = ( renderer != null ) ? renderer.sharedMaterial : null;
+			var albedo = ( material != null ) ? AssetDatabase.GetAssetPath( material.GetTexture( "_MainTex" ) ) : "";
+			var triangles = TriangleCount( ( filter != null ) ? filter.sharedMesh : null );
+			var volume = MeshVolume( filter, out var size );
+
+			rocksTextured += ( albedo == "Assets/Game Objects/Rocks/Textures/" + name + " - Albedo.jpg" ) ? 1 : 0;
+			rocksLight += ( ( triangles > 1000 ) && ( triangles < 4000 ) ) ? 1 : 0;
+			rocksSized += ( c_oldPropVolumes.TryGetValue( model, out var oldVolume ) && ( oldVolume > 0.0f ) && ( Mathf.Abs( volume / oldVolume - 1.0f ) < 0.25f ) ) ? 1 : 0;
+			rockDetails.Add( name + ": " + ( ( material != null ) ? material.name : "none" ) + " " + albedo.Replace( "Assets/Game Objects/", "" ) + ", " + triangles + " triangles, " + size.ToString( "F2" ) );
+			measured.Add( "{ \"" + model + "\", " + volume.ToString( "F3", System.Globalization.CultureInfo.InvariantCulture ) + "f }" );
+		}
+
+		// ---- 2. the deposits: those made in a rock's shape take the rock's grey map under their element's colour; Endurium and Mercury have their own maps
+		var elements = grid.m_terrainElements.m_elementTemplates;
+		var depositsGrey = 0;
+		var depositsRockShaped = 0;
+		var ownShapes = 0;
+		var depositDetails = new List<string>();
+
+		for ( var i = 0; i < elements.Length; i++ )
+		{
+			var template = elements[ i ];
+			var model = TemplateModelPath( template );
+			var name = System.IO.Path.GetFileNameWithoutExtension( model );
+			var renderer = ( template != null ) ? template.GetComponentInChildren<MeshRenderer>( true ) : null;
+			var material = ( renderer != null ) ? renderer.sharedMaterial : null;
+			var albedo = ( material != null ) ? AssetDatabase.GetAssetPath( material.GetTexture( "_MainTex" ) ) : "";
+			var filter = ( template != null ) ? template.GetComponentInChildren<MeshFilter>( true ) : null;
+			var volume = MeshVolume( filter, out var size );
+
+			if ( model.StartsWith( "Assets/Game Objects/Rocks/" ) )
+			{
+				// (one element's deposit is drawn in the rock's own material, and keeps the rock's new maps)
+				depositsRockShaped++;
+				depositsGrey += ( ( albedo == "Assets/Game Objects/Rocks/Textures/" + name + " - Grey.jpg" ) || ( ( material != null ) && ( material.name == name ) && ( albedo == "Assets/Game Objects/Rocks/Textures/" + name + " - Albedo.jpg" ) ) ) ? 1 : 0;
+			}
+			else
+			{
+				var emissive = ( material != null ) ? AssetDatabase.GetAssetPath( material.GetTexture( "SF_EmissiveMap" ) ) : "";
+				var ownMaps = ( albedo == "Assets/Game Objects/Elements/Textures/" + name + " - Albedo.jpg" ) && ( ( name != "Endurium" ) || ( emissive == "Assets/Game Objects/Elements/Textures/Endurium - Emissive.jpg" ) );
+				// (the mercury, a flat pool, keeps the old pool's widest side, 7.17, and is thinner; the crystals keep about the old volume)
+				var sized = ( name == "Mercury" ) ? ( Mathf.Abs( Mathf.Max( size.x, Mathf.Max( size.y, size.z ) ) / 7.173f - 1.0f ) < 0.1f ) : ( c_oldPropVolumes.TryGetValue( model, out var oldVolume ) && ( oldVolume > 0.0f ) && ( volume / oldVolume > 0.5f ) && ( volume / oldVolume < 2.0f ) );
+
+				ownShapes += ( ownMaps && sized ) ? 1 : 0;
+				depositDetails.Add( name + " own maps " + ownMaps + ", sized " + sized + " " + size.ToString( "F2" ) );
+				measured.Add( "{ \"" + model + "\", " + volume.ToString( "F3", System.Globalization.CultureInfo.InvariantCulture ) + "f }" );
+			}
+
+			depositDetails.Add( name + "/" + ( ( material != null ) ? material.name : "none" ) + " " + albedo.Replace( "Assets/Game Objects/", "" ) );
+		}
+
+		Log( "rockmodels: rocks: " + string.Join( " | ", rockDetails ) );
+		Log( "rockmodels: deposits: " + string.Join( " | ", depositDetails ) );
+		Log( "rockmodels: volumes: " + string.Join( ", ", measured ) );
+
+		// ---- 3. on the ground of planet 92 (minerals 15): the placed rocks and deposits are in the new materials
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+		yield return Frames( 5 );
+
+		var placedRocks = grid.m_terrainRocks.GetComponentsInChildren<MeshRenderer>( false );
+		var placedDeposits = grid.m_terrainElements.GetComponentsInChildren<MeshRenderer>( false );
+		var rocksNew = System.Array.TrueForAll( placedRocks, r => ( r.sharedMaterial != null ) && AssetDatabase.GetAssetPath( r.sharedMaterial.GetTexture( "_MainTex" ) ).StartsWith( "Assets/Game Objects/Rocks/Textures/" ) );
+		var depositsNew = System.Array.TrueForAll( placedDeposits, r => ( r.sharedMaterial != null ) && AssetDatabase.GetAssetPath( r.sharedMaterial.GetTexture( "_MainTex" ) ).Contains( "/Textures/" ) );
+
+		// (with -Graphics, a picture of the vehicle among them)
+		if ( SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null )
+		{
+			RenderScreenPicture( System.IO.Path.Combine( System.IO.Path.GetTempPath(), "starflight-probe", "rockmodels-on-92.png" ) );
+		}
+
+		Log( "rockmodels: planet 92: " + placedRocks.Length + " rocks and " + placedDeposits.Length + " deposits on the ground, rocks new " + rocksNew + ", deposits new " + depositsNew );
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "rockmodels: each of the nine rocks is in its own material with its new maps", ( rocks.Length == 9 ) && ( rocksTextured == 9 ), rocksTextured + "/" + rocks.Length );
+		Check( "rockmodels: each rock has between 1,000 and 4,000 triangles", rocksLight == 9, rocksLight.ToString() );
+		Check( "rockmodels: each rock is the old rock's size (its bounding volume within a quarter)", rocksSized == 9, rocksSized.ToString() );
+		Check( "rockmodels: every deposit made in a rock's shape takes the rock's grey map under its element's colour (or the rock's own new maps, if it is drawn in the rock's material)", ( depositsRockShaped == 20 ) && ( depositsGrey == 20 ), depositsGrey + "/" + depositsRockShaped );
+		Check( "rockmodels: Endurium and Mercury have their own maps (Endurium's glow too), at about the old size", ownShapes == 2, ownShapes.ToString() );
+		Check( "rockmodels: on the ground the rocks and the deposits are in the new materials", done[ 0 ] && ( placedRocks.Length > 0 ) && ( placedDeposits.Length > 0 ) && rocksNew && depositsNew, done[ 0 ] + " " + placedRocks.Length + " " + placedDeposits.Length + " " + rocksNew + " " + depositsNew );
+		Check( "rockmodels: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=rockmodels rocks=" + rocksTextured + "/" + rocksLight + "/" + rocksSized + " deposits=" + depositsGrey + "/" + depositsRockShaped + " own=" + ownShapes + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
