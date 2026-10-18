@@ -1,0 +1,440 @@
+{
+	"race": "Rocks and Deposits",
+	"vessels": [],
+	"materials": [
+		{
+			"name": "Rock 1",
+			"albedo": [
+				0.55,
+				0.55,
+				0.55
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Rocks",
+			"albedoMap": "Assets/Game Objects/Rocks/Textures/Rock 1 - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Rocks/Textures/Rock 1 - Specular.png",
+			"normalMap": "Assets/Game Objects/Rocks/Textures/Rock 1 - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Rocks/Textures/Rock 1 - Emissive.jpg"
+		},
+		{
+			"name": "Rock 2",
+			"albedo": [
+				0.55,
+				0.55,
+				0.55
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Rocks",
+			"albedoMap": "Assets/Game Objects/Rocks/Textures/Rock 2 - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Rocks/Textures/Rock 2 - Specular.png",
+			"normalMap": "Assets/Game Objects/Rocks/Textures/Rock 2 - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Rocks/Textures/Rock 2 - Emissive.jpg"
+		},
+		{
+			"name": "Rock 3",
+			"albedo": [
+				0.55,
+				0.55,
+				0.55
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Rocks",
+			"albedoMap": "Assets/Game Objects/Rocks/Textures/Rock 3 - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Rocks/Textures/Rock 3 - Specular.png",
+			"normalMap": "Assets/Game Objects/Rocks/Textures/Rock 3 - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Rocks/Textures/Rock 3 - Emissive.jpg"
+		},
+		{
+			"name": "Rock 4",
+			"albedo": [
+				0.55,
+				0.55,
+				0.55
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Rocks",
+			"albedoMap": "Assets/Game Objects/Rocks/Textures/Rock 4 - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Rocks/Textures/Rock 4 - Specular.png",
+			"normalMap": "Assets/Game Objects/Rocks/Textures/Rock 4 - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Rocks/Textures/Rock 4 - Emissive.jpg"
+		},
+		{
+			"name": "Rock 5",
+			"albedo": [
+				0.55,
+				0.55,
+				0.55
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Rocks",
+			"albedoMap": "Assets/Game Objects/Rocks/Textures/Rock 5 - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Rocks/Textures/Rock 5 - Specular.png",
+			"normalMap": "Assets/Game Objects/Rocks/Textures/Rock 5 - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Rocks/Textures/Rock 5 - Emissive.jpg"
+		},
+		{
+			"name": "Rock 6",
+			"albedo": [
+				0.55,
+				0.55,
+				0.55
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Rocks",
+			"albedoMap": "Assets/Game Objects/Rocks/Textures/Rock 6 - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Rocks/Textures/Rock 6 - Specular.png",
+			"normalMap": "Assets/Game Objects/Rocks/Textures/Rock 6 - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Rocks/Textures/Rock 6 - Emissive.jpg"
+		},
+		{
+			"name": "Rock 7",
+			"albedo": [
+				0.55,
+				0.55,
+				0.55
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Rocks",
+			"albedoMap": "Assets/Game Objects/Rocks/Textures/Rock 7 - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Rocks/Textures/Rock 7 - Specular.png",
+			"normalMap": "Assets/Game Objects/Rocks/Textures/Rock 7 - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Rocks/Textures/Rock 7 - Emissive.jpg"
+		},
+		{
+			"name": "Rock 8",
+			"albedo": [
+				0.55,
+				0.55,
+				0.55
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Rocks",
+			"albedoMap": "Assets/Game Objects/Rocks/Textures/Rock 8 - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Rocks/Textures/Rock 8 - Specular.png",
+			"normalMap": "Assets/Game Objects/Rocks/Textures/Rock 8 - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Rocks/Textures/Rock 8 - Emissive.jpg"
+		},
+		{
+			"name": "Rock 9",
+			"albedo": [
+				0.55,
+				0.55,
+				0.55
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Rocks",
+			"albedoMap": "Assets/Game Objects/Rocks/Textures/Rock 9 - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Rocks/Textures/Rock 9 - Specular.png",
+			"normalMap": "Assets/Game Objects/Rocks/Textures/Rock 9 - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Rocks/Textures/Rock 9 - Emissive.jpg"
+		},
+		{
+			"name": "Endurium",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Elements",
+			"albedoMap": "Assets/Game Objects/Elements/Textures/Endurium - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Elements/Textures/Endurium - Specular.png",
+			"normalMap": "Assets/Game Objects/Elements/Textures/Endurium - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Elements/Textures/Endurium - Emissive.jpg"
+		},
+		{
+			"name": "Mercury",
+			"albedo": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"specular": [
+				1.0,
+				1.0,
+				1.0
+			],
+			"smoothness": 1.0,
+			"emissive": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"folder": "Assets/Game Objects/Elements",
+			"albedoMap": "Assets/Game Objects/Elements/Textures/Mercury - Albedo.jpg",
+			"specularMap": "Assets/Game Objects/Elements/Textures/Mercury - Specular.png",
+			"normalMap": "Assets/Game Objects/Elements/Textures/Mercury - Normal.jpg",
+			"emissiveMap": "Assets/Game Objects/Elements/Textures/Mercury - Emissive.jpg"
+		}
+	],
+	"models": [
+		{
+			"model": "Assets/Game Objects/Rocks/Rock 1.fbx",
+			"materials": [
+				"Rock 1"
+			],
+			"meshy": {
+				"concept": "01a14c14-715a-751e-a135-07598a16e330",
+				"model": "01a14c26-5bc1-7163-924d-bb69ba549a87",
+				"remesh": "01a14c27-7c34-7062-ad73-9cfca74b799e"
+			}
+		},
+		{
+			"model": "Assets/Game Objects/Rocks/Rock 2.fbx",
+			"materials": [
+				"Rock 2"
+			],
+			"meshy": {
+				"concept": "01a14c14-d8c1-7419-b066-bac8e9878e0c",
+				"model": "01a14c26-6160-7345-93dd-c4571bd6c312",
+				"remesh": "01a14c27-8076-74b2-a74b-161503c369c2"
+			}
+		},
+		{
+			"model": "Assets/Game Objects/Rocks/Rock 3.fbx",
+			"materials": [
+				"Rock 3"
+			],
+			"meshy": {
+				"concept": "01a14c15-3fe2-70eb-bab4-11f292bbdc70",
+				"model": "01a14c26-667a-757b-b3ff-00f5d5d92a6a",
+				"remesh": "01a14c27-849e-74ac-bf85-3d0d357a58fa"
+			}
+		},
+		{
+			"model": "Assets/Game Objects/Rocks/Rock 4.fbx",
+			"materials": [
+				"Rock 4"
+			],
+			"meshy": {
+				"concept": "01a14c15-e2a3-72a4-af18-e56f30915eee",
+				"model": "01a14c26-6be2-75d7-aecd-6079e2b319ab",
+				"remesh": "01a14c27-c314-7284-8c2f-62d68fa2796a"
+			}
+		},
+		{
+			"model": "Assets/Game Objects/Rocks/Rock 5.fbx",
+			"materials": [
+				"Rock 5"
+			],
+			"meshy": {
+				"concept": "01a14c16-85f4-7665-b068-84bb3d4f787c",
+				"model": "01a14c26-711c-73a5-b007-fd85023ab6e1",
+				"remesh": "01a14c27-c7a5-70c1-b3e0-6a0cd619712b"
+			}
+		},
+		{
+			"model": "Assets/Game Objects/Rocks/Rock 6.fbx",
+			"materials": [
+				"Rock 6"
+			],
+			"meshy": {
+				"concept": "01a14c16-ec1a-7685-8d22-78a67673ce30",
+				"model": "01a14c26-76ba-76f5-98ba-83f7727769f5",
+				"remesh": "01a14c27-cc02-7720-8d23-3f55329bf39b"
+			}
+		},
+		{
+			"model": "Assets/Game Objects/Rocks/Rock 7.fbx",
+			"materials": [
+				"Rock 7"
+			],
+			"meshy": {
+				"concept": "01a14c17-8efb-7508-94e2-a9e33cf7d6e1",
+				"model": "01a14c26-7c1c-7454-a7da-2838605bfdeb",
+				"remesh": "01a14c27-d057-7624-ab93-c179e765fe1a"
+			}
+		},
+		{
+			"model": "Assets/Game Objects/Rocks/Rock 8.fbx",
+			"materials": [
+				"Rock 8"
+			],
+			"meshy": {
+				"concept": "01a14c17-f527-71f5-965d-ac01756d7b45",
+				"model": "01a14c26-80c8-7240-835a-87a4304784f4",
+				"remesh": "01a14c27-d498-759f-9e52-a546d64aa4b0"
+			}
+		},
+		{
+			"model": "Assets/Game Objects/Rocks/Rock 9.fbx",
+			"materials": [
+				"Rock 9"
+			],
+			"meshy": {
+				"concept": "01a14c18-5b91-727c-a0c8-8c44d4c0dc7a",
+				"model": "01a14c26-861f-70b0-8b1e-d384185914c9",
+				"remesh": "01a14c27-d876-71fc-ba49-54aa350cd88c"
+			}
+		},
+		{
+			"model": "Assets/Game Objects/Elements/Endurium.fbx",
+			"materials": [
+				"Endurium"
+			],
+			"meshy": {
+				"concept": "01a14bff-f005-7564-aa9a-57f1245b828b",
+				"model": "01a14c0e-366a-7423-a527-d6e97222f1c9",
+				"remesh": "01a14c0f-9829-7564-acac-9c32369f4970"
+			}
+		},
+		{
+			"model": "Assets/Game Objects/Elements/Mercury.fbx",
+			"materials": [
+				"Mercury"
+			],
+			"meshy": {
+				"concept": "01a14c00-e1b0-7558-8874-e0151b4daf61",
+				"model": "01a14c0e-3c9c-72d3-8203-dc9eaad8eb79",
+				"remesh": "01a14c0f-9c13-70d8-83f9-4bd1480bf735"
+			}
+		}
+	],
+	"rockMaps": [
+		{
+			"model": "Assets/Game Objects/Rocks/Rock 1.fbx",
+			"grey": "Assets/Game Objects/Rocks/Textures/Rock 1 - Grey.jpg",
+			"normal": "Assets/Game Objects/Rocks/Textures/Rock 1 - Normal.jpg"
+		},
+		{
+			"model": "Assets/Game Objects/Rocks/Rock 2.fbx",
+			"grey": "Assets/Game Objects/Rocks/Textures/Rock 2 - Grey.jpg",
+			"normal": "Assets/Game Objects/Rocks/Textures/Rock 2 - Normal.jpg"
+		},
+		{
+			"model": "Assets/Game Objects/Rocks/Rock 3.fbx",
+			"grey": "Assets/Game Objects/Rocks/Textures/Rock 3 - Grey.jpg",
+			"normal": "Assets/Game Objects/Rocks/Textures/Rock 3 - Normal.jpg"
+		},
+		{
+			"model": "Assets/Game Objects/Rocks/Rock 4.fbx",
+			"grey": "Assets/Game Objects/Rocks/Textures/Rock 4 - Grey.jpg",
+			"normal": "Assets/Game Objects/Rocks/Textures/Rock 4 - Normal.jpg"
+		},
+		{
+			"model": "Assets/Game Objects/Rocks/Rock 5.fbx",
+			"grey": "Assets/Game Objects/Rocks/Textures/Rock 5 - Grey.jpg",
+			"normal": "Assets/Game Objects/Rocks/Textures/Rock 5 - Normal.jpg"
+		},
+		{
+			"model": "Assets/Game Objects/Rocks/Rock 6.fbx",
+			"grey": "Assets/Game Objects/Rocks/Textures/Rock 6 - Grey.jpg",
+			"normal": "Assets/Game Objects/Rocks/Textures/Rock 6 - Normal.jpg"
+		},
+		{
+			"model": "Assets/Game Objects/Rocks/Rock 7.fbx",
+			"grey": "Assets/Game Objects/Rocks/Textures/Rock 7 - Grey.jpg",
+			"normal": "Assets/Game Objects/Rocks/Textures/Rock 7 - Normal.jpg"
+		},
+		{
+			"model": "Assets/Game Objects/Rocks/Rock 8.fbx",
+			"grey": "Assets/Game Objects/Rocks/Textures/Rock 8 - Grey.jpg",
+			"normal": "Assets/Game Objects/Rocks/Textures/Rock 8 - Normal.jpg"
+		},
+		{
+			"model": "Assets/Game Objects/Rocks/Rock 9.fbx",
+			"grey": "Assets/Game Objects/Rocks/Textures/Rock 9 - Grey.jpg",
+			"normal": "Assets/Game Objects/Rocks/Textures/Rock 9 - Normal.jpg"
+		}
+	]
+}

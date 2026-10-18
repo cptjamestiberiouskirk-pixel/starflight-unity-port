@@ -2,21 +2,31 @@
 %TAG !u! tag:unity3d.com,2011:
 --- !u!21 &2100000
 Material:
-  serializedVersion: 6
+  serializedVersion: 8
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Rock 5
   m_Shader: {fileID: 4800000, guid: f67073489be24934c9032d00068b6661, type: 3}
-  m_ShaderKeywords: SF_ALBEDOMAP_ON SF_ALBEDOOCCLUSIONON_ON SF_ALBEDOOCCLUSION_ON
-    SF_NORMALMAP_ISCOMPRESSED SF_NORMALMAP_ON SF_SPECULARMAP_ON SF_SPECULAR_ON SF_ZWRITEON_ON
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - SF_ALBEDOMAP_ON
+  - SF_EMISSIVEMAP_ON
+  - SF_NORMALMAP_ISCOMPRESSED
+  - SF_NORMALMAP_ON
+  - SF_SPECULARMAP_ON
+  - SF_SPECULAR_ON
+  m_InvalidKeywords:
+  - SF_ZWRITEON_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses: []
+  m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -25,19 +35,23 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - SF_EmissiveMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: 2bfd5c8a08b39e84787eb162b22353c7, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - SF_NormalMap:
-        m_Texture: {fileID: 2800000, guid: 223399ef4e178b847ad81a941ba011bd, type: 3}
+        m_Texture: {fileID: 2800000, guid: 74684ef848b13ea45adb97c0b032dd63, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - SF_OcclusionMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - SF_ReflectionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - SF_SpecularMap:
-        m_Texture: {fileID: 2800000, guid: 9552bf96e9038374ebf7ea58dbb34ffe, type: 3}
+        m_Texture: {fileID: 2800000, guid: f5585385de07dff418890804e71ef8d0, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
@@ -61,7 +75,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: ee17fe741ad166b47890ac8e38ba3abb, type: 3}
+        m_Texture: {fileID: 2800000, guid: fe34f7cf7bff9bf4c87b4141747604e3, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
@@ -76,8 +90,9 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    m_Ints: []
     m_Floats:
-    - SF_AlbedoOcclusionOn: 1
+    - SF_AlbedoOcclusionOn: 0
     - SF_AlphaTestValue: 0
     - SF_BlendDst: 0
     - SF_BlendSrc: 1
@@ -85,10 +100,10 @@ Material:
     - SF_DetailNormalMapStrength: 1
     - SF_EmissiveProjectionOn: 0
     - SF_FractalDetailsOn: 0
-    - SF_NormalMapStrength: 2
-    - SF_OcclusionPower: 0
+    - SF_NormalMapStrength: 1
+    - SF_OcclusionPower: 1
     - SF_OrthonormalizeOn: 0
-    - SF_Smoothness: 0.35
+    - SF_Smoothness: 1
     - SF_ZTest: 4
     - SF_ZWriteOn: 1
     - _BumpScale: 1
@@ -108,8 +123,18 @@ Material:
     - _UVSec: 0
     - _ZWrite: 1
     m_Colors:
-    - SF_AlbedoColor: {r: 1, g: 1, b: 1, a: 1}
+    - SF_AlbedoColor: {r: 0.55, g: 0.55, b: 0.55, a: 1}
     - SF_EmissiveColor: {r: 0, g: 0, b: 0, a: 1}
+    - SF_EmissiveColorTint: {r: 1, g: 1, b: 1, a: 1}
+    - SF_EmissiveTint: {r: 1, g: 1, b: 1, a: 1}
+    - SF_PaletteColor0: {r: 1, g: 1, b: 1, a: 1}
+    - SF_PaletteColor1: {r: 1, g: 1, b: 1, a: 1}
+    - SF_PaletteColor2: {r: 1, g: 1, b: 1, a: 1}
+    - SF_PaletteColor3: {r: 1, g: 1, b: 1, a: 1}
+    - SF_PaletteColor4: {r: 1, g: 1, b: 1, a: 1}
+    - SF_ReflectionColor: {r: 1, g: 1, b: 1, a: 1}
     - SF_SpecularColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

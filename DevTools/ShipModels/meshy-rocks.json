@@ -1,0 +1,213 @@
+{
+	"name": "Rocks and Deposits",
+	"textureSize": 1024,
+	"props": [
+		{
+			"glb": "rock-1.glb",
+			"fbx": "Assets/Game Objects/Rocks/Rock 1.fbx",
+			"material": "Rock 1",
+			"materialFolder": "Assets/Game Objects/Rocks",
+			"textures": "Assets/Game Objects/Rocks/Textures",
+			"fit": "volume",
+			"grey": true,
+			"meshy": {
+				"concept": "01a14c14-715a-751e-a135-07598a16e330",
+				"model": "01a14c26-5bc1-7163-924d-bb69ba549a87",
+				"remesh": "01a14c27-7c34-7062-ad73-9cfca74b799e"
+			},
+			"albedo": [
+				0.55,
+				0.55,
+				0.55
+			]
+		},
+		{
+			"glb": "rock-2.glb",
+			"fbx": "Assets/Game Objects/Rocks/Rock 2.fbx",
+			"material": "Rock 2",
+			"materialFolder": "Assets/Game Objects/Rocks",
+			"textures": "Assets/Game Objects/Rocks/Textures",
+			"fit": "volume",
+			"grey": true,
+			"meshy": {
+				"concept": "01a14c14-d8c1-7419-b066-bac8e9878e0c",
+				"model": "01a14c26-6160-7345-93dd-c4571bd6c312",
+				"remesh": "01a14c27-8076-74b2-a74b-161503c369c2"
+			},
+			"albedo": [
+				0.55,
+				0.55,
+				0.55
+			]
+		},
+		{
+			"glb": "rock-3.glb",
+			"fbx": "Assets/Game Objects/Rocks/Rock 3.fbx",
+			"material": "Rock 3",
+			"materialFolder": "Assets/Game Objects/Rocks",
+			"textures": "Assets/Game Objects/Rocks/Textures",
+			"fit": "volume",
+			"grey": true,
+			"meshy": {
+				"concept": "01a14c15-3fe2-70eb-bab4-11f292bbdc70",
+				"model": "01a14c26-667a-757b-b3ff-00f5d5d92a6a",
+				"remesh": "01a14c27-849e-74ac-bf85-3d0d357a58fa"
+			},
+			"albedo": [
+				0.55,
+				0.55,
+				0.55
+			]
+		},
+		{
+			"glb": "rock-4.glb",
+			"fbx": "Assets/Game Objects/Rocks/Rock 4.fbx",
+			"material": "Rock 4",
+			"materialFolder": "Assets/Game Objects/Rocks",
+			"textures": "Assets/Game Objects/Rocks/Textures",
+			"fit": "volume",
+			"grey": true,
+			"meshy": {
+				"concept": "01a14c15-e2a3-72a4-af18-e56f30915eee",
+				"model": "01a14c26-6be2-75d7-aecd-6079e2b319ab",
+				"remesh": "01a14c27-c314-7284-8c2f-62d68fa2796a"
+			},
+			"albedo": [
+				0.55,
+				0.55,
+				0.55
+			]
+		},
+		{
+			"glb": "rock-5.glb",
+			"fbx": "Assets/Game Objects/Rocks/Rock 5.fbx",
+			"material": "Rock 5",
+			"materialFolder": "Assets/Game Objects/Rocks",
+			"textures": "Assets/Game Objects/Rocks/Textures",
+			"fit": "volume",
+			"grey": true,
+			"meshy": {
+				"concept": "01a14c16-85f4-7665-b068-84bb3d4f787c",
+				"model": "01a14c26-711c-73a5-b007-fd85023ab6e1",
+				"remesh": "01a14c27-c7a5-70c1-b3e0-6a0cd619712b"
+			},
+			"albedo": [
+				0.55,
+				0.55,
+				0.55
+			]
+		},
+		{
+			"glb": "rock-6.glb",
+			"fbx": "Assets/Game Objects/Rocks/Rock 6.fbx",
+			"material": "Rock 6",
+			"materialFolder": "Assets/Game Objects/Rocks",
+			"textures": "Assets/Game Objects/Rocks/Textures",
+			"fit": "volume",
+			"grey": true,
+			"meshy": {
+				"concept": "01a14c16-ec1a-7685-8d22-78a67673ce30",
+				"model": "01a14c26-76ba-76f5-98ba-83f7727769f5",
+				"remesh": "01a14c27-cc02-7720-8d23-3f55329bf39b"
+			},
+			"albedo": [
+				0.55,
+				0.55,
+				0.55
+			]
+		},
+		{
+			"glb": "rock-7.glb",
+			"fbx": "Assets/Game Objects/Rocks/Rock 7.fbx",
+			"material": "Rock 7",
+			"materialFolder": "Assets/Game Objects/Rocks",
+			"textures": "Assets/Game Objects/Rocks/Textures",
+			"fit": "volume",
+			"grey": true,
+			"meshy": {
+				"concept": "01a14c17-8efb-7508-94e2-a9e33cf7d6e1",
+				"model": "01a14c26-7c1c-7454-a7da-2838605bfdeb",
+				"remesh": "01a14c27-d057-7624-ab93-c179e765fe1a"
+			},
+			"albedo": [
+				0.55,
+				0.55,
+				0.55
+			]
+		},
+		{
+			"glb": "rock-8.glb",
+			"fbx": "Assets/Game Objects/Rocks/Rock 8.fbx",
+			"material": "Rock 8",
+			"materialFolder": "Assets/Game Objects/Rocks",
+			"textures": "Assets/Game Objects/Rocks/Textures",
+			"fit": "volume",
+			"grey": true,
+			"meshy": {
+				"concept": "01a14c17-f527-71f5-965d-ac01756d7b45",
+				"model": "01a14c26-80c8-7240-835a-87a4304784f4",
+				"remesh": "01a14c27-d498-759f-9e52-a546d64aa4b0"
+			},
+			"albedo": [
+				0.55,
+				0.55,
+				0.55
+			]
+		},
+		{
+			"glb": "rock-9.glb",
+			"fbx": "Assets/Game Objects/Rocks/Rock 9.fbx",
+			"material": "Rock 9",
+			"materialFolder": "Assets/Game Objects/Rocks",
+			"textures": "Assets/Game Objects/Rocks/Textures",
+			"fit": "volume",
+			"grey": true,
+			"meshy": {
+				"concept": "01a14c18-5b91-727c-a0c8-8c44d4c0dc7a",
+				"model": "01a14c26-861f-70b0-8b1e-d384185914c9",
+				"remesh": "01a14c27-d876-71fc-ba49-54aa350cd88c"
+			},
+			"albedo": [
+				0.55,
+				0.55,
+				0.55
+			]
+		},
+		{
+			"glb": "endurium.glb",
+			"fbx": "Assets/Game Objects/Elements/Endurium.fbx",
+			"material": "Endurium",
+			"materialFolder": "Assets/Game Objects/Elements",
+			"textures": "Assets/Game Objects/Elements/Textures",
+			"fit": "volume",
+			"glow": {
+				"hue": [
+					[
+						260.0,
+						335.0
+					]
+				],
+				"saturation": 0.25,
+				"value": 0.2
+			},
+			"meshy": {
+				"concept": "01a14bff-f005-7564-aa9a-57f1245b828b",
+				"model": "01a14c0e-366a-7423-a527-d6e97222f1c9",
+				"remesh": "01a14c0f-9829-7564-acac-9c32369f4970"
+			}
+		},
+		{
+			"glb": "mercury.glb",
+			"fbx": "Assets/Game Objects/Elements/Mercury.fbx",
+			"material": "Mercury",
+			"materialFolder": "Assets/Game Objects/Elements",
+			"textures": "Assets/Game Objects/Elements/Textures",
+			"fit": "footprint",
+			"meshy": {
+				"concept": "01a14c00-e1b0-7558-8874-e0151b4daf61",
+				"model": "01a14c0e-3c9c-72d3-8203-dc9eaad8eb79",
+				"remesh": "01a14c0f-9c13-70d8-83f9-4bd1480bf735"
+			}
+		}
+	]
+}
