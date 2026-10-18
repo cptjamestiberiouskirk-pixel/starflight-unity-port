@@ -118,12 +118,16 @@ public class SensorsButton : ShipButton
 						numPlanets++;
 				}
 
+				// the star's state is the science officer's call, as the original's analysis of a star (ANALYZE-OV WF31E: " STATE: " then ?.CERTAIN)
+				var scienceOfficer = playerData.m_crewAssignment.IsAssigned( PD_CrewAssignment.Role.ScienceOfficer ) ? playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer ) : null;
+				var scienceSkill = ( ( scienceOfficer != null ) && ( scienceOfficer.m_vitality > 0 ) ) ? scienceOfficer.m_science : 0;
+
 				SpaceflightController.m_instance.m_messages.AddText(
 					"<color=yellow>Star System Scan:</color>\n" +
 					"Coordinates: <color=white>" + star.m_xCoordinate + ", " + star.m_yCoordinate + "</color>\n" +
 					"Spectral Class: <color=white>" + star.m_class + "</color>\n" +
 					"Planets: <color=white>" + numPlanets + "</color>\n" +
-					"Stability: <color=white>" + star.GetStabilityText( playerData.m_general.m_gameTime, playerData.m_general.m_gameWon, playerData.m_general.m_winTime ) + "</color>"
+					"Stability: <color=white>" + AnalysisButton.Certain( star.GetStabilityText( playerData.m_general.m_gameTime, playerData.m_general.m_gameWon, playerData.m_general.m_winTime ), scienceSkill ) + "</color>"
 				);
 
 				SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
