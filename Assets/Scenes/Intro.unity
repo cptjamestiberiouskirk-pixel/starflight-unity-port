@@ -289,16 +289,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: '<size=75%><u>Additional Programming</u></size>
-
-    <color=#E6F0FF>Jeff
-    Graw</color><size=25%>
-
-
-    </size><size=75%><u>Forth Reverse Engineering</u></size>
-
-    <color=#E6F0FF>Sebastian
-    Macke</color>'
+  m_text: 
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: d07afbe253219e34cb642386b1a33ff5, type: 2}
   m_sharedMaterial: {fileID: -1740682439310892978, guid: d07afbe253219e34cb642386b1a33ff5,
@@ -1863,7 +1854,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: The Starflight Remake Project
+  m_text: "Starflight: The Remaking of a Legend"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 837e87a8e408c8c4b8a61880af427289, type: 2}
   m_sharedMaterial: {fileID: 2508922811541953856, guid: 837e87a8e408c8c4b8a61880af427289,
@@ -3545,16 +3536,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: '<size=75%><u>Build Master & Quality Assurance</u></size>
-
-    <color=#E6F0FF>Michael
-    Gams</color><size=25%>
-
-
-    </size><size=75%><u>Social Media</u></size>
-
-    <color=#E6F0FF>Daniel
-    Blakeley</color>'
+  m_text: 
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: d07afbe253219e34cb642386b1a33ff5, type: 2}
   m_sharedMaterial: {fileID: -1740682439310892978, guid: d07afbe253219e34cb642386b1a33ff5,
@@ -3732,7 +3714,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: BraveArmy.com/starflight
+  m_text: github.com/cptjamestiberiouskirk-pixel
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 5bfddd1310b2f2f4693c8125215b123d, type: 2}
   m_sharedMaterial: {fileID: -8393139232426345987, guid: 5bfddd1310b2f2f4693c8125215b123d,
@@ -5111,19 +5093,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: '<size=75%><u>Planet Map Project</u></size>
-
-    <color=#E6F0FF>Michael
-    Gams (676), Daniel Blakeley (72)
-
-    Stephen A Rogers (52), & Marvin Herbold
-    (11)</color><size=25%>
-
-
-    </size><size=75%><u>Bug Hunters</u></size>
-
-    <color=#E6F0FF>Michael
-    Gams & Aaron Diggens</color>'
+  m_text: "<size=75%>Full credits: press Escape in the game, then About</size>"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: d07afbe253219e34cb642386b1a33ff5, type: 2}
   m_sharedMaterial: {fileID: -1740682439310892978, guid: d07afbe253219e34cb642386b1a33ff5,
@@ -5458,10 +5428,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: '<size=75%><u>Programmer & Project Lead</u></size>
-
-    <color=#E6F0FF>Marvin
-    Herbold</color>'
+  m_text: "<size=75%><u>Programmer & Project Lead</u></size>\n<color=#E6F0FF>cptjamestiberiouskirk-pixel</color>"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: d07afbe253219e34cb642386b1a33ff5, type: 2}
   m_sharedMaterial: {fileID: -1740682439310892978, guid: d07afbe253219e34cb642386b1a33ff5,

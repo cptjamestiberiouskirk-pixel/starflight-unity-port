@@ -286,4 +286,4 @@ See [CHANGELOG.md](CHANGELOG.md) for the detailed version history.
 
 ---
 
-> *Original concept by the BraveArmy team. Unity 6 port and modernization by @cptjamestiberiouskirk-pixel.*
+> *By @cptjamestiberiouskirk-pixel. Built on the Starflight Remake Project by Marvin Herbold, released into the public domain.*

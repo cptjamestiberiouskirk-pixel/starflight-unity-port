@@ -82,6 +82,24 @@ public class SaveGamePanel : Panel
 	TextMeshProUGUI m_schemeDescriptionText;
 	Button m_colorsDoneButton;
 
+	// the button that opens the About screen, and the screen: who made the game, what it is built on, and the credits the licences of its sounds and music ask
+	// for (made like the Colors screen, from the resume button and the switch panel, the first time they are needed)
+	Button m_aboutButton;
+	GameObject m_aboutPanel;
+	TextMeshProUGUI m_aboutText;
+	Button m_aboutDoneButton;
+
+	// the About screen's text
+	public const string c_aboutText =
+		"<b>Starflight: The Remaking of a Legend</b>\n" +
+		"By cptjamestiberiouskirk-pixel, github.com/cptjamestiberiouskirk-pixel\n\n" +
+		"Built on the Starflight Remake Project by Marvin Herbold, released into the public domain.\n" +
+		"With thanks to the Starflight Remake Project's Jeff Graw, Sebastian Macke, Michael Gams, Daniel Blakeley, Stephen A Rogers, Aaron Diggens and the Planet Map Project.\n\n" +
+		"Starflight (1986) was created by Binary Systems and published by Electronic Arts. This is an unofficial, free fan project, not affiliated with or endorsed by either company.\n\n" +
+		"Music: ambiences by Tabletop Audio (tabletopaudio.com), under Creative Commons Attribution-NonCommercial-NoDerivatives 4.0.\n" +
+		"Sound effects: \"Laser Shot Big 4\" and \"Laser Shot Silenced\" by bubaproducer (freesound.org), under Creative Commons Attribution 4.0; \"explosion05\" by V-ktor (freesound.org), under CC0.\n" +
+		"Fonts: Orbitron, Rajdhani and Share Tech Mono, under the SIL Open Font License.";
+
 	// the theme roles a scheme's swatches show, left to right: its screen, its panels, its text, its two accents, and its fuel and danger colours
 	static readonly UIKitTheme.ColorRole[] c_swatchRoles =
 	{
@@ -109,8 +127,14 @@ public class SaveGamePanel : Panel
 			m_colorsPanel.SetActive( false );
 		}
 
-		// the button for the Colors screen
+		if ( m_aboutPanel != null )
+		{
+			m_aboutPanel.SetActive( false );
+		}
+
+		// the buttons for the Colors and About screens
 		MakeColorsButton();
+		MakeAboutButton();
 
 		// enable the main menu buttons
 		EnableMenuButtons( true );
@@ -325,13 +349,141 @@ public class SaveGamePanel : Panel
 		SoundController.m_instance.PlaySound( SoundController.Sound.Update );
 	}
 
-	// panel tick: the cancel key (escape) leaves the Colors screen
+	// panel tick: the cancel key (escape) leaves the Colors and About screens
 	public override void Tick()
 	{
-		if ( ( m_colorsPanel != null ) && m_colorsPanel.activeSelf && InputController.m_instance.m_cancel )
+		var screenIsOpen = ( ( m_colorsPanel != null ) && m_colorsPanel.activeSelf ) || ( ( m_aboutPanel != null ) && m_aboutPanel.activeSelf );
+
+		if ( screenIsOpen && InputController.m_instance.m_cancel )
 		{
 			CancelClicked();
 		}
+	}
+
+	// called when the player clicks on about: the game's credits
+	public void AboutClicked()
+	{
+		InputController.m_instance.Debounce();
+
+		MakeAboutPanel();
+
+		if ( m_aboutPanel == null )
+		{
+			return;
+		}
+
+		// deselect all the buttons
+		EventSystem.current.SetSelectedGameObject( null );
+
+		// disable the menu buttons
+		EnableMenuButtons( false );
+
+		// activate the overlay and the about panel
+		m_overlayPanel.SetActive( true );
+		m_aboutPanel.SetActive( true );
+
+		if ( m_aboutDoneButton != null )
+		{
+			m_aboutDoneButton.Select();
+		}
+
+		// play the activate sound
+		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+	}
+
+	// the About screen's text, as it shows (for the probe)
+	public string GetAboutText()
+	{
+		return ( m_aboutText != null ) ? m_aboutText.text : null;
+	}
+
+	// makes the button for the About screen: a copy of the resume button, in front of it (after the Colors button)
+	void MakeAboutButton()
+	{
+		if ( ( m_aboutButton != null ) || ( m_resumeButton == null ) )
+		{
+			return;
+		}
+
+		m_aboutButton = CopyButton( m_resumeButton, m_resumeButton.transform.parent, "About Button", "About", AboutClicked );
+
+		m_aboutButton.transform.SetSiblingIndex( m_resumeButton.transform.GetSiblingIndex() );
+	}
+
+	// makes the About screen the first time it is needed: a copy of the switch panel, with its heading, the credits under it and a done button
+	void MakeAboutPanel()
+	{
+		if ( ( m_aboutPanel != null ) || ( m_switchPanel == null ) || ( m_switchCancelButton == null ) )
+		{
+			return;
+		}
+
+		m_aboutPanel = Instantiate( m_switchPanel, m_switchPanel.transform.parent );
+		m_aboutPanel.name = "About Panel";
+		m_aboutPanel.SetActive( false );
+
+		var panelTransform = (RectTransform) m_aboutPanel.transform;
+
+		panelTransform.anchorMin = new Vector2( 0.1f, 0.08f );
+		panelTransform.anchorMax = new Vector2( 0.9f, 0.92f );
+		panelTransform.offsetMin = Vector2.zero;
+		panelTransform.offsetMax = Vector2.zero;
+
+		// the copy's contents are laid out here by hand: its layout group goes, and so does everything in it but its heading
+		var layout = m_aboutPanel.GetComponentInChildren<VerticalLayoutGroup>( true );
+
+		if ( layout == null )
+		{
+			Destroy( m_aboutPanel );
+			m_aboutPanel = null;
+
+			return;
+		}
+
+		var content = (RectTransform) layout.transform;
+		var heading = content.GetComponentInChildren<TextMeshProUGUI>( true );
+
+		DestroyImmediate( layout );
+
+		for ( var i = content.childCount - 1; i >= 0; i-- )
+		{
+			var child = content.GetChild( i );
+
+			if ( ( heading == null ) || ( child != heading.transform ) )
+			{
+				DestroyImmediate( child.gameObject );
+			}
+		}
+
+		if ( heading != null )
+		{
+			heading.text = "About";
+
+			PlaceAt( heading.rectTransform, new Vector2( 0.0f, 1.0f ), new Vector2( 1.0f, 1.0f ), new Vector2( 0.0f, -56.0f ), Vector2.zero );
+
+			// the credits, under it, in the kit's body text
+			m_aboutText = Instantiate( heading, content );
+			m_aboutText.name = "About Text";
+			m_aboutText.text = c_aboutText;
+			m_aboutText.textWrappingMode = TextWrappingModes.Normal;
+
+			PlaceAt( m_aboutText.rectTransform, Vector2.zero, Vector2.one, new Vector2( 0.0f, 80.0f ), new Vector2( 0.0f, -72.0f ) );
+			SetAlignment( m_aboutText, HorizontalAlignmentOptions.Left, VerticalAlignmentOptions.Top );
+
+			if ( m_aboutText.TryGetComponent<UIKitStyle>( out var textStyle ) )
+			{
+				textStyle.m_textStyle = UIKitTheme.TextStyleRole.BodyM;
+				textStyle.m_color = UIKitTheme.ColorRole.TextPrimary;
+				textStyle.m_fontSize = 20.0f;
+				textStyle.Apply();
+			}
+		}
+
+		// the done button, at the bottom right
+		m_aboutDoneButton = CopyButton( m_switchCancelButton, content, "Done Button", "Done", CancelClicked );
+
+		PlaceAt( (RectTransform) m_aboutDoneButton.transform, new Vector2( 1.0f, 0.0f ), new Vector2( 1.0f, 0.0f ), new Vector2( -240.0f, 0.0f ), new Vector2( 0.0f, 64.0f ) );
+		CenterLabel( m_aboutDoneButton );
 	}
 
 	// makes the button for the Colors screen: a copy of the resume button, in front of it
@@ -909,6 +1061,11 @@ public class SaveGamePanel : Panel
 			m_colorsPanel.SetActive( false );
 		}
 
+		if ( m_aboutPanel != null )
+		{
+			m_aboutPanel.SetActive( false );
+		}
+
 		// select the resume button by default
 		m_resumeButton.Select();
 
@@ -1018,6 +1175,11 @@ public class SaveGamePanel : Panel
 		if ( m_colorsButton != null )
 		{
 			m_colorsButton.interactable = enable;
+		}
+
+		if ( m_aboutButton != null )
+		{
+			m_aboutButton.interactable = enable;
 		}
 	}
 }
