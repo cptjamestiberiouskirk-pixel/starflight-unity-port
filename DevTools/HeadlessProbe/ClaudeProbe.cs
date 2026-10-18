@@ -22587,6 +22587,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
+		// a science officer who can always tell the star's state (since 2026-10-18 the scan gives it only when the officer can: starstate)
+		DataController.m_instance.m_playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer ).m_science = 250;
+
 		var encounterRange = controller.m_encounterRange;
 
 		controller.m_encounterRange = 0.0f;
