@@ -39,14 +39,12 @@ public class PD_PlayerShip
 	public int m_shieldPoints;
 	public int m_armorPoints;
 
-	// how many seconds it takes the shields to regain one percent of their full charge
-	public const float c_shieldRechargeInterval = 5.0f;
+	// the shields regain their charge as the original's: 20 points on each of the ship's turns in an encounter, while below what the shielding can hold (COMBAT-OV
+	// COMBAT, WEF20 and WEEC4: class x 500), all of it when an encounter ends (HYPER-OV ENCCLEANUP, CHARGE-D), and none anywhere else (Encounter.UpdateShieldTurns)
+	public const int c_shieldPointsPerTurn = 20;
 
 	// true once the shield charge is kept when the shields are lowered (false in save files from before that - see ValidateShieldCharge)
 	public bool m_shieldChargeIsKept;
-
-	// how long it has been since the shields last regained some charge
-	public float m_shieldRechargeTimer;
 
 	// how many armor points the engineer repairs each second for every point of engineering skill, and the slowest an engineer ever works
 	public const float c_repairRatePerSkillPoint = 0.02f;
@@ -121,7 +119,6 @@ public class PD_PlayerShip
 		m_armorPoints = c_bareHullArmorPoints;
 
 		m_shieldChargeIsKept = true;
-		m_shieldRechargeTimer = 0.0f;
 
 		m_repairsAreUnderWay = false;
 		m_repairProgress = 0.0f;
@@ -778,43 +775,34 @@ public class PD_PlayerShip
 		m_shieldPoints = Mathf.Clamp( m_shieldPoints, 0, GetMaximumShieldPoints() );
 	}
 
-	// put the shields back at full charge (starport does this while the ship is docked)
+	// put the shields back at full charge (starport does this while the ship is docked, and the end of an encounter does it, as the original's CHARGE-D)
 	public void RechargeShieldsFully()
 	{
 		m_shieldChargeIsKept = true;
 		m_shieldPoints = GetMaximumShieldPoints();
-		m_shieldRechargeTimer = 0.0f;
 	}
 
-	// call this every frame during spaceflight - the shields slowly regain their charge whether they are up or down
+	// call this every frame during spaceflight - it keeps the charge within what the shielding can hold (a damaged shield generator holds less); the charge itself
+	// only grows in an encounter (GainShieldTurn) and is refilled when the encounter ends, as the original's
 	public void UpdateShields( float deltaTime )
 	{
 		ValidateShieldCharge();
+	}
 
-		// are the shields fully charged already?
-		var maximumPoints = GetMaximumShieldPoints();
+	// the ship's turn in an encounter: the shields regain 20 points, raised or lowered, while below what the shielding can hold (COMBAT-OV WEF20, WEEC4) - returns
+	// the points regained
+	public int GainShieldTurn()
+	{
+		ValidateShieldCharge();
 
-		if ( m_shieldPoints >= maximumPoints )
+		var before = m_shieldPoints;
+
+		if ( m_shieldPoints < GetMaximumShieldPoints() )
 		{
-			// yes - nothing to do
-			m_shieldRechargeTimer = 0.0f;
-
-			return;
+			m_shieldPoints = Mathf.Min( GetMaximumShieldPoints(), m_shieldPoints + c_shieldPointsPerTurn );
 		}
 
-		// no - update the timer
-		m_shieldRechargeTimer += deltaTime;
-
-		// is it time for the shields to regain some charge?
-		if ( m_shieldRechargeTimer >= c_shieldRechargeInterval )
-		{
-			// yes - one percent of the full charge for every interval that has passed
-			var intervals = Mathf.FloorToInt( m_shieldRechargeTimer / c_shieldRechargeInterval );
-
-			m_shieldRechargeTimer -= intervals * c_shieldRechargeInterval;
-
-			m_shieldPoints = Mathf.Min( maximumPoints, m_shieldPoints + intervals * Mathf.Max( 1, maximumPoints / 100 ) );
-		}
+		return m_shieldPoints - before;
 	}
 
 	// the number of armor points the engineer repairs each second (zero if there is no engineer who can work)

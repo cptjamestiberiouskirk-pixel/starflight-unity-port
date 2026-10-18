@@ -386,6 +386,9 @@ public class Encounter : MonoBehaviour
 		// a few of a race's ships may call for help, and more of them warp in
 		UpdateDistressCall();
 
+		// the player ship's turns, on which its shields regain their charge
+		UpdateShieldTurns();
+
 		// do we want to update the ships (both alien and player)?
 		if ( !m_pdEncounter.m_connected )
 		{
@@ -450,6 +453,9 @@ public class Encounter : MonoBehaviour
 	{
 		// get to the player data
 		var playerData = DataController.m_instance.m_playerData;
+
+		// the encounter's end refills the shields, as the original's (HYPER-OV ENCCLEANUP, CHARGE-D: class x 500)
+		playerData.m_playerShip.RechargeShieldsFully();
 
 		// calculate the normalized exit direction vector
 		var exitDirection = Vector3.Normalize( playerData.m_general.m_coordinates );
@@ -763,6 +769,9 @@ public class Encounter : MonoBehaviour
 
 		// the aliens' shields and weapons are taken as they are when the encounter shows, without a word (the original's IAPWR sets them without one)
 		m_shieldsAndWeaponsKnown = false;
+
+		// the player ship's first turn is a whole turn away
+		m_shieldTurnTimer = 0.0f;
 
 		// and so are the player's, for the aliens' mood
 		m_playerShieldsSeen = false;
@@ -2986,6 +2995,28 @@ public class Encounter : MonoBehaviour
 
 		// (a long frame does not save up passes)
 		m_distressPassTimer = Mathf.Min( m_distressPassTimer, c_passSeconds );
+	}
+
+	// the player ship's turns, as the original's (COMBAT-OV COMBAT, run once a pass of the main loop through 'EXTERNAL-EVENTS): each pass is one icon's turn, the
+	// alien ships' and the player ship's in turn (^VES round robin over ILOCAL), so the ship has a turn every (ships + 1) passes, as the aliens' moves do
+	// (GetAlienShipSpeed); on it the shields regain 20 points while below what the shielding can hold (WEF20, WEEC4), raised or lowered
+	float m_shieldTurnTimer;
+
+	void UpdateShieldTurns()
+	{
+		var passesPerTurn = GetAlienShipsPresent() + 1;
+
+		m_shieldTurnTimer += Time.deltaTime;
+
+		for ( var turn = 0; ( turn < 4 ) && ( m_shieldTurnTimer >= passesPerTurn * c_passSeconds ); turn++ )
+		{
+			m_shieldTurnTimer -= passesPerTurn * c_passSeconds;
+
+			DataController.m_instance.m_playerData.m_playerShip.GainShieldTurn();
+		}
+
+		// (a long frame does not save up turns)
+		m_shieldTurnTimer = Mathf.Min( m_shieldTurnTimer, passesPerTurn * c_passSeconds );
 	}
 
 	// one pass of the original's rolls: returns 1 when the aliens call for help, 2 when their ships warp in, 0 otherwise (public for the probe)

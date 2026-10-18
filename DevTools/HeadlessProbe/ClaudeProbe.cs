@@ -1646,6 +1646,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioShipCargo();
 				break;
 
+			case "shieldturns":
+				yield return ScenarioShieldTurns();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -3707,7 +3711,7 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( result, 0 );
 	}
 
-	// ---------------------------------------------------------------- M19: shields keep their charge and recharge slowly
+	// ---------------------------------------------------------------- M19: shields keep their charge (since 2026-10-18 they regain it only in an encounter: shieldturns)
 
 	IEnumerator ScenarioM19()
 	{
@@ -3763,7 +3767,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "class 2 shields, full " + full + ": after a 300 hit " + afterHit + ", while lowered " + chargeWhileDown + ", a 50 hit while lowered did " + hullDamageWhileDown + " to the hull, after raising again " + afterDropAndRaise );
 
-		// ten seconds of game time through the recharge method itself
+		// ten seconds of game time through the per-frame shield method itself (0 since the recharge is the original's, in an encounter only)
 		var rechargeInTenSeconds = -1;
 
 		if ( update != null )
@@ -44645,6 +44649,115 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "shipcargo: an artifact whose kind has been analysed shows its value", analysedRow == unknown.m_name + "|" + Tools.VolumeToText( unknown.m_volume ) + "|" + unknown.m_actualValue, analysedRow );
 
 		Finish( "scenario=shipcargo rows=" + rows.Count + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the shields' recharge as the original's (since 2026-10-18)
+
+	// the shield points the ship gains in this many seconds of game time, from none (the alien ships put far away, so that none of their fire lands meanwhile)
+	IEnumerator ShieldGain( float seconds, int[] gained )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+		{
+			foreach ( var alienShip in encounter.m_pdEncounter.GetAlienShipList() )
+			{
+				if ( alienShip.m_addedToEncounter )
+				{
+					alienShip.m_coordinates = new Vector3( 2000.0f, 0.0f, 2000.0f );
+				}
+			}
+		}
+
+		playerData.m_playerShip.m_shieldPoints = 0;
+
+		for ( var end = Time.time + seconds; Time.time < end; )
+		{
+			yield return null;
+		}
+
+		gained[ 0 ] = playerData.m_playerShip.m_shieldPoints;
+	}
+
+	// the shields regain their charge as the original's: 20 points on each of the ship's turns in an encounter (COMBAT-OV COMBAT, WEF20: each pass of the main loop
+	// is one icon's turn, the ship's every (ships + 1) passes of Encounter.c_passSeconds), none outside an encounter (the code before gave 1% of the full charge every
+	// 5 s anywhere), and the whole charge when the encounter ends (HYPER-OV ENCCLEANUP, CHARGE-D); class 2 shielding, 1000 points
+	IEnumerator ScenarioShieldTurns()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var general = playerData.m_general;
+		var outside = new int[ 1 ];
+		var withOne = new int[ 1 ];
+		var withThree = new int[ 1 ];
+
+		EnsureCrew();
+
+		ship.m_shieldingClass = 2;
+		ship.m_armorPoints = 100000;
+		ship.RaiseShields();
+		ship.RestoreSystems();
+
+		var full = ship.GetMaximumShieldPoints();
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		// ---- 1. hyperspace, in a quiet corner, no encounter: six seconds
+		general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 6.0f, 0.0f, 6.0f ) );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+		yield return ShieldGain( 6.0f, outside );
+
+		// ---- 2. Spemin group 135 with one ship in it, then three: four seconds each
+		EnterEncounter( 135 );
+
+		yield return Frames( 3 );
+
+		KeepAlienShips( 1 );
+
+		var shipsOne = AlienShipsPresent();
+
+		yield return ShieldGain( 4.0f, withOne );
+
+		KeepAlienShips( 3 );
+
+		var shipsThree = AlienShipsPresent();
+
+		yield return ShieldGain( 4.0f, withThree );
+
+		// ---- 3. the encounter ends: the shields are refilled
+		ship.m_shieldPoints = 100;
+
+		var leave = typeof( Encounter ).GetMethod( "LeaveEncounter", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public );
+
+		leave.Invoke( controller.m_encounter, null );
+
+		yield return Frames( 3 );
+
+		var afterLeaving = ship.m_shieldPoints;
+		var leftTo = general.m_location;
+
+		controller.m_encounterRange = encounterRange;
+
+		// the gains a turn every (ships + 1) passes of 0.25 s would give, and how many turns the four seconds hold
+		// (20 points a turn, the original's WEF20: a number here, since the code before has no constant for it)
+		var expectOne = Mathf.FloorToInt( 4.0f / ( ( shipsOne + 1 ) * Encounter.c_passSeconds ) ) * 20;
+		var expectThree = Mathf.FloorToInt( 4.0f / ( ( shipsThree + 1 ) * Encounter.c_passSeconds ) ) * 20;
+
+		Log( "shieldturns: class 2 shielding (" + full + "): 6 s in hyperspace +" + outside[ 0 ] + "; 4 s in an encounter with " + shipsOne + " ship +" + withOne[ 0 ] + " (turns would give " + expectOne + "), with " + shipsThree + " ships +" + withThree[ 0 ] + " (" + expectThree + "); leaving the encounter (to " + leftTo + "): 100 -> " + afterLeaving );
+
+		Check( "shieldturns: the encounter has one alien ship, then three, and the shielding holds 1000 (control)", ( shipsOne == 1 ) && ( shipsThree == 3 ) && ( full == 1000 ), shipsOne + " / " + shipsThree + " / " + full );
+		Check( "shieldturns: outside an encounter the shields regain nothing (the code before gave 1% of the full charge every 5 s)", outside[ 0 ] == 0, "+" + outside[ 0 ] + " in 6 s" );
+		Check( "shieldturns: with one alien ship the shields regain 20 points on each of the ship's turns, every 2 passes (160 in 4 s, one turn either way)", Mathf.Abs( withOne[ 0 ] - expectOne ) <= 20, "+" + withOne[ 0 ] + " of " + expectOne );
+		Check( "shieldturns: with three alien ships the ship's turn comes every 4 passes (80 in 4 s, one turn either way)", Mathf.Abs( withThree[ 0 ] - expectThree ) <= 20, "+" + withThree[ 0 ] + " of " + expectThree );
+		Check( "shieldturns: the encounter's end refills the shields (HYPER-OV ENCCLEANUP, CHARGE-D)", afterLeaving == full, "100 -> " + afterLeaving );
+
+		Finish( "scenario=shieldturns checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
