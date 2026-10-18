@@ -11,6 +11,8 @@ for ( $n = $From; $n -le $To; $n++ ) {
 	# a save an earlier run of this stage left would carry the chain on past a stage that saved nothing
 	Remove-Item "$folder\stage-$n.json" -ErrorAction SilentlyContinue
 	$out = & "DevTools\HeadlessProbe\probe.ps1" -Scenario "playthrough-$n" -Name "chain-playthrough-$n"
+	# licensing stuck (probe.ps1 exits with 3): no stage can run until it is cleared
+	if ( $LASTEXITCODE -eq 3 ) { ( $out | Select-String -Pattern '^LICENSING STUCK' ).Line; "stage $n : licensing stuck; the chain stops" | Tee-Object -FilePath "$folder\chain.txt" -Append; break }
 	$result = ( $out | Select-String -Pattern 'RESULT' | Select-Object -Last 1 ).Line
 	$fails = ( $out | Select-String -Pattern 'CHECK FAIL' ).Count
 	$passes = ( $out | Select-String -Pattern 'CHECK PASS' ).Count

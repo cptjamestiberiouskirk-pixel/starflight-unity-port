@@ -3,8 +3,10 @@
 #
 #   & "<this folder>\compile-check.ps1" -Name some-label
 #
-# Logs go to %TEMP%\starflight-probe.
+# Logs go to %TEMP%\starflight-probe. Unity is launched through unity-batch.ps1, as in probe.ps1 (exit code 3: licensing stuck).
 param([string]$Name = 'compile')
+
+. (Join-Path $PSScriptRoot 'unity-batch.ps1')
 
 $proj = (Get-Location).Path
 $versionFile = Join-Path $proj 'ProjectSettings\ProjectVersion.txt'
@@ -27,16 +29,20 @@ New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 
 $log = Join-Path $logDir "$Name.log"
 
-$sw = [Diagnostics.Stopwatch]::StartNew()
 # an earlier run's log of this name would be read as this run's if Unity wrote none, as in probe.ps1
 if (Test-Path -LiteralPath $log) { Remove-Item -LiteralPath $log -Force -ErrorAction Stop }
 # Burst stays off, as in probe.ps1: Smart App Control blocks the unsigned DLLs its JIT writes to Library\BurstCache\JIT
-$p = Start-Process -FilePath $unity -ArgumentList '-batchmode', '-nographics', '--burst-disable-compilation', '-quit', '-projectPath', "`"$proj`"", '-logFile', "`"$log`"" -Wait -PassThru
+$run = Invoke-UnityBatch -Unity $unity -Arguments @('-batchmode', '-nographics', '--burst-disable-compilation', '-quit', '-projectPath', "`"$proj`"", '-logFile', "`"$log`"") -Log $log -TimeoutSeconds 3600
 
-"unity exit=$($p.ExitCode) elapsed=$([int]$sw.Elapsed.TotalSeconds)s log=$log"
+$run.Messages
+"unity exit=$($run.ExitCode) elapsed=$($run.Seconds)s log=$log"
+
+if ($run.LicensingStuck) {
+	exit 3
+}
 
 if (-not (Test-Path -LiteralPath $log)) {
-	"no log written: unity exit=$($p.ExitCode)"
+	"no log written: unity exit=$($run.ExitCode)"
 	exit 1
 }
 

@@ -24,6 +24,13 @@ foreach ($scenario in $Scenarios) {
 	foreach ($line in $errors | Select-Object -First 5) { "    COMPILE: $line" }
 	foreach ($line in $fails) { "    $line" }
 	foreach ($line in ($output | Where-Object { $_ -match '^\[ClaudeProbe\]\s+x\d+ ' })) { "    $line" }
+
+	# licensing stuck: every further launch would fail the same way (and add a licensing client), so the run stops here
+	if ($LASTEXITCODE -eq 3) {
+		foreach ($line in ($output | Where-Object { $_ -match '^LICENSING STUCK' })) { "    $line" }
+		"=== the run stops: licensing is stuck"
+		break
+	}
 }
 
 git status --short

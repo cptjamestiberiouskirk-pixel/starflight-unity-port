@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Probe Runs and a Stuck Licensing Client**: every headless Unity of a Windows user shares one licensing client. A probe run that launched Unity a second after the previous scenario's Unity had quit started a client while the old one was still shutting down; the new client took the client's lock and never served its pipe, and from then on every headless Unity on the PC, of every session, failed to license after 75 seconds, retried and left another client behind. `probe.ps1` and `compile-check.ps1` now launch Unity through `DevTools/HeadlessProbe/unity-batch.ps1`: one launch at a time across sessions until Unity's licensing is initialized, no launch while a licensing client runs without serving its pipe (it is waited for, and after 45 seconds reported with its process ids as stuck), and a Unity that fails to license is stopped at once. A stuck client makes the scripts exit with code 3, and `run-all-scenarios.ps1` and `run-playthrough.ps1` stop there.
 - **Return Order Notes**: the 1.2.0 notes and the Return order's code said a cliff could stop the order. The ground never stops the terrain vehicle: it drives up any slope at the same speed, since the original reads only the ground the vehicle is on (only the fuel it uses rises with the height); what stops it is a rock, a tree, a ruin or the ship in the way. The notes and the comment now say so.
 
 ## [1.3.0] - 2026-10-17
