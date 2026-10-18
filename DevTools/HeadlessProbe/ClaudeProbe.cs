@@ -1642,6 +1642,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioArtifactCargo();
 				break;
 
+			case "shipcargo":
+				yield return ScenarioShipCargo();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -44452,6 +44456,184 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "artifactcargo: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=artifactcargo checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the columns of the table the Captain's Cargo button renders in the text window, as the player sees them (empty strings while it is hidden)
+	static string[] ShipCargoTableColumns()
+	{
+		var columns = new List<string>();
+		var table = SpaceflightController.m_instance.m_messages.GetComponentInChildren<UnityEngine.UI.HorizontalLayoutGroup>();
+
+		if ( table != null )
+		{
+			foreach ( Transform column in table.transform )
+			{
+				var text = column.GetComponent( "TextMeshProUGUI" );
+
+				columns.Add( ( text == null ) ? "" : ( text.GetType().GetProperty( "text" ).GetValue( text ) as string ?? "" ) );
+			}
+		}
+
+		return columns.ToArray();
+	}
+
+	// the rows of the Cargo table below its headings, each as "item|volume|value" with the item's indent trimmed
+	static List<string> ShipCargoTableRows( string[] columns )
+	{
+		var rows = new List<string>();
+
+		if ( columns.Length < 3 )
+		{
+			return rows;
+		}
+
+		var items = columns[ 0 ].Split( '\n' );
+		var volumes = columns[ 1 ].Split( '\n' );
+		var values = columns[ 2 ].Split( '\n' );
+
+		for ( var i = 1; i < items.Length; i++ )
+		{
+			if ( items[ i ].Trim().Length == 0 )
+			{
+				continue;
+			}
+
+			rows.Add( items[ i ].Trim() + "|" + ( ( i < volumes.Length ) ? volumes[ i ] : "" ) + "|" + ( ( i < values.Length ) ? values[ i ] : "" ) );
+		}
+
+		return rows;
+	}
+
+	IEnumerator ScenarioShipCargo()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+
+		yield return Frames( 5 );
+
+		// ---- 1. an empty hold: the original says STARSHIP HOLD IS EMPTY. and shows no list (CAPTAIN (/ITEMS) WEEF2)
+		ship.m_elementStorage.Reset();
+		ship.m_artifactStorage.Reset();
+		ship.GetSpecimenStorage().m_specimenList.Clear();
+
+		PressButtonLabelled( ButtonController.ButtonSet.CommandB, "Cargo" );
+
+		yield return Frames( 5 );
+
+		var emptyMessages = MessageList();
+		var emptyColumns = ShipCargoTableColumns();
+		var emptyTable = string.Join( "#", emptyColumns ).Replace( '\n', '/' );
+
+		Log( "shipcargo: with the hold empty the messages say '" + emptyMessages + "', the table shows '" + emptyTable + "'" );
+
+		Check( "shipcargo: an empty hold says Starship hold is empty. and shows no list", emptyMessages.Contains( "Starship hold is empty." ) && !emptyTable.Contains( "ITEM" ), emptyMessages + " | " + emptyTable );
+
+		// ---- 2. a hold with every kind of item: two elements, two artifacts (one of a kind analysed, one not) and two specimens, each pair put in in that order
+		var enduriumId = gameData.m_misc.m_enduriumElementId;
+		var molybdenumId = Array.FindIndex( gameData.m_elementList, element => element.m_name == "Molybdenum" );
+		var knownId = Array.FindIndex( gameData.m_artifactList, artifact => artifact.m_name == "Bladed Toy" );
+		var unknownId = Array.FindIndex( gameData.m_artifactList, artifact => artifact.m_name == "Blue Bauble" );
+
+		if ( ( enduriumId < 0 ) || ( molybdenumId < 0 ) || ( knownId < 0 ) || ( unknownId < 0 ) )
+		{
+			Finish( "scenario=shipcargo abort: missing game data (" + enduriumId + " " + molybdenumId + " " + knownId + " " + unknownId + ")", 2 );
+			yield break;
+		}
+
+		// the Bladed Toy's kind analysed, the Blue Bauble's not
+		if ( !playerData.m_knownArtifacts.IsKnown( knownId ) )
+		{
+			playerData.m_knownArtifacts.Add( knownId );
+		}
+
+		for ( var attempt = 0; ( attempt < 10 ) && playerData.m_knownArtifacts.IsKnown( unknownId ); attempt++ )
+		{
+			playerData.m_knownArtifacts.Remove( unknownId );
+		}
+
+		ship.m_elementStorage.Add( enduriumId, 200 );
+		ship.m_elementStorage.Add( molybdenumId, 96 );
+
+		ship.m_artifactStorage.Add( knownId );
+		ship.m_artifactStorage.Add( unknownId );
+
+		var firstSpecimen = new PD_Specimen { m_planetId = 90, m_speciesIndex = 0, m_name = "Probe Specimen One", m_volume = 20, m_value = 400 };
+		var secondSpecimen = new PD_Specimen { m_planetId = 90, m_speciesIndex = 1, m_name = "Probe Specimen Two", m_volume = 15, m_value = 300 };
+
+		ship.GetSpecimenStorage().Add( firstSpecimen );
+		ship.GetSpecimenStorage().Add( secondSpecimen );
+
+		PressButtonLabelled( ButtonController.ButtonSet.CommandB, "Cargo" );
+
+		yield return Frames( 5 );
+
+		var rows = ShipCargoTableRows( ShipCargoTableColumns() );
+		var shown = string.Join( " / ", rows );
+
+		// with -Graphics, the whole screen with the list on it (Logs/screen-pictures/shipcargo/, or the folder given with -probePictures)
+		if ( SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null )
+		{
+			var folder = GetArg( "-probePictures", System.IO.Path.Combine( System.IO.Directory.GetCurrentDirectory(), "Logs", "screen-pictures", "shipcargo" ) );
+
+			System.IO.Directory.CreateDirectory( folder );
+
+			RenderScreenPicture( System.IO.Path.Combine( folder, "cargo_list.png" ) );
+
+			Log( "shipcargo: picture written to " + folder );
+		}
+
+		Log( "shipcargo: the Cargo list shows " + shown );
+
+		// the headings, in the order of the kinds
+		var items = rows.ConvertAll( row => row.Split( '|' )[ 0 ] );
+		var elementsAt = items.IndexOf( "ELEMENTS" );
+		var artifactsAt = items.IndexOf( "ARTIFACTS" );
+		var specimensAt = items.IndexOf( "SPECIMENS" );
+
+		Check( "shipcargo: the list has a heading for each kind of item in the hold: elements, artifacts and specimens", ( elementsAt >= 0 ) && ( artifactsAt > elementsAt ) && ( specimensAt > artifactsAt ), elementsAt + " " + artifactsAt + " " + specimensAt + " | " + shown );
+
+		// each kind's items under its heading, the one put in last first, each with its volume and value: an element at what the Trade Depot pays for a cubic
+		// meter of it, an artifact of an analysed kind at what the Trade Depot pays for it and one of a kind not analysed at ???, a specimen at its sale value
+		var molybdenum = gameData.m_elementList[ molybdenumId ];
+		var endurium = gameData.m_elementList[ enduriumId ];
+		var known = gameData.m_artifactList[ knownId ];
+		var unknown = gameData.m_artifactList[ unknownId ];
+
+		var expected = new List<string>
+		{
+			"ELEMENTS||",
+			molybdenum.m_name + "|9.6|" + molybdenum.GetActualValue(),
+			endurium.m_name + "|20.0|" + endurium.GetActualValue(),
+			"ARTIFACTS||",
+			unknown.m_name + "|" + Tools.VolumeToText( unknown.m_volume ) + "|???",
+			known.m_name + "|" + Tools.VolumeToText( known.m_volume ) + "|" + known.m_actualValue,
+			"SPECIMENS||",
+			"Probe Specimen Two|1.5|" + secondSpecimen.GetSaleValue(),
+			"Probe Specimen One|2.0|" + firstSpecimen.GetSaleValue()
+		};
+
+		var expectedText = string.Join( " / ", expected );
+
+		Check( "shipcargo: every item in the hold is listed under its kind, the one put in last first, with its volume and value (??? for an artifact not analysed)", shown == expectedText, "shown: " + shown + " | expected: " + expectedText );
+
+		// ---- 3. once the Blue Bauble's kind is analysed, the list shows its value
+		playerData.m_knownArtifacts.Add( unknownId );
+
+		PressButtonLabelled( ButtonController.ButtonSet.CommandB, "Cargo" );
+
+		yield return Frames( 5 );
+
+		var analysedRows = ShipCargoTableRows( ShipCargoTableColumns() );
+		var analysedRow = analysedRows.Find( row => row.StartsWith( unknown.m_name + "|" ) ) ?? "";
+
+		Log( "shipcargo: after the Blue Bauble's kind is analysed its row is '" + analysedRow + "'" );
+
+		Check( "shipcargo: an artifact whose kind has been analysed shows its value", analysedRow == unknown.m_name + "|" + Tools.VolumeToText( unknown.m_volume ) + "|" + unknown.m_actualValue, analysedRow );
+
+		Finish( "scenario=shipcargo rows=" + rows.Count + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

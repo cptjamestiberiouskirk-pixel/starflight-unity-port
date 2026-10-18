@@ -93,6 +93,7 @@ What the probe does:
 | `starport-ledger` | what the bank ledger says after the Trade Depot and Ship Configuration panels close with more or less money than they opened with, and the most of an element the player can afford with a very large balance |
 | `starport-ledgerrows` | the Bank's ledger, longer than its window, scrolls by whole rows: its top row is not cut in half under the headings and the newest row is still above the balance (about 15 s) |
 | `cargo` | volumes in cubic meters in the ship's cargo list, in the terrain vehicle's mining message and cargo list; a deposit that does not fit into the hold (the mining laser stops at a full hold and leaves the rest); the size of a scanned vessel in the sensor analysis; that the terrain vehicle has not moved meanwhile |
+| `shipcargo` | the Captain's Cargo list as the original's (IT-OV BOX>LIST), through the real Cargo button: an empty hold says Starship hold is empty. and shows no list; a hold with two elements, two artifacts and two specimens lists them under ELEMENTS, ARTIFACTS and SPECIMENS, the one put in last first, each with its volume and its value at the Trade Depot (??? for an artifact of a kind not analysed); and the artifact's value once its kind is analysed; with `-Graphics`, a picture of the screen with the list into `Logs/screen-pictures/shipcargo/` (about 15 s) |
 | `savedata` | the scene a saved game is loaded into for every location, the save panel's description of a game saved in the terrain vehicle, the terrain vehicle of a new game, and the stardate with the computer set to the Thai, Saudi Arabian, Persian and German cultures |
 | `combat` | a missile in the air while the game is paused, the size of an explosion that is used again, a launch with every missile of the pool in the air, and a ship that is fired at and hit again while it explodes |
 | `combatwounds` | the combat messages and the crew's wounds of the original (DAMAGE-OV): sixty hits through lowered shields wound the crew at times, the text window says how badly ("is slightly wounded.") and gives no damage numbers, and a plasma bolt says "Plasma bolt" (about 25 s) |
@@ -326,7 +327,7 @@ What the probe does:
 | `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 | `combatmessages` | the combat messages are the original's: WEAPONS NOT ARMED, NO TARGET PRESENT, WEAPON NOT AVAILABLE and OUT OF FUEL! when a weapon cannot fire, nothing of the port's own when the player's shot hits, and LASER CLASS n (LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (268 scenarios, about 225 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (269 scenarios, about 226 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### The playthrough
 
