@@ -1670,6 +1670,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSoundClips();
 				break;
 
+			case "aboutscreen":
+				yield return ScenarioAboutScreen();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -45584,6 +45588,106 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "soundclips: no errors", s_errorCount == errorsBefore, ( s_errorCount - errorsBefore ) + " error(s)" );
 
 		Finish( "scenario=soundclips checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the About screen and the intro's credits (since 2026-10-18)
+
+	// the save panel has an About screen with the game's credits (the remake it is built on, its contributors, Starflight's makers and the licences of its sounds,
+	// music and fonts), opened from its menu and closed with Done or Escape; the intro's third page credits the port (its name, its author's GitHub account) and
+	// sends the rest to the About screen. The code before had no About screen, and the intro credited the 2017 remake project and BraveArmy.com
+	IEnumerator ScenarioAboutScreen()
+	{
+		EnsureCrew();
+
+		// ---- 1. the save panel's menu has an About button, which opens the screen
+		PressEscape();
+
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var panel = PanelController.m_instance.m_saveGamePanel;
+		var aboutButton = FieldOrNull( panel, "m_aboutButton" ) as UnityEngine.UI.Button;
+		var buttonShown = ( aboutButton != null ) && aboutButton.gameObject.activeInHierarchy && aboutButton.interactable;
+
+		if ( aboutButton != null )
+		{
+			aboutButton.onClick.Invoke();
+		}
+
+		yield return Frames( 5 );
+
+		var aboutPanel = FieldOrNull( panel, "m_aboutPanel" ) as GameObject;
+		var aboutShown = ( aboutPanel != null ) && aboutPanel.activeInHierarchy;
+		var aboutText = ( typeof( SaveGamePanel ).GetMethod( "GetAboutText" ) != null ) ? ( Call( panel, "GetAboutText" ) as string ) ?? "" : "";
+		var folder = ScreenPictureFolder( "aboutscreen" );
+
+		// a picture of it, in a run with a graphics device (probe.ps1 -Graphics)
+		if ( folder != "" )
+		{
+			yield return new WaitForSecondsRealtime( 0.5f );
+
+			RenderScreenPicture( System.IO.Path.Combine( folder, "01_about_screen.png" ) );
+		}
+
+		// ---- 2. Escape closes it, back to the menu
+		SetInput( "m_cancel", true );
+
+		Call( panel, "Tick" );
+
+		SetInput( "m_cancel", false );
+
+		yield return Frames( 3 );
+
+		var closedByEscape = ( aboutPanel != null ) && !aboutPanel.activeInHierarchy && PanelController.m_instance.HasActivePanel();
+
+		yield return CloseTheSavePanel();
+
+		// ---- 3. the intro's third page credits the port
+		SceneManager.LoadScene( "Intro" );
+
+		yield return WaitForScene( "Intro" );
+		yield return Frames( 5 );
+
+		var introTexts = new List<string>();
+
+		// (the Intro scene's own texts: the save panel lives on in the persistent scene, and its About screen names the remake's team)
+		foreach ( var text in UnityEngine.Object.FindObjectsByType<TMPro.TMP_Text>( FindObjectsInactive.Include, FindObjectsSortMode.None ) )
+		{
+			if ( text.gameObject.scene.name == "Intro" )
+			{
+				introTexts.Add( text.text );
+			}
+		}
+
+		var intro = string.Join( " | ", introTexts );
+
+		// and of the intro's third page
+		if ( folder != "" )
+		{
+			var introController = UnityEngine.Object.FindFirstObjectByType<IntroController>();
+
+			if ( introController != null )
+			{
+				Time.timeScale = 0.0f;
+				SetField( introController, "m_timer", 38.0f );
+
+				yield return Frames( 5 );
+
+				RenderScreenPicture( System.IO.Path.Combine( folder, "02_intro_page_3.png" ) );
+
+				Time.timeScale = 1.0f;
+			}
+		}
+
+		Log( "aboutscreen: button " + buttonShown + ", shown " + aboutShown + ", closed by Escape " + closedByEscape + " | about: '" + aboutText.Replace( "\n", " / " ) + "' | intro: '" + intro.Replace( "\n", " / " ) + "'" );
+
+		Check( "aboutscreen: the save panel has an About button, which opens the About screen (the code before had none)", buttonShown && aboutShown, buttonShown + " " + aboutShown );
+		Check( "aboutscreen: it credits the port's author and the remake it is built on, released into the public domain", aboutText.Contains( "cptjamestiberiouskirk-pixel" ) && aboutText.Contains( "Built on the Starflight Remake Project by Marvin Herbold, released into the public domain." ), aboutText );
+		Check( "aboutscreen: it thanks the remake's contributors and names Starflight's makers and the licences of the music and sounds", aboutText.Contains( "Jeff Graw" ) && aboutText.Contains( "Planet Map Project" ) && aboutText.Contains( "Binary Systems" ) && aboutText.Contains( "Tabletop Audio" ) && aboutText.Contains( "bubaproducer" ), aboutText );
+		Check( "aboutscreen: Escape closes it, back to the save panel's menu", closedByEscape, closedByEscape.ToString() );
+		Check( "aboutscreen: the intro credits the port and its author's GitHub account, and no longer BraveArmy.com or the 2017 team", intro.Contains( "Starflight: The Remaking of a Legend" ) && intro.Contains( "github.com/cptjamestiberiouskirk-pixel" ) && !intro.Contains( "BraveArmy" ) && !intro.Contains( "Marvin" ), intro );
+		Check( "aboutscreen: the original's credits stay on the intro (Binary Systems, Electronic Arts)", intro.Contains( "Binary Systems" ) && intro.Contains( "Electronic Arts" ), intro );
+
+		Finish( "scenario=aboutscreen checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
