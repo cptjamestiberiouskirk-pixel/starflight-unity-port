@@ -124,6 +124,11 @@ public class DisembarkButton : ShipButton
 				// display message
 				SpaceflightController.m_instance.m_messages.Clear();
 
+				// the shields go down and the weapons are disarmed before the terrain vehicle goes out, each saying so, as the original's (SHIPBUTTONS WF095 calls WEDEC,
+				// which runs the shield and the arms overlays when they are up or armed); the shields keep their charge
+				playerData.m_playerShip.DropShields();
+				playerData.m_playerShip.DisarmWeapons();
+
 				// the original's words (SHIPBUTTONS: "STANDBY...SCANNING PLANET.")
 				SpaceflightController.m_instance.m_messages.AddText( "<color=white>Standby...scanning planet.</color>" );
 
