@@ -18005,7 +18005,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "crystalfield: the hull is halved at the 70th, 140th and 210th tick, with the original's three warnings", ( hullAt70 == 50 ) && ( hullAt140 == 25 ) && ( hullAt210 == 12 ) && hullText.Contains( "The hull temperature is increasing!" ) && hullText.Contains( "The hull is glowing red!" ) && hullText.Contains( "The hull is melting!" ), hullAt70 + "/" + hullAt140 + "/" + hullAt210 + " " + hullText );
 		Check( "crystalfield: leaving orbit ends the heat", heatActive && !heatAfterLeaving, heatAfterLeaving.ToString() );
 		Check( "crystalfield: with the Crystal Orb aboard it glows, the armor stays and the landing computer responds", orbText.Contains( "The Crystal Orb is glowing." ) && !orbText.Contains( "vibrate" ) && ( orbArmor == 300 ) && !orbHeat && !orbLandText.Contains( "Computer not responding!" ), orbText + " | " + orbArmor + " | " + orbLandText );
-		Check( "crystalfield: the 280th tick melts the ship, and the game is over", meltText.Contains( "AHHHHHH" ) && melted, meltText + " | " + melted );
+		Check( "crystalfield: the 280th tick melts the ship, and the game is over (the game over screen names the cause)", meltText.Contains( "Ship melted!" ) && melted, meltText + " | " + melted );
 
 		Finish( "scenario=crystalfield checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
