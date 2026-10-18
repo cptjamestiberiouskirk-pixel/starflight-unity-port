@@ -17807,37 +17807,78 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=cargodisplay open=" + shownOnOpen + " bytes=" + updateBytesPerCall + " back=" + vehicleShownAfterBack, 0 );
 	}
 
-	// ---------------------------------------------------------------- phase 4: the field of the Crystal Planet, and the Crystal Orb
+	// ---------------------------------------------------------------- phase 8: the heat of the Crystal Planet, and the Crystal Orb
 
-	// the armor points the player ship loses in orbit in the given number of real seconds, with its shields down and its armor full
-	static IEnumerator ArmorLostInOrbit( float seconds, int[] lost )
+	// runs a method if the code has it (so that this compiles and runs on code from before it) - returns true if it ran
+	static bool CallIfThere( object target, string name, params object[] args )
 	{
-		var ship = DataController.m_instance.m_playerData.m_playerShip;
-
-		ship.m_shieldsAreUp = false;
-		ship.m_armorPoints = ship.GetMaximumArmorPoints();
-
-		var before = ship.m_armorPoints;
-		var end = Time.realtimeSinceStartup + seconds;
-
-		while ( Time.realtimeSinceStartup < end )
+		if ( ( target == null ) || ( target.GetType().GetMethod( name, c_any ) == null ) )
 		{
-			yield return null;
+			return false;
 		}
 
-		lost[ 0 ] = before - ship.m_armorPoints;
+		Call( target, name, args );
+
+		return true;
 	}
 
+	// true if the heat of the Crystal Planet works on the ship (false on code from before it)
+	static bool CrystalHeatIsActive()
+	{
+		var inOrbit = SpaceflightController.m_instance.m_inOrbit;
+		var method = typeof( InOrbit ).GetMethod( "IsCrystalHeatActive", c_any );
+
+		return ( inOrbit != null ) && ( method != null ) && (bool) method.Invoke( inOrbit, null );
+	}
+
+	// the health of the six systems added up
+	static int SystemHealthTotal( PD_PlayerShip ship )
+	{
+		var total = 0;
+
+		for ( var system = PD_PlayerShip.ShipSystem.Engines; system < PD_PlayerShip.ShipSystem.Hull; system++ )
+		{
+			total += ship.GetSystemHealth( system );
+		}
+
+		return total;
+	}
+
+	// one tick of the heat after this many, by setting the count and calling the tick (nothing on code from before it)
+	static void HeatTickAfter( int ticks )
+	{
+		var inOrbit = SpaceflightController.m_instance.m_inOrbit;
+
+		if ( typeof( InOrbit ).GetField( "m_heatTicks", c_any ) == null )
+		{
+			return;
+		}
+
+		SetField( inOrbit, "m_heatTicks", ticks );
+
+		CallIfThere( inOrbit, "HeatTick" );
+	}
+
+	// the Crystal Planet as the original's (HYPERMSG-OV OSET, WED4B, HEAT, HCASE; LAND-OV ?LAND; COMM-OV WEFC3): without the Crystal Orb the ship begins to vibrate and its
+	// armor is gone, a random system loses 3 points a tick, the hull is halved at the 70th, 140th and 210th tick and the ship melts at the 280th; the landing
+	// computer does not respond and a distress call is jammed; with the orb aboard it glows and none of this happens. The code before took 5 points a second
+	// through the shields and the armor and let the ship land
 	IEnumerator ScenarioCrystalField()
 	{
 		var dataController = DataController.m_instance;
 		var playerData = dataController.m_playerData;
 		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
 		var ship = playerData.m_playerShip;
 		var orbId = gameData.FindArtifactId( "Crystal Orb" );
-		var lost = new int[ 1 ];
+		var crystalPlanet = 33;
 
 		EnsureCrew();
+
+		controller.m_encounterRange = 0.0f;
+
+		ship.RestoreSystems();
+		ship.m_armorPoints = 300;
 
 		// no Crystal Orb aboard to begin with
 		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( orbId ) != null ); guard++ )
@@ -17845,35 +17886,128 @@ public class ClaudeProbe : MonoBehaviour
 			ship.RemoveArtifact( orbId );
 		}
 
-		// ---- 1. the control: in orbit around an ordinary planet nothing damages the ship
+		// ---- 1. the control: in orbit around an ordinary planet nothing happens
+		controller.m_messages.Clear();
+
 		yield return GoIntoOrbit( gameData.m_planetList[ 90 ].m_starId, 90 );
-		yield return ArmorLostInOrbit( 3.0f, lost );
+		yield return Frames( 30 );
 
-		var lostAroundPlanet90 = lost[ 0 ];
+		var controlText = MessageList();
+		var controlArmor = ship.m_armorPoints;
+		var controlHeat = CrystalHeatIsActive();
 
-		// ---- 2. in orbit around the Crystal Planet (planet 1 of 192,152) without the Crystal Orb the ship takes damage
-		yield return GoIntoOrbit( gameData.m_planetList[ 33 ].m_starId, 33 );
+		// ---- 2. the Crystal Planet without the orb: the ship vibrates and its armor is gone
+		controller.m_messages.Clear();
 
-		var location = playerData.m_general.m_location;
+		yield return GoIntoOrbit( gameData.m_planetList[ crystalPlanet ].m_starId, crystalPlanet );
+		yield return Frames( 10 );
 
-		yield return ArmorLostInOrbit( 3.0f, lost );
+		var vibrateText = MessageList();
+		var armorAfterVibrate = ship.m_armorPoints;
+		var heatActive = CrystalHeatIsActive();
 
-		var lostWithoutTheOrb = lost[ 0 ];
+		// ---- 3. the heat ticks on in real time, 3 points off a random system each tick
+		var healthBefore = SystemHealthTotal( ship );
+		var ticksBefore = IntFieldOrMin( controller.m_inOrbit, "m_heatTicks" );
 
-		// ---- 3. with the Crystal Orb in the hold the field does nothing
+		yield return new WaitForSecondsRealtime( 1.5f );
+
+		var ticksAfter = IntFieldOrMin( controller.m_inOrbit, "m_heatTicks" );
+		var healthLost = healthBefore - SystemHealthTotal( ship );
+		var ticks = ticksAfter - ticksBefore;
+
+		// ---- 4. Land: the computer does not respond, and the ship stays in orbit
+		controller.m_messages.Clear();
+
+		var landStarted = new LandButton().Execute();
+		var landText = MessageList();
+
+		controller.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Bridge );
+
+		// ---- 5. a distress call is jammed
+		controller.m_messages.Clear();
+
+		new DistressYesButton().Execute();
+
+		var distressText = MessageList();
+		var locationAfterDistress = playerData.m_general.m_location;
+
+		controller.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Bridge );
+
+		// ---- 6. the hull is halved at the 70th, 140th and 210th tick, each with its warning
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Hull, 100 );
+		controller.m_messages.Clear();
+
+		HeatTickAfter( 69 );
+
+		var hullAt70 = ship.GetHullIntegrity();
+
+		HeatTickAfter( 139 );
+
+		var hullAt140 = ship.GetHullIntegrity();
+
+		HeatTickAfter( 209 );
+
+		var hullAt210 = ship.GetHullIntegrity();
+		var hullText = MessageList();
+
+		// ---- 7. leaving orbit ends the heat
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+
+		var heatAfterLeaving = CrystalHeatIsActive();
+
+		// ---- 8. with the orb aboard it glows, the armor stays and the computer responds
+		ship.RestoreSystems();
+		ship.m_armorPoints = 300;
 		ship.AddArtifact( orbId );
+		controller.m_messages.Clear();
 
-		yield return ArmorLostInOrbit( 3.0f, lost );
+		yield return GoIntoOrbit( gameData.m_planetList[ crystalPlanet ].m_starId, crystalPlanet );
+		yield return Frames( 30 );
 
-		var lostWithTheOrb = lost[ 0 ];
+		var orbText = MessageList();
+		var orbArmor = ship.m_armorPoints;
+		var orbHeat = CrystalHeatIsActive();
 
-		Log( "crystalfield: armor lost in 3 s around planet 90 " + lostAroundPlanet90 + ", around the Crystal Planet without the orb " + lostWithoutTheOrb + " (" + location + "), with the orb " + lostWithTheOrb );
+		controller.m_messages.Clear();
+		new LandButton().Execute();
 
-		Check( "crystalfield: in orbit around an ordinary planet the ship takes no damage (control)", lostAroundPlanet90 == 0, lostAroundPlanet90.ToString() );
-		Check( "crystalfield: in orbit around the Crystal Planet without the Crystal Orb the ship takes damage rapidly", ( location == PD_General.Location.InOrbit ) && ( lostWithoutTheOrb >= 10 ), lostWithoutTheOrb + " in " + location );
-		Check( "crystalfield: with the Crystal Orb in the hold the field does no damage", lostWithTheOrb == 0, lostWithTheOrb.ToString() );
+		var orbLandText = MessageList();
 
-		Finish( "scenario=crystalfield control=" + lostAroundPlanet90 + " withoutOrb=" + lostWithoutTheOrb + " withOrb=" + lostWithTheOrb, 0 );
+		controller.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Bridge );
+
+		// ---- 9. without the orb again, the 280th tick melts the ship, and the game is over
+		ship.RemoveArtifact( orbId );
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+		yield return GoIntoOrbit( gameData.m_planetList[ crystalPlanet ].m_starId, crystalPlanet );
+		yield return Frames( 10 );
+
+		controller.m_messages.Clear();
+
+		HeatTickAfter( 279 );
+
+		yield return Frames( 5 );
+
+		var meltText = MessageList();
+		var melted = controller.m_combatController.PlayerIsDestroyed() && ship.IsDestroyed();
+
+		Log( "crystalfield: control '" + controlText.Replace( "\n", " / " ) + "' armor " + controlArmor + " heat " + controlHeat + " | vibrate '" + vibrateText.Replace( "\n", " / " ) + "' armor " + armorAfterVibrate + " heat " + heatActive + " | " + ticks + " ticks in 1.5 s, systems lost " + healthLost + " | land " + landStarted + " '" + landText + "' | distress '" + distressText + "' " + locationAfterDistress + " | hull " + hullAt70 + "/" + hullAt140 + "/" + hullAt210 + " '" + hullText.Replace( "\n", " / " ) + "' | after leaving " + heatAfterLeaving + " | orb '" + orbText.Replace( "\n", " / " ) + "' armor " + orbArmor + " heat " + orbHeat + " land '" + orbLandText + "' | melt '" + meltText.Replace( "\n", " / " ) + "' " + melted );
+
+		Check( "crystalfield: in orbit around an ordinary planet nothing happens (control)", !controlText.Contains( "vibrate" ) && ( controlArmor == 300 ) && !controlHeat, controlText + " | " + controlArmor );
+		Check( "crystalfield: without the Crystal Orb the ship begins to vibrate and its armor is gone (the code before took 5 points a second)", vibrateText.Contains( "The ship is beginning to vibrate!" ) && ( armorAfterVibrate == 0 ) && heatActive, vibrateText + " | armor " + armorAfterVibrate );
+		Check( "crystalfield: the heat ticks on in real time, every tick 3 points off a random system", ( ticks >= 3 ) && ( healthLost == ticks * 3 ), ticks + " ticks, " + healthLost + " points" );
+		Check( "crystalfield: the landing computer does not respond, and the ship stays in orbit (the code before let it land)", !landStarted && landText.Contains( "Computer not responding!" ) && ( playerData.m_general.m_location == PD_General.Location.InOrbit ), landStarted + " " + landText );
+		Check( "crystalfield: a distress call is jammed", distressText.Contains( "Transmission is being jammed." ) && ( locationAfterDistress == PD_General.Location.InOrbit ), distressText + " | " + locationAfterDistress );
+		Check( "crystalfield: the hull is halved at the 70th, 140th and 210th tick, with the original's three warnings", ( hullAt70 == 50 ) && ( hullAt140 == 25 ) && ( hullAt210 == 12 ) && hullText.Contains( "The hull temperature is increasing!" ) && hullText.Contains( "The hull is glowing red!" ) && hullText.Contains( "The hull is melting!" ), hullAt70 + "/" + hullAt140 + "/" + hullAt210 + " " + hullText );
+		Check( "crystalfield: leaving orbit ends the heat", heatActive && !heatAfterLeaving, heatAfterLeaving.ToString() );
+		Check( "crystalfield: with the Crystal Orb aboard it glows, the armor stays and the landing computer responds", orbText.Contains( "The Crystal Orb is glowing." ) && !orbText.Contains( "vibrate" ) && ( orbArmor == 300 ) && !orbHeat && !orbLandText.Contains( "Computer not responding!" ), orbText + " | " + orbArmor + " | " + orbLandText );
+		Check( "crystalfield: the 280th tick melts the ship, and the game is over", meltText.Contains( "AHHHHHH" ) && melted, meltText + " | " + melted );
+
+		Finish( "scenario=crystalfield checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 4: the Black Egg
