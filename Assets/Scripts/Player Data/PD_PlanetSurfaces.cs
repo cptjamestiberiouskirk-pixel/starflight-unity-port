@@ -173,6 +173,14 @@ public class PD_PlanetSurfaces
 		}
 	}
 
+	// call this when the artifact of a site is back at its site (the Crystal Orb the Veloxi take: COMMSPEC-OV WEB3F)
+	public void ReturnArtifactSite( int artifactSiteId )
+	{
+		Validate();
+
+		m_takenArtifactSiteList.Remove( artifactSiteId );
+	}
+
 	// true if this item of a random ruin has been taken
 	public bool IsRandomRuinItemTaken( int itemKey )
 	{
