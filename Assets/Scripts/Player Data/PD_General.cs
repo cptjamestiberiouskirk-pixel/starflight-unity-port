@@ -172,6 +172,35 @@ public class PD_General
 
 		return m_orbitPermissionList;
 	}
+
+	// the order the aliens' eleven combat rules are tried in, by their numbers in the original's shipped order: a rule that fires swaps places with the rule halfway
+	// up the list, and the order lasts from one encounter to the next (COMBAT-OV <COMBAT>, the rule engine's swap, kept by SAVE-OVERLAY) - saved; older saves
+	// start from the shipped order
+	public int[] m_combatRuleOrder;
+
+	// the combat rules' order (never null, and always the eleven rules once each)
+	public int[] GetCombatRuleOrder( int ruleCount )
+	{
+		var valid = ( m_combatRuleOrder != null ) && ( m_combatRuleOrder.Length == ruleCount );
+
+		for ( var rule = 1; valid && ( rule <= ruleCount ); rule++ )
+		{
+			valid = Array.IndexOf( m_combatRuleOrder, rule ) >= 0;
+		}
+
+		if ( !valid )
+		{
+			m_combatRuleOrder = new int[ ruleCount ];
+
+			for ( var position = 0; position < ruleCount; position++ )
+			{
+				m_combatRuleOrder[ position ] = position + 1;
+			}
+		}
+
+		return m_combatRuleOrder;
+	}
+
 	public int m_unsuitableRecommendationCount;
 
 	// what the original keeps of a recommendation for its evaluation screen (CAPTAIN overlay, (/LOG-PLAN) in the decompiled original): its number, counted over

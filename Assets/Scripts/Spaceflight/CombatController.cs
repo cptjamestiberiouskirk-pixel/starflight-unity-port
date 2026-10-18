@@ -1046,21 +1046,41 @@ public class CombatController : MonoBehaviour
 		SpaceflightController.m_instance.m_gameOver = true;
 	}
 
-	/// <summary>
-	/// Called by aliens to fire at the player.
-	/// </summary>
+	// the number of the aliens' missiles in the air (the original's WDE3D, which its missile rule reads)
+	public int GetAlienMissilesInFlight()
+	{
+		return m_alienMissilesInFlight;
+	}
+
+	// an alien ship fires all it has at the player: its plasma bolt, or else its laser and its missile (for the probe and anything else that wants a whole volley;
+	// in an encounter each turn of an alien ship fires one or the other, Encounter's combat rules)
 	public void AlienFiresAtPlayer( PD_AlienShip alienShip, GD_Vessel vessel )
 	{
-		// there is nothing left to fire at once the player ship has been destroyed (a missile launched now would still be in the air when the game over screen pauses the game)
-		if ( m_playerIsDestroyed )
+		if ( vessel.m_hasPlasmaBolts )
 		{
+			AlienLaunchesMissile( alienShip, vessel );
+
 			return;
 		}
 
-		// nor at a ship the Shimmering Ball cloaks
-		if ( PlayerIsCloaked() )
+		AlienFiresLaser( alienShip, vessel );
+		AlienLaunchesMissile( alienShip, vessel );
+	}
+
+	// true if nothing can be fired at the player now: the ship has been destroyed (a missile launched now would still be in the air when the game over screen
+	// pauses the game), or the Shimmering Ball cloaks it
+	bool AlienCannotFire()
+	{
+		return m_playerIsDestroyed || PlayerIsCloaked();
+	}
+
+	// an alien ship launches its missile at the player, at any range (COMBAT-OV WEC95): a plasma bolt from a vessel that has them, else a missile of the vessel's
+	// class, while fewer than 10 of the aliens' missiles are in the air - returns true if it launched one
+	public bool AlienLaunchesMissile( PD_AlienShip alienShip, GD_Vessel vessel )
+	{
+		if ( AlienCannotFire() )
 		{
-			return;
+			return false;
 		}
 
 		var playerData = DataController.m_instance.m_playerData;
@@ -1070,7 +1090,6 @@ public class CombatController : MonoBehaviour
 		// calculate direction to player
 		var direction = ( playerPosition - alienPosition ).normalized;
 
-		// what weapon does the alien have?
 		if ( vessel.m_hasPlasmaBolts )
 		{
 			// a plasma bolt is the original's missile of class 6, the one missile that follows the ship (COMBAT-OV WE929): it flies after the ship and does its
@@ -1111,78 +1130,98 @@ public class CombatController : MonoBehaviour
 				// play torpedo launch sound
 				SoundController.m_instance.PlaySound( SoundController.Sound.TorpedoFire );
 			}
-		}
-		else if ( vessel.m_laserClass > 0 )
-		{
-			// fire laser
-			var laser = GetAvailableLaser();
-			if ( laser != null )
-			{
-				laser.SetColor( new Color( 1.0f, 0.5f, 0.5f ) ); // red laser
-				laser.Fire( alienPosition, playerPosition );
-			}
 
-			// apply damage: twice a laser's damage at that distance, and the Rod Device "projects an enhanced laser shield around a spaceship" (the Starport's
-			// analysis): a quarter of it with the Rod aboard (DAMAGE-OV WF3EA and WED36: ?ROD @ IF 4 /)
-			int damage = GetAlienLaserDamage( vessel.m_laserClass, Vector3.Distance( alienPosition, playerPosition ), playerData.m_playerShip.HasArtifact( "Rod Device" ) );
-
-			// what hit the ship, in the original's words (COMBAT-OV WECEA: LASER CLASS n, or LASER PARTIALLY DEFLECTED with the Rod Device)
-			SpaceflightController.m_instance.m_messages.AddText( playerData.m_playerShip.HasArtifact( "Rod Device" ) ? "<color=red>Laser partially deflected</color>" : "<color=red>Laser class " + vessel.m_laserClass + "</color>" );
-
-			ApplyDamageToPlayer( damage, direction );
+			return true;
 		}
 
-		// a ship with a missile launcher launches its missiles as well as firing its laser (COMBAT-OV <COMBAT> rolls the laser, WECEA, and the missile, WEC95, each
-		// on its own), while fewer than 10 of the aliens' missiles are in the air (WDFD2)
-		if ( !vessel.m_hasPlasmaBolts && ( vessel.m_missileClass > 0 ) && ( m_alienMissilesInFlight < c_maximumAlienMissilesInFlight ) )
+		if ( ( vessel.m_missileClass <= 0 ) || ( m_alienMissilesInFlight >= c_maximumAlienMissilesInFlight ) )
 		{
-			// fire missile
-			var missile = GetAvailableMissile();
-			if ( missile != null )
+			return false;
+		}
+
+		// fire missile
+		var missile = GetAvailableMissile();
+		if ( missile != null )
+		{
+			var playerShip = SpaceflightController.m_instance.m_playerShip;
+			int damage = GetMissileDamage( Mathf.Min( vessel.m_missileClass, c_plasmaBoltClass - 1 ) );
+
+			m_alienMissilesInFlight++;
+
+			// it flies to where the ship was when it was launched, and only the plasma bolt follows the ship (COMBAT-OV WE929): it hits if the ship is still
+			// about in that place (within 100 units, a cell and a quarter of the original's combat map at c_unitsPerCell)
+			missile.Fire( alienPosition, playerShip.transform.position, ( hitPosition, reachedTarget ) =>
 			{
-				var playerShip = SpaceflightController.m_instance.m_playerShip;
-				int damage = GetMissileDamage( Mathf.Min( vessel.m_missileClass, c_plasmaBoltClass - 1 ) );
+				m_alienMissilesInFlight = Mathf.Max( 0, m_alienMissilesInFlight - 1 );
 
-				m_alienMissilesInFlight++;
+				var didHit = reachedTarget && !m_playerIsDestroyed && ( Vector3.Distance( SpaceflightController.m_instance.m_playerShip.transform.position, hitPosition ) <= c_alienMissileHitRadius );
 
-				// it flies to where the ship was when it was launched, and only the plasma bolt follows the ship (COMBAT-OV WE929): it hits if the ship is still
-				// about in that place (within 100 units, a cell and a quarter of the original's combat map at c_unitsPerCell)
-				missile.Fire( alienPosition, playerShip.transform.position, ( hitPosition, reachedTarget ) =>
+				if ( didHit )
 				{
-					m_alienMissilesInFlight = Mathf.Max( 0, m_alienMissilesInFlight - 1 );
+					// what hit the ship, in the original's words (DAMAGE-OV: MISSILE CLASS n)
+					SpaceflightController.m_instance.m_messages.AddText( "<color=red>Missile class " + vessel.m_missileClass + "</color>" );
 
-					var didHit = reachedTarget && !m_playerIsDestroyed && ( Vector3.Distance( SpaceflightController.m_instance.m_playerShip.transform.position, hitPosition ) <= c_alienMissileHitRadius );
+					ApplyDamageToPlayer( damage, direction );
+				}
 
-					if ( didHit )
-					{
-						// what hit the ship, in the original's words (DAMAGE-OV: MISSILE CLASS n)
-						SpaceflightController.m_instance.m_messages.AddText( "<color=red>Missile class " + vessel.m_missileClass + "</color>" );
+				// play explosion
+				var explosion = GetAvailableExplosion();
+				if ( explosion != null )
+				{
+					explosion.SetScale( 0.5f );
+					explosion.Play( hitPosition );
+				}
 
-						ApplyDamageToPlayer( damage, direction );
-					}
+				// play torpedo explosion sound
+				SoundController.m_instance.PlaySound( SoundController.Sound.TorpedoExplosion );
+			} );
 
-					// play explosion
-					var explosion = GetAvailableExplosion();
-					if ( explosion != null )
-					{
-						explosion.SetScale( 0.5f );
-						explosion.Play( hitPosition );
-					}
+			// play torpedo launch sound
+			SoundController.m_instance.PlaySound( SoundController.Sound.TorpedoFire );
 
-					// play torpedo explosion sound
-					SoundController.m_instance.PlaySound( SoundController.Sound.TorpedoExplosion );
-				} );
-
-				// play torpedo launch sound
-				SoundController.m_instance.PlaySound( SoundController.Sound.TorpedoFire );
-
-			}
-			else
-			{
-				// play energy weapon sound
-				SoundController.m_instance.PlaySound( SoundController.Sound.EnergyWeapon );
-			}
 		}
+		else
+		{
+			// play energy weapon sound
+			SoundController.m_instance.PlaySound( SoundController.Sound.EnergyWeapon );
+		}
+
+		return true;
+	}
+
+	// an alien ship fires its laser at the player (COMBAT-OV WECEA) - returns true if it has one
+	public bool AlienFiresLaser( PD_AlienShip alienShip, GD_Vessel vessel )
+	{
+		if ( AlienCannotFire() || ( vessel.m_laserClass <= 0 ) )
+		{
+			return false;
+		}
+
+		var playerData = DataController.m_instance.m_playerData;
+		var playerPosition = playerData.m_general.m_coordinates;
+		var alienPosition = alienShip.m_coordinates;
+
+		// calculate direction to player
+		var direction = ( playerPosition - alienPosition ).normalized;
+
+		// fire laser
+		var laser = GetAvailableLaser();
+		if ( laser != null )
+		{
+			laser.SetColor( new Color( 1.0f, 0.5f, 0.5f ) ); // red laser
+			laser.Fire( alienPosition, playerPosition );
+		}
+
+		// apply damage: twice a laser's damage at that distance, and the Rod Device "projects an enhanced laser shield around a spaceship" (the Starport's
+		// analysis): a quarter of it with the Rod aboard (DAMAGE-OV WF3EA and WED36: ?ROD @ IF 4 /)
+		int damage = GetAlienLaserDamage( vessel.m_laserClass, Vector3.Distance( alienPosition, playerPosition ), playerData.m_playerShip.HasArtifact( "Rod Device" ) );
+
+		// what hit the ship, in the original's words (COMBAT-OV WECEA: LASER CLASS n, or LASER PARTIALLY DEFLECTED with the Rod Device)
+		SpaceflightController.m_instance.m_messages.AddText( playerData.m_playerShip.HasArtifact( "Rod Device" ) ? "<color=red>Laser partially deflected</color>" : "<color=red>Laser class " + vessel.m_laserClass + "</color>" );
+
+		ApplyDamageToPlayer( damage, direction );
+
+		return true;
 	}
 
 	// a hit that falls on the crew wounds each of them who is alive with a chance of 70 in 100, by the hit's share of their durability - 5 at least - and the text
