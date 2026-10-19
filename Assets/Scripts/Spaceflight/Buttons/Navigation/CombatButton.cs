@@ -34,6 +34,9 @@ public class CombatButton : ShipButton
 				// switch to combat button set
 				SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Combat );
 
+				// the Shimmering Ball comes on as Combat is entered (COMBAT-OV WF414)
+				CombatController.m_instance.EnterCombat();
+
 				SoundController.m_instance.PlaySound( SoundController.Sound.Click );
 
 				return true;

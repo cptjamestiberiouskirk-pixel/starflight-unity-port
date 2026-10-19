@@ -242,7 +242,7 @@ Found on 2026-10-18 by reading the shipped game's decompiled overlays against th
 | 8.34 | The Starport asks before repairing | CONFIG-OV `WF346`, `WF2C5` | Repair gives the cost to repair the entire ship and asks "Shall we repair the ship? [N Y]" (right yes, left no); a whole ship needs none, and without the money it says so and asks nothing (`ShipConfigurationPanel.RepairClicked`, `AnswerRepairQuestion`; probe `starport-repairquestion`) |
 | 8.35 | Disembark lowers the shields and disarms | SHIPBUTTONS `WEDEC` | Disembark lowers the shields and disarms, saying so (`DisembarkButton`; probe `disembarkshields`) |
 | 8.36 | The Veloxi drone asks up to six numbers | `VPROBE#` | six numbers from 1 to 99, each as likely, the first half a second after the link and each next a moment after an answer, 15 seconds to answer (none is wrong), the answers with no equipment check (`Encounter.UpdateVeloxProbeEncounter`, `AskDroneNumber`; probe `dronenumbers`) |
-| 8.37 | The Shimmering Ball makes the aliens' aim jitter | `WE911` | MISSING |
+| 8.37 | The Shimmering Ball makes the aliens' aim jitter | `WE911` | on entering Combat with the Ball aboard, "Cloaking device now active", and until the encounter ends every alien laser's, missile's and plasma bolt's aim is off by -1 to 1 cells on each axis; a laser off the ship's cell misses ("Laser missed us!"), a missile or bolt more than a cell and a quarter off misses (`CombatController.EnterCombat`, `RollAimJitter`; probe `shimmeringball`); the cloak is gone |
 
 ## Order
 

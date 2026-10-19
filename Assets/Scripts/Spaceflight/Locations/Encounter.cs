@@ -845,6 +845,10 @@ public class Encounter : MonoBehaviour
 			// combat rules read from RaceTalks)
 			m_pdEncounter.m_combatTurn = 0;
 			m_pdEncounter.m_aliensOpenedFire = false;
+
+			// the Shimmering Ball is off until Combat is entered (HYPER-OV ENCSETUP: CLEAR-CO)
+			CombatController.m_instance.ResetShimmeringBall();
+
 			m_pdEncounter.m_secondsSinceAlienFire = 0.0f;
 			m_pdEncounter.m_commTerminated = false;
 
