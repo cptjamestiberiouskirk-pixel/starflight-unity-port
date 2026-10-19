@@ -1710,6 +1710,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioDepositMinerals();
 				break;
 
+			case "planetrefill":
+				yield return ScenarioPlanetRefill();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -47226,6 +47230,174 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "depositminerals: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=depositminerals checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- roadmap 8.19: a planet's minerals, lifeforms and curios come back when the ship leaves
+
+	// what the original does when the ship leaves the orbit of a planet the terrain vehicle went out on (HYPER-OV WDB32 runs DPART-OV DEPART; WF166 deletes what
+	// WF0D6 picks, and MOVE-OV ?POPULA seeds each region again from its place when the vehicle comes back): within the orbit what was taken stays taken and a
+	// killed or captured lifeform stays so; after it the deposits, the lifeforms and the curios of the random ruins are back, the minerals and curios dropped
+	// there are gone, and a special artifact or a Black Egg dropped there (the game not won) and the Endurium taken from an ancient ruin site of STRINFO stay as
+	// they are; a planet the vehicle did not go out on keeps what was taken from it
+	IEnumerator ScenarioPlanetRefill()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var surfaces = playerData.m_planetSurfaces;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		surfaces.Validate();
+
+		// (the control: something taken from planet 90, which the vehicle does not go out on)
+		surfaces.SetDepositVolumeLeft( 90, 0, 0 );
+
+		// ---- 1. down on planet 92 of the Arth system (deposits and lifeforms), through the real Disembark button
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=planetrefill abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var visited = FieldOrNull( surfaces, "m_visitedPlanetList" ) as List<int>;
+		var visitedText = ( visited == null ) ? "none" : string.Join( ",", visited );
+		var deposits = controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true );
+		var lifeforms = LifeformsOnTheGround();
+
+		if ( ( deposits.Length < 2 ) || ( lifeforms.Count < 3 ) )
+		{
+			Finish( "scenario=planetrefill abort: planet 92 has " + deposits.Length + " deposits and " + lifeforms.Count + " lifeforms", 2 );
+			yield break;
+		}
+
+		var lifeformCount = lifeforms.Count;
+		var taken = deposits[ 0 ];
+		var mined = deposits[ 1 ];
+		var takenIndex = taken.m_depositIndex;
+		var minedIndex = mined.m_depositIndex;
+		var minedVolume = mined.m_volume;
+
+		// the first deposit taken and a cubic meter mined from the second (the mining laser's records, PD_PlanetSurfaces.SetDepositVolumeLeft)
+		surfaces.SetDepositVolumeLeft( 92, takenIndex, 0 );
+		surfaces.SetDepositVolumeLeft( 92, minedIndex, Mathf.Max( 1, minedVolume - 10 ) );
+
+		// a lifeform killed (its hits gone, through its own status check) and one captured (the capture takes it off the surface with RemoveEaten)
+		var killed = lifeforms[ 0 ].GetComponent<TerrainLifeform>();
+		var captured = lifeforms[ 1 ].GetComponent<TerrainLifeform>();
+
+		killed.m_hits = 0;
+		typeof( TerrainLifeform ).GetMethod( "UpdateStatus", BindingFlags.NonPublic | BindingFlags.Instance ).Invoke( killed, null );
+
+		controller.m_disembarked.m_terrainGrid.m_terrainLifeforms.RemoveEaten( captured );
+
+		// what the terrain vehicle drops, far from it: an element, a curio, a special artifact and a Black Egg left unarmed
+		var vehicle = controller.m_terrainVehicle.transform.position;
+		var curioId = -1;
+
+		for ( var i = 0; ( i < gameData.m_artifactList.Length ) && ( curioId < 0 ); i++ )
+		{
+			if ( !gameData.m_artifactList[ i ].IsSpecial() )
+			{
+				curioId = i;
+			}
+		}
+
+		var droppedElement = surfaces.AddDroppedCargo( 92, vehicle.x + 300.0f, vehicle.y, vehicle.z, taken.m_elementId, 20, -1 );
+		var droppedCurio = surfaces.AddDroppedCargo( 92, vehicle.x + 310.0f, vehicle.y, vehicle.z, -1, 0, curioId );
+		var droppedSpecial = surfaces.AddDroppedCargo( 92, vehicle.x + 320.0f, vehicle.y, vehicle.z, -1, 0, gameData.FindArtifactId( "Shimmering Ball" ) );
+		var droppedEgg = surfaces.AddDroppedCargo( 92, vehicle.x + 330.0f, vehicle.y, vehicle.z, -1, 0, gameData.FindArtifactId( "Black Egg" ) );
+
+		SetFieldIfThere( droppedEgg, "m_leftUnarmed", true );
+
+		// what was taken from a random ruin of the planet and from a ruin of an ancient ruin site (the keys of TerrainRuin.GetRandomItemKey)
+		var randomRuinKey = TerrainRuin.GetRandomItemKey( 92, 0, 0 );
+		var siteRuinKey = TerrainRuin.GetRandomItemKey( 92, 5, 0 );
+
+		surfaces.TakeRandomRuinItem( randomRuinKey );
+		surfaces.TakeRandomRuinItem( siteRuinKey );
+
+		yield return Frames( 2 );
+
+		// ---- 2. back into the ship and out again, the ship still in orbit
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		var again = LifeformsOnTheGround();
+		var againDead = 0;
+
+		foreach ( var lifeform in again )
+		{
+			againDead += ( lifeform.GetComponent<TerrainLifeform>().m_status == TerrainLifeform.Status.Dead ) ? 1 : 0;
+		}
+
+		var againTaken = surfaces.GetDepositVolumeLeft( 92, takenIndex );
+		var againMined = surfaces.GetDepositVolumeLeft( 92, minedIndex );
+		var againDrops = ( surfaces.FindDroppedCargo( droppedElement.m_id ) != null ) && ( surfaces.FindDroppedCargo( droppedCurio.m_id ) != null ) && ( surfaces.FindDroppedCargo( droppedSpecial.m_id ) != null ) && ( surfaces.FindDroppedCargo( droppedEgg.m_id ) != null );
+		var againRuin = surfaces.IsRandomRuinItemTaken( randomRuinKey );
+
+		// ---- 3. back into the ship, out of the orbit and into it again (the star system on the way: the original's DEPART), and out again
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var after = LifeformsOnTheGround();
+		var afterDead = 0;
+
+		foreach ( var lifeform in after )
+		{
+			afterDead += ( lifeform.GetComponent<TerrainLifeform>().m_status == TerrainLifeform.Status.Dead ) ? 1 : 0;
+		}
+
+		var afterDeposits = controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true );
+		var afterTakenShown = false;
+		var afterMinedVolume = -1;
+
+		foreach ( var deposit in afterDeposits )
+		{
+			if ( deposit.m_depositIndex == takenIndex )
+			{
+				afterTakenShown = deposit.gameObject.activeSelf;
+			}
+
+			if ( deposit.m_depositIndex == minedIndex )
+			{
+				afterMinedVolume = deposit.m_volume;
+			}
+		}
+
+		var afterTaken = surfaces.GetDepositVolumeLeft( 92, takenIndex );
+		var afterElement = surfaces.FindDroppedCargo( droppedElement.m_id ) != null;
+		var afterCurio = surfaces.FindDroppedCargo( droppedCurio.m_id ) != null;
+		var afterSpecial = surfaces.FindDroppedCargo( droppedSpecial.m_id ) != null;
+		var afterEgg = surfaces.FindDroppedCargo( droppedEgg.m_id ) != null;
+		var afterRuin = surfaces.IsRandomRuinItemTaken( randomRuinKey );
+		var afterSite = surfaces.IsRandomRuinItemTaken( siteRuinKey );
+		var control = surfaces.GetDepositVolumeLeft( 90, 0 );
+
+		// (nothing dropped is left lying on planet 92 for the scenarios after this one)
+		surfaces.RemoveDroppedCargo( droppedSpecial.m_id );
+		surfaces.RemoveDroppedCargo( droppedEgg.m_id );
+		surfaces.RemoveDroppedCargo( droppedElement.m_id );
+		surfaces.RemoveDroppedCargo( droppedCurio.m_id );
+
+		Log( "planetrefill: visited [" + visitedText + "], " + deposits.Length + " deposits, " + lifeformCount + " lifeforms | same orbit: deposit left " + againTaken + ", mined " + againMined + " of " + minedVolume + ", lifeforms " + again.Count + " (" + againDead + " dead), drops " + againDrops + ", ruin item taken " + againRuin + " | after leaving: deposit record " + afterTaken + ", shown " + afterTakenShown + ", mined one " + afterMinedVolume + " of " + minedVolume + ", lifeforms " + after.Count + " (" + afterDead + " dead), element " + afterElement + ", curio " + afterCurio + ", special " + afterSpecial + ", egg " + afterEgg + ", ruin item taken " + afterRuin + ", site item taken " + afterSite + " | planet 90's deposit " + control );
+
+		Check( "planetrefill: the Disembark button marks the planet visited in this orbit", ( visited != null ) && visited.Contains( 92 ), visitedText );
+		Check( "planetrefill: in the same orbit the deposits stay taken, the killed lifeform dead and the captured one gone, and what was dropped stays", ( againTaken == 0 ) && ( againMined == Mathf.Max( 1, minedVolume - 10 ) ) && ( again.Count == lifeformCount - 1 ) && ( againDead == 1 ) && againDrops && againRuin, againTaken + " " + againMined + " | " + again.Count + " of " + lifeformCount + ", " + againDead + " dead | " + againDrops + " " + againRuin );
+		Check( "planetrefill: after leaving the orbit the deposits are back whole", ( afterTaken < 0 ) && afterTakenShown && ( afterMinedVolume == minedVolume ), afterTaken + " " + afterTakenShown + " " + afterMinedVolume + " of " + minedVolume );
+		Check( "planetrefill: after leaving the orbit the lifeforms are back, alive", ( after.Count == lifeformCount ) && ( afterDead == 0 ), after.Count + " of " + lifeformCount + ", " + afterDead + " dead" );
+		Check( "planetrefill: after leaving the orbit a dropped mineral and a dropped curio are gone, and the curios of the random ruins are back", !afterElement && !afterCurio && !afterRuin, afterElement + " " + afterCurio + " " + afterRuin );
+		Check( "planetrefill: a dropped special artifact, a Black Egg left unarmed and the Endurium taken from an ancient ruin site stay", afterSpecial && afterEgg && afterSite, afterSpecial + " " + afterEgg + " " + afterSite );
+		Check( "planetrefill: a planet the terrain vehicle did not go out on keeps what was taken from it (the control)", control == 0, control.ToString() );
+
+		Finish( "scenario=planetrefill lifeforms=" + after.Count + "/" + lifeformCount + " deposit=" + afterTaken, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

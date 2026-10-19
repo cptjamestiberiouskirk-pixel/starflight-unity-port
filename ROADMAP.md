@@ -224,7 +224,7 @@ Found on 2026-10-18 by reading the shipped game's decompiled overlays against th
 | 8.16 | A deposit's mineral: the planet's first element half the time, the second a quarter, the third 15%, any other element 10% | SEED-OV `WF0F7`, `WF0C7` | the original's shares, drawn apart from the planet's seeded draws (`TerrainElement.ChooseDepositElement`, used by `TerrainElements` and `PlanetSurvey`; probe `depositminerals`) |
 | 8.17 | Jettison from the ship's hold | CAPTAIN `(/ITEMS)`, `TOSS` | Jettison on the ship's cargo list: an artifact or a specimen at once, an element by a volume typed or stepped with the stick (`ShipCargoJettisonButton`; probe `jettison`) |
 | 8.18 | Lifeforms as the shipped game makes and values them (replaces D3) | HP-OV, VITA-OV, LP-OV, ITEMS-OV `valuate` | MISSING |
-| 8.19 | A planet's minerals, lifeforms and curios come back after the ship leaves (replaces 3.0) | DPART-OV `WF166`, `WF0D6`; MOVE-OV `?POPULA` | MISSING |
+| 8.19 | A planet's minerals, lifeforms and curios come back after the ship leaves (replaces 3.0) | DPART-OV `WF166`, `WF0D6`; MOVE-OV `?POPULA` | the planets visited in an orbit are refilled when the ship leaves it: deposits, lifeforms and the curios of random ruins back, dropped minerals and curios gone; killed and captured lifeforms stay so within the orbit (`PD_PlanetSurfaces.VisitPlanet`, `LoseLifeform`, `RefillVisitedPlanets`; probe `planetrefill`) |
 | 8.20 | A navigator above 150 sees a flux as 1 to 7 dots by skill, 16 with the Ring Device | HYPER-OV `.FLUX-ICON` | MISSING |
 | 8.21 | The edge of hyperspace holds the ship | HYPER-OV `FLY`, `WEE53` | MISSING |
 | 8.22 | Alien groups in a star system are placed afresh on each visit | HYPER-OV `SYSSETUP`, `SETRNDXY` | MISSING |

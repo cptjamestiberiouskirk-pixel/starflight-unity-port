@@ -348,6 +348,12 @@ public class SpaceflightController : MonoBehaviour
 		{
 			playerData.m_general.m_selectedLatitude = 0.0f;
 			playerData.m_general.m_selectedLongitude = 0.0f;
+
+			// and DEPART gives the planets the terrain vehicle went out on in that orbit back their minerals, lifeforms and curios (DPART-OV WF166)
+			if ( playerData.m_planetSurfaces != null )
+			{
+				playerData.m_planetSurfaces.RefillVisitedPlanets( playerData.m_general.m_gameWon );
+			}
 		}
 
 		// make sure the display is updated (in case we are loading from a save game)

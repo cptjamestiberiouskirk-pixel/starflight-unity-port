@@ -307,9 +307,11 @@ The vehicle's status display shows its fuel, its efficiency, how full its hold i
 - **A lifeform**: **Record** its data, or **Ignore** it. To capture a living one into stasis, stun it first, then use Tools, **Capture** beside it (a dead lifeform can only be recorded).
 - **A mineral deposit**: names it and how much it holds. To take it, use Tools, **Mine**.
 
-**Mine** aims the mining laser at the nearest deposit within reach and cuts it into the hold a tenth of a cubic meter at a time, on the vehicle's fuel. A deposit holds between 1.0 and 9.9 cubic meters, and the largest takes about seven seconds. The laser stops when the deposit is gone, when the hold is full or the fuel runs out, or when you press Enter; what is left of a deposit stays for your next visit.
+**Mine** aims the mining laser at the nearest deposit within reach and cuts it into the hold a tenth of a cubic meter at a time, on the vehicle's fuel. A deposit holds between 1.0 and 9.9 cubic meters, and the largest takes about seven seconds. The laser stops when the deposit is gone, when the hold is full or the fuel runs out, or when you press Enter; what is left of a deposit stays as it is while the ship is in orbit.
 
 The vehicle's hold takes 50 cubic meters.
+
+What you take from a planet stays taken, and what you kill or capture stays gone, for as long as the ship stays in orbit. Once the ship leaves the orbit, the planet's minerals, lifeforms and ordinary artifacts are back as they were, and minerals or ordinary artifacts you dropped there are gone. A special artifact you drop stays where it lies.
 
 ### Getting back
 
