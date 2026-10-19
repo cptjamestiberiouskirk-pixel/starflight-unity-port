@@ -2,7 +2,8 @@ using UnityEngine;
 
 // places the ruins of a planet: where the original game has its messages (GameData.m_planetMessageList, recovered from STRINFO 3.1)
 // a message at a site lies in a ruin at its latitude and longitude, and one STRINFO puts at "random locations" or "several locations" lies in one ruin of its own,
-// at a place picked with random numbers seeded from the planet (the same every time) - and the random ruins of the 1984 design notes (see PlaceRandomRuins)
+// at a place picked with random numbers seeded from the planet (the same every time) - and the random ruins of the shipped game's regions (RandomRuinRegions),
+// placed only in the regions around the terrain vehicle and moved along with it (PlaceRegionsAround)
 public class TerrainRuins : TerrainGridPopulator
 {
 	// the ruin templates (the five ancient ruin models for now)
@@ -34,6 +35,22 @@ public class TerrainRuins : TerrainGridPopulator
 		return ruinIndex >= c_firstSiteRuinIndex;
 	}
 
+	// the random ruins are placed in the regions this near the terrain vehicle (a region is 64 by 96 units), and taken away beyond one more: up to 81 regions
+	// with ruins at a time, out of the 4096 of a planet (the shipped game seeds a region when the vehicle first comes into it)
+	const int c_regionPlaceDistance = 4;
+	const int c_regionKeepDistance = 5;
+
+	// how often the regions about the vehicle are looked at, in seconds
+	const float c_regionCheckSeconds = 0.5f;
+
+	// the planet the ruins are placed on, the regions whose random ruins are placed and what was placed for each
+	GD_Planet m_planet;
+	readonly System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<GameObject>> m_regionObjects = new System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<GameObject>>();
+	float m_regionTimer;
+
+	// the populators whose objects a ruin clears from about itself (ClearAroundRuins), for the ruins placed later
+	TerrainGridPopulator[] m_clearedPopulators;
+
 	// place the ruins of this planet
 	public void Initialize( PlanetGenerator planetGenerator, float elevationScale, int randomSeed )
 	{
@@ -42,6 +59,9 @@ public class TerrainRuins : TerrainGridPopulator
 
 		// remove the ruins of the last planet
 		Tools.DestroyChildrenOf( gameObject );
+
+		m_planet = null;
+		m_regionObjects.Clear();
 
 		// nothing to place without templates
 		if ( ( m_ruinTemplates == null ) || ( m_ruinTemplates.Length == 0 ) )
@@ -229,8 +249,11 @@ public class TerrainRuins : TerrainGridPopulator
 			}
 		}
 
-		// the random ruins (their random numbers come after everything else, so nothing above moves)
-		PlaceRandomRuins( planetGenerator, elevationScale, planet );
+		// the random ruins of the regions about the place the terrain vehicle goes out at (with generators of their own: they draw none of the game's random numbers)
+		m_planet = planet;
+		m_regionTimer = c_regionCheckSeconds;
+
+		PlaceRegionsAround( DataController.m_instance.m_playerData.m_general.m_lastDisembarkedCoordinates );
 
 		// the special artifacts beside the ruins that hold them (no random numbers)
 		foreach ( var ruin in GetComponentsInChildren<TerrainRuin>( true ) )
@@ -464,222 +487,187 @@ public class TerrainRuins : TerrainGridPopulator
 	// takes away the rocks and the trees that are too close to a ruin (call this once all the populators have placed their objects - taking them away moves nothing else)
 	public void ClearAroundRuins( TerrainGridPopulator[] populators )
 	{
+		// (remembered for the random ruins placed later, as the vehicle drives)
+		m_clearedPopulators = populators;
+
 		foreach ( Transform ruin in transform )
 		{
-			foreach ( var populator in populators )
+			ClearAroundRuin( ruin );
+		}
+	}
+
+	// takes the rocks and trees next to one ruin away
+	void ClearAroundRuin( Transform ruin )
+	{
+		if ( m_clearedPopulators == null )
+		{
+			return;
+		}
+
+		foreach ( var populator in m_clearedPopulators )
+		{
+			if ( populator == null )
 			{
-				if ( populator == null )
+				continue;
+			}
+
+			foreach ( Transform child in populator.transform )
+			{
+				var delta = child.position - ruin.position;
+
+				delta.y = 0.0f;
+
+				if ( delta.magnitude < c_clearRadius )
+				{
+					// destroyed, not hidden: the cargo and scan buttons go through the children of a populator, hidden ones too
+					Destroy( child.gameObject );
+				}
+			}
+		}
+	}
+
+	// the random ruins of the regions within c_regionPlaceDistance of this place are placed, and those beyond c_regionKeepDistance taken away - they come back
+	// the same when the vehicle comes back (RandomRuinRegions works a region out the same every time, and what was taken from a ruin is saved by its key)
+	void PlaceRegionsAround( Vector3 worldPosition )
+	{
+		var planetGenerator = GetPlanetGenerator();
+
+		if ( ( m_planet == null ) || ( planetGenerator == null ) || !RandomRuinRegions.HasRuins( m_planet ) || ( m_ruinTemplates == null ) || ( m_ruinTemplates.Length == 0 ) )
+		{
+			return;
+		}
+
+		Tools.WorldToMapCoordinates( worldPosition, out var mapX, out var mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
+
+		var centre = RandomRuinRegions.GetRegion( mapX, mapY, planetGenerator );
+		var kept = new System.Collections.Generic.HashSet<int>( RandomRuinRegions.GetRegionsAround( centre, c_regionKeepDistance ) );
+
+		// the regions too far away go (their ruins with what shows beside them)
+		var gone = new System.Collections.Generic.List<int>();
+
+		foreach ( var region in m_regionObjects.Keys )
+		{
+			if ( !kept.Contains( region ) )
+			{
+				gone.Add( region );
+			}
+		}
+
+		foreach ( var region in gone )
+		{
+			RemoveRegion( region );
+		}
+
+		// the regions near enough come (each once)
+		foreach ( var region in RandomRuinRegions.GetRegionsAround( centre, c_regionPlaceDistance ) )
+		{
+			if ( !m_regionObjects.ContainsKey( region ) )
+			{
+				PlaceRegion( region );
+			}
+		}
+	}
+
+	// places the random ruins of one region
+	void PlaceRegion( int region )
+	{
+		var placed = new System.Collections.Generic.List<GameObject>();
+
+		m_regionObjects[ region ] = placed;
+
+		foreach ( var regionRuin in RandomRuinRegions.ForRegion( GetPlanetGenerator(), m_elevationScale, m_planet, region, m_ruinTemplates.Length ) )
+		{
+			// (not in the spawn lists: nothing is placed after the ruins, and a list that took every ruin the vehicle passed would only grow)
+			var ruinObject = PlaceObjectAt( m_ruinTemplates[ Mathf.Clamp( regionRuin.m_templateIndex, 0, m_ruinTemplates.Length - 1 ) ], regionRuin.m_mapX, regionRuin.m_mapY, m_elevationScale, regionRuin.m_rotation, false );
+
+			ruinObject.name = ( regionRuin.m_isAncient ? "Ancient ruin" : "Recent ruin" ) + " of region " + region;
+
+			var ruin = ruinObject.AddComponent<TerrainRuin>();
+
+			ruin.m_isAncient = regionRuin.m_isAncient;
+			ruin.m_randomItems.AddRange( regionRuin.m_items );
+
+			ShowArtifacts( ruin );
+			ClearAroundRuin( ruinObject.transform );
+
+			placed.Add( ruinObject );
+		}
+	}
+
+	// takes away the random ruins of one region
+	void RemoveRegion( int region )
+	{
+		if ( m_regionObjects.TryGetValue( region, out var placed ) )
+		{
+			foreach ( var ruinObject in placed )
+			{
+				if ( ruinObject == null )
 				{
 					continue;
 				}
 
-				foreach ( Transform child in populator.transform )
+				if ( ruinObject.TryGetComponent<TerrainRuin>( out var ruin ) )
 				{
-					var delta = child.position - ruin.position;
-
-					delta.y = 0.0f;
-
-					if ( delta.magnitude < c_clearRadius )
+					foreach ( var display in ruin.m_artifactDisplays )
 					{
-						// destroyed, not hidden: the cargo and scan buttons go through the children of a populator, hidden ones too
-						Destroy( child.gameObject );
+						if ( display != null )
+						{
+							Destroy( display );
+						}
 					}
 				}
+
+				// (out of the populator at once, so that Scan and Cargo, which go through its children, no longer find it)
+				ruinObject.SetActive( false );
+				ruinObject.transform.SetParent( null, false );
+
+				Destroy( ruinObject );
 			}
 		}
+
+		m_regionObjects.Remove( region );
 	}
 
-	// the random ruins of the 1984 design notes (planet.txt; the original's kernel has a class of ruins, and its SEED-OV overlay seeds a planet's "mineral, lifeform
-	// & ruin" objects, but its code is not in the sources): ancient crystal ruins with lumps of Endurium or "truly amazing" artifacts worth 500 to 5000 MU, and
-	// Old Empire ruins with "amazing" artifacts worth 50 to 1000 MU, one to four of them (60%, 25%, 10% and 5%), whose value the crew estimates to within half of
-	// it - the notes do not say how many ruins a planet has, how much Endurium a ruin holds or which artifacts, so those are the port's: a quarter of the planets
-	// has one or two, half of them ancient, half of the ancient ones hold 1 to 5 cubic meters of Endurium, and the artifacts are the game data's that are found
-	// nowhere else, in the range of value of the ruin - the planets the original's messages and artifacts lie on have none, as STRINFO describes them
-	public static int GetRandomRuinCount( GD_Planet planet )
+	// unity update: the random ruins follow the terrain vehicle
+	void Update()
 	{
-		var gameData = DataController.m_instance.m_gameData;
-
-		foreach ( var planetMessage in gameData.m_planetMessageList )
+		if ( ( m_planet == null ) || ( m_terrainVehicle == null ) || ( SpaceflightController.m_instance == null ) || ( DataController.m_instance.m_playerData.m_general.m_location != PD_General.Location.Disembarked ) )
 		{
-			if ( planetMessage.m_planetId == planet.m_id )
-			{
-				return 0;
-			}
+			return;
 		}
 
-		foreach ( var artifactSite in gameData.m_artifactSiteList )
+		m_regionTimer -= Time.deltaTime;
+
+		if ( m_regionTimer > 0.0f )
 		{
-			if ( artifactSite.m_planetId == planet.m_id )
-			{
-				return 0;
-			}
+			return;
 		}
 
-		// nor the planets of the ancient ruin sites ("nothing else of note is there", STRINFO 2.1.4 and 2.5.4)
-		foreach ( var ancientRuinSite in gameData.m_ancientRuinSiteList )
-		{
-			if ( ancientRuinSite.m_planetId == planet.m_id )
-			{
-				return 0;
-			}
-		}
+		m_regionTimer = c_regionCheckSeconds;
 
-		// from the planet's id (so that a planet's ruins can be known without placing them), 18 in 100 with one and 7 with two
-		var hash = ( planet.m_id * 7919 + 104729 ) % 100;
-
-		return ( hash < 18 ) ? 1 : ( ( hash < 25 ) ? 2 : 0 );
+		PlaceRegionsAround( m_terrainVehicle.transform.position );
 	}
 
-	// the artifacts of the game data that random ruins hold: found nowhere else (no site, not sold) and in this range of value
-	static System.Collections.Generic.List<int> FindRandomRuinArtifacts( int lowestValue, int highestValue )
-	{
-		var gameData = DataController.m_instance.m_gameData;
-		var artifactIds = new System.Collections.Generic.List<int>();
-
-		for ( var artifactId = 0; artifactId < gameData.m_artifactList.Length; artifactId++ )
-		{
-			var artifact = gameData.m_artifactList[ artifactId ];
-
-			if ( artifact.m_availableInStarport || ( artifact.m_name == "Black Box" ) || ( artifact.m_actualValue < lowestValue ) || ( artifact.m_actualValue > highestValue ) )
-			{
-				continue;
-			}
-
-			var hasSite = false;
-
-			foreach ( var artifactSite in gameData.m_artifactSiteList )
-			{
-				hasSite = hasSite || ( artifactSite.m_artifactId == artifactId );
-			}
-
-			if ( !hasSite )
-			{
-				artifactIds.Add( artifactId );
-			}
-		}
-
-		return artifactIds;
-	}
-
-	// how many artifacts a random ruin holds: "60% theres 1, 25% theres 2, 10% theres 3, 5% theres 4"
-	static int GetRandomArtifactCount()
-	{
-		var chance = Random.value;
-
-		return ( chance < 0.6f ) ? 1 : ( ( chance < 0.85f ) ? 2 : ( ( chance < 0.95f ) ? 3 : 4 ) );
-	}
-
-	// a random ruin as the planet's random numbers make it: its place on the map, its kind, its model and turn, and what it holds
-	public class RandomRuin
-	{
-		public float m_mapX;
-		public float m_mapY;
-		public bool m_isAncient;
-		public int m_templateIndex;
-		public int m_rotation;
-		public System.Collections.Generic.List<TerrainRuin.RandomItem> m_items = new System.Collections.Generic.List<TerrainRuin.RandomItem>();
-	}
-
-	void PlaceRandomRuins( PlanetGenerator planetGenerator, float elevationScale, GD_Planet planet )
-	{
-		var randomRuins = MakeRandomRuins( planetGenerator, elevationScale, planet, m_ruinTemplates.Length );
-
-		for ( var ruinIndex = 0; ruinIndex < randomRuins.Count; ruinIndex++ )
-		{
-			var randomRuin = randomRuins[ ruinIndex ];
-			var ruinObject = PlaceObjectAt( m_ruinTemplates[ randomRuin.m_templateIndex ], randomRuin.m_mapX, randomRuin.m_mapY, elevationScale, randomRuin.m_rotation );
-
-			ruinObject.name = ( randomRuin.m_isAncient ? "Ancient ruin " : "Old Empire ruin " ) + ( ruinIndex + 1 );
-
-			var ruin = ruinObject.AddComponent<TerrainRuin>();
-
-			ruin.m_isAncient = randomRuin.m_isAncient;
-			ruin.m_randomItems.AddRange( randomRuin.m_items );
-		}
-	}
-
-	// the random ruins of a planet, made with the random numbers as they stand (seeded by the caller) - every draw in the order the surface makes them, so that
-	// they can be worked out without placing them (the Red Cylinder does that from orbit) - templateCount only picks a model, one draw whatever it is
-	static System.Collections.Generic.List<RandomRuin> MakeRandomRuins( PlanetGenerator planetGenerator, float elevationScale, GD_Planet planet, int templateCount )
-	{
-		var randomRuins = new System.Collections.Generic.List<RandomRuin>();
-		var count = GetRandomRuinCount( planet );
-		var gameData = DataController.m_instance.m_gameData;
-
-		for ( var ruinIndex = 0; ruinIndex < count; ruinIndex++ )
-		{
-			FindPlaceForRuin( planetGenerator, elevationScale, out var mapX, out var mapY );
-
-			var isAncient = Random.value < 0.5f;
-			var ruin = new RandomRuin { m_mapX = mapX, m_mapY = mapY, m_isAncient = isAncient, m_templateIndex = Random.Range( 0, Mathf.Max( 1, templateCount ) ), m_rotation = Random.Range( 0, 360 ) };
-
-			randomRuins.Add( ruin );
-
-			// an ancient ruin: lumps of Endurium, or truly amazing artifacts
-			if ( isAncient && ( Random.value < 0.5f ) )
-			{
-				ruin.m_items.Add( new TerrainRuin.RandomItem { m_key = TerrainRuin.GetRandomItemKey( planet.m_id, ruinIndex, 0 ), m_enduriumVolume = Random.Range( 1, 6 ) * 10 } );
-
-				continue;
-			}
-
-			var artifactIds = isAncient ? FindRandomRuinArtifacts( 500, 5000 ) : FindRandomRuinArtifacts( 50, 1000 );
-
-			if ( artifactIds.Count == 0 )
-			{
-				continue;
-			}
-
-			var artifactCount = GetRandomArtifactCount();
-
-			for ( var itemIndex = 0; itemIndex < artifactCount; itemIndex++ )
-			{
-				var artifactId = artifactIds[ Random.Range( 0, artifactIds.Count ) ];
-				var value = gameData.m_artifactList[ artifactId ].m_actualValue;
-
-				// the estimate is off by up to half of the value, most often by little ("a normal distribution with the peak at 0"), rounded to the nearest 100
-				var error = ( Random.value + Random.value - 1.0f ) * 0.5f;
-				var estimate = Mathf.Max( 100, Mathf.RoundToInt( value * ( 1.0f + error ) / 100.0f ) * 100 );
-
-				ruin.m_items.Add( new TerrainRuin.RandomItem { m_key = TerrainRuin.GetRandomItemKey( planet.m_id, ruinIndex, itemIndex ), m_artifactId = artifactId, m_estimatedValue = estimate } );
-			}
-		}
-
-		return randomRuins;
-	}
-
-	// the places of a planet's random ruins, worked out as the surface places them (with the planet's random numbers, seeded as TerrainGrid seeds this populator),
-	// in degrees as the landing map gives them (x east-west, y north-south), and whether each one is ancient - the game's random numbers are left as they were
+	// the places of a planet's random ruins, worked out as the surface places them, in degrees as the landing map gives them (x east-west, y north-south), and
+	// whether each one is ancient - every region of the planet (the game's random numbers are not used)
 	public static System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<Vector2, bool>> GetRandomRuinPlaces( PlanetGenerator planetGenerator, float elevationScale, GD_Planet planet )
 	{
 		var places = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<Vector2, bool>>();
 
-		if ( GetRandomRuinCount( planet ) == 0 )
+		foreach ( var regionRuin in RandomRuinRegions.ForPlanet( planetGenerator, elevationScale, planet ) )
 		{
-			return places;
-		}
-
-		var randomState = Random.state;
-
-		// (the random ruins are the only random numbers of this populator on a planet that has them, so they start from its seed)
-		Random.InitState( TerrainGrid.GetRuinSeed( planet ) );
-
-		foreach ( var randomRuin in MakeRandomRuins( planetGenerator, elevationScale, planet, 1 ) )
-		{
-			var world = Tools.MapToWorldCoordinates( randomRuin.m_mapX, randomRuin.m_mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
+			var world = Tools.MapToWorldCoordinates( regionRuin.m_mapX, regionRuin.m_mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
 
 			Tools.WorldToLatLongCoordinates( world, out var eastWest, out var northSouth );
 
-			places.Add( new System.Collections.Generic.KeyValuePair<Vector2, bool>( new Vector2( eastWest, northSouth ), randomRuin.m_isAncient ) );
+			places.Add( new System.Collections.Generic.KeyValuePair<Vector2, bool>( new Vector2( eastWest, northSouth ), regionRuin.m_isAncient ) );
 		}
-
-		Random.state = randomState;
 
 		return places;
 	}
 
-	// the places of a planet's ancient ruins, in degrees as the landing map gives them: its random ancient ruins, the formations of ancient ruins (STRINFO 4.1)
-	// and the ancient ruin sites (STRINFO 2.1.4, 2.5.4)
+	// the places of a planet's fixed ancient ruins, in degrees as the landing map gives them: the formations of ancient ruins (STRINFO 4.1) and the ancient ruin
+	// sites (STRINFO 2.1.4, 2.5.4) - its random ancient ruins go by region (RandomRuinRegions.GetAncientRegions: too many for a mark each on a planet of ruins)
 	public static System.Collections.Generic.List<Vector2> GetAncientRuinPlaces( PlanetGenerator planetGenerator, float elevationScale, GD_Planet planet )
 	{
 		var gameData = DataController.m_instance.m_gameData;
@@ -707,14 +695,6 @@ public class TerrainRuins : TerrainGridPopulator
 			if ( ancientRuinSite.m_planetId == planet.m_id )
 			{
 				places.Add( new Vector2( ancientRuinSite.m_longitude, ancientRuinSite.m_latitude ) );
-			}
-		}
-
-		foreach ( var place in GetRandomRuinPlaces( planetGenerator, elevationScale, planet ) )
-		{
-			if ( place.Value )
-			{
-				places.Add( place.Key );
 			}
 		}
 

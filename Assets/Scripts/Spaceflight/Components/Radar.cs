@@ -193,17 +193,8 @@ public class Radar : MonoBehaviour
 					// reset time since last detection
 					m_timeSinceLastDetection = 0.0f;
 
-					// play the radar blip sound
+					// play the radar blip sound (the science officer reports the aliens' moves as they make them: SpaceflightController.ReportMotion)
 					SoundController.m_instance.PlaySound( SoundController.Sound.RadarBlip, Mathf.Pow( opacity, 2.0f ) );
-
-					// let the player know we've detected motion - the original says so only through a science officer whose science skill is above 150
-					// (HYPERMSG-OV TRAK-E and WF28B: the science officer's ASSIGN-CREW slot, the CREWMEMBER science byte); its step numbers ("X: Y:") come
-					// from the original's hourly jumps of the alien groups, which the port's smooth movement does not have
-					if ( ScienceOfficerReportsMotion( playerData ) )
-					{
-						SpaceflightController.m_instance.m_messages.Clear();
-						SpaceflightController.m_instance.m_messages.AddText( "<color=white>Motion detected.</color>" );
-					}
 				}
 			}
 		}
@@ -290,22 +281,5 @@ public class Radar : MonoBehaviour
 				detection.Reset();
 			}
 		}
-	}
-
-	// the science skill above which the science officer reports motion (HYPERMSG-OV WF28B: 0x0096)
-	const int c_motionReportSkill = 150;
-
-	// whether the science officer is skilled enough to report the motion the radar has found
-	static bool ScienceOfficerReportsMotion( PlayerData playerData )
-	{
-		// no science officer, no report (a ship started in the Editor's Spaceflight scene has no crew)
-		if ( !playerData.m_crewAssignment.IsAssigned( PD_CrewAssignment.Role.ScienceOfficer ) )
-		{
-			return false;
-		}
-
-		var scienceOfficer = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer );
-
-		return ( scienceOfficer != null ) && ( scienceOfficer.m_science > c_motionReportSkill );
 	}
 }

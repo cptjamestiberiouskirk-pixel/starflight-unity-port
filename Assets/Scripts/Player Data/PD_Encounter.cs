@@ -51,6 +51,10 @@ public class PD_Encounter : IComparable
 	// set when the player fires on the aliens - they stay hostile until the player leaves the encounter (false in older save files)
 	public bool m_attackedByPlayer;
 
+	// the subjects the aliens will say no more about in this encounter, a bit each (1 << subject): the Old Empire and the Ancients can lock out
+	// (Encounter.IsLockedOut, the original's (LOCK-OUT)) - 0 in older save files
+	public int m_lockedOutSubjects;
+
 	// how many of their homeworld's warnings a home fleet has given, and whether it has given its last one (it attacks then) - 0 and false in older save files
 	public int m_homeworldWarningCount;
 	public bool m_homeworldWarningsGiven;

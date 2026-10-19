@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // draws the marks of the science officer's survey (PlanetSurvey) and the ancient ruins the Red Cylinder finds into a texture laid over a map of the planet:
-// a mineral field is a cross, a lifeform a dot and an ancient ruin a box, each with a dark edge so that it reads on any ground. The texture covers the
-// planet's map as the landing map shows it: east-west -180 to 180 across, north-south -90 to 90 up (decided 2026-10-17, ROADMAP D6)
+// a mineral field is a cross, a lifeform a dot and a fixed ancient ruin a box, each with a dark edge so that it reads on any ground, and a region holding a
+// random ancient ruin a light tint (a planet of ruins has hundreds of them: decided 2026-10-19). The texture covers the planet's map as the landing map shows
+// it: east-west -180 to 180 across, north-south -90 to 90 up (decided 2026-10-17, ROADMAP D6)
 public static class SurveyMarks
 {
 	// the size of the texture (twice the landing map's 448 by 224, so that the marks stay sharp)
@@ -20,8 +21,9 @@ public static class SurveyMarks
 	const float c_lineWidth = 2.5f;
 	const float c_edgeWidth = 2.0f;
 
-	// how opaque the dark edge is
+	// how opaque the dark edge is, and the tint of a region that holds a random ancient ruin
 	const float c_edgeAlpha = 0.85f;
+	const float c_regionTintAlpha = 0.3f;
 
 	// the pixels drawn into (kept, so that a new drawing does not make garbage)
 	static Color32[] s_pixels;
@@ -32,6 +34,7 @@ public static class SurveyMarks
 	static PlanetSurvey s_drawnSurvey;
 	static int s_drawnPlanetId = -1;
 	static int s_drawnRuinCount = -1;
+	static int s_drawnRegionCount = -1;
 	static UIKitTheme s_drawnTheme;
 
 	/// <summary>
@@ -53,8 +56,9 @@ public static class SurveyMarks
 		// (the survey kept is of the planet analysed last, which may be another)
 		var survey = ( ( controller.m_planetSurvey != null ) && ( controller.m_planetSurvey.m_planetId == planetId ) ) ? controller.m_planetSurvey : null;
 		var ruins = RedCylinder.GetAncientRuinPlaces();
+		var regions = RedCylinder.GetAncientRuinRegions();
 
-		if ( ( ( survey == null ) || ( survey.m_marks.Count == 0 ) ) && ( ruins.Count == 0 ) )
+		if ( ( ( survey == null ) || ( survey.m_marks.Count == 0 ) ) && ( ruins.Count == 0 ) && ( regions.Count == 0 ) )
 		{
 			return null;
 		}
@@ -74,26 +78,28 @@ public static class SurveyMarks
 
 			s_drawnTheme = null;
 		}
-		else if ( ( survey == s_drawnSurvey ) && ( planetId == s_drawnPlanetId ) && ( ruins.Count == s_drawnRuinCount ) && ( theme == s_drawnTheme ) )
+		else if ( ( survey == s_drawnSurvey ) && ( planetId == s_drawnPlanetId ) && ( ruins.Count == s_drawnRuinCount ) && ( regions.Count == s_drawnRegionCount ) && ( theme == s_drawnTheme ) )
 		{
 			return s_texture;
 		}
 
-		Draw( s_texture, survey, ruins, theme );
+		Draw( s_texture, survey, ruins, theme, regions );
 
 		s_drawnSurvey = survey;
 		s_drawnPlanetId = planetId;
 		s_drawnRuinCount = ruins.Count;
+		s_drawnRegionCount = regions.Count;
 		s_drawnTheme = theme;
 
 		return s_texture;
 	}
 
 	/// <summary>
-	/// Draws the survey's marks (none if the survey is null) and the ancient ruins (east-west and north-south, in degrees) into the texture, in the
-	/// colours of this theme (the minerals in its armor colour, the life in its fuel colour, the ruins in its danger colour).
+	/// Draws the survey's marks (none if the survey is null), the ancient ruins (east-west and north-south, in degrees) and the regions that hold a random
+	/// ancient ruin (RandomRuinRegions, none if null) into the texture, in the colours of this theme (the minerals in its armor colour, the life in its fuel
+	/// colour, the ruins and the regions' tint in its danger colour).
 	/// </summary>
-	public static void Draw( Texture2D texture, PlanetSurvey survey, List<Vector2> ruins, UIKitTheme theme )
+	public static void Draw( Texture2D texture, PlanetSurvey survey, List<Vector2> ruins, UIKitTheme theme, List<int> ancientRegions = null )
 	{
 		if ( ( texture == null ) || ( theme == null ) )
 		{
@@ -113,6 +119,15 @@ public static class SurveyMarks
 		var edge = theme.m_backgroundApp;
 
 		edge.a = c_edgeAlpha;
+
+		// the regions of the random ancient ruins first, under every mark
+		if ( ancientRegions != null )
+		{
+			foreach ( var region in ancientRegions )
+			{
+				TintRegion( width, height, region, theme.m_statusDanger );
+			}
+		}
 
 		if ( survey != null )
 		{
@@ -269,6 +284,23 @@ public static class SurveyMarks
 		var t = Mathf.Clamp01( Vector2.Dot( point - from, along ) / lengthSquared );
 
 		return Vector2.Distance( point, from + along * t );
+	}
+
+	// lays the light tint over a region of the map (its pixels whose middles lie in it)
+	static void TintRegion( int width, int height, int region, Color color )
+	{
+		RandomRuinRegions.GetRegionDegrees( region, out var west, out var east, out var south, out var north );
+
+		var low = GetPixel( width, height, west, south );
+		var high = GetPixel( width, height, east, north );
+
+		for ( var y = Mathf.Max( 0, Mathf.CeilToInt( low.y - 0.5f ) ); y < Mathf.Min( height, Mathf.CeilToInt( high.y - 0.5f ) ); y++ )
+		{
+			for ( var x = Mathf.Max( 0, Mathf.CeilToInt( low.x - 0.5f ) ); x < Mathf.Min( width, Mathf.CeilToInt( high.x - 0.5f ) ); x++ )
+			{
+				Blend( y * width + x, color, c_regionTintAlpha );
+			}
+		}
 	}
 
 	// lays a colour over a pixel ("over", with straight alpha, as the UI draws the texture)
