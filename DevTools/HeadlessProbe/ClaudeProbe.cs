@@ -1734,6 +1734,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioSystemGroups();
 				break;
 
+			case "racememory":
+				yield return ScenarioRaceMemory();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -48305,6 +48309,97 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "systemgroups: the system shown again without coming in from hyperspace (as after orbit or a load) leaves the group where it was (control)", Vector3.Distance( beforeOrbit, afterOrbit ) < 0.01f, beforeOrbit + " -> " + afterOrbit );
 
 		Finish( "scenario=systemgroups checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: each race remembers how it was treated (since 2026-10-18)
+
+	// meets an encounter, sets the aliens' mood to this (or leaves it as it starts, below 0), and leaves through the game's own end of an encounter - returns the
+	// mood the aliens started with
+	static IEnumerator MeetSetMoodAndLeave( int encounterId, float endMood, float[] startMood )
+	{
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 5 );
+
+		EnterEncounter( encounterId );
+
+		yield return Frames( 5 );
+
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		Call( encounter, "GetAlienTalkStance" );
+
+		startMood[ 0 ] = encounter.m_pdEncounter.m_mood;
+
+		if ( endMood >= 0.0f )
+		{
+			encounter.m_pdEncounter.m_mood = endMood;
+		}
+
+		Call( encounter, "LeaveEncounter" );
+
+		yield return Frames( 10 );
+	}
+
+	// each race remembers how it was treated: the end of an encounter moves the race's base mood toward the mood the encounter ended in, a third of the way and at
+	// least 5, by 5 toward calm when they are the same, and the next encounter starts from it (HYPER-OV ENCCLEANUP, BASE-EDL). The code before started every
+	// encounter from the race's fixed mood
+	IEnumerator ScenarioRaceMemory()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var start = new float[ 1 ];
+
+		EnsureCrew();
+
+		// shields down and weapons not armed, so that the aliens' mood starts at the race's
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+
+		SpaceflightController.m_instance.m_encounterRange = 0.0f;
+
+		var elowan = FindEncounterOfRace( GameData.Race.Elowan );
+		var thrynn = FindEncounterOfRace( GameData.Race.Thrynn );
+
+		// ---- 1. the first meeting starts from the race's mood (44, the shipped BASE-EDL), and ends angry (90): 44 + 15 = 59
+		yield return MeetSetMoodAndLeave( elowan, 90.0f, start );
+
+		var firstStart = start[ 0 ];
+
+		// ---- 2. the next meeting starts from 59, and ends calm (10): 59 - 16 = 43
+		yield return MeetSetMoodAndLeave( elowan, 10.0f, start );
+
+		var secondStart = start[ 0 ];
+
+		// ---- 3. the next starts from 43, and ends where it started: 5 toward calm, 38
+		yield return MeetSetMoodAndLeave( elowan, 43.0f, start );
+
+		var thirdStart = start[ 0 ];
+
+		yield return MeetSetMoodAndLeave( elowan, -1.0f, start );
+
+		var fourthStart = start[ 0 ];
+
+		// ---- 4. another race is not touched by it (the Thrynn start from their 44)
+		yield return MeetSetMoodAndLeave( thrynn, -1.0f, start );
+
+		var thrynnStart = start[ 0 ];
+
+		// ---- 5. the save keeps it
+		var copy = JsonUtility.FromJson<PD_General>( JsonUtility.ToJson( playerData.m_general ) );
+		var method = typeof( PD_General ).GetMethod( "GetRaceBaseMood", c_any );
+		var saved = ( method == null ) ? -1.0f : (float) method.Invoke( copy, new object[] { GameData.Race.Elowan, 44.0f } );
+
+		Log( "racememory: Elowan encounter " + elowan + ", starts " + firstStart + " / " + secondStart + " / " + thirdStart + " / " + fourthStart + " | Thrynn " + thrynn + " starts " + thrynnStart + " | saved Elowan base " + saved );
+
+		Check( "racememory: the first meeting starts from the race's mood (control)", Mathf.Approximately( firstStart, 44.0f ), firstStart.ToString() );
+		Check( "racememory: after an angry end (90) the next meeting starts a third of the way there, 59 (the code before started at 44 again)", Mathf.Approximately( secondStart, 59.0f ), secondStart.ToString() );
+		Check( "racememory: after a calm end (10) it starts a third of the way down, 43", Mathf.Approximately( thirdStart, 43.0f ), thirdStart.ToString() );
+		Check( "racememory: an end where it started moves it 5 toward calm, 38", Mathf.Approximately( fourthStart, 38.0f ), fourthStart.ToString() );
+		Check( "racememory: another race is not touched (the Thrynn start at 44)", Mathf.Approximately( thrynnStart, 44.0f ), thrynnStart.ToString() );
+		Check( "racememory: the save keeps a race's base mood", Mathf.Approximately( saved, 33.0f ), saved.ToString() );
+
+		Finish( "scenario=racememory checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

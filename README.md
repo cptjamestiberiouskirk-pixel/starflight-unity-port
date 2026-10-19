@@ -266,7 +266,7 @@ Assets/
 - The Elowan give 15 cubic meters of Endurium to a crew whose need for energy is dire, and see through one that already has 20 or more
 - The Veloxi demand a tribute of Endurium, and the Crystal Orb or the Ellipsoid if the ship carries one, and attack a crew that refuses; a Crystal Orb they take goes back to where it was found
 - The Thrynn buy artifacts at their own prices and plutonium for Endurium, and sell the Black Box for 30 Endurium
-- The Elowan, Thrynn, Spemin and Veloxi have moods: the player's posture calms or angers them, they grovel before a stronger ship, grow tired of talking, and fight or flee once they are too agitated to talk
+- The Elowan, Thrynn, Spemin and Veloxi have moods: the player's posture calms or angers them, they grovel before a stronger ship, grow tired of talking, and fight or flee once they are too agitated to talk; and each race remembers how its last encounters ended, and meets the ship again in that mood
 - The Elowan and the Thrynn hold the crew's friendship with the other race against it, and a crew member of the aliens' own race understands every word they say
 - The Minstrels sing, the Nomad probes transmit their planetary data, and the Noah 9 derelict sends its distress beacon and recorded message
 - A complete combat system with lasers, missiles, shields and armor
