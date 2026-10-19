@@ -28071,6 +28071,9 @@ public class ClaudeProbe : MonoBehaviour
 		var neutral = AnalyzeScan( SensorsDisplay.ScanType.MechanScout );
 
 		pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+		// (the Mechans' mood decides their posture, a fight too: a mood that gives it, fighting from 99)
+		pdEncounter.m_mood = 100.0f;
+		pdEncounter.m_moodSet = true;
 
 		var hostile = AnalyzeScan( SensorsDisplay.ScanType.MechanScout );
 
@@ -28891,6 +28894,9 @@ public class ClaudeProbe : MonoBehaviour
 		controller.m_messages.Clear();
 
 		pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+		// (the Mechans' mood decides their posture, a fight too: a mood that gives it, fighting from 99)
+		pdEncounter.m_mood = 100.0f;
+		pdEncounter.m_moodSet = true;
 
 		yield return Frames( 5 );
 
