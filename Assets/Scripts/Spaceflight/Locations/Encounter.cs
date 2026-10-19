@@ -912,7 +912,6 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_playerHailedFirst = false;
 			m_pdEncounter.m_playerPostures = 0;
 			m_pdEncounter.m_alienHails = 0;
-			m_pdEncounter.m_rivalLineSaid = false;
 			m_pdEncounter.m_distressCalled = false;
 
 			// initialize race encounter
@@ -1450,14 +1449,6 @@ public class Encounter : MonoBehaviour
 			return;
 		}
 
-		// a Thrynn aboard: they say so in place of a greeting, and end the comm link (STRINFO 2.4: "we wouldst have no dealings with thee") - they do not attack
-		if ( DataController.m_instance.m_playerData.m_crewAssignment.HasCrewOfRace( GameData.Race.Thrynn ) && !m_pdEncounter.m_attackedByPlayer )
-		{
-			UpdateElowanNoDealings();
-
-			return;
-		}
-
 		// has the player answered their question about energy?
 		if ( ( m_pdEncounter.m_lastQuestionFromAliens == c_elowanEnergyQuestionCommId ) && ( m_pdEncounter.m_lastSubjectFromPlayer == GD_Comm.Subject.Yes ) )
 		{
@@ -1469,87 +1460,25 @@ public class Encounter : MonoBehaviour
 		DefaultEncounterUpdate();
 	}
 
-	// the Elowan with a Thrynn in the crew: they say their one line for it in place of a hail, and the comm link is not open to the player again in the encounter
-	void UpdateElowanNoDealings()
-	{
-		if ( !m_pdEncounter.m_disconnected )
-		{
-			m_pdEncounter.m_conversationTimer -= Time.deltaTime;
-
-			if ( m_pdEncounter.m_conversationTimer <= 0.0f )
-			{
-				SayRaceComm( c_elowanThrynnAboardCommId );
-
-				if ( m_pdEncounter.m_connected )
-				{
-					Disconnect();
-				}
-				else
-				{
-					m_pdEncounter.m_disconnected = true;
-					m_pdEncounter.m_playerWantsToConnect = false;
-					m_pdEncounter.m_aliensWantToConnect = false;
-				}
-			}
-		}
-
-		UpdateAlienCombat();
-	}
-
-	// what the Elowan and the Thrynn say of a crew that is friends with the other race (STRINFO 2.4 and 2.5): a crew member aboard, or a first comm link opened
-	// with the other race
+	// what the Elowan and the Thrynn say of a crew that is friends with the other race, as a comm link opens (their special actions): one of the other race aboard,
+	// or the other race's base mood in its friendly band (STRINFO 2.4 and 2.5, COMMSPEC-OV WEDA7, WEDDB, WEE3F and WEE73)
 	const int c_elowanThrynnAboardCommId = 1;
-	const int c_elowanThrynnFirstCommId = 2;
+	const int c_elowanFriendsOfThrynnCommId = 2;
 	const int c_thrynnElowanAboardCommId = 297;
-	const int c_thrynnElowanFirstCommId = 298;
+	const int c_thrynnFriendsOfElowanCommId = 298;
 
-	// the rival race of the Elowan or the Thrynn (None for any other race)
-	static GameData.Race GetRivalRace( GameData.Race race )
+	// true if the crew is friends with this race in the other aliens' eyes: the race's base mood is in its friendly band (COMMSPEC-OV WEDDB and WEE73: its
+	// BASE-EDL below its AET)
+	static bool IsFriendOfRace( GameData.Race race )
 	{
-		if ( race == GameData.Race.Elowan )
-		{
-			return GameData.Race.Thrynn;
-		}
+		var personality = AlienPersonality.Find( race );
 
-		if ( race == GameData.Race.Thrynn )
-		{
-			return GameData.Race.Elowan;
-		}
-
-		return GameData.Race.None;
-	}
-
-	// true if the crew is friends with the aliens' rival race: one of the rival race is aboard, or the crew opened a comm link with the rival race first
-	bool IsFriendOfRival()
-	{
-		var rival = GetRivalRace( m_gdEncounter.m_race );
-
-		if ( rival == GameData.Race.None )
+		if ( personality == null )
 		{
 			return false;
 		}
 
-		var playerData = DataController.m_instance.m_playerData;
-
-		return playerData.m_crewAssignment.HasCrewOfRace( rival ) || ( playerData.m_general.m_firstContactRace == rival );
-	}
-
-	// the line the Elowan or the Thrynn say once in an encounter, in place of a greeting, to a crew that is friends with their rival race - null if there is none
-	GD_Comm FindRivalLine()
-	{
-		if ( m_pdEncounter.m_rivalLineSaid || !IsFriendOfRival() )
-		{
-			return null;
-		}
-
-		var rivalAboard = DataController.m_instance.m_playerData.m_crewAssignment.HasCrewOfRace( GetRivalRace( m_gdEncounter.m_race ) );
-
-		if ( m_gdEncounter.m_race == GameData.Race.Elowan )
-		{
-			return FindRaceComm( rivalAboard ? c_elowanThrynnAboardCommId : c_elowanThrynnFirstCommId );
-		}
-
-		return FindRaceComm( rivalAboard ? c_thrynnElowanAboardCommId : c_thrynnElowanFirstCommId );
+		return DataController.m_instance.m_playerData.m_general.GetRaceBaseMood( race, personality.m_startingMood ) < personality.m_friendlyBelow;
 	}
 
 	// the Elowan's question of their own, and their answers to a yes (STRINFO 2.4)
@@ -2038,17 +1967,27 @@ public class Encounter : MonoBehaviour
 
 	// ---------------------------------------------------------------- a race's special actions as the comm link opens (COMMSPEC-OV)
 
-	// what a race asks of the crew as a comm link opens, before anything else its aliens say (COMMSPEC-OV SA-CASE, run by DO-SA): the Veloxi's demands for the
-	// Crystal Orb (CRYSTAL-ORB), the Ellipsoid (WEF36) and a tribute (WF1D2)
+	// what a race asks of the crew, or tells it, as a comm link opens, before anything else its aliens say (COMMSPEC-OV SA-CASE, run by DO-SA): the Veloxi's
+	// demands for the Crystal Orb (CRYSTAL-ORB), the Ellipsoid (WEF36) and a tribute (WF1D2), and the Elowan's and the Thrynn's word for friends of their rival
+	// race (WEDA7, WEDDB, WEE3F, WEE73) - the values are saved (PD_Encounter.m_specialActionAsked), so new ones go at the end
 	public enum SpecialAction
 	{
 		None,
 		VeloxCrystalOrb,
 		VeloxEllipsoid,
-		VeloxTribute
+		VeloxTribute,
+		ElowanThrynnAboard,
+		ElowanFriendsOfThrynn,
+		ThrynnElowanAboard,
+		ThrynnFriendsOfElowan
 	}
 
-	// the Veloxi's special actions, in the order they are run (COMMSPEC-OV SA-CASE)
+	// the Elowan's and the Thrynn's special actions, in the order they are run (COMMSPEC-OV SA-ELOWAN and SA-THRYNN; what the Elowan say once Elan has been
+	// destroyed is UpdateElowanAfterElan's)
+	static readonly SpecialAction[] s_elowanSpecialActions = { SpecialAction.ElowanThrynnAboard, SpecialAction.ElowanFriendsOfThrynn };
+	static readonly SpecialAction[] s_thrynnSpecialActions = { SpecialAction.ThrynnElowanAboard, SpecialAction.ThrynnFriendsOfElowan };
+
+	// the Veloxi's special actions, in the order they are run (COMMSPEC-OV SA-VELOX)
 	static readonly SpecialAction[] s_veloxSpecialActions = { SpecialAction.VeloxCrystalOrb, SpecialAction.VeloxEllipsoid, SpecialAction.VeloxTribute };
 
 	// how long the aliens wait for the answer to a special action, in seconds (COMMSPEC-OV XY/N: TIRED-TIME 60000 ms) - they say nothing else meanwhile
@@ -2062,6 +2001,14 @@ public class Encounter : MonoBehaviour
 	{
 		switch ( m_gdEncounter.m_race )
 		{
+			case GameData.Race.Elowan:
+
+				return s_elowanSpecialActions;
+
+			case GameData.Race.Thrynn:
+
+				return s_thrynnSpecialActions;
+
 			case GameData.Race.Velox:
 
 				return s_veloxSpecialActions;
@@ -2074,12 +2021,29 @@ public class Encounter : MonoBehaviour
 	GD_Comm FindSpecialActionComm( SpecialAction specialAction )
 	{
 		var ship = DataController.m_instance.m_playerData.m_playerShip;
+		var crew = DataController.m_instance.m_playerData.m_crewAssignment;
 
-		// the Veloxi demand the artifacts only when they are not grovelling (COMMSPEC-OV CRYSTAL-ORB and WEF36: A-POSTU above obsequious)
+		// grovelling aliens say none of them but the tribute (COMMSPEC-OV CRYSTAL-ORB, WEF36, WEDA7, WEDDB, WEE3F and WEE73: A-POSTU above obsequious)
 		var grovelling = GetAlienTalkStance() == GD_Comm.Stance.Obsequious;
 
 		switch ( specialAction )
 		{
+			case SpecialAction.ElowanThrynnAboard:
+
+				return ( !grovelling && crew.HasCrewOfRace( GameData.Race.Thrynn ) ) ? FindRaceComm( c_elowanThrynnAboardCommId ) : null;
+
+			case SpecialAction.ElowanFriendsOfThrynn:
+
+				return ( !grovelling && IsFriendOfRace( GameData.Race.Thrynn ) ) ? FindRaceComm( c_elowanFriendsOfThrynnCommId ) : null;
+
+			case SpecialAction.ThrynnElowanAboard:
+
+				return ( !grovelling && crew.HasCrewOfRace( GameData.Race.Elowan ) ) ? FindRaceComm( c_thrynnElowanAboardCommId ) : null;
+
+			case SpecialAction.ThrynnFriendsOfElowan:
+
+				return ( !grovelling && IsFriendOfRace( GameData.Race.Elowan ) ) ? FindRaceComm( c_thrynnFriendsOfElowanCommId ) : null;
+
 			case SpecialAction.VeloxCrystalOrb:
 
 				return ( !grovelling && ship.HasArtifact( "Crystal Orb" ) ) ? FindRaceComm( c_veloxCrystalOrbDemandCommId ) : null;
@@ -2119,6 +2083,15 @@ public class Encounter : MonoBehaviour
 
 			AddComm( GD_Comm.Subject.Custom, false, comm );
 
+			// the rivals' word for friends of the other race asks nothing: they end the comm link and fight (COMMSPEC-OV WEDA7, WEDDB, WEE3F and WEE73: STOP-SA
+			// and WEBB6)
+			if ( !AsksForAnAnswer( specialAction ) )
+			{
+				StopSpecialActionsAndFight();
+
+				return true;
+			}
+
 			// the crew answers it with Yes, No or Terminate (COMMSPEC-OV XY/N)
 			SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.AnswerQuestion );
 
@@ -2131,6 +2104,12 @@ public class Encounter : MonoBehaviour
 		m_pdEncounter.m_specialActionStep = 0;
 
 		return false;
+	}
+
+	// true for a special action that waits for the crew's Yes or No (the Veloxi's demands)
+	static bool AsksForAnAnswer( SpecialAction specialAction )
+	{
+		return ( specialAction == SpecialAction.VeloxCrystalOrb ) || ( specialAction == SpecialAction.VeloxEllipsoid ) || ( specialAction == SpecialAction.VeloxTribute );
 	}
 
 	// the crew's answer to the special action the aliens wait on: Yes, or No - ending the comm link, or no answer in 60 seconds, is a No (COMMSPEC-OV XY/N)
@@ -3341,13 +3320,6 @@ public class Encounter : MonoBehaviour
 
 			m_pdEncounter.m_mood = startingMood + AlienPersonality.GetMeetingMood( DataController.m_instance.m_playerData.m_playerShip );
 			m_pdEncounter.m_moodSet = true;
-
-			// the Elowan and the Thrynn hold the crew's friendship with their rival race against it: they start in their hostile band (decided 2026-10-11),
-			// which for the Elowan is fight or flight, as the original says the rival lines only to aliens past their neutral posture (COMMSPEC-OV: A-POSTU > 1)
-			if ( IsFriendOfRival() )
-			{
-				m_pdEncounter.m_mood = Mathf.Max( m_pdEncounter.m_mood, personality.m_hostileFrom );
-			}
 		}
 	}
 
@@ -4282,19 +4254,6 @@ public class Encounter : MonoBehaviour
 				}
 			}
 
-			// the Elowan and the Thrynn greet a crew that is friends with their rival race with what they think of it, once
-			if ( ( subject == GD_Comm.Subject.GreetingHail ) || ( subject == GD_Comm.Subject.GreetingResponse ) )
-			{
-				var rivalLine = FindRivalLine();
-
-				if ( rivalLine != null )
-				{
-					m_pdEncounter.m_rivalLineSaid = true;
-
-					return rivalLine;
-				}
-			}
-
 			// cowardly aliens say each of their surrender lines for the subject first, in whichever stance the game data has it (the Thrynn's is neutral)
 			if ( m_pdEncounter.m_aliensAreCowardly )
 			{
@@ -4861,14 +4820,6 @@ public class Encounter : MonoBehaviour
 		m_pdEncounter.m_alienPhrases = 0;
 
 		DrawPhraseLimit();
-
-		// the first comm link with the Thrynn or the Elowan is remembered for the rest of the game
-		var playerGeneral = DataController.m_instance.m_playerData.m_general;
-
-		if ( ( playerGeneral.m_firstContactRace == GameData.Race.None ) && ( GetRivalRace( m_gdEncounter.m_race ) != GameData.Race.None ) )
-		{
-			playerGeneral.m_firstContactRace = m_gdEncounter.m_race;
-		}
 
 		// a comm link that opens now runs the race's special actions first, at every opening (COMMSPEC-OV DO-SA) - not one shown again from a save file
 		if ( !m_pdEncounter.m_connected )
