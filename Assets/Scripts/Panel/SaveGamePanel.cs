@@ -96,7 +96,7 @@ public class SaveGamePanel : Panel
 		"Built on the Starflight Remake Project by Marvin Herbold, released into the public domain.\n" +
 		"With thanks to the Starflight Remake Project's Jeff Graw, Sebastian Macke, Michael Gams, Daniel Blakeley, Stephen A Rogers, Aaron Diggens and the Planet Map Project.\n\n" +
 		"Starflight (1986) was created by Binary Systems and published by Electronic Arts. This is an unofficial, free fan project, not affiliated with or endorsed by either company.\n\n" +
-		"Music: ambiences by Tabletop Audio (tabletopaudio.com), under Creative Commons Attribution-NonCommercial-NoDerivatives 4.0.\n" +
+		"Music: made for this port.\n" +
 		"Sound effects: \"Laser Shot Big 4\" and \"Laser Shot Silenced\" by bubaproducer (freesound.org), under Creative Commons Attribution 4.0; \"explosion05\" by V-ktor (freesound.org), under CC0.\n" +
 		"Fonts: Orbitron, Rajdhani and Share Tech Mono, under the SIL Open Font License.";
 
