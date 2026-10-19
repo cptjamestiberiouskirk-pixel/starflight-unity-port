@@ -408,10 +408,65 @@ public class Encounter : MonoBehaviour
 	}
 
 	// the player has flown out of the encounter - go back to where the ship was when the encounter began
-	// the Crystal Pearl has warped the ship out of the encounter - it leaves the encounter the way it would by flying out of it
-	public void WarpOut()
+	// the Crystal Pearl is "an automatic warp-out device for when a ship is heavily damaged" (the Thrynn): the original's MANEUVER asks it first (HYPERMSG-OV ?PRL):
+	// in an encounter with armed aliens and a living alien ship, not the police, with the Pearl (artifact 13) aboard and the ship heavily damaged (SCIENCE ?HEAVY:
+	// the status display's damage under 50, PD_PlayerShip.GetOverallIntegrity) - true if it fires
+	public bool CrystalPearlFires()
 	{
-		LeaveEncounter();
+		var playerData = DataController.m_instance.m_playerData;
+
+		if ( ( m_pdEncounter == null ) || ( m_gdEncounter == null ) || ( playerData.m_general.m_location != PD_General.Location.Encounter ) )
+		{
+			return false;
+		}
+
+		return AliensAreArmed() && ( GetAlienShipsPresent() > 0 ) && ( m_gdEncounter.m_race != GameData.Race.InterstelPolice ) && playerData.m_playerShip.HasArtifact( "Crystal Pearl" ) && ( playerData.m_playerShip.GetOverallIntegrity() < c_crystalPearlHeavyDamage );
+	}
+
+	// the integrity under which the ship is heavily damaged (SCIENCE ?HEAVY: WE760 < 50)
+	const int c_crystalPearlHeavyDamage = 50;
+
+	// how far off the place the Crystal Pearl draws the ship comes out, in the original's units (JMPSHP: RCOLLIDE + 1)
+	const float c_crystalPearlStepUnits = 4.0f;
+
+	// the Crystal Pearl fires: it pulses, the encounter ends as it always does, and the ship goes out to hyperspace, to a place drawn anywhere on the map and a step
+	// off it in one of the eight directions, its navigator's bearings lost for a while (HYPERMSG-OV ?PRL: THE CRYSTAL PEARL IS PULSING!, the unnests to hyperspace,
+	// then JMPSHP: RRND 0 2000 and RRND 0 1760 of the original's units, 8 to a map coordinate, and NAV-TIME)
+	public void WarpWithCrystalPearl()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		controller.m_messages.Clear();
+		controller.m_messages.AddText( "<color=yellow>The Crystal Pearl is pulsing!</color>" );
+
+		// the encounter ends as every encounter does: the race remembers it, the shields are charged again, and a minute without another one unless it began in
+		// orbit
+		RememberRaceMood();
+
+		playerData.m_playerShip.RechargeShieldsFully();
+
+		if ( playerData.m_general.m_lastLocation != PD_General.Location.InOrbit )
+		{
+			controller.HoldOffEncounters();
+		}
+
+		SayLeavingEncounter();
+
+		// nothing that is still in the air follows the ship
+		CombatController.m_instance.ClearMissiles();
+
+		// the place, in the original's units
+		var directions = new[] { new Vector3( 1.0f, 0.0f, 0.0f ), new Vector3( 1.0f, 0.0f, 1.0f ), new Vector3( 0.0f, 0.0f, 1.0f ), new Vector3( -1.0f, 0.0f, 1.0f ), new Vector3( -1.0f, 0.0f, 0.0f ), new Vector3( -1.0f, 0.0f, -1.0f ), new Vector3( 0.0f, 0.0f, -1.0f ), new Vector3( 1.0f, 0.0f, -1.0f ) };
+		var units = new Vector3( Random.Range( 0, 2000 ), 0.0f, Random.Range( 0, 1760 ) ) + directions[ Random.Range( 0, directions.Length ) ] * c_crystalPearlStepUnits;
+
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( units / 8.0f );
+		playerData.m_general.m_currentSpeed = 0.0f;
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		// and the navigator has lost the ship's bearings, as after a flux
+		controller.LoseBearings();
 	}
 
 	void LeaveEncounter()
@@ -421,6 +476,9 @@ public class Encounter : MonoBehaviour
 
 		// the race remembers how this encounter left it
 		RememberRaceMood();
+
+		// the Mysterions, the Nomad probes and the Minstrels move on
+		MoveOn();
 
 		// the encounter's end refills the shields, as the original's (HYPER-OV ENCCLEANUP, CHARGE-D: class x 500)
 		playerData.m_playerShip.RechargeShieldsFully();
@@ -448,12 +506,22 @@ public class Encounter : MonoBehaviour
 
 			case PD_General.Location.InOrbit:
 
-				// in orbit around a planet - did the aliens let the ship into orbit (a veloxi drone that was answered correctly)?
-				if ( SpaceflightController.m_instance.HasOrbitPermission( m_pdEncounter.m_encounterId ) )
+				// in orbit around a planet - does the ship go back into orbit (a veloxi drone that was answered correctly, the Noah 9 derelict, or a fleet whose
+				// ships are all destroyed)?
+				if ( EndsBackInOrbit() )
 				{
-					// yes - the encounter ends first, then the ship is back in orbit, which says "...Orbit established." (the encounter does not begin again
-					// while the ship stays in this star system)
+					// yes - the derelict does not begin again until the ship leaves orbit (a drone's permission lasts the visit to the star system, and a fleet with
+					// no ship left never begins again)
+					if ( !SpaceflightController.m_instance.HasOrbitPermission( m_pdEncounter.m_encounterId ) && !playerData.m_general.GetOrbitEncountersEnded().Contains( m_pdEncounter.m_encounterId ) )
+					{
+						playerData.m_general.GetOrbitEncountersEnded().Add( m_pdEncounter.m_encounterId );
+					}
+
+					// the encounter ends first, then the orbital maneuver, and the ship is back in orbit, which says "...Orbit established." (WF022: OSET, the
+					// original's INITIATING ORBITAL MANEUVER... and ...ORBIT ESTABLISHED)
 					SayLeavingEncounter();
+
+					SpaceflightController.m_instance.m_messages.AddText( "<color=white>Initiating orbital maneuver...</color>" );
 
 					SpaceflightController.m_instance.SwitchLocation( PD_General.Location.InOrbit );
 
@@ -479,6 +547,62 @@ public class Encounter : MonoBehaviour
 		}
 
 		SayLeavingEncounter();
+	}
+
+	// true if an encounter that began in orbit ends back in orbit rather than out in the star system: one that has let the ship into orbit, the Noah 9 derelict, and
+	// a fleet whose ships are all destroyed unless it is a fleet of 255 (HYPER-OV ENCCLEANUP: SKIP2NEST for species 19, and when WDA56 is off - MAX#SHIPS less
+	// #SHIPS-DESTROYED is none and MAX#SHIPS is not 255 - for an encounter entered from orbit)
+	bool EndsBackInOrbit()
+	{
+		if ( ( m_pdEncounter == null ) || ( m_gdEncounter == null ) )
+		{
+			return false;
+		}
+
+		return SpaceflightController.m_instance.HasOrbitPermission( m_pdEncounter.m_encounterId ) || ( m_gdEncounter.m_race == GameData.Race.NoahDerelict ) || ( !m_pdEncounter.HasLivingAlienShips() && ( m_gdEncounter.m_maxNumShips != 255 ) );
+	}
+
+	// Maneuver leaves at once an encounter from orbit that lets the ship back into orbit from its start: the Noah 9 derelict, and a drone that has let the ship
+	// into orbit (the original's MANEUVER: with SKIP2NEST on, UNNEST) - returns true if it did
+	public bool ManeuverBackIntoOrbit()
+	{
+		if ( ( m_pdEncounter == null ) || ( m_gdEncounter == null ) || ( DataController.m_instance.m_playerData.m_general.m_lastLocation != PD_General.Location.InOrbit ) )
+		{
+			return false;
+		}
+
+		if ( ( m_gdEncounter.m_race != GameData.Race.NoahDerelict ) && !SpaceflightController.m_instance.HasOrbitPermission( m_pdEncounter.m_encounterId ) )
+		{
+			return false;
+		}
+
+		LeaveEncounter();
+
+		return true;
+	}
+
+	// the Mysterions, the Nomad probes and the Minstrels move on to anywhere in hyperspace after each encounter, and keep how far they are from home (HYPER-OV
+	// ENCCLEANUP: WDC19 gives species 4, 5 and 11 a place of RRND 0 to 2000 and RRND 0 to 1760 of the original's units, 8 to a map coordinate; their displacement
+	// from home is left as it was) - all of them are groups of hyperspace
+	void MoveOn()
+	{
+		var race = m_gdEncounter.m_race;
+
+		if ( ( race != GameData.Race.Mysterion ) && ( race != GameData.Race.NomadProbe ) && ( race != GameData.Race.Minstrel ) )
+		{
+			return;
+		}
+
+		if ( m_pdEncounter.GetLocation() != PD_General.Location.Hyperspace )
+		{
+			return;
+		}
+
+		var place = Tools.GameToWorldCoordinates( new Vector3( Random.Range( 0, 2000 ) / 8.0f, 0.0f, Random.Range( 0, 1760 ) / 8.0f ) );
+		var move = place - m_pdEncounter.m_currentCoordinates;
+
+		m_pdEncounter.m_currentCoordinates = place;
+		m_pdEncounter.m_homeCoordinates += move;
 	}
 
 	// say so, as the original does ("LEAVING ENCOUNTER..." and "...ENCOUNTER TERMINATED", made in STARB.COM as "LEAVING STARPORT..." and "...STARPORT CLEAR" are)
@@ -845,6 +969,10 @@ public class Encounter : MonoBehaviour
 			// combat rules read from RaceTalks)
 			m_pdEncounter.m_combatTurn = 0;
 			m_pdEncounter.m_aliensOpenedFire = false;
+
+			// the Shimmering Ball is off until Combat is entered (HYPER-OV ENCSETUP: CLEAR-CO)
+			CombatController.m_instance.ResetShimmeringBall();
+
 			m_pdEncounter.m_secondsSinceAlienFire = 0.0f;
 			m_pdEncounter.m_commTerminated = false;
 

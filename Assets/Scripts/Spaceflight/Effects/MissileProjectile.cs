@@ -21,6 +21,9 @@ public class MissileProjectile : MonoBehaviour
 	// the target transform (for homing)
 	Transform m_targetTransform;
 
+	// how far off the target transform this missile aims (the Shimmering Ball's jitter of a plasma bolt), none unless set
+	Vector3 m_targetOffset;
+
 	// callback when missile hits
 	System.Action<Vector3, bool> m_onHitCallback;
 
@@ -190,7 +193,7 @@ public class MissileProjectile : MonoBehaviour
 		// update target position if we have a transform
 		if ( m_targetTransform != null )
 		{
-			m_targetPosition = m_targetTransform.position;
+			m_targetPosition = m_targetTransform.position + m_targetOffset;
 		}
 
 		// calculate direction to target
@@ -216,11 +219,18 @@ public class MissileProjectile : MonoBehaviour
 	/// <summary>
 	/// Fire the missile at a target position.
 	/// </summary>
+	// aims a missile that follows its target this far off it
+	public void SetTargetOffset( Vector3 offset )
+	{
+		m_targetOffset = offset;
+	}
+
 	public void Fire( Vector3 startPosition, Vector3 targetPosition, System.Action<Vector3, bool> onHitCallback )
 	{
 		transform.position = startPosition;
 		m_targetPosition = targetPosition;
 		m_targetTransform = null;
+		m_targetOffset = Vector3.zero;
 		m_onHitCallback = onHitCallback;
 		m_lifetime = 0.0f;
 		m_isActive = true;
@@ -241,6 +251,7 @@ public class MissileProjectile : MonoBehaviour
 		transform.position = startPosition;
 		m_targetTransform = targetTransform;
 		m_targetPosition = targetTransform.position;
+		m_targetOffset = Vector3.zero;
 		m_onHitCallback = onHitCallback;
 		m_lifetime = 0.0f;
 		m_isActive = true;

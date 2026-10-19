@@ -283,6 +283,13 @@ public class PlayerCamera : MonoBehaviour
 	// the terrain is there below the ship: the original says so then, after the autopilot (ORBIT-OV, DESCEND: "TOPOGRAPHY NET LOCKED ON" when the grid shows)
 	public void TopographyNetLockedOn()
 	{
+		// a landing without the fuel for it: the window is cleared and the crash told first (ORBIT-OV DESCEND: ?FUEL-DIE, CTERASE, OUT OF FUEL! CRASH IMMINENT!)
+		if ( SpaceflightController.m_instance.m_landingCrashes )
+		{
+			SpaceflightController.m_instance.m_messages.Clear();
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Out of fuel! Crash imminent!</color>" );
+		}
+
 		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Topography net locked on.</color>" );
 
 		SoundController.m_instance.PlaySound( SoundController.Sound.Update );

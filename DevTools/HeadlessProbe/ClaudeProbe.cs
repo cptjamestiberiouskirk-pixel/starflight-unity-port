@@ -1754,6 +1754,22 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioDroneNumbers();
 				break;
 
+			case "flaresterilises":
+				yield return ScenarioFlareSterilises();
+				break;
+
+			case "crashline":
+				yield return ScenarioCrashLine();
+				break;
+
+			case "moveon":
+				yield return ScenarioMoveOn();
+				break;
+
+			case "orbitreturn":
+				yield return ScenarioOrbitReturn();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -14746,9 +14762,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "orbit: the way out of an encounter that began in a star system or in hyperspace is unchanged (control)", ( locationBefore == PD_General.Location.StarSystem ) && ( locationAfterSystemEncounter == PD_General.Location.StarSystem ) && ( Vector3.Distance( systemMove, Vector3.right * range ) < 0.01f ) && ( locationAfterHyperspaceEncounter != PD_General.Location.Encounter ) && ( Vector3.Distance( hyperspaceMove, Vector3.right * range ) < 0.01f ), "star system: " + locationAfterSystemEncounter + " moved " + systemMove + " | hyperspace: " + locationAfterHyperspaceEncounter + " moved " + hyperspaceMove + " | expected (" + range.ToString( "F1" ) + ", 0, 0)" );
 
-		// ---- the star of encounter 316 (a derelict in orbit 3 of star 30, and no other encounter in that star system)
-		const int c_encounterId = 316;
-		const int c_starId = 30;
+		// ---- the star of encounter 302 (a Veloxi drone in orbit 5 of star 29, and no other encounter in that star system; the Noah 9 derelict, which this used,
+		// lets the ship back into orbit since roadmap 8.13: probe orbitreturn)
+		const int c_encounterId = 302;
+		const int c_starId = 29;
 
 		var theEncounter = gameData.m_encounterList[ c_encounterId ];
 
@@ -14794,7 +14811,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var locationAtOtherPlanet = playerData.m_general.m_location;
 
-		// ---- 2. into orbit around the planet the derelict is at
+		// ---- 2. into orbit around the planet the drone is at
 		var exceptionsBefore = s_exceptionCount;
 
 		yield return EnterOrbit( guardedPlanetId );
@@ -14853,7 +14870,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "orbit: an encounter from orbit ends at the level of the star system, where the ship was", ( locationAfterLeaving == "StarSystem" ) && ( movedBy == 0.0f ) && ( locationLater == "StarSystem" ), locationAfterLeaving + ", moved " + movedBy.ToString( "F1" ) + ", later " + locationLater );
 
-		// ---- 4. back into orbit: the derelict is still there, so the encounter begins again
+		// ---- 4. back into orbit: the drone is still there, so the encounter begins again
 		var locationSecondTime = "not tried";
 
 		if ( encounterBegun )
@@ -19458,6 +19475,33 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 4: the Crystal Pearl
 
+	// every system and the hull at this health (the status display's damage reads them all: PD_PlayerShip.GetOverallIntegrity)
+	static void SetAllSystemsHealth( int health )
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+
+		for ( var system = (PD_PlayerShip.ShipSystem) 0; system < PD_PlayerShip.ShipSystem.Count; system++ )
+		{
+			ship.SetSystemHealth( system, health );
+		}
+	}
+
+	// Maneuver pressed in the current encounter, and where the ship is a few frames later
+	IEnumerator ManeuverIn( PD_General.Location[] where )
+	{
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		new ManeuverButton().Execute();
+
+		yield return Frames( 10 );
+
+		where[ 0 ] = DataController.m_instance.m_playerData.m_general.m_location;
+	}
+
+	// the Crystal Pearl as the original's (starflt MANEUVER: ?PRL first, before the engines' check; HYPERMSG-OV ?PRL, SCIENCE ?HEAVY): with the Pearl aboard, in an
+	// encounter with armed aliens, a living alien ship, not the police, and the ship heavily damaged (its overall integrity under 50), Maneuver says "The Crystal
+	// Pearl is pulsing!" and the ship goes out to hyperspace and on to a place drawn anywhere on the map (JMPSHP), its navigator's bearings lost; a hit never
+	// warps it. The code before warped the ship out on any hit that left less than a tenth of the armor or would have destroyed the hull, and Maneuver did nothing
 	IEnumerator ScenarioCrystalPearl()
 	{
 		var dataController = DataController.m_instance;
@@ -19465,78 +19509,142 @@ public class ClaudeProbe : MonoBehaviour
 		var gameData = dataController.m_gameData;
 		var ship = playerData.m_playerShip;
 		var combat = CombatController.m_instance;
+		var controller = SpaceflightController.m_instance;
 		var pearlId = gameData.FindArtifactId( "Crystal Pearl" );
-		var speminId = FindEncounter( 1, 6, 3, 0 );
-
-		// class 1 armor (500 points): a chunk takes its own size off it ((6 - 1) / 5), so a hit takes about its own size (its last chunk is at least 10 points)
-		ship.m_armorClass = 1;
-
-		var maximum = ship.GetMaximumArmorPoints();
+		var uhlekId = FindEncounterOfRace( GameData.Race.Uhlek );
+		var where = new PD_General.Location[ 1 ];
 
 		EnsureCrew();
 
+		// a navigator of skill 100, who loses the ship's bearings for 75 s after a jump ((250 - skill) / 2 s: none at 250, the probe's usual navigator)
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Navigator ).m_navigation = 100;
+
+		// class 1 armor (500 points), the shields down, the Pearl aboard
+		ship.m_armorClass = 1;
 		ship.m_shieldsAreUp = false;
+
+		var maximum = ship.GetMaximumArmorPoints();
 
 		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( pearlId ) != null ); guard++ )
 		{
 			ship.RemoveArtifact( pearlId );
 		}
 
-		// ---- 1. the control: without the Crystal Pearl a ship hit down to about a twentieth of its armor stays in the encounter
+		ship.AddArtifact( pearlId );
+
+		UnityEngine.Random.InitState( 8642 );
+
+		// ---- 1. a hit down to a twentieth of the armor: the ship stays in the encounter (the Uhlek: they fight, so they are armed)
 		ship.m_armorPoints = maximum;
 
-		EnterEncounter( speminId );
+		EnterEncounter( uhlekId );
 		yield return Frames( 10 );
 
 		combat.ApplyDamageToPlayer( maximum - maximum / 20, Vector3.forward );
 
 		yield return Frames( 10 );
 
-		var locationWithout = playerData.m_general.m_location;
-		var armorWithout = ship.m_armorPoints;
+		var afterHit = playerData.m_general.m_location;
 
 		ClearMissiles();
-		LeaveEncounter();
+
+		// ---- 2. heavily damaged (every system and the hull at 40), Maneuver: out to hyperspace, somewhere on the map, the bearings lost
+		// (armor enough for the Uhlek's plasma bolts meanwhile, 4000 a bolt)
+		ship.m_armorPoints = 100000;
+		SetAllSystemsHealth( 40 );
+
+		if ( playerData.m_general.m_location != PD_General.Location.Encounter )
+		{
+			EnterEncounter( uhlekId );
+			yield return Frames( 10 );
+		}
+
+		var armed = controller.m_encounter.AliensAreArmed();
+
+		yield return ManeuverIn( where );
+
+		var afterManeuver = where[ 0 ];
+		var pulsing = MessageList().Contains( "Crystal Pearl is pulsing" );
+		var bearingsLost = controller.HasLostBearings();
+		var places = new List<Vector3>();
+
+		places.Add( Tools.WorldToGameCoordinates( playerData.m_general.m_coordinates ) );
+
+		// ---- 3. three more times: a new place each time
+		for ( var i = 0; i < 3; i++ )
+		{
+			ClearMissiles();
+			EnterEncounter( uhlekId );
+			yield return Frames( 10 );
+
+			yield return ManeuverIn( where );
+
+			places.Add( Tools.WorldToGameCoordinates( playerData.m_general.m_coordinates ) );
+		}
+
+		var allOnTheMap = places.TrueForAll( place => ( place.x >= -1.0f ) && ( place.x <= 251.0f ) && ( place.z >= -1.0f ) && ( place.z <= 221.0f ) );
+		var allDifferent = true;
+
+		for ( var i = 0; i < places.Count; i++ )
+		{
+			for ( var j = i + 1; j < places.Count; j++ )
+			{
+				allDifferent = allDifferent && ( Vector3.Distance( places[ i ], places[ j ] ) > 1.0f );
+			}
+		}
+
+		// ---- 4. the engines broken down: the Pearl still fires (it comes before the engines' check)
+		ClearMissiles();
+		EnterEncounter( uhlekId );
 		yield return Frames( 10 );
 
-		// ---- 2. with the Crystal Pearl the same hit warps the ship out of the encounter, with the armor it has left
+		ship.SetInoperative( PD_PlayerShip.ShipSystem.Engines, true );
+
+		yield return ManeuverIn( where );
+
+		var withEnginesDown = where[ 0 ];
+
+		ship.SetInoperative( PD_PlayerShip.ShipSystem.Engines, false );
+
+		// ---- 5. the controls: integrity 60, and no Pearl - Maneuver leaves the ship in the encounter
+		ClearMissiles();
+		EnterEncounter( uhlekId );
+		yield return Frames( 10 );
+
+		SetAllSystemsHealth( 60 );
+
+		yield return ManeuverIn( where );
+
+		var lightlyDamaged = where[ 0 ];
+
+		SetAllSystemsHealth( 40 );
+		ship.RemoveArtifact( pearlId );
+
+		yield return ManeuverIn( where );
+
+		var noPearl = where[ 0 ];
+
+		// ---- 6. last, the Pearl aboard and a hit that destroys the hull: the ship is lost (nothing rescues it)
 		ship.AddArtifact( pearlId );
+		SetAllSystemsHealth( 100 );
 		ship.m_armorPoints = maximum;
-
-		EnterEncounter( speminId );
-		yield return Frames( 10 );
-
-		SpaceflightController.m_instance.m_messages.Clear();
-
-		combat.ApplyDamageToPlayer( maximum - maximum / 20, Vector3.forward );
-
-		yield return Frames( 10 );
-
-		var locationWith = playerData.m_general.m_location;
-		var armorWith = ship.m_armorPoints;
-		var warpText = MessageList();
-
-		// ---- 3. and a hit that would destroy the ship (its hull) warps it out with the hull at 1 point of its integrity
-		ship.m_armorPoints = maximum;
-
-		EnterEncounter( speminId );
-		yield return Frames( 10 );
 
 		DestroyWithAHit( 10 );
 
 		yield return Frames( 10 );
 
-		var locationAfterLethal = playerData.m_general.m_location;
-		var armorAfterLethal = ship.GetHullIntegrity();
 		var destroyed = combat.PlayerIsDestroyed();
 
-		Log( "crystalpearl: a hit down to about " + ( maximum / 20 ) + " of " + maximum + " armor points without the Pearl: " + locationWithout + " with " + armorWithout + " | with the Pearl: " + locationWith + " with " + armorWith + " (" + warpText + ") | a hit that destroys the hull with the Pearl: " + locationAfterLethal + " with the hull at " + armorAfterLethal + ", destroyed " + destroyed );
+		Log( "crystalpearl: a hit to a twentieth of the armor: " + afterHit + " | heavily damaged, aliens armed " + armed + ", Maneuver: " + afterManeuver + ", pulsing " + pulsing + ", bearings lost " + bearingsLost + " | places " + string.Join( " ", places.ConvertAll( place => place.x.ToString( "F0" ) + "," + place.z.ToString( "F0" ) ) ) + " | engines down: " + withEnginesDown + " | integrity 60: " + lightlyDamaged + " | no Pearl: " + noPearl + " | a lethal hit with the Pearl: destroyed " + destroyed );
 
-		Check( "crystalpearl: without the Crystal Pearl a critically wounded ship stays in the encounter (control)", ( locationWithout == PD_General.Location.Encounter ) && ( armorWithout > 0 ) && ( armorWithout * 10 < maximum ), locationWithout + ", " + armorWithout );
-		Check( "crystalpearl: with the Crystal Pearl a critically wounded ship is warped out of the encounter", ( locationWith != PD_General.Location.Encounter ) && ( armorWith > 0 ) && ( armorWith * 10 < maximum ) && warpText.Contains( "Crystal Pearl" ), locationWith + ", " + armorWith + " | " + warpText );
-		Check( "crystalpearl: with the Crystal Pearl a hit that would destroy the ship warps it out with the hull at 1 point of its integrity", ( locationAfterLethal != PD_General.Location.Encounter ) && ( armorAfterLethal == 1 ) && !destroyed, locationAfterLethal + ", hull " + armorAfterLethal + ", " + destroyed );
+		Check( "crystalpearl: a hit never warps the ship out, however low the armor (control of the old rule's case)", afterHit == PD_General.Location.Encounter, afterHit.ToString() );
+		Check( "crystalpearl: heavily damaged, Maneuver with the Pearl: The Crystal Pearl is pulsing!, out to hyperspace, the bearings lost (MANEUVER ?PRL, JMPSHP)", armed && ( afterManeuver == PD_General.Location.Hyperspace ) && pulsing && bearingsLost, armed + ", " + afterManeuver + ", " + pulsing + ", " + bearingsLost );
+		Check( "crystalpearl: each time to a new place somewhere on the hyperspace map", allOnTheMap && allDifferent, string.Join( " ", places.ConvertAll( place => place.x.ToString( "F0" ) + "," + place.z.ToString( "F0" ) ) ) );
+		Check( "crystalpearl: the Pearl fires with the engines broken down (before the engines' check)", withEnginesDown == PD_General.Location.Hyperspace, withEnginesDown.ToString() );
+		Check( "crystalpearl: with the ship's integrity at 60, or without the Pearl, Maneuver leaves it in the encounter (controls)", ( lightlyDamaged == PD_General.Location.Encounter ) && ( noPearl == PD_General.Location.Encounter ), lightlyDamaged + ", " + noPearl );
+		Check( "crystalpearl: a hit that destroys the hull destroys the ship, Pearl or not", destroyed, destroyed.ToString() );
 
-		Finish( "scenario=crystalpearl without=" + locationWithout + "/" + armorWithout + " with=" + locationWith + "/" + armorWith + " lethal=" + locationAfterLethal + "/" + armorAfterLethal + "/" + destroyed, 0 );
+		Finish( "scenario=crystalpearl checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- the artifact the aliens chase: the Crystal Pearl (roadmap 8.11; phase 4 gave it to the Dodecahedron)
@@ -19645,19 +19753,25 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 4: the Shimmering Ball
 
+	// the Shimmering Ball as the original's (COMBAT-OV WF414, WE96B, WE911): entering Combat with the Ball aboard says "Cloaking device now active" and, until the
+	// encounter ends, puts RRND -1 to 2 cells on each axis of every alien laser's, missile's and plasma bolt's aim; a laser that misses the ship's cell says "Laser
+	// missed us!" and does nothing (WECC7), so one in nine hits. The code before cloaked the ship whenever the Ball was aboard: no alien could fire at all, except for
+	// 3 s after each shot of the player's
 	IEnumerator ScenarioShimmeringBall()
 	{
 		var dataController = DataController.m_instance;
 		var playerData = dataController.m_playerData;
 		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
 		var ship = playerData.m_playerShip;
 		var combat = CombatController.m_instance;
 		var ballId = gameData.FindArtifactId( "Shimmering Ball" );
 
 		EnsureCrew();
 
-		// a ship that can fire its laser, and no Shimmering Ball to begin with
+		// a ship that can fire its laser, its weapons armed, and no Shimmering Ball to begin with
 		ship.m_laserCannonClass = 1;
+		ship.m_weaponsAreArmed = true;
 		ship.AddElement( 5, 50 );
 
 		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( ballId ) != null ); guard++ )
@@ -19665,13 +19779,20 @@ public class ClaudeProbe : MonoBehaviour
 			ship.RemoveArtifact( ballId );
 		}
 
+		// a vessel with a laser and no missile, and one with a missile and no plasma bolts
 		GD_Vessel laserVessel = null;
+		GD_Vessel missileVessel = null;
 
 		foreach ( var vessel in gameData.m_vesselList )
 		{
-			if ( ( laserVessel == null ) && !vessel.m_hasPlasmaBolts && ( vessel.m_laserClass > 0 ) )
+			if ( ( laserVessel == null ) && !vessel.m_hasPlasmaBolts && ( vessel.m_laserClass > 0 ) && ( vessel.m_missileClass <= 0 ) )
 			{
 				laserVessel = vessel;
+			}
+
+			if ( ( missileVessel == null ) && !vessel.m_hasPlasmaBolts && ( vessel.m_missileClass > 0 ) )
+			{
+				missileVessel = vessel;
 			}
 		}
 
@@ -19682,39 +19803,102 @@ public class ClaudeProbe : MonoBehaviour
 
 		var alienShip = playerData.FindEncounter( speminId ).GetAlienShipList()[ 0 ];
 
-		// ---- 1. the control: without the Shimmering Ball an alien laser hits
-		var hitWithout = ArmorLostToOneShot( alienShip, laserVessel );
+		UnityEngine.Random.InitState( 2468 );
 
-		// ---- 2. with the Shimmering Ball in the hold the aliens cannot fire at the cloaked ship
+		// ---- 1. the control: without the Shimmering Ball every alien laser shot hits
+		var hitsWithout = LaserHits( alienShip, laserVessel, 30 );
+
+		// ---- 2. the Ball aboard, Combat not entered: every shot hits
 		ship.AddArtifact( ballId );
 
-		var hitCloaked = ArmorLostToOneShot( alienShip, laserVessel );
+		var hitsBallNoCombat = LaserHits( alienShip, laserVessel, 30 );
 
-		// ---- 3. a shot of the player drops the cloak: the aliens can fire back
+		// ---- 3. Combat entered: "Cloaking device now active", and one shot in nine hits; a miss says "Laser missed us!"
+		controller.m_messages.Clear();
+
+		var enteredCombat = new CombatButton().Execute();
+		var cloakingSaid = MessageList().Contains( "Cloaking device now active" );
+
+		controller.m_messages.Clear();
+
+		var hitsInCombat = LaserHits( alienShip, laserVessel, 180 );
+		var missedSaid = MessageList().Contains( "Laser missed us!" );
+
+		// ---- 4. a shot of the player's changes nothing: still about one in nine
 		combat.SetTarget( FirstLivingAlien() );
 
 		BringAliensClose();
 
 		var laserFired = combat.FirePlayerLaser();
-		var hitAfterFiring = ArmorLostToOneShot( alienShip, laserVessel );
+		var hitsAfterFiring = LaserHits( alienShip, laserVessel, 90 );
 
-		// ---- 4. and a few seconds later the ship is cloaked again
-		yield return new WaitForSecondsRealtime( 4.0f );
+		// ---- 5. missiles: each aimed at the ship's cell plus -1 to 1 cells on each axis
+		var offsets = new HashSet<string>();
+		var offsetsOnTheGrid = true;
 
-		var hitLater = ArmorLostToOneShot( alienShip, laserVessel );
+		for ( var i = 0; i < 40; i++ )
+		{
+			// (the game's own clearing, which also counts the aliens' missiles in the air down to none)
+			combat.ClearMissiles();
+
+			combat.AlienLaunchesMissile( alienShip, missileVessel );
+
+			foreach ( var missile in UnityEngine.Object.FindObjectsByType<MissileProjectile>( FindObjectsSortMode.None ) )
+			{
+				var target = (Vector3) GetField( missile, "m_targetPosition" );
+				var offset = target - SpaceflightController.m_instance.m_playerShip.transform.position;
+				var x = Mathf.RoundToInt( offset.x );
+				var z = Mathf.RoundToInt( offset.z );
+
+				offsetsOnTheGrid = offsetsOnTheGrid && ( ( x == 0 ) || ( Mathf.Abs( x ) == 80 ) ) && ( ( z == 0 ) || ( Mathf.Abs( z ) == 80 ) );
+				offsets.Add( x + "," + z );
+			}
+		}
+
+		combat.ClearMissiles();
+
+		// ---- 6. a new encounter, Combat not entered: every shot hits again
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		EnterEncounter( speminId );
+		yield return Frames( 10 );
+
+		alienShip = playerData.FindEncounter( speminId ).GetAlienShipList()[ 0 ];
+
+		var hitsNewEncounter = LaserHits( alienShip, laserVessel, 30 );
 
 		ClearMissiles();
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		Log( "shimmeringball: one laser shot of a " + laserVessel.m_name + ": without the Shimmering Ball " + hitWithout + ", cloaked " + hitCloaked + ", right after the player fired (fired " + laserFired + ") " + hitAfterFiring + ", 4 s later " + hitLater );
+		Log( "shimmeringball: laser shots of a " + laserVessel.m_name + " that hit: without the Ball " + hitsWithout + "/30, with it but Combat not entered " + hitsBallNoCombat + "/30, in Combat (entered " + enteredCombat + ", cloaking said " + cloakingSaid + ") " + hitsInCombat + "/180 (missed said " + missedSaid + "), after the player fired (" + laserFired + ") " + hitsAfterFiring + "/90, in a new encounter " + hitsNewEncounter + "/30; missile aim offsets " + string.Join( " ", offsets ) );
 
-		Check( "shimmeringball: without the Shimmering Ball an alien laser hits (control)", hitWithout > 0, hitWithout.ToString() );
-		Check( "shimmeringball: with the Shimmering Ball the aliens cannot fire at the cloaked ship", hitCloaked == 0, hitCloaked.ToString() );
-		Check( "shimmeringball: a shot of the player drops the cloak, and the aliens can fire back", laserFired && ( hitAfterFiring > 0 ), laserFired + ", " + hitAfterFiring );
-		Check( "shimmeringball: a few seconds after the player's shot the ship is cloaked again", hitLater == 0, hitLater.ToString() );
+		Check( "shimmeringball: without the Shimmering Ball every alien laser shot hits (control)", hitsWithout == 30, hitsWithout + "/30" );
+		Check( "shimmeringball: with the Ball aboard but Combat not entered, every shot hits (WDE41 is set on entering Combat)", hitsBallNoCombat == 30, hitsBallNoCombat + "/30" );
+		Check( "shimmeringball: entering Combat with the Ball says Cloaking device now active (COMBAT-OV WF414)", enteredCombat && cloakingSaid, enteredCombat + ", " + cloakingSaid );
+		Check( "shimmeringball: in Combat about one alien laser shot in nine hits (5 to 45 of 180), and a miss says Laser missed us! (WE911, WECC7)", ( hitsInCombat >= 5 ) && ( hitsInCombat <= 45 ) && missedSaid, hitsInCombat + "/180, " + missedSaid );
+		Check( "shimmeringball: a shot of the player's changes nothing (2 to 25 of 90)", laserFired && ( hitsAfterFiring >= 2 ) && ( hitsAfterFiring <= 25 ), laserFired + ", " + hitsAfterFiring + "/90" );
+		Check( "shimmeringball: an alien missile is aimed at the ship's cell plus -1 to 1 cells on each axis", offsetsOnTheGrid && ( offsets.Count >= 4 ), string.Join( " ", offsets ) );
+		Check( "shimmeringball: a new encounter starts without it: every shot hits until Combat is entered (CLEAR-CO)", hitsNewEncounter == 30, hitsNewEncounter + "/30" );
 
-		Finish( "scenario=shimmeringball without=" + hitWithout + " cloaked=" + hitCloaked + " afterFiring=" + hitAfterFiring + " later=" + hitLater, 0 );
+		Finish( "scenario=shimmeringball checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// how many of this many alien laser shots from 3 cells away hit the ship
+	static int LaserHits( PD_AlienShip alienShip, GD_Vessel vessel, int shots )
+	{
+		var hits = 0;
+
+		for ( var i = 0; i < shots; i++ )
+		{
+			if ( ArmorLostToOneShot( alienShip, vessel ) > 0 )
+			{
+				hits++;
+			}
+		}
+
+		return hits;
 	}
 
 	// ---------------------------------------------------------------- phase 4: the Ring Device
@@ -32263,12 +32447,15 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=bridgepictures pictures=" + pictures.Count, 0 );
 	}
 
-	// the original tells of motion only through a science officer whose science skill is above 150 (HYPERMSG-OV TRAK-E and WF28B: the ASSIGN-CREW slot at 0x14 is
-	// the science officer, the CREWMEMBER byte at 0x1a the science skill); the radar's blips and sound are the port's and stay for everyone
+	// the science officer reports the aliens' moves as the original's (HYPERMSG-OV TRAK-E and WF28B): at each move of the groups (every 2 star hours) a science
+	// officer of science above 150 says "Motion detected at" once, then a line for each group that moved a map coordinate or more, X and Y its step in the
+	// original's units over -8 (a group 5 coordinates east that comes 2 nearer: X:2); nobody reports below 151, and the radar says nothing of its own. The code
+	// before said "Motion detected." whenever the radar swept over a group, with no figures
 	IEnumerator ScenarioMotionDetected()
 	{
 		var playerData = DataController.m_instance.m_playerData;
 		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
 
 		EnsureCrew();
 
@@ -32277,54 +32464,107 @@ public class ClaudeProbe : MonoBehaviour
 
 		// out in dark hyperspace, with no encounter able to begin
 		controller.m_encounterRange = 0.0f;
-		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 4.0f, 0.0f, 4.0f ) );
+		general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 20.0f, 0.0f, 20.0f ) );
 		controller.SwitchLocation( PD_General.Location.Hyperspace );
 
 		yield return Frames( 30 );
 
-		// a group of aliens within the radar's reach (2048 units in hyperspace)
-		PD_Encounter group = null;
+		// two hyperspace groups to watch, every other one far away
+		var ship = general.m_coordinates;
+		var groups = new List<PD_Encounter>();
 
 		foreach ( var pdEncounter in playerData.m_encounterList )
 		{
-			if ( pdEncounter.GetLocation() == PD_General.Location.Hyperspace )
+			if ( pdEncounter.GetLocation() != PD_General.Location.Hyperspace )
 			{
-				group = pdEncounter;
+				continue;
+			}
 
-				break;
+			if ( ( groups.Count < 2 ) && pdEncounter.HasLivingAlienShips() )
+			{
+				groups.Add( pdEncounter );
+			}
+			else
+			{
+				pdEncounter.m_currentCoordinates = ship + new Vector3( 100.0f * 256.0f, 0.0f, 100.0f * 256.0f );
+				pdEncounter.m_homeCoordinates = pdEncounter.m_currentCoordinates;
 			}
 		}
 
-		group.m_currentCoordinates = playerData.m_general.m_coordinates + new Vector3( 700.0f, 0.0f, 700.0f );
+		var far = ship + new Vector3( 100.0f * 256.0f, 0.0f, -100.0f * 256.0f );
+		var said = new string[ 1 ];
 
-		// ---- a science officer of science 100: the radar sweeps over the group (a turn takes 6 s) and nothing is said
-		scienceOfficer.m_science = 100;
-		controller.m_messages.Clear();
-
-		yield return new WaitForSecondsRealtime( 7.0f );
-
-		var unskilled = MessageList();
-
-		// ---- of science 200: the motion is reported
+		// ---- 1. science 200, a group 5 coordinates east: it comes 2 nearer, X:2 Y:0
 		scienceOfficer.m_science = 200;
+
+		PlaceGroupAt( groups[ 0 ], 5.0f, 0.0f );
+		PlaceGroupAt( groups[ 1 ], 0.0f, 0.0f, far );
+
+		yield return MotionPass( said );
+
+		var east = said[ 0 ];
+
+		// ---- 2. a group 5 west and 3 south: X:-2 Y:-1
+		PlaceGroupAt( groups[ 0 ], -5.0f, -3.0f );
+
+		yield return MotionPass( said );
+
+		var westSouth = said[ 0 ];
+
+		// ---- 3. both at once: one heading, a line each
+		PlaceGroupAt( groups[ 0 ], 5.0f, 0.0f );
+		PlaceGroupAt( groups[ 1 ], -5.0f, -3.0f );
+
+		yield return MotionPass( said );
+
+		var both = said[ 0 ];
+		var headings = System.Text.RegularExpressions.Regex.Matches( both, "Motion detected at" ).Count;
+
+		// ---- 4. a group half a coordinate away comes onto the ship, a step too small to report (control)
+		PlaceGroupAt( groups[ 0 ], 0.5f, 0.0f );
+		PlaceGroupAt( groups[ 1 ], 0.0f, 0.0f, far );
+
+		yield return MotionPass( said );
+
+		var halfway = said[ 0 ];
+
+		// ---- 5. science 150: the same move, and nobody reports it
+		scienceOfficer.m_science = 150;
+
+		PlaceGroupAt( groups[ 0 ], 5.0f, 0.0f );
+
+		yield return MotionPass( said );
+
+		var unskilled = said[ 0 ];
+
+		// ---- 6. science 200, the radar sweeping over a group 2.7 coordinates away for 7 s between two moves: the radar itself says nothing
+		scienceOfficer.m_science = 200;
+
+		groups[ 0 ].m_currentCoordinates = general.m_coordinates + new Vector3( 700.0f, 0.0f, 700.0f );
+		groups[ 0 ].m_homeCoordinates = groups[ 0 ].m_currentCoordinates;
 		controller.m_messages.Clear();
 
 		yield return new WaitForSecondsRealtime( 7.0f );
 
-		var skilled = MessageList();
+		var radarSweep = MessageList();
 
 		controller.m_encounterRange = encounterRange;
 
-		Log( "motiondetected: the group " + Vector3.Distance( group.m_currentCoordinates, playerData.m_general.m_coordinates ).ToString( "F0" ) + " away | science 100: '" + unskilled + "' | science 200: '" + skilled + "'" );
+		Log( "motiondetected: science 200, 5 east: '" + east + "' | 5 west 3 south: '" + westSouth + "' | both: '" + both + "' | half a coordinate: '" + halfway + "' | science 150: '" + unskilled + "' | radar sweep 7 s: '" + radarSweep + "'" );
 
-		Check( "motiondetected: a science officer of science 100 reports no motion, as the original's (above 150 only)", !unskilled.Contains( "Motion detected" ), "'" + unskilled + "'" );
-		Check( "motiondetected: a science officer of science 200 reports the motion", skilled.Contains( "Motion detected" ), "'" + skilled + "'" );
+		Check( "motiondetected: a group 5 coordinates east that comes 2 nearer: Motion detected at, X:2 Y:0 (HYPERMSG-OV WF28B)", east.Contains( "Motion detected at" ) && east.Contains( "X:2" ) && east.Contains( "Y:0" ), "'" + east + "'" );
+		Check( "motiondetected: a group 5 west and 3 south: X:-2 Y:-1", westSouth.Contains( "X:-2" ) && westSouth.Contains( "Y:-1" ), "'" + westSouth + "'" );
+		Check( "motiondetected: two groups at once: one heading, a line for each", ( headings == 1 ) && both.Contains( "X:2" ) && both.Contains( "X:-2" ), headings + " headings: '" + both + "'" );
+		Check( "motiondetected: a step of less than a map coordinate is not reported (control)", !halfway.Contains( "Motion detected" ), "'" + halfway + "'" );
+		Check( "motiondetected: a science officer of science 150 reports nothing, as the original's (above 150 only; control)", !unskilled.Contains( "Motion detected" ), "'" + unskilled + "'" );
+		Check( "motiondetected: the radar sweeping over a group says nothing of its own", !radarSweep.Contains( "Motion detected" ), "'" + radarSweep + "'" );
 
 		// with no science officer assigned (a ship started in the Editor's Spaceflight scene has no crew), nobody reports the motion, and nothing throws
 		{
 			var crew = DataController.m_instance.m_playerData.m_crewAssignment;
 			var scienceFileId = crew.GetFileId( PD_CrewAssignment.Role.ScienceOfficer );
-			var reportsMotion = typeof( Radar ).GetMethod( "ScienceOfficerReportsMotion", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static );
+			var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static;
+			var reportsMotion = typeof( SpaceflightController ).GetMethod( "ScienceOfficerReportsMotion", flags ) ?? typeof( Radar ).GetMethod( "ScienceOfficerReportsMotion", flags );
 			var outcome = "";
 
 			crew.Assign( PD_CrewAssignment.Role.ScienceOfficer, -1 );
@@ -32344,6 +32584,27 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		Finish( "scenario=motiondetected checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// puts a group of aliens this many map coordinates east and north of the ship (or of a given place), with its home where it is
+	static void PlaceGroupAt( PD_Encounter pdEncounter, float coordinatesEast, float coordinatesNorth, Vector3? from = null )
+	{
+		var origin = from ?? DataController.m_instance.m_playerData.m_general.m_coordinates;
+
+		pdEncounter.m_currentCoordinates = origin + new Vector3( coordinatesEast * 256.0f, 0.0f, coordinatesNorth * 256.0f );
+		pdEncounter.m_homeCoordinates = pdEncounter.m_currentCoordinates;
+	}
+
+	// one move of the alien groups (2 star hours on), and what the message window says after it
+	static IEnumerator MotionPass( string[] said )
+	{
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		AdvanceGameHours( 2 );
+
+		yield return Frames( 5 );
+
+		said[ 0 ] = System.Text.RegularExpressions.Regex.Replace( MessageList(), "<[^>]*>", "" );
 	}
 
 	// the Trade Depot's Analysis lists the ship's own artifacts only, at their value, as the original's ANALYSIS screen (starflt_080, starflt_099): the Starport's
@@ -40049,8 +40310,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 10 );
 
-		// out of it the way the game leaves every encounter (the Crystal Pearl's warp goes through Encounter.LeaveEncounter)
-		encounter.WarpOut();
+		// out of it the way the game leaves every encounter (Encounter.LeaveEncounter)
+		typeof( Encounter ).GetMethod( "LeaveEncounter", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public ).Invoke( encounter, null );
 
 		yield return Frames( 5 );
 
@@ -49524,6 +49785,526 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "dronenumbers: the numbers run from 1 to 99, each as likely: about 16 in 99 are multiples of 6 (10% to 23% of 990)", ( lowest == 1 ) && ( highest == 99 ) && ( multiplesOfSix >= 99 ) && ( multiplesOfSix <= 228 ), lowest + " to " + highest + ", " + multiplesOfSix + " of 990" );
 
 		Finish( "scenario=dronenumbers checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: a flare sterilises its star system (roadmap 8.29)
+
+	// a star that flares between these days, has a planet with life (other than the one given), and no encounter in its system or in an orbit of it - its id, and
+	// the living planet's through the array (-1 if there is none)
+	static int FlaringStarWithLife( int fromDay, int toDay, int otherThan, int[] livingPlanet )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		livingPlanet[ 0 ] = -1;
+
+		foreach ( var star in gameData.m_starList )
+		{
+			if ( ( star.m_id == otherThan ) || ( star.m_daysToNextFlare < fromDay ) || ( star.m_daysToNextFlare > toDay ) )
+			{
+				continue;
+			}
+
+			var guarded = false;
+
+			foreach ( var gdEncounter in gameData.m_encounterList )
+			{
+				guarded = guarded || ( ( gdEncounter.m_location != 0 ) && ( gdEncounter.m_xCoordinate == star.m_xCoordinate ) && ( gdEncounter.m_yCoordinate == star.m_yCoordinate ) );
+			}
+
+			if ( guarded )
+			{
+				continue;
+			}
+
+			foreach ( var planet in gameData.m_planetList )
+			{
+				if ( ( planet.m_starId == star.m_id ) && ( planet.m_bioDensity > 0 ) && !planet.IsGasGiant() )
+				{
+					livingPlanet[ 0 ] = planet.m_id;
+
+					return star.m_id;
+				}
+			}
+		}
+
+		return -1;
+	}
+
+	// what the orbit sensors read of a planet's life, and how many species it has (GD_Species.ForPlanet, which the lifeforms and the survey from orbit use)
+	IEnumerator LifeInOrbit( int starId, int planetId, int[] life )
+	{
+		var controller = SpaceflightController.m_instance;
+
+		yield return GoIntoOrbit( starId, planetId );
+
+		new SensorsButton().Execute();
+
+		yield return Frames( 5 );
+
+		var display = controller.m_displayController.m_sensorsDisplay;
+
+		life[ 0 ] = (int) GetField( display, "m_bioDensity" );
+		life[ 1 ] = GD_Species.ForPlanet( DataController.m_instance.m_gameData.m_planetList[ planetId ] ).Count;
+
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+	}
+
+	// a flare sterilises its star system as the original's (ANALYZE-OV WF436, WEC26, WEC04): on the first analysis of a star whose flare day has come (and the game
+	// not won before it) every planet of the star loses its life for good; nothing happens until then, however long after the flare. The code before never took
+	// the life away
+	IEnumerator ScenarioFlareSterilises()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+		var scans = new List<string>();
+		var life = new int[ 2 ];
+		var planet = new int[ 1 ];
+
+		EnsureCrew();
+
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer ).m_science = 250;
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		var star = FlaringStarWithLife( 100, 290, -1, planet );
+		var livingPlanet = planet[ 0 ];
+		var flareDay = Mathf.CeilToInt( gameData.m_starList[ star ].m_daysToNextFlare );
+
+		// ---- 1. the day before the flare: a scan of the star, and the planet has life (control)
+		SetGameDay( flareDay - 1 );
+
+		yield return ScanStarSystem( star, scans );
+		yield return LifeInOrbit( star, livingPlanet, life );
+
+		var bioBefore = life[ 0 ];
+		var speciesBefore = life[ 1 ];
+
+		// ---- 2. the day after the flare, without analysing the star: the life is still there (the original sterilises on the analysis) - the day is moved on out
+		// in hyperspace, as a ship in the system when its star flares is incinerated, and one that comes in after the flare day is not
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 5 );
+
+		SetGameDay( flareDay + 1 );
+
+		yield return LifeInOrbit( star, livingPlanet, life );
+
+		var bioLazy = life[ 0 ];
+		var speciesLazy = life[ 1 ];
+
+		// ---- 3. the star analysed after its flare: no life left
+		yield return ScanStarSystem( star, scans );
+		yield return LifeInOrbit( star, livingPlanet, life );
+
+		var bioAfter = life[ 0 ];
+		var speciesAfter = life[ 1 ];
+
+		// ---- 4. it lasts: through a save and a load (the sterilised planets are saved)
+		var dataController = DataController.m_instance;
+
+		dataController.SaveActiveGame();
+
+		var loaded = new MemorySaveSystem().Load<PlayerData>( dataController.m_playerDataFileName, dataController.m_activeSaveGameSlotNumber );
+		var sterilisedField = typeof( PD_PlanetSurfaces ).GetField( "m_sterilisedPlanetList" );
+		var keptInSave = ( sterilisedField != null ) && ( sterilisedField.GetValue( loaded.m_planetSurfaces ) is List<int> kept ) && kept.Contains( livingPlanet );
+
+		// ---- 5. the control: a game won before another star's flare keeps that star's life
+		var otherPlanet = new int[ 1 ];
+		var otherStar = FlaringStarWithLife( 100, 290, star, otherPlanet );
+		var otherFlareDay = Mathf.CeilToInt( gameData.m_starList[ otherStar ].m_daysToNextFlare );
+		var gameWon = general.m_gameWon;
+		var winTime = general.m_winTime;
+
+		general.m_gameWon = true;
+		general.m_winTime = otherFlareDay - 10;
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 5 );
+
+		SetGameDay( otherFlareDay + 1 );
+
+		yield return ScanStarSystem( otherStar, scans );
+		yield return LifeInOrbit( otherStar, otherPlanet[ 0 ], life );
+
+		var bioWon = life[ 0 ];
+
+		general.m_gameWon = gameWon;
+		general.m_winTime = winTime;
+		controller.m_encounterRange = encounterRange;
+
+		Log( "flaresterilises: star " + star + " flares on day " + flareDay + ", its planet " + livingPlanet + ": the day before " + bioBefore + "% and " + speciesBefore + " species; the day after, not analysed, " + bioLazy + "% and " + speciesLazy + "; analysed, " + bioAfter + "% and " + speciesAfter + "; in the save " + keptInSave + " | star " + otherStar + " after a win before its flare (day " + otherFlareDay + "): " + bioWon + "%" );
+
+		Check( "flaresterilises: before the flare the planet has life (control)", ( bioBefore > 0 ) && ( speciesBefore > 0 ), bioBefore + "%, " + speciesBefore + " species" );
+		Check( "flaresterilises: after the flare, until the star is analysed, the life is still there (WF436 runs WEC26 on the analysis; control)", ( bioLazy == bioBefore ) && ( speciesLazy == speciesBefore ), bioLazy + "%, " + speciesLazy + " species" );
+		Check( "flaresterilises: once the star is analysed after its flare the planet has no life: the sensors read 0 and there are no species (ANALYZE-OV WEC26)", ( bioAfter == 0 ) && ( speciesAfter == 0 ), bioAfter + "%, " + speciesAfter + " species" );
+		Check( "flaresterilises: the sterilised planets are kept in the save", keptInSave, keptInSave.ToString() );
+		Check( "flaresterilises: a game won before a star's flare keeps its life (WEC04; control)", bioWon > 0, bioWon + "%" );
+
+		Finish( "scenario=flaresterilises checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: the crash line, as the original's (roadmap 8.24)
+
+	// descends from orbit (Land, Descend) and keeps every message the window shows, in order, until a safe landing or the end of the game; "[cleared]" marks the
+	// window being cleared
+	static IEnumerator DescendWatching( List<string> lines )
+	{
+		var controller = SpaceflightController.m_instance;
+		var shown = DataController.m_instance.m_playerData.m_general.m_messageList;
+		var last = new List<string>();
+
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.CommandB, 0 );
+
+		yield return Frames( 5 );
+
+		PressButton( ButtonController.ButtonSet.Land, 1 );
+
+		var end = Time.realtimeSinceStartup + 60.0f;
+		var settle = -1.0f;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			var now = new List<string>();
+
+			foreach ( var message in shown )
+			{
+				now.Add( System.Text.RegularExpressions.Regex.Replace( message, "<[^>]*>", "" ) );
+			}
+
+			var kept = now.Count >= last.Count;
+
+			for ( var i = 0; kept && ( i < last.Count ); i++ )
+			{
+				kept = now[ i ] == last[ i ];
+			}
+
+			if ( !kept )
+			{
+				lines.Add( "[cleared]" );
+				lines.AddRange( now );
+			}
+			else
+			{
+				lines.AddRange( now.GetRange( last.Count, now.Count - last.Count ) );
+			}
+
+			last = now;
+
+			// a second more once it is over, for the last words
+			if ( ( settle < 0.0f ) && ( CombatController.m_instance.PlayerIsDestroyed() || lines.Exists( line => line.Contains( "Safe landing" ) ) ) )
+			{
+				settle = Time.realtimeSinceStartup + 1.0f;
+			}
+
+			if ( ( settle >= 0.0f ) && ( Time.realtimeSinceStartup > settle ) )
+			{
+				break;
+			}
+
+			yield return null;
+		}
+	}
+
+	// the position of the first line holding this text, or -1
+	static int LineIndex( List<string> lines, string text, int from = 0 )
+	{
+		for ( var i = Mathf.Max( 0, from ); i < lines.Count; i++ )
+		{
+			if ( lines[ i ].Contains( text ) )
+			{
+				return i;
+			}
+		}
+
+		return -1;
+	}
+
+	// a landing without the fuel for it says so as the original's (ORBIT-OV DESCEND, LAND-OV WF430): "Autopilot engaged. Descending...", then the window cleared and
+	// "Out of fuel! Crash imminent!" before "Topography net locked on.", never "Safe landing, captain.", and the game ends with the emergency locator's
+	// transmission; with the fuel for it (the control) no such line and a safe landing. The code before said nothing of the crash before the end
+	IEnumerator ScenarioCrashLine()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+
+		EnsureCrew();
+
+		var planet90Star = gameData.m_planetList[ 90 ].m_starId;
+
+		yield return GoIntoOrbit( planet90Star, 90 );
+
+		// ---- 1. the control: 100 tenths of Endurium, a safe landing
+		SetEndurium( 100 );
+
+		var safe = new List<string>();
+
+		yield return DescendWatching( safe );
+
+		// back to orbit
+		new LaunchYesButton().Execute();
+
+		yield return WaitForLocation( PD_General.Location.InOrbit, 20.0f );
+		yield return Frames( 10 );
+
+		// ---- 2. 1 tenth: a crash
+		SetEndurium( 1 );
+
+		var crash = new List<string>();
+
+		yield return DescendWatching( crash );
+
+		var crashed = CombatController.m_instance.PlayerIsDestroyed();
+
+		Log( "crashline: with 100 tenths: " + string.Join( " | ", safe ) + " || with 1 tenth: " + string.Join( " | ", crash ) + " (destroyed " + crashed + ")" );
+
+		var safeAutopilot = LineIndex( safe, "Autopilot engaged" );
+		var safeTopography = LineIndex( safe, "Topography net locked on", safeAutopilot );
+		var safeLanding = LineIndex( safe, "Safe landing, captain", safeTopography );
+
+		Check( "crashline: with the fuel for it: autopilot, topography net, safe landing, and nothing of a crash (control)", ( safeAutopilot >= 0 ) && ( safeTopography > safeAutopilot ) && ( safeLanding > safeTopography ) && ( LineIndex( safe, "Crash imminent" ) < 0 ), string.Join( " | ", safe ) );
+
+		var crashAutopilot = LineIndex( crash, "Autopilot engaged" );
+		var crashCleared = LineIndex( crash, "[cleared]", crashAutopilot + 1 );
+		var crashLine = LineIndex( crash, "Out of fuel! Crash imminent!", crashCleared );
+		var crashTopography = LineIndex( crash, "Topography net locked on", crashLine );
+
+		Check( "crashline: without it: the autopilot line, then the window cleared and Out of fuel! Crash imminent! before Topography net locked on. (ORBIT-OV DESCEND)", ( crashAutopilot >= 0 ) && ( crashCleared > crashAutopilot ) && ( crashLine > crashCleared ) && ( crashTopography > crashLine ), string.Join( " | ", crash ) );
+		Check( "crashline: no safe landing, and the game ends with the emergency locator's transmission (control)", crashed && ( LineIndex( crash, "Safe landing" ) < 0 ) && ( LineIndex( crash, "crashed on planet" ) >= 0 ), crashed + ": " + string.Join( " | ", crash ) );
+
+		Finish( "scenario=crashline checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: the Mysterions, the Nomad probes and the Minstrels move on (roadmap 8.23)
+
+	// leaves the current encounter the game's own way (Encounter.LeaveEncounter, which the probe's LeaveEncounter helper does not run)
+	static void LeaveEncounterTheGamesWay()
+	{
+		var leave = typeof( Encounter ).GetMethod( "LeaveEncounter", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public );
+
+		leave.Invoke( SpaceflightController.m_instance.m_encounter, null );
+	}
+
+	// the Mysterions, the Nomad probes and the Minstrels move on after each encounter, as the original's (HYPER-OV ENCCLEANUP: WDC19 gives species 4, 5 and 11 a
+	// place of RRND 0 to 2000 and RRND 0 to 1760 of the original's units, anywhere on the hyperspace map, and leaves the displacement from home as it was); other
+	// groups stay where the encounter left them. The code before left every group where the encounter had been
+	IEnumerator ScenarioMoveOn()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+
+		EnsureCrew();
+
+		// in hyperspace, in the middle of the map
+		general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 125.0f, 0.0f, 110.0f ) );
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		UnityEngine.Random.InitState( 1357 );
+
+		var ids = new[] { 78, 83, 310, FindEncounter( 0, 1, 1, 0, GameData.Race.Spemin ) };
+		var results = new List<string>();
+		var movedOn = 0;
+		var withinTheMap = 0;
+		var displacementKept = 0;
+		var speminStayed = false;
+
+		foreach ( var id in ids )
+		{
+			EnterEncounter( id );
+
+			yield return Frames( 10 );
+
+			var pdEncounter = playerData.FindEncounter( id );
+			var before = pdEncounter.m_currentCoordinates;
+			var displacement = pdEncounter.m_currentCoordinates - pdEncounter.m_homeCoordinates;
+
+			LeaveEncounterTheGamesWay();
+
+			yield return Frames( 10 );
+
+			var after = pdEncounter.m_currentCoordinates;
+			var map = Tools.WorldToGameCoordinates( after );
+			var kept = Vector3.Distance( after - pdEncounter.m_homeCoordinates, displacement ) < 0.01f;
+			var moved = Vector3.Distance( before, after ) / 256.0f;
+			var inMap = ( map.x >= 0.0f ) && ( map.x <= 250.0f ) && ( map.z >= 0.0f ) && ( map.z <= 220.0f );
+
+			results.Add( id + " (" + GameDataRace( id ) + "): moved " + moved.ToString( "F1" ) + " coordinates to " + map.x.ToString( "F1" ) + "," + map.z.ToString( "F1" ) + ", displacement kept " + kept );
+
+			if ( id == ids[ ids.Length - 1 ] )
+			{
+				speminStayed = moved < 0.01f;
+			}
+			else
+			{
+				movedOn += ( moved > 1.0f ) ? 1 : 0;
+				withinTheMap += inMap ? 1 : 0;
+				displacementKept += kept ? 1 : 0;
+			}
+
+			// (the next encounter is met from where this one left the ship)
+			yield return Frames( 5 );
+		}
+
+		Log( "moveon: " + string.Join( " | ", results ) );
+
+		Check( "moveon: a Mysterion, a Nomad probe and a Minstrel each move on after the encounter (HYPER-OV WDC19)", movedOn == 3, movedOn + " of 3: " + string.Join( " | ", results ) );
+		Check( "moveon: each to somewhere on the hyperspace map (0 to 250 across, 0 to 220 along)", withinTheMap == 3, withinTheMap + " of 3" );
+		Check( "moveon: each keeps how far it is from home", displacementKept == 3, displacementKept + " of 3" );
+		Check( "moveon: a Spemin group stays where the encounter left it (control)", speminStayed, results[ results.Count - 1 ] );
+
+		Finish( "scenario=moveon checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the race of an encounter of the game data
+	static string GameDataRace( int encounterId )
+	{
+		return DataController.m_instance.m_gameData.m_encounterList[ encounterId ].m_race.ToString();
+	}
+
+	// ---------------------------------------------------------------- phase 8: back into orbit after the derelict or a destroyed orbit fleet (roadmap 8.13)
+
+	// ends the current encounter the game's own way (Encounter.LeaveEncounter, which the probe's LeaveEncounter helper does not run)
+	static void EndEncounterAsTheGameDoes()
+	{
+		var leave = typeof( Encounter ).GetMethod( "LeaveEncounter", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public );
+
+		leave.Invoke( SpaceflightController.m_instance.m_encounter, null );
+	}
+
+	// an encounter that began in orbit ends back in orbit, not out in the star system, after the Noah 9 derelict and after an orbit fleet whose ships are all
+	// destroyed (HYPER-OV ENCCLEANUP: SKIP2NEST for species 19, and for an encounter entered from orbit with MAX#SHIPS - #SHIPS-DESTROYED at 0 unless MAX#SHIPS is
+	// 255; WF022 then OSET: "INITIATING ORBITAL MANEUVER...", "...ORBIT ESTABLISHED"), and Maneuver leaves the derelict's encounter at once (MANEUVER: SKIP2NEST,
+	// UNNEST); the derelict begins again only once the ship has left orbit. The code before ended every encounter from orbit out in the star system, unless a drone
+	// had let the ship into orbit
+	IEnumerator ScenarioOrbitReturn()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+
+		EnsureCrew();
+
+		// a ship that survives what the aliens do meanwhile
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// ---- 1. the derelict (encounter 316): into orbit, the encounter begins, and Maneuver leaves it back into orbit around the same planet
+		const int c_derelictId = 316;
+
+		var derelictPlanet = PlanetOfOrbitEncounter( c_derelictId );
+		var derelictStar = gameData.m_planetList[ derelictPlanet ].m_starId;
+
+		yield return GoIntoOrbit( derelictStar, derelictPlanet );
+
+		var derelictBegun = ( general.m_location == PD_General.Location.Encounter ) && ( general.m_currentEncounterId == c_derelictId );
+
+		controller.m_messages.Clear();
+
+		new ManeuverButton().Execute();
+
+		yield return Frames( 10 );
+
+		var afterManeuver = general.m_location;
+		var planetAfterManeuver = general.m_currentPlanetId;
+		var lines = System.Text.RegularExpressions.Regex.Replace( MessageList(), "<[^>]*>", "" );
+
+		yield return Frames( 30 );
+
+		var laterInOrbit = general.m_location;
+
+		// ---- 2. out to the star system and back into orbit: the derelict begins again, and flying out of it ends back in orbit too
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+		yield return EnterOrbit( derelictPlanet );
+
+		var derelictAgain = ( general.m_location == PD_General.Location.Encounter ) && ( general.m_currentEncounterId == c_derelictId );
+
+		if ( derelictAgain )
+		{
+			yield return FlyOutOfEncounter();
+		}
+
+		var afterFlyingOut = general.m_location;
+
+		// ---- 3. an orbit fleet whose ships are all destroyed (the Veloxi drone, encounter 304): back into orbit, and it never begins again
+		const int c_droneId = 304;
+
+		var dronePlanet = PlanetOfOrbitEncounter( c_droneId );
+		var droneStar = gameData.m_planetList[ dronePlanet ].m_starId;
+
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 5 );
+		yield return GoIntoOrbit( droneStar, dronePlanet );
+
+		var droneBegun = ( general.m_location == PD_General.Location.Encounter ) && ( general.m_currentEncounterId == c_droneId );
+
+		foreach ( var alienShip in playerData.FindEncounter( c_droneId ).GetAlienShipList() )
+		{
+			alienShip.m_isDead = true;
+		}
+
+		EndEncounterAsTheGameDoes();
+
+		yield return Frames( 10 );
+
+		var afterDestroyed = general.m_location;
+
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+		yield return EnterOrbit( dronePlanet );
+
+		var droneAgain = general.m_location;
+
+		// ---- 4. the control: an orbit encounter with living ships (the Veloxi drone 302, made hostile) still ends out in the star system
+		const int c_livingId = 302;
+
+		var livingPlanet = PlanetOfOrbitEncounter( c_livingId );
+		var livingStar = gameData.m_planetList[ livingPlanet ].m_starId;
+
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 5 );
+		yield return GoIntoOrbit( livingStar, livingPlanet );
+
+		var livingBegun = ( general.m_location == PD_General.Location.Encounter ) && ( general.m_currentEncounterId == c_livingId );
+
+		EndEncounterAsTheGameDoes();
+
+		yield return Frames( 10 );
+
+		var afterLiving = general.m_location;
+
+		Log( "orbitreturn: derelict begun " + derelictBegun + ", after Maneuver " + afterManeuver + " at planet " + planetAfterManeuver + " (" + derelictPlanet + "), 30 frames later " + laterInOrbit + " | lines: " + lines + " | begins again from the system " + derelictAgain + ", after flying out " + afterFlyingOut + " | drone 304 begun " + droneBegun + ", its ships destroyed: " + afterDestroyed + ", into orbit again: " + droneAgain + " | drone 302 alive, begun " + livingBegun + ": " + afterLiving );
+
+		Check( "orbitreturn: Maneuver in the derelict's encounter goes back into orbit around its planet at once, and the derelict does not begin again there", derelictBegun && ( afterManeuver == PD_General.Location.InOrbit ) && ( planetAfterManeuver == derelictPlanet ) && ( laterInOrbit == PD_General.Location.InOrbit ), derelictBegun + ", " + afterManeuver + " at " + planetAfterManeuver + ", later " + laterInOrbit );
+		Check( "orbitreturn: in the original's words: ...Encounter terminated., Initiating orbital maneuver..., ...Orbit established.", ( lines.IndexOf( "Encounter terminated" ) >= 0 ) && ( lines.IndexOf( "Initiating orbital maneuver" ) > lines.IndexOf( "Encounter terminated" ) ) && ( lines.IndexOf( "Orbit established" ) > lines.IndexOf( "Initiating orbital maneuver" ) ), lines );
+		Check( "orbitreturn: once the ship has left orbit the derelict begins again, and flying out of it ends back in orbit", derelictAgain && ( afterFlyingOut == PD_General.Location.InOrbit ), derelictAgain + ", " + afterFlyingOut );
+		Check( "orbitreturn: an orbit encounter whose ships are all destroyed ends back in orbit, and never begins again", droneBegun && ( afterDestroyed == PD_General.Location.InOrbit ) && ( droneAgain == PD_General.Location.InOrbit ), droneBegun + ", " + afterDestroyed + ", again " + droneAgain );
+		Check( "orbitreturn: an orbit encounter with living ships still ends out in the star system (control)", livingBegun && ( afterLiving == PD_General.Location.StarSystem ), livingBegun + ", " + afterLiving );
+
+		Finish( "scenario=orbitreturn checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

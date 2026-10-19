@@ -341,6 +341,12 @@ public class SpaceflightController : MonoBehaviour
 			playerData.m_general.GetOrbitPermissions().Clear();
 		}
 
+		// leaving orbit lets an encounter that ended back in orbit begin again the next time (the original's WD9EC, cleared by UNNEST-CLEAN on leaving orbit)
+		if ( ( newLocation == PD_General.Location.StarSystem ) || ( newLocation == PD_General.Location.Hyperspace ) || ( newLocation == PD_General.Location.DockingBay ) || ( newLocation == PD_General.Location.Starport ) )
+		{
+			playerData.m_general.GetOrbitEncountersEnded().Clear();
+		}
+
 		// a ship in the star system or in hyperspace has left any orbit, and the next planet's landing site starts at LAT 0 LONG 0: the original's DEPART sets PLHI to
 		// -1 on leaving orbit, and Select Site then puts its crosshair in the middle of the map (SITE-OV in the decompiled original, WF014) - within one orbit the
 		// last site chosen stays
@@ -562,6 +568,9 @@ public class SpaceflightController : MonoBehaviour
 		if ( trackAliens )
 		{
 			m_trackedHourCount = hourCount;
+
+			// the science officer's report of this pass starts with its heading (HYPERMSG-OV TRAK-E: WF27F on)
+			m_motionHeadingPending = true;
 		}
 
 		// with the Crystal Pearl aboard the aliens come farther at each move and are not held near home (the original's ?12, set when artifact 13, the Crystal Pearl,
@@ -668,6 +677,51 @@ public class SpaceflightController : MonoBehaviour
 	// the game hour (days * 24 + hours) the aliens last moved at (-1 before the first: not saved, as the original's TRAK-HR is set at launch)
 	int m_trackedHourCount = -1;
 
+	// true until the first move of a tracking pass is reported, which says "Motion detected at" first (HYPERMSG-OV WF27F)
+	bool m_motionHeadingPending;
+
+	// the science skill above which the science officer reports motion (HYPERMSG-OV WF28B: 0x0096)
+	const int c_motionReportSkill = 150;
+
+	// whether the science officer is skilled enough to report the aliens' moves (the science officer's ASSIGN-CREW slot, its CREWMEMBER science byte)
+	public static bool ScienceOfficerReportsMotion( PlayerData playerData )
+	{
+		// no science officer, no report (a ship started in the Editor's Spaceflight scene has no crew)
+		if ( !playerData.m_crewAssignment.IsAssigned( PD_CrewAssignment.Role.ScienceOfficer ) )
+		{
+			return false;
+		}
+
+		var scienceOfficer = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer );
+
+		return ( scienceOfficer != null ) && ( scienceOfficer.m_science > c_motionReportSkill );
+	}
+
+	// a science officer of science above 150 reports each group's move, under one "Motion detected at" a pass, as the original's (HYPERMSG-OV WF28B): each axis's step
+	// in the original's units over -8, so a group 5 map coordinates east that comes 2 nearer reads X:2, the Y at the seventh column - and nothing when the step is less
+	// than a map coordinate on both axes
+	void ReportMotion( int unitsX, int unitsZ )
+	{
+		if ( ( ( unitsX / 8 ) * 8 == 0 ) && ( ( unitsZ / 8 ) * 8 == 0 ) )
+		{
+			return;
+		}
+
+		if ( !ScienceOfficerReportsMotion( DataController.m_instance.m_playerData ) )
+		{
+			return;
+		}
+
+		if ( m_motionHeadingPending )
+		{
+			m_messages.AddText( "<color=white>Motion detected at</color>" );
+
+			m_motionHeadingPending = false;
+		}
+
+		m_messages.AddText( "<color=white>" + ( "X:" + ( unitsX / -8 ) ).PadRight( 7 ) + "Y:" + ( unitsZ / -8 ) + "</color>" );
+	}
+
 	// moves one group of aliens a step of the original's towards the ship - false if it did not move
 	bool TrackTowards( PD_Encounter encounter, Vector3 shipCoordinates, bool inHyperspace, bool crystalPearlAboard )
 	{
@@ -694,26 +748,33 @@ public class SpaceflightController : MonoBehaviour
 		var numerator = ( inHyperspace ? 1 : 3 ) + ( crystalPearlAboard ? 3 : 0 );
 		var denominator = ( inHyperspace ? 2 : 4 ) + ( crystalPearlAboard ? 3 : 0 );
 
-		var stepX = TrackingStep( shipCoordinates.x - encounter.m_currentCoordinates.x, unit, numerator, denominator );
-		var stepZ = TrackingStep( shipCoordinates.z - encounter.m_currentCoordinates.z, unit, numerator, denominator );
+		var stepX = TrackingStep( shipCoordinates.x - encounter.m_currentCoordinates.x, unit, numerator, denominator, out var unitsX );
+		var stepZ = TrackingStep( shipCoordinates.z - encounter.m_currentCoordinates.z, unit, numerator, denominator, out var unitsZ );
 
 		encounter.m_currentCoordinates += new Vector3( stepX, 0.0f, stepZ );
+
+		// the science officer reports the move
+		ReportMotion( unitsX, unitsZ );
 
 		return ( stepX != 0.0f ) || ( stepZ != 0.0f );
 	}
 
 	// one axis of a TRAK-E move: the share of the distance (in the original's units) in whole map coordinates, rounded towards none, or the whole distance once
-	// that is none
-	static float TrackingStep( float distance, float unit, int numerator, int denominator )
+	// that is none - and the step in the original's units (WF283, WF287)
+	static float TrackingStep( float distance, float unit, int numerator, int denominator, out int stepUnits )
 	{
 		var units = Mathf.RoundToInt( distance / unit );
 
 		if ( units == 0 )
 		{
+			stepUnits = 0;
+
 			return 0.0f;
 		}
 
 		var step = units * numerator / denominator / 8 * 8;
+
+		stepUnits = ( step != 0 ) ? step : units;
 
 		return ( step != 0 ) ? ( step * unit ) : distance;
 	}
@@ -854,6 +915,12 @@ public class SpaceflightController : MonoBehaviour
 
 			// skip an encounter that has already let the ship into orbit during this visit to the star system
 			if ( HasOrbitPermission( encounter.m_encounterId ) )
+			{
+				continue;
+			}
+
+			// and one that ended back in this orbit (the Noah 9 derelict), until the ship leaves it
+			if ( playerData.m_general.GetOrbitEncountersEnded().Contains( encounter.m_encounterId ) )
 			{
 				continue;
 			}

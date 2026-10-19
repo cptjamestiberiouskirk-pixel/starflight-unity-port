@@ -502,6 +502,27 @@ public class PlayerData
 		return (int) System.Math.Min( fine, int.MaxValue );
 	}
 
+	// a planet's life, in percent: the game data's bio density, or none once a flare of its star has sterilised it (ANALYZE-OV WEC26) - every read of a planet's life
+	// for the game goes through this (the sensors, the terrain vehicle's scan, the ship's log, a colony's evaluation, the species and lifeforms, the survey from
+	// orbit); the look of the planet (its trees, grass and vegetation) keeps the game data's, since the objects of a surface are placed by its random numbers
+	public int GetBioDensity( GD_Planet planet )
+	{
+		if ( planet == null )
+		{
+			return 0;
+		}
+
+		return ( ( m_planetSurfaces != null ) && m_planetSurfaces.IsPlanetSterilised( planet.m_id ) ) ? 0 : planet.m_bioDensity;
+	}
+
+	// the same, from code that may run without the player data (the game data's own code, the Editor's tools): the game data's value then
+	public static int GetBioDensityOf( GD_Planet planet )
+	{
+		var playerData = ( DataController.m_instance != null ) ? DataController.m_instance.m_playerData : null;
+
+		return ( playerData != null ) ? playerData.GetBioDensity( planet ) : ( ( planet != null ) ? planet.m_bioDensity : 0 );
+	}
+
 	// returns true if the player data version is current
 	public bool IsCurrentVersion()
 	{
