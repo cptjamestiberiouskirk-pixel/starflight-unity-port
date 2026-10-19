@@ -17110,7 +17110,8 @@ public class ClaudeProbe : MonoBehaviour
 			yield break;
 		}
 
-		var ruins = RuinsOnTheGround();
+		// (the ruins of the messages and the sites: Earth also has a recent ruin in nearly every region since roadmap 8.32, placed about the vehicle)
+		var ruins = RuinsOnTheGround().FindAll( ruin => !ruin.name.Contains( " of region " ) );
 
 		// the ruin of the site, where the latitude and the longitude put it
 		var sitePosition = Tools.LatLongToWorldCoordinates( -104.0f, 11.0f );
@@ -17226,7 +17227,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var placesAfter = "";
 
-		foreach ( var ruin in RuinsOnTheGround() )
+		foreach ( var ruin in RuinsOnTheGround().FindAll( one => !one.name.Contains( " of region " ) ) )
 		{
 			placesAfter += Mathf.RoundToInt( ruin.transform.position.x ) + "/" + Mathf.RoundToInt( ruin.transform.position.z ) + " ";
 		}
@@ -17336,7 +17337,8 @@ public class ClaudeProbe : MonoBehaviour
 			yield break;
 		}
 
-		var ruins = RuinsOnTheGround();
+		// (the ruins of the messages and the sites: Earth's recent ruins of the regions, roadmap 8.32, are left out)
+		var ruins = RuinsOnTheGround().FindAll( one => !one.name.Contains( " of region " ) );
 		var sitePosition = Tools.LatLongToWorldCoordinates( -104.0f, 11.0f );
 		Component siteRuin = null;
 
@@ -17373,7 +17375,11 @@ public class ClaudeProbe : MonoBehaviour
 
 		var scanText = MessageList();
 
-		Check( "artifactsites: the scan reports the artifact in the ruin", scanText.Contains( "Artifact in the ruins: 1" ), scanText.Substring( 0, Mathf.Min( 200, scanText.Length ) ) );
+		// (one or more: the curios of the recent ruins of the regions nearby count too since roadmap 8.32)
+		var artifactsMatch = System.Text.RegularExpressions.Regex.Match( scanText, "Artifacts? in the ruins: ([0-9]+)" );
+		var artifactsInRuins = artifactsMatch.Success ? int.Parse( artifactsMatch.Groups[ 1 ].Value ) : 0;
+
+		Check( "artifactsites: the scan reports the artifact in the ruin", artifactsInRuins >= 1, artifactsInRuins + " | " + scanText.Substring( 0, Mathf.Min( 200, scanText.Length ) ) );
 
 		// ---- 4. the cargo button takes it, once, and the taking is saved
 		new TVCargoButton().Execute();
@@ -23375,62 +23381,303 @@ public class ClaudeProbe : MonoBehaviour
 		said.Add( MessageList() );
 	}
 
+	// the random ruins of every region of a planet as RandomRuinRegions works them out (null on the code before roadmap 8.32)
+	static System.Collections.IList RegionRuinsOfPlanet( int planetId, float elevationScale )
+	{
+		var type = typeof( ShipButton ).Assembly.GetType( "RandomRuinRegions" );
+		var method = ( type == null ) ? null : type.GetMethod( "ForPlanet" );
+		var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( planetId );
+
+		if ( ( method == null ) || ( planetController == null ) || !planetController.HasMaps() )
+		{
+			return null;
+		}
+
+		return method.Invoke( null, new object[] { planetController.GetPlanetGenerator(), elevationScale, DataController.m_instance.m_gameData.m_planetList[ planetId ] } ) as System.Collections.IList;
+	}
+
+	// how many regions of a planet have their middle on land (above the liquid)
+	static int LandRegionCount( int planetId )
+	{
+		var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( planetId );
+
+		if ( ( planetController == null ) || !planetController.HasMaps() )
+		{
+			return 0;
+		}
+
+		var planetGenerator = planetController.GetPlanetGenerator();
+		var count = 0;
+
+		for ( var row = 0; row < 32; row++ )
+		{
+			for ( var column = 0; column < 128; column++ )
+			{
+				// the middle of the region (18 by 30 of the original's 2304 by 960 units, the map's middle three quarters from pole to pole)
+				var mapX = ( column * 18 + 9 ) * planetGenerator.m_textureMapWidth / 2304.0f;
+				var mapY = ( row * 30 + 15 ) * planetGenerator.m_textureMapHeight * 0.75f / 960.0f + planetGenerator.m_textureMapHeight * 0.125f;
+
+				count += ( planetGenerator.GetBilinearSmoothedElevation( mapX, mapY ) > planetGenerator.m_waterElevation ) ? 1 : 0;
+			}
+		}
+
+		return count;
+	}
+
+	// the region ruins on the ground (named "... of region n"), with how many of them are farther than this from a place (x and z apart, in regions of 64 by
+	// 96 units)
+	static List<Component> RegionRuinsOnTheGround( Vector3 place, float regions, out int farther )
+	{
+		var list = new List<Component>();
+
+		farther = 0;
+
+		foreach ( var ruin in RuinsOnTheGround() )
+		{
+			if ( !ruin.name.Contains( " of region " ) )
+			{
+				continue;
+			}
+
+			list.Add( ruin );
+
+			var delta = ruin.transform.position - place;
+
+			// (the map goes round east to west: 8192 units)
+			var dx = Mathf.Abs( Mathf.Repeat( delta.x + 4096.0f, 8192.0f ) - 4096.0f );
+
+			if ( ( dx > regions * 64.0f ) || ( Mathf.Abs( delta.z ) > regions * 96.0f ) )
+			{
+				farther++;
+			}
+		}
+
+		return list;
+	}
+
+	// the key of the curio of a region ruin on the ground (-1 if it holds none), and its artifact
+	static int RegionRuinCurio( Component ruin, out int artifactId )
+	{
+		artifactId = -1;
+
+		if ( FieldOrNull( ruin, "m_randomItems" ) is System.Collections.IList items )
+		{
+			foreach ( var item in items )
+			{
+				var id = FieldOrNull( item, "m_artifactId" );
+
+				if ( ( id is int ) && ( (int) id >= 0 ) )
+				{
+					artifactId = (int) id;
+
+					return (int) FieldOrNull( item, "m_key" );
+				}
+			}
+		}
+
+		return -1;
+	}
+
+	// the random ruins as the shipped game places them (SEED-OV POPULA, WF492, WF468, WF26B, WF245, WF19B; roadmap 8.32): a region of 18 by 30 of the planet's
+	// 2304 by 960 units holds an ancient ruin and a recent ruin with a chance by two bytes of the planet's type (none on the generic types), three in ten hold a
+	// curio, an ancient one Endurium beside it; the port places the regions near the terrain vehicle only, and what is taken stays taken until the ship leaves
+	// the orbit (8.19)
 	IEnumerator ScenarioRandomRuins()
 	{
 		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
 		var controller = SpaceflightController.m_instance;
+		var surfaces = playerData.m_planetSurfaces;
 		var done = new bool[ 1 ];
 
 		EnsureCrew();
 
-		// ---- 1. planet 94, the small rock planet of the Arth system, has no message of the original's and one random ruin
-		yield return LandOnPlanet94At( Vector3.zero, done );
+		// ---- 1. down on planet 92 of the Arth system (a planet of ruins: an ancient ruin one region in four, a recent one in three)
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
 
-		var randomRuins = RandomRuinsOnTheGround();
-		var place = ( randomRuins.Count > 0 ) ? randomRuins[ 0 ].transform.position : Vector3.zero;
-		var placeBefore = ( randomRuins.Count > 0 ) ? Mathf.RoundToInt( place.x ) + "/" + Mathf.RoundToInt( place.z ) : "none";
-		var name = ( randomRuins.Count > 0 ) ? randomRuins[ 0 ].name : "none";
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=randomruins abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
 
-		// ---- 2. landed beside it, Cargo takes what it holds aboard, and a second press nothing more
-		controller.SwitchLocation( PD_General.Location.Planetside );
+		var elevationScale = controller.m_disembarked.m_terrainGrid.m_elevationScale;
 
-		yield return Frames( 5 );
-		yield return LandOnPlanet94At( place + Vector3.forward * 5.0f, done );
+		// ---- 2. the ruins of every region of 94 (the small rock planet: a generic type, none), 92 and 93 (Arth: a recent ruin in every region), worked out twice
+		var on94 = RegionRuinsOfPlanet( 94, elevationScale );
+		var on92 = RegionRuinsOfPlanet( 92, elevationScale );
+		var on93 = RegionRuinsOfPlanet( 93, elevationScale );
+		var on92Again = RegionRuinsOfPlanet( 92, elevationScale );
+		var land92 = LandRegionCount( 92 );
+		var land93 = LandRegionCount( 93 );
 
-		var said = new List<string>();
-		var roomBefore = playerData.m_terrainVehicle.GetRemainingVolume();
+		int ancient92 = 0, recent92 = 0, ancient93 = 0, recent93 = 0, withCurio = 0, all = 0, ancientWithEndurium = 0, ancientAll = 0, curioNotSpecial = 0, enduriumInRange = 0;
 
-		yield return PressCargo( said );
+		foreach ( var list in new[] { on92, on93 } )
+		{
+			if ( list == null )
+			{
+				continue;
+			}
 
-		var roomAfter = playerData.m_terrainVehicle.GetRemainingVolume();
+			foreach ( var ruin in list )
+			{
+				var isAncient = (bool) FieldOrNull( ruin, "m_isAncient" );
 
-		yield return PressCargo( said );
+				if ( list == on92 )
+				{
+					ancient92 += isAncient ? 1 : 0;
+					recent92 += isAncient ? 0 : 1;
+				}
+				else
+				{
+					ancient93 += isAncient ? 1 : 0;
+					recent93 += isAncient ? 0 : 1;
+				}
 
-		var roomAgain = playerData.m_terrainVehicle.GetRemainingVolume();
+				all++;
+				ancientAll += isAncient ? 1 : 0;
 
-		// ---- 3. back into the ship and out again at the same place: the ruin is where it was, and what was taken is gone
+				var hasCurio = false;
+				var hasEndurium = false;
+
+				foreach ( var item in (System.Collections.IList) FieldOrNull( ruin, "m_items" ) )
+				{
+					var artifactId = (int) FieldOrNull( item, "m_artifactId" );
+					var endurium = (int) FieldOrNull( item, "m_enduriumVolume" );
+
+					if ( artifactId >= 0 )
+					{
+						hasCurio = true;
+						curioNotSpecial += gameData.m_artifactList[ artifactId ].IsSpecial() ? 0 : 1;
+					}
+
+					if ( endurium > 0 )
+					{
+						hasEndurium = true;
+						enduriumInRange += ( ( endurium >= 10 ) && ( endurium <= 99 ) ) ? 1 : 0;
+					}
+				}
+
+				withCurio += hasCurio ? 1 : 0;
+				ancientWithEndurium += ( isAncient && hasEndurium ) ? 1 : 0;
+			}
+		}
+
+		var sameTwice = ( on92 != null ) && ( on92Again != null ) && ( on92.Count == on92Again.Count ) && ( on92.Count > 0 ) && ( (float) FieldOrNull( on92[ 0 ], "m_mapX" ) == (float) FieldOrNull( on92Again[ 0 ], "m_mapX" ) );
+		var curioShare = ( all > 0 ) ? withCurio / (float) all : 0.0f;
+		var ancient92Share = ( land92 > 0 ) ? ancient92 / (float) land92 : 0.0f;
+		var recent92Share = ( land92 > 0 ) ? recent92 / (float) land92 : 0.0f;
+		var recent93Share = ( land93 > 0 ) ? recent93 / (float) land93 : 0.0f;
+
+		// ---- 2b. with the Red Cylinder aboard the landing map tints the regions that hold an ancient ruin (decided 2026-10-19: a box for each would cover a
+		// planet of ruins): the middle of such a region in the danger colour, one without an ancient ruin clear
+		var redCylinder = gameData.FindArtifactId( "Red Cylinder" );
+		var getRegions = typeof( RedCylinder ).GetMethod( "GetAncientRuinRegions" );
+		var tintedRegions = -1;
+		var tintedOk = 0;
+		var clearOk = 0;
+		var tintSample = 0;
+		var clearSample = 0;
+
+		playerData.m_playerShip.AddArtifact( redCylinder );
+
+		var marks = SurveyMarks.GetTexture();
+
+		if ( ( getRegions != null ) && ( marks != null ) && ( getRegions.Invoke( null, null ) is List<int> ancientRegions ) )
+		{
+			tintedRegions = ancientRegions.Count;
+
+			var danger = UIKitTheme.GetViewTheme().m_statusDanger;
+
+			for ( var region = 0; region < 128 * 32; region += 37 )
+			{
+				// the middle of the region on the marks' texture (east-west -180 across, north-south -90 up)
+				var pixel = SurveyMarks.GetPixel( marks.width, marks.height, ( ( region % 128 ) + 0.5f ) * 360.0f / 128.0f - 180.0f, ( ( region / 128 ) + 0.5f ) * 180.0f / 32.0f - 90.0f );
+				var colour = marks.GetPixel( Mathf.FloorToInt( pixel.x ), Mathf.FloorToInt( pixel.y ) );
+				var tinted = ( colour.a > 0.1f ) && ( Mathf.Abs( colour.r - danger.r ) < 0.1f ) && ( Mathf.Abs( colour.g - danger.g ) < 0.1f ) && ( Mathf.Abs( colour.b - danger.b ) < 0.1f );
+
+				if ( ancientRegions.Contains( region ) )
+				{
+					tintSample++;
+					tintedOk += tinted ? 1 : 0;
+				}
+				else
+				{
+					clearSample++;
+					clearOk += ( colour.a < 0.05f ) ? 1 : 0;
+				}
+			}
+		}
+
+		playerData.m_playerShip.RemoveArtifact( redCylinder );
+
+		// ---- 3. on the ground: the region ruins about the vehicle only, and they follow it
+		var start = controller.m_terrainVehicle.transform.position;
+		var nearStart = RegionRuinsOnTheGround( start, 5.5f, out var fartherAtStart );
+		var curioRuin = nearStart.Find( ruin => RegionRuinCurio( ruin, out _ ) >= 0 );
+		var curioKey = ( curioRuin != null ) ? RegionRuinCurio( curioRuin, out _ ) : -1;
+		var curioPlace = ( curioRuin != null ) ? curioRuin.transform.position : Vector3.zero;
+
+		// what the Cargo button takes from it (the key it saves), then the vehicle 1500 units away to the east
+		if ( curioKey >= 0 )
+		{
+			surfaces.TakeRandomRuinItem( curioKey );
+		}
+
+		playerData.m_general.m_coordinates = start + Vector3.right * 1500.0f;
+
+		var waitUntil = Time.time + 1.5f;
+
+		while ( Time.time < waitUntil )
+		{
+			yield return null;
+		}
+
+		var moved = controller.m_terrainVehicle.transform.position;
+		var nearMoved = RegionRuinsOnTheGround( moved, 5.5f, out var fartherAfterMove );
+		var leftAtStart = 0;
+
+		foreach ( var ruin in nearMoved )
+		{
+			leftAtStart += ( Vector3.Distance( ruin.transform.position, start ) < 300.0f ) ? 1 : 0;
+		}
+
+		// and back: the ruin with the curio is there again, its curio taken (what Scan and Cargo read: PD_PlanetSurfaces.IsRandomRuinItemTaken)
+		playerData.m_general.m_coordinates = start;
+
+		waitUntil = Time.time + 1.5f;
+
+		while ( Time.time < waitUntil )
+		{
+			yield return null;
+		}
+
+		// (as a bool now: the next landing destroys these objects, and a destroyed object reads as null)
+		var ruinBack = RegionRuinsOnTheGround( start, 5.5f, out _ ).Find( ruin => Vector3.Distance( ruin.transform.position, curioPlace ) < 0.5f ) != null;
+		var takenWithinOrbit = ( curioKey >= 0 ) && surfaces.IsRandomRuinItemTaken( curioKey );
+
+		// ---- 4. out of the orbit and back (the original's DEPART): the curio is back in its ruin
 		controller.SwitchLocation( PD_General.Location.Planetside );
 
 		yield return Frames( 10 );
-		yield return DisembarkNow( done );
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
 
-		var randomRuinsAgain = RandomRuinsOnTheGround();
-		var placeAfter = ( randomRuinsAgain.Count > 0 ) ? Mathf.RoundToInt( randomRuinsAgain[ 0 ].transform.position.x ) + "/" + Mathf.RoundToInt( randomRuinsAgain[ 0 ].transform.position.z ) : "none";
+		var takenAfterLeaving = ( curioKey >= 0 ) && surfaces.IsRandomRuinItemTaken( curioKey );
+		var curioRuinAfter = RegionRuinsOnTheGround( start, 5.5f, out _ ).Find( ruin => Vector3.Distance( ruin.transform.position, curioPlace ) < 0.5f );
 
-		yield return PressCargo( said );
+		Log( "randomruins: 94 " + ( ( on94 == null ) ? "-" : on94.Count.ToString() ) + " | 92 ancient " + ancient92 + " recent " + recent92 + " of " + land92 + " land regions (" + ancient92Share.ToString( "0.00" ) + ", " + recent92Share.ToString( "0.00" ) + ") | 93 ancient " + ancient93 + " recent " + recent93 + " of " + land93 + " (" + recent93Share.ToString( "0.00" ) + ") | curios " + withCurio + " of " + all + " (" + curioShare.ToString( "0.00" ) + "), not special " + curioNotSpecial + "; ancient with Endurium " + ancientWithEndurium + " of " + ancientAll + ", in range " + enduriumInRange + " | same twice " + sameTwice + " | on the ground " + nearStart.Count + " (" + fartherAtStart + " too far), after moving " + nearMoved.Count + " (" + fartherAfterMove + " too far, " + leftAtStart + " left at the start) | curio key " + curioKey + ": ruin back " + ruinBack + ", taken " + takenWithinOrbit + " -> after leaving " + takenAfterLeaving + ", ruin there " + ( curioRuinAfter != null ) );
 
-		Log( "randomruins: planet 94 has " + randomRuins.Count + " random ruin (" + name + ") at " + placeBefore + " | room " + roomBefore + " -> " + roomAfter + " -> " + roomAgain + " | " + string.Join( " || ", said ) + " | after landing again at " + placeAfter );
+		Check( "randomruins: a generic planet (94, small rock) has no random ruins", ( on94 != null ) && ( on94.Count == 0 ), ( on94 == null ) ? "no RandomRuinRegions" : on94.Count + " ruins" );
+		Check( "randomruins: Arth (93) has a recent ruin in nearly every land region and no ancient one (its bytes 0 and 255)", ( on93 != null ) && ( ancient93 == 0 ) && ( recent93Share >= 0.7f ) && ( recent93Share <= 1.1f ), ancient93 + " / " + recent93 + " of " + land93 );
+		Check( "randomruins: planet 92 has an ancient ruin about one region in four and a recent one about one in three (its bytes 30 and 102)", ( on92 != null ) && ( ancient92Share >= 0.15f ) && ( ancient92Share <= 0.33f ) && ( recent92Share >= 0.22f ) && ( recent92Share <= 0.42f ), ancient92Share.ToString( "0.00" ) + " / " + recent92Share.ToString( "0.00" ) );
+		Check( "randomruins: three ruins in ten hold a curio, never a special artifact, and every ancient ruin has 1.0 to 9.9 cubic meters of Endurium", ( all > 0 ) && ( curioShare >= 0.22f ) && ( curioShare <= 0.36f ) && ( curioNotSpecial == withCurio ) && ( ancientWithEndurium == ancientAll ) && ( enduriumInRange == ancientAll ), curioShare.ToString( "0.00" ) + " " + curioNotSpecial + "/" + withCurio + " " + ancientWithEndurium + "/" + ancientAll + " " + enduriumInRange );
+		Check( "randomruins: a planet's region ruins are the same every time", sameTwice, sameTwice.ToString() );
+		Check( "randomruins: the ruins are placed in the regions about the terrain vehicle only, and follow it", ( nearStart.Count > 0 ) && ( fartherAtStart == 0 ) && ( nearMoved.Count > 0 ) && ( fartherAfterMove == 0 ) && ( leftAtStart == 0 ), nearStart.Count + " " + fartherAtStart + " | " + nearMoved.Count + " " + fartherAfterMove + " " + leftAtStart );
+		Check( "randomruins: with the Red Cylinder aboard the landing map tints the regions that hold an ancient ruin, and leaves the others clear", ( tintedRegions == ancient92 ) && ( tintSample > 0 ) && ( tintedOk == tintSample ) && ( clearSample > 0 ) && ( clearOk == clearSample ), tintedRegions + " regions (" + ancient92 + " ancient ruins), tinted " + tintedOk + "/" + tintSample + ", clear " + clearOk + "/" + clearSample );
+		Check( "randomruins: a curio taken from a ruin stays taken while the ship is in orbit, and is back after it leaves", ( curioKey >= 0 ) && ruinBack && takenWithinOrbit && !takenAfterLeaving && ( curioRuinAfter != null ), curioKey + " " + ruinBack + " " + takenWithinOrbit + " " + takenAfterLeaving + " " + ( curioRuinAfter != null ) );
 
-		var first = said[ 0 ];
-		var second = said[ 1 ];
-		var third = said[ 2 ];
-
-		Check( "randomruins: planet 94 has a random ruin", randomRuins.Count == 1, randomRuins.Count + " random ruins" );
-		Check( "randomruins: Cargo beside it takes what it holds aboard", first.Contains( "Captain, we have discovered" ) && ( roomAfter < roomBefore ), roomBefore + " -> " + roomAfter + " | " + first );
-		Check( "randomruins: what has been taken is not there again", !second.Contains( "Captain, we have discovered" ) && ( roomAgain == roomAfter ) && !third.Contains( "Captain, we have discovered" ), second + " || " + third );
-		Check( "randomruins: the ruin is at the same place on every visit", ( placeBefore != "none" ) && ( placeBefore == placeAfter ), placeBefore + " | " + placeAfter );
-
-		Finish( "scenario=randomruins ruin=" + name + " at=" + placeBefore, 0 );
+		Finish( "scenario=randomruins ruins92=" + ( ancient92 + recent92 ) + " ruins93=" + recent93 + " ground=" + nearStart.Count, 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 6: lava, and the loss of the terrain vehicle
@@ -25562,8 +25809,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
-		// planet 94 of the Arth system has an ancient random ruin
-		yield return LandInTheArthSystemAt( 94, Vector3.zero, done );
+		// planet 92 of the Arth system is a planet of ruins (roadmap 8.32: ancient and recent ruins region by region, placed about the terrain vehicle)
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
 
 		yield return Frames( 5 );
 
@@ -25574,18 +25821,18 @@ public class ClaudeProbe : MonoBehaviour
 
 		foreach ( Transform child in terrainRuins.transform )
 		{
-			if ( child.name.StartsWith( "Ancient ruin" ) || child.name.StartsWith( "Old Empire ruin" ) )
+			if ( child.name.Contains( " of region " ) )
 			{
 				Tools.WorldToLatLongCoordinates( child.position, out var eastWest, out var northSouth );
 
-				placed.Add( ( child.name.StartsWith( "Ancient" ) ? "ancient" : "old" ) + " " + eastWest.ToString( "F1" ) + "/" + northSouth.ToString( "F1" ) );
+				placed.Add( ( child.name.StartsWith( "Ancient" ) ? "ancient" : "recent" ) + " " + eastWest.ToString( "F1" ) + "/" + northSouth.ToString( "F1" ) );
 				placedPlaces.Add( new Vector2( eastWest, northSouth ) );
 			}
 		}
 
 		// ---- 2. where they are worked out from the planet's maps, as the Red Cylinder does from orbit
-		var planet = gameData.m_planetList[ 94 ];
-		var planetGenerator = controller.m_starSystem.GetPlanetController( 94 ).GetPlanetGenerator();
+		var planet = gameData.m_planetList[ 92 ];
+		var planetGenerator = controller.m_starSystem.GetPlanetController( 92 ).GetPlanetGenerator();
 		var getPlaces = typeof( TerrainRuins ).GetMethod( "GetRandomRuinPlaces" );
 		var worked = new List<string>();
 
@@ -25598,7 +25845,7 @@ public class ClaudeProbe : MonoBehaviour
 				var where = (Vector2) place.GetType().GetProperty( "Key" ).GetValue( place );
 				var ancient = (bool) place.GetType().GetProperty( "Value" ).GetValue( place );
 
-				worked.Add( ( ancient ? "ancient" : "old" ) + " " + where.x.ToString( "F1" ) + "/" + where.y.ToString( "F1" ) );
+				worked.Add( ( ancient ? "ancient" : "recent" ) + " " + where.x.ToString( "F1" ) + "/" + where.y.ToString( "F1" ) );
 			}
 		}
 
@@ -25652,9 +25899,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		playerData.m_playerShip.RemoveArtifact( redCylinder );
 
-		Log( "redcylinder: placed [" + string.Join( ", ", placed ) + "] worked out [" + string.Join( ", ", worked ) + "] | without it: sites " + withoutItSites + ", seen " + withoutItSeen + ", '" + withoutItMessages + "' | with it: sites " + withItSites + ", flashing " + withItFlashing + ", seen " + withItSeen + ", '" + withItMessages + "' | after 3.5 s: flashing " + afterwardsFlashing + ", seen " + afterwardsSeen );
+		Log( "redcylinder: placed [" + string.Join( ", ", placed ) + "] worked out " + worked.Count + " | without it: sites " + withoutItSites + ", seen " + withoutItSeen + ", '" + withoutItMessages + "' | with it: sites " + withItSites + ", flashing " + withItFlashing + ", seen " + withItSeen + ", '" + withItMessages + "' | after 3.5 s: flashing " + afterwardsFlashing + ", seen " + afterwardsSeen );
 
-		Check( "redcylinder: the random ruins are worked out from orbit where the surface places them", ( placed.Count > 0 ) && ( string.Join( ", ", placed ) == string.Join( ", ", worked ) ), string.Join( ", ", placed ) + " | " + string.Join( ", ", worked ) );
+		// (the surface places the regions about the vehicle only, the orbit works out all 4096: every ruin on the ground is one of those)
+		var notWorked = placed.FindAll( one => !worked.Contains( one ) );
+
+		Check( "redcylinder: the random ruins are worked out from orbit where the surface places them", ( placed.Count > 0 ) && ( notWorked.Count == 0 ), placed.Count + " on the ground, " + worked.Count + " worked out, not among them: " + string.Join( ", ", notWorked ) );
 		Check( "redcylinder: with the Red Cylinder aboard, the landing map flashes the planet's message and artifact sites when it opens, and says so", ( withItSites >= 1 ) && ( withItSites <= 10 ) && withItFlashing && withItSeen && withItMessages.Contains( "The Red Cylinder is flashing." ), withItSites + " " + withItFlashing + " " + withItSeen + " | " + withItMessages );
 		Check( "redcylinder: without it aboard nothing flashes (the control)", ( withoutItSites <= 0 ) && !withoutItSeen && !withoutItMessages.Contains( "The Red Cylinder is flashing" ), withoutItSites + " " + withoutItSeen + " | " + withoutItMessages );
 		Check( "redcylinder: the sites stop flashing after a few seconds", ( withItSites >= 1 ) && !afterwardsFlashing && !afterwardsSeen, afterwardsFlashing + " " + afterwardsSeen );
@@ -42588,7 +42838,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "surveymap: before the planet is analysed from orbit, the landing map has no marks", !shownBeforeAnalysis, shownBeforeAnalysis.ToString() );
 		Check( "surveymap: after the analysis, every mineral field and lifeform found is marked on the landing map in its colour, and the map is clear away from them", shownAfterAnalysis && ( survey != null ) && ( minerals > 0 ) && ( mineralsMarked == minerals ) && ( lifeforms > 0 ) && ( lifeformsMarked == lifeforms ) && clearAway, shownAfterAnalysis + " " + mineralsMarked + "/" + minerals + " " + lifeformsMarked + "/" + lifeforms + " " + clearAway );
 		Check( "surveymap: the marks take the colours of another scheme picked while the map is open, and the views' colours in the light mode", ( otherScheme > 0 ) && inOtherScheme && inLightMode, otherScheme + " " + inOtherScheme + " " + inLightMode );
-		Check( "surveymap: with the Red Cylinder aboard every ancient ruin is marked on the landing map; without it a planet not analysed has no marks", !shownWithout && shownWith && ( ruinPlaces.Count > 0 ) && ( ruinsMarked == ruinPlaces.Count ) && !shownAfter, shownWithout + " " + shownWith + " " + ruinsMarked + "/" + ruinPlaces.Count + " " + shownAfter );
+		Check( "surveymap: with the Red Cylinder aboard every fixed ancient ruin is marked with a box on the landing map (the random ones tint their regions, see randomruins); without it a planet not analysed has no marks", !shownWithout && shownWith && ( ruinPlaces.Count > 0 ) && ( ruinsMarked == ruinPlaces.Count ) && !shownAfter, shownWithout + " " + shownWith + " " + ruinsMarked + "/" + ruinPlaces.Count + " " + shownAfter );
 		Check( "surveymap: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=surveymap minerals=" + mineralsMarked + "/" + minerals + " lifeforms=" + lifeformsMarked + "/" + lifeforms + " ruins=" + ruinsMarked + "/" + ruinPlaces.Count + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
@@ -44390,8 +44640,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "ruinmodels: " + ruins.m_ruinTemplates.Length + " templates: " + string.Join( " | ", details ) );
 
-		// ---- 2. on the ground of planet 94 (one random ruin): the placed ruin is in its textured material
-		yield return LandOnPlanet94At( Vector3.zero, done );
+		// ---- 2. on the ground of planet 92 (a planet of ruins since roadmap 8.32, with random ruins in the regions about the vehicle): the placed ruins are in
+		// their textured material
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
 
 		var randomRuins = RandomRuinsOnTheGround();
 		var placedTextured = randomRuins.Count > 0;
@@ -44412,13 +44663,13 @@ public class ClaudeProbe : MonoBehaviour
 			controller.SwitchLocation( PD_General.Location.Planetside );
 
 			yield return Frames( 5 );
-			yield return LandOnPlanet94At( place + Vector3.forward * 40.0f, done );
+			yield return LandInTheArthSystemAt( 92, place + Vector3.forward * 40.0f, done );
 			yield return Frames( 10 );
 
-			RenderScreenPicture( System.IO.Path.Combine( System.IO.Path.GetTempPath(), "starflight-probe", "ruinmodels-on-94.png" ) );
+			RenderScreenPicture( System.IO.Path.Combine( System.IO.Path.GetTempPath(), "starflight-probe", "ruinmodels-on-92.png" ) );
 		}
 
-		Log( "ruinmodels: planet 94: " + randomRuins.Count + " random ruins on the ground, in their textured materials " + placedTextured );
+		Log( "ruinmodels: planet 92: " + randomRuins.Count + " random ruins on the ground, in their textured materials " + placedTextured );
 
 		var errorsDuring = s_errorCount - errorsBefore;
 

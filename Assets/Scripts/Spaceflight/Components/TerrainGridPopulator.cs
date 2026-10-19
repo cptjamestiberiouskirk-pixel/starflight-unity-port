@@ -47,9 +47,9 @@ public class TerrainGridPopulator : MonoBehaviour
 		m_spawnLists = null;
 	}
 
-	// places one object at a given place on the planet's map, with no random numbers: on the surface, turned by yaw degrees, and in the spawn list,
-	// so that nothing placed after it lands on it
-	protected GameObject PlaceObjectAt( GameObject template, float mapX, float mapY, float elevationScale, float yaw )
+	// places one object at a given place on the planet's map, with no random numbers: on the surface, turned by yaw degrees, and in the spawn list (unless
+	// told not to), so that nothing placed after it lands on it
+	protected GameObject PlaceObjectAt( GameObject template, float mapX, float mapY, float elevationScale, float yaw, bool addToSpawnList = true )
 	{
 		var normal = m_planetGenerator.GetBilinearSmoothedNormal( mapX, mapY, elevationScale * 0.125f );
 
@@ -61,7 +61,10 @@ public class TerrainGridPopulator : MonoBehaviour
 
 		var clonedObject = Instantiate( template, position, rotation, transform );
 
-		AddToSpawnList( position );
+		if ( addToSpawnList )
+		{
+			AddToSpawnList( position );
+		}
 
 		return clonedObject;
 	}
