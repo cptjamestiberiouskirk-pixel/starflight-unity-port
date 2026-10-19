@@ -24,6 +24,13 @@ public class PD_Specimen
 	// the value saved with it when it was captured (TerrainLifeforms)
 	public int m_value;
 
+	// where and when it was captured, which the ship's cargo list describes (CAPTAIN WEC73: its system, planet, location and date) - a specimen from a save
+	// written before has none (m_hasCapturePlace false)
+	public bool m_hasCapturePlace;
+	public int m_capturedNorthSouth;
+	public int m_capturedEastWest;
+	public string m_capturedStardateYMD;
+
 	// what the Trade Depot pays for it
 	public int GetSaleValue()
 	{

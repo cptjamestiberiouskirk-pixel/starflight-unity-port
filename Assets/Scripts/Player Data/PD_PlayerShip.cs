@@ -40,7 +40,7 @@ public class PD_PlayerShip
 	public int m_armorPoints;
 
 	// the shields regain their charge as the original's: 20 points on each of the ship's turns in an encounter, while below what the shielding can hold (COMBAT-OV
-	// COMBAT, WEF20 and WEEC4: class x 500), all of it when an encounter ends (HYPER-OV ENCCLEANUP, CHARGE-D), and none anywhere else (Encounter.UpdateShieldTurns)
+	// COMBAT, WEF20 and WEEC4: class x 500), all of it when an encounter ends (HYPER-OV ENCCLEANUP, CHARGE-D), and none anywhere else (Encounter.CombatPass)
 	public const int c_shieldPointsPerTurn = 20;
 
 	// true once the shield charge is kept when the shields are lowered (false in save files from before that - see ValidateShieldCharge)

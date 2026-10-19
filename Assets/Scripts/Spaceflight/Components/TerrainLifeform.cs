@@ -14,6 +14,10 @@ public class TerrainLifeform : MonoBehaviour
 	// its species (GD_Species.ForPlanet)
 	public GD_Species m_species;
 
+	// its place in the order the lifeforms of its planet are placed (the same every time): what has become of it is kept by it until the ship leaves the orbit
+	// (PD_PlanetSurfaces.LoseLifeform)
+	public int m_placeIndex;
+
 	// its hit points and stuns left, starting with its species'
 	public int m_hits;
 	public int m_stuns;
@@ -246,11 +250,25 @@ public class TerrainLifeform : MonoBehaviour
 		UpdateStatus();
 	}
 
+	// a lifeform that was killed on an earlier run of the terrain vehicle in this orbit lies dead where it is placed
+	public void LieDead()
+	{
+		m_hits = 0;
+
+		UpdateStatus();
+	}
+
 	// the notes' status check: "DIE <-- ?HITS>0 FALSE", "STUNNED <-- ?STUNS>0 FALSE ?STUNNED FALSE"
 	void UpdateStatus()
 	{
 		if ( m_hits <= 0 )
 		{
+			// it stays dead on later runs of the terrain vehicle until the ship leaves the orbit
+			if ( ( m_status != Status.Dead ) && ( m_populator != null ) )
+			{
+				m_populator.LifeformDied( this );
+			}
+
 			m_hits = 0;
 			m_status = Status.Dead;
 
@@ -743,8 +761,9 @@ public class TerrainLifeform : MonoBehaviour
 		return playerData.m_playerShip.HasArtifact( "Flat Device" ) || ( ( playerData.m_terrainVehicle != null ) && playerData.m_terrainVehicle.HasArtifact( "Flat Device" ) );
 	}
 
-	// how much harder the Flat Device makes it for a lifeform to hit: its chance is halved (the port's; the sources say only "difficult")
-	const int c_flatDeviceHitDivisor = 2;
+	// how much harder the Flat Device makes it for a lifeform to hit: the original multiplies its hit roll of 0 to 99 by 10 when the terrain vehicle has the
+	// Flat Device (BEHAV-OV WE8C2, ?FLAT), so a lifeform hits about a tenth as often
+	const int c_flatDeviceRollFactor = 10;
 
 	void AttackPlayer()
 	{
@@ -801,8 +820,8 @@ public class TerrainLifeform : MonoBehaviour
 				continue;
 			}
 
-			// the Flat Device's shield turns away half of the attacks that would hit
-			if ( shielded && ( hitRoll >= hitChance / c_flatDeviceHitDivisor ) )
+			// the Flat Device's shield turns away the attacks whose roll from 0 to 99, times 10, is not under the chance (BEHAV-OV WE8C2)
+			if ( shielded && ( ( hitRoll - 1 ) * c_flatDeviceRollFactor >= hitChance ) )
 			{
 				messages.AddText( "<color=white>" + phrase + ", but the shield turns it away.</color>" );
 

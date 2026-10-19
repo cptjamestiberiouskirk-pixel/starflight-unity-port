@@ -3,13 +3,14 @@ using System;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using TMPro;
 
 public class ShipConfigurationPanel : Panel
 {
 	enum State
 	{
-		MenuBar, BuyPart, SellPart, SelectClass, GiveName, ErrorMessage
+		MenuBar, BuyPart, SellPart, SelectClass, GiveName, ErrorMessage, RepairQuestion
 	}
 
 	enum GameObjects
@@ -54,6 +55,9 @@ public class ShipConfigurationPanel : Panel
 	Vector3 m_baseSelectionOffsetMin;
 	Vector3 m_baseSelectionOffsetMax;
 	float m_ignoreControllerTimer;
+
+	// what the repair the player is being asked about costs
+	int m_repairCost;
 
 	// constant values
 	const int c_numParts = 6;
@@ -151,6 +155,12 @@ public class ShipConfigurationPanel : Panel
 			case State.ErrorMessage:
 			{
 				UpdateControllerForErrorMessageState();
+				break;
+			}
+
+			case State.RepairQuestion:
+			{
+				UpdateControllerForRepairQuestionState();
 				break;
 			}
 		}
@@ -482,6 +492,7 @@ public class ShipConfigurationPanel : Panel
 
 			// we are currently showing the error message
 			case State.ErrorMessage:
+			case State.RepairQuestion:
 			{
 				UpdateScreenForErrorMessageState( gameObjectIsVisible );
 				break;
@@ -691,51 +702,102 @@ public class ShipConfigurationPanel : Panel
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 	}
 
-	// this is called if we clicked on the repair button - the Starport restores the armor at a price and the shields for nothing
+	// this is called if we clicked on the repair button: the original's repair asks first (CONFIG-OV WF346, WF2C5): a whole ship needs none, without the money it
+	// says so, and otherwise it gives the cost to repair the entire ship and asks "Shall we repair the ship? [N Y]", answered with the stick, right for yes
 	public void RepairClicked()
 	{
 		InputController.m_instance.Debounce();
 
 		var ship = DataController.m_instance.m_playerData.m_playerShip;
 		var bank = DataController.m_instance.m_playerData.m_bank;
-
-		var armorIsWhole = ship.m_armorPoints >= ship.GetMaximumArmorPoints();
-		var shieldsAreWhole = ship.m_shieldPoints >= ship.GetMaximumShieldPoints();
-
-		// nothing to repair?
-		if ( armorIsWhole && shieldsAreWhole && ship.AllSystemsAreWhole() )
-		{
-			SwitchToErrorMessageState( "The ship needs no repairs" );
-
-			return;
-		}
-
 		var cost = ship.GetStarportRepairCost();
 
-		if ( cost > bank.m_currentBalance )
+		// nothing to repair (the shields are refilled for nothing, as on every docking)
+		if ( ( cost <= 0 ) && ( ship.m_armorPoints >= ship.GetMaximumArmorPoints() ) && ship.AllSystemsAreWhole() )
 		{
-			SwitchToErrorMessageState( "Repairs cost " + cost + " M.U. - insufficient funds" );
+			ship.m_shieldPoints = Math.Max( ship.m_shieldPoints, ship.GetMaximumShieldPoints() );
+
+			SwitchToErrorMessageState( "No repairs are needed", false );
 
 			return;
 		}
 
-		// pay, and the ship is whole again (the engineer has nothing left to do)
-		bank.m_currentBalance -= cost;
+		var costLine = "Cost to repair entire ship: " + cost + " M.U.";
 
-		// the armor gets the full points of its class, as the original's repair sets them (CONFIG-OV): points left over a class lowered by the armor class
-		// equivalency (PD_PlayerShip.InstallArmor) go with it
-		ship.m_armorPoints = ship.GetMaximumArmorPoints();
+		// not enough money: the cost, and a beep
+		if ( cost > bank.m_currentBalance )
+		{
+			SwitchToErrorMessageState( costLine + "\nInsufficient funds" );
 
-		ship.m_shieldPoints = ship.GetMaximumShieldPoints();
-		ship.m_repairsAreUnderWay = false;
+			return;
+		}
 
-		// the ship's other systems are repaired with the armor, for nothing (as the shields)
-		ship.RestoreSystems();
+		// ask, with the stick held from the menu bar let go first
+		m_repairCost = cost;
 
-		SwitchToErrorMessageState( "Repairs complete" + ( ( cost > 0 ) ? ( " - " + cost + " M.U." ) : "" ), false );
+		SwitchToErrorMessageState( costLine + "\nShall we repair the ship?  [N Y]", false );
 
-		// play a ui sound
-		SoundController.m_instance.PlaySound( SoundController.Sound.Update );
+		m_currentState = State.RepairQuestion;
+		m_ignoreControllerTimer = 0.3f;
+	}
+
+	// the answer to "Shall we repair the ship?": right (or Y) is yes, left (or N) or cancel is no
+	void UpdateControllerForRepairQuestionState()
+	{
+		if ( m_ignoreControllerTimer > 0.0f )
+		{
+			return;
+		}
+
+		var input = InputController.m_instance;
+		var keyboard = Keyboard.current;
+		var yes = input.m_east || ( ( keyboard != null ) && keyboard.yKey.wasPressedThisFrame );
+		var no = input.m_west || input.m_cancel || ( ( keyboard != null ) && keyboard.nKey.wasPressedThisFrame );
+
+		if ( yes || no )
+		{
+			input.Debounce();
+
+			AnswerRepairQuestion( yes && !no );
+		}
+	}
+
+	// answers the repair question: yes pays and makes the ship whole (CONFIG-OV WF2FA), no changes nothing; either way the question goes and the menu bar comes
+	// back, with no message, as the original's
+	public void AnswerRepairQuestion( bool yes )
+	{
+		if ( m_currentState != State.RepairQuestion )
+		{
+			return;
+		}
+
+		if ( yes )
+		{
+			var ship = DataController.m_instance.m_playerData.m_playerShip;
+			var bank = DataController.m_instance.m_playerData.m_bank;
+
+			// pay, and the ship is whole again (the engineer has nothing left to do)
+			bank.m_currentBalance -= m_repairCost;
+
+			// the armor gets the full points of its class, as the original's repair sets them (CONFIG-OV): points left over a class lowered by the armor class
+			// equivalency (PD_PlayerShip.InstallArmor) go with it
+			ship.m_armorPoints = ship.GetMaximumArmorPoints();
+
+			ship.m_shieldPoints = ship.GetMaximumShieldPoints();
+			ship.m_repairsAreUnderWay = false;
+
+			// the ship's other systems are repaired with the armor, for nothing (as the shields)
+			ship.RestoreSystems();
+
+			// play a ui sound
+			SoundController.m_instance.PlaySound( SoundController.Sound.Update );
+		}
+		else
+		{
+			SoundController.m_instance.PlaySound( SoundController.Sound.Deactivate );
+		}
+
+		SwitchToMenuBarState();
 	}
 
 	// this is called if we clicked on the name button

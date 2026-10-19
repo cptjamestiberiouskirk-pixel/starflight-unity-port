@@ -504,6 +504,10 @@ public class TVCargoButton : ShipButton
 	static int s_markedItem;
 	static int s_markedArtifactId = -1;
 
+	// the Black Egg just dropped, waiting for the answer to "Arm this device?" (-1 for none), and the line that said it was dropped
+	static int s_eggDroppedCargoId = -1;
+	static string s_eggDroppedText = "";
+
 	// the artifact marked on the cargo list while the list is open (-1 for an element, an empty hold or a closed list: the cargo display shows it turning)
 	public static int GetMarkedArtifactId()
 	{
@@ -663,16 +667,28 @@ public class TVCargoButton : ShipButton
 
 		SoundController.m_instance.PlaySound( SoundController.Sound.Transporter );
 
-		// what the messages say about it - a Black Egg is armed by dropping it ("to activate it, you must drop it" - the Starport's analysis)
+		// what the messages say about it
 		var droppedText = "<color=green>Dropped " + description + ".</color>";
-
-		if ( ( item.m_artifactId >= 0 ) && ( item.m_artifactId == DataController.m_instance.m_gameData.FindArtifactId( "Black Egg" ) ) )
-		{
-			droppedText += "\n<color=red>The Black Egg is armed.</color>";
-		}
 
 		// the display shows the hold
 		SpaceflightController.m_instance.m_displayController.m_terrainVehicleDisplay.Show();
+
+		// a Black Egg is armed only if the crew says so ("to activate it, you must drop it" - the Starport's analysis; "ARM THIS DEVICE? NO [  ] YES" - ITEMS-OV
+		// WE9AA): it lies unarmed until the answer, which AnswerArmEgg takes
+		if ( ( item.m_artifactId >= 0 ) && ( item.m_artifactId == DataController.m_instance.m_gameData.FindArtifactId( "Black Egg" ) ) )
+		{
+			droppedCargo.m_leftUnarmed = true;
+
+			s_eggDroppedCargoId = droppedCargo.m_id;
+			s_eggDroppedText = droppedText;
+
+			SpaceflightController.m_instance.m_messages.Clear();
+			SpaceflightController.m_instance.m_messages.AddText( droppedText + "\n<color=white>Arm this device?</color>" );
+
+			SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.TerrainVehicleArmEgg );
+
+			return;
+		}
 
 		// anything left to drop?
 		if ( BuildCargoItems().Count == 0 )
@@ -686,6 +702,40 @@ public class TVCargoButton : ShipButton
 		}
 
 		ShowCargoList( droppedText );
+	}
+
+	// the answer to "Arm this device?" after the Black Egg was dropped: yes arms the egg where it lies; then back to the cargo list, or to the terrain vehicle if
+	// the hold is empty
+	public static void AnswerArmEgg( bool arm )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var droppedCargo = ( ( s_eggDroppedCargoId >= 0 ) && ( playerData.m_planetSurfaces != null ) ) ? playerData.m_planetSurfaces.FindDroppedCargo( s_eggDroppedCargoId ) : null;
+		var text = s_eggDroppedText;
+
+		if ( arm && ( droppedCargo != null ) )
+		{
+			droppedCargo.m_leftUnarmed = false;
+
+			text += "\n<color=red>The Black Egg is armed.</color>";
+		}
+
+		s_eggDroppedCargoId = -1;
+		s_eggDroppedText = "";
+
+		// anything left to drop?
+		if ( BuildCargoItems().Count == 0 )
+		{
+			SpaceflightController.m_instance.m_messages.Clear();
+			SpaceflightController.m_instance.m_messages.AddText( text + "\n<color=yellow>Terrain Vehicle Cargo:</color>\n<color=white>Empty</color>" );
+
+			BackToTerrainVehicle();
+
+			return;
+		}
+
+		SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.TerrainVehicleCargo );
+
+		ShowCargoList( text );
 	}
 
 	// drops everything in the terrain vehicle's cargo hold on the ground where it is, as the Drop button does one item (the original's >DEBRIS, when the
@@ -772,6 +822,14 @@ public class TVCargoButton : ShipButton
 
 			var remainingVolume = playerData.m_terrainVehicle.GetRemainingVolume();
 
+			// the wreck of a terrain vehicle is far too big for the hold (MOVE-OV WEF48 makes it 300 cubic meters)
+			if ( droppedCargo.m_isVehicleWreck )
+			{
+				text += ( ( text == "" ) ? "" : "\n" ) + "<color=yellow>The wreck of a terrain vehicle lies here, far too big for the cargo hold.</color>";
+
+				continue;
+			}
+
 			if ( ( droppedCargo.m_artifactId >= 0 ) && ( droppedCargo.m_artifactId < gameData.m_artifactList.Length ) )
 			{
 				var artifact = gameData.m_artifactList[ droppedCargo.m_artifactId ];
@@ -781,6 +839,12 @@ public class TVCargoButton : ShipButton
 					text += ( ( text == "" ) ? "" : "\n" ) + "<color=yellow>The " + artifact.m_name + " lies here, but the cargo hold has no room for it.</color>";
 
 					continue;
+				}
+
+				// picking up an armed Black Egg disarms it, and says so (ITEMS-OV WE9FA: "DISARMING DEVICE")
+				if ( ( droppedCargo.m_artifactId == gameData.FindArtifactId( "Black Egg" ) ) && !droppedCargo.m_leftUnarmed )
+				{
+					text += ( ( text == "" ) ? "" : "\n" ) + "<color=white>Disarming device.</color>";
 				}
 
 				playerData.m_terrainVehicle.AddArtifact( droppedCargo.m_artifactId );
