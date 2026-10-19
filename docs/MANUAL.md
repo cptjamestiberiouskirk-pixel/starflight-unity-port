@@ -239,7 +239,7 @@ Flying inside a star system uses no fuel.
 
 ### In hyperspace
 
-The coordinates at the top show where you are. Stars appear as you fly; fly into one to enter its system.
+The coordinates at the top show where you are. Stars appear as you fly; fly into one to enter its system. The map runs from 0 to 249 across and 0 to 219 up: at its edge the ship goes no further, and flying into the edge at a slant slides you along it.
 
 **The Starmap** (Navigation, **Starmap**, hyperspace only) pauses the game and shows the region around you. Move the cursor with the direction keys: the top line shows your position, the cursor's, the distance and **the fuel the trip needs**. Escape or Enter closes it.
 

@@ -62,6 +62,13 @@ public class PlayerShip : MonoBehaviour
 	// in the encounter (6 with one ship, 3 with two, 2 from three); with no direction held the ship stops at once and the step goes back to 1
 	const int c_encounterStepPasses = 96;
 	const int c_encounterSteps = 6;
+
+	// the edge of hyperspace holds the ship, as the original's (HYPER-OV FLY, WEE53): each axis is kept within the map, 0 to 1992 of the original's units across
+	// (map x 0 to 249) and 0 to 1752 along (map y 0 to 219), with no message and the heading kept, so a ship flying into the edge at a slant slides along it. A
+	// place outside the map (a ship coming out of a star system or a flux at the edge) is not moved, and the next step brings the ship back in
+	public const float c_hyperspaceLowestCoordinate = -32768.0f;
+	public const float c_hyperspaceHighestX = ( 249.0f - 128.0f ) * 256.0f;
+	public const float c_hyperspaceHighestZ = ( 219.0f - 128.0f ) * 256.0f;
 	float m_encounterPassTimer;
 	int m_encounterPasses;
 
@@ -271,6 +278,13 @@ public class PlayerShip : MonoBehaviour
 
 				// make sure the ship stays on the zero plane
 				newPosition.y = 0.0f;
+
+				// in hyperspace the edge of the map holds the ship
+				if ( playerData.m_general.m_location == PD_General.Location.Hyperspace )
+				{
+					newPosition.x = Mathf.Clamp( newPosition.x, c_hyperspaceLowestCoordinate, c_hyperspaceHighestX );
+					newPosition.z = Mathf.Clamp( newPosition.z, c_hyperspaceLowestCoordinate, c_hyperspaceHighestZ );
+				}
 
 				// update the player position
 				transform.position = newPosition;
