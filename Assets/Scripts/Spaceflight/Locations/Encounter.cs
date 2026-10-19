@@ -403,10 +403,65 @@ public class Encounter : MonoBehaviour
 	}
 
 	// the player has flown out of the encounter - go back to where the ship was when the encounter began
-	// the Crystal Pearl has warped the ship out of the encounter - it leaves the encounter the way it would by flying out of it
-	public void WarpOut()
+	// the Crystal Pearl is "an automatic warp-out device for when a ship is heavily damaged" (the Thrynn): the original's MANEUVER asks it first (HYPERMSG-OV ?PRL):
+	// in an encounter with armed aliens and a living alien ship, not the police, with the Pearl (artifact 13) aboard and the ship heavily damaged (SCIENCE ?HEAVY:
+	// the status display's damage under 50, PD_PlayerShip.GetOverallIntegrity) - true if it fires
+	public bool CrystalPearlFires()
 	{
-		LeaveEncounter();
+		var playerData = DataController.m_instance.m_playerData;
+
+		if ( ( m_pdEncounter == null ) || ( m_gdEncounter == null ) || ( playerData.m_general.m_location != PD_General.Location.Encounter ) )
+		{
+			return false;
+		}
+
+		return AliensAreArmed() && ( GetAlienShipsPresent() > 0 ) && ( m_gdEncounter.m_race != GameData.Race.InterstelPolice ) && playerData.m_playerShip.HasArtifact( "Crystal Pearl" ) && ( playerData.m_playerShip.GetOverallIntegrity() < c_crystalPearlHeavyDamage );
+	}
+
+	// the integrity under which the ship is heavily damaged (SCIENCE ?HEAVY: WE760 < 50)
+	const int c_crystalPearlHeavyDamage = 50;
+
+	// how far off the place the Crystal Pearl draws the ship comes out, in the original's units (JMPSHP: RCOLLIDE + 1)
+	const float c_crystalPearlStepUnits = 4.0f;
+
+	// the Crystal Pearl fires: it pulses, the encounter ends as it always does, and the ship goes out to hyperspace, to a place drawn anywhere on the map and a step
+	// off it in one of the eight directions, its navigator's bearings lost for a while (HYPERMSG-OV ?PRL: THE CRYSTAL PEARL IS PULSING!, the unnests to hyperspace,
+	// then JMPSHP: RRND 0 2000 and RRND 0 1760 of the original's units, 8 to a map coordinate, and NAV-TIME)
+	public void WarpWithCrystalPearl()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+
+		controller.m_messages.Clear();
+		controller.m_messages.AddText( "<color=yellow>The Crystal Pearl is pulsing!</color>" );
+
+		// the encounter ends as every encounter does: the race remembers it, the shields are charged again, and a minute without another one unless it began in
+		// orbit
+		RememberRaceMood();
+
+		playerData.m_playerShip.RechargeShieldsFully();
+
+		if ( playerData.m_general.m_lastLocation != PD_General.Location.InOrbit )
+		{
+			controller.HoldOffEncounters();
+		}
+
+		SayLeavingEncounter();
+
+		// nothing that is still in the air follows the ship
+		CombatController.m_instance.ClearMissiles();
+
+		// the place, in the original's units
+		var directions = new[] { new Vector3( 1.0f, 0.0f, 0.0f ), new Vector3( 1.0f, 0.0f, 1.0f ), new Vector3( 0.0f, 0.0f, 1.0f ), new Vector3( -1.0f, 0.0f, 1.0f ), new Vector3( -1.0f, 0.0f, 0.0f ), new Vector3( -1.0f, 0.0f, -1.0f ), new Vector3( 0.0f, 0.0f, -1.0f ), new Vector3( 1.0f, 0.0f, -1.0f ) };
+		var units = new Vector3( Random.Range( 0, 2000 ), 0.0f, Random.Range( 0, 1760 ) ) + directions[ Random.Range( 0, directions.Length ) ] * c_crystalPearlStepUnits;
+
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( units / 8.0f );
+		playerData.m_general.m_currentSpeed = 0.0f;
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		// and the navigator has lost the ship's bearings, as after a flux
+		controller.LoseBearings();
 	}
 
 	void LeaveEncounter()
