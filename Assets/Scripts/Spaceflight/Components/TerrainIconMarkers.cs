@@ -122,7 +122,8 @@ public class TerrainIconMarkers : MonoBehaviour
 			}
 		}
 
-		LateUpdate();
+		// in place at once (Show runs inside the Map button's Execute, before the console has made it the running button, so not LateUpdate's check)
+		PlaceMarkers();
 	}
 
 	// the Map is at this height now
@@ -197,7 +198,7 @@ public class TerrainIconMarkers : MonoBehaviour
 		return null;
 	}
 
-	// unity late update - the markers follow what they mark, turn with the camera and keep their size on the screen
+	// unity late update
 	void LateUpdate()
 	{
 		// the Map is over: the markers and the key go
@@ -208,6 +209,12 @@ public class TerrainIconMarkers : MonoBehaviour
 			return;
 		}
 
+		PlaceMarkers();
+	}
+
+	// the markers follow what they mark, turn with the camera and keep their size on the screen
+	void PlaceMarkers()
+	{
 		if ( m_camera == null )
 		{
 			m_camera = Camera.main;
