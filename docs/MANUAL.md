@@ -150,7 +150,7 @@ Buy, sell, repair and name your ship.
 
 - **Buy** and **Sell**: cargo pods, engines, shielding, armor, a missile launcher and a laser cannon. Every part but the pods comes in classes 1 to 5 (prices in [section 14](#ship-equipment)). The ship holds one of each part: sell the old one before buying another class. A part sells back for what it is worth in its condition.
 - **Cargo pods**: 500 M.U. each, up to 16. Each holds 50 cubic meters. **The ship starts with none**, so it can carry no cargo until you buy some.
-- **Repair**: the Starport restores the armor for 4 M.U. a point and the hull for 250 M.U. a point of its integrity, and repairs damaged equipment by the part's price and how badly it is damaged. Shields are refilled free.
+- **Repair**: the Starport restores the armor for 4 M.U. a point and the hull for 250 M.U. a point of its integrity, and repairs damaged equipment by the part's price and how badly it is damaged. Shields are refilled free. Repair first tells you what the whole repair costs and asks "Shall we repair the ship? [N Y]": press right for yes, left for no. It is all or nothing.
 - **Name**: christen the ship. It cannot launch without a name.
 
 The right side shows what is installed, with the ship's mass, its acceleration and the Endurium aboard.

@@ -1722,6 +1722,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioHyperspaceEdge();
 				break;
 
+			case "starport-repairquestion":
+				yield return ScenarioStarportRepairQuestion();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -20109,6 +20113,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		message[ 0 ] = panel.m_errorMessageText.text;
 
+		// the repair asks first (since 2026-10-18, as the original's): yes
+		if ( Equals( GetField( panel, "m_currentState" ).ToString(), "RepairQuestion" ) )
+		{
+			Call( panel, "AnswerRepairQuestion", true );
+		}
+
 		// back to the menu, as the player's next key would
 		if ( Equals( GetField( panel, "m_currentState" ).ToString(), "ErrorMessage" ) )
 		{
@@ -20203,10 +20213,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "starport-repair: a whole ship: " + costWhole + " (" + messageWhole + ") | class 1 armor at 200 of 500, shields empty: " + costClass1 + " M.U. (" + messageClass1 + "), armor " + armorAfterClass1 + ", shields " + shieldsAfterClass1 + " of " + ship.GetMaximumShieldPoints() + " | a bare hull at 100 of 250: " + costBareHull + " M.U., armor " + armorAfterBareHull + " | with 10 M.U.: " + costTooPoor + " (" + messageTooPoor + "), armor " + armorTooPoor + " | the ledger on closing: " + ledgerEntry );
 
-		Check( "starport-repair: a whole ship needs no repairs and pays nothing", ( costWhole == 0 ) && messageWhole.Contains( "no repairs" ), costWhole + " | " + messageWhole );
+		Check( "starport-repair: a whole ship needs no repairs and pays nothing", ( costWhole == 0 ) && messageWhole.ToLowerInvariant().Contains( "no repairs" ), costWhole + " | " + messageWhole );
 		Check( "starport-repair: the missing armor is paid at 4 M.U. a point, as the original's, and the ship is whole again with full shields", ( costClass1 == 1200 ) && ( armorAfterClass1 == 500 ) && ( shieldsAfterClass1 == ship.GetMaximumShieldPoints() ), costClass1 + ", " + armorAfterClass1 + ", " + shieldsAfterClass1 );
 		Check( "starport-repair: a bare hull is repaired at 4 M.U. a point too", ( costBareHull == 600 ) && ( armorAfterBareHull == 250 ), costBareHull + ", " + armorAfterBareHull );
-		Check( "starport-repair: without the money the repair is refused and nothing changes", ( costTooPoor == 0 ) && ( armorTooPoor == 100 ) && messageTooPoor.Contains( "insufficient funds" ), costTooPoor + ", " + armorTooPoor + " | " + messageTooPoor );
+		Check( "starport-repair: without the money the repair is refused and nothing changes", ( costTooPoor == 0 ) && ( armorTooPoor == 100 ) && messageTooPoor.ToLowerInvariant().Contains( "insufficient funds" ), costTooPoor + ", " + armorTooPoor + " | " + messageTooPoor );
 
 		Log( "starport-repair: a class 3 laser cannon at 40% and the sensors at 50%: " + costSystems + " M.U., then lasers " + lasersAfter + "%, sensors " + sensorsAfter + "% | a class 5 missile launcher sells for " + resaleWhole + " whole and " + resaleHalf + " at 50%" );
 
@@ -34617,6 +34627,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		panel.RepairClicked();
 
+		// the repair asks first (since 2026-10-18, as the original's): yes
+		if ( Equals( GetField( panel, "m_currentState" ).ToString(), "RepairQuestion" ) )
+		{
+			Call( panel, "AnswerRepairQuestion", true );
+		}
+
 		Log( "armorequivalency: repaired: " + ship.m_armorPoints + " points, hull " + ship.GetHullIntegrity() );
 
 		Check( "armorequivalency: the Starport repair sets the armor to its class's full 750 points", ( ship.m_armorPoints == 750 ) && ( ship.GetHullIntegrity() == 100 ), ship.m_armorPoints + " points, hull " + ship.GetHullIntegrity() );
@@ -47918,6 +47934,114 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "hyperspaceedge: the ship is still in hyperspace, no star or flux on the way", stayedInHyperspace, playerData.m_general.m_location.ToString() );
 
 		Finish( "scenario=hyperspaceedge checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: the Starport asks before repairing (since 2026-10-18)
+
+	// the state of the Ship Configuration panel, by name (State is private to the panel)
+	static string ShipConfigurationState( ShipConfigurationPanel panel )
+	{
+		var state = GetField( panel, "m_currentState" );
+
+		return ( state != null ) ? state.ToString() : "";
+	}
+
+	// presses a direction (or cancel) once on the panel, after the question's 0.3 s, as the player's stick does
+	IEnumerator AnswerWithStick( ShipConfigurationPanel panel, string input )
+	{
+		yield return new WaitForSecondsRealtime( 0.4f );
+
+		SetInput( input, true );
+
+		Call( panel, "Tick" );
+
+		SetInput( input, false );
+
+		yield return Frames( 2 );
+	}
+
+	// the Starport's repair asks first, as the original's (CONFIG-OV WF346, WF2C5): "Cost to repair entire ship: N M.U." and "Shall we repair the ship? [N Y]",
+	// right for yes and left for no; a whole ship needs none, and without the money it says so and asks nothing. The code before repaired at once
+	IEnumerator ScenarioStarportRepairQuestion()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var bank = playerData.m_bank;
+		var panel = FindPanel<ShipConfigurationPanel>();
+
+		bank.m_currentBalance = 100000;
+		ship.m_shieldingClass = 1;
+		ship.m_armorClass = 1;
+
+		yield return OpenPanel( panel, "ship configuration" );
+
+		// ---- 1. class 1 armor at 200 of 500 points and the hull at 90: Repair asks, and nothing changes yet
+		ship.m_armorPoints = 200;
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Hull, 90 );
+
+		var cost = ship.GetStarportRepairCost();
+
+		panel.RepairClicked();
+
+		yield return Frames( 2 );
+
+		var askState = ShipConfigurationState( panel );
+		var askText = panel.m_errorMessageText.text;
+		var unchangedWhileAsking = ( bank.m_currentBalance == 100000 ) && ( ship.m_armorPoints == 200 ) && ( ship.GetHullIntegrity() == 90 );
+
+		// ---- 2. left: no, and nothing changes
+		yield return AnswerWithStick( panel, "m_west" );
+
+		var noState = ShipConfigurationState( panel );
+		var unchangedAfterNo = ( bank.m_currentBalance == 100000 ) && ( ship.m_armorPoints == 200 ) && ( ship.GetHullIntegrity() == 90 );
+
+		// ---- 3. Repair again, right: yes, paid, and the ship is whole
+		if ( askState == "RepairQuestion" )
+		{
+			panel.RepairClicked();
+
+			yield return Frames( 2 );
+			yield return AnswerWithStick( panel, "m_east" );
+		}
+
+		var yesState = ShipConfigurationState( panel );
+		var paid = 100000 - bank.m_currentBalance;
+		var wholeAfterYes = ( ship.m_armorPoints == ship.GetMaximumArmorPoints() ) && ( ship.GetHullIntegrity() == 100 );
+
+		// ---- 4. the controls: a whole ship needs no repairs, and without the money it says so; neither asks
+		panel.RepairClicked();
+
+		yield return Frames( 2 );
+
+		var wholeState = ShipConfigurationState( panel );
+		var wholeText = panel.m_errorMessageText.text;
+
+		Call( panel, "SwitchToMenuBarState" );
+
+		ship.m_armorPoints = 100;
+		bank.m_currentBalance = 10;
+
+		panel.RepairClicked();
+
+		yield return Frames( 2 );
+
+		var poorState = ShipConfigurationState( panel );
+		var poorText = panel.m_errorMessageText.text;
+		var poorUnchanged = ( bank.m_currentBalance == 10 ) && ( ship.m_armorPoints == 100 );
+
+		Call( panel, "SwitchToMenuBarState" );
+
+		yield return ClosePanel( panel, "ship configuration" );
+
+		Log( "starport-repairquestion: cost " + cost + "; asked: " + askState + " '" + askText.Replace( "\n", " / " ) + "', unchanged " + unchangedWhileAsking + "; no: " + noState + ", unchanged " + unchangedAfterNo + "; yes: " + yesState + ", paid " + paid + ", whole " + wholeAfterYes + "; whole ship: " + wholeState + " '" + wholeText + "'; too poor: " + poorState + " '" + poorText.Replace( "\n", " / " ) + "', unchanged " + poorUnchanged );
+
+		Check( "starport-repairquestion: Repair gives the cost to repair the entire ship and asks first, and nothing changes yet (the code before repaired at once)", ( askState == "RepairQuestion" ) && askText.Contains( "Cost to repair entire ship: " + cost + " M.U." ) && askText.Contains( "Shall we repair the ship?" ) && unchangedWhileAsking, askState + " | " + askText );
+		Check( "starport-repairquestion: left (no) leaves everything as it was and goes back to the menu", ( noState == "MenuBar" ) && unchangedAfterNo, noState + " " + unchangedAfterNo );
+		Check( "starport-repairquestion: right (yes) pays the cost and makes the ship whole", ( yesState == "MenuBar" ) && ( paid == cost ) && wholeAfterYes, yesState + " paid " + paid + " of " + cost + " whole " + wholeAfterYes );
+		Check( "starport-repairquestion: a whole ship needs no repairs, and is not asked (control)", ( wholeState == "ErrorMessage" ) && wholeText.ToLowerInvariant().Contains( "no repairs" ), wholeState + " | " + wholeText );
+		Check( "starport-repairquestion: without the money it says so and asks nothing (control)", ( poorState == "ErrorMessage" ) && poorText.ToLowerInvariant().Contains( "insufficient funds" ) && poorUnchanged, poorState + " | " + poorText );
+
+		Finish( "scenario=starport-repairquestion checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
