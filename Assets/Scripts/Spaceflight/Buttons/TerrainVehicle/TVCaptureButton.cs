@@ -45,6 +45,12 @@ public class TVCaptureButton : ShipButton
 			return Refuse( "The lifeform must be stunned first." );
 		}
 
+		// one specimen of a species a landing (ITEMS-OV WE75B, "DUPLICATE SPECIMEN")
+		if ( TerrainLifeforms.WasCaptured( lifeform.m_species ) )
+		{
+			return Refuse( "Duplicate specimen." );
+		}
+
 		lifeforms.StartCapture( lifeform );
 
 		return false;

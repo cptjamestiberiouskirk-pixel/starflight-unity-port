@@ -234,6 +234,9 @@ public class PlayerCamera : MonoBehaviour
 
 	public void PlayerHasLanded()
 	{
+		// a new landing: the lifeforms recorded and captured on the last one may be again
+		TerrainLifeforms.NewLanding();
+
 		var spaceflightController = SpaceflightController.m_instance;
 
 		// a landing without the fuel for it is a crash, and a planet of more than 7.99 G crushes the hull: the game is over (LAND-OV WF258 and WF1F1)

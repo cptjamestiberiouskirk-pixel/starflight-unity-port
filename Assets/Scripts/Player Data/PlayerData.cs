@@ -194,8 +194,8 @@ public class PlayerData
 		return interest;
 	}
 
-	// Interstel pays for the lifeform data recorded since the last visit (planet.txt: "When the player returns to starport recorded information is automatically
-	// paid for") - returns what it paid
+	// Interstel pays for lifeform data an older save file recorded before roadmap 8.18 (the 1984 notes paid it on docking; the shipped game's recordings are items
+	// of the hold, sold at the Trade Depot) - returns what it paid
 	public int PayLifeformData()
 	{
 		var value = m_general.m_unpaidLifeformDataValue;
