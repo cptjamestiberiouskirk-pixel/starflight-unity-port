@@ -92,7 +92,7 @@ public class LogPlanetButton : ShipButton
 							  "Lithosphere: " + lithosphere + "\n" +
 							  "Surface: " + surface + "\n" +
 							  "Weather: " + weather + "\n" +
-							  "Bio Density: " + planet.m_bioDensity + "%\n" +
+							  "Bio Density: " + PlayerData.GetBioDensityOf( planet ) + "%\n" +
 							  "Mineral Density: " + planet.m_mineralDensity + "%";
 
 				// get stardate
