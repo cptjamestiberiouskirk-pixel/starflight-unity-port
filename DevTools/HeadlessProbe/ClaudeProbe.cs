@@ -858,8 +858,8 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCrystalPearl();
 				break;
 
-			case "dodecahedron":
-				yield return ScenarioDodecahedron();
+			case "pearlchase":
+				yield return ScenarioPearlChase();
 				break;
 
 			case "shimmeringball":
@@ -1702,6 +1702,22 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioJettison();
 				break;
 
+			case "lookland":
+				yield return ScenarioLookLand();
+				break;
+
+			case "depositminerals":
+				yield return ScenarioDepositMinerals();
+				break;
+
+			case "planetrefill":
+				yield return ScenarioPlanetRefill();
+				break;
+
+			case "alienpostures":
+				yield return ScenarioAlienPostures();
+				break;
+
 			case "starport-repairquestion":
 				yield return ScenarioStarportRepairQuestion();
 				break;
@@ -1776,13 +1792,15 @@ public class ClaudeProbe : MonoBehaviour
 				continue;
 			}
 
-			// on the circle around the player, facing the middle, as Encounter.AddAlienShips puts a later ship
-			var randomPosition = UnityEngine.Random.insideUnitCircle;
-			var coordinates = Vector3.Normalize( new Vector3( randomPosition.x, 0.0f, randomPosition.y ) ) * 4096.0f;
+			// on the square 15 cells round the player, facing the player, as Encounter.AddAlienShips puts a later ship (HYPERMSG-OV WE616); on code from before the
+			// original's combat turns a later ship came on a circle 4096 units out
+			var side = UnityEngine.Random.Range( -15, 16 );
+			var edge = ( UnityEngine.Random.Range( 0, 2 ) == 0 ) ? -15 : 15;
+			var coordinates = ( ( UnityEngine.Random.Range( 0, 2 ) == 0 ) ? new Vector3( side, 0.0f, edge ) : new Vector3( edge, 0.0f, side ) ) * CombatController.c_unitsPerCell;
 			var direction = -Vector3.Normalize( coordinates );
 
 			alienShip.m_coordinates = coordinates;
-			alienShip.m_targetCoordinates = Vector3.zero;
+			alienShip.m_targetCoordinates = coordinates;
 			alienShip.m_currentDirection = direction;
 			alienShip.m_lastDirection = direction;
 			alienShip.m_currentBankingAngle = 0.0f;
@@ -14251,13 +14269,14 @@ public class ClaudeProbe : MonoBehaviour
 
 			var position = deposits[ i ].transform.position;
 
-			placement = ( placement * 31 + Mathf.RoundToInt( position.x ) * 7 + Mathf.RoundToInt( position.z ) * 3 + deposits[ i ].m_elementId ) % 1000000007L;
+			// (the places alone: a deposit's element is drawn apart from the placement since roadmap 8.16, and may differ)
+			placement = ( placement * 31 + Mathf.RoundToInt( position.x ) * 7 + Mathf.RoundToInt( position.z ) * 3 ) % 1000000007L;
 		}
 
 		Log( "deposits: planet 90 has " + deposits.Length + " deposits, from " + Tools.VolumeToText( smallest ) + " to " + Tools.VolumeToText( largest ) + " cubic meters, " + Tools.VolumeToText( total ) + " in all; " + outside + " outside 1.0 to 9.9, " + notWholeCubicMeters + " not whole cubic meters; placement checksum " + placement );
 
 		// the size is still one random draw per deposit, so the deposits (and everything placed after them) are where they were with 1 to 5 cubic meters
-		Check( "deposits: the deposits are where they were (the placement checksum of the deposits of 1 to 5 cubic meters)", placement == 789127093L, placement.ToString() );
+		Check( "deposits: the deposits are where they were (the placement checksum of the deposits of 1 to 5 cubic meters)", placement == 418660676L, placement.ToString() );
 		Check( "deposits: every deposit holds 1.0 to 9.9 cubic meters in tenths, as the original's", ( outside == 0 ) && ( largest > 50 ) && ( notWholeCubicMeters > 0 ), "from " + Tools.VolumeToText( smallest ) + " to " + Tools.VolumeToText( largest ) + " cubic meters, " + outside + " of " + deposits.Length + " outside 1.0 to 9.9, " + notWholeCubicMeters + " not whole cubic meters" );
 
 		// ---- 2. mine one with the real button (the mining laser, TVMineButton): what the message says and what arrives in the hold
@@ -19482,9 +19501,47 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=crystalpearl without=" + locationWithout + "/" + armorWithout + " with=" + locationWith + "/" + armorWith + " lethal=" + locationAfterLethal + "/" + armorAfterLethal + "/" + destroyed, 0 );
 	}
 
-	// ---------------------------------------------------------------- phase 4: the Dodecahedron
+	// ---------------------------------------------------------------- the artifact the aliens chase: the Crystal Pearl (roadmap 8.11; phase 4 gave it to the Dodecahedron)
 
-	IEnumerator ScenarioDodecahedron()
+	// how far an alien group 5 coordinates from the ship and 9 from its home is after the move of 2 star hours, with these artifacts in the hold
+	IEnumerator PursuitWith( PD_Encounter pdEncounter, int[] artifactIds, float[] result )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var general = playerData.m_general;
+
+		foreach ( var artifactId in artifactIds )
+		{
+			ship.AddArtifact( artifactId );
+		}
+
+		general.m_minute = 0;
+		general.m_second = 0;
+
+		PlaceAlienGroup( pdEncounter, 5.0f, 9.0f );
+
+		AdvanceGameHours( 2 );
+
+		for ( var end = Time.time + 1.0f; Time.time < end; )
+		{
+			yield return null;
+		}
+
+		result[ 0 ] = AlienGroupCoordinates( pdEncounter );
+
+		foreach ( var artifactId in artifactIds )
+		{
+			for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( artifactId ) != null ); guard++ )
+			{
+				ship.RemoveArtifact( artifactId );
+			}
+		}
+	}
+
+	// with the Crystal Pearl aboard the aliens come four fifths of the way at each move and are not held near home (HYPERMSG-OV WF3AB, WF333 with ?12, which is set
+	// when artifact 13, the Crystal Pearl, is in the hold); the Dodecahedron does nothing of the kind (no word of the shipped game looks for it). The code before gave
+	// this to the Dodecahedron
+	IEnumerator ScenarioPearlChase()
 	{
 		var dataController = DataController.m_instance;
 		var playerData = dataController.m_playerData;
@@ -19492,12 +19549,16 @@ public class ClaudeProbe : MonoBehaviour
 		var controller = SpaceflightController.m_instance;
 		var ship = playerData.m_playerShip;
 		var dodecahedronId = gameData.FindArtifactId( "Dodecahedron" );
+		var pearlId = gameData.FindArtifactId( "Crystal Pearl" );
 
 		EnsureCrew();
 
-		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( dodecahedronId ) != null ); guard++ )
+		foreach ( var artifactId in new[] { dodecahedronId, pearlId } )
 		{
-			ship.RemoveArtifact( dodecahedronId );
+			for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( artifactId ) != null ); guard++ )
+			{
+				ship.RemoveArtifact( artifactId );
+			}
 		}
 
 		// in hyperspace, the ship standing still, with no encounter able to begin while the aliens are watched
@@ -19516,48 +19577,32 @@ public class ClaudeProbe : MonoBehaviour
 		var encounterId = FindEncounter( 0, 1, 1, 0 );
 		var pdEncounter = playerData.FindEncounter( encounterId );
 
-		general.m_minute = 0;
-		general.m_second = 0;
-
 		yield return Frames( 10 );
 
-		// ---- 1. the control: without the Dodecahedron a group 9 coordinates from its home (beyond the original's 63 units) does not come at the move
-		PlaceAlienGroup( pdEncounter, 5.0f, 9.0f );
+		// ---- 1. the control: with neither, a group 9 coordinates from its home (beyond the original's 63 units) stays where it is at the move
+		var neither = new float[ 1 ];
 
-		AdvanceGameHours( 2 );
+		yield return PursuitWith( pdEncounter, new int[ 0 ], neither );
 
-		for ( var end = Time.time + 1.0f; Time.time < end; )
-		{
-			yield return null;
-		}
+		// ---- 2. with the Dodecahedron in the hold, it still stays
+		var dodecahedron = new float[ 1 ];
 
-		var without = AlienGroupCoordinates( pdEncounter );
+		yield return PursuitWith( pdEncounter, new[] { dodecahedronId }, dodecahedron );
 
-		// ---- 2. with the Dodecahedron in the hold it does, four fifths of the way in whole coordinates: 4 nearer
-		ship.AddArtifact( dodecahedronId );
+		// ---- 3. with the Crystal Pearl in the hold it comes anyway, four fifths of the way in whole coordinates: 4 nearer
+		var pearl = new float[ 1 ];
 
-		general.m_minute = 0;
-		general.m_second = 0;
-
-		PlaceAlienGroup( pdEncounter, 5.0f, 9.0f );
-
-		AdvanceGameHours( 2 );
-
-		for ( var end = Time.time + 1.0f; Time.time < end; )
-		{
-			yield return null;
-		}
-
-		var with = AlienGroupCoordinates( pdEncounter );
+		yield return PursuitWith( pdEncounter, new[] { pearlId }, pearl );
 
 		controller.m_encounterRange = encounterRange;
 
-		Log( "dodecahedron: encounter " + encounterId + " 5 coordinates from the ship and 9 from its home: after the move of 2 star hours it is " + without.ToString( "0.000" ) + " away without the Dodecahedron and " + with.ToString( "0.000" ) + " with it" );
+		Log( "pearlchase: encounter " + encounterId + " 5 coordinates from the ship and 9 from its home: after the move of 2 star hours it is " + neither[ 0 ].ToString( "0.000" ) + " away with neither artifact, " + dodecahedron[ 0 ].ToString( "0.000" ) + " with the Dodecahedron and " + pearl[ 0 ].ToString( "0.000" ) + " with the Crystal Pearl" );
 
-		Check( "dodecahedron: without the Dodecahedron aliens more than 63 of the original's units from home stay where they are (the original's leash, HYPERMSG-OV WF3AB)", Mathf.Abs( without - 5.0f ) < 0.01f, without.ToString( "0.000" ) );
-		Check( "dodecahedron: with the Dodecahedron in the hold they come anyway, and four fifths of the way: 4 coordinates nearer (WF333 with ?12)", Mathf.Abs( with - 1.0f ) < 0.01f, with.ToString( "0.000" ) );
+		Check( "pearlchase: with neither artifact aliens more than 63 of the original's units from home stay where they are (the original's leash, HYPERMSG-OV WF3AB; control)", Mathf.Abs( neither[ 0 ] - 5.0f ) < 0.01f, neither[ 0 ].ToString( "0.000" ) );
+		Check( "pearlchase: with the Dodecahedron in the hold they stay too (the code before brought them 4 nearer)", Mathf.Abs( dodecahedron[ 0 ] - 5.0f ) < 0.01f, dodecahedron[ 0 ].ToString( "0.000" ) );
+		Check( "pearlchase: with the Crystal Pearl in the hold they come anyway, and four fifths of the way: 4 coordinates nearer (WF333 with ?12; the code before left them)", Mathf.Abs( pearl[ 0 ] - 1.0f ) < 0.01f, pearl[ 0 ].ToString( "0.000" ) );
 
-		Finish( "scenario=dodecahedron without=" + without.ToString( "0.000" ) + " with=" + with.ToString( "0.000" ), 0 );
+		Finish( "scenario=pearlchase neither=" + neither[ 0 ].ToString( "0.000" ) + " dodecahedron=" + dodecahedron[ 0 ].ToString( "0.000" ) + " pearl=" + pearl[ 0 ].ToString( "0.000" ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 4: the Shimmering Ball
@@ -25431,13 +25476,49 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 4: the Red Cylinder
 
-	// the Red Cylinder looks at this place of the landing map (null on the code before it)
-	static object RedCylinderLook( float eastWest, float northSouth )
+	// a static method of the Red Cylinder by name (null on the code before it: SITE-OV's flashing came with roadmap 8.15)
+	static object RedCylinderCall( string method )
 	{
 		var type = typeof( ShipButton ).Assembly.GetType( "RedCylinder" );
-		var look = ( type == null ) ? null : type.GetMethod( "Look" );
+		var found = ( type == null ) ? null : type.GetMethod( method );
 
-		return ( look == null ) ? null : look.Invoke( null, new object[] { eastWest, northSouth } );
+		return ( found == null ) ? null : found.Invoke( null, null );
+	}
+
+	// how many sites the Red Cylinder flashes on the landing map (-1 on the code before), and whether they flash now
+	static int RedCylinderSiteCount()
+	{
+		return ( RedCylinderCall( "GetSites" ) is System.Collections.ICollection sites ) ? sites.Count : -1;
+	}
+
+	static bool RedCylinderIsFlashing()
+	{
+		return ( RedCylinderCall( "IsFlashing" ) is bool flashing ) && flashing;
+	}
+
+	// whether the image of the flashing sites over the landing map is shown at any time in this many seconds (it blinks by the game's time, on and off every
+	// eighth of a second, and a headless frame can be far shorter: a count of frames could see only the off half)
+	IEnumerator SeeCylinderSites( float seconds, bool[] seen )
+	{
+		seen[ 0 ] = false;
+
+		var end = Time.time + seconds;
+
+		while ( Time.time < end )
+		{
+			var map = SpaceflightController.m_instance.m_displayController.m_terrainMapDisplay;
+			var image = ( map != null ) ? map.transform.GetComponentsInChildren<UnityEngine.UI.RawImage>( false ) : new UnityEngine.UI.RawImage[ 0 ];
+
+			foreach ( var raw in image )
+			{
+				if ( ( raw.name == "Red Cylinder Sites" ) && raw.enabled )
+				{
+					seen[ 0 ] = true;
+				}
+			}
+
+			yield return null;
+		}
 	}
 
 	IEnumerator ScenarioRedCylinder()
@@ -25489,26 +25570,62 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		// ---- 3. the Red Cylinder flashes at the ancient ruin, not far from it, and not without the Red Cylinder (the control)
-		var ruin = ( placedPlaces.Count > 0 ) ? placedPlaces[ 0 ] : Vector2.zero;
+		// ---- 3. the Red Cylinder as the shipped game's (SITE-OV .MERCATOR, WF389, WF290, roadmap 8.15): when the landing map opens it flashes the planet's message
+		// and artifact sites, up to ten, and says so; nothing without it aboard (the control) - in orbit around Earth, which has both, through the real Land button
 		var redCylinder = gameData.FindArtifactId( "Red Cylinder" );
+		var seen = new bool[ 1 ];
+
+		yield return GoIntoOrbit( 0, 5 );
+
+		if ( playerData.m_playerShip.HasArtifact( "Red Cylinder" ) )
+		{
+			playerData.m_playerShip.RemoveArtifact( redCylinder );
+		}
 
 		controller.m_messages.Clear();
 
-		var withoutIt = RedCylinderLook( ruin.x, ruin.y );
+		PressButtonLabelled( ButtonController.ButtonSet.CommandB, "Land" );
+
+		yield return SeeCylinderSites( 0.5f, seen );
+
+		var withoutItMessages = MessageList();
+		var withoutItSites = RedCylinderSiteCount();
+		var withoutItSeen = seen[ 0 ];
 
 		playerData.m_playerShip.AddArtifact( redCylinder );
 
-		var farAway = RedCylinderLook( ruin.x + 90.0f, -ruin.y );
-		var atTheRuin = RedCylinderLook( ruin.x + 3.0f, ruin.y - 2.0f );
-		var messages = MessageList();
+		controller.m_messages.Clear();
+
+		PressButtonLabelled( ButtonController.ButtonSet.CommandB, "Land" );
+
+		yield return SeeCylinderSites( 0.5f, seen );
+
+		var withItMessages = MessageList();
+		var withItSites = RedCylinderSiteCount();
+		var withItFlashing = RedCylinderIsFlashing();
+		var withItSeen = seen[ 0 ];
+
+		// and it stops: the shipped game cycles the colours 80 times, the port blinks for 3 seconds
+		var stopAt = Time.time + 3.5f;
+
+		while ( Time.time < stopAt )
+		{
+			yield return null;
+		}
+
+		yield return SeeCylinderSites( 0.5f, seen );
+
+		var afterwardsFlashing = RedCylinderIsFlashing();
+		var afterwardsSeen = seen[ 0 ];
 
 		playerData.m_playerShip.RemoveArtifact( redCylinder );
 
-		Log( "redcylinder: placed [" + string.Join( ", ", placed ) + "] worked out [" + string.Join( ", ", worked ) + "] | without it " + withoutIt + ", far away " + farAway + ", at the ruin " + atTheRuin + " | " + messages );
+		Log( "redcylinder: placed [" + string.Join( ", ", placed ) + "] worked out [" + string.Join( ", ", worked ) + "] | without it: sites " + withoutItSites + ", seen " + withoutItSeen + ", '" + withoutItMessages + "' | with it: sites " + withItSites + ", flashing " + withItFlashing + ", seen " + withItSeen + ", '" + withItMessages + "' | after 3.5 s: flashing " + afterwardsFlashing + ", seen " + afterwardsSeen );
 
 		Check( "redcylinder: the random ruins are worked out from orbit where the surface places them", ( placed.Count > 0 ) && ( string.Join( ", ", placed ) == string.Join( ", ", worked ) ), string.Join( ", ", placed ) + " | " + string.Join( ", ", worked ) );
-		Check( "redcylinder: the Red Cylinder flashes on the landing map near an ancient ruin, not far from it, and only aboard", ( atTheRuin is bool ) && (bool) atTheRuin && !(bool) farAway && !(bool) withoutIt && messages.Contains( "The Red Cylinder is flashing" ), withoutIt + ", " + farAway + ", " + atTheRuin + " | " + messages );
+		Check( "redcylinder: with the Red Cylinder aboard, the landing map flashes the planet's message and artifact sites when it opens, and says so", ( withItSites >= 1 ) && ( withItSites <= 10 ) && withItFlashing && withItSeen && withItMessages.Contains( "The Red Cylinder is flashing." ), withItSites + " " + withItFlashing + " " + withItSeen + " | " + withItMessages );
+		Check( "redcylinder: without it aboard nothing flashes (the control)", ( withoutItSites <= 0 ) && !withoutItSeen && !withoutItMessages.Contains( "The Red Cylinder is flashing" ), withoutItSites + " " + withoutItSeen + " | " + withoutItMessages );
+		Check( "redcylinder: the sites stop flashing after a few seconds", ( withItSites >= 1 ) && !afterwardsFlashing && !afterwardsSeen, afterwardsFlashing + " " + afterwardsSeen );
 
 		Finish( "scenario=redcylinder placed=" + placed.Count + " worked=" + worked.Count, 0 );
 	}
@@ -35190,6 +35307,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 5 );
 
+		// where the vehicle stops for good (its wreck lies there, roadmap 8.14)
+		var stopPlace = controller.m_terrainVehicle.transform.position;
+
 		// Move, as the player drives on
 		PressButton( ButtonController.ButtonSet.TerrainVehicle, 1 );
 
@@ -35201,9 +35321,63 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 10 );
 
 		var location = playerData.m_general.m_location;
-		var droppedAfter = ( playerData.m_planetSurfaces != null ) ? playerData.m_planetSurfaces.m_droppedCargoList.Count : 0;
+		// what lies on the ground: the cargo, and the vehicle's wreck, counted apart (read by name: the code before left no wreck)
+		var droppedAfter = 0;
+		var wrecks = 0;
+		var wreckWhereItStopped = false;
+
+		if ( playerData.m_planetSurfaces != null )
+		{
+			foreach ( var droppedCargo in playerData.m_planetSurfaces.m_droppedCargoList )
+			{
+				if ( ( FieldOrNull( droppedCargo, "m_isVehicleWreck" ) is bool isWreck ) && isWreck )
+				{
+					wrecks++;
+					wreckWhereItStopped |= ( Mathf.Abs( droppedCargo.m_x - stopPlace.x ) < 30.0f ) && ( Mathf.Abs( droppedCargo.m_z - stopPlace.z ) < 30.0f );
+				}
+				else
+				{
+					droppedAfter++;
+				}
+			}
+		}
+
 		var ironInShip = playerData.m_playerShip.m_elementStorage.Find( ironId );
 		var ironShipAfter = ( ironInShip != null ) ? ironInShip.m_volume : 0;
+
+		// the wreck as a later visit places it: the terrain vehicle's meshes, with nothing of the vehicle that runs
+		var wreckMeshes = 0;
+		var wreckOthers = new List<string>();
+
+		if ( ( playerData.m_planetSurfaces != null ) && ( controller.m_disembarked.m_terrainGrid.m_terrainRuins != null ) )
+		{
+			foreach ( var droppedCargo in playerData.m_planetSurfaces.m_droppedCargoList )
+			{
+				if ( !( ( FieldOrNull( droppedCargo, "m_isVehicleWreck" ) is bool isWreck ) && isWreck ) )
+				{
+					continue;
+				}
+
+				var wreckObject = controller.m_disembarked.m_terrainGrid.m_terrainRuins.PlaceDroppedCargo( droppedCargo );
+
+				if ( wreckObject != null )
+				{
+					foreach ( var component in wreckObject.GetComponentsInChildren<Component>( true ) )
+					{
+						if ( component is MeshRenderer )
+						{
+							wreckMeshes++;
+						}
+						else if ( !( component is Transform ) && !( component is MeshFilter ) && !( component is TerrainDroppedCargo ) )
+						{
+							wreckOthers.Add( component.GetType().Name );
+						}
+					}
+
+					UnityEngine.Object.Destroy( wreckObject );
+				}
+			}
+		}
 
 		var vitalityAfter = 0.0f;
 
@@ -35223,7 +35397,36 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "outoffuel: an empty tank says so, in the original's words (OUT OF FUEL, RETURNING TO SHIP ON FOOT)", messages.Contains( "Out of fuel." ) && messages.Contains( "Returning to ship on foot." ), messages );
 		Check( "outoffuel: the crew are back in the ship, not stranded on the planet", location == PD_General.Location.Planetside, location.ToString() );
 		Check( "outoffuel: the vehicle's cargo is left on the ground where it stopped (the original's >DEBRIS), not carried into the ship", ( droppedAfter == droppedBefore + 1 ) && ( ironShipAfter == ironShipBefore ), droppedBefore + " / " + droppedAfter + ", iron in the ship " + ironShipBefore + " / " + ironShipAfter );
-		Check( "outoffuel: back in the ship the vehicle is refuelled", vehicle.GetPercentFuelRemaining() == 100, vehicle.GetPercentFuelRemaining().ToString() );
+		// the vehicle is lost (MOVE-OV WEF48 leaves it as a wreck; the port refuelled it before): Disembark finds none, and at the Starport a new one is
+		// installed for a fine of 10,000 MU (OP-OV WF045)
+		var lostAfterWalk = TerrainVehicleIsLost();
+
+		controller.m_messages.Clear();
+
+		new DisembarkButton().Execute();
+
+		yield return Frames( 3 );
+
+		var disembarkMessage = MessageList();
+		var afterDisembark = playerData.m_general.m_location;
+		var balanceBefore = playerData.m_bank.m_currentBalance;
+
+		controller.SwitchLocation( PD_General.Location.DockingBay );
+
+		yield return Frames( 10 );
+
+		// (the fine is booked when Interstel's evaluation is shown in Operations)
+		BookSupplementalFines();
+
+		var balanceAfter = playerData.m_bank.m_currentBalance;
+		var lostAfterDocking = TerrainVehicleIsLost();
+
+		Log( "outoffuel: lost " + lostAfterWalk + ", wrecks " + wrecks + " (where it stopped " + wreckWhereItStopped + ") | disembark: " + disembarkMessage + " (" + afterDisembark + ") | balance " + balanceBefore + " -> " + balanceAfter + ", lost after docking " + lostAfterDocking );
+
+		Check( "outoffuel: the vehicle is lost, left as a wreck where it stopped (MOVE-OV WEF48)", lostAfterWalk && ( wrecks == 1 ) && wreckWhereItStopped, lostAfterWalk + " " + wrecks + " " + wreckWhereItStopped );
+		Check( "outoffuel: the wreck looks like the terrain vehicle, its meshes and nothing that runs", ( wreckMeshes > 0 ) && ( wreckOthers.Count == 0 ), wreckMeshes + " meshes, others: " + string.Join( ",", wreckOthers ) );
+		Check( "outoffuel: with the vehicle lost there is no disembarking", disembarkMessage.Contains( "no terrain vehicle" ) && ( afterDisembark == PD_General.Location.Planetside ), afterDisembark + " | " + disembarkMessage );
+		Check( "outoffuel: at the Starport a new terrain vehicle is installed for a fine of 10,000 MU (OP-OV WF045)", !lostAfterDocking && ( balanceBefore - balanceAfter == 10000 ), lostAfterDocking + " " + ( balanceBefore - balanceAfter ) );
 
 		Finish( "scenario=outoffuel checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
@@ -36267,6 +36470,12 @@ public class ClaudeProbe : MonoBehaviour
 		{
 			yield return Tap( Key.Enter );
 			yield return Frames( 5 );
+		}
+
+		// the Combat menu has no Bridge button: back to Navigation first
+		if ( ( PtIndexOf( officer ) < 0 ) && ( PtIndexOf( "Bridge" ) < 0 ) && ( PtIndexOf( "Navigation" ) >= 0 ) )
+		{
+			yield return PtPress( "Navigation" );
 		}
 
 		if ( PtIndexOf( officer ) < 0 )
@@ -37324,6 +37533,35 @@ public class ClaudeProbe : MonoBehaviour
 
 	// fights an encounter: shields up, weapons armed, Combat, Target and the lasers (and missiles) until every ship that came is destroyed, the time is up, the
 	// fight is being lost, or enough (when given) says the stage has had enough of it
+	// flies the ship after this alien ship in the encounter (the engines on and the direction held, as the stick does), turning toward it every frame, until it is
+	// within this distance, is destroyed, the encounter ends or the time is up, then stops
+	IEnumerator PtCloseIn( PD_AlienShip alienShip, float within, float seconds )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+
+		controller.m_playerShip.TurnOnEngines();
+
+		for ( var end = Time.realtimeSinceStartup + seconds; Time.realtimeSinceStartup < end; )
+		{
+			var toTarget = alienShip.m_coordinates - general.m_coordinates;
+
+			toTarget.y = 0.0f;
+
+			if ( alienShip.m_isDead || ( toTarget.magnitude <= within ) || ( general.m_location != PD_General.Location.Encounter ) || CombatController.m_instance.PlayerIsDestroyed() )
+			{
+				break;
+			}
+
+			general.m_currentDirection = toTarget.normalized;
+
+			yield return null;
+		}
+
+		controller.m_playerShip.TurnOffEngines();
+	}
+
 	IEnumerator PtFight( float seconds, int[] result, Func<bool> enough = null )
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -37335,6 +37573,7 @@ public class ClaudeProbe : MonoBehaviour
 		var fuelBefore = Endurium();
 		var retargets = 0;
 		var outOfRange = 0;
+		var approaches = 0;
 		var shotLog = new List<string>();
 		var alienPointsBefore = PtSumOfNumbers( PtAlienPoints() );
 
@@ -37413,22 +37652,26 @@ public class ClaudeProbe : MonoBehaviour
 			// a target out of laser range (800): Target picks the next one, as a player does when the game says it is out of range
 			var targetDistance = Vector3.Distance( encounter.m_pdEncounter.GetAlienShipList()[ target ].m_coordinates, playerData.m_general.m_coordinates );
 
-			// nothing in reach of the missiles either (1500): wait for them to come
-			if ( ( targetDistance > 1500.0f ) && ( retargets >= 3 ) )
+			// a target out of laser range (800): Target picks the next one once, as a player does when the game says it is out of range, and then the ship goes after
+			// it until it is within 600, for 3 s at most, as a captain does in the Combat menu (aliens that fight keep their distance: COMBAT-OV <COMBAT> gives only
+			// hostile ones a rule to close in)
+			if ( targetDistance > 800.0f )
 			{
-				retargets = 0;
-
-				yield return new WaitForSecondsRealtime( 0.5f );
-
-				continue;
-			}
-
-			if ( ( targetDistance > 800.0f ) && ( retargets < 3 ) )
-			{
-				retargets++;
 				outOfRange++;
 
-				yield return PtPress( "Target" );
+				if ( retargets < 1 )
+				{
+					retargets++;
+
+					yield return PtPress( "Target" );
+
+					continue;
+				}
+
+				retargets = 0;
+				approaches++;
+
+				yield return PtCloseIn( encounter.m_pdEncounter.GetAlienShipList()[ target ], 600.0f, 3.0f );
 
 				continue;
 			}
@@ -37465,7 +37708,7 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		Log( "playthrough: the fight's shots (weapon@distance): " + string.Join( " ", shotLog ) + "; targets out of laser range " + outOfRange + " times; the aliens' armor+shields left: " + points );
+		Log( "playthrough: the fight's shots (weapon@distance): " + string.Join( " ", shotLog ) + "; targets out of laser range " + outOfRange + " times, closed in " + approaches + " times; the aliens' armor+shields left: " + points );
 
 		result[ 0 ] = destroyed;
 
@@ -38415,14 +38658,13 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=playthrough-11 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
-	// stage 12: in hyperspace by the Black Egg's star with the Orb and the egg. The Uhlek of encounter 261 (40,188, on the way west to the Crystal Cone): they
-	// attack on sight and never talk, so the ship fights them, then flies out
+	// stage 12: in hyperspace by the Black Egg's star with the Orb and the egg. The Uhlek of encounter 261, on the way to the Crystal Cone: they attack on sight,
+	// never talk and keep their distance, firing plasma bolts, so the ship tries a hail and saves the game in the encounter, and stage 13 gets away
 	IEnumerator ScenarioPlaythrough12()
 	{
 		var playerData = DataController.m_instance.m_playerData;
 		var ship = playerData.m_playerShip;
 		var met = new bool[ 1 ];
-		var result = new int[ 1 ];
 
 		ProbeKeyboard();
 
@@ -38434,15 +38676,32 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "playthrough-12: the Uhlek encounter 261 is met in hyperspace", met[ 0 ], playerData.m_general.m_location.ToString() );
 
+		var saved = false;
+
 		if ( met[ 0 ] )
 		{
 			var encounter = SpaceflightController.m_instance.m_encounter;
-			var armorBefore = ship.m_armorPoints;
-			var hailed = new List<string>();
 
-			yield return new WaitForSecondsRealtime( 2.0f );
+			// the Uhlek attack on sight: they fight from their first turn (COMBAT-OV <COMBAT> rule 3; their posture is always FIGHT, the posture thresholds of their
+			// race being 0), and never close in: on a turn they do not fire they move away, so a ship that stays out of the Combat menu sees them leave
+			for ( var end = Time.realtimeSinceStartup + 6.0f; ( Time.realtimeSinceStartup < end ) && !encounter.m_pdEncounter.m_aliensOpenedFire && ( playerData.m_general.m_location == PD_General.Location.Encounter ); )
+			{
+				yield return null;
+			}
 
-			// the Uhlek do not answer a hail
+			Log( "playthrough-12: the Uhlek: opened fire " + encounter.m_pdEncounter.m_aliensOpenedFire + ", " + PtEncounterText() + ", armor " + ship.m_armorPoints + ", shields " + ship.m_shieldPoints + ", messages '" + PtMessages() + "'" );
+
+			Check( "playthrough-12: the Uhlek open fire at once", encounter.m_pdEncounter.m_aliensOpenedFire && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile ), encounter.m_pdEncounter.m_aliensOpenedFire + ", " + encounter.m_pdEncounter.m_alienStance );
+
+			// the game is saved in the encounter, and the next stage loads it there
+			if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+			{
+				PlaythroughSave( "location=" + playerData.m_general.m_location + " " + PtEncounterText() + " armor=" + ship.m_armorPoints );
+
+				saved = true;
+			}
+
+			// the Uhlek do not answer a hail (they may meanwhile leave, ending the encounter by itself)
 			yield return PtOfficer( "Communications" );
 			yield return PtPress( "Hail" );
 
@@ -38453,25 +38712,16 @@ public class ClaudeProbe : MonoBehaviour
 
 			yield return new WaitForSecondsRealtime( 3.0f );
 
-			var afterHail = PtMessages();
+			Log( "playthrough-12: hailing the Uhlek: connected " + encounter.IsConnected() + ", stance " + encounter.m_pdEncounter.m_alienStance + ", location " + playerData.m_general.m_location + ", messages '" + PtMessages() + "'" );
 
-			Log( "playthrough-12: hailing the Uhlek: connected " + encounter.IsConnected() + ", stance " + encounter.m_pdEncounter.m_alienStance + ", messages '" + afterHail + "'" );
-
-			Check( "playthrough-12: the Uhlek are hostile and do not answer a hail", !encounter.IsConnected() && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile ), encounter.IsConnected() + ", " + encounter.m_pdEncounter.m_alienStance );
-
-			// the first part of the fight ends with the shields down to half, and stage 13 goes on with the other half: since alien ships fire their laser and missile
-			// each, 55 s of it took all the shields and the hull down to about half, and from there the ship could not fire on the Uhlek after loading and still get out
-			// (or with the first Uhlek ship destroyed: with the original's weapon damage the ship can destroy them all long before its class 5 shields are at half, and
-			// stage 13 needs some left to fight)
-			yield return PtFight( 55.0f, result, () => ( ship.m_shieldPoints <= ship.GetMaximumShieldPoints() / 2 ) || PtAlienPoints().Contains( "dead" ) );
-
-			Log( "playthrough-12: after the first part of the fight: " + PtEncounterText() + ", armor " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() + ", shields " + ship.m_shieldPoints + ", systems " + string.Join( ",", Array.ConvertAll( SystemHealth(), h => h.ToString() ) ) + ", fuel " + Endurium() );
-
-			Check( "playthrough-12: the ship survives the first part of the fight", !CombatController.m_instance.PlayerIsDestroyed() && !ship.IsDestroyed(), "armor " + ship.m_armorPoints + ", hull " + ship.GetHullIntegrity() );
+			Check( "playthrough-12: the Uhlek do not answer a hail", !encounter.IsConnected(), encounter.IsConnected() + ", " + encounter.m_pdEncounter.m_alienStance );
 		}
 
-		// the game is saved in the middle of the fight, and the next stage goes on with it after loading
-		PlaythroughSave( "location=" + playerData.m_general.m_location + " " + ( ( playerData.m_general.m_location == PD_General.Location.Encounter ) ? PtEncounterText() : "" ) + " armor=" + ship.m_armorPoints );
+		// the game is saved in the encounter (above), or wherever the ship is
+		if ( !saved )
+		{
+			PlaythroughSave( "location=" + playerData.m_general.m_location + " armor=" + ship.m_armorPoints );
+		}
 
 		Finish( "scenario=playthrough-12 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
@@ -38501,7 +38751,6 @@ public class ClaudeProbe : MonoBehaviour
 	{
 		var playerData = DataController.m_instance.m_playerData;
 		var ship = playerData.m_playerShip;
-		var result = new int[ 1 ];
 
 		ProbeKeyboard();
 
@@ -38511,30 +38760,19 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "playthrough-13: loaded: location " + playerData.m_general.m_location + ( ( playerData.m_general.m_location == PD_General.Location.Encounter ) ? " " + PtEncounterText() : "" ) + ", the aliens' armor+shields " + loadedPoints + ", armor " + ship.m_armorPoints + ", shields " + ship.m_shieldPoints + " (up " + ship.m_shieldsAreUp + "), weapons armed " + ship.m_weaponsAreArmed + ", console " + PtLabels() );
 
-		Check( "playthrough-13: the game saved in the fight loads in the Uhlek encounter with the damage done to them", ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == 261 ) && loadedPoints.Contains( "+" ) && !loadedPoints.StartsWith( "1000+1400 1000+1400 1000+1400" ), playerData.m_general.m_location + " " + loadedPoints );
+		Check( "playthrough-13: the game saved in the encounter loads in the Uhlek encounter, with its ships", ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == 261 ) && loadedPoints.Contains( "+" ), playerData.m_general.m_location + " " + loadedPoints );
 
 		if ( playerData.m_general.m_location == PD_General.Location.Encounter )
 		{
-			var armorBefore = ship.m_armorPoints;
+			// a captain does not stand and trade shots with the Uhlek, who keep their distance and fire plasma bolts: the ship gets away (out of the Combat menu, the
+			// encounter ends once they are all more than 22 cells away)
+			yield return PtFlyOutOfEncounter( 6.0f );
 
-			// once the weapons have hit and the shields are gone the captain breaks off, with the hull whole enough for the flight out of the encounter (the Uhlek
-			// scouts' class 5 missiles take 200 points a hit)
-			yield return PtFight( 60.0f, result, () => ship.m_shieldPoints <= 0 );
+			s_ptEncounters.Add( "Uhlek 261 after loading: escaped, armor " + ship.m_armorPoints + ", hull " + ship.GetHullIntegrity() );
 
-			s_ptEncounters.Add( "Uhlek 261 after loading: " + result[ 0 ] + " destroyed, armor " + armorBefore + " -> " + ship.m_armorPoints );
+			Log( "playthrough-13: after getting away: " + playerData.m_general.m_location + ", armor " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() + ", shields " + ship.m_shieldPoints + ", systems " + string.Join( ",", Array.ConvertAll( SystemHealth(), h => h.ToString() ) ) + ", fuel " + Endurium() + ", hold " + PtShipHold() );
 
-			// whether a ship is destroyed before the fight is broken off depends on the fight's luck: the weapons have worked if the aliens' armor and shields went down
-			var pointsAfterFight = PtAlienPoints();
-			var hitTheAliens = ( result[ 0 ] >= 1 ) || ( PtSumOfNumbers( pointsAfterFight ) < PtSumOfNumbers( loadedPoints ) );
-
-			Check( "playthrough-13: the ship's weapons hit the Uhlek (a ship destroyed, or their armor and shields down), and the ship survives", hitTheAliens && !CombatController.m_instance.PlayerIsDestroyed() && !ship.IsDestroyed(), result[ 0 ] + " destroyed, armor " + ship.m_armorPoints + ", hull " + ship.GetHullIntegrity() + ", aliens " + PtAlienPoints() );
-
-			if ( !CombatController.m_instance.PlayerIsDestroyed() )
-			{
-				yield return PtFlyOutOfEncounter( 4.0f );
-			}
-
-			Log( "playthrough-13: after the fight: " + playerData.m_general.m_location + ", armor " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() + ", shields " + ship.m_shieldPoints + ", systems " + string.Join( ",", Array.ConvertAll( SystemHealth(), h => h.ToString() ) ) + ", fuel " + Endurium() + ", hold " + PtShipHold() );
+			Check( "playthrough-13: the ship gets away from the Uhlek and survives", !CombatController.m_instance.PlayerIsDestroyed() && !ship.IsDestroyed(), "armor " + ship.m_armorPoints + ", hull " + ship.GetHullIntegrity() );
 		}
 
 		Check( "playthrough-13: out of the encounter, back in hyperspace", playerData.m_general.m_location == PD_General.Location.Hyperspace, playerData.m_general.m_location.ToString() );
@@ -41707,6 +41945,75 @@ public class ClaudeProbe : MonoBehaviour
 	// ---------------------------------------------------------------- the speeds in an encounter (COMBAT-OV COMBAT, HYPER-OV #VES-SPEED, ACCELERATE)
 
 	// the path length an alien ship flies in this many seconds of game time, over the time
+	// watches an alien ship's turns for this long: each time it is given a new cell, how far that is across and along in cells and how far short of its last cell it
+	// still was. Fills result with the turns, the largest step's longer side in cells, the shortest step's (of those that moved), how far short a ship was at most
+	// when its next turn came, and the diagonal steps
+	static IEnumerator WatchAlienTurns( int alienIndex, float seconds, float[] result )
+	{
+		var ship = EncounterShip( alienIndex );
+		var lastTarget = ship.m_targetCoordinates;
+		var start = Time.time;
+		var turns = 0;
+		var largest = 0.0f;
+		var shortest = float.MaxValue;
+		var mostShort = 0.0f;
+		var diagonals = 0;
+
+		while ( Time.time - start < seconds )
+		{
+			var before = ship.m_coordinates;
+
+			yield return null;
+
+			if ( ( ship.m_targetCoordinates - lastTarget ).sqrMagnitude < 0.01f )
+			{
+				continue;
+			}
+
+			// a new cell: the step from the last one, and how far from that one the ship was in the frame before
+			var step = ( ship.m_targetCoordinates - lastTarget ) / CombatController.c_unitsPerCell;
+			var longer = Mathf.Max( Mathf.Abs( step.x ), Mathf.Abs( step.z ) );
+
+			turns++;
+			largest = Mathf.Max( largest, longer );
+			shortest = Mathf.Min( shortest, longer );
+			mostShort = Mathf.Max( mostShort, Vector3.Distance( before, lastTarget ) );
+
+			if ( ( Mathf.Abs( step.x ) > 0.5f ) && ( Mathf.Abs( step.z ) > 0.5f ) )
+			{
+				diagonals++;
+			}
+
+			lastTarget = ship.m_targetCoordinates;
+		}
+
+		result[ 0 ] = turns;
+		result[ 1 ] = largest;
+		result[ 2 ] = ( turns > 0 ) ? shortest : 0.0f;
+		result[ 3 ] = mostShort;
+		result[ 4 ] = diagonals;
+	}
+
+	// the turns watched are whole cells (at least one), and a ship was never more than a frame's way short of its cell when its next turn came
+	static bool TurnsAreWholeCells( float[] turns )
+	{
+		return ( turns[ 0 ] >= 1.0f ) && ( Mathf.Abs( turns[ 1 ] - 1.0f ) < 0.05f ) && ( Mathf.Abs( turns[ 2 ] - 1.0f ) < 0.05f ) && ( turns[ 3 ] < 6.0f );
+	}
+
+	static string TurnsText( float[] turns )
+	{
+		return turns[ 0 ].ToString( "F0" ) + " steps (cells " + turns[ 2 ].ToString( "F2" ) + " to " + turns[ 1 ].ToString( "F2" ) + ", " + turns[ 4 ].ToString( "F0" ) + " diagonal, short by " + turns[ 3 ].ToString( "F1" ) + " at most)";
+	}
+
+	// the seconds between an alien ship's turns (Encounter.GetTurnSeconds; -1 on code without it)
+	static float AlienTurnSeconds()
+	{
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var method = ( encounter != null ) ? typeof( Encounter ).GetMethod( "GetTurnSeconds", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic ) : null;
+
+		return ( method != null ) ? (float) method.Invoke( encounter, null ) : -1.0f;
+	}
+
 	static IEnumerator MeasureAlienSpeed( int alienIndex, float seconds, float[] result )
 	{
 		var ship = EncounterShip( alienIndex );
@@ -41796,9 +42103,15 @@ public class ClaudeProbe : MonoBehaviour
 			controller.m_buttonController.DeactivateButton();
 		}
 
-		var one = new float[ 1 ];
+		var oneTurns = new float[ 5 ];
 
-		yield return MeasureAlienSpeed( FirstLivingAlien(), 2.0f, one );
+		yield return WatchAlienTurns( FirstLivingAlien(), 4.0f, oneTurns );
+
+		var oneTurnSeconds = AlienTurnSeconds();
+
+		// in the Combat menu, as in a fight: out of it the encounter ends by itself once the aliens are over 22 cells away (the original's ?UNNEST), and they move
+		// off by their posture while the player's ship circles
+		controller.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Combat );
 
 		var times = new[] { 0.75f, 5.0f, 9.0f };
 		var oneShipSpeeds = new float[ times.Length ];
@@ -41824,9 +42137,13 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		var threePresent = AlienShipsPresent();
-		var three = new float[ 1 ];
+		var threeTurns = new float[ 5 ];
 
-		yield return MeasureAlienSpeed( FirstLivingAlien(), 2.0f, three );
+		yield return WatchAlienTurns( FirstLivingAlien(), 6.0f, threeTurns );
+
+		var threeTurnSeconds = AlienTurnSeconds();
+
+		controller.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Combat );
 
 		var threeTimes = new[] { 10.0f };
 		var threeShipSpeeds = new float[ 1 ];
@@ -41838,16 +42155,17 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		Log( "encounterspeeds: one ship: alien " + one[ 0 ].ToString( "F1" ) + ", player at 0.75/5/9 s " + oneShipSpeeds[ 0 ].ToString( "F0" ) + "/" + oneShipSpeeds[ 1 ].ToString( "F0" ) + "/" + oneShipSpeeds[ 2 ].ToString( "F0" ) + ", after letting go " + stopped.ToString( "F1" ) + " || " + threePresent + " ships: alien " + three[ 0 ].ToString( "F1" ) + ", player after 10 s " + threeShipSpeeds[ 0 ].ToString( "F0" ) );
+		Log( "encounterspeeds: one ship: a turn every " + oneTurnSeconds.ToString( "F2" ) + " s, " + TurnsText( oneTurns ) + ", player at 0.75/5/9 s " + oneShipSpeeds[ 0 ].ToString( "F0" ) + "/" + oneShipSpeeds[ 1 ].ToString( "F0" ) + "/" + oneShipSpeeds[ 2 ].ToString( "F0" ) + ", after letting go " + stopped.ToString( "F1" ) + " || " + threePresent + " ships: a turn every " + threeTurnSeconds.ToString( "F2" ) + " s, " + TurnsText( threeTurns ) + ", player after 10 s " + threeShipSpeeds[ 0 ].ToString( "F0" ) );
 
-		Check( "encounterspeeds: an alien ship moves a cell every (ships + 1) passes of the original's loop: 160 with one ship, 80 with three (COMBAT-OV COMBAT, WEDCE)", ( Mathf.Abs( one[ 0 ] - 160.0f ) < 8.0f ) && ( threePresent == 3 ) && ( Mathf.Abs( three[ 0 ] - 80.0f ) < 4.0f ), one[ 0 ].ToString( "F1" ) + " / " + threePresent + " ships " + three[ 0 ].ToString( "F1" ) );
+		Check( "encounterspeeds: an alien ship's turn comes every (ships + 1) passes of the original's loop, 0.5 s with one ship and 1 s with three (COMBAT-OV COMBAT, WEDCE)", ( Mathf.Abs( oneTurnSeconds - 0.5f ) < 0.01f ) && ( threePresent == 3 ) && ( Mathf.Abs( threeTurnSeconds - 1.0f ) < 0.01f ), oneTurnSeconds.ToString( "F2" ) + " / " + threePresent + " ships " + threeTurnSeconds.ToString( "F2" ) );
+		Check( "encounterspeeds: a turn moves a ship a cell across, along or both, and it is there by its next turn, a diagonal step too (the code before left a diagonal step a third short)", TurnsAreWholeCells( oneTurns ) && TurnsAreWholeCells( threeTurns ) && ( oneTurns[ 4 ] + threeTurns[ 4 ] >= 1.0f ), TurnsText( oneTurns ) + " / " + TurnsText( threeTurns ) );
 		Check( "encounterspeeds: the player's ship moves a cell a pass at first and a cell more every 14 passes with 7 G (320, 640, 960: HYPER-OV ACCELERATE)", ( Mathf.Abs( oneShipSpeeds[ 0 ] - 320.0f ) < 25.0f ) && ( Mathf.Abs( oneShipSpeeds[ 1 ] - 640.0f ) < 40.0f ) && ( Mathf.Abs( oneShipSpeeds[ 2 ] - 960.0f ) < 60.0f ), oneShipSpeeds[ 0 ].ToString( "F0" ) + " / " + oneShipSpeeds[ 1 ].ToString( "F0" ) + " / " + oneShipSpeeds[ 2 ].ToString( "F0" ) );
 		Check( "encounterspeeds: with three alien ships the step stops at 2 cells (640: HYPER-OV #VES-SPEED)", Mathf.Abs( threeShipSpeeds[ 0 ] - 640.0f ) < 40.0f, threeShipSpeeds[ 0 ].ToString( "F0" ) );
 		Check( "encounterspeeds: with no direction held the ship stops at once", stopped < 0.1f, stopped.ToString( "F1" ) );
 
 		Time.captureDeltaTime = 0.0f;
 
-		Finish( "scenario=encounterspeeds alien=" + one[ 0 ].ToString( "F0" ) + "/" + three[ 0 ].ToString( "F0" ), 0 );
+		Finish( "scenario=encounterspeeds turns=" + oneTurnSeconds.ToString( "F2" ) + "/" + threeTurnSeconds.ToString( "F2" ), 0 );
 	}
 
 	// ---------------------------------------------------------------- the survey's marks on the landing map (TerrainMapDisplay, SurveyMarks: ROADMAP D6)
@@ -44908,7 +45226,9 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- the shields' recharge as the original's (since 2026-10-18)
 
-	// the shield points the ship gains in this many seconds of game time, from none (the alien ships put far away, so that none of their fire lands meanwhile)
+	// the shield points the ship gains in this many seconds of game time, from none, with the shields down: the alien ships are put far away, out of their lasers'
+	// reach, but hostile aliens that have opened fire launch missiles at any range (COMBAT-OV rules 1 and 2), and a missile that lands meanwhile hits the armor of
+	// a ship with its shields down, not the shield points
 	IEnumerator ShieldGain( float seconds, int[] gained )
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -44925,6 +45245,7 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
+		playerData.m_playerShip.DropShields();
 		playerData.m_playerShip.m_shieldPoints = 0;
 
 		for ( var end = Time.time + seconds; Time.time < end; )
@@ -44952,7 +45273,6 @@ public class ClaudeProbe : MonoBehaviour
 
 		ship.m_shieldingClass = 2;
 		ship.m_armorPoints = 100000;
-		ship.RaiseShields();
 		ship.RestoreSystems();
 
 		var full = ship.GetMaximumShieldPoints();
@@ -44968,10 +45288,13 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 10 );
 		yield return ShieldGain( 6.0f, outside );
 
-		// ---- 2. Spemin group 135 with one ship in it, then three: four seconds each
+		// ---- 2. Spemin group 135 with one ship in it, then three: four seconds each, in the Combat menu as in a fight (out of it the encounter can end by itself
+		// once the aliens move off over 22 cells, the original's ?UNNEST)
 		EnterEncounter( 135 );
 
 		yield return Frames( 3 );
+
+		controller.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Combat );
 
 		KeepAlienShips( 1 );
 
@@ -46870,6 +47193,586 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=jettison checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
+	// ---------------------------------------------------------------- phase 8: Look describes the land and the region's temperature (roadmap 8.30)
+
+	// one field of Look's report ("Terrain", "Temperature"), without its colours ("" if it is not there)
+	static string LookField( string report, string field )
+	{
+		var plain = System.Text.RegularExpressions.Regex.Replace( report, "<[^>]*>", "" );
+		var match = System.Text.RegularExpressions.Regex.Match( plain, field + @": ([^\n]*?)(  Gravity:|\n|$)" );
+
+		return match.Success ? match.Groups[ 1 ].Value.Trim() : "";
+	}
+
+	// Look's report with the terrain vehicle at this latitude (Look reads where the vehicle is from the saved coordinates)
+	static string LookAtLatitude( float northSouth )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		playerData.m_general.m_lastDisembarkedCoordinates = Tools.LatLongToWorldCoordinates( 0.0f, northSouth );
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		new LookButton().Execute();
+
+		return string.Join( "\n", playerData.m_general.m_messageList );
+	}
+
+	IEnumerator ScenarioLookLand()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var errorsBefore = s_errorCount;
+		var done = new bool[ 1 ];
+
+		// the region temperatures of the original, coldest first (the REGIONS file)
+		var regionWords = new[] { "Subfreezing", "Arctic", "Temperate", "Tropical", "Searing", "Furnace" };
+
+		EnsureCrew();
+
+		// ---- 1. planet 94 of Arth: rock under an atmosphere, searing to inferno
+		yield return LandOnPlanet94At( Tools.LatLongToWorldCoordinates( 4.3f, -16.0f ), done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=lookland abort: no landing on planet 94 (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var planet94 = gameData.m_planetList[ 94 ];
+		var nearThePole = LookAtLatitude( 85.0f );
+
+		yield return Frames( 2 );
+
+		var atTheEquator = LookAtLatitude( 0.0f );
+
+		yield return Frames( 2 );
+
+		var again = LookAtLatitude( 0.0f );
+
+		var terrain94 = LookField( atTheEquator, "Terrain" );
+		var terrain94Again = LookField( again, "Terrain" );
+		var temperaturePole = LookField( nearThePole, "Temperature" );
+		var temperatureEquator = LookField( atTheEquator, "Temperature" );
+		var coldest94 = regionWords[ Mathf.Clamp( planet94.m_temperatureIdA, 0, 5 ) ];
+		var hottest94 = regionWords[ Mathf.Clamp( planet94.m_temperatureIdB, 0, 5 ) ];
+
+		// ---- 2. planet 92 of Arth: frozen
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var terrain92 = done[ 0 ] ? LookField( LookAtLatitude( 0.0f ), "Terrain" ) : "(no landing)";
+
+		Log( "lookland: planet 94 (surface " + planet94.m_surfaceId + ", atmosphere " + planet94.m_atmosphereIdA + ", temperatures " + planet94.m_temperatureIdA + " to " + planet94.m_temperatureIdB + "): terrain '" + terrain94 + "', again '" + terrain94Again + "', temperature near the pole '" + temperaturePole + "', at the equator '" + temperatureEquator + "' | planet 92: terrain '" + terrain92 + "'" );
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "lookland: the land of a rocky planet with an atmosphere in the original's words (a colour, then rock and dirt or a sand)", System.Text.RegularExpressions.Regex.IsMatch( terrain94, "^(Grey|Yellowish|Reddish|Brownish|Black) (rock and dirt|rocky sand|pebbly sand|coarse sand|powdery sand)$" ), terrain94 );
+		Check( "lookland: a frozen planet: cracked plains and hills of coloured snow and ice", System.Text.RegularExpressions.Regex.IsMatch( terrain92, "^Cracked plains and hills of (white|blue tinted|green tinted|red tinted|yellow tinted) snow and ice$" ), terrain92 );
+		Check( "lookland: a planet's land reads the same every time", ( terrain94 != "" ) && ( terrain94 == terrain94Again ), terrain94 + " | " + terrain94Again );
+		Check( "lookland: the temperature is the region's: the planet's coldest near a pole, its hottest at the equator", ( temperaturePole == coldest94 ) && ( temperatureEquator == hottest94 ), temperaturePole + " / " + temperatureEquator + " (expected " + coldest94 + " / " + hottest94 + ")" );
+		Check( "lookland: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=lookland checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: a deposit's mineral by the original's shares (roadmap 8.16)
+
+	IEnumerator ScenarioDepositMinerals()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var errorsBefore = s_errorCount;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// planet 90 of Arth: mineral density 43, three different elements, the first not Endurium
+		var planet = gameData.m_planetList[ 90 ];
+
+		yield return GoIntoOrbit( planet.m_starId, 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=depositminerals abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var grid = controller.m_disembarked.m_terrainGrid;
+		var ground = new List<TerrainElement>( grid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true ) );
+
+		ground.Sort( ( a, b ) => a.m_depositIndex.CompareTo( b.m_depositIndex ) );
+
+		// the shares on the ground (the original's SEED-OV WF0F7: the first element below 50 of 100, the second below 75, the third below 90, any other the rest)
+		int first = 0, second = 0, third = 0, others = 0, enduriumOthers = 0;
+		var endurium = gameData.m_misc.m_enduriumElementId;
+
+		// and a fingerprint of where they lie and how much they hold, the same with the old code and the new (nothing the planet's seeded draws place moves)
+		var positionSum = 0.0;
+		var volumeSum = 0L;
+
+		foreach ( var deposit in ground )
+		{
+			if ( deposit.m_elementId == planet.m_elementIdA )
+			{
+				first++;
+			}
+			else if ( deposit.m_elementId == planet.m_elementIdB )
+			{
+				second++;
+			}
+			else if ( deposit.m_elementId == planet.m_elementIdC )
+			{
+				third++;
+			}
+			else
+			{
+				others++;
+
+				if ( deposit.m_elementId == endurium )
+				{
+					enduriumOthers++;
+				}
+			}
+
+			positionSum += deposit.transform.position.x + deposit.transform.position.z;
+			volumeSum += deposit.m_volume;
+		}
+
+		var total = Mathf.Max( 1, ground.Count );
+
+		// the survey from orbit works the deposits out again (PlanetSurvey): every deposit's element as on the ground
+		PlanetSurvey.Forget();
+
+		var generator = controller.m_starSystem.GetPlanetController( 90 ).GetPlanetGenerator();
+		var survey = PlanetSurvey.GetDepositPlaces( planet, generator, grid );
+		var mismatches = 0;
+
+		for ( var i = 0; i < Mathf.Min( survey.Count, ground.Count ); i++ )
+		{
+			if ( Mathf.RoundToInt( survey[ i ].z ) != ground[ i ].m_elementId )
+			{
+				mismatches++;
+			}
+		}
+
+		Log( "depositminerals: " + ground.Count + " deposits on planet 90 (elements " + planet.m_elementIdA + ", " + planet.m_elementIdB + ", " + planet.m_elementIdC + "): first " + first + ", second " + second + ", third " + third + ", others " + others + " (Endurium " + enduriumOthers + ") | survey " + survey.Count + " deposits, " + mismatches + " elements differ | fingerprint positions " + positionSum.ToString( "F2" ) + " volumes " + volumeSum );
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "depositminerals: half the deposits are the planet's first element, a quarter its second, 15% its third and 10% others (SEED-OV WF0F7)", ( ground.Count >= 200 ) && ( Mathf.Abs( first / (float) total - 0.50f ) < 0.08f ) && ( Mathf.Abs( second / (float) total - 0.25f ) < 0.07f ) && ( Mathf.Abs( third / (float) total - 0.15f ) < 0.06f ) && ( Mathf.Abs( others / (float) total - 0.10f ) < 0.06f ), first + " / " + second + " / " + third + " / " + others + " of " + ground.Count );
+		Check( "depositminerals: the other elements are never Endurium (the planet's first element is not Endurium, WF0C7)", enduriumOthers == 0, enduriumOthers + " of " + others );
+		Check( "depositminerals: the survey from orbit gives every deposit the element it has on the ground", ( survey.Count == ground.Count ) && ( mismatches == 0 ), survey.Count + " / " + ground.Count + ", " + mismatches + " differ" );
+		Check( "depositminerals: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=depositminerals checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- roadmap 8.19: a planet's minerals, lifeforms and curios come back when the ship leaves
+
+	// what the original does when the ship leaves the orbit of a planet the terrain vehicle went out on (HYPER-OV WDB32 runs DPART-OV DEPART; WF166 deletes what
+	// WF0D6 picks, and MOVE-OV ?POPULA seeds each region again from its place when the vehicle comes back): within the orbit what was taken stays taken and a
+	// killed or captured lifeform stays so; after it the deposits, the lifeforms and the curios of the random ruins are back, the minerals and curios dropped
+	// there are gone, and a special artifact or a Black Egg dropped there (the game not won) and the Endurium taken from an ancient ruin site of STRINFO stay as
+	// they are; a planet the vehicle did not go out on keeps what was taken from it
+	IEnumerator ScenarioPlanetRefill()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var surfaces = playerData.m_planetSurfaces;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		surfaces.Validate();
+
+		// (the control: something taken from planet 90, which the vehicle does not go out on)
+		surfaces.SetDepositVolumeLeft( 90, 0, 0 );
+
+		// ---- 1. down on planet 92 of the Arth system (deposits and lifeforms), through the real Disembark button
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=planetrefill abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var visited = FieldOrNull( surfaces, "m_visitedPlanetList" ) as List<int>;
+		var visitedText = ( visited == null ) ? "none" : string.Join( ",", visited );
+		var deposits = controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true );
+		var lifeforms = LifeformsOnTheGround();
+
+		if ( ( deposits.Length < 2 ) || ( lifeforms.Count < 3 ) )
+		{
+			Finish( "scenario=planetrefill abort: planet 92 has " + deposits.Length + " deposits and " + lifeforms.Count + " lifeforms", 2 );
+			yield break;
+		}
+
+		var lifeformCount = lifeforms.Count;
+		var taken = deposits[ 0 ];
+		var mined = deposits[ 1 ];
+		var takenIndex = taken.m_depositIndex;
+		var minedIndex = mined.m_depositIndex;
+		var minedVolume = mined.m_volume;
+
+		// the first deposit taken and a cubic meter mined from the second (the mining laser's records, PD_PlanetSurfaces.SetDepositVolumeLeft)
+		surfaces.SetDepositVolumeLeft( 92, takenIndex, 0 );
+		surfaces.SetDepositVolumeLeft( 92, minedIndex, Mathf.Max( 1, minedVolume - 10 ) );
+
+		// a lifeform killed (its hits gone, through its own status check) and one captured (the capture takes it off the surface with RemoveEaten)
+		var killed = lifeforms[ 0 ].GetComponent<TerrainLifeform>();
+		var captured = lifeforms[ 1 ].GetComponent<TerrainLifeform>();
+
+		killed.m_hits = 0;
+		typeof( TerrainLifeform ).GetMethod( "UpdateStatus", BindingFlags.NonPublic | BindingFlags.Instance ).Invoke( killed, null );
+
+		controller.m_disembarked.m_terrainGrid.m_terrainLifeforms.RemoveEaten( captured );
+
+		// what the terrain vehicle drops, far from it: an element, a curio, a special artifact and a Black Egg left unarmed
+		var vehicle = controller.m_terrainVehicle.transform.position;
+		var curioId = -1;
+
+		for ( var i = 0; ( i < gameData.m_artifactList.Length ) && ( curioId < 0 ); i++ )
+		{
+			if ( !gameData.m_artifactList[ i ].IsSpecial() )
+			{
+				curioId = i;
+			}
+		}
+
+		var droppedElement = surfaces.AddDroppedCargo( 92, vehicle.x + 300.0f, vehicle.y, vehicle.z, taken.m_elementId, 20, -1 );
+		var droppedCurio = surfaces.AddDroppedCargo( 92, vehicle.x + 310.0f, vehicle.y, vehicle.z, -1, 0, curioId );
+		var droppedSpecial = surfaces.AddDroppedCargo( 92, vehicle.x + 320.0f, vehicle.y, vehicle.z, -1, 0, gameData.FindArtifactId( "Shimmering Ball" ) );
+		var droppedEgg = surfaces.AddDroppedCargo( 92, vehicle.x + 330.0f, vehicle.y, vehicle.z, -1, 0, gameData.FindArtifactId( "Black Egg" ) );
+
+		SetFieldIfThere( droppedEgg, "m_leftUnarmed", true );
+
+		// what was taken from a random ruin of the planet and from a ruin of an ancient ruin site (the keys of TerrainRuin.GetRandomItemKey)
+		var randomRuinKey = TerrainRuin.GetRandomItemKey( 92, 0, 0 );
+		var siteRuinKey = TerrainRuin.GetRandomItemKey( 92, 5, 0 );
+
+		surfaces.TakeRandomRuinItem( randomRuinKey );
+		surfaces.TakeRandomRuinItem( siteRuinKey );
+
+		yield return Frames( 2 );
+
+		// ---- 2. back into the ship and out again, the ship still in orbit
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		var again = LifeformsOnTheGround();
+		var againDead = 0;
+
+		foreach ( var lifeform in again )
+		{
+			againDead += ( lifeform.GetComponent<TerrainLifeform>().m_status == TerrainLifeform.Status.Dead ) ? 1 : 0;
+		}
+
+		var againTaken = surfaces.GetDepositVolumeLeft( 92, takenIndex );
+		var againMined = surfaces.GetDepositVolumeLeft( 92, minedIndex );
+		var againDrops = ( surfaces.FindDroppedCargo( droppedElement.m_id ) != null ) && ( surfaces.FindDroppedCargo( droppedCurio.m_id ) != null ) && ( surfaces.FindDroppedCargo( droppedSpecial.m_id ) != null ) && ( surfaces.FindDroppedCargo( droppedEgg.m_id ) != null );
+		var againRuin = surfaces.IsRandomRuinItemTaken( randomRuinKey );
+
+		// ---- 3. back into the ship, out of the orbit and into it again (the star system on the way: the original's DEPART), and out again
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var after = LifeformsOnTheGround();
+		var afterDead = 0;
+
+		foreach ( var lifeform in after )
+		{
+			afterDead += ( lifeform.GetComponent<TerrainLifeform>().m_status == TerrainLifeform.Status.Dead ) ? 1 : 0;
+		}
+
+		var afterDeposits = controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true );
+		var afterTakenShown = false;
+		var afterMinedVolume = -1;
+
+		foreach ( var deposit in afterDeposits )
+		{
+			if ( deposit.m_depositIndex == takenIndex )
+			{
+				afterTakenShown = deposit.gameObject.activeSelf;
+			}
+
+			if ( deposit.m_depositIndex == minedIndex )
+			{
+				afterMinedVolume = deposit.m_volume;
+			}
+		}
+
+		var afterTaken = surfaces.GetDepositVolumeLeft( 92, takenIndex );
+		var afterElement = surfaces.FindDroppedCargo( droppedElement.m_id ) != null;
+		var afterCurio = surfaces.FindDroppedCargo( droppedCurio.m_id ) != null;
+		var afterSpecial = surfaces.FindDroppedCargo( droppedSpecial.m_id ) != null;
+		var afterEgg = surfaces.FindDroppedCargo( droppedEgg.m_id ) != null;
+		var afterRuin = surfaces.IsRandomRuinItemTaken( randomRuinKey );
+		var afterSite = surfaces.IsRandomRuinItemTaken( siteRuinKey );
+		var control = surfaces.GetDepositVolumeLeft( 90, 0 );
+
+		// (nothing dropped is left lying on planet 92 for the scenarios after this one)
+		surfaces.RemoveDroppedCargo( droppedSpecial.m_id );
+		surfaces.RemoveDroppedCargo( droppedEgg.m_id );
+		surfaces.RemoveDroppedCargo( droppedElement.m_id );
+		surfaces.RemoveDroppedCargo( droppedCurio.m_id );
+
+		Log( "planetrefill: visited [" + visitedText + "], " + deposits.Length + " deposits, " + lifeformCount + " lifeforms | same orbit: deposit left " + againTaken + ", mined " + againMined + " of " + minedVolume + ", lifeforms " + again.Count + " (" + againDead + " dead), drops " + againDrops + ", ruin item taken " + againRuin + " | after leaving: deposit record " + afterTaken + ", shown " + afterTakenShown + ", mined one " + afterMinedVolume + " of " + minedVolume + ", lifeforms " + after.Count + " (" + afterDead + " dead), element " + afterElement + ", curio " + afterCurio + ", special " + afterSpecial + ", egg " + afterEgg + ", ruin item taken " + afterRuin + ", site item taken " + afterSite + " | planet 90's deposit " + control );
+
+		Check( "planetrefill: the Disembark button marks the planet visited in this orbit", ( visited != null ) && visited.Contains( 92 ), visitedText );
+		Check( "planetrefill: in the same orbit the deposits stay taken, the killed lifeform dead and the captured one gone, and what was dropped stays", ( againTaken == 0 ) && ( againMined == Mathf.Max( 1, minedVolume - 10 ) ) && ( again.Count == lifeformCount - 1 ) && ( againDead == 1 ) && againDrops && againRuin, againTaken + " " + againMined + " | " + again.Count + " of " + lifeformCount + ", " + againDead + " dead | " + againDrops + " " + againRuin );
+		Check( "planetrefill: after leaving the orbit the deposits are back whole", ( afterTaken < 0 ) && afterTakenShown && ( afterMinedVolume == minedVolume ), afterTaken + " " + afterTakenShown + " " + afterMinedVolume + " of " + minedVolume );
+		Check( "planetrefill: after leaving the orbit the lifeforms are back, alive", ( after.Count == lifeformCount ) && ( afterDead == 0 ), after.Count + " of " + lifeformCount + ", " + afterDead + " dead" );
+		Check( "planetrefill: after leaving the orbit a dropped mineral and a dropped curio are gone, and the curios of the random ruins are back", !afterElement && !afterCurio && !afterRuin, afterElement + " " + afterCurio + " " + afterRuin );
+		Check( "planetrefill: a dropped special artifact, a Black Egg left unarmed and the Endurium taken from an ancient ruin site stay", afterSpecial && afterEgg && afterSite, afterSpecial + " " + afterEgg + " " + afterSite );
+		Check( "planetrefill: a planet the terrain vehicle did not go out on keeps what was taken from it (the control)", control == 0, control.ToString() );
+
+		Finish( "scenario=planetrefill lifeforms=" + after.Count + "/" + lifeformCount + " deposit=" + afterTaken, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: aliens move and fire by their posture (since 2026-10-18)
+
+	// the farthest an alien ship of the encounter is from the player's across or along, in cells (the living ones, or all that have come in)
+	static float FarthestAlienCells( bool wrecksToo )
+	{
+		var player = DataController.m_instance.m_playerData.m_general.m_coordinates;
+		var farthest = 0.0f;
+
+		foreach ( var alienShip in SpaceflightController.m_instance.m_encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			if ( !alienShip.m_addedToEncounter || ( alienShip.m_isDead && !wrecksToo ) )
+			{
+				continue;
+			}
+
+			var offset = alienShip.m_coordinates - player;
+
+			farthest = Mathf.Max( farthest, Mathf.Max( Mathf.Abs( offset.x ), Mathf.Abs( offset.z ) ) / CombatController.c_unitsPerCell );
+		}
+
+		return farthest;
+	}
+
+	// the nearest living alien ship's distance across or along, in cells
+	static float NearestAlienCells()
+	{
+		var player = DataController.m_instance.m_playerData.m_general.m_coordinates;
+		var nearest = float.MaxValue;
+
+		foreach ( var alienShip in SpaceflightController.m_instance.m_encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			if ( !alienShip.m_addedToEncounter || alienShip.m_isDead )
+			{
+				continue;
+			}
+
+			var offset = alienShip.m_coordinates - player;
+
+			nearest = Mathf.Min( nearest, Mathf.Max( Mathf.Abs( offset.x ), Mathf.Abs( offset.z ) ) / CombatController.c_unitsPerCell );
+		}
+
+		return nearest;
+	}
+
+	// gives every alien ship of the encounter this vessel, whole
+	static void GiveAlienShipsVessel( int vesselId )
+	{
+		foreach ( var alienShip in SpaceflightController.m_instance.m_encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			alienShip.m_vesselId = vesselId;
+		}
+	}
+
+	// enters the encounter afresh, as the game does, with the aliens' mood set and the comm link terminated or not
+	static IEnumerator EnterWithPosture( int encounterId, float mood, bool fight, bool commTerminated, int vesselId )
+	{
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 5 );
+
+		EnterEncounterRaw( encounterId );
+
+		yield return Frames( 3 );
+
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		if ( vesselId >= 0 )
+		{
+			GiveAlienShipsVessel( vesselId );
+		}
+
+		Call( encounter, "GetAlienTalkStance" );
+
+		encounter.m_pdEncounter.m_mood = mood;
+		encounter.m_pdEncounter.m_attackedByPlayer = fight;
+		encounter.m_pdEncounter.m_alienStance = fight ? GD_Comm.Stance.Hostile : GD_Comm.Stance.Neutral;
+
+		if ( typeof( PD_Encounter ).GetField( "m_commTerminated" ) != null )
+		{
+			SetField( encounter.m_pdEncounter, "m_commTerminated", commTerminated );
+		}
+	}
+
+	// waits in the encounter for a while, or until it ends
+	static IEnumerator StayInEncounter( float seconds )
+	{
+		var end = Time.realtimeSinceStartup + seconds;
+
+		while ( ( Time.realtimeSinceStartup < end ) && ( DataController.m_instance.m_playerData.m_general.m_location == PD_General.Location.Encounter ) )
+		{
+			yield return null;
+		}
+	}
+
+	// the aliens move and fire by their posture, as the original's combat rules (COMBAT-OV <COMBAT>, a turn of each icon every pass of the main loop): they arrive
+	// about 21 cells ahead; fighting aliens open fire at once, with missiles at any range; hostile ones close in to within 11 cells; once the comm link is over
+	// the others move away, and the encounter ends when every ship is more than 22 cells away, unless the player is in combat; with nothing to do they wander;
+	// and the rule that fires moves up in the rules' order, which is saved. The code before had every alien close in on the player, fire only within 5 cells on
+	// a timer while hostile, and ended the encounter when the player was 4096 units from its centre
+	IEnumerator ScenarioAlienPostures()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+
+		// a ship that survives whatever comes, standing still, and no other encounter able to begin
+		ship.m_armorPoints = 1000000;
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+		controller.m_encounterRange = 0.0f;
+
+		var thrynn = FindEncounterOfRace( GameData.Race.Thrynn );
+		var missileVessel = -1;
+
+		for ( var vesselId = 0; vesselId < gameData.m_vesselList.Length; vesselId++ )
+		{
+			var vessel = gameData.m_vesselList[ vesselId ];
+
+			if ( ( vessel.m_race == GameData.Race.Thrynn ) && ( vessel.m_missileClass > 0 ) && ( vessel.m_laserClass > 0 ) && ( vessel.GetSpeedFactor() > 0.0f ) && ( missileVessel < 0 ) )
+			{
+				missileVessel = vesselId;
+			}
+		}
+
+		// ---- 1. the aliens arrive about 21 cells ahead (as the game places them: a neutral mood, nothing else changed)
+		yield return EnterWithPosture( thrynn, 44.0f, false, false, -1 );
+
+		var arrivalFarthest = FarthestAlienCells( false );
+		var arrivalNearest = NearestAlienCells();
+
+		// ---- 2. aliens that fight open fire at once, with a missile from beyond a laser's 5 cells
+		yield return EnterWithPosture( thrynn, 90.0f, true, false, missileVessel );
+
+		var missilesBefore = IntFieldOrMin( controller.m_combatController, "m_alienMissilesInFlight" );
+		var nearestWhenFiring = NearestAlienCells();
+
+		yield return StayInEncounter( 2.5f );
+
+		var missilesFired = IntFieldOrMin( controller.m_combatController, "m_alienMissilesInFlight" ) - missilesBefore;
+
+		// ---- 3. hostile aliens (their mood in the hostile band, not fighting) close in to within 11 cells
+		yield return EnterWithPosture( thrynn, 70.0f, false, false, missileVessel );
+
+		var hostileStart = NearestAlienCells();
+		var hostilePosture = ( typeof( Encounter ).GetMethod( "GetCombatPosture" ) != null ) ? (int) Call( controller.m_encounter, "GetCombatPosture" ) : -1;
+
+		for ( var end = Time.realtimeSinceStartup + 20.0f; ( Time.realtimeSinceStartup < end ) && ( FarthestAlienCells( false ) > 11.5f ) && ( playerData.m_general.m_location == PD_General.Location.Encounter ); )
+		{
+			yield return null;
+		}
+
+		var hostileFarthest = FarthestAlienCells( false );
+
+		// ---- 4. with the comm link over, neutral aliens move away, and the encounter ends once they are all more than 22 cells away
+		yield return EnterWithPosture( thrynn, 44.0f, false, true, missileVessel );
+
+		var endedStart = FarthestAlienCells( true );
+
+		yield return StayInEncounter( 15.0f );
+
+		var endedByThemselves = playerData.m_general.m_location != PD_General.Location.Encounter;
+
+		// ---- 5. not while the player is in combat
+		yield return EnterWithPosture( thrynn, 44.0f, false, true, missileVessel );
+
+		controller.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Combat );
+
+		yield return StayInEncounter( 8.0f );
+
+		var stillInCombat = playerData.m_general.m_location == PD_General.Location.Encounter;
+		var farthestInCombat = FarthestAlienCells( true );
+
+		controller.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Bridge );
+
+		yield return StayInEncounter( 6.0f );
+
+		var endedAfterCombat = playerData.m_general.m_location != PD_General.Location.Encounter;
+
+		// ---- 6. with nothing to do (neutral, the link not ended) they wander: they move, but do not close in
+		yield return EnterWithPosture( thrynn, 44.0f, false, false, missileVessel );
+
+		var wanderStart = new List<Vector3>();
+
+		foreach ( var alienShip in controller.m_encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			wanderStart.Add( alienShip.m_coordinates );
+		}
+
+		var wanderNearestStart = NearestAlienCells();
+
+		yield return StayInEncounter( 5.0f );
+
+		var moved = 0;
+		var list = controller.m_encounter.m_pdEncounter.GetAlienShipList();
+
+		for ( var i = 0; i < list.Length; i++ )
+		{
+			if ( list[ i ].m_addedToEncounter && ( Vector3.Distance( list[ i ].m_coordinates, wanderStart[ i ] ) > 40.0f ) )
+			{
+				moved++;
+			}
+		}
+
+		var wanderNearestEnd = NearestAlienCells();
+
+		LeaveEncounter();
+
+		yield return Frames( 5 );
+
+		// ---- 7. the rules that fired moved up in their order, and the order is saved
+		var order = FieldOrNull( playerData.m_general, "m_combatRuleOrder" ) as int[];
+		var copy = JsonUtility.FromJson<PD_General>( JsonUtility.ToJson( playerData.m_general ) );
+		var savedOrder = FieldOrNull( copy, "m_combatRuleOrder" ) as int[];
+		var reordered = ( order != null ) && ( order.Length == 11 ) && ( order[ 0 ] != 1 || order[ 1 ] != 2 || order[ 2 ] != 3 );
+		var orderSaved = ( savedOrder != null ) && ( order != null ) && ( string.Join( ",", savedOrder ) == string.Join( ",", order ) );
+
+		Log( "alienpostures: Thrynn encounter " + thrynn + ", missile vessel " + missileVessel + " | arrival " + arrivalNearest.ToString( "0.0" ) + " to " + arrivalFarthest.ToString( "0.0" ) + " cells | fight: " + missilesFired + " missiles in 2.5 s, nearest " + nearestWhenFiring.ToString( "0.0" ) + " cells | hostile (posture " + hostilePosture + "): from " + hostileStart.ToString( "0.0" ) + " to farthest " + hostileFarthest.ToString( "0.0" ) + " cells | link over: from " + endedStart.ToString( "0.0" ) + ", ended " + endedByThemselves + " | combat: held " + stillInCombat + " at " + farthestInCombat.ToString( "0.0" ) + ", ended after " + endedAfterCombat + " | wander: " + moved + " moved, nearest " + wanderNearestStart.ToString( "0.0" ) + " to " + wanderNearestEnd.ToString( "0.0" ) + " | order " + ( ( order != null ) ? string.Join( ",", order ) : "none" ) + " saved " + orderSaved );
+
+		Check( "alienpostures: the aliens arrive about 21 cells ahead, none farther than 21 across or along (the code before brought them 51 cells out)", ( arrivalFarthest <= 21.5f ) && ( arrivalNearest >= 14.0f ), arrivalNearest.ToString( "0.0" ) + " to " + arrivalFarthest.ToString( "0.0" ) );
+		Check( "alienpostures: aliens that fight open fire at once, with missiles from beyond 5 cells (the code before fired only within 5)", ( missileVessel >= 0 ) && ( missilesFired > 0 ) && ( nearestWhenFiring > 5.0f ), missilesFired + " missiles, nearest " + nearestWhenFiring.ToString( "0.0" ) );
+		Check( "alienpostures: hostile aliens close in to within 11 cells", ( hostilePosture == 8 ) && ( hostileStart > 12.0f ) && ( hostileFarthest <= 11.5f ), hostilePosture + ": " + hostileStart.ToString( "0.0" ) + " to " + hostileFarthest.ToString( "0.0" ) );
+		Check( "alienpostures: with the comm link over, neutral aliens move away and the encounter ends by itself once they are more than 22 cells away", endedByThemselves, endedStart.ToString( "0.0" ) + " " + endedByThemselves );
+		Check( "alienpostures: the encounter does not end while the player is in combat, and does once out of it", stillInCombat && ( farthestInCombat > 22.0f ) && endedAfterCombat, stillInCombat + " " + farthestInCombat.ToString( "0.0" ) + " " + endedAfterCombat );
+		Check( "alienpostures: with nothing to do they wander, and do not close in", ( moved >= 1 ) && ( wanderNearestEnd >= wanderNearestStart - 6.0f ), moved + " moved, " + wanderNearestStart.ToString( "0.0" ) + " to " + wanderNearestEnd.ToString( "0.0" ) );
+		Check( "alienpostures: the rules that fired moved up in their order, and the order is saved", reordered && orderSaved, ( ( order != null ) ? string.Join( ",", order ) : "none" ) + " " + orderSaved );
+
+		Finish( "scenario=alienpostures checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
 	// ---------------------------------------------------------------- phase 8: the Starport asks before repairing (since 2026-10-18)
 
 	// the state of the Ship Configuration panel, by name (State is private to the panel)

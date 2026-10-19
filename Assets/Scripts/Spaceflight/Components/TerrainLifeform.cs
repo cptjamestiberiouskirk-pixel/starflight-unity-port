@@ -14,6 +14,10 @@ public class TerrainLifeform : MonoBehaviour
 	// its species (GD_Species.ForPlanet)
 	public GD_Species m_species;
 
+	// its place in the order the lifeforms of its planet are placed (the same every time): what has become of it is kept by it until the ship leaves the orbit
+	// (PD_PlanetSurfaces.LoseLifeform)
+	public int m_placeIndex;
+
 	// its hit points and stuns left, starting with its species'
 	public int m_hits;
 	public int m_stuns;
@@ -246,11 +250,25 @@ public class TerrainLifeform : MonoBehaviour
 		UpdateStatus();
 	}
 
+	// a lifeform that was killed on an earlier run of the terrain vehicle in this orbit lies dead where it is placed
+	public void LieDead()
+	{
+		m_hits = 0;
+
+		UpdateStatus();
+	}
+
 	// the notes' status check: "DIE <-- ?HITS>0 FALSE", "STUNNED <-- ?STUNS>0 FALSE ?STUNNED FALSE"
 	void UpdateStatus()
 	{
 		if ( m_hits <= 0 )
 		{
+			// it stays dead on later runs of the terrain vehicle until the ship leaves the orbit
+			if ( ( m_status != Status.Dead ) && ( m_populator != null ) )
+			{
+				m_populator.LifeformDied( this );
+			}
+
 			m_hits = 0;
 			m_status = Status.Dead;
 
