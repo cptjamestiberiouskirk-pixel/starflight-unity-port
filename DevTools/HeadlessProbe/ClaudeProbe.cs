@@ -858,8 +858,8 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCrystalPearl();
 				break;
 
-			case "dodecahedron":
-				yield return ScenarioDodecahedron();
+			case "pearlchase":
+				yield return ScenarioPearlChase();
 				break;
 
 			case "shimmeringball":
@@ -19478,9 +19478,47 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=crystalpearl without=" + locationWithout + "/" + armorWithout + " with=" + locationWith + "/" + armorWith + " lethal=" + locationAfterLethal + "/" + armorAfterLethal + "/" + destroyed, 0 );
 	}
 
-	// ---------------------------------------------------------------- phase 4: the Dodecahedron
+	// ---------------------------------------------------------------- the artifact the aliens chase: the Crystal Pearl (roadmap 8.11; phase 4 gave it to the Dodecahedron)
 
-	IEnumerator ScenarioDodecahedron()
+	// how far an alien group 5 coordinates from the ship and 9 from its home is after the move of 2 star hours, with these artifacts in the hold
+	IEnumerator PursuitWith( PD_Encounter pdEncounter, int[] artifactIds, float[] result )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var general = playerData.m_general;
+
+		foreach ( var artifactId in artifactIds )
+		{
+			ship.AddArtifact( artifactId );
+		}
+
+		general.m_minute = 0;
+		general.m_second = 0;
+
+		PlaceAlienGroup( pdEncounter, 5.0f, 9.0f );
+
+		AdvanceGameHours( 2 );
+
+		for ( var end = Time.time + 1.0f; Time.time < end; )
+		{
+			yield return null;
+		}
+
+		result[ 0 ] = AlienGroupCoordinates( pdEncounter );
+
+		foreach ( var artifactId in artifactIds )
+		{
+			for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( artifactId ) != null ); guard++ )
+			{
+				ship.RemoveArtifact( artifactId );
+			}
+		}
+	}
+
+	// with the Crystal Pearl aboard the aliens come four fifths of the way at each move and are not held near home (HYPERMSG-OV WF3AB, WF333 with ?12, which is set
+	// when artifact 13, the Crystal Pearl, is in the hold); the Dodecahedron does nothing of the kind (no word of the shipped game looks for it). The code before gave
+	// this to the Dodecahedron
+	IEnumerator ScenarioPearlChase()
 	{
 		var dataController = DataController.m_instance;
 		var playerData = dataController.m_playerData;
@@ -19488,12 +19526,16 @@ public class ClaudeProbe : MonoBehaviour
 		var controller = SpaceflightController.m_instance;
 		var ship = playerData.m_playerShip;
 		var dodecahedronId = gameData.FindArtifactId( "Dodecahedron" );
+		var pearlId = gameData.FindArtifactId( "Crystal Pearl" );
 
 		EnsureCrew();
 
-		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( dodecahedronId ) != null ); guard++ )
+		foreach ( var artifactId in new[] { dodecahedronId, pearlId } )
 		{
-			ship.RemoveArtifact( dodecahedronId );
+			for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( artifactId ) != null ); guard++ )
+			{
+				ship.RemoveArtifact( artifactId );
+			}
 		}
 
 		// in hyperspace, the ship standing still, with no encounter able to begin while the aliens are watched
@@ -19512,48 +19554,32 @@ public class ClaudeProbe : MonoBehaviour
 		var encounterId = FindEncounter( 0, 1, 1, 0 );
 		var pdEncounter = playerData.FindEncounter( encounterId );
 
-		general.m_minute = 0;
-		general.m_second = 0;
-
 		yield return Frames( 10 );
 
-		// ---- 1. the control: without the Dodecahedron a group 9 coordinates from its home (beyond the original's 63 units) does not come at the move
-		PlaceAlienGroup( pdEncounter, 5.0f, 9.0f );
+		// ---- 1. the control: with neither, a group 9 coordinates from its home (beyond the original's 63 units) stays where it is at the move
+		var neither = new float[ 1 ];
 
-		AdvanceGameHours( 2 );
+		yield return PursuitWith( pdEncounter, new int[ 0 ], neither );
 
-		for ( var end = Time.time + 1.0f; Time.time < end; )
-		{
-			yield return null;
-		}
+		// ---- 2. with the Dodecahedron in the hold, it still stays
+		var dodecahedron = new float[ 1 ];
 
-		var without = AlienGroupCoordinates( pdEncounter );
+		yield return PursuitWith( pdEncounter, new[] { dodecahedronId }, dodecahedron );
 
-		// ---- 2. with the Dodecahedron in the hold it does, four fifths of the way in whole coordinates: 4 nearer
-		ship.AddArtifact( dodecahedronId );
+		// ---- 3. with the Crystal Pearl in the hold it comes anyway, four fifths of the way in whole coordinates: 4 nearer
+		var pearl = new float[ 1 ];
 
-		general.m_minute = 0;
-		general.m_second = 0;
-
-		PlaceAlienGroup( pdEncounter, 5.0f, 9.0f );
-
-		AdvanceGameHours( 2 );
-
-		for ( var end = Time.time + 1.0f; Time.time < end; )
-		{
-			yield return null;
-		}
-
-		var with = AlienGroupCoordinates( pdEncounter );
+		yield return PursuitWith( pdEncounter, new[] { pearlId }, pearl );
 
 		controller.m_encounterRange = encounterRange;
 
-		Log( "dodecahedron: encounter " + encounterId + " 5 coordinates from the ship and 9 from its home: after the move of 2 star hours it is " + without.ToString( "0.000" ) + " away without the Dodecahedron and " + with.ToString( "0.000" ) + " with it" );
+		Log( "pearlchase: encounter " + encounterId + " 5 coordinates from the ship and 9 from its home: after the move of 2 star hours it is " + neither[ 0 ].ToString( "0.000" ) + " away with neither artifact, " + dodecahedron[ 0 ].ToString( "0.000" ) + " with the Dodecahedron and " + pearl[ 0 ].ToString( "0.000" ) + " with the Crystal Pearl" );
 
-		Check( "dodecahedron: without the Dodecahedron aliens more than 63 of the original's units from home stay where they are (the original's leash, HYPERMSG-OV WF3AB)", Mathf.Abs( without - 5.0f ) < 0.01f, without.ToString( "0.000" ) );
-		Check( "dodecahedron: with the Dodecahedron in the hold they come anyway, and four fifths of the way: 4 coordinates nearer (WF333 with ?12)", Mathf.Abs( with - 1.0f ) < 0.01f, with.ToString( "0.000" ) );
+		Check( "pearlchase: with neither artifact aliens more than 63 of the original's units from home stay where they are (the original's leash, HYPERMSG-OV WF3AB; control)", Mathf.Abs( neither[ 0 ] - 5.0f ) < 0.01f, neither[ 0 ].ToString( "0.000" ) );
+		Check( "pearlchase: with the Dodecahedron in the hold they stay too (the code before brought them 4 nearer)", Mathf.Abs( dodecahedron[ 0 ] - 5.0f ) < 0.01f, dodecahedron[ 0 ].ToString( "0.000" ) );
+		Check( "pearlchase: with the Crystal Pearl in the hold they come anyway, and four fifths of the way: 4 coordinates nearer (WF333 with ?12; the code before left them)", Mathf.Abs( pearl[ 0 ] - 1.0f ) < 0.01f, pearl[ 0 ].ToString( "0.000" ) );
 
-		Finish( "scenario=dodecahedron without=" + without.ToString( "0.000" ) + " with=" + with.ToString( "0.000" ), 0 );
+		Finish( "scenario=pearlchase neither=" + neither[ 0 ].ToString( "0.000" ) + " dodecahedron=" + dodecahedron[ 0 ].ToString( "0.000" ) + " pearl=" + pearl[ 0 ].ToString( "0.000" ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 4: the Shimmering Ball

@@ -233,7 +233,7 @@ Assets/
 - The Rod Device cuts the damage of alien lasers to a quarter
 - The Crystal Pearl warps a critically damaged ship out of an encounter
 - The ship steers the moment you press a direction and stops when you let go, as in the original, and its top speed follows its engines: class 5 engines fly at the original's pace in hyperspace and in star systems, as measured in GOG's version of the game, class 1 at a third of it, and the ship's acceleration (engines against mass) sets how quickly it gets there
-- Alien ships come after you as in the original: every two star hours they jump toward your ship, half the way in hyperspace and three quarters in a star system, and in hyperspace they stay near their home ground; the Dodecahedron draws them farther and faster
+- Alien ships come after you as in the original: every two star hours they jump toward your ship, half the way in hyperspace and three quarters in a star system, and in hyperspace they stay near their home ground; the Crystal Pearl draws them farther and faster
 - The Shimmering Ball cloaks the ship in combat until it fires
 - The Flat Device shields the terrain vehicle: lifeforms hit its crew half as often
 - The Red Cylinder flashes on the landing map near a planet's ancient ruins
