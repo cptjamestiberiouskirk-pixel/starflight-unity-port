@@ -234,6 +234,7 @@ Assets/
 - The Crystal Pearl warps a critically damaged ship out of an encounter
 - The ship steers the moment you press a direction and stops when you let go, as in the original, and its top speed follows its engines: class 5 engines fly at the original's pace in hyperspace and in star systems, as measured in GOG's version of the game, class 1 at a third of it, and the ship's acceleration (engines against mass) sets how quickly it gets there
 - Alien ships come after you as in the original: every two star hours they jump toward your ship, half the way in hyperspace and three quarters in a star system, and in hyperspace they stay near their home ground; the Crystal Pearl draws them farther and faster
+- A science officer trained beyond 150 reports each of those jumps: "Motion detected at", and how far each group moved across and along, in map coordinates
 - The Shimmering Ball cloaks the ship in combat until it fires
 - The Flat Device shields the terrain vehicle: lifeforms hit its crew half as often
 - The Red Cylinder flashes a planet's message and artifact sites on the landing map when it opens, and marks its ancient ruins
