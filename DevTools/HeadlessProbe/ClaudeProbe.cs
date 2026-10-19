@@ -1762,6 +1762,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCrashLine();
 				break;
 
+			case "moveon":
+				yield return ScenarioMoveOn();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -49773,6 +49777,95 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "crashline: no safe landing, and the game ends with the emergency locator's transmission (control)", crashed && ( LineIndex( crash, "Safe landing" ) < 0 ) && ( LineIndex( crash, "crashed on planet" ) >= 0 ), crashed + ": " + string.Join( " | ", crash ) );
 
 		Finish( "scenario=crashline checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: the Mysterions, the Nomad probes and the Minstrels move on (roadmap 8.23)
+
+	// leaves the current encounter the game's own way (Encounter.LeaveEncounter, which the probe's LeaveEncounter helper does not run)
+	static void LeaveEncounterTheGamesWay()
+	{
+		var leave = typeof( Encounter ).GetMethod( "LeaveEncounter", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public );
+
+		leave.Invoke( SpaceflightController.m_instance.m_encounter, null );
+	}
+
+	// the Mysterions, the Nomad probes and the Minstrels move on after each encounter, as the original's (HYPER-OV ENCCLEANUP: WDC19 gives species 4, 5 and 11 a
+	// place of RRND 0 to 2000 and RRND 0 to 1760 of the original's units, anywhere on the hyperspace map, and leaves the displacement from home as it was); other
+	// groups stay where the encounter left them. The code before left every group where the encounter had been
+	IEnumerator ScenarioMoveOn()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+
+		EnsureCrew();
+
+		// in hyperspace, in the middle of the map
+		general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 125.0f, 0.0f, 110.0f ) );
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		UnityEngine.Random.InitState( 1357 );
+
+		var ids = new[] { 78, 83, 310, FindEncounter( 0, 1, 1, 0, GameData.Race.Spemin ) };
+		var results = new List<string>();
+		var movedOn = 0;
+		var withinTheMap = 0;
+		var displacementKept = 0;
+		var speminStayed = false;
+
+		foreach ( var id in ids )
+		{
+			EnterEncounter( id );
+
+			yield return Frames( 10 );
+
+			var pdEncounter = playerData.FindEncounter( id );
+			var before = pdEncounter.m_currentCoordinates;
+			var displacement = pdEncounter.m_currentCoordinates - pdEncounter.m_homeCoordinates;
+
+			LeaveEncounterTheGamesWay();
+
+			yield return Frames( 10 );
+
+			var after = pdEncounter.m_currentCoordinates;
+			var map = Tools.WorldToGameCoordinates( after );
+			var kept = Vector3.Distance( after - pdEncounter.m_homeCoordinates, displacement ) < 0.01f;
+			var moved = Vector3.Distance( before, after ) / 256.0f;
+			var inMap = ( map.x >= 0.0f ) && ( map.x <= 250.0f ) && ( map.z >= 0.0f ) && ( map.z <= 220.0f );
+
+			results.Add( id + " (" + GameDataRace( id ) + "): moved " + moved.ToString( "F1" ) + " coordinates to " + map.x.ToString( "F1" ) + "," + map.z.ToString( "F1" ) + ", displacement kept " + kept );
+
+			if ( id == ids[ ids.Length - 1 ] )
+			{
+				speminStayed = moved < 0.01f;
+			}
+			else
+			{
+				movedOn += ( moved > 1.0f ) ? 1 : 0;
+				withinTheMap += inMap ? 1 : 0;
+				displacementKept += kept ? 1 : 0;
+			}
+
+			// (the next encounter is met from where this one left the ship)
+			yield return Frames( 5 );
+		}
+
+		Log( "moveon: " + string.Join( " | ", results ) );
+
+		Check( "moveon: a Mysterion, a Nomad probe and a Minstrel each move on after the encounter (HYPER-OV WDC19)", movedOn == 3, movedOn + " of 3: " + string.Join( " | ", results ) );
+		Check( "moveon: each to somewhere on the hyperspace map (0 to 250 across, 0 to 220 along)", withinTheMap == 3, withinTheMap + " of 3" );
+		Check( "moveon: each keeps how far it is from home", displacementKept == 3, displacementKept + " of 3" );
+		Check( "moveon: a Spemin group stays where the encounter left it (control)", speminStayed, results[ results.Count - 1 ] );
+
+		Finish( "scenario=moveon checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// the race of an encounter of the game data
+	static string GameDataRace( int encounterId )
+	{
+		return DataController.m_instance.m_gameData.m_encounterList[ encounterId ].m_race.ToString();
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
