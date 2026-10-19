@@ -27,6 +27,13 @@ public class TerrainRuins : TerrainGridPopulator
 	const int c_firstSiteRuinIndex = 5;
 	const int c_maxSiteRuins = 5;
 
+	// true if this place among a planet's ruins is a ruin of an ancient ruin site (its Endurium is taken once: the site is not seeded again, see
+	// PD_PlanetSurfaces.RefillVisitedPlanets)
+	public static bool IsSiteRuinIndex( int ruinIndex )
+	{
+		return ruinIndex >= c_firstSiteRuinIndex;
+	}
+
 	// place the ruins of this planet
 	public void Initialize( PlanetGenerator planetGenerator, float elevationScale, int randomSeed )
 	{

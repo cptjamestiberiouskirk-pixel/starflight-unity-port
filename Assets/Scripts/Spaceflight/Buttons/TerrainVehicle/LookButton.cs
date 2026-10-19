@@ -19,17 +19,18 @@ public class LookButton : ShipButton
 		SpaceflightController.m_instance.m_messages.Clear();
 
 		// the planet's fields as the original gives them on the surface, in its order (MAPS-OV WF4F4): SKY, TEMPERATURE and GRAVITY on one line, ATMO, HYDRO and
-		// TERRAIN - the atmosphere and the hydrosphere by their main compound; the temperature is the planet's (the original's is the region's, which the port
-		// does not have)
+		// TERRAIN - the atmosphere and the hydrosphere by their main compound, the temperature of the region the terrain vehicle is in (WEDB2), and the land in
+		// its colours (.SURFACE)
+		Tools.WorldToLatLongCoordinates( playerData.m_general.m_lastDisembarkedCoordinates, out _, out var northSouth );
 		var atmosphere = ( ( planet.m_atmosphereIdA >= 0 ) && ( planet.m_atmosphereIdA < gameData.m_atmosphereList.Length ) ) ? gameData.m_atmosphereList[ planet.m_atmosphereIdA ].m_name : "None";
 		var hydrosphere = ( ( planet.m_hydrosphereId >= 0 ) && ( planet.m_hydrosphereId < gameData.m_hydrosphereList.Length ) ) ? gameData.m_hydrosphereList[ planet.m_hydrosphereId ].m_name : "None";
 
 		var report = "<color=#FFFF00>You observe your surroundings:</color>\n";
 		report += "Sky: <color=white>" + PlanetWeather.GetSkyText() + "</color>\n";
-		report += "Temperature: <color=white>" + planet.GetTemperatureText() + "</color>  Gravity: <color=white>" + planet.GetGravityText() + "</color>\n";
+		report += "Temperature: <color=white>" + planet.GetRegionTemperatureText( northSouth ) + "</color>  Gravity: <color=white>" + planet.GetGravityText() + "</color>\n";
 		report += "Atmo: <color=white>" + atmosphere + "</color>\n";
 		report += "Hydro: <color=white>" + hydrosphere + "</color>\n";
-		report += "Terrain: <color=white>" + planet.GetSurfaceText() + "</color>";
+		report += "Terrain: <color=white>" + planet.GetLandText() + "</color>";
 
 		// what is next to the terrain vehicle (planet.txt, LOOK: "a description of the icon the eyeball is over is given" - the port describes what is nearest)
 		report += DescribeNearby();
