@@ -19489,6 +19489,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
+		// a navigator of skill 100, who loses the ship's bearings for 75 s after a jump ((250 - skill) / 2 s: none at 250, the probe's usual navigator)
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Navigator ).m_navigation = 100;
+
 		// class 1 armor (500 points), the shields down, the Pearl aboard
 		ship.m_armorClass = 1;
 		ship.m_shieldsAreUp = false;
