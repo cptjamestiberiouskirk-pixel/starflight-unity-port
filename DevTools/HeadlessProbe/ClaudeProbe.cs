@@ -1702,6 +1702,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioJettison();
 				break;
 
+			case "fluxdots":
+				yield return ScenarioFluxDots();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -46938,6 +46942,143 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "jettison: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=jettison checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: a flux shows as dots by the navigator's skill (since 2026-10-18)
+
+	// the first flux copy of hyperspace: whether it is shown, how many points its particle system draws, and where they are (world coordinates)
+	static int FluxDotsOfFirstFlux( List<Vector3> where, out bool shown, out Vector3 fluxPlace )
+	{
+		var hyperspace = SpaceflightController.m_instance.m_hyperspace;
+		var list = GetField( hyperspace, "m_fluxObjectList" ) as List<GameObject>;
+
+		shown = false;
+		fluxPlace = Vector3.zero;
+		where.Clear();
+
+		if ( ( list == null ) || ( list.Count == 0 ) || ( list[ 0 ] == null ) )
+		{
+			return -1;
+		}
+
+		shown = list[ 0 ].activeInHierarchy;
+		fluxPlace = list[ 0 ].transform.position;
+
+		var particleSystem = list[ 0 ].GetComponentInChildren<ParticleSystem>( true );
+
+		if ( ( particleSystem == null ) || !shown )
+		{
+			return 0;
+		}
+
+		var particles = new ParticleSystem.Particle[ Mathf.Max( 1, particleSystem.particleCount ) ];
+		var count = particleSystem.GetParticles( particles );
+
+		for ( var i = 0; i < count; i++ )
+		{
+			where.Add( ( particleSystem.main.simulationSpace == ParticleSystemSimulationSpace.World ) ? particles[ i ].position : particleSystem.transform.TransformPoint( particles[ i ].position ) );
+		}
+
+		return count;
+	}
+
+	// a flux shows as the original's dots (HYPER-OV .FLUX-ICON): none to a navigator of skill 150 or less, (skill - 150) * 6 / 100 + 1 above (1 at 151 and 166, 2 at
+	// 167, 4 at 200, 7 at 250), and 16 with the Ring Device whatever the skill; each within 120 of the port's units across and 117 along of the flux (RNDCPT(15)),
+	// placed afresh as the ship steps, so they twinkle. The code before drew the same particle swirl whatever the skill
+	IEnumerator ScenarioFluxDots()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var ringId = gameData.FindArtifactId( "Ring Device" );
+		var where = new List<Vector3>();
+		bool shown;
+		Vector3 fluxPlace;
+
+		EnsureCrew();
+
+		var navigator = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Navigator );
+
+		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( ringId ) != null ); guard++ )
+		{
+			ship.RemoveArtifact( ringId );
+		}
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 4.0f, 0.0f, 4.0f ) );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		// ---- 1. by the navigator's skill, without the Ring Device
+		var skills = new[] { 150, 151, 166, 167, 200, 250 };
+		var expected = new[] { 0, 1, 1, 2, 4, 7 };
+		var counts = new int[ skills.Length ];
+		var allWithin = true;
+
+		for ( var i = 0; i < skills.Length; i++ )
+		{
+			navigator.m_navigation = skills[ i ];
+
+			yield return new WaitForSecondsRealtime( 0.3f );
+
+			counts[ i ] = FluxDotsOfFirstFlux( where, out shown, out fluxPlace );
+
+			foreach ( var dot in where )
+			{
+				allWithin = allWithin && ( Mathf.Abs( dot.x - fluxPlace.x ) <= 120.5f ) && ( Mathf.Abs( dot.z - fluxPlace.z ) <= 117.5f );
+			}
+		}
+
+		// ---- 2. the dots move: two looks 0.3 s apart at skill 250
+		FluxDotsOfFirstFlux( where, out shown, out fluxPlace );
+
+		var first = new List<Vector3>( where );
+
+		yield return new WaitForSecondsRealtime( 0.3f );
+
+		FluxDotsOfFirstFlux( where, out shown, out fluxPlace );
+
+		var moved = ( first.Count > 0 ) && ( where.Count == first.Count ) && !first.TrueForAll( dot => where.Contains( dot ) );
+
+		// ---- 3. with the Ring Device: 16, whatever the skill
+		ship.AddArtifact( ringId );
+
+		navigator.m_navigation = 100;
+
+		yield return new WaitForSecondsRealtime( 0.3f );
+
+		var ringLow = FluxDotsOfFirstFlux( where, out shown, out fluxPlace );
+
+		navigator.m_navigation = 250;
+
+		yield return new WaitForSecondsRealtime( 0.3f );
+
+		var ringHigh = FluxDotsOfFirstFlux( where, out shown, out fluxPlace );
+
+		ship.RemoveArtifact( ringId );
+		controller.m_encounterRange = encounterRange;
+
+		Log( "fluxdots: skills " + string.Join( "/", skills ) + " -> " + string.Join( "/", counts ) + " dots (expected " + string.Join( "/", expected ) + "), all within the RNDCPT ellipse " + allWithin + ", moved " + moved + "; with the Ring Device at 100 and 250: " + ringLow + ", " + ringHigh );
+
+		var countsRight = true;
+
+		for ( var i = 0; i < skills.Length; i++ )
+		{
+			countsRight = countsRight && ( counts[ i ] == expected[ i ] );
+		}
+
+		Check( "fluxdots: a navigator of skill 150 sees no flux, and above it a flux shows (skill - 150) * 6 / 100 + 1 dots: 1, 1, 2, 4 and 7 at 151, 166, 167, 200 and 250 (the code before drew the same swirl)", countsRight, string.Join( "/", counts ) );
+		Check( "fluxdots: the dots lie within the original's RNDCPT(15) ellipse round the flux (120 units across, 117 along), and are placed afresh as the ship steps", allWithin && moved, allWithin + " " + moved );
+		Check( "fluxdots: with the Ring Device a flux shows 16 dots, whatever the navigator's skill", ( ringLow == 16 ) && ( ringHigh == 16 ), ringLow + " " + ringHigh );
+
+		Finish( "scenario=fluxdots checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
