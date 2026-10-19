@@ -3,7 +3,8 @@ using System;
 using System.Collections.Generic;
 
 // what has been taken from the surfaces of the planets - the objects of a planet are placed again from the planet's seed every time the terrain vehicle goes out,
-// so without this a deposit that was picked up would be back the next time
+// so without this a deposit that was picked up would be back the next time; the minerals, lifeforms and curios come back when the ship leaves the orbit, as the
+// original's do (RefillVisitedPlanets)
 [Serializable]
 
 public class PD_PlanetSurfaces
@@ -44,6 +45,14 @@ public class PD_PlanetSurfaces
 		public int m_elementId = -1;
 		public int m_volume;
 		public int m_artifactId = -1;
+
+		// a Black Egg the crew chose not to arm when it was dropped ("ARM THIS DEVICE?", ITEMS-OV WE9AA) - false for an egg in a save from before the question,
+		// which was armed by being dropped
+		public bool m_leftUnarmed;
+
+		// the wreck of a terrain vehicle that ran out of fuel here (MOVE-OV WEF48 leaves it as an item of 300 cubic meters, too big for any hold) - it holds
+		// nothing (its cargo was dropped beside it) and cannot be picked up
+		public bool m_isVehicleWreck;
 	}
 
 	// what the terrain vehicle has dropped on the planets ("when an object is dropped on a planet's surface it can be picked up again" - the manual, page 21)
@@ -53,6 +62,26 @@ public class PD_PlanetSurfaces
 	// the planets a Black Egg has destroyed (ids into the game data's planet list)
 	public List<int> m_destroyedPlanetList;
 
+	[Serializable]
+
+	public class LostLifeform
+	{
+		// the planet, and the lifeform by the order it is placed in (the same every time, since the placing is seeded from the planet)
+		public int m_planetId;
+		public int m_placeIndex;
+
+		// dead (it lies where it is placed), or gone (captured or eaten)
+		public bool m_isDead;
+	}
+
+	// the lifeforms of the planets visited in this orbit that have been killed, captured or eaten: they stay so until the ship leaves the orbit (null in older
+	// save files)
+	public List<LostLifeform> m_lostLifeformList;
+
+	// the planets the terrain vehicle has gone out on since the ship went into orbit (the original's ?LANDED, which SHIPBUTTONS WF095 sets on the first run):
+	// what was taken from them comes back when the ship leaves the orbit (null in older save files)
+	public List<int> m_visitedPlanetList;
+
 	public void Reset()
 	{
 		m_depositList = new List<Deposit>();
@@ -61,6 +90,8 @@ public class PD_PlanetSurfaces
 		m_droppedCargoList = new List<DroppedCargo>();
 		m_nextDroppedCargoId = 0;
 		m_destroyedPlanetList = new List<int>();
+		m_lostLifeformList = new List<LostLifeform>();
+		m_visitedPlanetList = new List<int>();
 	}
 
 	// make sure there are lists (save files from before them have none)
@@ -89,6 +120,16 @@ public class PD_PlanetSurfaces
 		if ( m_destroyedPlanetList == null )
 		{
 			m_destroyedPlanetList = new List<int>();
+		}
+
+		if ( m_lostLifeformList == null )
+		{
+			m_lostLifeformList = new List<LostLifeform>();
+		}
+
+		if ( m_visitedPlanetList == null )
+		{
+			m_visitedPlanetList = new List<int>();
 		}
 	}
 
@@ -173,6 +214,14 @@ public class PD_PlanetSurfaces
 		}
 	}
 
+	// call this when the artifact of a site is back at its site (the Crystal Orb the Veloxi take: COMMSPEC-OV WEB3F)
+	public void ReturnArtifactSite( int artifactSiteId )
+	{
+		Validate();
+
+		m_takenArtifactSiteList.Remove( artifactSiteId );
+	}
+
 	// true if this item of a random ruin has been taken
 	public bool IsRandomRuinItemTaken( int itemKey )
 	{
@@ -224,5 +273,108 @@ public class PD_PlanetSurfaces
 		}
 
 		m_depositList.Add( new Deposit { m_planetId = planetId, m_depositIndex = depositIndex, m_volumeLeft = volumeLeft } );
+	}
+
+	// call this when a lifeform of a visited planet dies (isDead) or is captured or eaten
+	public void LoseLifeform( int planetId, int placeIndex, bool isDead )
+	{
+		Validate();
+
+		foreach ( var lostLifeform in m_lostLifeformList )
+		{
+			if ( ( lostLifeform.m_planetId == planetId ) && ( lostLifeform.m_placeIndex == placeIndex ) )
+			{
+				// (a dead lifeform that is eaten is gone)
+				lostLifeform.m_isDead = lostLifeform.m_isDead && isDead;
+
+				return;
+			}
+		}
+
+		m_lostLifeformList.Add( new LostLifeform { m_planetId = planetId, m_placeIndex = placeIndex, m_isDead = isDead } );
+	}
+
+	// what has become of a lifeform of a visited planet (null if it is as it was placed)
+	public LostLifeform FindLostLifeform( int planetId, int placeIndex )
+	{
+		Validate();
+
+		foreach ( var lostLifeform in m_lostLifeformList )
+		{
+			if ( ( lostLifeform.m_planetId == planetId ) && ( lostLifeform.m_placeIndex == placeIndex ) )
+			{
+				return lostLifeform;
+			}
+		}
+
+		return null;
+	}
+
+	// call this when the terrain vehicle goes out on a planet
+	public void VisitPlanet( int planetId )
+	{
+		Validate();
+
+		if ( ( planetId >= 0 ) && !m_visitedPlanetList.Contains( planetId ) )
+		{
+			m_visitedPlanetList.Add( planetId );
+		}
+	}
+
+	// call this when the ship leaves an orbit: the planets visited in it get back their minerals, lifeforms and curios, as the original's DEPART does when the
+	// ship leaves the orbit of a planet it has landed on (DPART-OV WF166 deletes them from the surface, and each region is seeded again from its place when the
+	// terrain vehicle comes back: MOVE-OV ?POPULA, WED34)
+	public void RefillVisitedPlanets( bool gameWon )
+	{
+		Validate();
+
+		foreach ( var planetId in m_visitedPlanetList )
+		{
+			RefillPlanet( planetId, gameWon );
+		}
+
+		m_visitedPlanetList.Clear();
+	}
+
+	// what the original deletes (DPART-OV WF0D6): the elements (the deposits and what was dropped), the lifeforms, the curios (the artifacts that are not special:
+	// in the random ruins and what was dropped) and a dropped Black Egg once the game is won - the special artifacts, the artifact sites, the ancient ruins whose
+	// Endurium STRINFO gives and the wreck of a terrain vehicle stay as they are
+	void RefillPlanet( int planetId, bool gameWon )
+	{
+		m_depositList.RemoveAll( deposit => deposit.m_planetId == planetId );
+		m_lostLifeformList.RemoveAll( lostLifeform => lostLifeform.m_planetId == planetId );
+		m_takenRandomRuinItemList.RemoveAll( itemKey => ( TerrainRuin.GetRandomItemPlanetId( itemKey ) == planetId ) && !TerrainRuins.IsSiteRuinIndex( TerrainRuin.GetRandomItemRuinIndex( itemKey ) ) );
+		m_droppedCargoList.RemoveAll( droppedCargo => ( droppedCargo.m_planetId == planetId ) && IsDeletedOnDeparture( droppedCargo, gameWon ) );
+	}
+
+	// true if the original deletes this when the ship leaves (DPART-OV WF0D6: class 26, the elements; class 28 species 16 to 50, the curios; species 3, the
+	// Black Egg, once the game is won - the wreck of a terrain vehicle is species 51, MOVE-OV WEF48)
+	static bool IsDeletedOnDeparture( DroppedCargo droppedCargo, bool gameWon )
+	{
+		if ( droppedCargo.m_isVehicleWreck )
+		{
+			return false;
+		}
+
+		if ( droppedCargo.m_elementId >= 0 )
+		{
+			return true;
+		}
+
+		var gameData = DataController.m_instance.m_gameData;
+
+		if ( ( droppedCargo.m_artifactId < 0 ) || ( droppedCargo.m_artifactId >= gameData.m_artifactList.Length ) )
+		{
+			return false;
+		}
+
+		var artifact = gameData.m_artifactList[ droppedCargo.m_artifactId ];
+
+		if ( artifact.m_name == "Black Egg" )
+		{
+			return gameWon;
+		}
+
+		return !artifact.IsSpecial();
 	}
 }

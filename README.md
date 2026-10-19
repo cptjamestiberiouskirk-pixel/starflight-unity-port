@@ -72,9 +72,9 @@ The full history is in [CHANGELOG.md](CHANGELOG.md).
 - **The original Unity remake** was started by Marvin Herbold in 2017, with contributions from Jeffrey Graw, Aaron Franke and Andrew Steeley.
 - **The Unity 6 port** and its completion to 1.0.0: @cptjamestiberiouskirk-pixel. Claude AI assisted with development.
 - **Fonts:** Orbitron, Rajdhani and Share Tech Mono, under the SIL Open Font License (`Assets/Fonts/`).
-- **Sound effects:** "Laser Shot Big 4" and "Laser Shot Silenced" by bubaproducer ([151020](https://freesound.org/people/bubaproducer/sounds/151020/) and [151022](https://freesound.org/people/bubaproducer/sounds/151022/) on freesound.org), under [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/), unchanged; "explosion05" by V-ktor ([434430](https://freesound.org/people/V-ktor/sounds/434430/) on freesound.org), under CC0 (`Assets/_MyCombatAssets/Sounds/`).
+- **Sound effects:** made for this port (`Assets/Sounds/`, `Assets/_MyCombatAssets/Sounds/`): every sound the game plays, from the console clicks to the docking bay doors and the explosions.
 - **Music:** made for this port (`Assets/Music/`): a title theme and a track for each place the game plays music, the Starport, the docking bay, a star system, orbit, hyperspace, an encounter and a planet's surface.
-- **Licences:** the Unlicense (`LICENSE`) covers the code and what was made for this port, the music among it. The sound effects credited above keep their own licences.
+- **Licences:** the Unlicense (`LICENSE`) covers the code and what was made for this port, the music and the sound effects among it.
 
 ---
 
@@ -91,7 +91,7 @@ The port runs on **Unity 6 (6000.3.13f1)** and has been modernized throughout:
 
 ## 🎮 Features
 
-- **Combat**: laser cannons, missile launchers, shields and armor, with alien tactics and victory and defeat detection. Alien ships have their own armor and shield points, any race turns hostile when fired on (the Uhlek attack on sight), aliens hold their fire while a comm link is up, and every shot burns a little Endurium.
+- **Combat**: laser cannons, missile launchers, shields and armor, with alien tactics and victory and defeat detection. Alien ships have their own armor and shield points, any race turns hostile when fired on (the Uhlek attack on sight), aliens hold their fire while a comm link is up, and every shot burns a little Endurium. Aliens act by their posture, as the original's combat rules: fighting aliens open fire, hostile ones close in and may open fire, friendly and neutral ones leave once the talking is over, grovelling ones flee, and an encounter ends when every ship is far enough away.
 - **Encounters in orbit**: home fleets, drones and a derelict wait in orbit around their planets and meet the ship when it arrives. Leaving the encounter returns the ship to the star system, as in the original.
 - **Speed by the engines**: the ship steers the moment you press a direction and stops when you let go, as in the original. Its top speed in hyperspace and in a star system follows its engines: class 1 flies at a third of the original's top speed, class 5 at all of it, and the ship's acceleration (engines against mass) sets how quickly it gets there, so a heavily loaded ship is sluggish.
 - **Ship systems over time**: shields keep their charge and, as in the original, regain it on the ship's turns in an encounter and in full when it ends, and the engineer's repairs and the crew's healing take time, going faster with higher skill: everyone on board heals slowly, and the doctor's patient twice as fast. The doctor asks which crew member to examine or treat, just like the original.
@@ -105,7 +105,7 @@ The port runs on **Unity 6 (6000.3.13f1)** and has been modernized throughout:
 - **Game over**: losing the ship brings up the game over screen, and returning to the title screen restores the last save.
 - **Terrain scanning**: world-space labels on the terrain, mineral detection and a transporter-style beam effect.
 - **Ground sounds**: the mining laser hums and crackles as it cuts, a mined-out deposit crumbles, a capture plays the stasis beam's pulsing hum, and a floating artifact hums softly beside its ruin, louder as the terrain vehicle comes near.
-- **Combat and flight sounds**: a hull alarm when the armor runs low, a shimmer as cargo is beamed aboard, a chirp as the ship hails, the laser cannon, missile launches, the aliens' energy weapon, and a whoosh into and out of a flux, all made for this port in an early 1980s electronic style.
+- **Sound effects made for the port**: every sound in the game is made for this port in one grounded, industrial style, as if heard from inside a working spacecraft: metal hatches with servos and latches, hydraulic bay doors, magnetic boots on deck plates, a drive that rumbles through the hull at launch and landing, soft console chirps, comm channels broken up by digital noise, and concussive explosions. The loops (the rover's engine, the mining laser, the capture beam, an artifact's hum) repeat without a seam.
 - **Music made for the port**: a modern science fiction score, dark and grounded, in low strings, deep synth bass, sparse woodwinds and metallic percussion: a title theme, and a track for the Starport, the docking bay, star systems, orbit, hyperspace, encounters and planet surfaces, each looping without a seam and streamed from disk.
 - **Survey from orbit**: the science officer's analysis of a planet in orbit reports its mineral fields and lifeforms, as many as the officer's skill and the sensors find, and the sensor picture and the landing map mark them where the officer placed them. Their places are worked out from the planet's own seeds exactly as the surface places its deposits and lifeforms (`PlanetSurvey`, `SurveyMarks`).
 - **Cargo management**: real-time volume tracking for minerals and elements, with automatic transfer to the ship. A mineral deposit holds 1.0 to 9.9 cubic meters, as in the original.
@@ -217,7 +217,7 @@ Assets/
 <summary>Show the full feature list (spoilers)</summary>
 
 - Full Starport operations: Personnel, Crew Assignment, Ship Configuration, the Trade Depot, the Bank and Operations
-- Hyperspace navigation and star system exploration
+- Hyperspace navigation and star system exploration; the edge of hyperspace holds the ship, as in the original
 - Planetary landings and terrain vehicle exploration
 - The terrain vehicle offers to go back into the ship when it stops within 3 km of it on the way back, and Tools, Return drives it back by itself
 - The terrain vehicle mines mineral deposits with a mining laser (Tools, Mine), a tenth of a cubic meter at a time on the vehicle's energy
@@ -233,10 +233,10 @@ Assets/
 - The Rod Device cuts the damage of alien lasers to a quarter
 - The Crystal Pearl warps a critically damaged ship out of an encounter
 - The ship steers the moment you press a direction and stops when you let go, as in the original, and its top speed follows its engines: class 5 engines fly at the original's pace in hyperspace and in star systems, as measured in GOG's version of the game, class 1 at a third of it, and the ship's acceleration (engines against mass) sets how quickly it gets there
-- Alien ships come after you as in the original: every two star hours they jump toward your ship, half the way in hyperspace and three quarters in a star system, and in hyperspace they stay near their home ground; the Dodecahedron draws them farther and faster
+- Alien ships come after you as in the original: every two star hours they jump toward your ship, half the way in hyperspace and three quarters in a star system, and in hyperspace they stay near their home ground; the Crystal Pearl draws them farther and faster
 - The Shimmering Ball cloaks the ship in combat until it fires
 - The Flat Device shields the terrain vehicle: lifeforms hit its crew half as often
-- The Red Cylinder flashes on the landing map near a planet's ancient ruins
+- The Red Cylinder flashes a planet's message and artifact sites on the landing map when it opens, and marks its ancient ruins
 - The ancient ruins placed by STRINFO's editors, on the Mechans' ice planet and deep in Elowan space, hold their Endurium
 - Continuum fluxes show on the screen to a navigator trained beyond 150, or with the Ring Device aboard; a flux the ship has been through is remembered, and the starmap draws it as a line between its ends
 - The price of Endurium rises with the notices of 20-02 and 15-05, and the Starport buys it back at its selling price
@@ -264,7 +264,7 @@ Assets/
 - The Spemin, Thrynn and Veloxi give up after losing half their ships: they stop fighting and surrender
 - The crew reports when aliens raise or lower their shields and arm or disarm their weapons, and Analysis gives the class of their shields and whether they are up
 - The Elowan give 15 cubic meters of Endurium to a crew whose need for energy is dire, and see through one that already has 20 or more
-- The Veloxi demand a tribute of Endurium, and the Crystal Orb or the Ellipsoid if the ship carries one, and attack a crew that refuses
+- The Veloxi demand a tribute of Endurium, and the Crystal Orb or the Ellipsoid if the ship carries one, and attack a crew that refuses; a Crystal Orb they take goes back to where it was found
 - The Thrynn buy artifacts at their own prices and plutonium for Endurium, and sell the Black Box for 30 Endurium
 - The Elowan, Thrynn, Spemin and Veloxi have moods: the player's posture calms or angers them, they grovel before a stronger ship, grow tired of talking, and fight or flee once they are too agitated to talk
 - The Elowan and the Thrynn hold the crew's friendship with the other race against it, and a crew member of the aliens' own race understands every word they say

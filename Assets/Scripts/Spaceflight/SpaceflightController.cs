@@ -348,6 +348,12 @@ public class SpaceflightController : MonoBehaviour
 		{
 			playerData.m_general.m_selectedLatitude = 0.0f;
 			playerData.m_general.m_selectedLongitude = 0.0f;
+
+			// and DEPART gives the planets the terrain vehicle went out on in that orbit back their minerals, lifeforms and curios (DPART-OV WF166)
+			if ( playerData.m_planetSurfaces != null )
+			{
+				playerData.m_planetSurfaces.RefillVisitedPlanets( playerData.m_general.m_gameWon );
+			}
 		}
 
 		// make sure the display is updated (in case we are loading from a save game)
@@ -558,9 +564,9 @@ public class SpaceflightController : MonoBehaviour
 			m_trackedHourCount = hourCount;
 		}
 
-		// the Dodecahedron is "an ancient distress beacon which attracts any ships in the area" (the Thrynn, STRINFO 2.5): with it aboard the aliens come farther at each
-		// move and are not held near home (the original's ?12, set when artifact 13 is in the hold)
-		var dodecahedronAboard = playerData.m_playerShip.HasArtifact( "Dodecahedron" );
+		// with the Crystal Pearl aboard the aliens come farther at each move and are not held near home (the original's ?12, set when artifact 13, the Crystal Pearl,
+		// is in the hold: HYPERMSG-OV (!'EXT), COMMSPEC-OV WEA50; no word of the shipped game looks for the Dodecahedron)
+		var crystalPearlAboard = playerData.m_playerShip.HasArtifact( "Crystal Pearl" );
 
 		// the encounter the player has run into in this frame (the nearest one, if more than one is within range)
 		PD_Encounter encounterToBegin = null;
@@ -612,7 +618,7 @@ public class SpaceflightController : MonoBehaviour
 			var distance = encounter.CalculateDistance( coordinates );
 
 			// every 2 star hours the aliens jump towards the ship (they never go back home)
-			if ( trackAliens && TrackTowards( encounter, coordinates, location == PD_General.Location.Hyperspace, dodecahedronAboard ) )
+			if ( trackAliens && TrackTowards( encounter, coordinates, location == PD_General.Location.Hyperspace, crystalPearlAboard ) )
 			{
 				distance = encounter.CalculateDistance( coordinates );
 			}
@@ -637,10 +643,10 @@ public class SpaceflightController : MonoBehaviour
 	}
 
 	// how the aliens come after the ship, as the original's TRAK-E (HYPERMSG-OV): every 2 star hours each group jumps towards the ship, along each axis a share of the
-	// way - a half in hyperspace, three quarters in a star system, four fifths and six sevenths with the Dodecahedron aboard (WF333) - in whole map coordinates of 8 of
+	// way - a half in hyperspace, three quarters in a star system, four fifths and six sevenths with the Crystal Pearl aboard (WF333) - in whole map coordinates of 8 of
 	// the original's units, rounded towards none, and the whole way once that comes to none, so that it lands on the ship (WF31B). In hyperspace only the groups of the
 	// region around the ship move (ILOCAL, 75 of the original's units), and only while they are within 63 of them of home on both axes (WF3AB), unless the
-	// Dodecahedron is aboard; in a star system every group of it moves (IGLOBAL)
+	// Crystal Pearl is aboard; in a star system every group of it moves (IGLOBAL)
 	const int c_trackingHours = 2;
 	const float c_hyperspaceUnit = 32.0f;
 	const float c_starSystemUnit = 8192.0f / 400.0f;
@@ -650,7 +656,7 @@ public class SpaceflightController : MonoBehaviour
 	int m_trackedHourCount = -1;
 
 	// moves one group of aliens a step of the original's towards the ship - false if it did not move
-	bool TrackTowards( PD_Encounter encounter, Vector3 shipCoordinates, bool inHyperspace, bool dodecahedronAboard )
+	bool TrackTowards( PD_Encounter encounter, Vector3 shipCoordinates, bool inHyperspace, bool crystalPearlAboard )
 	{
 		var unit = inHyperspace ? c_hyperspaceUnit : c_starSystemUnit;
 
@@ -666,14 +672,14 @@ public class SpaceflightController : MonoBehaviour
 			var displacementX = Mathf.RoundToInt( ( encounter.m_currentCoordinates.x - encounter.m_homeCoordinates.x ) / unit );
 			var displacementZ = Mathf.RoundToInt( ( encounter.m_currentCoordinates.z - encounter.m_homeCoordinates.z ) / unit );
 
-			if ( !dodecahedronAboard && ( ( displacementX < -63 ) || ( displacementX > 63 ) || ( displacementZ < -64 ) || ( displacementZ > 63 ) ) )
+			if ( !crystalPearlAboard && ( ( displacementX < -63 ) || ( displacementX > 63 ) || ( displacementZ < -64 ) || ( displacementZ > 63 ) ) )
 			{
 				return false;
 			}
 		}
 
-		var numerator = ( inHyperspace ? 1 : 3 ) + ( dodecahedronAboard ? 3 : 0 );
-		var denominator = ( inHyperspace ? 2 : 4 ) + ( dodecahedronAboard ? 3 : 0 );
+		var numerator = ( inHyperspace ? 1 : 3 ) + ( crystalPearlAboard ? 3 : 0 );
+		var denominator = ( inHyperspace ? 2 : 4 ) + ( crystalPearlAboard ? 3 : 0 );
 
 		var stepX = TrackingStep( shipCoordinates.x - encounter.m_currentCoordinates.x, unit, numerator, denominator );
 		var stepZ = TrackingStep( shipCoordinates.z - encounter.m_currentCoordinates.z, unit, numerator, denominator );

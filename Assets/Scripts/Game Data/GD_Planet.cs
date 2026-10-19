@@ -390,6 +390,84 @@ public class GD_Planet
 		return gameData.m_surfaceList[ m_surfaceId ].m_name;
 	}
 
+	// the original's words for the land Look describes (PLSET-OV (TERRAIN picks them when the ship lands, MAPS-OV .SURFACE prints them): the colours of frozen
+	// land (CLIST1), of oceans (CLIST2) and of rock (CLIST3), the sands (SAND), and the region temperatures (the REGIONS file, coldest first)
+	static readonly string[] c_frozenColours = { "white", "blue tinted", "green tinted", "red tinted", "yellow tinted" };
+	static readonly string[] c_oceanColours = { "black", "dark blue", "turquoise", "green", "muddy brown" };
+	static readonly string[] c_rockColours = { "grey", "yellowish", "reddish", "brownish", "black" };
+	static readonly string[] c_sands = { "rocky sand", "pebbly sand", "coarse sand", "powdery sand" };
+	static readonly string[] c_regionTemperatures = { "Subfreezing", "Arctic", "Temperate", "Tropical", "Searing", "Furnace" };
+
+	// the land as Look describes it (PLSET-OV (TERRAIN and MAPS-OV .SURFACE): by the surface, with colours the original draws when the ship lands - the port draws
+	// them from the planet's id, so a planet looks the same on every visit
+	public string GetLandText()
+	{
+		var random = new System.Random( m_id * 31 + 7 );
+		var hasAtmosphere = m_atmosphereIdA >= 0;
+		string text;
+
+		switch ( m_surfaceId )
+		{
+			// a world of water: its oceans' colour, and the land as rock (WF40E, .LIQUID)
+			case 2:
+				text = c_oceanColours[ random.Next( 0, 5 ) ] + " oceans and " + GetRockText( random, hasAtmosphere );
+				break;
+
+			// frozen (WF389, .ICE)
+			case 3:
+				text = "cracked plains and hills of " + c_frozenColours[ random.Next( 0, 5 ) ] + " snow and ice";
+				break;
+
+			// molten (WF41C, .MOLTEN)
+			case 4:
+				text = "volcanic rock, steaming vents, boiling pools and flowing lava";
+				break;
+
+			// rock (WF3BA, .ROCK)
+			case 5:
+				text = GetRockText( random, hasAtmosphere );
+				break;
+
+			// a gas giant has no land to describe (nobody lands there)
+			case 1:
+				return GetSurfaceText();
+
+			// crystal (WF434, .CRYSTAL)
+			default:
+				text = "smooth and featureless";
+				break;
+		}
+
+		return char.ToUpper( text[ 0 ] ) + text.Substring( 1 );
+	}
+
+	// rock under an atmosphere is coloured, rock and dirt or, three times in ten, one of the sands; without one it is cratered rock and dust (WF3BA)
+	static string GetRockText( System.Random random, bool hasAtmosphere )
+	{
+		if ( !hasAtmosphere )
+		{
+			return "cratered rock and dust";
+		}
+
+		var colour = c_rockColours[ random.Next( 0, 5 ) ];
+		var phrase = ( random.Next( 1, 100 ) < 31 ) ? c_sands[ random.Next( 0, 4 ) ] : "rock and dirt";
+
+		return colour + " " + phrase;
+	}
+
+	// the temperature of the region at this latitude (MAPS-OV WEDB2, WED78): the planet's coldest at the poles to its hottest at the equator, in as many bands as it
+	// has temperatures, counted on the original's map of 960 rows from pole to pole folded at the equator
+	public string GetRegionTemperatureText( float latitude )
+	{
+		var coldest = Mathf.Clamp( m_temperatureIdA, 0, c_regionTemperatures.Length - 1 );
+		var hottest = Mathf.Clamp( m_temperatureIdB, coldest, c_regionTemperatures.Length - 1 );
+		var regions = hottest - coldest + 1;
+		var rowsFromPole = Mathf.Clamp( Mathf.RoundToInt( ( 90.0f - Mathf.Abs( latitude ) ) * 480.0f / 90.0f ), 0, 480 );
+		var region = coldest + rowsFromPole / ( 480 / regions + 1 );
+
+		return c_regionTemperatures[ Mathf.Clamp( region, coldest, hottest ) ];
+	}
+
 	// get the gravity text
 	public string GetGravityText()
 	{

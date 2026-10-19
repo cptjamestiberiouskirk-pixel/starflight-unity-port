@@ -97,7 +97,7 @@ public class SaveGamePanel : Panel
 		"With thanks to the Starflight Remake Project's Jeff Graw, Sebastian Macke, Michael Gams, Daniel Blakeley, Stephen A Rogers, Aaron Diggens and the Planet Map Project.\n\n" +
 		"Starflight (1986) was created by Binary Systems and published by Electronic Arts. This is an unofficial, free fan project, not affiliated with or endorsed by either company.\n\n" +
 		"Music: made for this port.\n" +
-		"Sound effects: \"Laser Shot Big 4\" and \"Laser Shot Silenced\" by bubaproducer (freesound.org), under Creative Commons Attribution 4.0; \"explosion05\" by V-ktor (freesound.org), under CC0.\n" +
+		"Sound effects: made for this port.\n" +
 		"Fonts: Orbitron, Rajdhani and Share Tech Mono, under the SIL Open Font License.";
 
 	// the theme roles a scheme's swatches show, left to right: its screen, its panels, its text, its two accents, and its fuel and danger colours
