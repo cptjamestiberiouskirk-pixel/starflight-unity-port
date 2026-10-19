@@ -343,7 +343,7 @@ What the probe does:
 | `savecoords` | a save slot in a star system gives the system's coordinates, as above the main view: 125, 100 in Arth's system with the ship away from its middle (about 15 s) |
 | `combatmessages` | the combat messages are the original's: WEAPONS NOT ARMED, NO TARGET PRESENT, WEAPON NOT AVAILABLE and OUT OF FUEL! when a weapon cannot fire, nothing of the port's own when the player's shot hits, and LASER CLASS n (LASER PARTIALLY DEFLECTED with the Rod Device) when an alien laser hits (about 20 s) |
 
-Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (284 scenarios, about 239 minutes; one summary block per scenario with the failed checks and exceptions).
+Run them all with `& "DevTools\HeadlessProbe\run-all-scenarios.ps1" -Tag some-label` (285 scenarios, about 239 minutes; one summary block per scenario with the failed checks and exceptions).
 
 ### The playthrough
 
