@@ -185,6 +185,9 @@ public class Hyperspace : MonoBehaviour
 					// change the system
 					playerData.m_general.m_currentStarId = star.m_id;
 
+					// its alien groups are placed afresh
+					SpaceflightController.m_instance.PlaceStarSystemEncounters( star.m_id );
+
 					// set the position of the player inside this system
 					var starToShip = playerData.m_general.m_coordinates - star.GetWorldCoordinates();
 					starToShip.Normalize();
