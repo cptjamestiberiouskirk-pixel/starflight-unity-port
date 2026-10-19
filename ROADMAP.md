@@ -231,7 +231,7 @@ Found on 2026-10-18 by reading the shipped game's decompiled overlays against th
 | 8.23 | The Mysterions, Nomad probes and Minstrels move on after an encounter | HYPER-OV `ENCCLEANUP`, `WDC19` | MISSING |
 | 8.24 | "OUT OF FUEL! CRASH IMMINENT!" and the motion report's coordinates | ORBIT-OV `DESCEND`; HYPERMSG-OV `WF28B` | MISSING |
 | 8.25 | Questions about the Old Empire and the Ancients can be shut off | COMM-OV `?LOCKED-OUT` | each question about either locks it out one time in five, and the aliens answer it with a subject 5 line for the rest of the encounter (`Encounter.IsLockedOut`, `PD_Encounter.m_lockedOutSubjects`; probe `lockout`) |
-| 8.26 | Impatience, and a fighting race calming down | COMM-OV `>IMPATIENT`, `<EDL>` | MISSING |
+| 8.26 | Impatience, and a fighting race calming down | COMM-OV `>IMPATIENT`, `<EDL>` | 20 seconds after the second reminder, or at any answer after it, the aliens lose patience: twice their posture's value on their mood, the question dropped, the link kept up; Terminate while they wait costs it too (`Encounter.LoseThePatience`, `Impatient`); `MoodDecides` no longer holds a fight the mood started, so lowering the shields and disarming calm the aliens out of it, the player's fire still holds them (probes `impatience`, `calming`) |
 | 8.27 | The terrain vehicle's icon key | LISTICONS `ICONS` | MISSING |
 | 8.28 | The Flat Device: lifeform attacks hit a tenth as often | BEHAV-OV `WE8C2` | the hit roll times 10 with the Flat Device (`TerrainLifeform.AttackPlayer`; probe `flatdevice`) |
 | 8.29 | A flare sterilises its system | ANALYZE-OV `WEC26` | MISSING |
