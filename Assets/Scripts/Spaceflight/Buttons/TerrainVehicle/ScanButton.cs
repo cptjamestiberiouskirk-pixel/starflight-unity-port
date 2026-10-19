@@ -46,7 +46,7 @@ public class ScanButton : ShipButton
 		// build scan report
 		var report = "<color=#FFFF00>Local Scan Results:</color>\n";
 		report += "Mineral Density: <color=white>" + planet.m_mineralDensity + "%</color>\n";
-		report += "Bio Density: <color=white>" + planet.m_bioDensity + "%</color>\n";
+		report += "Bio Density: <color=white>" + PlayerData.GetBioDensityOf( planet ) + "%</color>\n";
 		report += "Elements: <color=white>" + elementsText + "</color>";
 
 		// add nearby objects if any found

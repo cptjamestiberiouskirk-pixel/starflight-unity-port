@@ -1754,6 +1754,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioDroneNumbers();
 				break;
 
+			case "flaresterilises":
+				yield return ScenarioFlareSterilises();
+				break;
+
 			case "crashline":
 				yield return ScenarioCrashLine();
 				break;
@@ -49397,6 +49401,169 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "dronenumbers: the numbers run from 1 to 99, each as likely: about 16 in 99 are multiples of 6 (10% to 23% of 990)", ( lowest == 1 ) && ( highest == 99 ) && ( multiplesOfSix >= 99 ) && ( multiplesOfSix <= 228 ), lowest + " to " + highest + ", " + multiplesOfSix + " of 990" );
 
 		Finish( "scenario=dronenumbers checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: a flare sterilises its star system (roadmap 8.29)
+
+	// a star that flares between these days, has a planet with life (other than the one given), and no encounter in its system or in an orbit of it - its id, and
+	// the living planet's through the array (-1 if there is none)
+	static int FlaringStarWithLife( int fromDay, int toDay, int otherThan, int[] livingPlanet )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		livingPlanet[ 0 ] = -1;
+
+		foreach ( var star in gameData.m_starList )
+		{
+			if ( ( star.m_id == otherThan ) || ( star.m_daysToNextFlare < fromDay ) || ( star.m_daysToNextFlare > toDay ) )
+			{
+				continue;
+			}
+
+			var guarded = false;
+
+			foreach ( var gdEncounter in gameData.m_encounterList )
+			{
+				guarded = guarded || ( ( gdEncounter.m_location != 0 ) && ( gdEncounter.m_xCoordinate == star.m_xCoordinate ) && ( gdEncounter.m_yCoordinate == star.m_yCoordinate ) );
+			}
+
+			if ( guarded )
+			{
+				continue;
+			}
+
+			foreach ( var planet in gameData.m_planetList )
+			{
+				if ( ( planet.m_starId == star.m_id ) && ( planet.m_bioDensity > 0 ) && !planet.IsGasGiant() )
+				{
+					livingPlanet[ 0 ] = planet.m_id;
+
+					return star.m_id;
+				}
+			}
+		}
+
+		return -1;
+	}
+
+	// what the orbit sensors read of a planet's life, and how many species it has (GD_Species.ForPlanet, which the lifeforms and the survey from orbit use)
+	IEnumerator LifeInOrbit( int starId, int planetId, int[] life )
+	{
+		var controller = SpaceflightController.m_instance;
+
+		yield return GoIntoOrbit( starId, planetId );
+
+		new SensorsButton().Execute();
+
+		yield return Frames( 5 );
+
+		var display = controller.m_displayController.m_sensorsDisplay;
+
+		life[ 0 ] = (int) GetField( display, "m_bioDensity" );
+		life[ 1 ] = GD_Species.ForPlanet( DataController.m_instance.m_gameData.m_planetList[ planetId ] ).Count;
+
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+	}
+
+	// a flare sterilises its star system as the original's (ANALYZE-OV WF436, WEC26, WEC04): on the first analysis of a star whose flare day has come (and the game
+	// not won before it) every planet of the star loses its life for good; nothing happens until then, however long after the flare. The code before never took
+	// the life away
+	IEnumerator ScenarioFlareSterilises()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+		var scans = new List<string>();
+		var life = new int[ 2 ];
+		var planet = new int[ 1 ];
+
+		EnsureCrew();
+
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.ScienceOfficer ).m_science = 250;
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		var star = FlaringStarWithLife( 100, 290, -1, planet );
+		var livingPlanet = planet[ 0 ];
+		var flareDay = Mathf.CeilToInt( gameData.m_starList[ star ].m_daysToNextFlare );
+
+		// ---- 1. the day before the flare: a scan of the star, and the planet has life (control)
+		SetGameDay( flareDay - 1 );
+
+		yield return ScanStarSystem( star, scans );
+		yield return LifeInOrbit( star, livingPlanet, life );
+
+		var bioBefore = life[ 0 ];
+		var speciesBefore = life[ 1 ];
+
+		// ---- 2. the day after the flare, without analysing the star: the life is still there (the original sterilises on the analysis) - the day is moved on out
+		// in hyperspace, as a ship in the system when its star flares is incinerated, and one that comes in after the flare day is not
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 5 );
+
+		SetGameDay( flareDay + 1 );
+
+		yield return LifeInOrbit( star, livingPlanet, life );
+
+		var bioLazy = life[ 0 ];
+		var speciesLazy = life[ 1 ];
+
+		// ---- 3. the star analysed after its flare: no life left
+		yield return ScanStarSystem( star, scans );
+		yield return LifeInOrbit( star, livingPlanet, life );
+
+		var bioAfter = life[ 0 ];
+		var speciesAfter = life[ 1 ];
+
+		// ---- 4. it lasts: through a save and a load (the sterilised planets are saved)
+		var dataController = DataController.m_instance;
+
+		dataController.SaveActiveGame();
+
+		var loaded = new MemorySaveSystem().Load<PlayerData>( dataController.m_playerDataFileName, dataController.m_activeSaveGameSlotNumber );
+		var sterilisedField = typeof( PD_PlanetSurfaces ).GetField( "m_sterilisedPlanetList" );
+		var keptInSave = ( sterilisedField != null ) && ( sterilisedField.GetValue( loaded.m_planetSurfaces ) is List<int> kept ) && kept.Contains( livingPlanet );
+
+		// ---- 5. the control: a game won before another star's flare keeps that star's life
+		var otherPlanet = new int[ 1 ];
+		var otherStar = FlaringStarWithLife( 100, 290, star, otherPlanet );
+		var otherFlareDay = Mathf.CeilToInt( gameData.m_starList[ otherStar ].m_daysToNextFlare );
+		var gameWon = general.m_gameWon;
+		var winTime = general.m_winTime;
+
+		general.m_gameWon = true;
+		general.m_winTime = otherFlareDay - 10;
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 5 );
+
+		SetGameDay( otherFlareDay + 1 );
+
+		yield return ScanStarSystem( otherStar, scans );
+		yield return LifeInOrbit( otherStar, otherPlanet[ 0 ], life );
+
+		var bioWon = life[ 0 ];
+
+		general.m_gameWon = gameWon;
+		general.m_winTime = winTime;
+		controller.m_encounterRange = encounterRange;
+
+		Log( "flaresterilises: star " + star + " flares on day " + flareDay + ", its planet " + livingPlanet + ": the day before " + bioBefore + "% and " + speciesBefore + " species; the day after, not analysed, " + bioLazy + "% and " + speciesLazy + "; analysed, " + bioAfter + "% and " + speciesAfter + "; in the save " + keptInSave + " | star " + otherStar + " after a win before its flare (day " + otherFlareDay + "): " + bioWon + "%" );
+
+		Check( "flaresterilises: before the flare the planet has life (control)", ( bioBefore > 0 ) && ( speciesBefore > 0 ), bioBefore + "%, " + speciesBefore + " species" );
+		Check( "flaresterilises: after the flare, until the star is analysed, the life is still there (WF436 runs WEC26 on the analysis; control)", ( bioLazy == bioBefore ) && ( speciesLazy == speciesBefore ), bioLazy + "%, " + speciesLazy + " species" );
+		Check( "flaresterilises: once the star is analysed after its flare the planet has no life: the sensors read 0 and there are no species (ANALYZE-OV WEC26)", ( bioAfter == 0 ) && ( speciesAfter == 0 ), bioAfter + "%, " + speciesAfter + " species" );
+		Check( "flaresterilises: the sterilised planets are kept in the save", keptInSave, keptInSave.ToString() );
+		Check( "flaresterilises: a game won before a star's flare keeps its life (WEC04; control)", bioWon > 0, bioWon + "%" );
+
+		Finish( "scenario=flaresterilises checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 8: the crash line, as the original's (roadmap 8.24)

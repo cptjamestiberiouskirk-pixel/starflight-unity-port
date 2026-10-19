@@ -85,6 +85,14 @@ public class GD_Species
 	// the species of a planet: none without life, and more the higher its bio density (1 for the lowest, up to 6)
 	public static List<GD_Species> ForPlanet( GD_Planet planet )
 	{
+		// a planet a flare has sterilised has none (PlayerData.GetBioDensity)
+		var bioDensity = PlayerData.GetBioDensityOf( planet );
+
+		if ( bioDensity <= 0 )
+		{
+			return new List<GD_Species>();
+		}
+
 		if ( s_speciesOfPlanet.TryGetValue( planet.m_id, out var known ) )
 		{
 			return known;
@@ -92,11 +100,11 @@ public class GD_Species
 
 		var speciesList = new List<GD_Species>();
 
-		if ( ( planet.m_bioDensity > 0 ) && !planet.IsGasGiant() )
+		if ( ( bioDensity > 0 ) && !planet.IsGasGiant() )
 		{
 			// their own random numbers, so the game's do not move
 			var random = new System.Random( planet.m_id * 977 + 13 );
-			var count = 1 + planet.m_bioDensity / 20;
+			var count = 1 + bioDensity / 20;
 
 			for ( var index = 0; index < count; index++ )
 			{
