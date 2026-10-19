@@ -239,7 +239,7 @@ Found on 2026-10-18 by reading the shipped game's decompiled overlays against th
 | 8.31 | Arming the Black Egg is asked on the drop, and picking it up disarms it | ITEMS-OV `WE9AA`, `WE9FA`; DPART-OV | the drop asks "Arm this device?" (`ArmEggYesButton`, `ArmEggNoButton`, `PD_PlanetSurfaces.DroppedCargo.m_leftUnarmed`), and picking up an armed egg says "Disarming device." (probe `eggarming`) |
 | 8.32 | Random ruins by the shipped game's rule (replaces 3.5; needs two planet bytes from the original's data) | SEED-OV `WF492`, `WF468`, `WF26B` | MISSING |
 | 8.33 | Describe an artifact or a specimen from the cargo list | CAPTAIN `WEA62`, `WEC73` | the ship's cargo list marks an item, with Next, Describe and Back (`ShipCargoButton`), and a specimen keeps its capture place and date (`PD_Specimen`; probe `cargodescribe`) |
-| 8.34 | The Starport asks before repairing | CONFIG-OV `WF346`, `WF2C5` | MISSING |
+| 8.34 | The Starport asks before repairing | CONFIG-OV `WF346`, `WF2C5` | Repair gives the cost to repair the entire ship and asks "Shall we repair the ship? [N Y]" (right yes, left no); a whole ship needs none, and without the money it says so and asks nothing (`ShipConfigurationPanel.RepairClicked`, `AnswerRepairQuestion`; probe `starport-repairquestion`) |
 | 8.35 | Disembark lowers the shields and disarms | SHIPBUTTONS `WEDEC` | Disembark lowers the shields and disarms, saying so (`DisembarkButton`; probe `disembarkshields`) |
 | 8.36 | The Veloxi drone asks up to six numbers | `VPROBE#` | MISSING |
 | 8.37 | The Shimmering Ball makes the aliens' aim jitter | `WE911` | MISSING |
