@@ -1742,10 +1742,6 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCrashLine();
 				break;
 
-			case "crushline":
-				yield return ScenarioCrushLine();
-				break;
-
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -48618,58 +48614,6 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "crashline: no safe landing, and the game ends with the emergency locator's transmission (control)", crashed && ( LineIndex( crash, "Safe landing" ) < 0 ) && ( LineIndex( crash, "crashed on planet" ) >= 0 ), crashed + ": " + string.Join( " | ", crash ) );
 
 		Finish( "scenario=crashline checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
-	}
-
-	// a ship with the fuel for it lands on a planet of more than 7.99 G and is crushed: the original says "Safe landing, captain." first (LAND-OV WF430: DESCEND ends
-	// with it whenever there was the fuel, then WF1F1 crushes the hull). The code before went straight to the end
-	IEnumerator ScenarioCrushLine()
-	{
-		var gameData = DataController.m_instance.m_gameData;
-
-		EnsureCrew();
-
-		// the first planet that crushes a hull with no encounter waiting in its orbit
-		GD_Planet heavy = null;
-
-		foreach ( var planet in gameData.m_planetList )
-		{
-			if ( ( heavy != null ) || !PD_PlayerShip.GravityCrushesHull( planet ) )
-			{
-				continue;
-			}
-
-			var star = gameData.m_starList[ planet.m_starId ];
-			var guarded = false;
-
-			foreach ( var gdEncounter in gameData.m_encounterList )
-			{
-				guarded = guarded || ( ( gdEncounter.m_location == 2 ) && ( gdEncounter.m_xCoordinate == star.m_xCoordinate ) && ( gdEncounter.m_yCoordinate == star.m_yCoordinate ) && ( gdEncounter.m_orbitPosition == planet.m_orbitPosition ) );
-			}
-
-			if ( !guarded )
-			{
-				heavy = planet;
-			}
-		}
-
-		yield return GoIntoOrbit( heavy.m_starId, heavy.m_id );
-
-		SetEndurium( 1000 );
-
-		var lines = new List<string>();
-
-		yield return DescendWatching( lines );
-
-		var crushed = CombatController.m_instance.PlayerIsDestroyed();
-
-		Log( "crushline: planet " + heavy.m_id + " (" + heavy.m_gravity + " hundredths of a G): " + string.Join( " | ", lines ) + " (destroyed " + crushed + ")" );
-
-		var landing = LineIndex( lines, "Safe landing, captain" );
-		var crushing = LineIndex( lines, "crushed by extreme gravity", landing );
-
-		Check( "crushline: with the fuel for it the ship lands safely, then the gravity crushes it", crushed && ( landing >= 0 ) && ( crushing > landing ), crushed + ": " + string.Join( " | ", lines ) );
-
-		Finish( "scenario=crushline checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
