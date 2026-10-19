@@ -236,7 +236,7 @@ Assets/
 - Alien ships come after you as in the original: every two star hours they jump toward your ship, half the way in hyperspace and three quarters in a star system, and in hyperspace they stay near their home ground; the Crystal Pearl draws them farther and faster
 - The Shimmering Ball cloaks the ship in combat until it fires
 - The Flat Device shields the terrain vehicle: lifeforms hit its crew half as often
-- The Red Cylinder flashes on the landing map near a planet's ancient ruins
+- The Red Cylinder flashes a planet's message and artifact sites on the landing map when it opens, and marks its ancient ruins
 - The ancient ruins placed by STRINFO's editors, on the Mechans' ice planet and deep in Elowan space, hold their Endurium
 - Continuum fluxes show on the screen to a navigator trained beyond 150, or with the Ring Device aboard
 - The price of Endurium rises with the notices of 20-02 and 15-05, and the Starport buys it back at its selling price

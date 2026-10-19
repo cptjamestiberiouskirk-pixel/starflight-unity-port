@@ -1706,6 +1706,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLookLand();
 				break;
 
+			case "depositminerals":
+				yield return ScenarioDepositMinerals();
+				break;
+
 			case "alienpostures":
 				yield return ScenarioAlienPostures();
 				break;
@@ -14257,13 +14261,14 @@ public class ClaudeProbe : MonoBehaviour
 
 			var position = deposits[ i ].transform.position;
 
-			placement = ( placement * 31 + Mathf.RoundToInt( position.x ) * 7 + Mathf.RoundToInt( position.z ) * 3 + deposits[ i ].m_elementId ) % 1000000007L;
+			// (the places alone: a deposit's element is drawn apart from the placement since roadmap 8.16, and may differ)
+			placement = ( placement * 31 + Mathf.RoundToInt( position.x ) * 7 + Mathf.RoundToInt( position.z ) * 3 ) % 1000000007L;
 		}
 
 		Log( "deposits: planet 90 has " + deposits.Length + " deposits, from " + Tools.VolumeToText( smallest ) + " to " + Tools.VolumeToText( largest ) + " cubic meters, " + Tools.VolumeToText( total ) + " in all; " + outside + " outside 1.0 to 9.9, " + notWholeCubicMeters + " not whole cubic meters; placement checksum " + placement );
 
 		// the size is still one random draw per deposit, so the deposits (and everything placed after them) are where they were with 1 to 5 cubic meters
-		Check( "deposits: the deposits are where they were (the placement checksum of the deposits of 1 to 5 cubic meters)", placement == 789127093L, placement.ToString() );
+		Check( "deposits: the deposits are where they were (the placement checksum of the deposits of 1 to 5 cubic meters)", placement == 418660676L, placement.ToString() );
 		Check( "deposits: every deposit holds 1.0 to 9.9 cubic meters in tenths, as the original's", ( outside == 0 ) && ( largest > 50 ) && ( notWholeCubicMeters > 0 ), "from " + Tools.VolumeToText( smallest ) + " to " + Tools.VolumeToText( largest ) + " cubic meters, " + outside + " of " + deposits.Length + " outside 1.0 to 9.9, " + notWholeCubicMeters + " not whole cubic meters" );
 
 		// ---- 2. mine one with the real button (the mining laser, TVMineButton): what the message says and what arrives in the hold
@@ -25457,13 +25462,49 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 4: the Red Cylinder
 
-	// the Red Cylinder looks at this place of the landing map (null on the code before it)
-	static object RedCylinderLook( float eastWest, float northSouth )
+	// a static method of the Red Cylinder by name (null on the code before it: SITE-OV's flashing came with roadmap 8.15)
+	static object RedCylinderCall( string method )
 	{
 		var type = typeof( ShipButton ).Assembly.GetType( "RedCylinder" );
-		var look = ( type == null ) ? null : type.GetMethod( "Look" );
+		var found = ( type == null ) ? null : type.GetMethod( method );
 
-		return ( look == null ) ? null : look.Invoke( null, new object[] { eastWest, northSouth } );
+		return ( found == null ) ? null : found.Invoke( null, null );
+	}
+
+	// how many sites the Red Cylinder flashes on the landing map (-1 on the code before), and whether they flash now
+	static int RedCylinderSiteCount()
+	{
+		return ( RedCylinderCall( "GetSites" ) is System.Collections.ICollection sites ) ? sites.Count : -1;
+	}
+
+	static bool RedCylinderIsFlashing()
+	{
+		return ( RedCylinderCall( "IsFlashing" ) is bool flashing ) && flashing;
+	}
+
+	// whether the image of the flashing sites over the landing map is shown at any time in this many seconds (it blinks by the game's time, on and off every
+	// eighth of a second, and a headless frame can be far shorter: a count of frames could see only the off half)
+	IEnumerator SeeCylinderSites( float seconds, bool[] seen )
+	{
+		seen[ 0 ] = false;
+
+		var end = Time.time + seconds;
+
+		while ( Time.time < end )
+		{
+			var map = SpaceflightController.m_instance.m_displayController.m_terrainMapDisplay;
+			var image = ( map != null ) ? map.transform.GetComponentsInChildren<UnityEngine.UI.RawImage>( false ) : new UnityEngine.UI.RawImage[ 0 ];
+
+			foreach ( var raw in image )
+			{
+				if ( ( raw.name == "Red Cylinder Sites" ) && raw.enabled )
+				{
+					seen[ 0 ] = true;
+				}
+			}
+
+			yield return null;
+		}
 	}
 
 	IEnumerator ScenarioRedCylinder()
@@ -25515,26 +25556,62 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		// ---- 3. the Red Cylinder flashes at the ancient ruin, not far from it, and not without the Red Cylinder (the control)
-		var ruin = ( placedPlaces.Count > 0 ) ? placedPlaces[ 0 ] : Vector2.zero;
+		// ---- 3. the Red Cylinder as the shipped game's (SITE-OV .MERCATOR, WF389, WF290, roadmap 8.15): when the landing map opens it flashes the planet's message
+		// and artifact sites, up to ten, and says so; nothing without it aboard (the control) - in orbit around Earth, which has both, through the real Land button
 		var redCylinder = gameData.FindArtifactId( "Red Cylinder" );
+		var seen = new bool[ 1 ];
+
+		yield return GoIntoOrbit( 0, 5 );
+
+		if ( playerData.m_playerShip.HasArtifact( "Red Cylinder" ) )
+		{
+			playerData.m_playerShip.RemoveArtifact( redCylinder );
+		}
 
 		controller.m_messages.Clear();
 
-		var withoutIt = RedCylinderLook( ruin.x, ruin.y );
+		PressButtonLabelled( ButtonController.ButtonSet.CommandB, "Land" );
+
+		yield return SeeCylinderSites( 0.5f, seen );
+
+		var withoutItMessages = MessageList();
+		var withoutItSites = RedCylinderSiteCount();
+		var withoutItSeen = seen[ 0 ];
 
 		playerData.m_playerShip.AddArtifact( redCylinder );
 
-		var farAway = RedCylinderLook( ruin.x + 90.0f, -ruin.y );
-		var atTheRuin = RedCylinderLook( ruin.x + 3.0f, ruin.y - 2.0f );
-		var messages = MessageList();
+		controller.m_messages.Clear();
+
+		PressButtonLabelled( ButtonController.ButtonSet.CommandB, "Land" );
+
+		yield return SeeCylinderSites( 0.5f, seen );
+
+		var withItMessages = MessageList();
+		var withItSites = RedCylinderSiteCount();
+		var withItFlashing = RedCylinderIsFlashing();
+		var withItSeen = seen[ 0 ];
+
+		// and it stops: the shipped game cycles the colours 80 times, the port blinks for 3 seconds
+		var stopAt = Time.time + 3.5f;
+
+		while ( Time.time < stopAt )
+		{
+			yield return null;
+		}
+
+		yield return SeeCylinderSites( 0.5f, seen );
+
+		var afterwardsFlashing = RedCylinderIsFlashing();
+		var afterwardsSeen = seen[ 0 ];
 
 		playerData.m_playerShip.RemoveArtifact( redCylinder );
 
-		Log( "redcylinder: placed [" + string.Join( ", ", placed ) + "] worked out [" + string.Join( ", ", worked ) + "] | without it " + withoutIt + ", far away " + farAway + ", at the ruin " + atTheRuin + " | " + messages );
+		Log( "redcylinder: placed [" + string.Join( ", ", placed ) + "] worked out [" + string.Join( ", ", worked ) + "] | without it: sites " + withoutItSites + ", seen " + withoutItSeen + ", '" + withoutItMessages + "' | with it: sites " + withItSites + ", flashing " + withItFlashing + ", seen " + withItSeen + ", '" + withItMessages + "' | after 3.5 s: flashing " + afterwardsFlashing + ", seen " + afterwardsSeen );
 
 		Check( "redcylinder: the random ruins are worked out from orbit where the surface places them", ( placed.Count > 0 ) && ( string.Join( ", ", placed ) == string.Join( ", ", worked ) ), string.Join( ", ", placed ) + " | " + string.Join( ", ", worked ) );
-		Check( "redcylinder: the Red Cylinder flashes on the landing map near an ancient ruin, not far from it, and only aboard", ( atTheRuin is bool ) && (bool) atTheRuin && !(bool) farAway && !(bool) withoutIt && messages.Contains( "The Red Cylinder is flashing" ), withoutIt + ", " + farAway + ", " + atTheRuin + " | " + messages );
+		Check( "redcylinder: with the Red Cylinder aboard, the landing map flashes the planet's message and artifact sites when it opens, and says so", ( withItSites >= 1 ) && ( withItSites <= 10 ) && withItFlashing && withItSeen && withItMessages.Contains( "The Red Cylinder is flashing." ), withItSites + " " + withItFlashing + " " + withItSeen + " | " + withItMessages );
+		Check( "redcylinder: without it aboard nothing flashes (the control)", ( withoutItSites <= 0 ) && !withoutItSeen && !withoutItMessages.Contains( "The Red Cylinder is flashing" ), withoutItSites + " " + withoutItSeen + " | " + withoutItMessages );
+		Check( "redcylinder: the sites stop flashing after a few seconds", ( withItSites >= 1 ) && !afterwardsFlashing && !afterwardsSeen, afterwardsFlashing + " " + afterwardsSeen );
 
 		Finish( "scenario=redcylinder placed=" + placed.Count + " worked=" + worked.Count, 0 );
 	}
@@ -47176,6 +47253,105 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lookland: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=lookland checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: a deposit's mineral by the original's shares (roadmap 8.16)
+
+	IEnumerator ScenarioDepositMinerals()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var errorsBefore = s_errorCount;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// planet 90 of Arth: mineral density 43, three different elements, the first not Endurium
+		var planet = gameData.m_planetList[ 90 ];
+
+		yield return GoIntoOrbit( planet.m_starId, 90 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+		yield return DisembarkNow( done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=depositminerals abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var grid = controller.m_disembarked.m_terrainGrid;
+		var ground = new List<TerrainElement>( grid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true ) );
+
+		ground.Sort( ( a, b ) => a.m_depositIndex.CompareTo( b.m_depositIndex ) );
+
+		// the shares on the ground (the original's SEED-OV WF0F7: the first element below 50 of 100, the second below 75, the third below 90, any other the rest)
+		int first = 0, second = 0, third = 0, others = 0, enduriumOthers = 0;
+		var endurium = gameData.m_misc.m_enduriumElementId;
+
+		// and a fingerprint of where they lie and how much they hold, the same with the old code and the new (nothing the planet's seeded draws place moves)
+		var positionSum = 0.0;
+		var volumeSum = 0L;
+
+		foreach ( var deposit in ground )
+		{
+			if ( deposit.m_elementId == planet.m_elementIdA )
+			{
+				first++;
+			}
+			else if ( deposit.m_elementId == planet.m_elementIdB )
+			{
+				second++;
+			}
+			else if ( deposit.m_elementId == planet.m_elementIdC )
+			{
+				third++;
+			}
+			else
+			{
+				others++;
+
+				if ( deposit.m_elementId == endurium )
+				{
+					enduriumOthers++;
+				}
+			}
+
+			positionSum += deposit.transform.position.x + deposit.transform.position.z;
+			volumeSum += deposit.m_volume;
+		}
+
+		var total = Mathf.Max( 1, ground.Count );
+
+		// the survey from orbit works the deposits out again (PlanetSurvey): every deposit's element as on the ground
+		PlanetSurvey.Forget();
+
+		var generator = controller.m_starSystem.GetPlanetController( 90 ).GetPlanetGenerator();
+		var survey = PlanetSurvey.GetDepositPlaces( planet, generator, grid );
+		var mismatches = 0;
+
+		for ( var i = 0; i < Mathf.Min( survey.Count, ground.Count ); i++ )
+		{
+			if ( Mathf.RoundToInt( survey[ i ].z ) != ground[ i ].m_elementId )
+			{
+				mismatches++;
+			}
+		}
+
+		Log( "depositminerals: " + ground.Count + " deposits on planet 90 (elements " + planet.m_elementIdA + ", " + planet.m_elementIdB + ", " + planet.m_elementIdC + "): first " + first + ", second " + second + ", third " + third + ", others " + others + " (Endurium " + enduriumOthers + ") | survey " + survey.Count + " deposits, " + mismatches + " elements differ | fingerprint positions " + positionSum.ToString( "F2" ) + " volumes " + volumeSum );
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "depositminerals: half the deposits are the planet's first element, a quarter its second, 15% its third and 10% others (SEED-OV WF0F7)", ( ground.Count >= 200 ) && ( Mathf.Abs( first / (float) total - 0.50f ) < 0.08f ) && ( Mathf.Abs( second / (float) total - 0.25f ) < 0.07f ) && ( Mathf.Abs( third / (float) total - 0.15f ) < 0.06f ) && ( Mathf.Abs( others / (float) total - 0.10f ) < 0.06f ), first + " / " + second + " / " + third + " / " + others + " of " + ground.Count );
+		Check( "depositminerals: the other elements are never Endurium (the planet's first element is not Endurium, WF0C7)", enduriumOthers == 0, enduriumOthers + " of " + others );
+		Check( "depositminerals: the survey from orbit gives every deposit the element it has on the ground", ( survey.Count == ground.Count ) && ( mismatches == 0 ), survey.Count + " / " + ground.Count + ", " + mismatches + " differ" );
+		Check( "depositminerals: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=depositminerals checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 8: aliens move and fire by their posture (since 2026-10-18)

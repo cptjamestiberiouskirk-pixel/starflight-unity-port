@@ -136,18 +136,18 @@ public class PlanetSurvey
 			TerrainGridPopulator.ReplayPlaces( planetGenerator, spawnLists, elevationScale, ( rocks.m_rockTemplates != null ) ? rocks.m_rockTemplates.Length : 1, numRocks, planet.m_id + 1, true, 1.0f, 1.0f, null );
 		}
 
-		// then the deposits, of the planet's three elements in turn (as TerrainElements places them)
+		// then the deposits, each of the element TerrainElements gives it (TerrainElement.ChooseDepositElement)
 		if ( terrainGrid.m_terrainElements != null )
 		{
 			var numElements = ( planet.m_mineralDensity * terrainGrid.m_terrainElements.m_maxNumElements ) / 100;
-			var elementIds = new[] { planet.m_elementIdA, planet.m_elementIdB, planet.m_elementIdC };
-			var places = TerrainGridPopulator.ReplayPlaces( planetGenerator, spawnLists, elevationScale, 3, numElements, planet.m_id + 2, true, 1.0f, 1.0f, TerrainElement.DrawVolume );
+			var numElementKinds = DataController.m_instance.m_gameData.m_elementList.Length;
+			var places = TerrainGridPopulator.ReplayPlaces( planetGenerator, spawnLists, elevationScale, numElementKinds, numElements, planet.m_id + 2, true, 1.0f, 1.0f, TerrainElement.DrawVolume, i => TerrainElement.ChooseDepositElement( planet, i ) );
 
 			for ( var i = 0; i < places.Count; i++ )
 			{
 				Tools.WorldToLatLongCoordinates( places[ i ].m_position, out var eastWest, out var northSouth );
 
-				s_deposits.Add( new Deposit { m_eastWest = eastWest, m_northSouth = northSouth, m_elementId = elementIds[ places[ i ].m_templateIndex % 3 ], m_volume = places[ i ].m_volume, m_depositIndex = i } );
+				s_deposits.Add( new Deposit { m_eastWest = eastWest, m_northSouth = northSouth, m_elementId = places[ i ].m_templateIndex, m_volume = places[ i ].m_volume, m_depositIndex = i } );
 			}
 		}
 

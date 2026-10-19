@@ -1,4 +1,5 @@
 ﻿
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -41,6 +42,11 @@ public class TerrainMapDisplay : ShipDisplay
 	// the image of the marks of the science officer's survey and of the Red Cylinder over the map (made when they are first shown)
 	RawImage m_surveyMarks;
 
+	// the image of the sites the Red Cylinder flashes over the map, its texture (made when it first flashes), and the sites it was drawn for
+	RawImage m_cylinderSites;
+	Texture2D m_cylinderSitesTexture;
+	List<Vector2> m_drawnCylinderSites;
+
 	// unity start
 	public override void Start()
 	{
@@ -63,6 +69,59 @@ public class TerrainMapDisplay : ShipDisplay
 	// unity update
 	public override void Update()
 	{
+		UpdateCylinderSites();
+	}
+
+	// unity on destroy
+	void OnDestroy()
+	{
+		// (a texture made at run time is never freed with the scene)
+		if ( m_cylinderSitesTexture != null )
+		{
+			Destroy( m_cylinderSitesTexture );
+		}
+	}
+
+	// the sites the Red Cylinder flashes blink over the map for a while after it opens (SITE-OV WF290 cycles their colours), drawn once each time
+	void UpdateCylinderSites()
+	{
+		if ( !RedCylinder.IsFlashing() || ( m_map == null ) )
+		{
+			if ( ( m_cylinderSites != null ) && m_cylinderSites.enabled )
+			{
+				m_cylinderSites.enabled = false;
+			}
+
+			return;
+		}
+
+		if ( m_cylinderSites == null )
+		{
+			m_cylinderSites = MakeOverlay( "Red Cylinder Sites" );
+		}
+
+		var sites = RedCylinder.GetSites();
+
+		if ( ( m_cylinderSitesTexture == null ) || ( sites != m_drawnCylinderSites ) )
+		{
+			if ( m_cylinderSitesTexture == null )
+			{
+				m_cylinderSitesTexture = new Texture2D( SurveyMarks.c_width, SurveyMarks.c_height, TextureFormat.RGBA32, true );
+				m_cylinderSitesTexture.name = "Red Cylinder Sites";
+				m_cylinderSitesTexture.wrapModeU = TextureWrapMode.Repeat;
+				m_cylinderSitesTexture.wrapModeV = TextureWrapMode.Clamp;
+				m_cylinderSitesTexture.filterMode = FilterMode.Trilinear;
+			}
+
+			// the sites as the survey marks draw the ancient ruins, boxes in the danger colour of the scheme drawn over the views
+			SurveyMarks.Draw( m_cylinderSitesTexture, null, sites, UIKitTheme.GetViewTheme() );
+
+			m_cylinderSites.texture = m_cylinderSitesTexture;
+			m_drawnCylinderSites = sites;
+		}
+
+		// on and off four times a second
+		m_cylinderSites.enabled = ( Mathf.FloorToInt( Time.time * 8.0f ) % 2 ) == 0;
 	}
 
 	// the display label
@@ -145,10 +204,16 @@ public class TerrainMapDisplay : ShipDisplay
 		m_surveyMarks.enabled = true;
 	}
 
-	// makes the image of the marks: a child of the map that covers it, drawn over it and under the crosshairs
+	// makes the image of the marks
 	void MakeSurveyMarks()
 	{
-		var marksObject = new GameObject( "Survey Marks", typeof( RectTransform ) );
+		m_surveyMarks = MakeOverlay( "Survey Marks" );
+	}
+
+	// makes an image over the map: a child of the map that covers it, drawn over it and under the crosshairs
+	RawImage MakeOverlay( string name )
+	{
+		var marksObject = new GameObject( name, typeof( RectTransform ) );
 
 		marksObject.layer = m_map.gameObject.layer;
 
@@ -161,10 +226,12 @@ public class TerrainMapDisplay : ShipDisplay
 		rectTransform.offsetMax = Vector2.zero;
 
 		// (white: the texture has the colours, and the kit's scheme never takes white for one of its own)
-		m_surveyMarks = marksObject.AddComponent<RawImage>();
+		var image = marksObject.AddComponent<RawImage>();
 
-		m_surveyMarks.color = Color.white;
-		m_surveyMarks.raycastTarget = false;
+		image.color = Color.white;
+		image.raycastTarget = false;
+
+		return image;
 	}
 
 	// another scheme or mode was picked: the marks are drawn again in its colours
@@ -276,9 +343,6 @@ public class TerrainMapDisplay : ShipDisplay
 		{
 			m_crosshairVelocity = Time.deltaTime * m_crosshairMoveAcceleration;
 		}
-
-		// the Red Cylinder flashes near an ancient ruin
-		RedCylinder.Look( playerData.m_general.m_selectedLatitude, playerData.m_general.m_selectedLongitude );
 
 		// the latitude is the north-south place and the longitude the east-west one, as the original's map gives them ("LAT 15N  LONG 30W") - the port's
 		// m_selectedLatitude holds the east-west place and its m_selectedLongitude the north-south one, so each text takes the other
