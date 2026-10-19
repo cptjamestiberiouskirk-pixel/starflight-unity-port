@@ -19627,19 +19627,25 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 4: the Shimmering Ball
 
+	// the Shimmering Ball as the original's (COMBAT-OV WF414, WE96B, WE911): entering Combat with the Ball aboard says "Cloaking device now active" and, until the
+	// encounter ends, puts RRND -1 to 2 cells on each axis of every alien laser's, missile's and plasma bolt's aim; a laser that misses the ship's cell says "Laser
+	// missed us!" and does nothing (WECC7), so one in nine hits. The code before cloaked the ship whenever the Ball was aboard: no alien could fire at all, except for
+	// 3 s after each shot of the player's
 	IEnumerator ScenarioShimmeringBall()
 	{
 		var dataController = DataController.m_instance;
 		var playerData = dataController.m_playerData;
 		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
 		var ship = playerData.m_playerShip;
 		var combat = CombatController.m_instance;
 		var ballId = gameData.FindArtifactId( "Shimmering Ball" );
 
 		EnsureCrew();
 
-		// a ship that can fire its laser, and no Shimmering Ball to begin with
+		// a ship that can fire its laser, its weapons armed, and no Shimmering Ball to begin with
 		ship.m_laserCannonClass = 1;
+		ship.m_weaponsAreArmed = true;
 		ship.AddElement( 5, 50 );
 
 		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( ballId ) != null ); guard++ )
@@ -19647,13 +19653,20 @@ public class ClaudeProbe : MonoBehaviour
 			ship.RemoveArtifact( ballId );
 		}
 
+		// a vessel with a laser and no missile, and one with a missile and no plasma bolts
 		GD_Vessel laserVessel = null;
+		GD_Vessel missileVessel = null;
 
 		foreach ( var vessel in gameData.m_vesselList )
 		{
-			if ( ( laserVessel == null ) && !vessel.m_hasPlasmaBolts && ( vessel.m_laserClass > 0 ) )
+			if ( ( laserVessel == null ) && !vessel.m_hasPlasmaBolts && ( vessel.m_laserClass > 0 ) && ( vessel.m_missileClass <= 0 ) )
 			{
 				laserVessel = vessel;
+			}
+
+			if ( ( missileVessel == null ) && !vessel.m_hasPlasmaBolts && ( vessel.m_missileClass > 0 ) )
+			{
+				missileVessel = vessel;
 			}
 		}
 
@@ -19664,39 +19677,102 @@ public class ClaudeProbe : MonoBehaviour
 
 		var alienShip = playerData.FindEncounter( speminId ).GetAlienShipList()[ 0 ];
 
-		// ---- 1. the control: without the Shimmering Ball an alien laser hits
-		var hitWithout = ArmorLostToOneShot( alienShip, laserVessel );
+		UnityEngine.Random.InitState( 2468 );
 
-		// ---- 2. with the Shimmering Ball in the hold the aliens cannot fire at the cloaked ship
+		// ---- 1. the control: without the Shimmering Ball every alien laser shot hits
+		var hitsWithout = LaserHits( alienShip, laserVessel, 30 );
+
+		// ---- 2. the Ball aboard, Combat not entered: every shot hits
 		ship.AddArtifact( ballId );
 
-		var hitCloaked = ArmorLostToOneShot( alienShip, laserVessel );
+		var hitsBallNoCombat = LaserHits( alienShip, laserVessel, 30 );
 
-		// ---- 3. a shot of the player drops the cloak: the aliens can fire back
+		// ---- 3. Combat entered: "Cloaking device now active", and one shot in nine hits; a miss says "Laser missed us!"
+		controller.m_messages.Clear();
+
+		var enteredCombat = new CombatButton().Execute();
+		var cloakingSaid = MessageList().Contains( "Cloaking device now active" );
+
+		controller.m_messages.Clear();
+
+		var hitsInCombat = LaserHits( alienShip, laserVessel, 180 );
+		var missedSaid = MessageList().Contains( "Laser missed us!" );
+
+		// ---- 4. a shot of the player's changes nothing: still about one in nine
 		combat.SetTarget( FirstLivingAlien() );
 
 		BringAliensClose();
 
 		var laserFired = combat.FirePlayerLaser();
-		var hitAfterFiring = ArmorLostToOneShot( alienShip, laserVessel );
+		var hitsAfterFiring = LaserHits( alienShip, laserVessel, 90 );
 
-		// ---- 4. and a few seconds later the ship is cloaked again
-		yield return new WaitForSecondsRealtime( 4.0f );
+		// ---- 5. missiles: each aimed at the ship's cell plus -1 to 1 cells on each axis
+		var offsets = new HashSet<string>();
+		var offsetsOnTheGrid = true;
 
-		var hitLater = ArmorLostToOneShot( alienShip, laserVessel );
+		for ( var i = 0; i < 40; i++ )
+		{
+			// (the game's own clearing, which also counts the aliens' missiles in the air down to none)
+			combat.ClearMissiles();
+
+			combat.AlienLaunchesMissile( alienShip, missileVessel );
+
+			foreach ( var missile in UnityEngine.Object.FindObjectsByType<MissileProjectile>( FindObjectsSortMode.None ) )
+			{
+				var target = (Vector3) GetField( missile, "m_targetPosition" );
+				var offset = target - SpaceflightController.m_instance.m_playerShip.transform.position;
+				var x = Mathf.RoundToInt( offset.x );
+				var z = Mathf.RoundToInt( offset.z );
+
+				offsetsOnTheGrid = offsetsOnTheGrid && ( ( x == 0 ) || ( Mathf.Abs( x ) == 80 ) ) && ( ( z == 0 ) || ( Mathf.Abs( z ) == 80 ) );
+				offsets.Add( x + "," + z );
+			}
+		}
+
+		combat.ClearMissiles();
+
+		// ---- 6. a new encounter, Combat not entered: every shot hits again
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		EnterEncounter( speminId );
+		yield return Frames( 10 );
+
+		alienShip = playerData.FindEncounter( speminId ).GetAlienShipList()[ 0 ];
+
+		var hitsNewEncounter = LaserHits( alienShip, laserVessel, 30 );
 
 		ClearMissiles();
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		Log( "shimmeringball: one laser shot of a " + laserVessel.m_name + ": without the Shimmering Ball " + hitWithout + ", cloaked " + hitCloaked + ", right after the player fired (fired " + laserFired + ") " + hitAfterFiring + ", 4 s later " + hitLater );
+		Log( "shimmeringball: laser shots of a " + laserVessel.m_name + " that hit: without the Ball " + hitsWithout + "/30, with it but Combat not entered " + hitsBallNoCombat + "/30, in Combat (entered " + enteredCombat + ", cloaking said " + cloakingSaid + ") " + hitsInCombat + "/180 (missed said " + missedSaid + "), after the player fired (" + laserFired + ") " + hitsAfterFiring + "/90, in a new encounter " + hitsNewEncounter + "/30; missile aim offsets " + string.Join( " ", offsets ) );
 
-		Check( "shimmeringball: without the Shimmering Ball an alien laser hits (control)", hitWithout > 0, hitWithout.ToString() );
-		Check( "shimmeringball: with the Shimmering Ball the aliens cannot fire at the cloaked ship", hitCloaked == 0, hitCloaked.ToString() );
-		Check( "shimmeringball: a shot of the player drops the cloak, and the aliens can fire back", laserFired && ( hitAfterFiring > 0 ), laserFired + ", " + hitAfterFiring );
-		Check( "shimmeringball: a few seconds after the player's shot the ship is cloaked again", hitLater == 0, hitLater.ToString() );
+		Check( "shimmeringball: without the Shimmering Ball every alien laser shot hits (control)", hitsWithout == 30, hitsWithout + "/30" );
+		Check( "shimmeringball: with the Ball aboard but Combat not entered, every shot hits (WDE41 is set on entering Combat)", hitsBallNoCombat == 30, hitsBallNoCombat + "/30" );
+		Check( "shimmeringball: entering Combat with the Ball says Cloaking device now active (COMBAT-OV WF414)", enteredCombat && cloakingSaid, enteredCombat + ", " + cloakingSaid );
+		Check( "shimmeringball: in Combat about one alien laser shot in nine hits (5 to 45 of 180), and a miss says Laser missed us! (WE911, WECC7)", ( hitsInCombat >= 5 ) && ( hitsInCombat <= 45 ) && missedSaid, hitsInCombat + "/180, " + missedSaid );
+		Check( "shimmeringball: a shot of the player's changes nothing (2 to 25 of 90)", laserFired && ( hitsAfterFiring >= 2 ) && ( hitsAfterFiring <= 25 ), laserFired + ", " + hitsAfterFiring + "/90" );
+		Check( "shimmeringball: an alien missile is aimed at the ship's cell plus -1 to 1 cells on each axis", offsetsOnTheGrid && ( offsets.Count >= 4 ), string.Join( " ", offsets ) );
+		Check( "shimmeringball: a new encounter starts without it: every shot hits until Combat is entered (CLEAR-CO)", hitsNewEncounter == 30, hitsNewEncounter + "/30" );
 
-		Finish( "scenario=shimmeringball without=" + hitWithout + " cloaked=" + hitCloaked + " afterFiring=" + hitAfterFiring + " later=" + hitLater, 0 );
+		Finish( "scenario=shimmeringball checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// how many of this many alien laser shots from 3 cells away hit the ship
+	static int LaserHits( PD_AlienShip alienShip, GD_Vessel vessel, int shots )
+	{
+		var hits = 0;
+
+		for ( var i = 0; i < shots; i++ )
+		{
+			if ( ArmorLostToOneShot( alienShip, vessel ) > 0 )
+			{
+				hits++;
+			}
+		}
+
+		return hits;
 	}
 
 	// ---------------------------------------------------------------- phase 4: the Ring Device
