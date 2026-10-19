@@ -38,7 +38,7 @@ $results = Join-Path $root ( 'flight-' + ( Get-Date -Format 'yyyyMMdd-HHmmss' ) 
 New-Item -ItemType Directory -Force -Path $scripts, $out, $results | Out-Null
 
 # the Sandbox's scripts, with Windows line endings for cmd.exe
-foreach ( $name in 'flight-check.cmd', 'flight-driver.ps1', 'watch-starflight.ps1' ) {
+foreach ( $name in 'flight-check.cmd', 'flight-driver.ps1', 'watch-starflight.ps1', 'mute-sandbox.ps1' ) {
 	$text = [IO.File]::ReadAllText( ( Join-Path $PSScriptRoot $name ) ) -replace "`r?`n", "`r`n"
 	[IO.File]::WriteAllText( ( Join-Path $scripts $name ), $text, [Text.Encoding]::ASCII )
 }

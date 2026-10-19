@@ -24,6 +24,8 @@ Make a build (see "Make a build" in the main README), then from the project root
 
 The Sandbox opens after 20 to 30 seconds and the game starts by itself in a window, with a command window behind it and the watcher's PowerShell window minimized. Play, then quit the game with Escape and **Quit**: the script then copies the saves and the Code Integrity events out. Close the Sandbox window last.
 
+The game is silent unless `-Sound` is given. The Sandbox plays its sound through the host's speakers and the game has no volume setting of its own, so before the game starts `mute-sandbox.ps1` mutes the Sandbox's own output devices through Windows' Core Audio, and stops the Sandbox's Windows Audio service if one of them will not mute. It only does anything as the Sandbox's account (`WDAGUtilityAccount`): run anywhere else it stops at once, so it can never mute the host's own speakers. `mute.txt` in the results says what it did.
+
 | Option | What it does |
 |---|---|
 | `-BuildDir` | The folder with `Starflight.exe` in it (required) |
@@ -31,6 +33,7 @@ The Sandbox opens after 20 to 30 seconds and the game starts by itself in a wind
 | `-MemoryMB` | Memory for the Sandbox, 8192 by default |
 | `-Gpu` | Share the graphics card with the Sandbox (off by default, see below) |
 | `-NoLaunch` | Only write `%TEMP%\starflight-sandbox\Starflight.wsb`, to start by double-clicking it later |
+| `-Sound` | Let the game be heard (muted by default, see above) |
 
 Only one Sandbox can run at a time, so the script stops if one is open.
 
@@ -44,10 +47,11 @@ Everything goes to `%TEMP%\starflight-sandbox\out\last-run`, replacing the last 
 | `result.txt` | When the game started, and its exit code and time once it ends |
 | `watch.txt` | Every 10 seconds, the game's CPU time, whether Windows sees it responding, its memory and its window title. CPU time that keeps growing and "responding True" mean the game is running, even if the picture looks stuck. |
 | `smart-app-control.txt` | Smart App Control's state in the Sandbox: 1 enforce, 2 evaluation, 0 or missing off |
+| `mute.txt` | Each of the Sandbox's output devices, read back after the mute (`muted True`), or what was done instead; not there with `-Sound` |
 | `LocalLow\` | The save slots and their `.bak` backups, copied once the game ends |
 | `code-integrity.txt` | The last 30 Code Integrity events, copied once the game ends. A blocked exe or DLL shows as event 3033 or 3077, one that was only audited as 3076 |
 
-If the Sandbox is closed while the game is still running, only the first four are there.
+If the Sandbox is closed while the game is still running, only the first five are there.
 
 ## What the first runs showed
 
@@ -68,7 +72,7 @@ These were found with the 1.1.0 build on Windows 11 26H2 (build 26300) with AMD 
 
 The save can be any of the game's own with a crew and a named ship; a playthrough stage save from the probe does. For each engine class (`-Classes`, 1, 3 and 5 by default) it makes a copy of the save with those engines, in Arth's star system 4000 units west of the sun (`make_flight_seed.py`), and runs the build from it in its own Sandbox. Inside, `flight-driver.ps1` sends the keys a player would press: Enter through the intro, then Navigation, Maneuver and the right arrow, held until the game's log shows the ship leaving the system, 12,192 units on. The time is set against what the speed rules give (`PlayerShip.GetTopSpeed` and `GetRampSeconds`), and a time within 0.3 s passes. A last run (left out with `-NoSteering`) takes a screenshot every quarter of a second as the ship turns from east to north, to look at: the ship should face north at once.
 
-The results go to a new folder for each check, `%TEMP%\starflight-sandbox\flight-<date>-<time>`: `summary.txt`, and for each run the driver's `flight.txt`, its screenshots in `shots\` and the game's `Player.log`. The 1.3.0 build gave 14.51, 6.89 and 4.50 s for classes 1, 3 and 5, against 14.49, 6.86 and 4.45 s expected; the 1.2.0 build, whose ships all fly at the original's speed, took 4.49 s with class 1 engines.
+The results go to a new folder for each check, `%TEMP%\starflight-sandbox\flight-<date>-<time>`: `summary.txt`, and for each run the driver's `flight.txt`, its screenshots in `shots\`, the game's `Player.log` and `mute.txt`. A flight check is always silent: nobody listens, and `mute-sandbox.ps1` mutes the Sandbox as for a test. The 1.3.0 build gave 14.51, 6.89 and 4.50 s for classes 1, 3 and 5, against 14.49, 6.86 and 4.45 s expected; the 1.2.0 build, whose ships all fly at the original's speed, took 4.49 s with class 1 engines.
 
 Each run takes about two and a half minutes and needs the PC to itself while it runs (see the cores above). Two things learned while making it, which the scripts deal with:
 
@@ -82,9 +86,10 @@ Each run takes about two and a half minutes and needs the PC to itself while it 
 | `test-build.ps1` | Runs on the host: checks the build and the Sandbox, writes the configuration and starts it |
 | `run-starflight.cmd` | Runs in the Sandbox when it starts: runs the game in a window and collects the results |
 | `watch-starflight.ps1` | Runs in the Sandbox beside the game: writes `watch.txt` |
+| `mute-sandbox.ps1` | Runs in the Sandbox before the game, for a test and for a flight check: mutes the Sandbox's speakers, writes `mute.txt` |
 | `flight-check.ps1` | Runs on the host: one Sandbox for each engine class, timed, and one for the steering screenshots |
 | `make_flight_seed.py` | Runs on the host: the save a flight check starts from |
 | `flight-check.cmd` | Runs in the Sandbox for a flight check: puts the save in place, runs the game and the driver, shuts the Sandbox down |
 | `flight-driver.ps1` | Runs in the Sandbox beside the game: presses the keys, times the flight from the game's log, takes the screenshots |
 
-`test-build.ps1` copies the two Sandbox scripts to `%TEMP%\starflight-sandbox\scripts` for each run and maps three folders into the Sandbox's desktop: the build (read-only), those scripts (read-only) and `out` (the only one the Sandbox can write to). The save folder in the Sandbox follows the project's company and product names (`DefaultCompany`, `Starflight`); `run-starflight.cmd` has to follow them if they ever change.
+`test-build.ps1` copies the three Sandbox scripts to `%TEMP%\starflight-sandbox\scripts` for each run and maps three folders into the Sandbox's desktop: the build (read-only), those scripts (read-only) and `out` (the only one the Sandbox can write to). The save folder in the Sandbox follows the project's company and product names (`DefaultCompany`, `Starflight`); `run-starflight.cmd` has to follow them if they ever change.
