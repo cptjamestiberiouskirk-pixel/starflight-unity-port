@@ -42,10 +42,35 @@ public class TerrainLifeforms : TerrainGridPopulator
 	const float c_getAwayRange = c_besideRange * 1.5f;
 	const float c_attackDelay = 1.0f;
 
-	// a capture (planet.txt): "Capturing takes about 6 seconds", "Capturing does not require energy" and "Capturing raises the aliens EDL" - by 1 to 20, as the
-	// laser angers a lifeform (the port's) - and "If the lifeform was captured multiply its value by 5"
+	// a capture (planet.txt): "Capturing takes about 6 seconds" and "Capturing does not require energy"; the specimen holds the lifeform's value (the shipped game's
+	// ITEMS-OV WE75B: GD_Species.GetValue)
 	const float c_captureTime = 6.0f;
-	const int c_captureValueFactor = 5;
+
+	// the species recorded and captured on this landing (the shipped game keeps it in each species' record, biod, which VITA-OV makes again on every landing): a
+	// species already recorded gives no more data ("LIFEFORM ALREADY RECORDED", WE6B8) and one already captured no more specimens ("DUPLICATE SPECIMEN", WE75B)
+	// - not saved
+	static readonly HashSet<int> s_recordedSpecies = new HashSet<int>();
+	static readonly HashSet<int> s_capturedSpecies = new HashSet<int>();
+	static int s_landingPlanetId = -1;
+
+	// call this when the ship lands (PlayerCamera.PlayerHasLanded): a new landing has new records
+	public static void NewLanding()
+	{
+		s_recordedSpecies.Clear();
+		s_capturedSpecies.Clear();
+		s_landingPlanetId = -1;
+	}
+
+	// true if this species has been recorded, or captured, on this landing
+	public static bool WasRecorded( GD_Species species )
+	{
+		return ( species != null ) && s_recordedSpecies.Contains( species.m_index );
+	}
+
+	public static bool WasCaptured( GD_Species species )
+	{
+		return ( species != null ) && s_capturedSpecies.Contains( species.m_index );
+	}
 
 	// the capture beam that holds the lifeform while a capture runs (since 2026-10-17, TVCaptureButton): pulses of the combat lasers' beam, drawn small and pale
 	// blue, renewed before each fades
@@ -93,6 +118,14 @@ public class TerrainLifeforms : TerrainGridPopulator
 
 		m_planet = planetGenerator.GetPlanet();
 		m_planetId = m_planet.m_id;
+
+		// (the records of another planet are not this one's: a game loaded on another planet, say)
+		if ( s_landingPlanetId != m_planetId )
+		{
+			s_recordedSpecies.Clear();
+			s_capturedSpecies.Clear();
+			s_landingPlanetId = m_planetId;
+		}
 		m_speciesList = GD_Species.ForPlanet( m_planet );
 		m_life = GD_Species.GetLife( m_planet );
 
@@ -481,7 +514,7 @@ public class TerrainLifeforms : TerrainGridPopulator
 		return m_recording && m_capturing;
 	}
 
-	// starts capturing this lifeform (no energy is needed) - it is angered
+	// starts capturing this lifeform (no energy is needed)
 	public void StartCapture( TerrainLifeform lifeform )
 	{
 		var messages = SpaceflightController.m_instance.m_messages;
@@ -492,8 +525,6 @@ public class TerrainLifeforms : TerrainGridPopulator
 		m_capturing = true;
 		m_recordingTarget = lifeform;
 		m_recordingTimeLeft = c_captureTime;
-
-		lifeform.m_aggression = Mathf.Clamp( lifeform.m_aggression + Random.Range( 1, 21 ), 1, 100 );
 
 		// "If the response is capture then there is a suspenseful noise": the capture beam's hum, for as long as the beam holds the lifeform
 		messages.AddText( "<color=white>Capturing...</color>" );
@@ -520,6 +551,15 @@ public class TerrainLifeforms : TerrainGridPopulator
 		var messages = SpaceflightController.m_instance.m_messages;
 
 		messages.Clear();
+
+		if ( WasRecorded( lifeform.m_species ) )
+		{
+			messages.AddText( "<color=yellow>Lifeform already recorded.</color>" );
+
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+			return false;
+		}
 
 		if ( terrainVehicle.m_fuelRemaining < c_recordingEnergy )
 		{
@@ -625,10 +665,16 @@ public class TerrainLifeforms : TerrainGridPopulator
 			return;
 		}
 
-		// the data is worth what is new in it, paid at the Starport
-		playerData.m_general.m_unpaidLifeformDataValue += playerData.m_general.LearnLifeform( m_recordingTarget.m_species, playerData.m_general.m_currentPlanetId, m_recordingTarget.m_status == TerrainLifeform.Status.Dead );
+		// the data goes into the terrain vehicle's hold, worth an eighth of the lifeform's value (a tenth of that for a dead one), and taking no room (the shipped
+		// game's BIO-DATA: ITEMS-OV WE6B8 and WE67C) - it is sold at the Trade Depot, like a specimen
+		var species = m_recordingTarget.m_species;
+		var data = MakeSpecimen( playerData, species, true, 0, GetLifeformValue( playerData, species, m_recordingTarget.m_status == TerrainLifeform.Status.Dead ) / 8 );
 
-		messages.AddText( "<color=white>Data collection completed, sir.</color>" );
+		s_recordedSpecies.Add( species.m_index );
+
+		playerData.m_terrainVehicle.AddSpecimen( data );
+
+		messages.AddText( "<color=white>Lifeform recorded.</color>" );
 
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 	}
@@ -667,6 +713,16 @@ public class TerrainLifeforms : TerrainGridPopulator
 		var species = lifeform.m_species;
 		var volume = Mathf.Max( 1, species.m_volume );
 
+		// (one specimen of a species a landing)
+		if ( WasCaptured( species ) )
+		{
+			messages.AddText( "<color=yellow>Duplicate specimen.</color>" );
+
+			SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+			return;
+		}
+
 		messages.AddText( "<color=white>The alien lifeform has been captured and put in stasis. Now loading into T.V.</color>" );
 
 		if ( playerData.m_terrainVehicle.GetRemainingVolume() < volume )
@@ -678,22 +734,9 @@ public class TerrainLifeforms : TerrainGridPopulator
 			return;
 		}
 
-		var specimen = new PD_Specimen
-		{
-			m_planetId = playerData.m_general.m_currentPlanetId,
-			m_speciesIndex = species.m_index,
-			m_name = species.GetBodyPlanText(),
-			m_volume = volume,
-			m_value = playerData.m_general.LearnLifeform( species, playerData.m_general.m_currentPlanetId, false ) * c_captureValueFactor
-		};
+		var specimen = MakeSpecimen( playerData, species, false, volume, GetLifeformValue( playerData, species, false ) );
 
-		// where and when it was captured (the terrain vehicle's latitude and longitude, as the coordinates above the main view read them, and the stardate)
-		Tools.WorldToLatLongCoordinates( playerData.m_general.m_lastDisembarkedCoordinates, out var eastWest, out var northSouth );
-
-		specimen.m_hasCapturePlace = true;
-		specimen.m_capturedNorthSouth = Mathf.RoundToInt( northSouth );
-		specimen.m_capturedEastWest = Mathf.RoundToInt( eastWest );
-		specimen.m_capturedStardateYMD = playerData.m_general.m_currentStardateYMD;
+		s_capturedSpecies.Add( species.m_index );
 
 		playerData.m_terrainVehicle.AddSpecimen( specimen );
 
@@ -706,6 +749,40 @@ public class TerrainLifeforms : TerrainGridPopulator
 		RemoveEaten( lifeform );
 
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
+	}
+
+	// a lifeform's value (GD_Species.GetValue) on the planet the ship is on
+	static int GetLifeformValue( PlayerData playerData, GD_Species species, bool dead )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var starId = playerData.m_general.m_currentStarId;
+		var star = ( ( starId >= 0 ) && ( starId < gameData.m_starList.Length ) ) ? gameData.m_starList[ starId ] : null;
+
+		return species.GetValue( star, dead );
+	}
+
+	// a specimen, or a recording of a lifeform's data, of this species and value, with where and when it was taken (the terrain vehicle's latitude and longitude,
+	// as the coordinates above the main view read them, and the stardate)
+	static PD_Specimen MakeSpecimen( PlayerData playerData, GD_Species species, bool isBioData, int volume, int value )
+	{
+		var specimen = new PD_Specimen
+		{
+			m_planetId = playerData.m_general.m_currentPlanetId,
+			m_speciesIndex = species.m_index,
+			m_name = ( isBioData ? "Data: " : "" ) + species.GetBodyPlanText(),
+			m_isBioData = isBioData,
+			m_volume = volume,
+			m_value = value
+		};
+
+		Tools.WorldToLatLongCoordinates( playerData.m_general.m_lastDisembarkedCoordinates, out var eastWest, out var northSouth );
+
+		specimen.m_hasCapturePlace = true;
+		specimen.m_capturedNorthSouth = Mathf.RoundToInt( northSouth );
+		specimen.m_capturedEastWest = Mathf.RoundToInt( eastWest );
+		specimen.m_capturedStardateYMD = playerData.m_general.m_currentStardateYMD;
+
+		return specimen;
 	}
 
 	// a lifeform has been eaten (or captured): it is gone at once (taken out of the list and off the surface, so that neither Scan nor Fire finds it before it is

@@ -391,34 +391,35 @@ public class GD_Species
 		return ( GetNicheBits() & 2 ) != 0;
 	}
 
-	// its class, for the value of its data (planet.txt: "A new class", "A new order", "A new species"): its record's class and order, the first record of each
-	// (the shipped game names none), on its planet
-	public int GetBodyClass( int planetId )
+	// Arth's system in the original's units of the star map (map coordinates times 8: Arth is at 125, 100), from which ITEMS-OV ?dist measures
+	const int c_arthX = 1000;
+	const int c_arthY = 800;
+
+	// its value, as the shipped game's ITEMS-OV valuate gives it: 10 for an animal or 30 for a plant (niche>val), plus a tenth of its intelligence, times its size,
+	// times one more than its system's distance from Arth's in map units (?dist), a tenth of that for a dead one, at least 1 - a captured specimen holds this
+	// value and a recording an eighth of it, and the Trade Depot pays half of either. The arithmetic is the original's 16 bit one: each square of the distance
+	// keeps only its low 16 bits, so a system 32 map units or more from Arth on an axis is given a wrong, often smaller distance (an original quirk)
+	public int GetValue( GD_Star star, bool dead )
 	{
-		return planetId * 128 + ( ( m_record != null ) ? m_record.m_classFirst : (int) m_bodyPlan );
-	}
+		var distance = 0;
 
-	public int GetOrder( int planetId )
-	{
-		return planetId * 128 + ( ( m_record != null ) ? m_record.m_orderFirst : (int) m_bodyPlan );
-	}
+		if ( star != null )
+		{
+			var dx = star.m_xCoordinate * 8 - c_arthX;
+			var dy = star.m_yCoordinate * 8 - c_arthY;
+			var squares = (long) ( ( dx * dx ) & 0xffff ) + ( ( dy * dy ) & 0xffff );
 
-	// the base values of a lifeform's data (planet.txt: "A new class - 50 + X", "A new order - 20 + X", "A new species - 5 + X", "Same species - 0")
-	public const int c_newClassValue = 50;
-	public const int c_newOrderValue = 20;
-	public const int c_newSpeciesValue = 5;
+			distance = System.Math.Max( 1, (int) System.Math.Floor( System.Math.Sqrt( squares ) ) ) / 8;
+		}
 
-	// the value of its data from this base (planet.txt): "X is a bonus given for valuable attributes and is given in the form of a % of the base value" - its
-	// intelligence as the %, 25% if it eats plants and 50% if it eats animals, and its size as a % ("its size in cubic decimeters (with a max of 100)": the port
-	// takes its volume in tenths of a cubic metre, since in cubic decimetres every lifeform would have the full 100)
-	public int GetDataValue( int baseValue )
-	{
-		var bits = GetNicheBits();
-		var bonus = m_intelligence;
+		var nicheValue = IsPlant() ? 30 : 10;
+		var value = ( ( nicheValue + m_intelligence / 10 ) * m_size * ( distance + 1 ) ) & 0xffff;
 
-		bonus += ( ( bits & 8 ) != 0 ) ? 50 : ( ( ( bits & 4 ) != 0 ) ? 25 : 0 );
-		bonus += System.Math.Min( 100, m_volume );
+		if ( dead )
+		{
+			value /= 10;
+		}
 
-		return baseValue + baseValue * bonus / 100;
+		return System.Math.Max( 1, value );
 	}
 }

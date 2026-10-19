@@ -1790,6 +1790,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLifeWeapons();
 				break;
 
+			case "lifeformvalues":
+				yield return ScenarioLifeformValues();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -25374,12 +25378,17 @@ public class ClaudeProbe : MonoBehaviour
 		return ( value == null ) ? -1 : (int) value;
 	}
 
-	// what a species' data is worth from this base (-1 on the code before it)
-	static int DataValue( GD_Species species, int baseValue )
+	// a lifeform's value by the shipped game's ITEMS-OV valuate, worked out here: (10 for an animal or 30 for a plant, plus a tenth of its intelligence) x its size x
+	// (its system's distance from Arth in map units + 1), each square of the distance in 16 bits, a tenth for a dead one, at least 1
+	static int ShippedValue( GD_Species species, int starX, int starY, bool dead )
 	{
-		var method = typeof( GD_Species ).GetMethod( "GetDataValue" );
+		var dx = starX * 8 - 1000;
+		var dy = starY * 8 - 800;
+		var squares = (long) ( ( dx * dx ) & 0xffff ) + ( ( dy * dy ) & 0xffff );
+		var distance = Mathf.Max( 1, (int) Math.Floor( Math.Sqrt( squares ) ) ) / 8;
+		var value = ( ( ( species.IsPlant() ? 30 : 10 ) + species.m_intelligence / 10 ) * species.m_size * ( distance + 1 ) ) & 0xffff;
 
-		return ( method == null ) ? -1 : (int) method.Invoke( species, new object[] { baseValue } );
+		return Mathf.Max( 1, dead ? value / 10 : value );
 	}
 
 	IEnumerator ScenarioLifeformData()
@@ -25412,6 +25421,12 @@ public class ClaudeProbe : MonoBehaviour
 		var plant = all[ 0 ].GetComponent<TerrainLifeform>();
 		var runner = all[ 1 ].GetComponent<TerrainLifeform>();
 
+		// (a test plant that stays where it is put: since roadmap 8.18 the first lifeform may be any species)
+		plant.m_species = MakeTestPlant( 121 );
+		plant.m_status = TerrainLifeform.Status.Alive;
+		plant.m_hits = 100;
+		plant.m_stuns = plant.m_species.m_stunPoints;
+
 		// everything but the plant far away
 		for ( var i = 1; i < all.Count; i++ )
 		{
@@ -25423,8 +25438,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 2 );
 
-		// ---- 1. Cargo beside a living plant offers it, and Record records its data: a new class, worth 50 and its bonus, to be paid at the Starport
+		// ---- 1. Cargo beside a living plant offers it, and Record records its data: an item of the terrain vehicle's hold, worth an eighth of the plant's value
+		// (roadmap 8.18, the shipped game's BIO-DATA)
 		var unpaidBefore = UnpaidLifeformData();
+		var dataBefore = HoldItems( playerData.m_terrainVehicle, true ).Count;
 		var offer = Press( "TVCargoButton" );
 		var buttons = controller.m_buttonController.GetCurrentButtonSet().ToString();
 		var record = Press( "TVRecordButton" );
@@ -25433,15 +25450,19 @@ public class ClaudeProbe : MonoBehaviour
 
 		var recorded = MessageList();
 		var unpaidAfterFirst = UnpaidLifeformData();
-		var expected = DataValue( plant.m_species, 50 );
+		var expected = ShippedValue( plant.m_species, 125, 100, false ) / 8;
+		var dataItems = HoldItems( playerData.m_terrainVehicle, true );
+		var dataAfterFirst = dataItems.Count;
+		var dataValue = ( dataAfterFirst > dataBefore ) ? (int) FieldOrNull( dataItems[ dataAfterFirst - 1 ], "m_value" ) : -1;
 
-		// ---- 2. the same species again is worth nothing
+		// ---- 2. the same species again on this landing gives nothing
 		Press( "TVCargoButton" );
 		Press( "TVRecordButton" );
 
 		yield return new WaitForSecondsRealtime( 4.0f );
 
 		var unpaidAfterSecond = UnpaidLifeformData();
+		var dataAfterSecond = HoldItems( playerData.m_terrainVehicle, true ).Count;
 
 		// ---- 3. a lifeform that wanders off before the recording is done got away
 		plant.transform.position = vehicle + Vector3.left * 600.0f;
@@ -25463,8 +25484,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		var gotAway = MessageList();
 		var unpaidAfterRunner = UnpaidLifeformData();
+		var dataAfterRunner = HoldItems( playerData.m_terrainVehicle, true ).Count;
 
-		// ---- 4. at the Starport Interstel pays for the data
+		// ---- 4. at the Starport nothing is paid for the recordings: they are sold at the Trade Depot (the shipped game pays them nowhere else)
 		var balanceBefore = playerData.m_bank.m_currentBalance;
 
 		controller.SwitchLocation( PD_General.Location.DockingBay );
@@ -25476,15 +25498,15 @@ public class ClaudeProbe : MonoBehaviour
 		var unpaidAfterDocking = UnpaidLifeformData();
 		var ledger = playerData.m_bank.m_transactionList.Count > 0 ? playerData.m_bank.m_transactionList[ playerData.m_bank.m_transactionList.Count - 1 ].m_description : "";
 
-		Log( "lifeformdata: offer " + offer + " [" + buttons + "] record " + record + " -> " + recorded + " | unpaid " + unpaidBefore + " -> " + unpaidAfterFirst + " (expected " + expected + ") -> " + unpaidAfterSecond + " -> " + unpaidAfterRunner + " | " + gotAway + " || balance " + balanceBefore + " -> " + balanceAfter + ", unpaid " + unpaidAfterDocking + ", ledger " + ledger + " | " + docked );
+		Log( "lifeformdata: offer " + offer + " [" + buttons + "] record " + record + " -> " + recorded + " | recordings " + dataBefore + " -> " + dataAfterFirst + " (value " + dataValue + ", expected " + expected + ") -> " + dataAfterSecond + " -> " + dataAfterRunner + ", unpaid " + unpaidBefore + " -> " + unpaidAfterRunner + " | " + gotAway + " || balance " + balanceBefore + " -> " + balanceAfter + ", unpaid " + unpaidAfterDocking + ", ledger " + ledger + " | " + docked );
 
-		Check( "lifeformdata: Cargo beside a lifeform offers it, and Record collects its data", offer.Contains( "A lifeform" ) && ( buttons == "TerrainVehicleLifeform" ) && recorded.Contains( "Data collection completed" ), offer + " [" + buttons + "] " + recorded );
-		Check( "lifeformdata: the first of a class is worth 50 and its bonus", ( expected > 50 ) && ( unpaidAfterFirst == unpaidBefore + expected ), unpaidBefore + " -> " + unpaidAfterFirst + " (expected " + expected + ")" );
-		Check( "lifeformdata: the same species again is worth nothing", ( unpaidAfterFirst > 0 ) && ( unpaidAfterSecond == unpaidAfterFirst ), unpaidAfterFirst + " -> " + unpaidAfterSecond );
-		Check( "lifeformdata: a lifeform that wanders off before the recording is done got away", gotAway.Contains( "got away" ) && ( unpaidAfterRunner == unpaidAfterSecond ), gotAway + " | " + unpaidAfterRunner );
-		Check( "lifeformdata: at the Starport Interstel pays for the data", ( unpaidAfterFirst > 0 ) && ( balanceAfter == balanceBefore + unpaidAfterRunner ) && ( unpaidAfterDocking == 0 ) && ( ledger == "Lifeform data" ), balanceBefore + " -> " + balanceAfter + ", unpaid " + unpaidAfterDocking + ", " + ledger );
+		Check( "lifeformdata: Cargo beside a lifeform offers it, and Record collects its data", offer.Contains( "A lifeform" ) && ( buttons == "TerrainVehicleLifeform" ) && recorded.Contains( "Lifeform recorded" ), offer + " [" + buttons + "] " + recorded );
+		Check( "lifeformdata: the recording goes into the terrain vehicle's hold, worth an eighth of the lifeform's value (ITEMS-OV valuate)", ( expected > 0 ) && ( dataAfterFirst == dataBefore + 1 ) && ( dataValue == expected ) && ( unpaidAfterFirst == unpaidBefore ), dataBefore + " -> " + dataAfterFirst + ", value " + dataValue + " (expected " + expected + "), unpaid " + unpaidBefore + " -> " + unpaidAfterFirst );
+		Check( "lifeformdata: the same species again on this landing gives nothing", ( dataAfterFirst > dataBefore ) && ( dataAfterSecond == dataAfterFirst ), dataAfterFirst + " -> " + dataAfterSecond );
+		Check( "lifeformdata: a lifeform that wanders off before the recording is done got away", gotAway.Contains( "got away" ) && ( dataAfterRunner == dataAfterSecond ), gotAway + " | " + dataAfterRunner );
+		Check( "lifeformdata: at the Starport nothing is paid for the recordings (they are sold at the Trade Depot)", ( dataAfterFirst > dataBefore ) && ( balanceAfter == balanceBefore ) && ( unpaidAfterDocking == 0 ) && ( ledger != "Lifeform data" ), balanceBefore + " -> " + balanceAfter + ", unpaid " + unpaidAfterDocking + ", " + ledger );
 
-		Finish( "scenario=lifeformdata value=" + unpaidAfterFirst + " paid=" + ( balanceAfter - balanceBefore ), 0 );
+		Finish( "scenario=lifeformdata value=" + dataValue + " paid=" + ( balanceAfter - balanceBefore ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 6: capturing lifeforms
@@ -25547,7 +25569,7 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 2 );
 
 		// ---- 1. Cargo beside a living plant offers Record and Ignore (Capture is in Tools since 2026-10-17, for a stunned lifeform)
-		var expected = DataValue( plant.m_species, 50 ) * 5;
+		var expected = ShippedValue( plant.m_species, 125, 100, false );
 		var offer = Press( "TVCargoButton" );
 		var buttons = controller.m_buttonController.GetCurrentButtonSet().ToString();
 		var offerLabels = ButtonSetLabels( controller.m_buttonController.GetCurrentButtonSet() );
@@ -25621,7 +25643,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "capture: Cargo beside a living lifeform offers Record and Ignore, and Capture is in Tools", offer.Contains( "A lifeform" ) && ( buttons == "TerrainVehicleLifeform" ) && ( offerLabels == "Record,Ignore" ) && toolLabels.Contains( "Capture" ), offer + " [" + buttons + ": " + offerLabels + "], Tools [" + toolLabels + "]" );
 		Check( "capture: Capture refuses a lifeform that is not stunned (it started the capture)", unstunned.Contains( "stunned first" ) && !capturingUnstunned, unstunned + " (capturing " + capturingUnstunned + ")" );
 		Check( "capture: a stunned lifeform is captured into stasis in the terrain vehicle, off the surface, with a capture beam while it runs", beamShown && captured.Contains( "captured and put in stasis" ) && captured.Contains( "stored as item" ) && ( inVehicle == 1 ) && plantGone, inVehicle + ", gone " + plantGone + " | " + captured );
-		Check( "capture: a captured specimen is worth five times its data", ( expected > 0 ) && ( value == expected.ToString() ), value + " (expected " + expected + ")" );
+		Check( "capture: a captured specimen holds the lifeform's value (ITEMS-OV valuate)", ( expected > 0 ) && ( value == expected.ToString() ), value + " (expected " + expected + ")" );
 		Check( "capture: Capture refuses a dead lifeform, and Cargo beside it offers only Record", deadCapture.Contains( "dead lifeform cannot be captured" ) && deadOffer.Contains( "A dead lifeform" ) && ( deadButtons == "TerrainVehicleDeadLifeform" ), deadCapture + " | " + deadOffer + " [" + deadButtons + "]" );
 		Check( "capture: back in the ship, the specimen goes into the ship's hold", ( inShip == 1 ) && ( leftInVehicle == 0 ), inShip + " / " + leftInVehicle );
 
@@ -51050,6 +51072,203 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lifeweapons: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=lifeweapons checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- roadmap 8.18 part B: the lifeforms' values as the shipped game's (ITEMS-OV)
+
+	// a lifeform's value through GD_Species.GetValue (-1 on the code before roadmap 8.18 part B)
+	static int SpeciesValue( GD_Species species, GD_Star star, bool dead )
+	{
+		var method = typeof( GD_Species ).GetMethod( "GetValue" );
+
+		return ( method == null ) ? -1 : (int) method.Invoke( species, new object[] { star, dead } );
+	}
+
+	// the items of a hold's specimen storage that are recordings (m_isBioData true), or that are specimens
+	static List<object> HoldItems( object hold, bool recordings )
+	{
+		var items = new List<object>();
+		var list = FieldOrNull( FieldOrNull( hold, "m_specimenStorage" ), "m_specimenList" ) as IList;
+
+		if ( list == null )
+		{
+			return items;
+		}
+
+		foreach ( var item in list )
+		{
+			var isBioData = FieldOrNull( item, "m_isBioData" ) is bool flag && flag;
+
+			if ( isBioData == recordings )
+			{
+				items.Add( item );
+			}
+		}
+
+		return items;
+	}
+
+	// a test plant that stays where it is put, of a species index no planet has (the records of a landing go by the index)
+	static GD_Species MakeTestPlant( int index )
+	{
+		var species = MakeTestAnimal( GD_Species.Niche.Producer, 3 );
+
+		species.m_index = index;
+		species.m_intelligence = 25;
+		species.m_movementRate = 0;
+		species.m_canFly = false;
+		species.m_canFloat = false;
+
+		return species;
+	}
+
+	// the values of the lifeforms as the shipped game's: valuate (ITEMS-OV), a recording an item of the hold worth an eighth of it with no volume (WE6B8), once a
+	// species a landing, a specimen worth all of it, once a species a landing (WE75B), and the recordings carried to the ship with the rest of the cargo
+	IEnumerator ScenarioLifeformValues()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var done = new bool[ 1 ];
+		var errorsBefore = s_errorCount;
+
+		EnsureCrew();
+
+		// ---- 1. valuate, worked out by hand: (10 for an animal, 30 for a plant, plus a tenth of the intelligence) x size x (distance from Arth in map units + 1)
+		var animal = MakeTestAnimal( GD_Species.Niche.Herbivore, 4 );
+		var plant = MakeTestAnimal( GD_Species.Niche.Producer, 2 );
+
+		animal.m_intelligence = 55;
+		plant.m_intelligence = 9;
+
+		var arth = new GD_Star { m_xCoordinate = 125, m_yCoordinate = 100 };
+		var tenEast = new GD_Star { m_xCoordinate = 135, m_yCoordinate = 100 };
+		var fortyEast = new GD_Star { m_xCoordinate = 165, m_yCoordinate = 100 };
+
+		// (10 + 5) x 4 x 1 = 60; dead, a tenth: 6; (30 + 0) x 2 x (10 + 1) = 660; 40 east: 320 eighths, squared 102400 keeps its low 16 bits, 36864, whose root 192
+		// is 24 map units: 15 x 4 x 25 = 1500 (an original quirk: the true 40 would give 2460)
+		var atArth = SpeciesValue( animal, arth, false );
+		var deadAtArth = SpeciesValue( animal, arth, true );
+		var plantTenEast = SpeciesValue( plant, tenEast, false );
+		var animalFortyEast = SpeciesValue( animal, fortyEast, false );
+
+		// ---- 2. on planet 92 of the Arth system, a test plant beside the vehicle (every other lifeform far off): Record puts its data into the terrain vehicle's
+		// hold, an eighth of its value, (30 + 2) x 3 x 1 = 96, so 12, and no volume
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+		yield return Frames( 2 );
+
+		var all = LifeformsOnTheGround();
+
+		if ( all.Count < 2 )
+		{
+			Finish( "scenario=lifeformvalues abort: " + all.Count + " lifeforms", 2 );
+			yield break;
+		}
+
+		var vehicle = controller.m_terrainVehicle.transform.position;
+		var subject = all[ 0 ].GetComponent<TerrainLifeform>();
+		var second = all[ 1 ].GetComponent<TerrainLifeform>();
+		var testPlant = MakeTestPlant( 120 );
+
+		for ( var i = 1; i < all.Count; i++ )
+		{
+			all[ i ].position = vehicle + Vector3.right * 600.0f + Vector3.forward * ( i * 10.0f );
+		}
+
+		subject.m_species = testPlant;
+		subject.m_status = TerrainLifeform.Status.Alive;
+		subject.m_hits = 100;
+		subject.m_stuns = testPlant.m_stunPoints;
+		subject.transform.position = new Vector3( vehicle.x + 6.0f, subject.transform.position.y, vehicle.z );
+
+		yield return Frames( 2 );
+
+		var dataBefore = HoldItems( playerData.m_terrainVehicle, true ).Count;
+
+		Press( "TVCargoButton" );
+		Press( "TVRecordButton" );
+
+		yield return new WaitForSecondsRealtime( 4.0f );
+
+		var recordedText = MessageList();
+		var recordings = HoldItems( playerData.m_terrainVehicle, true );
+		var recording = ( recordings.Count > 0 ) ? recordings[ recordings.Count - 1 ] : null;
+		var recordingValue = ( recording == null ) ? -1 : (int) FieldOrNull( recording, "m_value" );
+		var recordingVolume = ( recording == null ) ? -1 : (int) FieldOrNull( recording, "m_volume" );
+
+		// ---- 3. the same species again on this landing: already recorded, nothing more
+		Press( "TVCargoButton" );
+		Press( "TVRecordButton" );
+
+		yield return Frames( 2 );
+
+		var againText = MessageList();
+		var dataAgain = HoldItems( playerData.m_terrainVehicle, true ).Count;
+
+		// ---- 4. a new landing (TerrainLifeforms.NewLanding, which PlayerCamera.PlayerHasLanded calls) records it again
+		var newLanding = typeof( TerrainLifeforms ).GetMethod( "NewLanding", BindingFlags.Public | BindingFlags.Static );
+
+		if ( newLanding != null )
+		{
+			newLanding.Invoke( null, null );
+		}
+
+		Press( "TVCargoButton" );
+		Press( "TVRecordButton" );
+
+		yield return new WaitForSecondsRealtime( 4.0f );
+
+		var dataAfterNewLanding = HoldItems( playerData.m_terrainVehicle, true ).Count;
+
+		// ---- 5. stunned, it is captured: the specimen holds the whole value, 96; a second lifeform of the species on this landing is a duplicate specimen
+		subject.m_status = TerrainLifeform.Status.Stunned;
+		subject.m_stuns = 0;
+
+		var specimensBefore = HoldItems( playerData.m_terrainVehicle, false ).Count;
+
+		Press( "TVCaptureButton" );
+
+		yield return new WaitForSecondsRealtime( 7.5f );
+
+		var specimens = HoldItems( playerData.m_terrainVehicle, false );
+		var specimenValue = ( specimens.Count > specimensBefore ) ? (int) FieldOrNull( specimens[ specimens.Count - 1 ], "m_value" ) : -1;
+
+		second.m_species = testPlant;
+		second.m_status = TerrainLifeform.Status.Stunned;
+		second.m_hits = 100;
+		second.m_stuns = 0;
+		second.transform.position = new Vector3( vehicle.x + 6.0f, second.transform.position.y, vehicle.z );
+
+		yield return Frames( 2 );
+
+		var duplicateText = Press( "TVCaptureButton" );
+
+		yield return Frames( 2 );
+
+		var capturingDuplicate = controller.m_disembarked.m_terrainGrid.m_terrainLifeforms.IsCapturing();
+		var specimensAfterDuplicate = HoldItems( playerData.m_terrainVehicle, false ).Count;
+
+		// ---- 6. back in the ship, the recordings go into the ship's hold with the specimen
+		var shipDataBefore = HoldItems( playerData.m_playerShip, true ).Count;
+
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		var shipData = HoldItems( playerData.m_playerShip, true ).Count - shipDataBefore;
+		var vehicleData = HoldItems( playerData.m_terrainVehicle, true ).Count;
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Log( "lifeformvalues: valuate 60 / 6 / 660 / 1500 expected: " + atArth + " / " + deadAtArth + " / " + plantTenEast + " / " + animalFortyEast + " | record: " + recordedText + " -> " + dataBefore + " to " + recordings.Count + " recordings, value " + recordingValue + ", volume " + recordingVolume + " | again: " + againText + " -> " + dataAgain + " | new landing -> " + dataAfterNewLanding + " | captured: value " + specimenValue + " | duplicate: " + duplicateText + " (capturing " + capturingDuplicate + ", specimens " + specimensAfterDuplicate + ") | ship " + shipData + " recordings, vehicle " + vehicleData );
+
+		Check( "lifeformvalues: a lifeform's value is the shipped game's valuate: (10 or 30 for a plant + a tenth of its intelligence) x its size x (its system's distance from Arth + 1), a tenth when dead, the distance squared in 16 bits", ( atArth == 60 ) && ( deadAtArth == 6 ) && ( plantTenEast == 660 ) && ( animalFortyEast == 1500 ), atArth + " " + deadAtArth + " " + plantTenEast + " " + animalFortyEast );
+		Check( "lifeformvalues: Record puts the lifeform's data into the terrain vehicle's hold, worth an eighth of its value, with no volume (BIO-DATA)", recordedText.Contains( "Lifeform recorded" ) && ( recordings.Count == dataBefore + 1 ) && ( recordingValue == 12 ) && ( recordingVolume == 0 ), recordings.Count + " " + recordingValue + " " + recordingVolume + " | " + recordedText );
+		Check( "lifeformvalues: a species already recorded on this landing gives no more data", againText.Contains( "already recorded" ) && ( dataAgain == recordings.Count ), dataAgain + " | " + againText );
+		Check( "lifeformvalues: on a new landing it can be recorded again", ( recordings.Count > 0 ) && ( dataAfterNewLanding == recordings.Count + 1 ), recordings.Count + " -> " + dataAfterNewLanding );
+		Check( "lifeformvalues: a captured specimen holds the lifeform's whole value, and a second of its species on the landing is a duplicate", ( specimenValue == 96 ) && duplicateText.Contains( "Duplicate specimen" ) && !capturingDuplicate && ( specimensAfterDuplicate == specimens.Count ), specimenValue + " | " + duplicateText );
+		Check( "lifeformvalues: back in the ship, the recordings go into the ship's hold with the rest of the cargo", ( shipData == 2 ) && ( vehicleData == 0 ), shipData + " / " + vehicleData );
+		Check( "lifeformvalues: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=lifeformvalues checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

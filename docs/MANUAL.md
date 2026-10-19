@@ -187,7 +187,7 @@ A new ship has class 1 engines, a bare hull, no cargo pods, no shields and no we
 5. **Trade Depot**: check your fuel. 20 cubic meters is enough to look around Arth's neighbourhood.
 6. **Docking Bay**: launch.
 
-Your first trips should earn money: minerals from nearby planets sell at the Trade Depot, and every planet explored and lifeform recorded pays. Better engines, shields and weapons come later.
+Your first trips should earn money: minerals from nearby planets sell at the Trade Depot, every planet explored pays, and so does the data of the lifeforms you record. Better engines, shields and weapons come later.
 
 ---
 
@@ -394,7 +394,7 @@ Some things to know:
 
 - **Minerals**: load deposits with the terrain vehicle, bring them home and sell them at the Trade Depot. Prices differ a lot between minerals.
 - **Artifacts**: found in ruins. Analyze them at the Trade Depot and sell them, or keep them: some are worth more aboard than their price.
-- **Lifeforms**: recorded data is paid when you dock. Captured specimens are sold at the Trade Depot, for several times the value of their data. Each new kind is worth the most.
+- **Lifeforms**: recorded data and captured specimens are sold at the Trade Depot. A specimen is worth about eight times the data of its kind; bigger, cleverer lifeforms, plants, and lifeforms from systems farther from Arth are worth more, a dead one much less, and each kind can be recorded and captured once on each landing.
 - **Colonies**: in orbit, Command, **Log Planet**, then **Yes** to recommend the planet for colonists, and give it a name (up to 15 letters). A good world earns a bonus; a poor one earns a fine, larger each time. The verdicts are in Operations, under Evaluation.
 - **Interest**: 12% a year on your balance.
 
