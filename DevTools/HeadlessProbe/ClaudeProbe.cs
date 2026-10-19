@@ -38849,6 +38849,9 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "playthrough: flew " + flown[ 0 ].ToString( "F0" ) + " units to the edge of the star system: " + playerData.m_general.m_location + " at " + playerData.m_general.m_coordinates + ", messages '" + PtMessages() + "'" );
 	}
 
+	// how many numbers the Veloxi drone asks (COMMSPEC-OV VPROBE#: six, roadmap 8.36)
+	const int c_ptDroneNumbers = 6;
+
 	// answers the Veloxi drone's numbers through the console: Yes to a multiple of 6, No to any other (STRINFO 2.3)
 	IEnumerator PtAnswerTheDrone( int[] answered )
 	{
@@ -38858,7 +38861,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		answered[ 0 ] = 0;
 
-		for ( var i = 0; i < 3; i++ )
+		for ( var i = 0; i < c_ptDroneNumbers; i++ )
 		{
 			yield return WaitForAlienQuestion( 25.0f, question );
 
@@ -38975,7 +38978,7 @@ public class ClaudeProbe : MonoBehaviour
 
 			Log( "playthrough-6: after " + answered[ 0 ] + " answers: " + playerData.m_general.m_location + " planet " + playerData.m_general.m_currentPlanetId + ", messages '" + PtMessages() + "'" );
 
-			Check( "playthrough-6: three right answers to the drone's numbers let the ship into orbit around Sphexi", ( answered[ 0 ] == 3 ) && ( playerData.m_general.m_location == PD_General.Location.InOrbit ) && ( playerData.m_general.m_currentPlanetId == orbSite.m_planetId ), answered[ 0 ] + " answered, " + playerData.m_general.m_location + " " + playerData.m_general.m_currentPlanetId );
+			Check( "playthrough-6: six right answers to the drone's numbers let the ship into orbit around Sphexi", ( answered[ 0 ] == c_ptDroneNumbers ) && ( playerData.m_general.m_location == PD_General.Location.InOrbit ) && ( playerData.m_general.m_currentPlanetId == orbSite.m_planetId ), answered[ 0 ] + " answered, " + playerData.m_general.m_location + " " + playerData.m_general.m_currentPlanetId );
 		}
 
 		Log( "playthrough-6: encounters on the way: " + string.Join( " ## ", s_ptEncounters ) );
@@ -39441,14 +39444,24 @@ public class ClaudeProbe : MonoBehaviour
 		{
 			var encounter = SpaceflightController.m_instance.m_encounter;
 
+			// a captain who meets the Uhlek raises the shields (their plasma bolts strip the armor and the systems of a ship without them)
+			yield return PtOfficer( "Navigation" );
+
+			if ( !ship.m_shieldsAreUp && ( PtIndexOf( "Raise Shields" ) >= 0 ) )
+			{
+				yield return PtPress( "Raise Shields" );
+			}
+
 			// the Uhlek attack on sight: they fight from their first turn (COMBAT-OV <COMBAT> rule 3; their posture is always FIGHT, the posture thresholds of their
 			// race being 0), and never close in: on a turn they do not fire they move away, so a ship that stays out of the Combat menu sees them leave
-			for ( var end = Time.realtimeSinceStartup + 6.0f; ( Time.realtimeSinceStartup < end ) && !encounter.m_pdEncounter.m_aliensOpenedFire && ( playerData.m_general.m_location == PD_General.Location.Encounter ); )
+			var waitStart = Time.realtimeSinceStartup;
+
+			for ( var end = waitStart + 12.0f; ( Time.realtimeSinceStartup < end ) && !encounter.m_pdEncounter.m_aliensOpenedFire && ( playerData.m_general.m_location == PD_General.Location.Encounter ); )
 			{
 				yield return null;
 			}
 
-			Log( "playthrough-12: the Uhlek: opened fire " + encounter.m_pdEncounter.m_aliensOpenedFire + ", " + PtEncounterText() + ", armor " + ship.m_armorPoints + ", shields " + ship.m_shieldPoints + ", messages '" + PtMessages() + "'" );
+			Log( "playthrough-12: the Uhlek: opened fire " + encounter.m_pdEncounter.m_aliensOpenedFire + " after " + ( Time.realtimeSinceStartup - waitStart ).ToString( "F1" ) + " s, " + PtEncounterText() + ", armor " + ship.m_armorPoints + ", shields " + ship.m_shieldPoints + " (up " + ship.m_shieldsAreUp + "), messages '" + PtMessages() + "'" );
 
 			Check( "playthrough-12: the Uhlek open fire at once", encounter.m_pdEncounter.m_aliensOpenedFire && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile ), encounter.m_pdEncounter.m_aliensOpenedFire + ", " + encounter.m_pdEncounter.m_alienStance );
 
@@ -39523,8 +39536,17 @@ public class ClaudeProbe : MonoBehaviour
 
 		if ( playerData.m_general.m_location == PD_General.Location.Encounter )
 		{
-			// a captain does not stand and trade shots with the Uhlek, who keep their distance and fire plasma bolts: the ship gets away (out of the Combat menu, the
-			// encounter ends once they are all more than 22 cells away)
+			// a captain does not stand and trade shots with the Uhlek, who keep their distance and fire plasma bolts: the ship gets away with its shields up (out of the
+			// Combat menu, the encounter ends once they are all more than 22 cells away)
+			yield return PtOfficer( "Navigation" );
+
+			if ( !ship.m_shieldsAreUp && ( PtIndexOf( "Raise Shields" ) >= 0 ) )
+			{
+				yield return PtPress( "Raise Shields" );
+			}
+
+			Log( "playthrough-13: getting away with the shields up " + ship.m_shieldsAreUp + " (" + ship.m_shieldPoints + ")" );
+
 			yield return PtFlyOutOfEncounter( 6.0f );
 
 			s_ptEncounters.Add( "Uhlek 261 after loading: escaped, armor " + ship.m_armorPoints + ", hull " + ship.GetHullIntegrity() );
