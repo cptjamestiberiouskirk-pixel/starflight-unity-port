@@ -230,7 +230,7 @@ Found on 2026-10-18 by reading the shipped game's decompiled overlays against th
 | 8.22 | Alien groups in a star system are placed afresh on each visit | HYPER-OV `SYSSETUP`, `SETRNDXY` | Coming in from hyperspace places each of the system's groups afresh, each axis RRND(-395, 395) of the system's 400 units, a corner brought in to 395 for the port's round system; not on the way back from orbit or a load (`SpaceflightController.PlaceStarSystemEncounters`, `PD_Encounter.PlaceAtRandomInStarSystem`; probe `systemgroups`) |
 | 8.23 | The Mysterions, Nomad probes and Minstrels move on after an encounter | HYPER-OV `ENCCLEANUP`, `WDC19` | MISSING |
 | 8.24 | "OUT OF FUEL! CRASH IMMINENT!" and the motion report's coordinates | ORBIT-OV `DESCEND`; HYPERMSG-OV `WF28B` | MISSING |
-| 8.25 | Questions about the Old Empire and the Ancients can be shut off | COMM-OV `?LOCKED-OUT` | MISSING |
+| 8.25 | Questions about the Old Empire and the Ancients can be shut off | COMM-OV `?LOCKED-OUT` | each question about either locks it out one time in five, and the aliens answer it with a subject 5 line for the rest of the encounter (`Encounter.IsLockedOut`, `PD_Encounter.m_lockedOutSubjects`; probe `lockout`) |
 | 8.26 | Impatience, and a fighting race calming down | COMM-OV `>IMPATIENT`, `<EDL>` | MISSING |
 | 8.27 | The terrain vehicle's icon key | LISTICONS `ICONS` | MISSING |
 | 8.28 | The Flat Device: lifeform attacks hit a tenth as often | BEHAV-OV `WE8C2` | the hit roll times 10 with the Flat Device (`TerrainLifeform.AttackPlayer`; probe `flatdevice`) |
