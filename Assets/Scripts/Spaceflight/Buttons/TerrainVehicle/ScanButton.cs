@@ -256,11 +256,13 @@ public class ScanButton : ShipButton
 
 			report += "<color=#FF80FF>Lifeform" + ( lifeformCount > 1 ? "s" : "" ) + ": " + lifeformCount + "</color>\n";
 			report += "Nearest: <color=white>" + species.GetBodyPlanText() + " (" + nearestLifeform.GetStatusText() + ")</color>\n";
-			report += "Volume: <color=white>" + Tools.VolumeToText( species.m_volume ) + " cubic meters</color>\n";
+
+			// the shipped game's four lines (SENT-OV WF166): height, niche, and the aggression and intelligence analogs - and its volume, for the hold
+			report += "Height: <color=white>" + species.GetHeightText() + "</color>\n";
+			report += "Niche: <color=white>" + species.GetNicheText() + "</color>\n";
 			report += "Aggression analog: <color=white>" + species.GetAggressionAnalog() + "</color>\n";
 			report += "Intelligence analog: <color=white>" + species.GetIntelligenceAnalog() + "</color>\n";
-			report += "Niche: <color=white>" + species.GetNicheText() + "</color>\n";
-			report += "Composition: <color=white>" + string.Join( ", ", species.m_composition ) + "</color>\n";
+			report += "Volume: <color=white>" + Tools.VolumeToText( species.m_volume ) + " cubic meters</color>\n";
 		}
 
 		// list ruins (the messages in them are recorded with the cargo button)

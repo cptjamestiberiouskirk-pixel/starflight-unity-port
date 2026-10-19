@@ -504,10 +504,12 @@ public class PlayerData
 
 	// a planet's life, in percent: the game data's bio density, or none once a flare of its star has sterilised it (ANALYZE-OV WEC26) - every read of a planet's life
 	// for the game goes through this (the sensors, the terrain vehicle's scan, the ship's log, a colony's evaluation, the species and lifeforms, the survey from
-	// orbit); the look of the planet (its trees, grass and vegetation) keeps the game data's, since the objects of a surface are placed by its random numbers
+	// orbit); the look of the planet (its trees, grass and vegetation) keeps the game data's, since the objects of a surface are placed by its random numbers - and
+	// none for a planet whose type the shipped game has no life tables for (ShippedLifeforms.HasRecord: of the planets the game data gives life, only one, whose
+	// generic type has none in the original, so its sensors read none there)
 	public int GetBioDensity( GD_Planet planet )
 	{
-		if ( planet == null )
+		if ( ( planet == null ) || !ShippedLifeforms.HasRecord( planet ) )
 		{
 			return 0;
 		}
@@ -520,7 +522,7 @@ public class PlayerData
 	{
 		var playerData = ( DataController.m_instance != null ) ? DataController.m_instance.m_playerData : null;
 
-		return ( playerData != null ) ? playerData.GetBioDensity( planet ) : ( ( planet != null ) ? planet.m_bioDensity : 0 );
+		return ( playerData != null ) ? playerData.GetBioDensity( planet ) : ( ( ( planet != null ) && ShippedLifeforms.HasRecord( planet ) ) ? planet.m_bioDensity : 0 );
 	}
 
 	// returns true if the player data version is current

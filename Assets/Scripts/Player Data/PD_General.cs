@@ -85,8 +85,8 @@ public class PD_General
 	// set once the Thrynn have sold the crew their device, the Black Box: they offer it once in a game (COMMSPEC-OV NEED-ENERGY: WF08A) - false in older save files
 	public bool m_thrynnDeviceSold;
 
-	// the lifeforms whose data the crew has collected, for the value of new data (GD_Species.GetBodyClass; a species is its planet's id x 16 + its index) - null in
-	// older save files
+	// the lifeforms whose data the crew has collected, for the value of new data (GD_Species.GetBodyClass and GetOrder; a species is its planet's id x 128 + its
+	// index, as are its class and order, since the shipped game's are records of their planet) - null in older save files
 	public List<int> m_knownLifeformClassList;
 	public List<int> m_knownLifeformOrderList;
 	public List<int> m_knownLifeformSpeciesList;
@@ -370,9 +370,9 @@ public class PD_General
 			m_knownLifeformSpeciesList = new List<int>();
 		}
 
-		var bodyClass = species.GetBodyClass();
-		var order = (int) species.m_bodyPlan;
-		var speciesKey = planetId * 16 + species.m_index;
+		var bodyClass = species.GetBodyClass( planetId );
+		var order = species.GetOrder( planetId );
+		var speciesKey = planetId * 128 + species.m_index;
 
 		var baseValue = 0;
 

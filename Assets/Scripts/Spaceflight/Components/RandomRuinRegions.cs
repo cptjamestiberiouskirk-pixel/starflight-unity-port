@@ -13,10 +13,10 @@ public static class RandomRuinRegions
 	public const int c_rows = 32;
 
 	// the original's units of a region and of the surface
-	const int c_regionWidth = 18;
-	const int c_regionHeight = 30;
-	const int c_surfaceWidth = 2304;
-	const int c_surfaceHeight = 960;
+	public const int c_regionWidth = 18;
+	public const int c_regionHeight = 30;
+	public const int c_surfaceWidth = 2304;
+	public const int c_surfaceHeight = 960;
 
 	// the chance bytes of each planet type (GD_Planet.m_planetTypeId is the original's planet species, the PLANET file's record): ancient ruins (0x0a, WEF65,
 	// the ruin species 2 with an Endurium deposit beside it) and recent ruins (0x0b, WEF6D, the ruin species 1) - types 1 to 17 are the generic kinds and have
@@ -89,13 +89,13 @@ public static class RandomRuinRegions
 
 	// the original's surface units of a place on the port's map: the map goes round the planet once from left to right, and from pole to pole over its middle
 	// three quarters (as Tools.LatLongToWorldCoordinates maps latitude 90 to a quarter of the way from the middle)
-	static void ToSurface( float mapX, float mapY, PlanetGenerator planetGenerator, out float x, out float y )
+	public static void ToSurface( float mapX, float mapY, PlanetGenerator planetGenerator, out float x, out float y )
 	{
 		x = mapX * c_surfaceWidth / planetGenerator.m_textureMapWidth;
 		y = ( mapY - planetGenerator.m_textureMapHeight * 0.125f ) * c_surfaceHeight / ( planetGenerator.m_textureMapHeight * 0.75f );
 	}
 
-	static void ToMap( float x, float y, PlanetGenerator planetGenerator, out float mapX, out float mapY )
+	public static void ToMap( float x, float y, PlanetGenerator planetGenerator, out float mapX, out float mapY )
 	{
 		mapX = x * planetGenerator.m_textureMapWidth / c_surfaceWidth;
 		mapY = y * ( planetGenerator.m_textureMapHeight * 0.75f ) / c_surfaceHeight + planetGenerator.m_textureMapHeight * 0.125f;
