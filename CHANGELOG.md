@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Known Fluxes on the Starmap**: the port remembered no continuum flux, and its starmap showed none, even one the ship had just been through. In the original a flux the ship goes through is known from then on and kept in the save (HYPER-OV `>FLUX-NODE`, `SET-FLUX-STATE`), and the starmap draws every known flux as a grey line between its two ends (MAP-OV `WEA70`, `WEA4C`). The port now does the same: `PD_General.m_knownFluxList` (both directions of a flux; older saves start with none), and the starmap draws the lines in a copy of its grid's material, in the colour scheme's secondary text colour. Roadmap 8.12. New probe scenario `fluxmap`, with a picture of the starmap.
+
 ### Changed
 
 - **Music Made for the Port**: the game's music was fifteen ambiences by Tabletop Audio, under a licence that forbids commercial use and changes, eight of them played and seven never; the intro played a cut-down copy of one. All fifteen are gone, and eight tracks made for this port take their places: a modern science fiction score, dark and grounded, in low strings, deep synth bass, sparse woodwinds and metallic percussion. A 40 second title theme plays over the intro's credit pages, and the Starport, the docking bay, star systems, orbit, hyperspace, encounters and planet surfaces each have a loop of their own, from about 2 to 6 minutes, that starts after its opening swell, ends before its fade and is crossfaded into itself, so it repeats without a seam or a dip. The loops are at one loudness (the old ones were up to 14 dB apart, the Starport's the quietest), and every track now streams from disk in place of being unpacked into memory when the game loads, where each old 10 minute track held about 100 MB once unpacked; the files take 38 MB in place of 200. The README and the About screen say the music was made for this port. New probe scenario `music`; `aboutscreen` reads the new credit.

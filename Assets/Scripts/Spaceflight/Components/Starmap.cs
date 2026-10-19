@@ -28,6 +28,16 @@ public class Starmap : MonoBehaviour
 	// the colour of the starmap's materials (the SF - Standard shader's albedo colour)
 	const string c_colourProperty = "SF_AlbedoColor";
 
+	// the known fluxes, drawn as lines between their ends when the starmap opens (MAP-OV WEA70 and WEA4C: a grey line for every flux the ship has been through), in
+	// a copy of the grid's material so that its shader is in every build
+	const string c_gridMaterialName = "Starmap - Grid";
+	const float c_fluxLineWidth = 0.75f;
+	const float c_fluxLineDepth = 14.0f;
+
+	GameObject m_knownFluxes;
+	Mesh m_knownFluxMesh;
+	Material m_knownFluxMaterial;
+
 	// unity start
 	void Start()
 	{
@@ -54,6 +64,104 @@ public class Starmap : MonoBehaviour
 	{
 		// the copies of the background material go with the scene
 		DestroyBackgroundCopies( m_backgroundMaterials );
+
+		// and so do the known fluxes' mesh and material
+		if ( m_knownFluxMesh != null )
+		{
+			Destroy( m_knownFluxMesh );
+		}
+
+		if ( m_knownFluxMaterial != null )
+		{
+			Destroy( m_knownFluxMaterial );
+		}
+	}
+
+	// draws the fluxes the ship has been through as lines between their ends (MAP-OV WEA70, WEA4C), in the starmap's own coordinates, where a place in hyperspace
+	// is at ( -x, y ) as the ship's marker is
+	void DrawKnownFluxes()
+	{
+		var fluxList = DataController.m_instance.m_gameData.m_fluxList;
+		var known = DataController.m_instance.m_playerData.m_general.GetKnownFluxes();
+
+		if ( m_knownFluxes == null )
+		{
+			// the grid's material, copied (null if the starmap has none: then nothing is drawn)
+			Material gridMaterial = null;
+
+			foreach ( var starmapRenderer in m_starmap.GetComponentsInChildren<Renderer>( true ) )
+			{
+				foreach ( var material in starmapRenderer.sharedMaterials )
+				{
+					if ( ( material != null ) && ( material.name == c_gridMaterialName ) )
+					{
+						gridMaterial = material;
+					}
+				}
+			}
+
+			if ( gridMaterial == null )
+			{
+				return;
+			}
+
+			m_knownFluxMaterial = new Material( gridMaterial ) { name = "Starmap - Known Fluxes" };
+			m_knownFluxMesh = new Mesh { name = "Starmap - Known Fluxes" };
+
+			m_knownFluxes = new GameObject( "Known Fluxes" );
+			m_knownFluxes.transform.SetParent( m_starmap.transform, false );
+			m_knownFluxes.layer = m_starmap.layer;
+			m_knownFluxes.AddComponent<MeshFilter>().sharedMesh = m_knownFluxMesh;
+			m_knownFluxes.AddComponent<MeshRenderer>().sharedMaterial = m_knownFluxMaterial;
+
+			UseSchemeColours();
+		}
+
+		var vertices = new System.Collections.Generic.List<Vector3>();
+		var triangles = new System.Collections.Generic.List<int>();
+
+		foreach ( var flux in fluxList )
+		{
+			// each flux once (the list has it both ways), and only the known ones
+			if ( !known.Contains( flux.m_id ) || ( ( flux.m_x1 > flux.m_x2 ) || ( ( flux.m_x1 == flux.m_x2 ) && ( flux.m_y1 > flux.m_y2 ) ) ) )
+			{
+				continue;
+			}
+
+			var from = new Vector3( -flux.m_x1, flux.m_y1, c_fluxLineDepth );
+			var to = new Vector3( -flux.m_x2, flux.m_y2, c_fluxLineDepth );
+			var along = to - from;
+
+			if ( along.sqrMagnitude < 0.01f )
+			{
+				continue;
+			}
+
+			var across = new Vector3( -along.y, along.x, 0.0f ).normalized * ( c_fluxLineWidth * 0.5f );
+			var first = vertices.Count;
+
+			vertices.Add( from + across );
+			vertices.Add( from - across );
+			vertices.Add( to - across );
+			vertices.Add( to + across );
+
+			// both faces, so that the line shows whichever way the starmap faces the camera
+			triangles.AddRange( new[] { first, first + 1, first + 2, first, first + 2, first + 3 } );
+			triangles.AddRange( new[] { first, first + 2, first + 1, first, first + 3, first + 2 } );
+		}
+
+		m_knownFluxMesh.Clear();
+		m_knownFluxMesh.SetVertices( vertices );
+		m_knownFluxMesh.SetTriangles( triangles, 0 );
+		m_knownFluxMesh.RecalculateBounds();
+
+		m_knownFluxes.SetActive( vertices.Count > 0 );
+	}
+
+	// how many fluxes the starmap draws (for the probe)
+	public int GetDrawnFluxCount()
+	{
+		return ( m_knownFluxMesh != null ) && ( m_knownFluxes != null ) && m_knownFluxes.activeSelf ? m_knownFluxMesh.vertexCount / 4 : 0;
 	}
 
 	// gives the starmap's background, grid, ship marker and crosshair the colours of the kit's scheme in use, in its dark mode (the starmap is a view of
@@ -91,6 +199,7 @@ public class Starmap : MonoBehaviour
 					case "Starmap - Grid": colour = theme.m_accentPrimaryDim; break;
 					case "Starmap - Player Ship": colour = theme.m_accentPrimary; break;
 					case "Starmap - Crosshair": colour = theme.m_textPrimary; break;
+					case "Starmap - Known Fluxes": colour = theme.m_textSecondary; break;
 					default: continue;
 				}
 
@@ -300,6 +409,9 @@ public class Starmap : MonoBehaviour
 
 		// update the player ship position
 		m_playerShip.transform.localPosition = new Vector3( -gameHyperspaceCoordinates.x, gameHyperspaceCoordinates.z, 15.0f );
+
+		// and draw the fluxes the ship has been through
+		DrawKnownFluxes();
 
 		// the cursor is on the ship to begin with
 		UpdateLabel();
