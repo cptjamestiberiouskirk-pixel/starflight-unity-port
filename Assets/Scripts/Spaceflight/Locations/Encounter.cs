@@ -2499,7 +2499,8 @@ public class Encounter : MonoBehaviour
 				}
 			}
 
-			// are the aliens waiting for the answer to their question? after 20 seconds they say they are waiting, twice at most (COMM-OV TIRED-OF-WAITING)
+			// are the aliens waiting for the answer to their question? after 20 seconds they say they are waiting, twice at most (COMM-OV TIRED-OF-WAITING), and 20
+			// seconds after the second reminder they lose patience (COMM-LOOP2: ?TIRED-OF-WAITING with ?REPEAT off) - the Veloxi drone's numbers are its own
 			if ( ( m_pdEncounter.m_lastQuestionFromAliens != 0 ) && m_pdEncounter.m_connected && ( m_pdEncounter.m_lastSubjectFromPlayer == GD_Comm.Subject.None ) )
 			{
 				m_pdEncounter.m_conversationTimer -= Time.deltaTime;
@@ -2512,6 +2513,10 @@ public class Encounter : MonoBehaviour
 					AddComm( GD_Comm.Subject.WaitingForResponse, false );
 
 					aliensSaidSomething = true;
+				}
+				else if ( ( m_pdEncounter.m_conversationTimer <= 0.0f ) && ( m_gdEncounter.m_race != GameData.Race.VeloxProbe ) )
+				{
+					LoseThePatience();
 				}
 			}
 
@@ -3288,7 +3293,8 @@ public class Encounter : MonoBehaviour
 	}
 
 	// the aliens' mood decides their posture unless a rule has decided it: the player has fired on them, they have turned cowardly, they are a home fleet, Elan is
-	// gone (the Elowan), or they have turned to fight
+	// gone (the Elowan), or they are Mechans meeting a crew with no humans - a fight their mood has started calms down when their mood does (COMM-OV <EDL> keeps
+	// moving it in a fight, and +!EDL sets their posture again: only ?FIRED-WEAPONS holds them to it)
 	bool MoodDecides()
 	{
 		if ( m_pdEncounter.m_attackedByPlayer || m_pdEncounter.m_aliensAreCowardly || IsHomeFleet() )
@@ -3301,7 +3307,8 @@ public class Encounter : MonoBehaviour
 			return false;
 		}
 
-		return m_pdEncounter.m_alienStance != GD_Comm.Stance.Hostile;
+		// the Mechans are hostile to a crew with no humans (InitializeMechanEncounter)
+		return ( m_gdEncounter.m_race != GameData.Race.Mechan ) || DataController.m_instance.m_playerData.m_crewAssignment.HasAtLeastOneHumanCrew();
 	}
 
 	// the least a race's base mood moves at the end of an encounter (HYPER-OV ENCCLEANUP: 5)
@@ -3782,6 +3789,40 @@ public class Encounter : MonoBehaviour
 
 		// the shipped game draws the aliens' phrase limit again for their posture whenever their mood changes (COMM-OV +!EDL, EDL>POSTURE, GET-PHRASE-LIMIT)
 		DrawPhraseLimit();
+	}
+
+	// the aliens lose patience with a crew that keeps them waiting for an answer: their mood moves (Impatient), the question is dropped, and the comm buttons come
+	// back with the link still up (COMM-OV COMM-LOOP2: ?WAITING-FOR-ANSWER and #A-HAILS off)
+	void LoseThePatience()
+	{
+		Impatient();
+
+		m_pdEncounter.m_lastQuestionFromAliens = 0;
+		m_pdEncounter.m_alienHails = 0;
+		m_pdEncounter.m_conversationTimer = Random.Range( 10.0f, 30.0f );
+
+		if ( m_pdEncounter.m_connected )
+		{
+			SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Comm );
+		}
+	}
+
+	// their mood moves by twice the value of their posture: grovelling 2, friendly 4, neutral 8, hostile 16, and fighting 32 (COMM-OV >IMPATIENT: A-POSTU 2* +!EDL)
+	void Impatient()
+	{
+		var personality = AlienPersonality.Find( m_gdEncounter.m_race );
+
+		if ( ( personality == null ) || !MoodDecides() )
+		{
+			return;
+		}
+
+		EnsureMood( personality );
+
+		// fighting, or in flight from a far stronger ship (EDL>POSTURE: 16, or 1 as obsequious)
+		var postureValue = ( m_pdEncounter.m_mood >= personality.m_fightFrom ) ? ( ( GetStrengthDifferential() > c_fleeOverFight ) ? 1 : 16 ) : GD_Comm.GetPostureBit( GetMoodPosture( personality ) );
+
+		ChangeMood( 2.0f * postureValue );
 	}
 
 	// the player's Yes or No moves the aliens' mood by the change their question has for it (COMM-OV YES>EDL and NO-EDL: Velox "Of course Veloxi are superior all
@@ -4387,6 +4428,24 @@ public class Encounter : MonoBehaviour
 
 		// and so is the answer to a special action of the race's (COMMSPEC-OV XY/N, run as the comm link opens)
 		var specialActionAnswer = outgoing && ( m_pdEncounter.m_specialActionAsked != 0 ) && ( ( subject == GD_Comm.Subject.Yes ) || ( subject == GD_Comm.Subject.No ) );
+
+		// a button pressed while the aliens wait for the answer to their question (the Veloxi drone's numbers are its own)
+		var waitedOn = outgoing && ( m_pdEncounter.m_lastQuestionFromAliens != 0 ) && ( m_pdEncounter.m_lastSubjectFromPlayer == GD_Comm.Subject.None ) && ( m_gdEncounter.m_race != GameData.Race.VeloxProbe ) && ( ( subject == GD_Comm.Subject.Yes ) || ( subject == GD_Comm.Subject.No ) || ( subject == GD_Comm.Subject.Terminate ) );
+
+		// after their second reminder any answer is lost on them: they lose patience, nothing is transmitted, and the link stays up, even for Terminate (COMM-OV
+		// COMM-LOOP2: >Y/N with ?REPEAT off is >IMPATIENT)
+		if ( waitedOn && ( m_pdEncounter.m_alienHails >= c_maximumHails ) )
+		{
+			LoseThePatience();
+
+			return;
+		}
+
+		// before it, ending the link while they wait for an answer tries their patience (COMM-OV >TERMINATE: >IMPATIENT and TERMINATE)
+		if ( waitedOn && ( subject == GD_Comm.Subject.Terminate ) )
+		{
+			Impatient();
+		}
 
 		// once the link is up, each phrase of the player's goes through the comm's equipment check, and comm equipment that has broken down or malfunctions ends
 		// the link (COMM-OV CL1: the equipment check with part 2 once phrases have been exchanged, then COMMUNICATIONS HAVE BEEN TERMINATED)
