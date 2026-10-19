@@ -41813,6 +41813,75 @@ public class ClaudeProbe : MonoBehaviour
 	// ---------------------------------------------------------------- the speeds in an encounter (COMBAT-OV COMBAT, HYPER-OV #VES-SPEED, ACCELERATE)
 
 	// the path length an alien ship flies in this many seconds of game time, over the time
+	// watches an alien ship's turns for this long: each time it is given a new cell, how far that is across and along in cells and how far short of its last cell it
+	// still was. Fills result with the turns, the largest step's longer side in cells, the shortest step's (of those that moved), how far short a ship was at most
+	// when its next turn came, and the diagonal steps
+	static IEnumerator WatchAlienTurns( int alienIndex, float seconds, float[] result )
+	{
+		var ship = EncounterShip( alienIndex );
+		var lastTarget = ship.m_targetCoordinates;
+		var start = Time.time;
+		var turns = 0;
+		var largest = 0.0f;
+		var shortest = float.MaxValue;
+		var mostShort = 0.0f;
+		var diagonals = 0;
+
+		while ( Time.time - start < seconds )
+		{
+			var before = ship.m_coordinates;
+
+			yield return null;
+
+			if ( ( ship.m_targetCoordinates - lastTarget ).sqrMagnitude < 0.01f )
+			{
+				continue;
+			}
+
+			// a new cell: the step from the last one, and how far from that one the ship was in the frame before
+			var step = ( ship.m_targetCoordinates - lastTarget ) / CombatController.c_unitsPerCell;
+			var longer = Mathf.Max( Mathf.Abs( step.x ), Mathf.Abs( step.z ) );
+
+			turns++;
+			largest = Mathf.Max( largest, longer );
+			shortest = Mathf.Min( shortest, longer );
+			mostShort = Mathf.Max( mostShort, Vector3.Distance( before, lastTarget ) );
+
+			if ( ( Mathf.Abs( step.x ) > 0.5f ) && ( Mathf.Abs( step.z ) > 0.5f ) )
+			{
+				diagonals++;
+			}
+
+			lastTarget = ship.m_targetCoordinates;
+		}
+
+		result[ 0 ] = turns;
+		result[ 1 ] = largest;
+		result[ 2 ] = ( turns > 0 ) ? shortest : 0.0f;
+		result[ 3 ] = mostShort;
+		result[ 4 ] = diagonals;
+	}
+
+	// the turns watched are whole cells (at least one), and a ship was never more than a frame's way short of its cell when its next turn came
+	static bool TurnsAreWholeCells( float[] turns )
+	{
+		return ( turns[ 0 ] >= 1.0f ) && ( Mathf.Abs( turns[ 1 ] - 1.0f ) < 0.05f ) && ( Mathf.Abs( turns[ 2 ] - 1.0f ) < 0.05f ) && ( turns[ 3 ] < 6.0f );
+	}
+
+	static string TurnsText( float[] turns )
+	{
+		return turns[ 0 ].ToString( "F0" ) + " steps (cells " + turns[ 2 ].ToString( "F2" ) + " to " + turns[ 1 ].ToString( "F2" ) + ", " + turns[ 4 ].ToString( "F0" ) + " diagonal, short by " + turns[ 3 ].ToString( "F1" ) + " at most)";
+	}
+
+	// the seconds between an alien ship's turns (Encounter.GetTurnSeconds; -1 on code without it)
+	static float AlienTurnSeconds()
+	{
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var method = ( encounter != null ) ? typeof( Encounter ).GetMethod( "GetTurnSeconds", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic ) : null;
+
+		return ( method != null ) ? (float) method.Invoke( encounter, null ) : -1.0f;
+	}
+
 	static IEnumerator MeasureAlienSpeed( int alienIndex, float seconds, float[] result )
 	{
 		var ship = EncounterShip( alienIndex );
@@ -41902,9 +41971,15 @@ public class ClaudeProbe : MonoBehaviour
 			controller.m_buttonController.DeactivateButton();
 		}
 
-		var one = new float[ 1 ];
+		var oneTurns = new float[ 5 ];
 
-		yield return MeasureAlienSpeed( FirstLivingAlien(), 2.0f, one );
+		yield return WatchAlienTurns( FirstLivingAlien(), 4.0f, oneTurns );
+
+		var oneTurnSeconds = AlienTurnSeconds();
+
+		// in the Combat menu, as in a fight: out of it the encounter ends by itself once the aliens are over 22 cells away (the original's ?UNNEST), and they move
+		// off by their posture while the player's ship circles
+		controller.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Combat );
 
 		var times = new[] { 0.75f, 5.0f, 9.0f };
 		var oneShipSpeeds = new float[ times.Length ];
@@ -41930,9 +42005,13 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		var threePresent = AlienShipsPresent();
-		var three = new float[ 1 ];
+		var threeTurns = new float[ 5 ];
 
-		yield return MeasureAlienSpeed( FirstLivingAlien(), 2.0f, three );
+		yield return WatchAlienTurns( FirstLivingAlien(), 6.0f, threeTurns );
+
+		var threeTurnSeconds = AlienTurnSeconds();
+
+		controller.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Combat );
 
 		var threeTimes = new[] { 10.0f };
 		var threeShipSpeeds = new float[ 1 ];
@@ -41944,16 +42023,17 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		Log( "encounterspeeds: one ship: alien " + one[ 0 ].ToString( "F1" ) + ", player at 0.75/5/9 s " + oneShipSpeeds[ 0 ].ToString( "F0" ) + "/" + oneShipSpeeds[ 1 ].ToString( "F0" ) + "/" + oneShipSpeeds[ 2 ].ToString( "F0" ) + ", after letting go " + stopped.ToString( "F1" ) + " || " + threePresent + " ships: alien " + three[ 0 ].ToString( "F1" ) + ", player after 10 s " + threeShipSpeeds[ 0 ].ToString( "F0" ) );
+		Log( "encounterspeeds: one ship: a turn every " + oneTurnSeconds.ToString( "F2" ) + " s, " + TurnsText( oneTurns ) + ", player at 0.75/5/9 s " + oneShipSpeeds[ 0 ].ToString( "F0" ) + "/" + oneShipSpeeds[ 1 ].ToString( "F0" ) + "/" + oneShipSpeeds[ 2 ].ToString( "F0" ) + ", after letting go " + stopped.ToString( "F1" ) + " || " + threePresent + " ships: a turn every " + threeTurnSeconds.ToString( "F2" ) + " s, " + TurnsText( threeTurns ) + ", player after 10 s " + threeShipSpeeds[ 0 ].ToString( "F0" ) );
 
-		Check( "encounterspeeds: an alien ship moves a cell every (ships + 1) passes of the original's loop: 160 with one ship, 80 with three (COMBAT-OV COMBAT, WEDCE)", ( Mathf.Abs( one[ 0 ] - 160.0f ) < 8.0f ) && ( threePresent == 3 ) && ( Mathf.Abs( three[ 0 ] - 80.0f ) < 4.0f ), one[ 0 ].ToString( "F1" ) + " / " + threePresent + " ships " + three[ 0 ].ToString( "F1" ) );
+		Check( "encounterspeeds: an alien ship's turn comes every (ships + 1) passes of the original's loop, 0.5 s with one ship and 1 s with three (COMBAT-OV COMBAT, WEDCE)", ( Mathf.Abs( oneTurnSeconds - 0.5f ) < 0.01f ) && ( threePresent == 3 ) && ( Mathf.Abs( threeTurnSeconds - 1.0f ) < 0.01f ), oneTurnSeconds.ToString( "F2" ) + " / " + threePresent + " ships " + threeTurnSeconds.ToString( "F2" ) );
+		Check( "encounterspeeds: a turn moves a ship a cell across, along or both, and it is there by its next turn, a diagonal step too (the code before left a diagonal step a third short)", TurnsAreWholeCells( oneTurns ) && TurnsAreWholeCells( threeTurns ) && ( oneTurns[ 4 ] + threeTurns[ 4 ] >= 1.0f ), TurnsText( oneTurns ) + " / " + TurnsText( threeTurns ) );
 		Check( "encounterspeeds: the player's ship moves a cell a pass at first and a cell more every 14 passes with 7 G (320, 640, 960: HYPER-OV ACCELERATE)", ( Mathf.Abs( oneShipSpeeds[ 0 ] - 320.0f ) < 25.0f ) && ( Mathf.Abs( oneShipSpeeds[ 1 ] - 640.0f ) < 40.0f ) && ( Mathf.Abs( oneShipSpeeds[ 2 ] - 960.0f ) < 60.0f ), oneShipSpeeds[ 0 ].ToString( "F0" ) + " / " + oneShipSpeeds[ 1 ].ToString( "F0" ) + " / " + oneShipSpeeds[ 2 ].ToString( "F0" ) );
 		Check( "encounterspeeds: with three alien ships the step stops at 2 cells (640: HYPER-OV #VES-SPEED)", Mathf.Abs( threeShipSpeeds[ 0 ] - 640.0f ) < 40.0f, threeShipSpeeds[ 0 ].ToString( "F0" ) );
 		Check( "encounterspeeds: with no direction held the ship stops at once", stopped < 0.1f, stopped.ToString( "F1" ) );
 
 		Time.captureDeltaTime = 0.0f;
 
-		Finish( "scenario=encounterspeeds alien=" + one[ 0 ].ToString( "F0" ) + "/" + three[ 0 ].ToString( "F0" ), 0 );
+		Finish( "scenario=encounterspeeds turns=" + oneTurnSeconds.ToString( "F2" ) + "/" + threeTurnSeconds.ToString( "F2" ), 0 );
 	}
 
 	// ---------------------------------------------------------------- the survey's marks on the landing map (TerrainMapDisplay, SurveyMarks: ROADMAP D6)
