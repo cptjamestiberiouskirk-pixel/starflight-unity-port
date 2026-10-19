@@ -2016,6 +2016,33 @@ public class Encounter : MonoBehaviour
 	// the tribute, in tenths of a cubic meter of Endurium
 	const int c_veloxTribute = 30;
 
+	// the Crystal Orb the Veloxi take goes back to its site on its planet, unless that planet has been destroyed (COMMSPEC-OV -ARTIFACT and WEB3F: the orb, species 1,
+	// taken by the Veloxi while ?SPHEXI is on, is put back into its region of the planet; anything else handed over is gone). A site of the recovered data whose
+	// artifact has been taken is in the planet surfaces' taken list, so the orb is back once its site is out of the list
+	public static void ReturnCrystalOrbToItsSite()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var planetSurfaces = DataController.m_instance.m_playerData.m_planetSurfaces;
+		var orbId = gameData.FindArtifactId( "Crystal Orb" );
+
+		if ( ( planetSurfaces == null ) || ( orbId < 0 ) || ( gameData.m_artifactSiteList == null ) )
+		{
+			return;
+		}
+
+		for ( var artifactSiteId = 0; artifactSiteId < gameData.m_artifactSiteList.Length; artifactSiteId++ )
+		{
+			var site = gameData.m_artifactSiteList[ artifactSiteId ];
+
+			if ( ( site == null ) || ( site.m_artifactId != orbId ) || planetSurfaces.IsPlanetDestroyed( site.m_planetId ) )
+			{
+				continue;
+			}
+
+			planetSurfaces.ReturnArtifactSite( artifactSiteId );
+		}
+	}
+
 	// the answer to a Veloxi demand: a yes hands over what they demand, and anything else - a no, or ending the comm link with no answer - "will result in a Veloxi
 	// attack" (STRINFO 2.2 for the Crystal Orb and the Ellipsoid; for the tribute, and for a yes with less than 3 cubic meters of Endurium, decided
 	// 2026-10-11)
@@ -2050,6 +2077,9 @@ public class Encounter : MonoBehaviour
 				if ( handedOver )
 				{
 					messages.AddText( "<color=white>The Veloxi take the Crystal Orb aboard.</color>" );
+
+					// and put it back where it was found
+					ReturnCrystalOrbToItsSite();
 				}
 			}
 			else if ( demand == c_veloxEllipsoidDemandCommId )
