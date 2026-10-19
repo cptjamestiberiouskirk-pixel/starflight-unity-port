@@ -36375,6 +36375,12 @@ public class ClaudeProbe : MonoBehaviour
 			yield return Frames( 5 );
 		}
 
+		// the Combat menu has no Bridge button: back to Navigation first
+		if ( ( PtIndexOf( officer ) < 0 ) && ( PtIndexOf( "Bridge" ) < 0 ) && ( PtIndexOf( "Navigation" ) >= 0 ) )
+		{
+			yield return PtPress( "Navigation" );
+		}
+
 		if ( PtIndexOf( officer ) < 0 )
 		{
 			if ( PtIndexOf( "Bridge" ) >= 0 )
@@ -37430,24 +37436,31 @@ public class ClaudeProbe : MonoBehaviour
 
 	// fights an encounter: shields up, weapons armed, Combat, Target and the lasers (and missiles) until every ship that came is destroyed, the time is up, the
 	// fight is being lost, or enough (when given) says the stage has had enough of it
-	// flies the ship toward this place in the encounter for so long (the engines on and the direction held, as the stick does in an encounter), then stops
-	IEnumerator PtCloseIn( Vector3 target, float seconds )
+	// flies the ship after this alien ship in the encounter (the engines on and the direction held, as the stick does), turning toward it every frame, until it is
+	// within this distance, is destroyed, the encounter ends or the time is up, then stops
+	IEnumerator PtCloseIn( PD_AlienShip alienShip, float within, float seconds )
 	{
+		var playerData = DataController.m_instance.m_playerData;
 		var controller = SpaceflightController.m_instance;
-		var general = DataController.m_instance.m_playerData.m_general;
-		var toTarget = target - general.m_coordinates;
+		var general = playerData.m_general;
 
-		toTarget.y = 0.0f;
-
-		if ( toTarget.sqrMagnitude < 1.0f )
-		{
-			yield break;
-		}
-
-		general.m_currentDirection = toTarget.normalized;
 		controller.m_playerShip.TurnOnEngines();
 
-		yield return new WaitForSecondsRealtime( seconds );
+		for ( var end = Time.realtimeSinceStartup + seconds; Time.realtimeSinceStartup < end; )
+		{
+			var toTarget = alienShip.m_coordinates - general.m_coordinates;
+
+			toTarget.y = 0.0f;
+
+			if ( alienShip.m_isDead || ( toTarget.magnitude <= within ) || ( general.m_location != PD_General.Location.Encounter ) || CombatController.m_instance.PlayerIsDestroyed() )
+			{
+				break;
+			}
+
+			general.m_currentDirection = toTarget.normalized;
+
+			yield return null;
+		}
 
 		controller.m_playerShip.TurnOffEngines();
 	}
@@ -37542,24 +37555,26 @@ public class ClaudeProbe : MonoBehaviour
 			// a target out of laser range (800): Target picks the next one, as a player does when the game says it is out of range
 			var targetDistance = Vector3.Distance( encounter.m_pdEncounter.GetAlienShipList()[ target ].m_coordinates, playerData.m_general.m_coordinates );
 
-			// nothing in reach of the missiles either (1500): close in on the target for half a second, as a captain does in the Combat menu (aliens that fight keep
-			// their distance: COMBAT-OV <COMBAT> gives only hostile ones a rule to close in)
-			if ( ( targetDistance > 1500.0f ) && ( retargets >= 3 ) )
+			// a target out of laser range (800): Target picks the next one once, as a player does when the game says it is out of range, and then the ship goes after
+			// it until it is within 600, for 3 s at most, as a captain does in the Combat menu (aliens that fight keep their distance: COMBAT-OV <COMBAT> gives only
+			// hostile ones a rule to close in)
+			if ( targetDistance > 800.0f )
 			{
+				outOfRange++;
+
+				if ( retargets < 1 )
+				{
+					retargets++;
+
+					yield return PtPress( "Target" );
+
+					continue;
+				}
+
 				retargets = 0;
 				approaches++;
 
-				yield return PtCloseIn( encounter.m_pdEncounter.GetAlienShipList()[ target ].m_coordinates, 0.5f );
-
-				continue;
-			}
-
-			if ( ( targetDistance > 800.0f ) && ( retargets < 3 ) )
-			{
-				retargets++;
-				outOfRange++;
-
-				yield return PtPress( "Target" );
+				yield return PtCloseIn( encounter.m_pdEncounter.GetAlienShipList()[ target ], 600.0f, 3.0f );
 
 				continue;
 			}
