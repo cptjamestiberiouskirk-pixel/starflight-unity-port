@@ -37430,6 +37430,28 @@ public class ClaudeProbe : MonoBehaviour
 
 	// fights an encounter: shields up, weapons armed, Combat, Target and the lasers (and missiles) until every ship that came is destroyed, the time is up, the
 	// fight is being lost, or enough (when given) says the stage has had enough of it
+	// flies the ship toward this place in the encounter for so long (the engines on and the direction held, as the stick does in an encounter), then stops
+	IEnumerator PtCloseIn( Vector3 target, float seconds )
+	{
+		var controller = SpaceflightController.m_instance;
+		var general = DataController.m_instance.m_playerData.m_general;
+		var toTarget = target - general.m_coordinates;
+
+		toTarget.y = 0.0f;
+
+		if ( toTarget.sqrMagnitude < 1.0f )
+		{
+			yield break;
+		}
+
+		general.m_currentDirection = toTarget.normalized;
+		controller.m_playerShip.TurnOnEngines();
+
+		yield return new WaitForSecondsRealtime( seconds );
+
+		controller.m_playerShip.TurnOffEngines();
+	}
+
 	IEnumerator PtFight( float seconds, int[] result, Func<bool> enough = null )
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -37441,6 +37463,7 @@ public class ClaudeProbe : MonoBehaviour
 		var fuelBefore = Endurium();
 		var retargets = 0;
 		var outOfRange = 0;
+		var approaches = 0;
 		var shotLog = new List<string>();
 		var alienPointsBefore = PtSumOfNumbers( PtAlienPoints() );
 
@@ -37519,12 +37542,14 @@ public class ClaudeProbe : MonoBehaviour
 			// a target out of laser range (800): Target picks the next one, as a player does when the game says it is out of range
 			var targetDistance = Vector3.Distance( encounter.m_pdEncounter.GetAlienShipList()[ target ].m_coordinates, playerData.m_general.m_coordinates );
 
-			// nothing in reach of the missiles either (1500): wait for them to come
+			// nothing in reach of the missiles either (1500): close in on the target for half a second, as a captain does in the Combat menu (aliens that fight keep
+			// their distance: COMBAT-OV <COMBAT> gives only hostile ones a rule to close in)
 			if ( ( targetDistance > 1500.0f ) && ( retargets >= 3 ) )
 			{
 				retargets = 0;
+				approaches++;
 
-				yield return new WaitForSecondsRealtime( 0.5f );
+				yield return PtCloseIn( encounter.m_pdEncounter.GetAlienShipList()[ target ].m_coordinates, 0.5f );
 
 				continue;
 			}
@@ -37571,7 +37596,7 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		Log( "playthrough: the fight's shots (weapon@distance): " + string.Join( " ", shotLog ) + "; targets out of laser range " + outOfRange + " times; the aliens' armor+shields left: " + points );
+		Log( "playthrough: the fight's shots (weapon@distance): " + string.Join( " ", shotLog ) + "; targets out of laser range " + outOfRange + " times, closed in " + approaches + " times; the aliens' armor+shields left: " + points );
 
 		result[ 0 ] = destroyed;
 
@@ -38542,29 +38567,11 @@ public class ClaudeProbe : MonoBehaviour
 
 		if ( met[ 0 ] )
 		{
-			var encounter = SpaceflightController.m_instance.m_encounter;
 			var armorBefore = ship.m_armorPoints;
-			var hailed = new List<string>();
 
-			yield return new WaitForSecondsRealtime( 2.0f );
-
-			// the Uhlek do not answer a hail
-			yield return PtOfficer( "Communications" );
-			yield return PtPress( "Hail" );
-
-			if ( PtIndexOf( "Friendly" ) >= 0 )
-			{
-				yield return PtPress( "Friendly" );
-			}
-
-			yield return new WaitForSecondsRealtime( 3.0f );
-
-			var afterHail = PtMessages();
-
-			Log( "playthrough-12: hailing the Uhlek: connected " + encounter.IsConnected() + ", stance " + encounter.m_pdEncounter.m_alienStance + ", messages '" + afterHail + "'" );
-
-			Check( "playthrough-12: the Uhlek are hostile and do not answer a hail", !encounter.IsConnected() && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile ), encounter.IsConnected() + ", " + encounter.m_pdEncounter.m_alienStance );
-
+			// straight into combat: the Uhlek fight from the first turn and never close in (COMBAT-OV <COMBAT>: their posture is FIGHT, with TERMINA on, so on a turn
+			// they do not fire they move away), and out of the Combat menu the encounter ends by itself once they are all more than 22 cells away (?UNNEST); the hail
+			// is tried at the end of stage 13
 			// the first part of the fight ends with the shields down to half, and stage 13 goes on with the other half: since alien ships fire their laser and missile
 			// each, 55 s of it took all the shields and the hull down to about half, and from there the ship could not fire on the Uhlek after loading and still get out
 			// (or with the first Uhlek ship destroyed: with the original's weapon damage the ship can destroy them all long before its class 5 shields are at half, and
@@ -38611,6 +38618,14 @@ public class ClaudeProbe : MonoBehaviour
 
 		ProbeKeyboard();
 
+		// straight into the Combat menu, as a captain does on loading in a fight: out of it the encounter ends by itself once the Uhlek, who keep their distance,
+		// are all more than 22 cells away
+		if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+		{
+			yield return PtOfficer( "Navigation" );
+			yield return PtPress( "Combat" );
+		}
+
 		yield return Frames( 30 );
 
 		var loadedPoints = PtAlienPoints();
@@ -38635,7 +38650,27 @@ public class ClaudeProbe : MonoBehaviour
 
 			Check( "playthrough-13: the ship's weapons hit the Uhlek (a ship destroyed, or their armor and shields down), and the ship survives", hitTheAliens && !CombatController.m_instance.PlayerIsDestroyed() && !ship.IsDestroyed(), result[ 0 ] + " destroyed, armor " + ship.m_armorPoints + ", hull " + ship.GetHullIntegrity() + ", aliens " + PtAlienPoints() );
 
-			if ( !CombatController.m_instance.PlayerIsDestroyed() )
+			// the Uhlek do not answer a hail (out of the Combat menu the encounter may end by itself meanwhile, as the Uhlek move off)
+			if ( !CombatController.m_instance.PlayerIsDestroyed() && ( playerData.m_general.m_location == PD_General.Location.Encounter ) )
+			{
+				var encounter = SpaceflightController.m_instance.m_encounter;
+
+				yield return PtOfficer( "Communications" );
+				yield return PtPress( "Hail" );
+
+				if ( PtIndexOf( "Friendly" ) >= 0 )
+				{
+					yield return PtPress( "Friendly" );
+				}
+
+				yield return new WaitForSecondsRealtime( 3.0f );
+
+				Log( "playthrough-13: hailing the Uhlek: connected " + encounter.IsConnected() + ", stance " + encounter.m_pdEncounter.m_alienStance + ", location " + playerData.m_general.m_location + ", messages '" + PtMessages() + "'" );
+
+				Check( "playthrough-13: the Uhlek are hostile and do not answer a hail", !encounter.IsConnected() && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile ), encounter.IsConnected() + ", " + encounter.m_pdEncounter.m_alienStance );
+			}
+
+			if ( !CombatController.m_instance.PlayerIsDestroyed() && ( playerData.m_general.m_location == PD_General.Location.Encounter ) )
 			{
 				yield return PtFlyOutOfEncounter( 4.0f );
 			}
