@@ -1778,6 +1778,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCalming();
 				break;
 
+			case "iconkey":
+				yield return ScenarioIconKey();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -50539,6 +50543,230 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "calming: aliens the player has fired on keep fighting (?FIRED-WEAPONS; control)", firedStance == GD_Comm.Stance.Hostile, firedMood + " " + firedStance );
 
 		Finish( "scenario=calming checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: the terrain vehicle's icon key (roadmap 8.27)
+
+	// a static method of the game's code by its type's name, called with these arguments (null if the type or the method is missing: the code before)
+	static object CallStatic( string typeName, string method, params object[] args )
+	{
+		var type = typeof( MapButton ).Assembly.GetType( typeName );
+		var info = ( type == null ) ? null : type.GetMethod( method, BindingFlags.Public | BindingFlags.Static );
+
+		return ( info == null ) ? null : info.Invoke( null, args );
+	}
+
+	// a method of an object called with these arguments (null if the object or the method is missing: the code before)
+	static object CallIfThere( object target, string name, params object[] args )
+	{
+		var method = ( target == null ) ? null : target.GetType().GetMethod( name, c_any );
+
+		return ( method == null ) ? null : method.Invoke( target, args );
+	}
+
+	// a pixel of one of the shipped game's surface icons as "r,g,b" ("missing" on the code before)
+	static string IconPixel( int icon, int column, int row )
+	{
+		var pixel = CallStatic( "TerrainIconKey", "GetPixel", icon, column, row );
+
+		if ( pixel == null )
+		{
+			return "missing";
+		}
+
+		var colour = (Color32) pixel;
+
+		return colour.r + "," + colour.g + "," + colour.b;
+	}
+
+	// the icon the original's map would give this object of the surface, worked out here on its own (-1 for none): the vehicle, the ship, a deposit, a ruin, a
+	// lifeform by its state and its body plan (the first of a producer's two pictures, the animals' plans in the order of the pictures 6 to 16)
+	static int ExpectedIcon( Transform target )
+	{
+		var disembarked = SpaceflightController.m_instance.m_disembarked;
+
+		if ( target == null )
+		{
+			return -1;
+		}
+
+		if ( target.GetComponent<TerrainVehicle>() != null )
+		{
+			return 26;
+		}
+
+		if ( ( disembarked.m_arthShip != null ) && ( target == disembarked.m_arthShip.transform ) )
+		{
+			return 25;
+		}
+
+		if ( target.GetComponent<TerrainElement>() != null )
+		{
+			return 21;
+		}
+
+		var ruin = target.GetComponent<TerrainRuin>();
+
+		if ( ruin != null )
+		{
+			return ruin.m_isAncient ? 24 : 23;
+		}
+
+		var lifeform = target.GetComponent<TerrainLifeform>();
+
+		if ( lifeform != null )
+		{
+			if ( lifeform.m_status == TerrainLifeform.Status.Dead )
+			{
+				return 19;
+			}
+
+			var species = lifeform.m_species;
+
+			if ( species.m_canFly )
+			{
+				return 17;
+			}
+
+			if ( species.m_canFloat )
+			{
+				return 18;
+			}
+
+			switch ( species.m_bodyPlan )
+			{
+				case GD_Species.BodyPlan.LeavedLarge: return 0;
+				case GD_Species.BodyPlan.LeavedMedium: return 2;
+				case GD_Species.BodyPlan.LeavedSmall: return 4;
+			}
+
+			return 6 + (int) species.m_bodyPlan;
+		}
+
+		// an artifact lying in a ruin
+		return 22;
+	}
+
+	// the terrain vehicle's icon key as the original's (LISTICONS ICONS, BEHAV-OV >BUTTONS 6: roadmap 8.27): the shipped game's 27 surface icons with their
+	// names (ICON1:1, ICON-NAME), on two pages, icons 0 to 14 and 15 to 26 with the elevation bar on the second, shown on the auxiliary display while the Map is
+	// up (the port's console has no room for the original's seventh button), turned with left and right, and the icons over the surface in the Map's overhead
+	// view, each object with its own; both go when the Map does, however it ends. The code before had no key and no icons
+	IEnumerator ScenarioIconKey()
+	{
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// out in the terrain vehicle on planet 92 of the Arth system (it has life)
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=iconkey abort: never got into the terrain vehicle (" + DataController.m_instance.m_playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var display = controller.m_displayController.m_terrainVehicleDisplay;
+
+		// ---- 1. the names and the pictures, as the shipped game's
+		var names = new List<string>();
+
+		for ( var icon = 0; icon < 27; icon++ )
+		{
+			names.Add( ( CallStatic( "TerrainIconKey", "GetName", icon ) as string ) ?? "missing" );
+		}
+
+		// the terrain vehicle's top row (black at 3 and 4, the key's light grey elsewhere) and the biped's (the first layer's light cyan at 3 and 5, the second's
+		// blue at 2, 4 and 6 over it)
+		var vehicleRow = IconPixel( 26, 0, 0 ) + " " + IconPixel( 26, 3, 0 ) + " " + IconPixel( 26, 4, 0 );
+		var bipedRow = IconPixel( 9, 2, 0 ) + " " + IconPixel( 9, 3, 0 ) + " " + IconPixel( 9, 4, 0 ) + " " + IconPixel( 9, 5, 0 );
+
+		// ---- 2. no key before the Map is up (control)
+		var keyBefore = display.transform.Find( "Icon key" ) != null;
+
+		// ---- 3. the Map: the key on the auxiliary display, its first page, then the second after a push to the right
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 0 );
+
+		yield return Frames( 10 );
+
+		var mapButton = FieldOrNull( buttonController, "m_currentButton" );
+		var key = ( mapButton != null ) ? CallIfThere( mapButton, "GetIconKey" ) : null;
+		var keyOnDisplay = ( key != null ) && ( ( (Component) key ).transform.parent == display.transform );
+		var firstPage = ( key != null ) ? ( Call( key, "GetPageText" ) as string ) : "no key";
+
+		yield return Tap( Key.RightArrow );
+		yield return Frames( 3 );
+
+		var secondPage = ( key != null ) ? ( Call( key, "GetPageText" ) as string ) : "no key";
+
+		// ---- 4. the markers over the surface: each object with the icon the original's map gives it
+		var markers = ( mapButton != null ) ? CallIfThere( mapButton, "GetIconMarkers" ) : null;
+		var markerCount = ( markers != null ) ? (int) Call( markers, "GetMarkerCount" ) : 0;
+		var wrongIcons = new List<string>();
+		var kinds = new Dictionary<int, int>();
+
+		for ( var i = 0; i < markerCount; i++ )
+		{
+			var icon = (int) Call( markers, "GetMarkerIcon", i );
+			var target = Call( markers, "GetMarkerTarget", i ) as Transform;
+			var expected = ExpectedIcon( target );
+
+			kinds[ icon ] = ( kinds.TryGetValue( icon, out var count ) ? count : 0 ) + 1;
+
+			if ( icon != expected )
+			{
+				wrongIcons.Add( ( ( target != null ) ? target.name : "nothing" ) + " " + icon + " not " + expected );
+			}
+		}
+
+		var shownMarkers = ( markers != null ) ? ( (Component) markers ).GetComponentsInChildren<SpriteRenderer>( false ).Length : 0;
+		var deposits = controller.m_disembarked.m_terrainGrid.m_terrainElements.GetComponentsInChildren<TerrainElement>( false ).Length;
+		var lifeforms = controller.m_disembarked.m_terrainGrid.m_terrainLifeforms.m_lifeformList.Count;
+		var kindText = "";
+
+		foreach ( var kind in kinds )
+		{
+			kindText += " " + kind.Key + "x" + kind.Value;
+		}
+
+		// ---- 5. the Map ended with the fire button: the key and the markers go
+		yield return Tap( Key.Enter );
+		yield return Frames( 5 );
+
+		var keyAfterExit = ( key != null ) && ( (UnityEngine.Object) key != null );
+		var markersAfterExit = ( markers != null ) && ( (UnityEngine.Object) markers != null );
+
+		// ---- 6. the Map ended another way (the console's menu changed under it): they go too
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 0 );
+
+		yield return Frames( 10 );
+
+		var secondMapButton = FieldOrNull( buttonController, "m_currentButton" );
+		var secondKey = ( secondMapButton != null ) ? CallIfThere( secondMapButton, "GetIconKey" ) : null;
+		var secondMarkers = ( secondMapButton != null ) ? CallIfThere( secondMapButton, "GetIconMarkers" ) : null;
+
+		buttonController.ChangeButtonSet( ButtonController.ButtonSet.TerrainVehicle );
+		buttonController.ClearCurrentButton();
+
+		yield return Frames( 5 );
+
+		var keyAfterMenu = ( secondKey != null ) && ( (UnityEngine.Object) secondKey != null );
+		var markersAfterMenu = ( secondMarkers != null ) && ( (UnityEngine.Object) secondMarkers != null );
+
+		Log( "iconkey: names " + string.Join( " | ", names ) + " || vehicle row " + vehicleRow + " | biped row " + bipedRow + " || key before " + keyBefore + ", on the display " + keyOnDisplay + " || first page: " + firstPage.Replace( "\n", " | " ) + " || second page: " + secondPage.Replace( "\n", " | " ) + " || markers " + markerCount + " (" + shownMarkers + " shown):" + kindText + ", deposits " + deposits + ", lifeforms " + lifeforms + ", wrong " + string.Join( "; ", wrongIcons ) + " || after Enter: key " + keyAfterExit + ", markers " + markersAfterExit + " || after the menu changed: key " + keyAfterMenu + ", markers " + markersAfterMenu );
+
+		Check( "iconkey: the 27 icons have the shipped game's names, from Large producer to Terrain vehicle (ICON-NAME)", ( names[ 0 ] == "Large producer" ) && ( names[ 9 ] == "Bilateral bipedal" ) && ( names[ 21 ] == "Mineral" ) && ( names[ 24 ] == "Ancient ruins" ) && ( names[ 26 ] == "Terrain vehicle" ), string.Join( " | ", names ) );
+		Check( "iconkey: the pictures are the shipped game's, in its EGA colours on the key's light grey (ICON1:1, C>EGA, GREY1)", ( vehicleRow == "170,170,170 0,0,0 0,0,0" ) && ( bipedRow == "0,0,170 85,255,255 0,0,170 85,255,255" ), vehicleRow + " | " + bipedRow );
+		Check( "iconkey: no key before the Map is up (control)", !keyBefore, keyBefore.ToString() );
+		Check( "iconkey: with the Map up the key is on the auxiliary display, its first page the icons 0 to 14 (SEE-BLTS 0 to 15)", keyOnDisplay && firstPage.StartsWith( "Icon key\nLarge producer" ) && firstPage.EndsWith( "Radial multipedal" ) && !firstPage.Contains( "Amorphous" ), firstPage );
+		Check( "iconkey: a push to the right turns to the second page, the icons 15 to 26 and the elevation bar (LISTICONS altitude)", secondPage.StartsWith( "Icon key\nAmorphous\n" ) && secondPage.Contains( "Terrain vehicle\nLo.....elevation.....hi (bar)" ), secondPage );
+		Check( "iconkey: the Map marks the vehicle, the ship, every deposit and every lifeform, each with the icon the original's map gives it", ( markerCount > 0 ) && ( wrongIcons.Count == 0 ) && kinds.ContainsKey( 26 ) && kinds.ContainsKey( 25 ) && ( ( kinds.TryGetValue( 21, out var depositMarks ) ? depositMarks : 0 ) == deposits ) && ( shownMarkers > 0 ), markerCount + ":" + kindText + ", deposits " + deposits + ", lifeforms " + lifeforms + ", wrong " + string.Join( "; ", wrongIcons ) );
+		Check( "iconkey: leaving the Map takes the key and the markers away", ( key != null ) && !keyAfterExit && ( markers != null ) && !markersAfterExit, keyAfterExit + ", " + markersAfterExit );
+		Check( "iconkey: so does a Map that ends another way (the console's menu changed under it)", ( secondKey != null ) && !keyAfterMenu && ( secondMarkers != null ) && !markersAfterMenu, keyAfterMenu + ", " + markersAfterMenu );
+
+		Finish( "scenario=iconkey checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
