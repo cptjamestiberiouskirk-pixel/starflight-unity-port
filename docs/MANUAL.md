@@ -256,7 +256,8 @@ Landing and launching from a planet burn fuel too, more on heavier planets. Rais
 ### Hazards of space
 
 - **Nebulae**: shields cannot be raised inside one.
-- **Stars**: Science, **Sensors** in a star system reports the star's class and its stability: stable, slightly unstable, or unstable with the Arth days left before it flares. The stability is your science officer's call: one with little skill often reports it "Not certain", so scan again or train them. A star that flares destroys any ship in its system.
+- **Alien movements**: a science officer trained beyond 150 tells you when alien groups close in: "Motion detected at", then how far each group moved across (X) and along (Y), in map coordinates.
+- **Stars**: Science, **Sensors** in a star system reports the star's class and its stability: stable, slightly unstable, or unstable with the Arth days left before it flares. The stability is your science officer's call: one with little skill often reports it "Not certain", so scan again or train them. A star that flares destroys any ship in its system, and its planets' life with it: once a flared star has been scanned, they have no life left.
 - **Continuum fluxes**: notices from other captains speak of rifts in hyperspace that fling ships far across the map. A well-trained navigator may see one as a few faint dots, more of them the better the training. Once you have been through one, the starmap shows it as a grey line between its two ends.
 
 ### Time
