@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **The Crystal Orb Goes Back to Its Site**: a Crystal Orb handed to the Veloxi was gone for good. In the original the Veloxi's demand (COMMSPEC-OV `CRYSTAL-ORB`, `-ARTIFACT`, `WEB3F`) puts the orb back into its region of its planet, so it can be found again, unless that planet has been destroyed; anything else they take is gone. The port now does the same (`Encounter.ReturnCrystalOrbToItsSite`, `PD_PlanetSurfaces.ReturnArtifactSite`). Roadmap 8.2. New probe scenario `orbreturns`.
+- **The Crystal Pearl Draws the Aliens, Not the Dodecahedron**: with the Dodecahedron aboard the aliens came four fifths of the way toward the ship at each move instead of half (six sevenths in a star system instead of three quarters) and were not held near their home ground. That rule is the shipped game's, but it belongs to the Crystal Pearl: its flag `?12` is set when artifact 13, the Crystal Pearl, is in the hold (HYPERMSG-OV `(!'EXT)`, COMMSPEC-OV `WEA50`), and no word of the shipped game looks for the Dodecahedron. The pursuit now follows the Crystal Pearl (`SpaceflightController.UpdateEncounters`). Roadmap 8.11. The probe scenario `dodecahedron` is now `pearlchase`: with the Dodecahedron the aliens stay put, with the Crystal Pearl they come 4 coordinates nearer.
 
 ## [1.4.0] - 2026-10-18
 

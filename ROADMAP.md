@@ -162,7 +162,7 @@ Only the effects that matter for winning had to come before Phase 5. The others 
 | Tesseract | doubles engine efficiency: #124 (half the engines' fuel in hyperspace) | found | no |
 | Crystal Pearl | warps a badly damaged ship away: #128 (out of an encounter below a tenth of the armor; the tenth is the port's choice; replaced 2026-10-18 by item 8.10, the shipped game's trigger and destination) | found | no |
 | Red Cylinder | finds ancient ruins from orbit: flashes on the landing map near an ancient ruin (the shipped game's "THE RED CYLINDER IS FLASHING" is in its landing map code; how near is the port's choice) | found | no |
-| Dodecahedron | attracts every ship nearby: #129 (twice the alien radar distance), replaced on 2026-10-15 by the released game's rule (HYPERMSG-OV TRAK-E: groups come four fifths of the way at each move instead of half, and are not held near home) | found | no |
+| Dodecahedron | attracts every ship nearby: #129 (twice the alien radar distance), replaced on 2026-10-15 by the released game's rule (HYPERMSG-OV TRAK-E: groups come four fifths of the way at each move instead of half, and are not held near home), which on 2026-10-18 turned out to be the Crystal Pearl's (item 8.11): no word of the shipped game looks for the Dodecahedron | found | no |
 | Black Box, Hypercube, Ellipsoid | none beyond their documented roles (D5, decided 2026-10-11) | found or traded | no |
 
 ## Phase 5: Main story and endgame
@@ -216,7 +216,7 @@ Found on 2026-10-18 by reading the shipped game's decompiled overlays against th
 | 8.8 | When races make their own offers: by posture, the tribute's size, lying to the Elowan, the Thrynn's offers in turn, plutonium at 84% | COMMSPEC-OV `WF174`, `WF1D2`, `NEED-ENERGY` | MISSING |
 | 8.9 | The comm officer's translation strength: 16.7 x the square root of skill and the bonuses, at most 250 | COMM-OV `INIT-MCOMM` | MISSING |
 | 8.10 | The Crystal Pearl fires when the ship is heavily damaged and the aliens are armed, and puts the ship at a random place in hyperspace | HYPERMSG-OV `?PRL`; SCIENCE `?HEAVY` | MISSING |
-| 8.11 | The artifact that makes the aliens chase harder is the Crystal Pearl | HYPERMSG-OV `(!'EXT)`, COMMSPEC-OV `WEA50` (`?12`) | MISSING |
+| 8.11 | The artifact that makes the aliens chase harder is the Crystal Pearl | HYPERMSG-OV `(!'EXT)`, COMMSPEC-OV `WEA50` (`?12`) | The aliens' pursuit with the Crystal Pearl aboard: four fifths of the way in hyperspace, six sevenths in a star system, not held near home; the Dodecahedron does nothing here (`SpaceflightController.UpdateEncounters`, `TrackTowards`; probe `pearlchase`) |
 | 8.12 | Fluxes the ship has been through are remembered and drawn on the starmap | HYPER-OV `SET-FLUX-STATE`; MAP-OV `WEA70`, `WEA4C` | MISSING |
 | 8.13 | Back into orbit after the Noah 9 derelict or a destroyed orbit fleet | HYPER-OV `?DOUBLE-UNNEST`, `SKIP2NEST`; HYPERMSG-OV `WE84B` | MISSING |
 | 8.14 | A terrain vehicle that runs out of fuel is lost: the crew walk back, the vehicle stays as debris, the Starport fines its loss | MOVE-OV `WF16E`, `WEF48`; SHIPBUTTONS `WF095`; OP-OV `WF045` | the vehicle is lost and left as a wreck where it stopped (`MoveButton.LeaveTheWreck`, `TerrainRuins.PlaceVehicleWreck`, `DroppedCargo.m_isVehicleWreck`); the walk back and the fine were there (probe `outoffuel`) |
