@@ -50557,7 +50557,7 @@ public class ClaudeProbe : MonoBehaviour
 	}
 
 	// a method of an object called with these arguments (null if the object or the method is missing: the code before)
-	static object CallIfThere( object target, string name, params object[] args )
+	static object CallOrNull( object target, string name, params object[] args )
 	{
 		var method = ( target == null ) ? null : target.GetType().GetMethod( name, c_any );
 
@@ -50692,7 +50692,7 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 10 );
 
 		var mapButton = FieldOrNull( buttonController, "m_currentButton" );
-		var key = ( mapButton != null ) ? CallIfThere( mapButton, "GetIconKey" ) : null;
+		var key = ( mapButton != null ) ? CallOrNull( mapButton, "GetIconKey" ) : null;
 		var keyOnDisplay = ( key != null ) && ( ( (Component) key ).transform.parent == display.transform );
 		var firstPage = ( key != null ) ? ( Call( key, "GetPageText" ) as string ) : "no key";
 
@@ -50717,7 +50717,7 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		// ---- 4. the markers over the surface: each object with the icon the original's map gives it
-		var markers = ( mapButton != null ) ? CallIfThere( mapButton, "GetIconMarkers" ) : null;
+		var markers = ( mapButton != null ) ? CallOrNull( mapButton, "GetIconMarkers" ) : null;
 		var markerCount = ( markers != null ) ? (int) Call( markers, "GetMarkerCount" ) : 0;
 		var wrongIcons = new List<string>();
 		var kinds = new Dictionary<int, int>();
@@ -50759,8 +50759,8 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 10 );
 
 		var secondMapButton = FieldOrNull( buttonController, "m_currentButton" );
-		var secondKey = ( secondMapButton != null ) ? CallIfThere( secondMapButton, "GetIconKey" ) : null;
-		var secondMarkers = ( secondMapButton != null ) ? CallIfThere( secondMapButton, "GetIconMarkers" ) : null;
+		var secondKey = ( secondMapButton != null ) ? CallOrNull( secondMapButton, "GetIconKey" ) : null;
+		var secondMarkers = ( secondMapButton != null ) ? CallOrNull( secondMapButton, "GetIconMarkers" ) : null;
 
 		buttonController.ChangeButtonSet( ButtonController.ButtonSet.TerrainVehicle );
 		buttonController.ClearCurrentButton();
