@@ -128,9 +128,31 @@ public static class RedCylinder
 			var elevationScale = ( terrainGrid != null ) ? terrainGrid.m_elevationScale : 100.0f;
 
 			s_places = TerrainRuins.GetAncientRuinPlaces( planetController.GetPlanetGenerator(), elevationScale, gameData.m_planetList[ planetId ] );
+			s_regions = RandomRuinRegions.GetAncientRegions( planetController.GetPlanetGenerator(), elevationScale, gameData.m_planetList[ planetId ] );
 			s_planetId = planetId;
 		}
 
 		return s_places;
+	}
+
+	// the regions of the planet last looked at that hold a random ancient ruin
+	static List<int> s_regions;
+
+	// none (what GetAncientRuinRegions returns without the Red Cylinder)
+	static readonly List<int> s_noRegions = new List<int>();
+
+	/// <summary>
+	/// The regions of the planet the ship orbits that hold a random ancient ruin (RandomRuinRegions) if the ship carries the Red Cylinder, none without it:
+	/// the landing map tints them (decided 2026-10-19). The list is kept: do not change it.
+	/// </summary>
+	public static List<int> GetAncientRuinRegions()
+	{
+		// (worked out with the places)
+		if ( ( GetAncientRuinPlaces() == s_none ) || ( s_regions == null ) )
+		{
+			return s_noRegions;
+		}
+
+		return s_regions;
 	}
 }

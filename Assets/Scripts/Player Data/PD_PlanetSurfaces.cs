@@ -343,7 +343,7 @@ public class PD_PlanetSurfaces
 	{
 		m_depositList.RemoveAll( deposit => deposit.m_planetId == planetId );
 		m_lostLifeformList.RemoveAll( lostLifeform => lostLifeform.m_planetId == planetId );
-		m_takenRandomRuinItemList.RemoveAll( itemKey => ( TerrainRuin.GetRandomItemPlanetId( itemKey ) == planetId ) && !TerrainRuins.IsSiteRuinIndex( TerrainRuin.GetRandomItemRuinIndex( itemKey ) ) );
+		m_takenRandomRuinItemList.RemoveAll( itemKey => ( TerrainRuin.GetRandomItemPlanetId( itemKey ) == planetId ) && !TerrainRuin.IsSiteRuinItemKey( itemKey ) );
 		m_droppedCargoList.RemoveAll( droppedCargo => ( droppedCargo.m_planetId == planetId ) && IsDeletedOnDeparture( droppedCargo, gameWon ) );
 	}
 

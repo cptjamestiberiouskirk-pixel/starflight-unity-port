@@ -136,7 +136,7 @@ What each officer's skill does:
 | Communications | Communications | How much of what aliens say you understand |
 | Doctor | Medicine | How fast wounds are treated |
 
-A crew member of an alien race also understands every word their own people say. Some races hold old grudges against others, and they notice who serves in your crew.
+A crew member of an alien race helps your communications officer understand their own people, and helps most as the communications officer. Some races hold old grudges against others, and they notice who serves in your crew.
 
 ### Bank
 
@@ -258,7 +258,7 @@ Landing and launching from a planet burn fuel too, more on heavier planets. Rais
 - **Nebulae**: shields cannot be raised inside one.
 - **Alien movements**: a science officer trained beyond 150 tells you when alien groups close in: "Motion detected at", then how far each group moved across (X) and along (Y), in map coordinates.
 - **Stars**: Science, **Sensors** in a star system reports the star's class and its stability: stable, slightly unstable, or unstable with the Arth days left before it flares. The stability is your science officer's call: one with little skill often reports it "Not certain", so scan again or train them. A star that flares destroys any ship in its system.
-- **Continuum fluxes**: notices from other captains speak of rifts in hyperspace that fling ships far across the map. A well-trained navigator may see one as a few faint dots, more of them the better the training.
+- **Continuum fluxes**: notices from other captains speak of rifts in hyperspace that fling ships far across the map. A well-trained navigator may see one as a few faint dots, more of them the better the training. Once you have been through one, the starmap shows it as a grey line between its two ends.
 
 ### Time
 
@@ -351,6 +351,7 @@ Some things to know:
 - Every race has its own temper. Your posture, your shields and weapons, the strength of your ship and what you say all change how they treat you. A stronger ship gets more respect.
 - Races remember. A race you leave angry meets you angrier next time, and one you leave calm meets you calmer.
 - Aliens hold their fire while a comm link is up.
+- Aliens can tire of questions about the Old Empire and the Ancients. Once they say they know nothing more, they keep saying so until you meet them again.
 - Fire on aliens and they will not talk to you again in that encounter.
 - How much you understand depends on your communications officer.
 - What they tell you is kept in the Ship's Log, under Alien Comms. Much of the game's story is told this way: listen.

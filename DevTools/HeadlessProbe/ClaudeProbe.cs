@@ -1738,6 +1738,18 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioRaceMemory();
 				break;
 
+			case "fluxmap":
+				yield return ScenarioFluxMap();
+				break;
+
+			case "lockout":
+				yield return ScenarioLockOut();
+				break;
+
+			case "translation":
+				yield return ScenarioTranslation();
+				break;
+
 			case "crashline":
 				yield return ScenarioCrashLine();
 				break;
@@ -17098,7 +17110,8 @@ public class ClaudeProbe : MonoBehaviour
 			yield break;
 		}
 
-		var ruins = RuinsOnTheGround();
+		// (the ruins of the messages and the sites: Earth also has a recent ruin in nearly every region since roadmap 8.32, placed about the vehicle)
+		var ruins = RuinsOnTheGround().FindAll( ruin => !ruin.name.Contains( " of region " ) );
 
 		// the ruin of the site, where the latitude and the longitude put it
 		var sitePosition = Tools.LatLongToWorldCoordinates( -104.0f, 11.0f );
@@ -17214,7 +17227,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var placesAfter = "";
 
-		foreach ( var ruin in RuinsOnTheGround() )
+		foreach ( var ruin in RuinsOnTheGround().FindAll( one => !one.name.Contains( " of region " ) ) )
 		{
 			placesAfter += Mathf.RoundToInt( ruin.transform.position.x ) + "/" + Mathf.RoundToInt( ruin.transform.position.z ) + " ";
 		}
@@ -17324,7 +17337,8 @@ public class ClaudeProbe : MonoBehaviour
 			yield break;
 		}
 
-		var ruins = RuinsOnTheGround();
+		// (the ruins of the messages and the sites: Earth's recent ruins of the regions, roadmap 8.32, are left out)
+		var ruins = RuinsOnTheGround().FindAll( one => !one.name.Contains( " of region " ) );
 		var sitePosition = Tools.LatLongToWorldCoordinates( -104.0f, 11.0f );
 		Component siteRuin = null;
 
@@ -17361,7 +17375,11 @@ public class ClaudeProbe : MonoBehaviour
 
 		var scanText = MessageList();
 
-		Check( "artifactsites: the scan reports the artifact in the ruin", scanText.Contains( "Artifact in the ruins: 1" ), scanText.Substring( 0, Mathf.Min( 200, scanText.Length ) ) );
+		// (one or more: the curios of the recent ruins of the regions nearby count too since roadmap 8.32)
+		var artifactsMatch = System.Text.RegularExpressions.Regex.Match( scanText, "Artifacts? in the ruins: ([0-9]+)" );
+		var artifactsInRuins = artifactsMatch.Success ? int.Parse( artifactsMatch.Groups[ 1 ].Value ) : 0;
+
+		Check( "artifactsites: the scan reports the artifact in the ruin", artifactsInRuins >= 1, artifactsInRuins + " | " + scanText.Substring( 0, Mathf.Min( 200, scanText.Length ) ) );
 
 		// ---- 4. the cargo button takes it, once, and the taking is saved
 		new TVCargoButton().Execute();
@@ -21244,7 +21262,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "systemeffects: a damaged shield generator holds less charge (half of it at half its health)", ( shieldsWhole > 0 ) && ( shieldsHalf == shieldsWhole / 2 ), shieldsWhole + " -> " + shieldsHalf );
 		Check( "systemeffects: in hyperspace engines at half health keep the top speed (the original's engine damage counts only in an encounter's acceleration, HYPER-OV !S/A)", ( speedWhole > 0.0f ) && Mathf.Abs( speedHalf - speedWhole ) < 0.01f, speedWhole + " -> " + speedHalf );
 		Check( "systemeffects: a damaged laser cannon does less damage, and a destroyed one does not fire", ( laserHits[ 0 ] > 0 ) && ( laserHits[ 1 ] == Mathf.RoundToInt( laserHits[ 0 ] / 2.0f ) ) && !firesDestroyed, laserHits[ 0 ] + " -> " + laserHits[ 1 ] + ", " + firesDestroyed );
-		Check( "systemeffects: destroyed comm equipment garbles what a fully trained officer understands", commWhole.Contains( speminComm.m_text ) && !commDestroyed.Contains( speminComm.m_text ), commDestroyed );
+		Check( "systemeffects: destroyed comm equipment garbles no more: a fully trained officer still understands every word (COMM-OV ?SCRAMBLE reads only the officer's strength; the equipment check stops a damaged comm instead)", commWhole.Contains( speminComm.m_text ) && commDestroyed.Contains( speminComm.m_text ), commDestroyed );
 		Check( "systemeffects: destroyed sensors malfunction and give no readings", sensorsWhole.Contains( "Star System Scan" ) && sensorsBroken.Contains( "Sensors: MALFUNCTION" ) && !sensorsBroken.Contains( "Star System Scan" ), sensorsBroken );
 
 		Finish( "scenario=systemeffects shields=" + shieldsWhole + "/" + shieldsHalf + " speed=" + speedWhole + "/" + speedHalf + " laser=" + laserHits[ 0 ] + "/" + laserHits[ 1 ], 0 );
@@ -22626,7 +22644,7 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 4. translation: an officer with no skill, and the Thrynn's greeting comes through whole with a Thrynn aboard - garbled without (the control)
+		// ---- 4. translation: an officer with no skill, and the Thrynn's greeting comes through in part with a Thrynn aboard - garbled without (the control)
 		officer.m_communications = 0;
 
 		var withThrynn = new List<string>();
@@ -22668,7 +22686,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "rivals: the first comm link with the Thrynn is remembered", ( firstBefore == "None" ) && ( firstAfter == "Thrynn" ), firstBefore + " -> " + firstAfter );
 		Check( "rivals: after the Thrynn the Elowan greet the crew as friends of the Thrynn, and start in their hostile band", elowanGreeting.Contains( CommText( 2 ) ) && ( elowanMood >= 60.0f ), elowanMood + " | " + elowanGreeting );
 		Check( "rivals: with a Thrynn aboard the Elowan have no dealings with the ship, end the comm link, and do not attack", noDealings.Contains( CommText( 1 ) ) && noDealingsDisconnected && ( noDealingsStance != GD_Comm.Stance.Hostile ), noDealingsDisconnected + ", " + noDealingsStance + " | " + noDealings );
-		Check( "rivals: with a Thrynn aboard an officer with no skill understands every word of the Thrynn, and without one not (control)", wholeWithThrynn && !wholeWithout, string.Join( " | ", withThrynn ) + " || " + string.Join( " | ", withoutThrynn ) );
+		Check( "rivals: with a Thrynn aboard an officer with no skill gets the Thrynn's greeting in part, not every word (the crew member adds 50 to the translation strength, COMM-OV INIT-MCOMM: probe translation), and without one garbled (control)", !wholeWithThrynn && !wholeWithout, string.Join( " | ", withThrynn ) + " || " + string.Join( " | ", withoutThrynn ) );
 		Check( "rivals: with an Elowan aboard the Thrynn greet with \"most regrettable\", and start in their hostile band (60, less the 8 of the player's friendly hail)", regrettable.Contains( CommText( 297 ) ) && ( thrynnMood >= 52.0f ), thrynnMood + " | " + regrettable );
 
 		Finish( "scenario=rivals first=" + firstAfter + " elowanMood=" + elowanMood + " thrynnMood=" + thrynnMood, 0 );
@@ -23363,62 +23381,303 @@ public class ClaudeProbe : MonoBehaviour
 		said.Add( MessageList() );
 	}
 
+	// the random ruins of every region of a planet as RandomRuinRegions works them out (null on the code before roadmap 8.32)
+	static System.Collections.IList RegionRuinsOfPlanet( int planetId, float elevationScale )
+	{
+		var type = typeof( ShipButton ).Assembly.GetType( "RandomRuinRegions" );
+		var method = ( type == null ) ? null : type.GetMethod( "ForPlanet" );
+		var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( planetId );
+
+		if ( ( method == null ) || ( planetController == null ) || !planetController.HasMaps() )
+		{
+			return null;
+		}
+
+		return method.Invoke( null, new object[] { planetController.GetPlanetGenerator(), elevationScale, DataController.m_instance.m_gameData.m_planetList[ planetId ] } ) as System.Collections.IList;
+	}
+
+	// how many regions of a planet have their middle on land (above the liquid)
+	static int LandRegionCount( int planetId )
+	{
+		var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( planetId );
+
+		if ( ( planetController == null ) || !planetController.HasMaps() )
+		{
+			return 0;
+		}
+
+		var planetGenerator = planetController.GetPlanetGenerator();
+		var count = 0;
+
+		for ( var row = 0; row < 32; row++ )
+		{
+			for ( var column = 0; column < 128; column++ )
+			{
+				// the middle of the region (18 by 30 of the original's 2304 by 960 units, the map's middle three quarters from pole to pole)
+				var mapX = ( column * 18 + 9 ) * planetGenerator.m_textureMapWidth / 2304.0f;
+				var mapY = ( row * 30 + 15 ) * planetGenerator.m_textureMapHeight * 0.75f / 960.0f + planetGenerator.m_textureMapHeight * 0.125f;
+
+				count += ( planetGenerator.GetBilinearSmoothedElevation( mapX, mapY ) > planetGenerator.m_waterElevation ) ? 1 : 0;
+			}
+		}
+
+		return count;
+	}
+
+	// the region ruins on the ground (named "... of region n"), with how many of them are farther than this from a place (x and z apart, in regions of 64 by
+	// 96 units)
+	static List<Component> RegionRuinsOnTheGround( Vector3 place, float regions, out int farther )
+	{
+		var list = new List<Component>();
+
+		farther = 0;
+
+		foreach ( var ruin in RuinsOnTheGround() )
+		{
+			if ( !ruin.name.Contains( " of region " ) )
+			{
+				continue;
+			}
+
+			list.Add( ruin );
+
+			var delta = ruin.transform.position - place;
+
+			// (the map goes round east to west: 8192 units)
+			var dx = Mathf.Abs( Mathf.Repeat( delta.x + 4096.0f, 8192.0f ) - 4096.0f );
+
+			if ( ( dx > regions * 64.0f ) || ( Mathf.Abs( delta.z ) > regions * 96.0f ) )
+			{
+				farther++;
+			}
+		}
+
+		return list;
+	}
+
+	// the key of the curio of a region ruin on the ground (-1 if it holds none), and its artifact
+	static int RegionRuinCurio( Component ruin, out int artifactId )
+	{
+		artifactId = -1;
+
+		if ( FieldOrNull( ruin, "m_randomItems" ) is System.Collections.IList items )
+		{
+			foreach ( var item in items )
+			{
+				var id = FieldOrNull( item, "m_artifactId" );
+
+				if ( ( id is int ) && ( (int) id >= 0 ) )
+				{
+					artifactId = (int) id;
+
+					return (int) FieldOrNull( item, "m_key" );
+				}
+			}
+		}
+
+		return -1;
+	}
+
+	// the random ruins as the shipped game places them (SEED-OV POPULA, WF492, WF468, WF26B, WF245, WF19B; roadmap 8.32): a region of 18 by 30 of the planet's
+	// 2304 by 960 units holds an ancient ruin and a recent ruin with a chance by two bytes of the planet's type (none on the generic types), three in ten hold a
+	// curio, an ancient one Endurium beside it; the port places the regions near the terrain vehicle only, and what is taken stays taken until the ship leaves
+	// the orbit (8.19)
 	IEnumerator ScenarioRandomRuins()
 	{
 		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
 		var controller = SpaceflightController.m_instance;
+		var surfaces = playerData.m_planetSurfaces;
 		var done = new bool[ 1 ];
 
 		EnsureCrew();
 
-		// ---- 1. planet 94, the small rock planet of the Arth system, has no message of the original's and one random ruin
-		yield return LandOnPlanet94At( Vector3.zero, done );
+		// ---- 1. down on planet 92 of the Arth system (a planet of ruins: an ancient ruin one region in four, a recent one in three)
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
 
-		var randomRuins = RandomRuinsOnTheGround();
-		var place = ( randomRuins.Count > 0 ) ? randomRuins[ 0 ].transform.position : Vector3.zero;
-		var placeBefore = ( randomRuins.Count > 0 ) ? Mathf.RoundToInt( place.x ) + "/" + Mathf.RoundToInt( place.z ) : "none";
-		var name = ( randomRuins.Count > 0 ) ? randomRuins[ 0 ].name : "none";
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=randomruins abort: never got into the terrain vehicle (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
 
-		// ---- 2. landed beside it, Cargo takes what it holds aboard, and a second press nothing more
-		controller.SwitchLocation( PD_General.Location.Planetside );
+		var elevationScale = controller.m_disembarked.m_terrainGrid.m_elevationScale;
 
-		yield return Frames( 5 );
-		yield return LandOnPlanet94At( place + Vector3.forward * 5.0f, done );
+		// ---- 2. the ruins of every region of 94 (the small rock planet: a generic type, none), 92 and 93 (Arth: a recent ruin in every region), worked out twice
+		var on94 = RegionRuinsOfPlanet( 94, elevationScale );
+		var on92 = RegionRuinsOfPlanet( 92, elevationScale );
+		var on93 = RegionRuinsOfPlanet( 93, elevationScale );
+		var on92Again = RegionRuinsOfPlanet( 92, elevationScale );
+		var land92 = LandRegionCount( 92 );
+		var land93 = LandRegionCount( 93 );
 
-		var said = new List<string>();
-		var roomBefore = playerData.m_terrainVehicle.GetRemainingVolume();
+		int ancient92 = 0, recent92 = 0, ancient93 = 0, recent93 = 0, withCurio = 0, all = 0, ancientWithEndurium = 0, ancientAll = 0, curioNotSpecial = 0, enduriumInRange = 0;
 
-		yield return PressCargo( said );
+		foreach ( var list in new[] { on92, on93 } )
+		{
+			if ( list == null )
+			{
+				continue;
+			}
 
-		var roomAfter = playerData.m_terrainVehicle.GetRemainingVolume();
+			foreach ( var ruin in list )
+			{
+				var isAncient = (bool) FieldOrNull( ruin, "m_isAncient" );
 
-		yield return PressCargo( said );
+				if ( list == on92 )
+				{
+					ancient92 += isAncient ? 1 : 0;
+					recent92 += isAncient ? 0 : 1;
+				}
+				else
+				{
+					ancient93 += isAncient ? 1 : 0;
+					recent93 += isAncient ? 0 : 1;
+				}
 
-		var roomAgain = playerData.m_terrainVehicle.GetRemainingVolume();
+				all++;
+				ancientAll += isAncient ? 1 : 0;
 
-		// ---- 3. back into the ship and out again at the same place: the ruin is where it was, and what was taken is gone
+				var hasCurio = false;
+				var hasEndurium = false;
+
+				foreach ( var item in (System.Collections.IList) FieldOrNull( ruin, "m_items" ) )
+				{
+					var artifactId = (int) FieldOrNull( item, "m_artifactId" );
+					var endurium = (int) FieldOrNull( item, "m_enduriumVolume" );
+
+					if ( artifactId >= 0 )
+					{
+						hasCurio = true;
+						curioNotSpecial += gameData.m_artifactList[ artifactId ].IsSpecial() ? 0 : 1;
+					}
+
+					if ( endurium > 0 )
+					{
+						hasEndurium = true;
+						enduriumInRange += ( ( endurium >= 10 ) && ( endurium <= 99 ) ) ? 1 : 0;
+					}
+				}
+
+				withCurio += hasCurio ? 1 : 0;
+				ancientWithEndurium += ( isAncient && hasEndurium ) ? 1 : 0;
+			}
+		}
+
+		var sameTwice = ( on92 != null ) && ( on92Again != null ) && ( on92.Count == on92Again.Count ) && ( on92.Count > 0 ) && ( (float) FieldOrNull( on92[ 0 ], "m_mapX" ) == (float) FieldOrNull( on92Again[ 0 ], "m_mapX" ) );
+		var curioShare = ( all > 0 ) ? withCurio / (float) all : 0.0f;
+		var ancient92Share = ( land92 > 0 ) ? ancient92 / (float) land92 : 0.0f;
+		var recent92Share = ( land92 > 0 ) ? recent92 / (float) land92 : 0.0f;
+		var recent93Share = ( land93 > 0 ) ? recent93 / (float) land93 : 0.0f;
+
+		// ---- 2b. with the Red Cylinder aboard the landing map tints the regions that hold an ancient ruin (decided 2026-10-19: a box for each would cover a
+		// planet of ruins): the middle of such a region in the danger colour, one without an ancient ruin clear
+		var redCylinder = gameData.FindArtifactId( "Red Cylinder" );
+		var getRegions = typeof( RedCylinder ).GetMethod( "GetAncientRuinRegions" );
+		var tintedRegions = -1;
+		var tintedOk = 0;
+		var clearOk = 0;
+		var tintSample = 0;
+		var clearSample = 0;
+
+		playerData.m_playerShip.AddArtifact( redCylinder );
+
+		var marks = SurveyMarks.GetTexture();
+
+		if ( ( getRegions != null ) && ( marks != null ) && ( getRegions.Invoke( null, null ) is List<int> ancientRegions ) )
+		{
+			tintedRegions = ancientRegions.Count;
+
+			var danger = UIKitTheme.GetViewTheme().m_statusDanger;
+
+			for ( var region = 0; region < 128 * 32; region += 37 )
+			{
+				// the middle of the region on the marks' texture (east-west -180 across, north-south -90 up)
+				var pixel = SurveyMarks.GetPixel( marks.width, marks.height, ( ( region % 128 ) + 0.5f ) * 360.0f / 128.0f - 180.0f, ( ( region / 128 ) + 0.5f ) * 180.0f / 32.0f - 90.0f );
+				var colour = marks.GetPixel( Mathf.FloorToInt( pixel.x ), Mathf.FloorToInt( pixel.y ) );
+				var tinted = ( colour.a > 0.1f ) && ( Mathf.Abs( colour.r - danger.r ) < 0.1f ) && ( Mathf.Abs( colour.g - danger.g ) < 0.1f ) && ( Mathf.Abs( colour.b - danger.b ) < 0.1f );
+
+				if ( ancientRegions.Contains( region ) )
+				{
+					tintSample++;
+					tintedOk += tinted ? 1 : 0;
+				}
+				else
+				{
+					clearSample++;
+					clearOk += ( colour.a < 0.05f ) ? 1 : 0;
+				}
+			}
+		}
+
+		playerData.m_playerShip.RemoveArtifact( redCylinder );
+
+		// ---- 3. on the ground: the region ruins about the vehicle only, and they follow it
+		var start = controller.m_terrainVehicle.transform.position;
+		var nearStart = RegionRuinsOnTheGround( start, 5.5f, out var fartherAtStart );
+		var curioRuin = nearStart.Find( ruin => RegionRuinCurio( ruin, out _ ) >= 0 );
+		var curioKey = ( curioRuin != null ) ? RegionRuinCurio( curioRuin, out _ ) : -1;
+		var curioPlace = ( curioRuin != null ) ? curioRuin.transform.position : Vector3.zero;
+
+		// what the Cargo button takes from it (the key it saves), then the vehicle 1500 units away to the east
+		if ( curioKey >= 0 )
+		{
+			surfaces.TakeRandomRuinItem( curioKey );
+		}
+
+		playerData.m_general.m_coordinates = start + Vector3.right * 1500.0f;
+
+		var waitUntil = Time.time + 1.5f;
+
+		while ( Time.time < waitUntil )
+		{
+			yield return null;
+		}
+
+		var moved = controller.m_terrainVehicle.transform.position;
+		var nearMoved = RegionRuinsOnTheGround( moved, 5.5f, out var fartherAfterMove );
+		var leftAtStart = 0;
+
+		foreach ( var ruin in nearMoved )
+		{
+			leftAtStart += ( Vector3.Distance( ruin.transform.position, start ) < 300.0f ) ? 1 : 0;
+		}
+
+		// and back: the ruin with the curio is there again, its curio taken (what Scan and Cargo read: PD_PlanetSurfaces.IsRandomRuinItemTaken)
+		playerData.m_general.m_coordinates = start;
+
+		waitUntil = Time.time + 1.5f;
+
+		while ( Time.time < waitUntil )
+		{
+			yield return null;
+		}
+
+		// (as a bool now: the next landing destroys these objects, and a destroyed object reads as null)
+		var ruinBack = RegionRuinsOnTheGround( start, 5.5f, out _ ).Find( ruin => Vector3.Distance( ruin.transform.position, curioPlace ) < 0.5f ) != null;
+		var takenWithinOrbit = ( curioKey >= 0 ) && surfaces.IsRandomRuinItemTaken( curioKey );
+
+		// ---- 4. out of the orbit and back (the original's DEPART): the curio is back in its ruin
 		controller.SwitchLocation( PD_General.Location.Planetside );
 
 		yield return Frames( 10 );
-		yield return DisembarkNow( done );
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
 
-		var randomRuinsAgain = RandomRuinsOnTheGround();
-		var placeAfter = ( randomRuinsAgain.Count > 0 ) ? Mathf.RoundToInt( randomRuinsAgain[ 0 ].transform.position.x ) + "/" + Mathf.RoundToInt( randomRuinsAgain[ 0 ].transform.position.z ) : "none";
+		var takenAfterLeaving = ( curioKey >= 0 ) && surfaces.IsRandomRuinItemTaken( curioKey );
+		var curioRuinAfter = RegionRuinsOnTheGround( start, 5.5f, out _ ).Find( ruin => Vector3.Distance( ruin.transform.position, curioPlace ) < 0.5f );
 
-		yield return PressCargo( said );
+		Log( "randomruins: 94 " + ( ( on94 == null ) ? "-" : on94.Count.ToString() ) + " | 92 ancient " + ancient92 + " recent " + recent92 + " of " + land92 + " land regions (" + ancient92Share.ToString( "0.00" ) + ", " + recent92Share.ToString( "0.00" ) + ") | 93 ancient " + ancient93 + " recent " + recent93 + " of " + land93 + " (" + recent93Share.ToString( "0.00" ) + ") | curios " + withCurio + " of " + all + " (" + curioShare.ToString( "0.00" ) + "), not special " + curioNotSpecial + "; ancient with Endurium " + ancientWithEndurium + " of " + ancientAll + ", in range " + enduriumInRange + " | same twice " + sameTwice + " | on the ground " + nearStart.Count + " (" + fartherAtStart + " too far), after moving " + nearMoved.Count + " (" + fartherAfterMove + " too far, " + leftAtStart + " left at the start) | curio key " + curioKey + ": ruin back " + ruinBack + ", taken " + takenWithinOrbit + " -> after leaving " + takenAfterLeaving + ", ruin there " + ( curioRuinAfter != null ) );
 
-		Log( "randomruins: planet 94 has " + randomRuins.Count + " random ruin (" + name + ") at " + placeBefore + " | room " + roomBefore + " -> " + roomAfter + " -> " + roomAgain + " | " + string.Join( " || ", said ) + " | after landing again at " + placeAfter );
+		Check( "randomruins: a generic planet (94, small rock) has no random ruins", ( on94 != null ) && ( on94.Count == 0 ), ( on94 == null ) ? "no RandomRuinRegions" : on94.Count + " ruins" );
+		Check( "randomruins: Arth (93) has a recent ruin in nearly every land region and no ancient one (its bytes 0 and 255)", ( on93 != null ) && ( ancient93 == 0 ) && ( recent93Share >= 0.7f ) && ( recent93Share <= 1.1f ), ancient93 + " / " + recent93 + " of " + land93 );
+		Check( "randomruins: planet 92 has an ancient ruin about one region in four and a recent one about one in three (its bytes 30 and 102)", ( on92 != null ) && ( ancient92Share >= 0.15f ) && ( ancient92Share <= 0.33f ) && ( recent92Share >= 0.22f ) && ( recent92Share <= 0.42f ), ancient92Share.ToString( "0.00" ) + " / " + recent92Share.ToString( "0.00" ) );
+		Check( "randomruins: three ruins in ten hold a curio, never a special artifact, and every ancient ruin has 1.0 to 9.9 cubic meters of Endurium", ( all > 0 ) && ( curioShare >= 0.22f ) && ( curioShare <= 0.36f ) && ( curioNotSpecial == withCurio ) && ( ancientWithEndurium == ancientAll ) && ( enduriumInRange == ancientAll ), curioShare.ToString( "0.00" ) + " " + curioNotSpecial + "/" + withCurio + " " + ancientWithEndurium + "/" + ancientAll + " " + enduriumInRange );
+		Check( "randomruins: a planet's region ruins are the same every time", sameTwice, sameTwice.ToString() );
+		Check( "randomruins: the ruins are placed in the regions about the terrain vehicle only, and follow it", ( nearStart.Count > 0 ) && ( fartherAtStart == 0 ) && ( nearMoved.Count > 0 ) && ( fartherAfterMove == 0 ) && ( leftAtStart == 0 ), nearStart.Count + " " + fartherAtStart + " | " + nearMoved.Count + " " + fartherAfterMove + " " + leftAtStart );
+		Check( "randomruins: with the Red Cylinder aboard the landing map tints the regions that hold an ancient ruin, and leaves the others clear", ( tintedRegions == ancient92 ) && ( tintSample > 0 ) && ( tintedOk == tintSample ) && ( clearSample > 0 ) && ( clearOk == clearSample ), tintedRegions + " regions (" + ancient92 + " ancient ruins), tinted " + tintedOk + "/" + tintSample + ", clear " + clearOk + "/" + clearSample );
+		Check( "randomruins: a curio taken from a ruin stays taken while the ship is in orbit, and is back after it leaves", ( curioKey >= 0 ) && ruinBack && takenWithinOrbit && !takenAfterLeaving && ( curioRuinAfter != null ), curioKey + " " + ruinBack + " " + takenWithinOrbit + " " + takenAfterLeaving + " " + ( curioRuinAfter != null ) );
 
-		var first = said[ 0 ];
-		var second = said[ 1 ];
-		var third = said[ 2 ];
-
-		Check( "randomruins: planet 94 has a random ruin", randomRuins.Count == 1, randomRuins.Count + " random ruins" );
-		Check( "randomruins: Cargo beside it takes what it holds aboard", first.Contains( "Captain, we have discovered" ) && ( roomAfter < roomBefore ), roomBefore + " -> " + roomAfter + " | " + first );
-		Check( "randomruins: what has been taken is not there again", !second.Contains( "Captain, we have discovered" ) && ( roomAgain == roomAfter ) && !third.Contains( "Captain, we have discovered" ), second + " || " + third );
-		Check( "randomruins: the ruin is at the same place on every visit", ( placeBefore != "none" ) && ( placeBefore == placeAfter ), placeBefore + " | " + placeAfter );
-
-		Finish( "scenario=randomruins ruin=" + name + " at=" + placeBefore, 0 );
+		Finish( "scenario=randomruins ruins92=" + ( ancient92 + recent92 ) + " ruins93=" + recent93 + " ground=" + nearStart.Count, 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 6: lava, and the loss of the terrain vehicle
@@ -25550,8 +25809,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
-		// planet 94 of the Arth system has an ancient random ruin
-		yield return LandInTheArthSystemAt( 94, Vector3.zero, done );
+		// planet 92 of the Arth system is a planet of ruins (roadmap 8.32: ancient and recent ruins region by region, placed about the terrain vehicle)
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
 
 		yield return Frames( 5 );
 
@@ -25562,18 +25821,18 @@ public class ClaudeProbe : MonoBehaviour
 
 		foreach ( Transform child in terrainRuins.transform )
 		{
-			if ( child.name.StartsWith( "Ancient ruin" ) || child.name.StartsWith( "Old Empire ruin" ) )
+			if ( child.name.Contains( " of region " ) )
 			{
 				Tools.WorldToLatLongCoordinates( child.position, out var eastWest, out var northSouth );
 
-				placed.Add( ( child.name.StartsWith( "Ancient" ) ? "ancient" : "old" ) + " " + eastWest.ToString( "F1" ) + "/" + northSouth.ToString( "F1" ) );
+				placed.Add( ( child.name.StartsWith( "Ancient" ) ? "ancient" : "recent" ) + " " + eastWest.ToString( "F1" ) + "/" + northSouth.ToString( "F1" ) );
 				placedPlaces.Add( new Vector2( eastWest, northSouth ) );
 			}
 		}
 
 		// ---- 2. where they are worked out from the planet's maps, as the Red Cylinder does from orbit
-		var planet = gameData.m_planetList[ 94 ];
-		var planetGenerator = controller.m_starSystem.GetPlanetController( 94 ).GetPlanetGenerator();
+		var planet = gameData.m_planetList[ 92 ];
+		var planetGenerator = controller.m_starSystem.GetPlanetController( 92 ).GetPlanetGenerator();
 		var getPlaces = typeof( TerrainRuins ).GetMethod( "GetRandomRuinPlaces" );
 		var worked = new List<string>();
 
@@ -25586,7 +25845,7 @@ public class ClaudeProbe : MonoBehaviour
 				var where = (Vector2) place.GetType().GetProperty( "Key" ).GetValue( place );
 				var ancient = (bool) place.GetType().GetProperty( "Value" ).GetValue( place );
 
-				worked.Add( ( ancient ? "ancient" : "old" ) + " " + where.x.ToString( "F1" ) + "/" + where.y.ToString( "F1" ) );
+				worked.Add( ( ancient ? "ancient" : "recent" ) + " " + where.x.ToString( "F1" ) + "/" + where.y.ToString( "F1" ) );
 			}
 		}
 
@@ -25640,9 +25899,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		playerData.m_playerShip.RemoveArtifact( redCylinder );
 
-		Log( "redcylinder: placed [" + string.Join( ", ", placed ) + "] worked out [" + string.Join( ", ", worked ) + "] | without it: sites " + withoutItSites + ", seen " + withoutItSeen + ", '" + withoutItMessages + "' | with it: sites " + withItSites + ", flashing " + withItFlashing + ", seen " + withItSeen + ", '" + withItMessages + "' | after 3.5 s: flashing " + afterwardsFlashing + ", seen " + afterwardsSeen );
+		Log( "redcylinder: placed [" + string.Join( ", ", placed ) + "] worked out " + worked.Count + " | without it: sites " + withoutItSites + ", seen " + withoutItSeen + ", '" + withoutItMessages + "' | with it: sites " + withItSites + ", flashing " + withItFlashing + ", seen " + withItSeen + ", '" + withItMessages + "' | after 3.5 s: flashing " + afterwardsFlashing + ", seen " + afterwardsSeen );
 
-		Check( "redcylinder: the random ruins are worked out from orbit where the surface places them", ( placed.Count > 0 ) && ( string.Join( ", ", placed ) == string.Join( ", ", worked ) ), string.Join( ", ", placed ) + " | " + string.Join( ", ", worked ) );
+		// (the surface places the regions about the vehicle only, the orbit works out all 4096: every ruin on the ground is one of those)
+		var notWorked = placed.FindAll( one => !worked.Contains( one ) );
+
+		Check( "redcylinder: the random ruins are worked out from orbit where the surface places them", ( placed.Count > 0 ) && ( notWorked.Count == 0 ), placed.Count + " on the ground, " + worked.Count + " worked out, not among them: " + string.Join( ", ", notWorked ) );
 		Check( "redcylinder: with the Red Cylinder aboard, the landing map flashes the planet's message and artifact sites when it opens, and says so", ( withItSites >= 1 ) && ( withItSites <= 10 ) && withItFlashing && withItSeen && withItMessages.Contains( "The Red Cylinder is flashing." ), withItSites + " " + withItFlashing + " " + withItSeen + " | " + withItMessages );
 		Check( "redcylinder: without it aboard nothing flashes (the control)", ( withoutItSites <= 0 ) && !withoutItSeen && !withoutItMessages.Contains( "The Red Cylinder is flashing" ), withoutItSites + " " + withoutItSeen + " | " + withoutItMessages );
 		Check( "redcylinder: the sites stop flashing after a few seconds", ( withItSites >= 1 ) && !afterwardsFlashing && !afterwardsSeen, afterwardsFlashing + " " + afterwardsSeen );
@@ -42653,7 +42915,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "surveymap: before the planet is analysed from orbit, the landing map has no marks", !shownBeforeAnalysis, shownBeforeAnalysis.ToString() );
 		Check( "surveymap: after the analysis, every mineral field and lifeform found is marked on the landing map in its colour, and the map is clear away from them", shownAfterAnalysis && ( survey != null ) && ( minerals > 0 ) && ( mineralsMarked == minerals ) && ( lifeforms > 0 ) && ( lifeformsMarked == lifeforms ) && clearAway, shownAfterAnalysis + " " + mineralsMarked + "/" + minerals + " " + lifeformsMarked + "/" + lifeforms + " " + clearAway );
 		Check( "surveymap: the marks take the colours of another scheme picked while the map is open, and the views' colours in the light mode", ( otherScheme > 0 ) && inOtherScheme && inLightMode, otherScheme + " " + inOtherScheme + " " + inLightMode );
-		Check( "surveymap: with the Red Cylinder aboard every ancient ruin is marked on the landing map; without it a planet not analysed has no marks", !shownWithout && shownWith && ( ruinPlaces.Count > 0 ) && ( ruinsMarked == ruinPlaces.Count ) && !shownAfter, shownWithout + " " + shownWith + " " + ruinsMarked + "/" + ruinPlaces.Count + " " + shownAfter );
+		Check( "surveymap: with the Red Cylinder aboard every fixed ancient ruin is marked with a box on the landing map (the random ones tint their regions, see randomruins); without it a planet not analysed has no marks", !shownWithout && shownWith && ( ruinPlaces.Count > 0 ) && ( ruinsMarked == ruinPlaces.Count ) && !shownAfter, shownWithout + " " + shownWith + " " + ruinsMarked + "/" + ruinPlaces.Count + " " + shownAfter );
 		Check( "surveymap: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=surveymap minerals=" + mineralsMarked + "/" + minerals + " lifeforms=" + lifeformsMarked + "/" + lifeforms + " ruins=" + ruinsMarked + "/" + ruinPlaces.Count + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
@@ -44455,8 +44717,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "ruinmodels: " + ruins.m_ruinTemplates.Length + " templates: " + string.Join( " | ", details ) );
 
-		// ---- 2. on the ground of planet 94 (one random ruin): the placed ruin is in its textured material
-		yield return LandOnPlanet94At( Vector3.zero, done );
+		// ---- 2. on the ground of planet 92 (a planet of ruins since roadmap 8.32, with random ruins in the regions about the vehicle): the placed ruins are in
+		// their textured material
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
 
 		var randomRuins = RandomRuinsOnTheGround();
 		var placedTextured = randomRuins.Count > 0;
@@ -44477,13 +44740,13 @@ public class ClaudeProbe : MonoBehaviour
 			controller.SwitchLocation( PD_General.Location.Planetside );
 
 			yield return Frames( 5 );
-			yield return LandOnPlanet94At( place + Vector3.forward * 40.0f, done );
+			yield return LandInTheArthSystemAt( 92, place + Vector3.forward * 40.0f, done );
 			yield return Frames( 10 );
 
-			RenderScreenPicture( System.IO.Path.Combine( System.IO.Path.GetTempPath(), "starflight-probe", "ruinmodels-on-94.png" ) );
+			RenderScreenPicture( System.IO.Path.Combine( System.IO.Path.GetTempPath(), "starflight-probe", "ruinmodels-on-92.png" ) );
 		}
 
-		Log( "ruinmodels: planet 94: " + randomRuins.Count + " random ruins on the ground, in their textured materials " + placedTextured );
+		Log( "ruinmodels: planet 92: " + randomRuins.Count + " random ruins on the ground, in their textured materials " + placedTextured );
 
 		var errorsDuring = s_errorCount - errorsBefore;
 
@@ -48481,6 +48744,535 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "racememory: the save keeps a race's base mood", Mathf.Approximately( saved, 33.0f ), saved.ToString() );
 
 		Finish( "scenario=racememory checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: known fluxes on the starmap (since 2026-10-18)
+
+	// how many fluxes the starmap draws (-1 on code from before it)
+	static int DrawnFluxCount()
+	{
+		var starmap = SpaceflightController.m_instance.m_starmap;
+		var method = typeof( Starmap ).GetMethod( "GetDrawnFluxCount", c_any );
+
+		return ( method == null ) ? -1 : (int) method.Invoke( starmap, null );
+	}
+
+	// the fluxes the save knows (null on code from before it)
+	static List<int> KnownFluxes()
+	{
+		return FieldOrNull( DataController.m_instance.m_playerData.m_general, "m_knownFluxList" ) as List<int>;
+	}
+
+	// a flux the ship goes through is known from then on, both ways, kept in the save, and drawn on the starmap as a line between its ends (HYPER-OV
+	// SET-FLUX-STATE, MAP-OV WEA70 and WEA4C). The code before remembered no flux and drew none
+	IEnumerator ScenarioFluxMap()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var flux = gameData.m_fluxList[ 0 ];
+		var jumped = new bool[ 1 ];
+		var folder = ScreenPictureFolder( "fluxmap" );
+
+		EnsureCrew();
+
+		// a navigator who never loses the ship's bearings for long, fuel, and no encounter able to begin
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Navigator ).m_navigation = 250;
+		playerData.m_playerShip.AddElement( 5, 500 );
+		controller.m_encounterRange = 0.0f;
+
+		playerData.m_general.m_lastHyperspaceCoordinates = flux.GetFrom() + new Vector3( 1024.0f, 0.0f, 0.0f );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		// ---- 1. no flux known yet: the starmap draws none (the control)
+		controller.m_starmap.Show();
+
+		yield return Frames( 3 );
+
+		var drawnBefore = DrawnFluxCount();
+
+		controller.m_starmap.Hide();
+
+		// ---- 2. through flux 0: it is known both ways
+		yield return FluxJumpFrom( flux, jumped );
+
+		for ( var end = Time.time + 5.0f; ( Time.time < end ) && Equals( GetField( controller.m_hyperspace, "m_travelingThroughFlux" ), true ); )
+		{
+			yield return null;
+		}
+
+		// and the fade out of the flux (2 s), so that the picture below shows the starmap and not the flux's tunnel
+		yield return new WaitForSeconds( 2.5f );
+
+		var known = KnownFluxes();
+		var reverse = -1;
+
+		foreach ( var other in gameData.m_fluxList )
+		{
+			if ( ( other.m_x1 == flux.m_x2 ) && ( other.m_y1 == flux.m_y2 ) && ( other.m_x2 == flux.m_x1 ) && ( other.m_y2 == flux.m_y1 ) )
+			{
+				reverse = other.m_id;
+			}
+		}
+
+		var knownBothWays = ( known != null ) && known.Contains( flux.m_id ) && known.Contains( reverse ) && ( known.Count == 2 );
+
+		// ---- 3. the starmap draws it, once, as a line between its ends
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( ( flux.m_x1 + flux.m_x2 ) * 0.5f, 0.0f, ( flux.m_y1 + flux.m_y2 ) * 0.5f ) );
+
+		controller.m_starmap.Show();
+
+		yield return Frames( 5 );
+
+		var drawnAfter = DrawnFluxCount();
+
+		// a picture of it, in a run with a graphics device (probe.ps1 -Graphics): without one, rendering the cameras just after a flux jump crashes Unity
+		if ( SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null )
+		{
+			RenderScreenPicture( System.IO.Path.Combine( folder, "01_starmap_with_flux_0.png" ) );
+		}
+
+		controller.m_starmap.Hide();
+		controller.m_buttonController.DeactivateButton();
+
+		// ---- 4. the save keeps it
+		var copy = JsonUtility.FromJson<PD_General>( JsonUtility.ToJson( playerData.m_general ) );
+		var savedKnown = FieldOrNull( copy, "m_knownFluxList" ) as List<int>;
+		var saved = ( savedKnown != null ) && savedKnown.Contains( flux.m_id ) && savedKnown.Contains( reverse );
+
+		Log( "fluxmap: flux 0 " + flux.m_x1 + "," + flux.m_y1 + " to " + flux.m_x2 + "," + flux.m_y2 + " (reverse " + reverse + "): drawn before " + drawnBefore + ", jumped " + jumped[ 0 ] + ", known [" + ( ( known != null ) ? string.Join( ",", known ) : "none" ) + "], drawn after " + drawnAfter + ", saved " + saved + "; picture in " + folder );
+
+		Check( "fluxmap: with no flux known the starmap draws none (control)", drawnBefore <= 0, drawnBefore.ToString() );
+		Check( "fluxmap: a flux the ship goes through is known both ways (the code before remembered none)", jumped[ 0 ] && knownBothWays, jumped[ 0 ] + " " + ( ( known != null ) ? string.Join( ",", known ) : "none" ) );
+		Check( "fluxmap: the starmap draws the known flux once, as a line between its ends", drawnAfter == 1, drawnAfter.ToString() );
+		Check( "fluxmap: the save keeps the known fluxes", saved, saved.ToString() );
+
+		Finish( "scenario=fluxmap checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: the Old Empire and the Ancients lock out (roadmap 8.25)
+
+	// the subject of each line the aliens of the encounter answer a question with, asked the given number of times (through Encounter.FindComm, the game's own
+	// choice of a line, so that nothing in the message box has to be read)
+	static List<GD_Comm.Subject> AnswerSubjects( GD_Comm.Subject subject, int count )
+	{
+		var findComm = typeof( Encounter ).GetMethod( "FindComm", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic );
+		var subjects = new List<GD_Comm.Subject>();
+
+		for ( var i = 0; i < count; i++ )
+		{
+			var comm = (GD_Comm) findComm.Invoke( SpaceflightController.m_instance.m_encounter, new object[] { subject, false } );
+
+			subjects.Add( ( comm != null ) ? comm.m_subject : GD_Comm.Subject.None );
+		}
+
+		return subjects;
+	}
+
+	// a seed for the game's random numbers whose first draw of 0 to 100 is not under 20 (the original's roll for the lock-out), so that the next question is
+	// answered
+	static int SeedThatAnswers( int from )
+	{
+		for ( var seed = from; seed < from + 1000; seed++ )
+		{
+			UnityEngine.Random.InitState( seed );
+
+			if ( UnityEngine.Random.Range( 0, 101 ) >= 20 )
+			{
+				return seed;
+			}
+		}
+
+		return from;
+	}
+
+	static string SubjectsText( List<GD_Comm.Subject> subjects )
+	{
+		return string.Join( ",", subjects.ConvertAll( subject => ( (int) subject ).ToString() ) );
+	}
+
+	// the Old Empire and the Ancients lock out as the original's (COMM-OV ?LOCKED-OUT, FIND-SUBJECT): each time the aliens are asked about either, a roll of
+	// RRND 0 to 101 under 20 locks that subject out for the rest of the encounter, and from then on they answer it with a subject 5 line (no more information);
+	// the lock is cleared when an encounter begins (INIT_GCOMM, from ENCSETUP). The Veloxi in their neutral band (mood 44): 8 Old Empire lines and 12 on the
+	// Ancients. The code before answered both in order to the last line, then once with a subject 5 line, and started over
+	IEnumerator ScenarioLockOut()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+
+		EnsureCrew();
+
+		// a Veloxi group met in flight
+		var veloxId = -1;
+
+		for ( var i = 0; ( i < gameData.m_encounterList.Length ) && ( veloxId < 0 ); i++ )
+		{
+			if ( ( gameData.m_encounterList[ i ].m_race == GameData.Race.Velox ) && ( gameData.m_encounterList[ i ].m_location != 2 ) )
+			{
+				veloxId = i;
+			}
+		}
+
+		EnterEncounter( veloxId );
+
+		yield return Frames( 10 );
+
+		controller.m_encounter.m_pdEncounter.m_mood = 44.0f;
+		controller.m_encounter.m_pdEncounter.m_moodSet = true;
+
+		// ---- 1. asked about the Old Empire 25 times, the first answered
+		general.SetLastCommId( GameData.Race.Velox, GD_Comm.Subject.OldEmpire, 0 );
+		UnityEngine.Random.InitState( SeedThatAnswers( 1 ) );
+
+		var oldEmpire = AnswerSubjects( GD_Comm.Subject.OldEmpire, 25 );
+		var firstLocked = oldEmpire.IndexOf( GD_Comm.Subject.NoMoreInformation );
+		var lockedForGood = ( firstLocked >= 0 ) && oldEmpire.GetRange( firstLocked, oldEmpire.Count - firstLocked ).TrueForAll( subject => subject == GD_Comm.Subject.NoMoreInformation );
+
+		// ---- 2. the Ancients have a lock of their own: with the Old Empire locked out, the next question about the Ancients is answered
+		general.SetLastCommId( GameData.Race.Velox, GD_Comm.Subject.TheAncients, 0 );
+		UnityEngine.Random.InitState( SeedThatAnswers( 100 ) );
+
+		var ancientsNext = AnswerSubjects( GD_Comm.Subject.TheAncients, 1 );
+
+		// ---- 3. a question about themselves never locks out: after a subject 5 line they start over
+		general.SetLastCommId( GameData.Race.Velox, GD_Comm.Subject.Themselves, 0 );
+		UnityEngine.Random.InitState( 7 );
+
+		var themselves = AnswerSubjects( GD_Comm.Subject.Themselves, 25 );
+		var themselvesStartOver = themselves.Contains( GD_Comm.Subject.Themselves );
+
+		for ( var i = 0; i + 1 < themselves.Count; i++ )
+		{
+			if ( ( themselves[ i ] == GD_Comm.Subject.NoMoreInformation ) && ( themselves[ i + 1 ] != GD_Comm.Subject.Themselves ) )
+			{
+				themselvesStartOver = false;
+			}
+		}
+
+		// ---- 4. how often a question locks out: 400 first questions about the Old Empire, the lock cleared before each (the code before has no lock to clear)
+		var lockField = typeof( PD_Encounter ).GetField( "m_lockedOutSubjects" );
+		var lockedOut = -1;
+
+		if ( lockField != null )
+		{
+			lockedOut = 0;
+
+			UnityEngine.Random.InitState( 12345 );
+
+			for ( var i = 0; i < 400; i++ )
+			{
+				lockField.SetValue( controller.m_encounter.m_pdEncounter, 0 );
+				general.SetLastCommId( GameData.Race.Velox, GD_Comm.Subject.OldEmpire, 0 );
+
+				if ( AnswerSubjects( GD_Comm.Subject.OldEmpire, 1 )[ 0 ] == GD_Comm.Subject.NoMoreInformation )
+				{
+					lockedOut++;
+				}
+			}
+
+			lockField.SetValue( controller.m_encounter.m_pdEncounter, 1 << (int) GD_Comm.Subject.OldEmpire );
+		}
+
+		// ---- 5. the encounter ends and begins again: the Old Empire is answered again
+		var leave = typeof( Encounter ).GetMethod( "LeaveEncounter", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public );
+
+		leave.Invoke( controller.m_encounter, null );
+
+		yield return Frames( 3 );
+
+		EnterEncounter( veloxId );
+
+		yield return Frames( 10 );
+
+		controller.m_encounter.m_pdEncounter.m_mood = 44.0f;
+		controller.m_encounter.m_pdEncounter.m_moodSet = true;
+
+		general.SetLastCommId( GameData.Race.Velox, GD_Comm.Subject.OldEmpire, 0 );
+		UnityEngine.Random.InitState( SeedThatAnswers( 200 ) );
+
+		var afresh = AnswerSubjects( GD_Comm.Subject.OldEmpire, 1 );
+
+		Log( "lockout: Veloxi encounter " + veloxId + "; the Old Empire asked 25 times: " + SubjectsText( oldEmpire ) + " (first subject 5 at " + firstLocked + "); then the Ancients: " + SubjectsText( ancientsNext ) + "; themselves 25 times: " + SubjectsText( themselves ) + "; locked out on " + lockedOut + " of 400 first questions; in a new encounter: " + SubjectsText( afresh ) );
+
+		Check( "lockout: the Veloxi in their neutral band answer the Old Empire with their Old Empire lines (control)", oldEmpire[ 0 ] == GD_Comm.Subject.OldEmpire, SubjectsText( oldEmpire.GetRange( 0, 3 ) ) );
+		Check( "lockout: once a question about the Old Empire is answered with a subject 5 line, every later one is, for the rest of the encounter (COMM-OV ?LOCKED-OUT)", lockedForGood, "first subject 5 at " + firstLocked + ": " + SubjectsText( oldEmpire ) );
+		Check( "lockout: the Ancients have a lock of their own: with the Old Empire locked out, they are still answered (control)", ancientsNext[ 0 ] == GD_Comm.Subject.TheAncients, SubjectsText( ancientsNext ) );
+		Check( "lockout: a question about them locks the subject out one time in five (RRND 0 to 101 under 20, 79 of 400 expected)", ( lockedOut >= 50 ) && ( lockedOut <= 110 ), lockedOut + " of 400" + ( ( lockField == null ) ? " (no lock in this code)" : "" ) );
+		Check( "lockout: an encounter that begins clears the lock, and the Old Empire is answered again", afresh[ 0 ] == GD_Comm.Subject.OldEmpire, SubjectsText( afresh ) );
+		Check( "lockout: a question about themselves never locks out: after a subject 5 line they start over (control)", themselvesStartOver, SubjectsText( themselves ) );
+
+		Finish( "scenario=lockout checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: the officer's translation strength (roadmap 8.9)
+
+	// the translation strength against the aliens of the encounter (Encounter.GetTranslationStrength), or -1 on the code before, which has none
+	static int TranslationStrength()
+	{
+		var method = typeof( Encounter ).GetMethod( "GetTranslationStrength" );
+
+		return ( method == null ) ? -1 : (int) method.Invoke( SpaceflightController.m_instance.m_encounter, null );
+	}
+
+	// an alien line said through the message box: how many of its words came through as they are in the game data, of how many (-1 if the shown words cannot be
+	// lined up with the line's)
+	static int WordsThrough( GD_Comm comm, out int words )
+	{
+		var shown = AlienCommShown( comm );
+		var start = shown.LastIndexOf( "<color=#0a0>" );
+		var end = ( start >= 0 ) ? shown.IndexOf( "</color>", start ) : -1;
+		var shownText = ( ( start >= 0 ) && ( end > start ) ) ? shown.Substring( start + 12, end - start - 12 ) : "";
+		var shownWords = shownText.Split( (char[]) null, StringSplitOptions.RemoveEmptyEntries );
+		var plainWords = comm.m_text.Split( (char[]) null, StringSplitOptions.RemoveEmptyEntries );
+
+		words = plainWords.Length;
+
+		if ( shownWords.Length != plainWords.Length )
+		{
+			return -1;
+		}
+
+		var through = 0;
+
+		for ( var i = 0; i < plainWords.Length; i++ )
+		{
+			if ( string.Equals( shownWords[ i ], plainWords[ i ], StringComparison.OrdinalIgnoreCase ) )
+			{
+				through++;
+			}
+		}
+
+		return through;
+	}
+
+	// the race's lines with nothing filled in (no captain, ship or alien names, no subject) and on one line of text, of five words or more
+	static List<GD_Comm> PlainLines( GameData.Race race )
+	{
+		var lines = new List<GD_Comm>();
+
+		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
+		{
+			if ( ( comm.m_race == race ) && !string.IsNullOrEmpty( comm.m_text ) && ( comm.m_text.IndexOfAny( new[] { '&', '*', '/', '(', ')', '%', '+', '\n', '\r' } ) < 0 ) && ( comm.m_text.Split( (char[]) null, StringSplitOptions.RemoveEmptyEntries ).Length >= 5 ) )
+			{
+				lines.Add( comm );
+			}
+		}
+
+		return lines;
+	}
+
+	// the first encounter of the race met in flight (not in orbit)
+	static int FindFlightEncounter( GameData.Race race )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		for ( var i = 0; i < gameData.m_encounterList.Length; i++ )
+		{
+			if ( ( gameData.m_encounterList[ i ].m_race == race ) && ( gameData.m_encounterList[ i ].m_location != 2 ) )
+			{
+				return i;
+			}
+		}
+
+		return -1;
+	}
+
+	// the officer's translation strength as the original's (COMM-OV INIT-MCOMM, ?SCRAMBLE): the square root of the communications skill plus 50 for a crew member
+	// of the aliens' race aboard and 50 more if the officer is one (the Veloxi, the Thrynn and the Elowan), plus 250 for the Spemin with the Whining Orb aboard,
+	// times 167 / 10, at most 250; a word of the aliens is garbled when its value, 0 to 249, is over the strength. The code before compared a word's difficulty
+	// with skill / 250 times the comm system's health, and a crew member of the aliens' race or the Whining Orb made every word understood
+	IEnumerator ScenarioTranslation()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var crew = playerData.m_crewAssignment;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+		ship.RestoreSystems();
+
+		var officer = crew.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer );
+		var humanRaceId = -1;
+		var thrynnRaceId = -1;
+
+		for ( var i = 0; i < gameData.m_crewRaceList.Length; i++ )
+		{
+			if ( ( gameData.m_crewRaceList[ i ].m_race == GameData.Race.Human ) && ( humanRaceId < 0 ) )
+			{
+				humanRaceId = i;
+			}
+
+			if ( ( gameData.m_crewRaceList[ i ].m_race == GameData.Race.Thrynn ) && ( thrynnRaceId < 0 ) )
+			{
+				thrynnRaceId = i;
+			}
+		}
+
+		// a human crew, and no Whining Orb aboard
+		foreach ( var role in new[] { PD_CrewAssignment.Role.Captain, PD_CrewAssignment.Role.ScienceOfficer, PD_CrewAssignment.Role.Navigator, PD_CrewAssignment.Role.Engineer, PD_CrewAssignment.Role.CommunicationsOfficer, PD_CrewAssignment.Role.Doctor } )
+		{
+			var file = crew.GetPersonnelFile( role );
+
+			if ( file != null )
+			{
+				file.m_crewRaceId = humanRaceId;
+			}
+		}
+
+		// a navigator of their own, apart from the officer (the probe's crew can be one person in every post)
+		var navigator = playerData.m_personnel.CreateNewPersonnel();
+
+		navigator.m_name = "Probe Navigator";
+		navigator.m_crewRaceId = humanRaceId;
+		navigator.m_vitality = 100.0f;
+		navigator.m_navigation = 250;
+
+		playerData.m_personnel.m_personnelList.Add( navigator );
+		crew.Assign( PD_CrewAssignment.Role.Navigator, navigator.m_fileId );
+
+		var orbId = gameData.FindArtifactId( "Whining Orb" );
+
+		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( orbId ) != null ); guard++ )
+		{
+			ship.RemoveArtifact( orbId );
+		}
+
+		// ---- 1. the Thrynn: the strength by the officer's skill
+		EnterEncounter( FindFlightEncounter( GameData.Race.Thrynn ) );
+		yield return Frames( 10 );
+
+		var skills = new[] { 0, 30, 50, 100, 150, 200, 225, 250 };
+		var expected = new[] { 0, 83, 116, 167, 200, 233, 250, 250 };
+		var bySkill = new List<string>();
+		var skillsMatch = true;
+
+		for ( var i = 0; i < skills.Length; i++ )
+		{
+			officer.m_communications = skills[ i ];
+
+			var strength = TranslationStrength();
+
+			bySkill.Add( skills[ i ] + ":" + strength );
+			skillsMatch = skillsMatch && ( strength == expected[ i ] );
+		}
+
+		// ---- 2. a crew member of their race: skill 100 and a Thrynn navigator 200, the officer a Thrynn as well 233
+		officer.m_communications = 100;
+		navigator.m_crewRaceId = thrynnRaceId;
+
+		var withThrynnNavigator = TranslationStrength();
+
+		officer.m_crewRaceId = thrynnRaceId;
+
+		var withThrynnOfficer = TranslationStrength();
+
+		officer.m_crewRaceId = humanRaceId;
+
+		// ---- 3. the words that come through: skill 100 (strength 167, a word through with a chance of 168 in 250), skill 0 with a Thrynn navigator (116), and
+		// skill 250 (the control: every word)
+		var thrynnLines = PlainLines( GameData.Race.Thrynn );
+
+		navigator.m_crewRaceId = humanRaceId;
+		officer.m_communications = 100;
+
+		var throughAt100 = 0;
+		var wordsAt100 = 0;
+		var unmatched = 0;
+
+		foreach ( var line in thrynnLines )
+		{
+			var through = WordsThrough( line, out var words );
+
+			if ( through < 0 )
+			{
+				unmatched++;
+
+				continue;
+			}
+
+			throughAt100 += through;
+			wordsAt100 += words;
+		}
+
+		officer.m_communications = 0;
+		navigator.m_crewRaceId = thrynnRaceId;
+
+		var wholeWithNavigator = 0;
+
+		foreach ( var line in thrynnLines )
+		{
+			if ( WordsThrough( line, out var words ) == words )
+			{
+				wholeWithNavigator++;
+			}
+		}
+
+		navigator.m_crewRaceId = humanRaceId;
+		officer.m_communications = 250;
+
+		var wholeAt250 = 0;
+
+		foreach ( var line in thrynnLines )
+		{
+			if ( WordsThrough( line, out var words ) == words )
+			{
+				wholeAt250++;
+			}
+		}
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 4. the Veloxi: a Thrynn aboard does not help with them (skill 100: 167)
+		EnterEncounter( FindFlightEncounter( GameData.Race.Velox ) );
+		yield return Frames( 10 );
+
+		officer.m_communications = 100;
+		navigator.m_crewRaceId = thrynnRaceId;
+
+		var veloxWithThrynn = TranslationStrength();
+
+		navigator.m_crewRaceId = humanRaceId;
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 5. the Spemin: skill 0 gives 0, and the Whining Orb 250
+		EnterEncounter( FindFlightEncounter( GameData.Race.Spemin ) );
+		yield return Frames( 10 );
+
+		officer.m_communications = 0;
+
+		var speminWithout = TranslationStrength();
+
+		ship.AddArtifact( orbId );
+
+		var speminWithOrb = TranslationStrength();
+
+		ship.RemoveArtifact( orbId );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		var rateAt100 = ( wordsAt100 > 0 ) ? (float) throughAt100 / wordsAt100 : 0.0f;
+
+		Log( "translation: strength by skill against the Thrynn " + string.Join( " ", bySkill ) + "; skill 100 with a Thrynn navigator " + withThrynnNavigator + ", the officer a Thrynn too " + withThrynnOfficer + "; " + thrynnLines.Count + " Thrynn lines (" + unmatched + " not lined up): at skill 100 " + throughAt100 + " of " + wordsAt100 + " words through (" + ( rateAt100 * 100.0f ).ToString( "F1" ) + "%), skill 0 with a Thrynn navigator " + wholeWithNavigator + " lines whole, skill 250 " + wholeAt250 + " whole; Veloxi with a Thrynn aboard " + veloxWithThrynn + "; Spemin skill 0 " + speminWithout + ", with the Whining Orb " + speminWithOrb );
+
+		Check( "translation: the strength is the square root of the officer's skill times 167 / 10, at most 250 (0, 83, 116, 167, 200, 233, 250, 250 at 0, 30, 50, 100, 150, 200, 225, 250)", skillsMatch, string.Join( " ", bySkill ) );
+		Check( "translation: a Thrynn aboard adds 50 to the skill against the Thrynn (100: 200), and a Thrynn officer 50 more (233)", ( withThrynnNavigator == 200 ) && ( withThrynnOfficer == 233 ), withThrynnNavigator + ", " + withThrynnOfficer );
+		Check( "translation: a crew member of another race does not help (a Thrynn aboard against the Veloxi, skill 100: 167)", veloxWithThrynn == 167, veloxWithThrynn.ToString() );
+		Check( "translation: the Whining Orb adds 250 against the Spemin (skill 0: 0 without it, 250 with it)", ( speminWithout == 0 ) && ( speminWithOrb == 250 ), speminWithout + ", " + speminWithOrb );
+		Check( "translation: at skill 100 about two words in three come through (168 in 250 expected; the code before let through about two in five)", ( wordsAt100 >= 200 ) && ( rateAt100 >= 0.57f ) && ( rateAt100 <= 0.77f ), throughAt100 + " of " + wordsAt100 );
+		Check( "translation: with no skill and a Thrynn aboard their lines come through in part, not whole (the code before: every word)", wholeWithNavigator < thrynnLines.Count / 10 + 1, wholeWithNavigator + " of " + thrynnLines.Count + " whole" );
+		Check( "translation: at skill 250 every line comes through whole (control)", ( thrynnLines.Count > 10 ) && ( wholeAt250 == thrynnLines.Count ), wholeAt250 + " of " + thrynnLines.Count );
+
+		Finish( "scenario=translation checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 8: the crash line, as the original's (roadmap 8.24)

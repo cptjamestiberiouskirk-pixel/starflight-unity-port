@@ -237,9 +237,9 @@ Assets/
 - A science officer trained beyond 150 reports each of those jumps: "Motion detected at", and how far each group moved across and along, in map coordinates
 - The Shimmering Ball cloaks the ship in combat until it fires
 - The Flat Device shields the terrain vehicle: lifeforms hit its crew half as often
-- The Red Cylinder flashes a planet's message and artifact sites on the landing map when it opens, and marks its ancient ruins
+- The Red Cylinder flashes a planet's message and artifact sites on the landing map when it opens, and marks its ancient ruins: a box on each fixed one, a light tint over the regions that hold the random ones
 - The ancient ruins placed by STRINFO's editors, on the Mechans' ice planet and deep in Elowan space, hold their Endurium
-- Continuum fluxes show on the screen as the original's twinkling dots: to a navigator trained beyond 150, 1 to 7 of them by skill, and 16 with the Ring Device aboard
+- Continuum fluxes show on the screen as the original's twinkling dots: to a navigator trained beyond 150, 1 to 7 of them by skill, and 16 with the Ring Device aboard; a flux the ship has been through is remembered, and the starmap draws it as a line between its ends
 - The price of Endurium rises with the notices of 20-02 and 15-05, and the Starport buys it back at its selling price
 - Nebulae keep the shields down
 - The Starport repairs the hull and damaged systems at the original's prices, and buys parts back according to their condition
@@ -251,7 +251,7 @@ Assets/
 - Lava destroys a terrain vehicle that drives into it, and the Starport installs a new one for a fine
 - Terrain vehicle fuel as the original's: every kilometer driven costs fuel by the ground under the vehicle, little at the shore, more the higher it climbs and about seven times as much on a liquid; a storm makes each kilometer dearer without slowing the vehicle
 - Surface weather as the original's: spells of weather rolled from the planet's weather activity, with storms picked by its surface; a storm halves the terrain vehicle's efficiency and can injure the crew, heavy snow, fog and rain cost a quarter of it, and storms and heavy snow lose the bearing to the ship unless the navigator is highly skilled
-- A quarter of the planets hold random ruins: ancient crystal ruins with Endurium or truly amazing artifacts, and Old Empire ruins with artifacts
+- Random ruins as the original places them: none on the common planets, many on the planets of ruins, region by region as the terrain vehicle drives; ancient crystal ruins with Endurium beside them, and recent ruins, both sometimes holding a curio
 - Destroyed ships leave debris that the ship can salvage by flying over it
 - The science officer's skill decides how much of an analysis is revealed, and each planet's readings are analyzed once
 - The bank pays the original's 12% annual interest on the balance when the crew boards at the Starport and with each new colony recommendation, shown as an Interest row in the ledger
@@ -268,8 +268,9 @@ Assets/
 - The Veloxi demand a tribute of Endurium, and the Crystal Orb or the Ellipsoid if the ship carries one, and attack a crew that refuses; a Crystal Orb they take goes back to where it was found
 - The Thrynn buy artifacts at their own prices and plutonium for Endurium, and sell the Black Box for 30 Endurium
 - The Elowan, Thrynn, Spemin and Veloxi have moods: the player's posture calms or angers them, they grovel before a stronger ship, grow tired of talking, and fight or flee once they are too agitated to talk; and each race remembers how its last encounters ended, and meets the ship again in that mood
-- The Elowan and the Thrynn hold the crew's friendship with the other race against it, and a crew member of the aliens' own race understands every word they say
+- The Elowan and the Thrynn hold the crew's friendship with the other race against it, and a crew member of the aliens' own race helps the communications officer understand them
 - The Minstrels sing, the Nomad probes transmit their planetary data, and the Noah 9 derelict sends its distress beacon and recorded message
+- Aliens asked about the Old Empire or the Ancients can refuse to say more about it for the rest of the encounter, one question in five, as in the original
 - A complete combat system with lasers, missiles, shields and armor
 - Ship destruction with debris
 - A model with debris for every alien vessel in the game data
