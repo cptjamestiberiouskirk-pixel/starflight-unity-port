@@ -29,6 +29,41 @@ public class TerrainElement : MonoBehaviour
 	const int c_minVolume = 10;
 	const int c_maxVolume = 99;
 
+	// the element of the deposit placed i-th on a planet, as the original's (SEED-OV WF0F7): the planet's first element half the time, its second a quarter, its
+	// third 15%, and the rest any element but Endurium, or Endurium itself when it is the planet's first (WF0C7) - drawn with a generator of its own, seeded from
+	// the planet and the deposit, so that it moves nothing the planet's seeded draws place, and the orbit survey (PlanetSurvey) draws the same
+	public static int ChooseDepositElement( GD_Planet planet, int i )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var random = new System.Random( planet.m_id * 7919 + i * 104729 + 11 );
+		var roll = random.Next( 0, 100 );
+		var chosen = ( roll < 50 ) ? planet.m_elementIdA : ( ( roll < 75 ) ? planet.m_elementIdB : ( ( roll < 90 ) ? planet.m_elementIdC : -1 ) );
+
+		if ( chosen < 0 )
+		{
+			var endurium = gameData.m_misc.m_enduriumElementId;
+
+			chosen = endurium;
+
+			if ( planet.m_elementIdA != endurium )
+			{
+				// any element but Endurium (the original draws again until it is not Endurium; a limit keeps it finite)
+				for ( var attempt = 0; attempt < 100; attempt++ )
+				{
+					chosen = random.Next( 0, gameData.m_elementList.Length );
+
+					if ( chosen != endurium )
+					{
+						break;
+					}
+				}
+			}
+		}
+
+		// (an element the planet does not have is never chosen: one of its own instead)
+		return ( ( chosen >= 0 ) && ( chosen < gameData.m_elementList.Length ) ) ? chosen : planet.m_elementIdA;
+	}
+
 	// initialize this element
 	public void Initialize( int elementId, TerrainVehicle terrainVehicle, int planetId, int depositIndex )
 	{
