@@ -332,7 +332,7 @@ Drive back to the ship and stop beside it, within half a kilometer, to go back i
 
 Alien ships move around the galaxy, and the radar shows them coming. When they close in, the ship drops into an **encounter**: you, them and the space around you. Some groups guard planets instead, and meet you when you go into orbit there.
 
-To leave an encounter, fly out of its area. Once you are clear, a minute passes before anyone else can stop you.
+Aliens act by their attitude. Hostile ones close in and may open fire; friendly and neutral ones go their way once you have talked or they have nothing more to say; grovelling ones flee. The encounter is over when every ship, wrecks included, is far enough from you: fly away from them, or wait for them to leave. It does not end while the Combat menu is up. Once you are clear, a minute passes before anyone else can stop you.
 
 In an encounter, Science, **Sensors** moves a ring over the ships with the direction keys; Enter scans the one under it. **Analysis** then tells you what it is, its size, and whether its shields are up and its weapons armed. Your crew also tells you when aliens raise their shields or arm their weapons.
 
