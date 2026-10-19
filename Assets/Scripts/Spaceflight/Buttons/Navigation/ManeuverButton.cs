@@ -20,6 +20,16 @@ public class ManeuverButton : ShipButton
 		// get to the player data
 		PlayerData playerData = DataController.m_instance.m_playerData;
 
+		// the Crystal Pearl comes first: in a fight with the ship heavily damaged it warps the ship away, engines or not (the original's MANEUVER: ?PRL before CHK-MOV)
+		if ( ( playerData.m_general.m_location == PD_General.Location.Encounter ) && SpaceflightController.m_instance.m_encounter.CrystalPearlFires() )
+		{
+			SpaceflightController.m_instance.m_encounter.WarpWithCrystalPearl();
+
+			SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
+			return false;
+		}
+
 		// engines that have broken down, or malfunction now, do not move the ship (HYPER-OV CHK-MOV: the equipment check with part 5, before it looks at where
 		// the ship is)
 		if ( !playerData.m_playerShip.UseEquipment( PD_PlayerShip.ShipSystem.Engines ) )
@@ -59,6 +69,16 @@ public class ManeuverButton : ShipButton
 				// display message (the original's "LEAVING ORBIT..." and "...COMMENCING SYSTEM TRAVEL" after the Starport's "STANDING BY TO MANEUVER")
 				SpaceflightController.m_instance.m_messages.AddText( "<color=white>Leaving orbit...</color>" );
 				SpaceflightController.m_instance.m_messages.AddText( "<color=white>...Commencing system travel.</color>" );
+
+				break;
+
+			case PD_General.Location.Encounter:
+
+				// the Noah 9 derelict, or a drone that has let the ship into orbit: Maneuver goes back into orbit at once (the original's MANEUVER, SKIP2NEST)
+				if ( SpaceflightController.m_instance.m_encounter.ManeuverBackIntoOrbit() )
+				{
+					return false;
+				}
 
 				break;
 
