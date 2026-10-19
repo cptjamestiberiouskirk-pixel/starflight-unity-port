@@ -24757,6 +24757,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 5 );
 		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
+		yield return WaitForBlocks();
 
 		Transform lifeform = null;
 
@@ -24775,6 +24776,9 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		var crewMember = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Captain );
+
+		// (every other lifeform far off and unpaired, so that none attacks the crew or bites it meanwhile)
+		PutOthersFarOff( lifeform.GetComponent<TerrainLifeform>() );
 
 		// ---- 1. the control: a lifeform that does not move (made so: the nearest is any species), of middling aggression, next to the vehicle neither moves nor
 		// attacks
@@ -25294,7 +25298,7 @@ public class ClaudeProbe : MonoBehaviour
 		{
 			var otherLifeform = other.GetComponent<TerrainLifeform>();
 
-			if ( ( otherLifeform != grazer ) && ( otherLifeform != prey ) )
+			if ( ( otherLifeform != null ) && ( otherLifeform != grazer ) && ( otherLifeform != prey ) )
 			{
 				other.position += Vector3.right * 500.0f;
 				SetField( otherLifeform, "m_mate", null );
@@ -25413,6 +25417,8 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 5 );
 		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
 
+		yield return WaitForBlocks();
+
 		var all = LifeformsOnTheGround();
 
 		if ( all.Count < 2 )
@@ -25427,6 +25433,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		// (a test plant that stays where it is put: since roadmap 8.18 the first lifeform may be any species)
 		plant.m_species = MakeTestPlant( 121 );
+		plant.m_aggression = plant.m_species.m_aggression;
+		plant.m_noticedPlayer = false;
 		plant.m_status = TerrainLifeform.Status.Alive;
 		plant.m_hits = 100;
 		plant.m_stuns = plant.m_species.m_stunPoints;
@@ -25446,6 +25454,8 @@ public class ClaudeProbe : MonoBehaviour
 		// (roadmap 8.18, the shipped game's BIO-DATA)
 		var unpaidBefore = UnpaidLifeformData();
 		var dataBefore = HoldItems( playerData.m_terrainVehicle, true ).Count;
+
+		PutOthersFarOff( plant );
 		var offer = Press( "TVCargoButton" );
 		var buttons = controller.m_buttonController.GetCurrentButtonSet().ToString();
 		var record = Press( "TVRecordButton" );
@@ -25460,6 +25470,7 @@ public class ClaudeProbe : MonoBehaviour
 		var dataValue = ( dataAfterFirst > dataBefore ) ? (int) FieldOrNull( dataItems[ dataAfterFirst - 1 ], "m_value" ) : -1;
 
 		// ---- 2. the same species again on this landing gives nothing
+		PutOthersFarOff( plant );
 		Press( "TVCargoButton" );
 		Press( "TVRecordButton" );
 
@@ -25549,6 +25560,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 5 );
 		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
+		yield return WaitForBlocks();
 
 		var all = LifeformsOnTheGround();
 
@@ -25573,6 +25585,12 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 2 );
 
 		// ---- 1. Cargo beside a living plant offers Record and Ignore (Capture is in Tools since 2026-10-17, for a stunned lifeform)
+		PutOthersFarOff( plant, corpse );
+
+		// (neither dangerous nor wimpy, whatever its species: one that attacks or flees holds up or ends the capture)
+		plant.m_aggression = 50;
+		plant.m_noticedPlayer = false;
+
 		var expected = ShippedValue( plant.m_species, 125, 100, false );
 		var offer = Press( "TVCargoButton" );
 		var buttons = controller.m_buttonController.GetCurrentButtonSet().ToString();
@@ -48435,10 +48453,16 @@ public class ClaudeProbe : MonoBehaviour
 
 		var after = LifeformsOnTheGround();
 		var afterDead = 0;
+		var killedAliveAfter = false;
+		var capturedBackAfter = false;
 
 		foreach ( var lifeform in after )
 		{
-			afterDead += ( lifeform.GetComponent<TerrainLifeform>().m_status == TerrainLifeform.Status.Dead ) ? 1 : 0;
+			var afterLifeform = lifeform.GetComponent<TerrainLifeform>();
+
+			afterDead += ( afterLifeform.m_status == TerrainLifeform.Status.Dead ) ? 1 : 0;
+			killedAliveAfter |= ( afterLifeform.m_placeIndex == killedPlace ) && ( afterLifeform.m_status != TerrainLifeform.Status.Dead );
+			capturedBackAfter |= afterLifeform.m_placeIndex == capturedPlace;
 		}
 
 		var afterDeposits = controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true );
@@ -48478,7 +48502,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "planetrefill: the Disembark button marks the planet visited in this orbit", ( visited != null ) && visited.Contains( 92 ), visitedText );
 		Check( "planetrefill: in the same orbit the deposits stay taken, the killed lifeform dead and the captured one gone, and what was dropped stays", ( againTaken == 0 ) && ( againMined == Mathf.Max( 1, minedVolume - 10 ) ) && ( again.Count <= lifeformCount - 1 ) && killedDeadAgain && !capturedBack && againDrops && againRuin, againTaken + " " + againMined + " | " + again.Count + " of " + lifeformCount + ", " + againDead + " dead, the killed one dead " + killedDeadAgain + ", the captured one back " + capturedBack + " | " + againDrops + " " + againRuin );
 		Check( "planetrefill: after leaving the orbit the deposits are back whole", ( afterTaken < 0 ) && afterTakenShown && ( afterMinedVolume == minedVolume ), afterTaken + " " + afterTakenShown + " " + afterMinedVolume + " of " + minedVolume );
-		Check( "planetrefill: after leaving the orbit the lifeforms are back, alive", ( after.Count == lifeformCount ) && ( afterDead == 0 ), after.Count + " of " + lifeformCount + ", " + afterDead + " dead" );
+		Check( "planetrefill: after leaving the orbit the lifeforms are back, alive", ( after.Count == lifeformCount ) && killedAliveAfter && capturedBackAfter, after.Count + " of " + lifeformCount + ", " + afterDead + " dead, the killed one alive " + killedAliveAfter + ", the captured one back " + capturedBackAfter );
 		Check( "planetrefill: after leaving the orbit a dropped mineral and a dropped curio are gone, and the curios of the random ruins are back", !afterElement && !afterCurio && !afterRuin, afterElement + " " + afterCurio + " " + afterRuin );
 		Check( "planetrefill: a dropped special artifact, a Black Egg left unarmed and the Endurium taken from an ancient ruin site stay", afterSpecial && afterEgg && afterSite, afterSpecial + " " + afterEgg + " " + afterSite );
 		Check( "planetrefill: a planet the terrain vehicle did not go out on keeps what was taken from it (the control)", control == 0, control.ToString() );
@@ -51126,6 +51150,46 @@ public class ClaudeProbe : MonoBehaviour
 		return species;
 	}
 
+	// every lifeform near the terrain vehicle but these put far off, and every pairing undone: since roadmap 8.18 the blocks about the vehicle hold more
+	// lifeforms, and the blocks follow the vehicle half a second after it goes out, so a dangerous newcomer could attack the crew (delaying a recording) or a mate
+	// bite the lifeform under test - call it once the blocks have settled (WaitForBlocks) and again before each step
+	static void PutOthersFarOff( params TerrainLifeform[] keep )
+	{
+		var vehicle = SpaceflightController.m_instance.m_terrainVehicle.transform.position;
+		var index = 0;
+
+		foreach ( var other in LifeformsOnTheGround() )
+		{
+			var otherLifeform = other.GetComponent<TerrainLifeform>();
+
+			// (the capture beam is a child of the populator too)
+			if ( otherLifeform == null )
+			{
+				continue;
+			}
+
+			SetField( otherLifeform, "m_mate", null );
+
+			if ( System.Array.IndexOf( keep, otherLifeform ) >= 0 )
+			{
+				continue;
+			}
+
+			index++;
+
+			if ( DistanceToVehicle( other ) < 300.0f )
+			{
+				other.position = vehicle + Vector3.right * 600.0f + Vector3.forward * ( index * 10.0f );
+			}
+		}
+	}
+
+	// waits until the blocks about the terrain vehicle have been placed about where it stands (TerrainLifeforms looks every half second)
+	static IEnumerator WaitForBlocks()
+	{
+		yield return new WaitForSecondsRealtime( 1.2f );
+	}
+
 	// the values of the lifeforms as the shipped game's: valuate (ITEMS-OV), a recording an item of the hold worth an eighth of it with no volume (WE6B8), once a
 	// species a landing, a specimen worth all of it, once a species a landing (WE75B), and the recordings carried to the ship with the rest of the cargo
 	IEnumerator ScenarioLifeformValues()
@@ -51158,7 +51222,7 @@ public class ClaudeProbe : MonoBehaviour
 		// ---- 2. on planet 92 of the Arth system, a test plant beside the vehicle (every other lifeform far off): Record puts its data into the terrain vehicle's
 		// hold, an eighth of its value, (30 + 2) x 3 x 1 = 96, so 12, and no volume
 		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
-		yield return Frames( 2 );
+		yield return WaitForBlocks();
 
 		var all = LifeformsOnTheGround();
 
@@ -51178,7 +51242,10 @@ public class ClaudeProbe : MonoBehaviour
 			all[ i ].position = vehicle + Vector3.right * 600.0f + Vector3.forward * ( i * 10.0f );
 		}
 
+		// (its own aggression too: a lifeform keeps the aggression of the species it was placed as, and one over 65 attacked the crew and held up the recording)
 		subject.m_species = testPlant;
+		subject.m_aggression = testPlant.m_aggression;
+		subject.m_noticedPlayer = false;
 		subject.m_status = TerrainLifeform.Status.Alive;
 		subject.m_hits = 100;
 		subject.m_stuns = testPlant.m_stunPoints;
@@ -51188,6 +51255,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var dataBefore = HoldItems( playerData.m_terrainVehicle, true ).Count;
 
+		PutOthersFarOff( subject );
 		Press( "TVCargoButton" );
 		Press( "TVRecordButton" );
 
@@ -51200,6 +51268,7 @@ public class ClaudeProbe : MonoBehaviour
 		var recordingVolume = ( recording == null ) ? -1 : (int) FieldOrNull( recording, "m_volume" );
 
 		// ---- 3. the same species again on this landing: already recorded, nothing more
+		PutOthersFarOff( subject );
 		Press( "TVCargoButton" );
 		Press( "TVRecordButton" );
 
@@ -51216,6 +51285,7 @@ public class ClaudeProbe : MonoBehaviour
 			newLanding.Invoke( null, null );
 		}
 
+		PutOthersFarOff( subject );
 		Press( "TVCargoButton" );
 		Press( "TVRecordButton" );
 
@@ -51229,6 +51299,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var specimensBefore = HoldItems( playerData.m_terrainVehicle, false ).Count;
 
+		PutOthersFarOff( subject );
 		Press( "TVCaptureButton" );
 
 		yield return new WaitForSecondsRealtime( 7.5f );
@@ -51237,12 +51308,16 @@ public class ClaudeProbe : MonoBehaviour
 		var specimenValue = ( specimens.Count > specimensBefore ) ? (int) FieldOrNull( specimens[ specimens.Count - 1 ], "m_value" ) : -1;
 
 		second.m_species = testPlant;
+		second.m_aggression = testPlant.m_aggression;
+		second.m_noticedPlayer = false;
 		second.m_status = TerrainLifeform.Status.Stunned;
 		second.m_hits = 100;
 		second.m_stuns = 0;
 		second.transform.position = new Vector3( vehicle.x + 6.0f, second.transform.position.y, vehicle.z );
 
 		yield return Frames( 2 );
+
+		PutOthersFarOff( second );
 
 		var duplicateText = Press( "TVCaptureButton" );
 
