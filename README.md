@@ -260,7 +260,7 @@ Assets/
 - Arth's sun flares on 01-01-4621 unless the game has been won: the Starport is destroyed, and any ship in Arth's system is incinerated
 - 10 alien races, each with its own encounter behavior
 - Aliens with only a ship or two left call for help, and more of their ships warp in
-- Encounters that guard planets from orbit, fought over the planet's own surface; a Veloxi drone grants permission to orbit to a crew that answers its numbers the Veloxi way
+- Encounters that guard planets from orbit, fought over the planet's own surface; a Veloxi drone grants permission to orbit to a crew that answers its six numbers the Veloxi way, each within 15 seconds
 - The Spemin, Thrynn and Veloxi home fleets warn ships away from their homeworlds, more sternly each time, and attack after the last warning
 - The Spemin, Thrynn and Veloxi give up after losing half their ships: they stop fighting and surrender
 - The crew reports when aliens raise or lower their shields and arm or disarm their weapons, and Analysis gives the class of their shields and whether they are up

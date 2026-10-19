@@ -1750,6 +1750,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioTranslation();
 				break;
 
+			case "dronenumbers":
+				yield return ScenarioDroneNumbers();
+				break;
+
 			case "crashline":
 				yield return ScenarioCrashLine();
 				break;
@@ -15688,7 +15692,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "drones: the game data has the drone's two lines from STRINFO, after the 556 of the original data", ( grantedLine == "1000:" + c_grantedText ) && ( deniedLine == "1001:" + c_deniedText ) && ( gameData.m_commList.Length == 558 ), "granted " + grantedLine + " | denied " + deniedLine + " | " + gameData.m_commList.Length + " comms" );
 
-		// ---- 2. the drone at the planet in orbit 5 of star 29 (the planet with a Black Egg): three numbers, each answered right
+		// ---- 2. the drone at the planet in orbit 5 of star 29: six numbers, each answered right (COMMSPEC-OV VPROBE#)
 		const int c_droneId = 302;
 		const int c_starId = 29;
 
@@ -15708,7 +15712,7 @@ public class ClaudeProbe : MonoBehaviour
 
 			yield return Frames( 2 );
 
-			for ( var i = 0; i < 3; i++ )
+			for ( var i = 0; i < 6; i++ )
 			{
 				yield return WaitForAlienQuestion( 8.0f, question );
 
@@ -15751,8 +15755,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "drones: into orbit around planet " + planetId + ": encounter begun " + begun + " | numbers asked: " + numbers.Trim() + " | granted shown " + grantedShown + " | then " + locationAfterGrant + " at planet " + planetAfterGrant + ", 30 frames later " + locationLater );
 
-		Check( "drones: the drone asks three numbers from 1 to 99", begun && ( numbersAsked == 3 ) && numbersInRange, "begun " + begun + ", numbers " + numbers.Trim() );
-		Check( "drones: three right answers get permission to orbit", grantedShown == 1, "granted shown " + grantedShown );
+		Check( "drones: the drone asks six numbers from 1 to 99", begun && ( numbersAsked == 6 ) && numbersInRange, "begun " + begun + ", numbers " + numbers.Trim() );
+		Check( "drones: six right answers get permission to orbit", grantedShown == 1, "granted shown " + grantedShown );
 		Check( "drones: after permission the ship is back in orbit around the planet, and the drone does not begin again", ( locationAfterGrant == PD_General.Location.InOrbit ) && ( planetAfterGrant == planetId ) && ( locationLater == PD_General.Location.InOrbit ), locationAfterGrant + " at " + planetAfterGrant + ", later " + locationLater );
 		Check( "drones: the encounter ends before the orbit is established again (Leaving encounter... and ...Encounter terminated. before ...Orbit established.)", ( linesAfterGrant.IndexOf( "Leaving encounter..." ) >= 0 ) && ( linesAfterGrant.IndexOf( "...Orbit established." ) > linesAfterGrant.IndexOf( "...Encounter terminated." ) ), linesAfterGrant.Replace( "\n", " | " ) );
 
@@ -49273,6 +49277,126 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "translation: at skill 250 every line comes through whole (control)", ( thrynnLines.Count > 10 ) && ( wholeAt250 == thrynnLines.Count ), wholeAt250 + " of " + thrynnLines.Count );
 
 		Finish( "scenario=translation checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: the Veloxi drone's numbers as the original's (roadmap 8.36)
+
+	// the drone's numbers as the original's (COMMSPEC-OV VPROBE#, the special action of species 10 at the start of the comm link): six numbers, each RRND 1 to
+	// 100 (1 to 99, each as likely, so 16 in 99 are multiples of 6), each shown after "RECEIVING:" and half a second, the answer given on the drone's own yes and
+	// no buttons with no equipment check of the comm, and 15 seconds to answer (TIRED-TIME): no answer is a wrong one. The code before asked three numbers, half of
+	// them multiples of 6, 2 to 4 seconds apart, waited for an answer for as long as it took, and put each answer through the comm's equipment check
+	IEnumerator ScenarioDroneNumbers()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var encounter = controller.m_encounter;
+
+		EnsureCrew();
+
+		// a ship that survives a drone attack
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		const int c_droneId = 302;
+		const int c_starId = 29;
+		const string c_deniedText = "Permission to orbit denied.";
+
+		var planetId = PlanetInOrbit( c_starId, 5 );
+		var question = new int[ 1 ];
+
+		yield return GoIntoOrbit( c_starId, planetId );
+
+		var begun = ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == c_droneId );
+
+		// ---- 1. the first number comes half a second after the link is up
+		encounter.Connect();
+
+		var linkUp = Time.realtimeSinceStartup;
+
+		yield return WaitForAlienQuestion( 8.0f, question );
+
+		var firstAfter = Time.realtimeSinceStartup - linkUp;
+		var first = question[ 0 ];
+
+		// ---- 2. a comm that has broken down: the right answer still counts, and the next number comes a moment later
+		SetSystemHealth( 2, 0 );
+		controller.m_messages.Clear();
+
+		if ( ( first % 6 ) == 0 )
+		{
+			new AnswerYesButton().Execute();
+		}
+		else
+		{
+			new AnswerNoButton().Execute();
+		}
+
+		var answered = Time.realtimeSinceStartup;
+
+		yield return Frames( 3 );
+
+		var connectedAfterAnswer = ( encounter.m_pdEncounter != null ) && encounter.m_pdEncounter.m_connected;
+
+		yield return WaitForAlienQuestion( 8.0f, question );
+
+		var nextAfter = Time.realtimeSinceStartup - answered;
+		var second = question[ 0 ];
+		var deniedAfterBrokenComm = CountMessages( c_deniedText );
+
+		SetSystemHealth( 2, 100 );
+
+		// ---- 3. no answer for 16 seconds: permission denied and an attack
+		controller.m_messages.Clear();
+
+		var waitEnd = Time.realtimeSinceStartup + 16.0f;
+
+		while ( Time.realtimeSinceStartup < waitEnd )
+		{
+			yield return null;
+		}
+
+		var deniedAfterSilence = CountMessages( c_deniedText );
+		var stanceAfterSilence = ( encounter.m_pdEncounter == null ) ? "none" : encounter.m_pdEncounter.m_alienStance.ToString();
+
+		// ---- 4. the numbers: 990 of them
+		var askDroneNumber = typeof( Encounter ).GetMethod( "AskDroneNumber", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic );
+		var multiplesOfSix = 0;
+		var lowest = 1000;
+		var highest = -1;
+
+		UnityEngine.Random.InitState( 4321 );
+
+		for ( var i = 0; ( i < 990 ) && ( askDroneNumber != null ) && ( encounter.m_pdEncounter != null ); i++ )
+		{
+			askDroneNumber.Invoke( encounter, null );
+
+			var number = encounter.m_pdEncounter.m_lastQuestionFromAliens;
+
+			lowest = Mathf.Min( lowest, number );
+			highest = Mathf.Max( highest, number );
+
+			if ( ( number % 6 ) == 0 )
+			{
+				multiplesOfSix++;
+			}
+		}
+
+		if ( encounter.m_pdEncounter != null )
+		{
+			encounter.m_pdEncounter.m_lastQuestionFromAliens = 0;
+		}
+
+		controller.m_messages.Clear();
+
+		yield return FlyOutOfEncounter();
+
+		Log( "dronenumbers: drone " + c_droneId + " begun " + begun + "; first number " + first + " " + firstAfter.ToString( "F2" ) + " s after the link; answered with the comm broken down: link up " + connectedAfterAnswer + ", next number " + second + " " + nextAfter.ToString( "F2" ) + " s later, denied " + deniedAfterBrokenComm + "; 16 s with no answer: denied " + deniedAfterSilence + ", stance " + stanceAfterSilence + "; 990 numbers from " + lowest + " to " + highest + ", " + multiplesOfSix + " multiples of 6" );
+
+		Check( "dronenumbers: the drone asks at once: its first number half a second after the link, the next a moment after an answer (within 1.5 s each)", begun && ( first != 0 ) && ( second != 0 ) && ( firstAfter <= 1.5f ) && ( nextAfter <= 1.5f ), firstAfter.ToString( "F2" ) + " s, " + nextAfter.ToString( "F2" ) + " s" );
+		Check( "dronenumbers: an answer to the drone needs no working comm (no equipment check: the right answer counts and the drone asks on)", connectedAfterAnswer && ( second != 0 ) && ( deniedAfterBrokenComm == 0 ), "link up " + connectedAfterAnswer + ", next " + second + ", denied " + deniedAfterBrokenComm );
+		Check( "dronenumbers: no answer in 15 seconds is a wrong one: permission denied and an attack", ( deniedAfterSilence == 1 ) && ( stanceAfterSilence == "Hostile" ), "denied " + deniedAfterSilence + ", stance " + stanceAfterSilence );
+		Check( "dronenumbers: the numbers run from 1 to 99, each as likely: about 16 in 99 are multiples of 6 (10% to 23% of 990)", ( lowest == 1 ) && ( highest == 99 ) && ( multiplesOfSix >= 99 ) && ( multiplesOfSix <= 228 ), lowest + " to " + highest + ", " + multiplesOfSix + " of 990" );
+
+		Finish( "scenario=dronenumbers checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 8: the crash line, as the original's (roadmap 8.24)
