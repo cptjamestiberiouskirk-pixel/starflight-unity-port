@@ -22123,12 +22123,17 @@ public class ClaudeProbe : MonoBehaviour
 	}
 
 	// meets the aliens of an encounter again, opens the comm link, and lets them ask their first question - adds what the messages show then
-	static IEnumerator MeetAndLetThemAsk( int encounterId, List<string> said )
+	static IEnumerator MeetAndLetThemAsk( int encounterId, List<string> said, System.Action afterEntering = null )
 	{
 		var encounter = SpaceflightController.m_instance.m_encounter;
 
 		EnterEncounter( encounterId );
 		yield return Frames( 10 );
+
+		if ( afterEntering != null )
+		{
+			afterEntering();
+		}
 
 		encounter.Hail( GD_Comm.Stance.Friendly, false );
 
@@ -22231,9 +22236,10 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 2: the Veloxi's demands
 
-	// meets the Veloxi with this much Endurium (in tenths) and these artifacts in the hold, lets them make their demand and answers it with this button - returns
-	// what was said, and what the hold and the aliens' stance are afterwards, through the list
-	static IEnumerator AnswerTheVeloxi( int encounterId, int endurium, string artifact, ShipButton answer, List<string> results )
+	// meets the Veloxi with this much Endurium (in tenths) and this artifact in the hold, the race's base mood at 44 (their own), lets them make their demand and
+	// answers it with this button - adds the demand, the reply, the Endurium left, whether the artifact is still aboard, whether the comm link is still up, the
+	// aliens' mood after the answer, the race's base mood once the encounter is over and the aliens' posture as they made the demand
+	static IEnumerator AnswerTheVeloxi( int encounterId, int endurium, string artifact, ShipButton answer, List<string> results, int shipClasses = -1, float baseMood = 44.0f, bool weakAliens = false )
 	{
 		var dataController = DataController.m_instance;
 		var playerData = dataController.m_playerData;
@@ -22258,33 +22264,69 @@ public class ClaudeProbe : MonoBehaviour
 
 		ship.RestoreSystems();
 
+		// the Veloxi's own base mood (the end of each encounter moves it: roadmap 8.5), and a ship of these classes (a far stronger one makes them grovel)
+		playerData.m_general.SetRaceBaseMood( GameData.Race.Velox, baseMood );
+
+		if ( shipClasses >= 0 )
+		{
+			SetShipClassesAndCaptain( shipClasses, 250 );
+		}
+
 		var said = new List<string>();
 
-		yield return MeetAndLetThemAsk( encounterId, said );
+		yield return MeetAndLetThemAsk( encounterId, said, weakAliens ? (System.Action) WeakenAlienShips : null );
 
 		var demand = ( said.Count > 1 ) ? said[ 1 ] : "nothing said";
+
+		// the aliens' posture as they made the demand (the Orb and the Ellipsoid are not demanded by grovelling aliens), their mood and how much stronger the ship is
+		var posture = Call( encounter, "GetAlienTalkStance" ) + " (mood " + encounter.m_pdEncounter.m_mood.ToString( "F0" ) + ", strength " + Call( encounter, "GetStrengthDifferential" ) + ")";
 
 		SpaceflightController.m_instance.m_messages.Clear();
 
 		answer.Execute();
-		yield return Frames( 3 );
+		yield return Frames( 5 );
 
 		var reply = MessageList();
-		var stance = encounter.m_pdEncounter.m_alienStance;
 		var connected = encounter.m_pdEncounter.m_connected;
+		var mood = encounter.m_pdEncounter.m_mood;
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		if ( shipClasses >= 0 )
+		{
+			SetShipClassesAndCaptain( 0, 250 );
+		}
 
 		results.Add( demand );
 		results.Add( reply );
 		results.Add( HeldElement( enduriumId ).ToString() );
 		results.Add( ( artifact != null ) && ship.HasArtifact( artifact ) ? "kept" : "gone" );
-		results.Add( stance.ToString() );
 		results.Add( connected.ToString() );
-
-		ClearMissiles();
-		LeaveEncounter();
-		yield return Frames( 10 );
+		results.Add( mood.ToString( "F0" ) );
+		results.Add( playerData.m_general.GetRaceBaseMood( GameData.Race.Velox, 44.0f ).ToString( "F0" ) );
+		results.Add( posture );
 	}
 
+	// leaves every alien ship of the encounter with 1 point of armor and no shields: the shipped game weighs the aliens' strength by what they have left
+	static void WeakenAlienShips()
+	{
+		foreach ( var alienShip in SpaceflightController.m_instance.m_encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			if ( ( alienShip != null ) && alienShip.m_addedToEncounter && !alienShip.m_isDead )
+			{
+				alienShip.m_armorPoints = 1;
+				alienShip.m_shieldPoints = 0;
+			}
+		}
+	}
+
+	// the Veloxi's demands as the original's (COMMSPEC-OV CRYSTAL-ORB, WEF36, XY/N, WEBB6): made as the comm link opens, before anything else they say; the Crystal
+	// Orb (yes 0, no +100) and the Ellipsoid (yes -40, no +50) asked only when the aliens are not grovelling; a refusal, or the link ended with no answer, ends
+	// the link and adds 100 more to their mood, and they remember it: the race's base mood goes to 100 after a refused Orb and 50 up after a refused Ellipsoid,
+	// 40 down after one given; after either answer about the Ellipsoid their line about the lost focusing stone is gone for good. The code before asked the demand
+	// as their first question, at any mood, and a refusal made them hostile for that encounter only
 	IEnumerator ScenarioVeloxDemands()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -22302,44 +22344,60 @@ public class ClaudeProbe : MonoBehaviour
 
 		var veloxId = FindEncounter( 1, 6, 3, 0, GameData.Race.Velox );
 
-		// ---- 1. the tribute of 3 cubic meters, paid from 5 (the control: they thank, and do not attack)
+		// ---- 1. the tribute of 3 cubic meters, paid from 5 (the control: they thank, and keep the link up)
 		var paid = new List<string>();
 
 		yield return AnswerTheVeloxi( veloxId, 50, null, new AnswerYesButton(), paid );
 
-		// ---- 2. the tribute refused
+		// ---- 2. the tribute refused: the link ends and their mood is at the top
 		var refused = new List<string>();
 
 		yield return AnswerTheVeloxi( veloxId, 50, null, new AnswerNoButton(), refused );
 
-		// ---- 3. a yes with 1 cubic meter in the hold
-		var tooLittle = new List<string>();
+		// ---- 3. the Crystal Orb in the hold, given (the control)
+		var orbGiven = new List<string>();
 
-		yield return AnswerTheVeloxi( veloxId, 10, null, new AnswerYesButton(), tooLittle );
+		yield return AnswerTheVeloxi( veloxId, 50, "Crystal Orb", new AnswerYesButton(), orbGiven );
 
-		// ---- 4. the Crystal Orb in the hold: their demand for it, and a yes
-		var orb = new List<string>();
+		// ---- 4. the Crystal Orb refused: the race's base mood goes to 100 (and the end of the encounter moves it 5 toward calm)
+		var orbRefused = new List<string>();
 
-		yield return AnswerTheVeloxi( veloxId, 50, "Crystal Orb", new AnswerYesButton(), orb );
+		yield return AnswerTheVeloxi( veloxId, 50, "Crystal Orb", new AnswerNoButton(), orbRefused );
 
-		// ---- 5. the Ellipsoid in the hold: their demand for it, and the comm link ended with no answer
-		var ellipsoid = new List<string>();
+		// ---- 5. the Ellipsoid given: their mood and the race's base mood 40 down, and their line about the lost stone gone
+		var ellipsoidGiven = new List<string>();
 
-		yield return AnswerTheVeloxi( veloxId, 50, "Ellipsoid", new TerminateButton(), ellipsoid );
+		yield return AnswerTheVeloxi( veloxId, 50, "Ellipsoid", new AnswerYesButton(), ellipsoidGiven );
+
+		var stoneLineField = typeof( PD_General ).GetField( "m_veloxStoneLineRemoved" );
+		var stoneLineGone = ( stoneLineField != null ) && (bool) stoneLineField.GetValue( playerData.m_general );
+
+		// ---- 6. the Ellipsoid, the comm link ended with no answer: the base mood 50 up
+		var ellipsoidRefused = new List<string>();
+
+		yield return AnswerTheVeloxi( veloxId, 50, "Ellipsoid", new TerminateButton(), ellipsoidRefused );
+
+		// ---- 7. the Crystal Orb aboard and the aliens grovelling (their hostile band, 65, before a far stronger ship, theirs badly damaged): they do not demand it
+		var grovelling = new List<string>();
+
+		yield return AnswerTheVeloxi( veloxId, 50, "Crystal Orb", new AnswerNoButton(), grovelling, 5, 65.0f, true );
 
 		controller.m_encounterRange = encounterRange;
+		playerData.m_general.SetRaceBaseMood( GameData.Race.Velox, 44.0f );
 
-		Log( "veloxdemands: encounter " + veloxId + " || paid: " + string.Join( " | ", paid ) + " || refused: " + string.Join( " | ", refused ) + " || too little: " + string.Join( " | ", tooLittle ) + " || orb: " + string.Join( " | ", orb ) + " || ellipsoid: " + string.Join( " | ", ellipsoid ) );
+		Log( "veloxdemands: encounter " + veloxId + " (demand | reply | Endurium | artifact | link up | mood | base mood) || paid: " + string.Join( " | ", paid ) + " || refused: " + string.Join( " | ", refused ) + " || orb given: " + string.Join( " | ", orbGiven ) + " || orb refused: " + string.Join( " | ", orbRefused ) + " || ellipsoid given: " + string.Join( " | ", ellipsoidGiven ) + " (stone line gone " + stoneLineGone + ") || ellipsoid refused: " + string.Join( " | ", ellipsoidRefused ) + " || grovelling: " + string.Join( " | ", grovelling ) );
 
 		var tribute = "pay tribute of 3 Arth energy crystals";
 
-		Check( "veloxdemands: the Veloxi demand a tribute of 3, and a yes pays it and gets their thanks without an attack (control of the attacks)", paid[ 0 ].Contains( tribute ) && paid[ 1 ].Contains( CommText( 415 ) ) && ( paid[ 2 ] == "20" ) && ( paid[ 4 ] != "Hostile" ), string.Join( " | ", paid ) );
-		Check( "veloxdemands: a refused tribute brings an attack and keeps the Endurium", refused[ 0 ].Contains( tribute ) && ( refused[ 2 ] == "50" ) && ( refused[ 4 ] == "Hostile" ) && ( refused[ 5 ] == "False" ), string.Join( " | ", refused ) );
-		Check( "veloxdemands: a yes with less than 3 cubic meters is refused like a no", tooLittle[ 0 ].Contains( tribute ) && ( tooLittle[ 2 ] == "10" ) && ( tooLittle[ 4 ] == "Hostile" ), string.Join( " | ", tooLittle ) );
-		Check( "veloxdemands: with the Crystal Orb aboard they demand it, and a yes hands it over without an attack", orb[ 0 ].Contains( CommText( 398 ) ) && ( orb[ 3 ] == "gone" ) && ( orb[ 4 ] != "Hostile" ), string.Join( " | ", orb ) );
-		Check( "veloxdemands: with the Ellipsoid aboard they demand it, and ending the comm link with no answer brings an attack", ellipsoid[ 0 ].Contains( CommText( 397 ) ) && ( ellipsoid[ 3 ] == "kept" ) && ( ellipsoid[ 4 ] == "Hostile" ), string.Join( " | ", ellipsoid ) );
+		Check( "veloxdemands: the Veloxi demand a tribute of 3, and a yes pays it and gets their thanks, the link kept up (control)", paid[ 0 ].Contains( tribute ) && paid[ 1 ].Contains( CommText( 415 ) ) && ( paid[ 2 ] == "20" ) && ( paid[ 4 ] == "True" ), string.Join( " | ", paid ) );
+		Check( "veloxdemands: a refused tribute ends the link with their mood at the top, the Endurium kept (WEBB6: +100)", refused[ 0 ].Contains( tribute ) && ( refused[ 2 ] == "50" ) && ( refused[ 4 ] == "False" ) && ( int.Parse( refused[ 5 ] ) >= 99 ), string.Join( " | ", refused ) );
+		Check( "veloxdemands: with the Crystal Orb aboard they demand it, and a yes hands it over with the link kept up (control)", orbGiven[ 0 ].Contains( CommText( 398 ) ) && ( orbGiven[ 3 ] == "gone" ) && ( orbGiven[ 4 ] == "True" ), string.Join( " | ", orbGiven ) );
+		Check( "veloxdemands: a refused Crystal Orb ends the link, and the Veloxi remember it: their base mood goes to 100 (CRYSTAL-ORB: BASE-EDL 100)", orbRefused[ 0 ].Contains( CommText( 398 ) ) && ( orbRefused[ 3 ] == "kept" ) && ( orbRefused[ 4 ] == "False" ) && ( int.Parse( orbRefused[ 6 ] ) >= 90 ), string.Join( " | ", orbRefused ) );
+		Check( "veloxdemands: the Ellipsoid given lowers their mood and their base mood by 40, and their line about the lost stone is gone (WEF36, WEF26)", ellipsoidGiven[ 0 ].Contains( CommText( 397 ) ) && ( ellipsoidGiven[ 3 ] == "gone" ) && ( int.Parse( ellipsoidGiven[ 6 ] ) <= 10 ) && stoneLineGone, string.Join( " | ", ellipsoidGiven ) + ", stone line gone " + stoneLineGone );
+		Check( "veloxdemands: the Ellipsoid's demand left unanswered ends the link and raises their base mood by 50", ellipsoidRefused[ 0 ].Contains( CommText( 397 ) ) && ( ellipsoidRefused[ 3 ] == "kept" ) && ( ellipsoidRefused[ 4 ] == "False" ) && ( int.Parse( ellipsoidRefused[ 6 ] ) >= 85 ), string.Join( " | ", ellipsoidRefused ) );
+		Check( "veloxdemands: grovelling before a far stronger ship they do not demand the Crystal Orb (A-POSTU above obsequious)", grovelling[ 7 ].StartsWith( "Obsequious" ) && !grovelling[ 0 ].Contains( CommText( 398 ) ) && ( grovelling[ 3 ] == "kept" ), string.Join( " | ", grovelling ) );
 
-		Finish( "scenario=veloxdemands paid=" + paid[ 2 ] + "/" + paid[ 4 ] + " refused=" + refused[ 4 ] + " orb=" + orb[ 3 ] + " ellipsoid=" + ellipsoid[ 4 ], 0 );
+		Finish( "scenario=veloxdemands checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 2: the Thrynn's trades
