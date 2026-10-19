@@ -22144,12 +22144,15 @@ public class ClaudeProbe : MonoBehaviour
 		yield return LetAliensSpeak( 1, said );
 	}
 
+	// the Elowan's question about energy as the original's special action (COMMSPEC-OV WF174): asked as the comm link opens, and only of a ship they are friendly
+	// with; a yes with less than 20 cubic meters aboard gets 15, a yes with 20 or more is a lie they see through (their reproach, and 8 more agitation), a no gets
+	// nothing. The code before asked it as their first question, in any mood, and the lie cost nothing
 	IEnumerator ScenarioElowanGift()
 	{
 		var dataController = DataController.m_instance;
 		var playerData = dataController.m_playerData;
+		var general = playerData.m_general;
 		var controller = SpaceflightController.m_instance;
-		var encounter = controller.m_encounter;
 		var enduriumId = dataController.m_gameData.m_misc.m_enduriumElementId;
 
 		EnsureCrew();
@@ -22164,14 +22167,30 @@ public class ClaudeProbe : MonoBehaviour
 		var elowanId = FindEncounterOfRace( GameData.Race.Elowan );
 		var question = CommText( 6 );
 
-		// ---- 1. 5 cubic meters of Endurium in the hold: the Elowan ask, and a yes gets 15 cubic meters
+		// ---- 1. the Elowan at their own mood (44, neutral after the 10 of the friendly hail), 5 cubic meters aboard: they do not ask
+		general.SetRaceBaseMood( GameData.Race.Elowan, 44.0f );
+		SetEndurium( 50 );
+
+		var neutralSaid = new List<string>();
+
+		yield return MeetAndLetThemAsk( elowanId, neutralSaid );
+
+		var neutralAsked = string.Join( " | ", neutralSaid ).Contains( question );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// friendly from here on (20, 10 after the hail)
+		general.SetRaceBaseMood( GameData.Race.Elowan, 20.0f );
+
+		// ---- 2. 5 cubic meters: they ask as the link opens, and a yes gets 15 cubic meters
 		SetEndurium( 50 );
 
 		var lowSaid = new List<string>();
 
 		yield return MeetAndLetThemAsk( elowanId, lowSaid );
 
-		var lowAsked = ( lowSaid.Count > 1 ) && lowSaid[ 1 ].Contains( question ) && ( encounter.m_pdEncounter.m_lastQuestionFromAliens == 6 );
+		var lowAsked = ( lowSaid.Count > 1 ) && lowSaid[ 1 ].Contains( question );
 
 		controller.m_messages.Clear();
 
@@ -22184,7 +22203,7 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 2. 30 cubic meters: a yes gets the Elowan's "thy need does not seem dire", and nothing
+		// ---- 3. 30 cubic meters: a yes is a lie - their reproach, nothing, and 8 more agitation
 		SetEndurium( 300 );
 
 		var highSaid = new List<string>();
@@ -22192,6 +22211,7 @@ public class ClaudeProbe : MonoBehaviour
 		yield return MeetAndLetThemAsk( elowanId, highSaid );
 
 		var highAsked = ( highSaid.Count > 1 ) && highSaid[ 1 ].Contains( question );
+		var moodBeforeLie = EncounterField( "m_mood", -1.0f );
 
 		controller.m_messages.Clear();
 
@@ -22200,11 +22220,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		var highAnswer = MessageList();
 		var highAfter = HeldElement( enduriumId );
+		var lieAnger = EncounterField( "m_mood", -1.0f ) - moodBeforeLie;
 
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 3. the control: 5 cubic meters again, and a no gets nothing
+		// ---- 4. the control: 5 cubic meters again, and a no gets nothing
 		SetEndurium( 50 );
 
 		var noSaid = new List<string>();
@@ -22222,16 +22243,17 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
+		general.SetRaceBaseMood( GameData.Race.Elowan, 44.0f );
 		controller.m_encounterRange = encounterRange;
 
-		Log( "elowangift: encounter " + elowanId + " | 5 m3: " + string.Join( " | ", lowSaid ) + " -> yes: " + lowAnswer + " (endurium " + lowAfter + ") || 30 m3: " + string.Join( " | ", highSaid ) + " -> yes: " + highAnswer + " (endurium " + highAfter + ") || 5 m3, no: " + noAnswer + " (endurium " + noAfter + ")" );
+		Log( "elowangift: encounter " + elowanId + " | neutral: " + string.Join( " | ", neutralSaid ) + " || friendly, 5 m3: " + string.Join( " | ", lowSaid ) + " -> yes: " + lowAnswer + " (endurium " + lowAfter + ") || 30 m3: " + string.Join( " | ", highSaid ) + " -> yes: " + highAnswer + " (endurium " + highAfter + ", mood " + lieAnger.ToString( "+0;-0;0" ) + ") || 5 m3, no: " + noAnswer + " (endurium " + noAfter + ")" );
 
-		Check( "elowangift: once the comm link is up the Elowan's first question is whether the ship's need for energy is dire", lowAsked && highAsked, ( ( lowSaid.Count > 1 ) ? lowSaid[ 1 ] : "nothing" ) );
-		Check( "elowangift: a yes with less than 20 cubic meters of Endurium gets 15 cubic meters", lowAnswer.Contains( CommText( 5 ) ) && ( lowAfter == 200 ), lowAfter + " | " + lowAnswer );
-		Check( "elowangift: a yes with 20 or more gets their reproach and nothing", highAnswer.Contains( CommText( 4 ) ) && ( highAfter == 300 ), highAfter + " | " + highAnswer );
+		Check( "elowangift: Elowan who are not friendly do not ask about energy (WF174: A-POSTU friendly)", !neutralAsked, string.Join( " | ", neutralSaid ) );
+		Check( "elowangift: friendly Elowan ask as the comm link opens, and a yes with less than 20 cubic meters of Endurium gets 15 (control)", lowAsked && lowAnswer.Contains( CommText( 5 ) ) && ( lowAfter == 200 ), lowAfter + " | " + string.Join( " | ", lowSaid ) + " | " + lowAnswer );
+		Check( "elowangift: a yes with 20 or more is a lie: their reproach, nothing, and 8 more agitation (WF174: 8 +!EDL)", highAsked && highAnswer.Contains( CommText( 4 ) ) && ( highAfter == 300 ) && Mathf.Approximately( lieAnger, 8.0f ), highAfter + ", mood " + lieAnger + " | " + highAnswer );
 		Check( "elowangift: a no gets nothing (control)", !noAnswer.Contains( CommText( 5 ) ) && ( noAfter == 50 ), noAfter + " | " + noAnswer );
 
-		Finish( "scenario=elowangift low=" + lowAfter + " high=" + highAfter + " no=" + noAfter, 0 );
+		Finish( "scenario=elowangift checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 2: the Veloxi's demands
@@ -22344,7 +22366,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var veloxId = FindEncounter( 1, 6, 3, 0, GameData.Race.Velox );
 
-		// ---- 1. the tribute of 3 cubic meters, paid from 5 (the control: they thank, and keep the link up)
+		// ---- 1. the tribute of 3 cubic meters of a neutral fleet, paid from 5: they take it and say nothing more, the link kept up
 		var paid = new List<string>();
 
 		yield return AnswerTheVeloxi( veloxId, 50, null, new AnswerYesButton(), paid );
@@ -22382,14 +22404,31 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return AnswerTheVeloxi( veloxId, 50, "Crystal Orb", new AnswerNoButton(), grovelling, 5, 65.0f, true );
 
+		// ---- 8. a hostile fleet (their hostile band, 65, before a weaker ship) and 10 cubic meters: a tribute of 9, and a yes pays it
+		var hostileTribute = new List<string>();
+
+		yield return AnswerTheVeloxi( veloxId, 100, null, new AnswerYesButton(), hostileTribute, -1, 65.0f );
+
+		// ---- 9. a friendly fleet (10) and 5 cubic meters: no tribute
+		var friendlyTribute = new List<string>();
+
+		yield return AnswerTheVeloxi( veloxId, 50, null, new AnswerNoButton(), friendlyTribute, -1, 10.0f );
+
+		// ---- 10. a neutral fleet and 3 cubic meters, under the 4 they ask of: no tribute
+		var poorTribute = new List<string>();
+
+		yield return AnswerTheVeloxi( veloxId, 30, null, new AnswerNoButton(), poorTribute );
+
 		controller.m_encounterRange = encounterRange;
 		playerData.m_general.SetRaceBaseMood( GameData.Race.Velox, 44.0f );
+
+		Log( "veloxdemands: tribute (demand | reply | Endurium | artifact | link up | mood | base mood | posture) hostile: " + string.Join( " | ", hostileTribute ) + " || friendly: " + string.Join( " | ", friendlyTribute ) + " || 3 m3: " + string.Join( " | ", poorTribute ) );
 
 		Log( "veloxdemands: encounter " + veloxId + " (demand | reply | Endurium | artifact | link up | mood | base mood) || paid: " + string.Join( " | ", paid ) + " || refused: " + string.Join( " | ", refused ) + " || orb given: " + string.Join( " | ", orbGiven ) + " || orb refused: " + string.Join( " | ", orbRefused ) + " || ellipsoid given: " + string.Join( " | ", ellipsoidGiven ) + " (stone line gone " + stoneLineGone + ") || ellipsoid refused: " + string.Join( " | ", ellipsoidRefused ) + " || grovelling: " + string.Join( " | ", grovelling ) );
 
 		var tribute = "pay tribute of 3 Arth energy crystals";
 
-		Check( "veloxdemands: the Veloxi demand a tribute of 3, and a yes pays it and gets their thanks, the link kept up (control)", paid[ 0 ].Contains( tribute ) && paid[ 1 ].Contains( CommText( 415 ) ) && ( paid[ 2 ] == "20" ) && ( paid[ 4 ] == "True" ), string.Join( " | ", paid ) );
+		Check( "veloxdemands: a neutral fleet demands a tribute of 3, and a yes pays it with no word after, the link kept up (WF1D2)", paid[ 0 ].Contains( tribute ) && !paid[ 1 ].Contains( CommText( 415 ) ) && ( paid[ 2 ] == "20" ) && ( paid[ 4 ] == "True" ), string.Join( " | ", paid ) );
 		Check( "veloxdemands: a refused tribute ends the link with their mood at the top, the Endurium kept (WEBB6: +100)", refused[ 0 ].Contains( tribute ) && ( refused[ 2 ] == "50" ) && ( refused[ 4 ] == "False" ) && ( int.Parse( refused[ 5 ] ) >= 99 ), string.Join( " | ", refused ) );
 		Check( "veloxdemands: with the Crystal Orb aboard they demand it, and a yes hands it over with the link kept up (control)", orbGiven[ 0 ].Contains( CommText( 398 ) ) && ( orbGiven[ 3 ] == "gone" ) && ( orbGiven[ 4 ] == "True" ), string.Join( " | ", orbGiven ) );
 		Check( "veloxdemands: a refused Crystal Orb ends the link, and the Veloxi remember it: their base mood goes to 100 (CRYSTAL-ORB: BASE-EDL 100)", orbRefused[ 0 ].Contains( CommText( 398 ) ) && ( orbRefused[ 3 ] == "kept" ) && ( orbRefused[ 4 ] == "False" ) && ( int.Parse( orbRefused[ 6 ] ) >= 90 ), string.Join( " | ", orbRefused ) );
@@ -22397,20 +22436,27 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "veloxdemands: the Ellipsoid's demand left unanswered ends the link and raises their base mood by 50", ellipsoidRefused[ 0 ].Contains( CommText( 397 ) ) && ( ellipsoidRefused[ 3 ] == "kept" ) && ( ellipsoidRefused[ 4 ] == "False" ) && ( int.Parse( ellipsoidRefused[ 6 ] ) >= 85 ), string.Join( " | ", ellipsoidRefused ) );
 		Check( "veloxdemands: grovelling before a far stronger ship they do not demand the Crystal Orb (A-POSTU above obsequious)", grovelling[ 7 ].StartsWith( "Obsequious" ) && !grovelling[ 0 ].Contains( CommText( 398 ) ) && ( grovelling[ 3 ] == "kept" ), string.Join( " | ", grovelling ) );
 
+		Check( "veloxdemands: a hostile fleet demands a tribute of 9, and a yes pays it (WF1D2: 9 and 90 of a hostile one)", hostileTribute[ 0 ].Contains( "pay tribute of 9 Arth energy crystals" ) && ( hostileTribute[ 2 ] == "10" ), string.Join( " | ", hostileTribute ) );
+		Check( "veloxdemands: a friendly fleet demands no tribute (WF1D2: neutral or hostile)", !friendlyTribute[ 0 ].Contains( "pay tribute of" ) && ( friendlyTribute[ 2 ] == "50" ), string.Join( " | ", friendlyTribute ) );
+		Check( "veloxdemands: no tribute of a ship with less than 4 cubic meters of Endurium (WF1D2: 40 6 ?>=ELEMENT)", !poorTribute[ 0 ].Contains( "pay tribute of" ) && ( poorTribute[ 2 ] == "30" ), string.Join( " | ", poorTribute ) );
+
 		Finish( "scenario=veloxdemands checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 2: the Thrynn's trades
 
-	// meets the Thrynn with this much Endurium and plutonium (in tenths) and these artifacts in the hold, lets them make their offer and answers it with this
-	// button - adds the offer, the reply, the Endurium and plutonium afterwards, whether the first artifact is still aboard, whether a Black Box is, and the stance
-	static IEnumerator TradeWithTheThrynn( int encounterId, int endurium, int plutonium, string[] artifacts, ShipButton answer, List<string> results )
+	// meets the Thrynn with this much Endurium and plutonium (in tenths) and these artifacts in the hold, the race's base mood at this, lets them make their offer
+	// and answers it with this button, then lets them speak once more - adds the offer, the reply, the Endurium and plutonium afterwards, whether the last artifact
+	// named is still aboard, whether a Black Box is, the stance, how much the answer moved their mood and what they said next
+	static IEnumerator TradeWithTheThrynn( int encounterId, int endurium, int plutonium, string[] artifacts, ShipButton answer, List<string> results, float baseMood = 44.0f )
 	{
 		var dataController = DataController.m_instance;
 		var gameData = dataController.m_gameData;
 		var encounter = SpaceflightController.m_instance.m_encounter;
 		var ship = dataController.m_playerData.m_playerShip;
 		var plutoniumId = gameData.FindElementId( "Plutonium" );
+
+		dataController.m_playerData.m_general.SetRaceBaseMood( GameData.Race.Thrynn, baseMood );
 
 		SetEndurium( endurium );
 
@@ -22441,6 +22487,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return MeetAndLetThemAsk( encounterId, said );
 
+		var moodBefore = EncounterField( "m_mood", -1.0f );
+
 		SpaceflightController.m_instance.m_messages.Clear();
 
 		answer.Execute();
@@ -22450,15 +22498,47 @@ public class ClaudeProbe : MonoBehaviour
 		results.Add( MessageList() );
 		results.Add( HeldElement( gameData.m_misc.m_enduriumElementId ).ToString() );
 		results.Add( HeldElement( plutoniumId ).ToString() );
-		results.Add( ( artifacts.Length > 0 ) && ship.HasArtifact( artifacts[ 0 ] ) ? "kept" : "gone" );
+		results.Add( ( artifacts.Length > 0 ) && ship.HasArtifact( artifacts[ artifacts.Length - 1 ] ) ? "kept" : "gone" );
 		results.Add( ship.HasArtifact( "Black Box" ) ? "black box" : "no black box" );
 		results.Add( encounter.m_pdEncounter.m_alienStance.ToString() );
+		results.Add( ( EncounterField( "m_mood", -1.0f ) - moodBefore ).ToString( "0" ) );
+
+		var next = new List<string>();
+
+		yield return LetAliensSpeak( 1, next );
+
+		results.Add( ( next.Count > 0 ) ? next[ 0 ] : "nothing said" );
 
 		ClearMissiles();
 		LeaveEncounter();
 		yield return Frames( 10 );
+
+		dataController.m_playerData.m_general.SetRaceBaseMood( GameData.Race.Thrynn, 44.0f );
 	}
 
+	// whether the Thrynn have sold the crew their device ("missing" on the code before it was kept), and setting it
+	static string ThrynnDeviceSold()
+	{
+		var field = typeof( PD_General ).GetField( "m_thrynnDeviceSold" );
+
+		return ( field == null ) ? "missing" : field.GetValue( DataController.m_instance.m_playerData.m_general ).ToString();
+	}
+
+	static void SetThrynnDeviceSold( bool sold )
+	{
+		var field = typeof( PD_General ).GetField( "m_thrynnDeviceSold" );
+
+		if ( field != null )
+		{
+			field.SetValue( DataController.m_instance.m_playerData.m_general, sold );
+		}
+	}
+
+	// the Thrynn's offers as the original's special actions (COMMSPEC-OV PLUTONIUM, WF312, NEED-ENERGY), made in turn as the comm link opens: the plutonium aboard
+	// for 84 percent of it in Endurium (a refusal stops the rest), an artifact of the hold from a random place in it, never the Black Box, for its value over 33
+	// in tenths (a refusal goes on), each refusal 5 more agitation, both capped by the room in the hold; the device, the Black Box, sold to a friendly ship once in
+	// a game for 30. The code before made one offer as their first question (the artifact they pay the most for at the STRINFO prices, else the plutonium one for
+	// one, else the Black Box whenever none was aboard) and said "very well" after every trade
 	IEnumerator ScenarioThrynnTrades()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -22479,37 +22559,34 @@ public class ClaudeProbe : MonoBehaviour
 
 		var thrynnId = FindEncounter( 1, 6, 3, 0, GameData.Race.Thrynn );
 
-		// ---- 1. the Tesseract (29 at their prices) and the Whining Orb (18) aboard: they offer for the Tesseract, and a yes sells it for 29 cubic meters
-		var sold = new List<string>();
+		SetThrynnDeviceSold( false );
 
-		yield return TradeWithTheThrynn( thrynnId, 50, 0, new[] { "Tesseract", "Whining Orb" }, new AnswerYesButton(), sold );
-
-		// ---- 2. the same, and a no (the control: "very well", nothing changes hands, no attack)
-		var kept = new List<string>();
-
-		yield return TradeWithTheThrynn( thrynnId, 50, 0, new[] { "Tesseract", "Whining Orb" }, new AnswerNoButton(), kept );
-
-		// ---- 3. 12 cubic meters of plutonium and nothing they want else: 12 of Endurium for it
+		// ---- 1. 12 cubic meters of plutonium: they offer 10 of Endurium (84 percent), and a yes sells it all for that, with no word after
 		var plutonium = new List<string>();
 
 		yield return TradeWithTheThrynn( thrynnId, 50, 120, new string[ 0 ], new AnswerYesButton(), plutonium );
 
-		// ---- 4. nothing to sell and 40 cubic meters of Endurium: they sell the Black Box for 30
-		var bought = new List<string>();
+		// ---- 2. the plutonium and the Tesseract aboard: the plutonium comes first, and a no angers them by 5 and stops the rest (no artifact offer)
+		var plutoniumRefused = new List<string>();
 
-		yield return TradeWithTheThrynn( thrynnId, 400, 0, new string[ 0 ], new AnswerYesButton(), bought );
+		yield return TradeWithTheThrynn( thrynnId, 50, 120, new[] { "Tesseract" }, new AnswerNoButton(), plutoniumRefused );
 
-		// ---- 5. nothing to sell and 10: "you do not have enough"
-		var tooLittle = new List<string>();
+		// ---- 3. the Tesseract alone: they offer its value over 33, 1818 tenths ("181 cubic Arth unitss"), and a yes sells it for that
+		var sold = new List<string>();
 
-		yield return TradeWithTheThrynn( thrynnId, 100, 0, new string[ 0 ], new AnswerYesButton(), tooLittle );
+		yield return TradeWithTheThrynn( thrynnId, 50, 0, new[] { "Tesseract" }, new AnswerYesButton(), sold );
 
-		// ---- 6. the Bladed Toy alone (1 at their prices): the offer's words as the shipped game fills them in, "a Bladed Toy." and one "unit"
-		var oneUnit = new List<string>();
+		// ---- 4. the same, and a no: 5 more agitation, nothing changes hands, no "very well" and no attack
+		var kept = new List<string>();
 
-		yield return TradeWithTheThrynn( thrynnId, 50, 0, new[] { "Bladed Toy" }, new AnswerNoButton(), oneUnit );
+		yield return TradeWithTheThrynn( thrynnId, 50, 0, new[] { "Tesseract" }, new AnswerNoButton(), kept );
 
-		// ---- 7. the Tesseract in a hold with 10 cubic meters of room once it is out: they offer the 10 that fit, not their 29, and pay what they offered
+		// ---- 5. the Black Box and the Bladed Toy aboard: never the Black Box; the Toy for 15 tenths, "1 cubic Arth unitss" as the shipped game fills it in
+		var notTheBlackBox = new List<string>();
+
+		yield return TradeWithTheThrynn( thrynnId, 50, 0, new[] { "Black Box", "Bladed Toy" }, new AnswerNoButton(), notTheBlackBox );
+
+		// ---- 6. the Tesseract in a hold with 9.5 cubic meters of room: they offer what fits, 95 tenths, and pay it
 		SetEndurium( 0 );
 
 		foreach ( var artifact in DataController.m_instance.m_gameData.m_artifactList )
@@ -22522,7 +22599,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		ship.RecalculateVolumeUsed();
 
-		// 100 tenths of room left once the Tesseract is out of the hold (the Endurium leaves room for it and 10 cubic meters more)
+		// 100 tenths of room once the Tesseract is out of the hold, 95 while it is in
 		var fillingEndurium = ship.m_volume - ship.m_volumeUsed - 100;
 		var fullHold = new List<string>();
 
@@ -22530,26 +22607,57 @@ public class ClaudeProbe : MonoBehaviour
 
 		var paidIntoFullHold = int.Parse( fullHold[ 2 ] ) - fillingEndurium;
 
+		// ---- 7. friendly Thrynn (20, 12 after the friendly hail), nothing to buy and 40 cubic meters: they sell the device for 30, with no word after
+		var bought = new List<string>();
+
+		yield return TradeWithTheThrynn( thrynnId, 400, 0, new string[ 0 ], new AnswerYesButton(), bought, 20.0f );
+
+		var soldOnce = ThrynnDeviceSold();
+
+		// ---- 8. the same again, the Black Box out of the hold: once in a game, so no offer
+		var again = new List<string>();
+
+		yield return TradeWithTheThrynn( thrynnId, 400, 0, new string[ 0 ], new AnswerNoButton(), again, 20.0f );
+
+		// ---- 9. not sold yet, 10 cubic meters: a yes gets "you do not have enough" and 5 more agitation
+		SetThrynnDeviceSold( false );
+
+		var tooLittle = new List<string>();
+
+		yield return TradeWithTheThrynn( thrynnId, 100, 0, new string[ 0 ], new AnswerYesButton(), tooLittle, 20.0f );
+
+		// ---- 10. a no gets "very well" (control)
+		var declined = new List<string>();
+
+		yield return TradeWithTheThrynn( thrynnId, 400, 0, new string[ 0 ], new AnswerNoButton(), declined, 20.0f );
+
+		// ---- 11. neutral Thrynn (44), nothing to buy: they do not offer the device
+		var neutral = new List<string>();
+
+		yield return TradeWithTheThrynn( thrynnId, 400, 0, new string[ 0 ], new AnswerNoButton(), neutral );
+
+		SetThrynnDeviceSold( false );
 		controller.m_encounterRange = encounterRange;
 
-		Log( "thrynntrades: encounter " + thrynnId + " || sold: " + string.Join( " | ", sold ) + " || kept: " + string.Join( " | ", kept ) + " || plutonium: " + string.Join( " | ", plutonium ) + " || black box: " + string.Join( " | ", bought ) + " || too little: " + string.Join( " | ", tooLittle ) );
+		Log( "thrynntrades: encounter " + thrynnId + " (offer | reply | Endurium | plutonium | artifact | black box | stance | mood change | next) || plutonium: " + string.Join( " | ", plutonium ) + " || plutonium refused: " + string.Join( " | ", plutoniumRefused ) + " || sold: " + string.Join( " | ", sold ) + " || kept: " + string.Join( " | ", kept ) + " || not the black box: " + string.Join( " | ", notTheBlackBox ) + " || full hold (" + fillingEndurium + ", paid " + paidIntoFullHold + "): " + string.Join( " | ", fullHold ) );
+		Log( "thrynntrades: device bought: " + string.Join( " | ", bought ) + " (sold " + soldOnce + ") || again: " + string.Join( " | ", again ) + " || too little: " + string.Join( " | ", tooLittle ) + " || declined: " + string.Join( " | ", declined ) + " || neutral: " + string.Join( " | ", neutral ) );
 
 		var veryWell = CommText( 303 );
+		var deviceOffer = CommText( 301 );
 
-		Check( "thrynntrades: they offer their price for the artifact aboard they pay the most for, and a yes sells it", sold[ 0 ].Contains( "a Tesseract" ) && sold[ 0 ].Contains( " 29 " ) && sold[ 1 ].Contains( veryWell ) && ( sold[ 2 ] == "340" ) && ( sold[ 4 ] == "gone" ), string.Join( " | ", sold ) );
-		Check( "thrynntrades: a no gets \"very well\", and nothing changes hands (control)", kept[ 0 ].Contains( "a Tesseract" ) && kept[ 1 ].Contains( veryWell ) && ( kept[ 2 ] == "50" ) && ( kept[ 4 ] == "kept" ) && ( kept[ 6 ] != "Hostile" ), string.Join( " | ", kept ) );
-		Check( "thrynntrades: they offer a cubic meter of Endurium for each of plutonium", plutonium[ 0 ].Contains( " 12 " ) && ( plutonium[ 2 ] == "170" ) && ( plutonium[ 3 ] == "0" ), string.Join( " | ", plutonium ) );
-		Check( "thrynntrades: with nothing they want aboard they sell the Black Box for 30", bought[ 0 ].Contains( CommText( 301 ) ) && ( bought[ 2 ] == "100" ) && ( bought[ 5 ] == "black box" ), string.Join( " | ", bought ) );
-		Check( "thrynntrades: a yes without 30 cubic meters gets \"you do not have enough\"", tooLittle[ 1 ].Contains( CommText( 302 ) ) && ( tooLittle[ 2 ] == "100" ) && ( tooLittle[ 5 ] == "no black box" ), string.Join( " | ", tooLittle ) );
+		Check( "thrynntrades: they offer 84 percent of the plutonium aboard in Endurium (10 for 12), and a yes sells all of it for that with no word after (PLUTONIUM)", plutonium[ 0 ].Contains( " 10 " ) && ( plutonium[ 2 ] == "150" ) && ( plutonium[ 3 ] == "0" ) && !plutonium[ 1 ].Contains( veryWell ), string.Join( " | ", plutonium ) );
+		Check( "thrynntrades: the plutonium comes before an artifact, and a no angers them by 5 and stops the rest of their offers", plutoniumRefused[ 0 ].Contains( " 10 " ) && ( plutoniumRefused[ 3 ] == "120" ) && ( plutoniumRefused[ 7 ] == "5" ) && !plutoniumRefused[ 8 ].Contains( "Thiss artifact" ), string.Join( " | ", plutoniumRefused ) );
+		Check( "thrynntrades: they offer the Tesseract's value over 33 (\"a Tesseract. Thiss artifact\", \"181 cubic Arth unitss\"), and a yes sells it for 1818 tenths (WF312, WF2AA)", sold[ 0 ].Contains( "a Tesseract. Thiss artifact" ) && sold[ 0 ].Contains( " 181 cubic Arth unitss " ) && ( sold[ 2 ] == "1868" ) && ( sold[ 4 ] == "gone" ) && !sold[ 1 ].Contains( veryWell ), string.Join( " | ", sold ) );
+		Check( "thrynntrades: a no to the artifact angers them by 5, nothing changes hands, no \"very well\" and no attack", kept[ 0 ].Contains( "a Tesseract" ) && ( kept[ 2 ] == "50" ) && ( kept[ 4 ] == "kept" ) && ( kept[ 7 ] == "5" ) && !kept[ 1 ].Contains( veryWell ) && ( kept[ 6 ] != "Hostile" ), string.Join( " | ", kept ) );
+		Check( "thrynntrades: never the Black Box: with the Bladed Toy aboard too they offer the Toy, \"a Bladed Toy.\" for 15 tenths, \"1 cubic Arth unitss\"", notTheBlackBox[ 0 ].Contains( "a Bladed Toy. Thiss artifact" ) && notTheBlackBox[ 0 ].Contains( " 1 cubic Arth unitss " ) && !notTheBlackBox[ 0 ].Contains( "Black Box" ), string.Join( " | ", notTheBlackBox ) );
+		Check( "thrynntrades: with 9.5 cubic meters of room they offer the 95 tenths that fit, and a yes pays them", fullHold[ 0 ].Contains( " 9 cubic Arth unitss " ) && ( paidIntoFullHold == 95 ) && ( fullHold[ 4 ] == "gone" ), fullHold[ 0 ] + " | paid " + paidIntoFullHold );
+		Check( "thrynntrades: friendly Thrynn sell the device for 30 cubic meters, with no word after, and remember it (NEED-ENERGY: WF08A)", bought[ 0 ].Contains( deviceOffer ) && ( bought[ 2 ] == "100" ) && ( bought[ 5 ] == "black box" ) && !bought[ 1 ].Contains( veryWell ) && ( soldOnce == "True" ), string.Join( " | ", bought ) + " | sold " + soldOnce );
+		Check( "thrynntrades: once sold, the device is not offered again in the game, even with no Black Box aboard", !again[ 0 ].Contains( deviceOffer ) && !again[ 8 ].Contains( deviceOffer ), string.Join( " | ", again ) );
+		Check( "thrynntrades: a yes without 30 cubic meters gets \"you do not have enough\" and 5 more agitation", tooLittle[ 1 ].Contains( CommText( 302 ) ) && ( tooLittle[ 2 ] == "100" ) && ( tooLittle[ 5 ] == "no black box" ) && ( tooLittle[ 7 ] == "5" ), string.Join( " | ", tooLittle ) );
+		Check( "thrynntrades: a no to the device gets \"very well\" (control)", declined[ 0 ].Contains( deviceOffer ) && declined[ 1 ].Contains( veryWell ) && ( declined[ 2 ] == "400" ), string.Join( " | ", declined ) );
+		Check( "thrynntrades: Thrynn who are not friendly do not offer the device (NEED-ENERGY: A-POSTU friendly)", !neutral[ 0 ].Contains( deviceOffer ) && !neutral[ 8 ].Contains( deviceOffer ), string.Join( " | ", neutral ) );
 
-		// the offer's words as the shipped game fills in its template (COMMSPEC-OV): the name with a full stop, "unitss" for more than one and "unit" for one,
-		// never the template's "unitxx"
-		Log( "thrynntrades: one unit: " + string.Join( " | ", oneUnit ) + " || a full hold (" + fillingEndurium + " of Endurium, paid " + paidIntoFullHold + "): " + string.Join( " | ", fullHold ) );
-
-		Check( "thrynntrades: the artifact offer reads \"a Tesseract. Thiss artifact\" and \"29 cubic Arth unitss\", and \"a Bladed Toy.\" for \"1 cubic Arth unit\"", sold[ 0 ].Contains( "a Tesseract. Thiss artifact" ) && sold[ 0 ].Contains( " 29 cubic Arth unitss " ) && oneUnit[ 0 ].Contains( "a Bladed Toy. Thiss artifact" ) && oneUnit[ 0 ].Contains( " 1 cubic Arth unit of " ) && !( sold[ 0 ] + oneUnit[ 0 ] ).Contains( "unitxx" ), sold[ 0 ] + " || " + oneUnit[ 0 ] );
-		Check( "thrynntrades: with room for 10 cubic meters they offer 10 for the Tesseract, and a yes pays the 10 they offered", fullHold[ 0 ].Contains( " 10 cubic Arth unitss " ) && ( paidIntoFullHold == 100 ) && ( fullHold[ 4 ] == "gone" ), fullHold[ 0 ] + " | paid " + paidIntoFullHold );
-
-		Finish( "scenario=thrynntrades sold=" + sold[ 2 ] + " plutonium=" + plutonium[ 2 ] + " blackbox=" + bought[ 5 ], 0 );
+		Finish( "scenario=thrynntrades checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 2: the aliens' mood
