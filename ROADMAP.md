@@ -42,8 +42,8 @@ The plan was first written on 2026-10-05 against `master` at `bf6a2910` and adop
 | Ship console: Engineer, Doctor | DONE | repairs with minerals, damage per system (#145 to #147); the Doctor treats lifeform injuries |
 | Ship console: Communications | DONE | Distress (#138) |
 | Combat | DONE | vessel armor, shields and speed from the data (#140) |
-| Comm system | DONE | moods, rivals, translation, homeworld warnings, surrender, transmissions (#150 to #159) |
-| Alien trade, tribute, surrender | DONE | #152, #154 to #156 |
+| Comm system | DONE | moods, rivals, translation, homeworld warnings, surrender, transmissions (#150 to #159); in Phase 8 the races' special actions as the link opens, the lock-out of subjects, translation strength, impatience and calming (#518, #519, #528 to #531) |
+| Alien trade, tribute, surrender | DONE | #152, #154 to #156; the races' own offers as the shipped game makes them (#530) |
 | Terrain vehicle: drive, map, mine, return | DONE | fuel by the ground under the vehicle, as the released game's MOVE-OV (replaced the slope rule of #187 on 2026-10-15) |
 | Terrain vehicle: Look, Scan | DONE | lifeforms, minerals, ruins (#167, #181) |
 | Ruins, artifacts, planet messages | DONE | Phase 3; random ruins (#164) |
@@ -53,7 +53,7 @@ The plan was first written on 2026-10-05 against `master` at `bf6a2910` and adop
 | Artifact effects (15 special artifacts) | DONE | the Black Box, Hypercube and Ellipsoid have none beyond their roles (D5) |
 | Main story and endgame | DONE | Phase 5 |
 
-All 59 items of Phases 0 to 7 below are done or decided (2026-10-13). The play test of item 0.6 was closed on 2026-10-12, and the comparison of every screen with the original game was completed on 2026-10-13, when the UI kit items it raised were also fixed or decided (`Research/Screen comparison.md`). The headless probe plays all of its scenarios, though the port has not yet been played through to the win by hand. Beyond that, only a few details remain open, each noted at its item: the writing in Old Empire ruins, for which the sources have no texts (3.5), typing a notice on the notices screen line by line (Phase 7), and the pace of the aliens' talk, which has no single value to port (2.1).
+All 59 items of Phases 0 to 7 below are done or decided (2026-10-13), and 35 of the 37 items of Phase 8 are built (2026-10-19): 8.18 and 8.27 are under way. The play test of item 0.6 was closed on 2026-10-12, and the comparison of every screen with the original game was completed on 2026-10-13, when the UI kit items it raised were also fixed or decided (`Research/Screen comparison.md`). The headless probe plays all of its scenarios, though the port has not yet been played through to the win by hand. Beyond that, only a few details remain open, each noted at its item: the writing in Old Empire ruins, for which the sources have no texts (3.5), typing a notice on the notices screen line by line (Phase 7), and the pace of the aliens' talk, which has no single value to port (2.1).
 
 ## Decisions
 
