@@ -38561,14 +38561,13 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=playthrough-11 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
-	// stage 12: in hyperspace by the Black Egg's star with the Orb and the egg. The Uhlek of encounter 261 (40,188, on the way west to the Crystal Cone): they
-	// attack on sight and never talk, so the ship fights them, then flies out
+	// stage 12: in hyperspace by the Black Egg's star with the Orb and the egg. The Uhlek of encounter 261, on the way to the Crystal Cone: they attack on sight,
+	// never talk and keep their distance, firing plasma bolts, so the ship tries a hail and saves the game in the encounter, and stage 13 gets away
 	IEnumerator ScenarioPlaythrough12()
 	{
 		var playerData = DataController.m_instance.m_playerData;
 		var ship = playerData.m_playerShip;
 		var met = new bool[ 1 ];
-		var result = new int[ 1 ];
 
 		ProbeKeyboard();
 
@@ -38580,26 +38579,52 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "playthrough-12: the Uhlek encounter 261 is met in hyperspace", met[ 0 ], playerData.m_general.m_location.ToString() );
 
+		var saved = false;
+
 		if ( met[ 0 ] )
 		{
-			var armorBefore = ship.m_armorPoints;
+			var encounter = SpaceflightController.m_instance.m_encounter;
 
-			// straight into combat: the Uhlek fight from the first turn and never close in (COMBAT-OV <COMBAT>: their posture is FIGHT, with TERMINA on, so on a turn
-			// they do not fire they move away), and out of the Combat menu the encounter ends by itself once they are all more than 22 cells away (?UNNEST); the hail
-			// is tried at the end of stage 13
-			// the first part of the fight ends with the shields down to half, and stage 13 goes on with the other half: since alien ships fire their laser and missile
-			// each, 55 s of it took all the shields and the hull down to about half, and from there the ship could not fire on the Uhlek after loading and still get out
-			// (or with the first Uhlek ship destroyed: with the original's weapon damage the ship can destroy them all long before its class 5 shields are at half, and
-			// stage 13 needs some left to fight)
-			yield return PtFight( 55.0f, result, () => ( ship.m_shieldPoints <= ship.GetMaximumShieldPoints() / 2 ) || PtAlienPoints().Contains( "dead" ) );
+			// the Uhlek attack on sight: they fight from their first turn (COMBAT-OV <COMBAT> rule 3; their posture is always FIGHT, the posture thresholds of their
+			// race being 0), and never close in: on a turn they do not fire they move away, so a ship that stays out of the Combat menu sees them leave
+			for ( var end = Time.realtimeSinceStartup + 6.0f; ( Time.realtimeSinceStartup < end ) && !encounter.m_pdEncounter.m_aliensOpenedFire && ( playerData.m_general.m_location == PD_General.Location.Encounter ); )
+			{
+				yield return null;
+			}
 
-			Log( "playthrough-12: after the first part of the fight: " + PtEncounterText() + ", armor " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() + ", shields " + ship.m_shieldPoints + ", systems " + string.Join( ",", Array.ConvertAll( SystemHealth(), h => h.ToString() ) ) + ", fuel " + Endurium() );
+			Log( "playthrough-12: the Uhlek: opened fire " + encounter.m_pdEncounter.m_aliensOpenedFire + ", " + PtEncounterText() + ", armor " + ship.m_armorPoints + ", shields " + ship.m_shieldPoints + ", messages '" + PtMessages() + "'" );
 
-			Check( "playthrough-12: the ship survives the first part of the fight", !CombatController.m_instance.PlayerIsDestroyed() && !ship.IsDestroyed(), "armor " + ship.m_armorPoints + ", hull " + ship.GetHullIntegrity() );
+			Check( "playthrough-12: the Uhlek open fire at once", encounter.m_pdEncounter.m_aliensOpenedFire && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile ), encounter.m_pdEncounter.m_aliensOpenedFire + ", " + encounter.m_pdEncounter.m_alienStance );
+
+			// the game is saved in the encounter, and the next stage loads it there
+			if ( playerData.m_general.m_location == PD_General.Location.Encounter )
+			{
+				PlaythroughSave( "location=" + playerData.m_general.m_location + " " + PtEncounterText() + " armor=" + ship.m_armorPoints );
+
+				saved = true;
+			}
+
+			// the Uhlek do not answer a hail (they may meanwhile leave, ending the encounter by itself)
+			yield return PtOfficer( "Communications" );
+			yield return PtPress( "Hail" );
+
+			if ( PtIndexOf( "Friendly" ) >= 0 )
+			{
+				yield return PtPress( "Friendly" );
+			}
+
+			yield return new WaitForSecondsRealtime( 3.0f );
+
+			Log( "playthrough-12: hailing the Uhlek: connected " + encounter.IsConnected() + ", stance " + encounter.m_pdEncounter.m_alienStance + ", location " + playerData.m_general.m_location + ", messages '" + PtMessages() + "'" );
+
+			Check( "playthrough-12: the Uhlek do not answer a hail", !encounter.IsConnected(), encounter.IsConnected() + ", " + encounter.m_pdEncounter.m_alienStance );
 		}
 
-		// the game is saved in the middle of the fight, and the next stage goes on with it after loading
-		PlaythroughSave( "location=" + playerData.m_general.m_location + " " + ( ( playerData.m_general.m_location == PD_General.Location.Encounter ) ? PtEncounterText() : "" ) + " armor=" + ship.m_armorPoints );
+		// the game is saved in the encounter (above), or wherever the ship is
+		if ( !saved )
+		{
+			PlaythroughSave( "location=" + playerData.m_general.m_location + " armor=" + ship.m_armorPoints );
+		}
 
 		Finish( "scenario=playthrough-12 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
@@ -38629,17 +38654,8 @@ public class ClaudeProbe : MonoBehaviour
 	{
 		var playerData = DataController.m_instance.m_playerData;
 		var ship = playerData.m_playerShip;
-		var result = new int[ 1 ];
 
 		ProbeKeyboard();
-
-		// straight into the Combat menu, as a captain does on loading in a fight: out of it the encounter ends by itself once the Uhlek, who keep their distance,
-		// are all more than 22 cells away
-		if ( playerData.m_general.m_location == PD_General.Location.Encounter )
-		{
-			yield return PtOfficer( "Navigation" );
-			yield return PtPress( "Combat" );
-		}
 
 		yield return Frames( 30 );
 
@@ -38647,50 +38663,19 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "playthrough-13: loaded: location " + playerData.m_general.m_location + ( ( playerData.m_general.m_location == PD_General.Location.Encounter ) ? " " + PtEncounterText() : "" ) + ", the aliens' armor+shields " + loadedPoints + ", armor " + ship.m_armorPoints + ", shields " + ship.m_shieldPoints + " (up " + ship.m_shieldsAreUp + "), weapons armed " + ship.m_weaponsAreArmed + ", console " + PtLabels() );
 
-		Check( "playthrough-13: the game saved in the fight loads in the Uhlek encounter with the damage done to them", ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == 261 ) && loadedPoints.Contains( "+" ) && !loadedPoints.StartsWith( "1000+1400 1000+1400 1000+1400" ), playerData.m_general.m_location + " " + loadedPoints );
+		Check( "playthrough-13: the game saved in the encounter loads in the Uhlek encounter, with its ships", ( playerData.m_general.m_location == PD_General.Location.Encounter ) && ( playerData.m_general.m_currentEncounterId == 261 ) && loadedPoints.Contains( "+" ), playerData.m_general.m_location + " " + loadedPoints );
 
 		if ( playerData.m_general.m_location == PD_General.Location.Encounter )
 		{
-			var armorBefore = ship.m_armorPoints;
+			// a captain does not stand and trade shots with the Uhlek, who keep their distance and fire plasma bolts: the ship gets away (out of the Combat menu, the
+			// encounter ends once they are all more than 22 cells away)
+			yield return PtFlyOutOfEncounter( 6.0f );
 
-			// once the weapons have hit and the shields are gone the captain breaks off, with the hull whole enough for the flight out of the encounter (the Uhlek
-			// scouts' class 5 missiles take 200 points a hit)
-			yield return PtFight( 60.0f, result, () => ship.m_shieldPoints <= 0 );
+			s_ptEncounters.Add( "Uhlek 261 after loading: escaped, armor " + ship.m_armorPoints + ", hull " + ship.GetHullIntegrity() );
 
-			s_ptEncounters.Add( "Uhlek 261 after loading: " + result[ 0 ] + " destroyed, armor " + armorBefore + " -> " + ship.m_armorPoints );
+			Log( "playthrough-13: after getting away: " + playerData.m_general.m_location + ", armor " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() + ", shields " + ship.m_shieldPoints + ", systems " + string.Join( ",", Array.ConvertAll( SystemHealth(), h => h.ToString() ) ) + ", fuel " + Endurium() + ", hold " + PtShipHold() );
 
-			// whether a ship is destroyed before the fight is broken off depends on the fight's luck: the weapons have worked if the aliens' armor and shields went down
-			var pointsAfterFight = PtAlienPoints();
-			var hitTheAliens = ( result[ 0 ] >= 1 ) || ( PtSumOfNumbers( pointsAfterFight ) < PtSumOfNumbers( loadedPoints ) );
-
-			Check( "playthrough-13: the ship's weapons hit the Uhlek (a ship destroyed, or their armor and shields down), and the ship survives", hitTheAliens && !CombatController.m_instance.PlayerIsDestroyed() && !ship.IsDestroyed(), result[ 0 ] + " destroyed, armor " + ship.m_armorPoints + ", hull " + ship.GetHullIntegrity() + ", aliens " + PtAlienPoints() );
-
-			// the Uhlek do not answer a hail (out of the Combat menu the encounter may end by itself meanwhile, as the Uhlek move off)
-			if ( !CombatController.m_instance.PlayerIsDestroyed() && ( playerData.m_general.m_location == PD_General.Location.Encounter ) )
-			{
-				var encounter = SpaceflightController.m_instance.m_encounter;
-
-				yield return PtOfficer( "Communications" );
-				yield return PtPress( "Hail" );
-
-				if ( PtIndexOf( "Friendly" ) >= 0 )
-				{
-					yield return PtPress( "Friendly" );
-				}
-
-				yield return new WaitForSecondsRealtime( 3.0f );
-
-				Log( "playthrough-13: hailing the Uhlek: connected " + encounter.IsConnected() + ", stance " + encounter.m_pdEncounter.m_alienStance + ", location " + playerData.m_general.m_location + ", messages '" + PtMessages() + "'" );
-
-				Check( "playthrough-13: the Uhlek are hostile and do not answer a hail", !encounter.IsConnected() && ( encounter.m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile ), encounter.IsConnected() + ", " + encounter.m_pdEncounter.m_alienStance );
-			}
-
-			if ( !CombatController.m_instance.PlayerIsDestroyed() && ( playerData.m_general.m_location == PD_General.Location.Encounter ) )
-			{
-				yield return PtFlyOutOfEncounter( 4.0f );
-			}
-
-			Log( "playthrough-13: after the fight: " + playerData.m_general.m_location + ", armor " + ship.m_armorPoints + "/" + ship.GetMaximumArmorPoints() + ", shields " + ship.m_shieldPoints + ", systems " + string.Join( ",", Array.ConvertAll( SystemHealth(), h => h.ToString() ) ) + ", fuel " + Endurium() + ", hold " + PtShipHold() );
+			Check( "playthrough-13: the ship gets away from the Uhlek and survives", !CombatController.m_instance.PlayerIsDestroyed() && !ship.IsDestroyed(), "armor " + ship.m_armorPoints + ", hull " + ship.GetHullIntegrity() );
 		}
 
 		Check( "playthrough-13: out of the encounter, back in hyperspace", playerData.m_general.m_location == PD_General.Location.Hyperspace, playerData.m_general.m_location.ToString() );
