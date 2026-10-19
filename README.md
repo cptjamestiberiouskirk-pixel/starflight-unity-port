@@ -72,9 +72,9 @@ The full history is in [CHANGELOG.md](CHANGELOG.md).
 - **The original Unity remake** was started by Marvin Herbold in 2017, with contributions from Jeffrey Graw, Aaron Franke and Andrew Steeley.
 - **The Unity 6 port** and its completion to 1.0.0: @cptjamestiberiouskirk-pixel. Claude AI assisted with development.
 - **Fonts:** Orbitron, Rajdhani and Share Tech Mono, under the SIL Open Font License (`Assets/Fonts/`).
-- **Sound effects:** "Laser Shot Big 4" and "Laser Shot Silenced" by bubaproducer ([151020](https://freesound.org/people/bubaproducer/sounds/151020/) and [151022](https://freesound.org/people/bubaproducer/sounds/151022/) on freesound.org), under [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/), unchanged; "explosion05" by V-ktor ([434430](https://freesound.org/people/V-ktor/sounds/434430/) on freesound.org), under CC0 (`Assets/_MyCombatAssets/Sounds/`).
+- **Sound effects:** made for this port (`Assets/Sounds/`, `Assets/_MyCombatAssets/Sounds/`): every sound the game plays, from the console clicks to the docking bay doors and the explosions.
 - **Music:** made for this port (`Assets/Music/`): a title theme and a track for each place the game plays music, the Starport, the docking bay, a star system, orbit, hyperspace, an encounter and a planet's surface.
-- **Licences:** the Unlicense (`LICENSE`) covers the code and what was made for this port, the music among it. The sound effects credited above keep their own licences.
+- **Licences:** the Unlicense (`LICENSE`) covers the code and what was made for this port, the music and the sound effects among it.
 
 ---
 
@@ -105,7 +105,7 @@ The port runs on **Unity 6 (6000.3.13f1)** and has been modernized throughout:
 - **Game over**: losing the ship brings up the game over screen, and returning to the title screen restores the last save.
 - **Terrain scanning**: world-space labels on the terrain, mineral detection and a transporter-style beam effect.
 - **Ground sounds**: the mining laser hums and crackles as it cuts, a mined-out deposit crumbles, a capture plays the stasis beam's pulsing hum, and a floating artifact hums softly beside its ruin, louder as the terrain vehicle comes near.
-- **Combat and flight sounds**: a hull alarm when the armor runs low, a shimmer as cargo is beamed aboard, a chirp as the ship hails, the laser cannon, missile launches, the aliens' energy weapon, and a whoosh into and out of a flux, all made for this port in an early 1980s electronic style.
+- **Sound effects made for the port**: every sound in the game is made for this port in one grounded, industrial style, as if heard from inside a working spacecraft: metal hatches with servos and latches, hydraulic bay doors, magnetic boots on deck plates, a drive that rumbles through the hull at launch and landing, soft console chirps, comm channels broken up by digital noise, and concussive explosions. The loops (the rover's engine, the mining laser, the capture beam, an artifact's hum) repeat without a seam.
 - **Music made for the port**: a modern science fiction score, dark and grounded, in low strings, deep synth bass, sparse woodwinds and metallic percussion: a title theme, and a track for the Starport, the docking bay, star systems, orbit, hyperspace, encounters and planet surfaces, each looping without a seam and streamed from disk.
 - **Survey from orbit**: the science officer's analysis of a planet in orbit reports its mineral fields and lifeforms, as many as the officer's skill and the sensors find, and the sensor picture and the landing map mark them where the officer placed them. Their places are worked out from the planet's own seeds exactly as the surface places its deposits and lifeforms (`PlanetSurvey`, `SurveyMarks`).
 - **Cargo management**: real-time volume tracking for minerals and elements, with automatic transfer to the ship. A mineral deposit holds 1.0 to 9.9 cubic meters, as in the original.
