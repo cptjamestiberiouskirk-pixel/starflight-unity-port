@@ -231,7 +231,7 @@ Assets/
 - The Tesseract halves the fuel the engines burn in hyperspace
 - The Whining Orb translates the Spemin
 - The Rod Device cuts the damage of alien lasers to a quarter
-- The Crystal Pearl warps a critically damaged ship out of an encounter
+- The Crystal Pearl, when the captain chooses Maneuver in a fight with the ship heavily damaged, warps it out of the encounter to a place anywhere in hyperspace
 - The ship steers the moment you press a direction and stops when you let go, as in the original, and its top speed follows its engines: class 5 engines fly at the original's pace in hyperspace and in star systems, as measured in GOG's version of the game, class 1 at a third of it, and the ship's acceleration (engines against mass) sets how quickly it gets there
 - Alien ships come after you as in the original: every two star hours they jump toward your ship, half the way in hyperspace and three quarters in a star system, and in hyperspace they stay near their home ground; the Crystal Pearl draws them farther and faster
 - A science officer trained beyond 150 reports each of those jumps: "Motion detected at", and how far each group moved across and along, in map coordinates

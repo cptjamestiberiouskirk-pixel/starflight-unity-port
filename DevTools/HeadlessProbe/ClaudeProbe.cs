@@ -19475,6 +19475,33 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 4: the Crystal Pearl
 
+	// every system and the hull at this health (the status display's damage reads them all: PD_PlayerShip.GetOverallIntegrity)
+	static void SetAllSystemsHealth( int health )
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+
+		for ( var system = (PD_PlayerShip.ShipSystem) 0; system < PD_PlayerShip.ShipSystem.Count; system++ )
+		{
+			ship.SetSystemHealth( system, health );
+		}
+	}
+
+	// Maneuver pressed in the current encounter, and where the ship is a few frames later
+	IEnumerator ManeuverIn( PD_General.Location[] where )
+	{
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		new ManeuverButton().Execute();
+
+		yield return Frames( 10 );
+
+		where[ 0 ] = DataController.m_instance.m_playerData.m_general.m_location;
+	}
+
+	// the Crystal Pearl as the original's (starflt MANEUVER: ?PRL first, before the engines' check; HYPERMSG-OV ?PRL, SCIENCE ?HEAVY): with the Pearl aboard, in an
+	// encounter with armed aliens, a living alien ship, not the police, and the ship heavily damaged (its overall integrity under 50), Maneuver says "The Crystal
+	// Pearl is pulsing!" and the ship goes out to hyperspace and on to a place drawn anywhere on the map (JMPSHP), its navigator's bearings lost; a hit never
+	// warps it. The code before warped the ship out on any hit that left less than a tenth of the armor or would have destroyed the hull, and Maneuver did nothing
 	IEnumerator ScenarioCrystalPearl()
 	{
 		var dataController = DataController.m_instance;
@@ -19482,78 +19509,142 @@ public class ClaudeProbe : MonoBehaviour
 		var gameData = dataController.m_gameData;
 		var ship = playerData.m_playerShip;
 		var combat = CombatController.m_instance;
+		var controller = SpaceflightController.m_instance;
 		var pearlId = gameData.FindArtifactId( "Crystal Pearl" );
-		var speminId = FindEncounter( 1, 6, 3, 0 );
-
-		// class 1 armor (500 points): a chunk takes its own size off it ((6 - 1) / 5), so a hit takes about its own size (its last chunk is at least 10 points)
-		ship.m_armorClass = 1;
-
-		var maximum = ship.GetMaximumArmorPoints();
+		var uhlekId = FindEncounterOfRace( GameData.Race.Uhlek );
+		var where = new PD_General.Location[ 1 ];
 
 		EnsureCrew();
 
+		// a navigator of skill 100, who loses the ship's bearings for 75 s after a jump ((250 - skill) / 2 s: none at 250, the probe's usual navigator)
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Navigator ).m_navigation = 100;
+
+		// class 1 armor (500 points), the shields down, the Pearl aboard
+		ship.m_armorClass = 1;
 		ship.m_shieldsAreUp = false;
+
+		var maximum = ship.GetMaximumArmorPoints();
 
 		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( pearlId ) != null ); guard++ )
 		{
 			ship.RemoveArtifact( pearlId );
 		}
 
-		// ---- 1. the control: without the Crystal Pearl a ship hit down to about a twentieth of its armor stays in the encounter
+		ship.AddArtifact( pearlId );
+
+		UnityEngine.Random.InitState( 8642 );
+
+		// ---- 1. a hit down to a twentieth of the armor: the ship stays in the encounter (the Uhlek: they fight, so they are armed)
 		ship.m_armorPoints = maximum;
 
-		EnterEncounter( speminId );
+		EnterEncounter( uhlekId );
 		yield return Frames( 10 );
 
 		combat.ApplyDamageToPlayer( maximum - maximum / 20, Vector3.forward );
 
 		yield return Frames( 10 );
 
-		var locationWithout = playerData.m_general.m_location;
-		var armorWithout = ship.m_armorPoints;
+		var afterHit = playerData.m_general.m_location;
 
 		ClearMissiles();
-		LeaveEncounter();
+
+		// ---- 2. heavily damaged (every system and the hull at 40), Maneuver: out to hyperspace, somewhere on the map, the bearings lost
+		// (armor enough for the Uhlek's plasma bolts meanwhile, 4000 a bolt)
+		ship.m_armorPoints = 100000;
+		SetAllSystemsHealth( 40 );
+
+		if ( playerData.m_general.m_location != PD_General.Location.Encounter )
+		{
+			EnterEncounter( uhlekId );
+			yield return Frames( 10 );
+		}
+
+		var armed = controller.m_encounter.AliensAreArmed();
+
+		yield return ManeuverIn( where );
+
+		var afterManeuver = where[ 0 ];
+		var pulsing = MessageList().Contains( "Crystal Pearl is pulsing" );
+		var bearingsLost = controller.HasLostBearings();
+		var places = new List<Vector3>();
+
+		places.Add( Tools.WorldToGameCoordinates( playerData.m_general.m_coordinates ) );
+
+		// ---- 3. three more times: a new place each time
+		for ( var i = 0; i < 3; i++ )
+		{
+			ClearMissiles();
+			EnterEncounter( uhlekId );
+			yield return Frames( 10 );
+
+			yield return ManeuverIn( where );
+
+			places.Add( Tools.WorldToGameCoordinates( playerData.m_general.m_coordinates ) );
+		}
+
+		var allOnTheMap = places.TrueForAll( place => ( place.x >= -1.0f ) && ( place.x <= 251.0f ) && ( place.z >= -1.0f ) && ( place.z <= 221.0f ) );
+		var allDifferent = true;
+
+		for ( var i = 0; i < places.Count; i++ )
+		{
+			for ( var j = i + 1; j < places.Count; j++ )
+			{
+				allDifferent = allDifferent && ( Vector3.Distance( places[ i ], places[ j ] ) > 1.0f );
+			}
+		}
+
+		// ---- 4. the engines broken down: the Pearl still fires (it comes before the engines' check)
+		ClearMissiles();
+		EnterEncounter( uhlekId );
 		yield return Frames( 10 );
 
-		// ---- 2. with the Crystal Pearl the same hit warps the ship out of the encounter, with the armor it has left
+		ship.SetInoperative( PD_PlayerShip.ShipSystem.Engines, true );
+
+		yield return ManeuverIn( where );
+
+		var withEnginesDown = where[ 0 ];
+
+		ship.SetInoperative( PD_PlayerShip.ShipSystem.Engines, false );
+
+		// ---- 5. the controls: integrity 60, and no Pearl - Maneuver leaves the ship in the encounter
+		ClearMissiles();
+		EnterEncounter( uhlekId );
+		yield return Frames( 10 );
+
+		SetAllSystemsHealth( 60 );
+
+		yield return ManeuverIn( where );
+
+		var lightlyDamaged = where[ 0 ];
+
+		SetAllSystemsHealth( 40 );
+		ship.RemoveArtifact( pearlId );
+
+		yield return ManeuverIn( where );
+
+		var noPearl = where[ 0 ];
+
+		// ---- 6. last, the Pearl aboard and a hit that destroys the hull: the ship is lost (nothing rescues it)
 		ship.AddArtifact( pearlId );
+		SetAllSystemsHealth( 100 );
 		ship.m_armorPoints = maximum;
-
-		EnterEncounter( speminId );
-		yield return Frames( 10 );
-
-		SpaceflightController.m_instance.m_messages.Clear();
-
-		combat.ApplyDamageToPlayer( maximum - maximum / 20, Vector3.forward );
-
-		yield return Frames( 10 );
-
-		var locationWith = playerData.m_general.m_location;
-		var armorWith = ship.m_armorPoints;
-		var warpText = MessageList();
-
-		// ---- 3. and a hit that would destroy the ship (its hull) warps it out with the hull at 1 point of its integrity
-		ship.m_armorPoints = maximum;
-
-		EnterEncounter( speminId );
-		yield return Frames( 10 );
 
 		DestroyWithAHit( 10 );
 
 		yield return Frames( 10 );
 
-		var locationAfterLethal = playerData.m_general.m_location;
-		var armorAfterLethal = ship.GetHullIntegrity();
 		var destroyed = combat.PlayerIsDestroyed();
 
-		Log( "crystalpearl: a hit down to about " + ( maximum / 20 ) + " of " + maximum + " armor points without the Pearl: " + locationWithout + " with " + armorWithout + " | with the Pearl: " + locationWith + " with " + armorWith + " (" + warpText + ") | a hit that destroys the hull with the Pearl: " + locationAfterLethal + " with the hull at " + armorAfterLethal + ", destroyed " + destroyed );
+		Log( "crystalpearl: a hit to a twentieth of the armor: " + afterHit + " | heavily damaged, aliens armed " + armed + ", Maneuver: " + afterManeuver + ", pulsing " + pulsing + ", bearings lost " + bearingsLost + " | places " + string.Join( " ", places.ConvertAll( place => place.x.ToString( "F0" ) + "," + place.z.ToString( "F0" ) ) ) + " | engines down: " + withEnginesDown + " | integrity 60: " + lightlyDamaged + " | no Pearl: " + noPearl + " | a lethal hit with the Pearl: destroyed " + destroyed );
 
-		Check( "crystalpearl: without the Crystal Pearl a critically wounded ship stays in the encounter (control)", ( locationWithout == PD_General.Location.Encounter ) && ( armorWithout > 0 ) && ( armorWithout * 10 < maximum ), locationWithout + ", " + armorWithout );
-		Check( "crystalpearl: with the Crystal Pearl a critically wounded ship is warped out of the encounter", ( locationWith != PD_General.Location.Encounter ) && ( armorWith > 0 ) && ( armorWith * 10 < maximum ) && warpText.Contains( "Crystal Pearl" ), locationWith + ", " + armorWith + " | " + warpText );
-		Check( "crystalpearl: with the Crystal Pearl a hit that would destroy the ship warps it out with the hull at 1 point of its integrity", ( locationAfterLethal != PD_General.Location.Encounter ) && ( armorAfterLethal == 1 ) && !destroyed, locationAfterLethal + ", hull " + armorAfterLethal + ", " + destroyed );
+		Check( "crystalpearl: a hit never warps the ship out, however low the armor (control of the old rule's case)", afterHit == PD_General.Location.Encounter, afterHit.ToString() );
+		Check( "crystalpearl: heavily damaged, Maneuver with the Pearl: The Crystal Pearl is pulsing!, out to hyperspace, the bearings lost (MANEUVER ?PRL, JMPSHP)", armed && ( afterManeuver == PD_General.Location.Hyperspace ) && pulsing && bearingsLost, armed + ", " + afterManeuver + ", " + pulsing + ", " + bearingsLost );
+		Check( "crystalpearl: each time to a new place somewhere on the hyperspace map", allOnTheMap && allDifferent, string.Join( " ", places.ConvertAll( place => place.x.ToString( "F0" ) + "," + place.z.ToString( "F0" ) ) ) );
+		Check( "crystalpearl: the Pearl fires with the engines broken down (before the engines' check)", withEnginesDown == PD_General.Location.Hyperspace, withEnginesDown.ToString() );
+		Check( "crystalpearl: with the ship's integrity at 60, or without the Pearl, Maneuver leaves it in the encounter (controls)", ( lightlyDamaged == PD_General.Location.Encounter ) && ( noPearl == PD_General.Location.Encounter ), lightlyDamaged + ", " + noPearl );
+		Check( "crystalpearl: a hit that destroys the hull destroys the ship, Pearl or not", destroyed, destroyed.ToString() );
 
-		Finish( "scenario=crystalpearl without=" + locationWithout + "/" + armorWithout + " with=" + locationWith + "/" + armorWith + " lethal=" + locationAfterLethal + "/" + armorAfterLethal + "/" + destroyed, 0 );
+		Finish( "scenario=crystalpearl checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- the artifact the aliens chase: the Crystal Pearl (roadmap 8.11; phase 4 gave it to the Dodecahedron)
@@ -40011,8 +40102,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 10 );
 
-		// out of it the way the game leaves every encounter (the Crystal Pearl's warp goes through Encounter.LeaveEncounter)
-		encounter.WarpOut();
+		// out of it the way the game leaves every encounter (Encounter.LeaveEncounter)
+		typeof( Encounter ).GetMethod( "LeaveEncounter", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public ).Invoke( encounter, null );
 
 		yield return Frames( 5 );
 
