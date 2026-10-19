@@ -45129,7 +45129,9 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- the shields' recharge as the original's (since 2026-10-18)
 
-	// the shield points the ship gains in this many seconds of game time, from none (the alien ships put far away, so that none of their fire lands meanwhile)
+	// the shield points the ship gains in this many seconds of game time, from none, with the shields down: the alien ships are put far away, out of their lasers'
+	// reach, but hostile aliens that have opened fire launch missiles at any range (COMBAT-OV rules 1 and 2), and a missile that lands meanwhile hits the armor of
+	// a ship with its shields down, not the shield points
 	IEnumerator ShieldGain( float seconds, int[] gained )
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -45146,6 +45148,7 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
+		playerData.m_playerShip.DropShields();
 		playerData.m_playerShip.m_shieldPoints = 0;
 
 		for ( var end = Time.time + seconds; Time.time < end; )
@@ -45173,7 +45176,6 @@ public class ClaudeProbe : MonoBehaviour
 
 		ship.m_shieldingClass = 2;
 		ship.m_armorPoints = 100000;
-		ship.RaiseShields();
 		ship.RestoreSystems();
 
 		var full = ship.GetMaximumShieldPoints();
