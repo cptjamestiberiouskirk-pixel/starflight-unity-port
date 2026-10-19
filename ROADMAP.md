@@ -222,7 +222,7 @@ Found on 2026-10-18 by reading the shipped game's decompiled overlays against th
 | 8.14 | A terrain vehicle that runs out of fuel is lost: the crew walk back, the vehicle stays as debris, the Starport fines its loss | MOVE-OV `WF16E`, `WEF48`; SHIPBUTTONS `WF095`; OP-OV `WF045` | MISSING |
 | 8.15 | The Red Cylinder flashes the planet's message and artifact sites when the landing map opens | SITE-OV `.MERCATOR`, `WF389`, `WF290` | MISSING |
 | 8.16 | A deposit's mineral: the planet's first element half the time, the second a quarter, the third 15%, any other element 10% | SEED-OV `WF0F7`, `WF0C7` | MISSING |
-| 8.17 | Jettison from the ship's hold | CAPTAIN `(/ITEMS)`, `TOSS` | MISSING |
+| 8.17 | Jettison from the ship's hold | CAPTAIN `(/ITEMS)`, `TOSS` | Jettison on the ship's cargo list: an artifact or a specimen at once, an element by a volume typed or stepped with the stick (`ShipCargoJettisonButton`; probe `jettison`) |
 | 8.18 | Lifeforms as the shipped game makes and values them (replaces D3) | HP-OV, VITA-OV, LP-OV, ITEMS-OV `valuate` | MISSING |
 | 8.19 | A planet's minerals, lifeforms and curios come back after the ship leaves (replaces 3.0) | DPART-OV `WF166`, `WF0D6`; MOVE-OV `?POPULA` | MISSING |
 | 8.20 | A navigator above 150 sees a flux as 1 to 7 dots by skill, 16 with the Ring Device | HYPER-OV `.FLUX-ICON` | MISSING |
