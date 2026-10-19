@@ -2970,10 +2970,11 @@ public class Encounter : MonoBehaviour
 		alienShip.m_currentDirection = step.normalized;
 	}
 
-	// the alien ships go on toward the cells their turns gave them, a cell in a round of turns
+	// the alien ships go on toward the cells their turns gave them, each there by its next turn: a turn moves a ship a cell across, a cell along or both at once
+	// (a diagonal step is a cell each way, as the original's), so a ship goes as far across or along as a cell in a round of turns
 	void MoveAlienShipsToTheirCells()
 	{
-		var speed = CombatController.c_unitsPerCell / GetTurnSeconds() * Time.deltaTime;
+		var cellSpeed = CombatController.c_unitsPerCell / GetTurnSeconds() * Time.deltaTime;
 
 		foreach ( var alienShip in m_pdEncounter.GetAlienShipList() )
 		{
@@ -2981,6 +2982,11 @@ public class Encounter : MonoBehaviour
 			{
 				continue;
 			}
+
+			// the way to the cell, and the longer of its two sides (the whole way for a step across or along, a cell's side of the diagonal)
+			var toCell = alienShip.m_targetCoordinates - alienShip.m_coordinates;
+			var longerSide = Mathf.Max( Mathf.Abs( toCell.x ), Mathf.Abs( toCell.z ) );
+			var speed = ( longerSide > 0.001f ) ? cellSpeed * toCell.magnitude / longerSide : cellSpeed;
 
 			alienShip.m_coordinates = Vector3.MoveTowards( alienShip.m_coordinates, alienShip.m_targetCoordinates, speed );
 		}
