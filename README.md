@@ -236,7 +236,7 @@ Assets/
 - Alien ships come after you as in the original: every two star hours they jump toward your ship, half the way in hyperspace and three quarters in a star system, and in hyperspace they stay near their home ground; the Crystal Pearl draws them farther and faster
 - The Shimmering Ball cloaks the ship in combat until it fires
 - The Flat Device shields the terrain vehicle: lifeforms hit its crew half as often
-- The Red Cylinder flashes a planet's message and artifact sites on the landing map when it opens, and marks its ancient ruins
+- The Red Cylinder flashes a planet's message and artifact sites on the landing map when it opens, and marks its ancient ruins: a box on each fixed one, a light tint over the regions that hold the random ones
 - The ancient ruins placed by STRINFO's editors, on the Mechans' ice planet and deep in Elowan space, hold their Endurium
 - Continuum fluxes show on the screen as the original's twinkling dots: to a navigator trained beyond 150, 1 to 7 of them by skill, and 16 with the Ring Device aboard; a flux the ship has been through is remembered, and the starmap draws it as a line between its ends
 - The price of Endurium rises with the notices of 20-02 and 15-05, and the Starport buys it back at its selling price
@@ -250,7 +250,7 @@ Assets/
 - Lava destroys a terrain vehicle that drives into it, and the Starport installs a new one for a fine
 - Terrain vehicle fuel as the original's: every kilometer driven costs fuel by the ground under the vehicle, little at the shore, more the higher it climbs and about seven times as much on a liquid; a storm makes each kilometer dearer without slowing the vehicle
 - Surface weather as the original's: spells of weather rolled from the planet's weather activity, with storms picked by its surface; a storm halves the terrain vehicle's efficiency and can injure the crew, heavy snow, fog and rain cost a quarter of it, and storms and heavy snow lose the bearing to the ship unless the navigator is highly skilled
-- A quarter of the planets hold random ruins: ancient crystal ruins with Endurium or truly amazing artifacts, and Old Empire ruins with artifacts
+- Random ruins as the original places them: none on the common planets, many on the planets of ruins, region by region as the terrain vehicle drives; ancient crystal ruins with Endurium beside them, and recent ruins, both sometimes holding a curio
 - Destroyed ships leave debris that the ship can salvage by flying over it
 - The science officer's skill decides how much of an analysis is revealed, and each planet's readings are analyzed once
 - The bank pays the original's 12% annual interest on the balance when the crew boards at the Starport and with each new colony recommendation, shown as an Interest row in the ledger
