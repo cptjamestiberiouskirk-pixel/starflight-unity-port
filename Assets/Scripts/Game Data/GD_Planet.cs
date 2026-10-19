@@ -172,7 +172,8 @@ public class GD_Planet
 			points++;
 		}
 
-		if ( m_bioDensity > 0 )
+		// (none for a planet a flare has sterilised: PlayerData.GetBioDensity)
+		if ( PlayerData.GetBioDensityOf( this ) > 0 )
 		{
 			points++;
 		}
