@@ -107,8 +107,8 @@ public class LandButton : ShipButton
 				// over the Crystal Planet the Crystal Cone reports where its control nexus is, for picking the landing site
 				CrystalCone.ReportNexus();
 
-				// and the Red Cylinder looks afresh for ancient ruins near the crosshair
-				RedCylinder.Reset();
+				// with the Red Cylinder aboard, the planet's message and artifact sites flash on the map (SITE-OV .MERCATOR)
+				RedCylinder.MapOpened();
 
 				return true;
 
