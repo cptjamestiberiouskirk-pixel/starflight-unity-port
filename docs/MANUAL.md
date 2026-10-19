@@ -270,12 +270,12 @@ The clock runs whenever you are away from the Starport: a star hour passes every
 
 ### Sensors and analysis
 
-In orbit, Science, **Sensors** scans the planet, and **Analysis** tells you what the readings mean: its surface, gravity, atmosphere, temperature and weather, and a survey of where its mineral fields and its lifeforms are. The better your science officer, the more an analysis reveals: a skilled officer finds most of the mineral fields and lifeforms and places them closely, a novice finds a few and places them roughly, and damaged sensors find less. What the officer finds is marked on the planet in the sensor picture and on the landing map. Each reading can be analyzed once: scan again for another analysis.
+In orbit, Science, **Sensors** scans the planet, and **Analysis** tells you what the readings mean: its surface, gravity, atmosphere, temperature and weather, and a survey of where its mineral fields are and in which latitudes its lifeforms live. The better your science officer, the more an analysis reveals: a skilled officer finds most of the mineral fields and places them closely, and most of the bands where life lives, a novice finds a few and places them roughly, and damaged sensors find less. What the officer finds is marked on the planet in the sensor picture and on the landing map. Each reading can be analyzed once: scan again for another analysis.
 
 ### Landing
 
 1. Command, **Land**.
-2. **Select Site**: move the crosshair over the planet's map with the direction keys. The coordinates show where it is. Enter sets the site. Once your science officer has analysed the planet, the map marks the mineral fields (crosses) and the lifeforms (dots) the survey found.
+2. **Select Site**: move the crosshair over the planet's map with the direction keys. The coordinates show where it is. Enter sets the site. Once your science officer has analysed the planet, the map marks the mineral fields (crosses) the survey found and tints the latitude bands where it found life, more strongly where life is crowded.
 3. **Descend**: the autopilot takes the ship down. **Abort** cancels.
 
 Gravity matters:
@@ -323,7 +323,7 @@ Drive back to the ship and stop beside it, within half a kilometer, to go back i
 - **Fuel**: every kilometer costs fuel by the ground you drive on: little on low ground, more on high ground, and about seven times as much on a liquid. Below 0% the tank still has a small reserve. If the vehicle runs dry, the crew walks back to the ship, the cargo stays behind, and the longer the walk the likelier someone is hurt on the way.
 - **Storms**: the weather can change every star hour, and the wilder the planet's weather the more often a storm comes. Rain, fog and snow make every kilometer cost more fuel and a storm twice as much. A storm can injure the crew, and storms and heavy snow hide the bearing to the ship unless your navigator is highly skilled.
 - **Lava**: drive off molten ground at once. After a few seconds in lava the vehicle and its cargo are lost. The crew gets back to the ship, and the Starport fits a new vehicle for a 10,000 M.U. fine.
-- **Lifeforms**: some are harmless and some flee, but dangerous ones come at the vehicle and attack the crew. The laser kills; the stunner only stuns.
+- **Lifeforms**: they live in the lowlands of their latitude band, and more appear as you drive on. Some are harmless and some flee, but dangerous ones come at the vehicle and attack the crew. The laser kills; the stunner only stuns.
 
 ---
 
@@ -422,8 +422,8 @@ This is a faithful remake of *Starflight* (Binary Systems, Electronic Arts, 1986
 
 - 3D views: real planets and stars (the planets in natural colors with skies and clouds, if you like), a 3D Starport and terrain;
 - a new console and Starport design, in 15 color schemes;
-- lifeforms on the planets' surfaces rebuilt from the game's 1984 design notes;
-- a survey from orbit: the science officer's analysis marks a planet's mineral fields and lifeforms on the landing map and the sensor picture, and its ruins with the Red Cylinder aboard;
+- lifeforms on the planets' surfaces made as the original makes them, species by species from each planet's own seed, with the behaviour of the game's 1984 design notes;
+- a survey from orbit: the science officer's analysis marks a planet's mineral fields and the latitudes where its lifeforms live on the landing map and the sensor picture, and its ruins with the Red Cylinder aboard;
 - an easier terrain vehicle: a mining laser in place of the original's one-press pickup of a deposit, a Return order, a transporter for its hold, and boarding anywhere within 3 km of the ship;
 - grass, pebbles and finer ground around the terrain vehicle, as much as the Colors screen's ground detail asks for.
 

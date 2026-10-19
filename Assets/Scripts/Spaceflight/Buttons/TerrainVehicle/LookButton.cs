@@ -88,7 +88,8 @@ public class LookButton : ShipButton
 			{
 				var species = nearest.m_species;
 
-				text += "\n\n<color=#FFFF00>A lifeform (" + species.GetBodyPlanText() + "):</color> <color=white>" + species.GetSizeText() + " and " + species.GetColourText() + ". " + nearest.GetMovementText() + " Status: " + nearest.GetStatusText() + ".</color>";
+				// its description as the shipped game gives it (SENT-OV SAYIT)
+				text += "\n\n<color=#FFFF00>A lifeform (" + species.GetBodyPlanText() + "):</color> <color=white>" + species.GetDescription() + " " + nearest.GetMovementText() + " Status: " + nearest.GetStatusText() + ".</color>";
 			}
 		}
 

@@ -2,18 +2,31 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// the science officer's survey of a planet from orbit, made by the analysis of a sensor reading of the planet: where its mineral deposits and its lifeforms
-// are. Their places are worked out from the planet's own maps and seeds exactly as the surface places them (TerrainGridPopulator.ReplayPlaces,
-// TerrainLifeforms.ReplayPlaces), then found as well as the officer's science skill and the sensors' health allow: a skilled officer with sound sensors finds
-// most of the mineral fields and lifeforms and puts them close to where they are, an unskilled one finds a few and puts them roughly (decided 2026-10-17,
-// ROADMAP D6: the shipped game's sensors give only the densities; the 1984 notes have life readings as dots on the sensor picture, and minerals and ruins
-// as marks on the map; the ancient ruins are left to the Red Cylinder, the device the original has for finding them from orbit)
+// the science officer's survey of a planet from orbit, made by the analysis of a sensor reading of the planet: where its mineral deposits are, and the
+// latitude bands its lifeforms live in. The deposits' places are worked out from the planet's own maps and seeds exactly as the surface places them
+// (TerrainGridPopulator.ReplayPlaces) and the bands from the regions of its lifeforms (GD_Species.GetLife: the shipped game places a block's lifeforms only when
+// the terrain vehicle comes into it, so their places are not known from orbit), then found as well as the officer's science skill and the sensors' health
+// allow: a skilled officer with sound sensors finds most of the mineral fields and bands with life and puts the fields close to where they are, an unskilled
+// one finds a few and puts them roughly (decided 2026-10-17, ROADMAP D6: the shipped game's sensors give only the densities; the 1984 notes have life readings
+// as dots on the sensor picture, and minerals and ruins as marks on the map; the ancient ruins are left to the Red Cylinder, the device the original has for
+// finding them from orbit; the bands with life, more strongly the more crowded, decided 2026-10-19)
 public class PlanetSurvey
 {
 	public enum Kind
 	{
-		Minerals, Life
+		Minerals
 	}
+
+	// a latitude band with life that the survey found: its edges (north-south, in degrees) and how crowded its region is (0 to 256, the shipped game's crowding)
+	public struct LifeBand
+	{
+		public float m_southEdge;
+		public float m_northEdge;
+		public int m_crowding;
+	}
+
+	// the degrees of latitude of one of the original's surface rows (960 from pole to pole)
+	const float c_degreesPerRow = 180.0f / 960.0f;
 
 	// a mark of the survey: what, where (east-west and north-south, in degrees, as the landing map's coordinates), how much (the deposits of a mineral field,
 	// 1 otherwise) and the element most of a field's deposits are of, if the officer can tell (-1 if not, and for anything but minerals)
@@ -37,7 +50,7 @@ public class PlanetSurvey
 	// the skill at which an officer finds everything there is to find (the crew's skills go up to 250)
 	const float c_fullSkill = 250.0f;
 
-	// how many of the mineral fields and the lifeforms the least skilled officer with sound sensors finds, and the most
+	// how many of the mineral fields and the bands with life the least skilled officer with sound sensors finds, and the most
 	const float c_leastFound = 0.15f;
 	const float c_lifeLeastFound = 0.2f;
 
@@ -50,14 +63,16 @@ public class PlanetSurvey
 	public readonly List<Mark> m_marks = new List<Mark>();
 	public int m_mineralFieldsFound;
 	public int m_mineralFields;
-	public int m_lifeformsFound;
-	public int m_lifeforms;
 	public int m_speciesCount;
+
+	// the bands with life found (a band a hemisphere, and one about the equator), and how many there are
+	public readonly List<LifeBand> m_lifeBands = new List<LifeBand>();
+	public int m_lifeBandCount;
 
 	// the element most of the mineral fields found are of (-1 if none was told)
 	public int m_mainElementId = -1;
 
-	// a deposit and a lifeform where the surface places them
+	// a deposit where the surface places it
 	struct Deposit
 	{
 		public float m_eastWest;
@@ -67,17 +82,9 @@ public class PlanetSurvey
 		public int m_depositIndex;
 	}
 
-	struct Lifeform
-	{
-		public float m_eastWest;
-		public float m_northSouth;
-		public int m_speciesIndex;
-	}
-
 	// the places of the last planet worked out (it takes a moment: every rock is placed again first, since the deposits must not land on them)
 	static int s_placesPlanetId = -1;
 	static List<Deposit> s_deposits;
-	static List<Lifeform> s_lifeforms;
 
 	PlanetSurvey( int planetId )
 	{
@@ -107,21 +114,20 @@ public class PlanetSurvey
 		var random = new System.Random( planet.m_id * 7919 + scienceSkill * 31 + Mathf.RoundToInt( sensorsFactor * 100.0f ) );
 
 		survey.AddMineralFields( planet, quality, error, random );
-		survey.AddLifeforms( planet, quality, error, random );
+		survey.AddLifeBands( planet, quality, random );
 
 		return survey;
 	}
 
-	// works out where the surface places the planet's deposits and lifeforms (once a planet)
+	// works out where the surface places the planet's deposits (once a planet)
 	static void WorkOutPlaces( GD_Planet planet, PlanetGenerator planetGenerator, TerrainGrid terrainGrid )
 	{
-		if ( ( s_placesPlanetId == planet.m_id ) && ( s_deposits != null ) && ( s_lifeforms != null ) )
+		if ( ( s_placesPlanetId == planet.m_id ) && ( s_deposits != null ) )
 		{
 			return;
 		}
 
 		s_deposits = new List<Deposit>();
-		s_lifeforms = new List<Lifeform>();
 		s_placesPlanetId = planet.m_id;
 
 		var elevationScale = terrainGrid.m_elevationScale;
@@ -150,20 +156,9 @@ public class PlanetSurvey
 				s_deposits.Add( new Deposit { m_eastWest = eastWest, m_northSouth = northSouth, m_elementId = places[ i ].m_templateIndex, m_volume = places[ i ].m_volume, m_depositIndex = i } );
 			}
 		}
-
-		// and the lifeforms, last
-		foreach ( var place in TerrainLifeforms.ReplayPlaces( planetGenerator, planet.m_id + 5 ) )
-		{
-			var position = Tools.MapToWorldCoordinates( place.Value.x, place.Value.y, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
-
-			Tools.WorldToLatLongCoordinates( position, out var eastWest, out var northSouth );
-
-			s_lifeforms.Add( new Lifeform { m_eastWest = eastWest, m_northSouth = northSouth, m_speciesIndex = place.Key } );
-		}
 	}
 
-	// the exact places of the planet's deposits and lifeforms (east-west, north-south and the element or the species; for the probe, which compares them
-	// with the objects on the surface)
+	// the exact places of the planet's deposits (east-west, north-south and the element; for the probe, which compares them with the objects on the surface)
 	public static List<Vector3> GetDepositPlaces( GD_Planet planet, PlanetGenerator planetGenerator, TerrainGrid terrainGrid )
 	{
 		var places = new List<Vector3>();
@@ -178,25 +173,6 @@ public class PlanetSurvey
 		foreach ( var deposit in s_deposits )
 		{
 			places.Add( new Vector3( deposit.m_eastWest, deposit.m_northSouth, deposit.m_elementId ) );
-		}
-
-		return places;
-	}
-
-	public static List<Vector3> GetLifeformPlaces( GD_Planet planet, PlanetGenerator planetGenerator, TerrainGrid terrainGrid )
-	{
-		var places = new List<Vector3>();
-
-		if ( ( planet == null ) || ( planetGenerator == null ) || ( planetGenerator.m_elevation == null ) || ( terrainGrid == null ) )
-		{
-			return places;
-		}
-
-		WorkOutPlaces( planet, planetGenerator, terrainGrid );
-
-		foreach ( var lifeform in s_lifeforms )
-		{
-			places.Add( new Vector3( lifeform.m_eastWest, lifeform.m_northSouth, lifeform.m_speciesIndex ) );
 		}
 
 		return places;
@@ -343,29 +319,69 @@ public class PlanetSurvey
 		}
 	}
 
-	// the lifeforms: each found by the officer's chance
-	void AddLifeforms( GD_Planet planet, float quality, float error, System.Random random )
+	// the latitude bands with life, each found by the officer's chance: the bands of the planet's regions as the shipped game picks a region by latitude
+	// (ShippedLifeforms.Result.GetRegionAt: the coldest at the poles, the hottest about the equator), one each side of the equator and one across it, those
+	// whose region has lifeforms placed in it
+	void AddLifeBands( GD_Planet planet, float quality, System.Random random )
 	{
-		m_lifeforms = s_lifeforms.Count;
-		m_speciesCount = GD_Species.ForPlanet( planet ).Count;
+		var life = GD_Species.GetLife( planet );
 
+		m_speciesCount = life.m_species.Count;
+
+		if ( m_speciesCount == 0 )
+		{
+			return;
+		}
+
+		var bands = life.m_highestRegion - life.m_lowestRegion + 1;
+		var rowsPerBand = 480 / bands + 1;
 		var chance = Mathf.Lerp( c_lifeLeastFound, 1.0f, quality );
 
-		foreach ( var lifeform in s_lifeforms )
+		for ( var band = 0; band < bands; band++ )
 		{
-			// (both numbers are drawn for every lifeform, so that what one officer finds does not move what is found after it)
-			var roll = random.NextDouble();
-			var eastWest = Wrap( lifeform.m_eastWest + Offset( random, error ) );
-			var northSouth = Mathf.Clamp( lifeform.m_northSouth + Offset( random, error ), -90.0f, 90.0f );
+			var region = life.m_lowestRegion + band;
+			var polewardEdge = 90.0f - band * rowsPerBand * c_degreesPerRow;
+			var equatorwardEdge = Mathf.Max( 0.0f, 90.0f - ( band + 1 ) * rowsPerBand * c_degreesPerRow );
+			var acrossTheEquator = equatorwardEdge <= 0.0f;
 
-			if ( roll >= chance )
+			// the north band, then the south one (one band across the equator)
+			for ( var hemisphere = 0; hemisphere < ( acrossTheEquator ? 1 : 2 ); hemisphere++ )
 			{
-				continue;
+				// (drawn for every band, so that what one officer finds does not move what is found after it)
+				var roll = random.NextDouble();
+
+				if ( !life.HasLifeIn( region ) )
+				{
+					continue;
+				}
+
+				m_lifeBandCount++;
+
+				if ( roll >= chance )
+				{
+					continue;
+				}
+
+				var lifeBand = new LifeBand { m_crowding = life.m_crowding[ region ] };
+
+				if ( acrossTheEquator )
+				{
+					lifeBand.m_southEdge = -polewardEdge;
+					lifeBand.m_northEdge = polewardEdge;
+				}
+				else if ( hemisphere == 0 )
+				{
+					lifeBand.m_southEdge = equatorwardEdge;
+					lifeBand.m_northEdge = polewardEdge;
+				}
+				else
+				{
+					lifeBand.m_southEdge = -polewardEdge;
+					lifeBand.m_northEdge = -equatorwardEdge;
+				}
+
+				m_lifeBands.Add( lifeBand );
 			}
-
-			m_marks.Add( new Mark { m_kind = Kind.Life, m_eastWest = eastWest, m_northSouth = northSouth, m_size = 1, m_elementId = -1 } );
-
-			m_lifeformsFound++;
 		}
 	}
 
@@ -386,6 +402,5 @@ public class PlanetSurvey
 	{
 		s_placesPlanetId = -1;
 		s_deposits = null;
-		s_lifeforms = null;
 	}
 }

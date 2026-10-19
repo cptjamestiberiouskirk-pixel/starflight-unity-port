@@ -1,18 +1,28 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// places the lifeforms of a planet: some of each of its species (GD_Species.ForPlanet), where the manual (page 21) says they live - "lifeforms are not distributed
-// evenly over the planet's surface, but tend to clump in the lower elevations near the equator or other temperate areas" - never on liquid, mud or lava
-// (planet.txt) - with the planet's random numbers, after every other populator, so nothing else moves; they are placed again on every visit (the notes:
-// the lifeforms of an encounter area are made as it is entered) - how many of each species and where exactly are the port's
+// places the lifeforms of a planet as the shipped game does (roadmap 8.18, SEED-OV POPULA): the surface is cut into blocks of 18 by 30 of the original's cells
+// (RandomRuinRegions' regions), and a block's lifeforms are placed when the terrain vehicle comes near it - the species of the block's region (its
+// temperature band by latitude, GD_Species.GetLife), each a random number of times up to the region's individuals per block, each at a random cell of the
+// block on low dry ground (the original's contour heights 0x21 to 0x3f), never on liquid, mud or lava, and the last species record never (an original quirk)
+// - only the blocks around the vehicle hold lifeforms, and those it leaves behind are taken away (decided 2026-10-19); the numbers are the kernel's, with a
+// seed per block, so a block holds the same lifeforms every time and the game's random numbers do not move
 public class TerrainLifeforms : TerrainGridPopulator
 {
-	// how many of a species are placed
-	const int c_fewestOfASpecies = 3;
-	const int c_mostOfASpecies = 8;
+	// the blocks whose lifeforms are placed: those this near the vehicle's (the 3 by 3 about it), and they are taken away beyond one more
+	const int c_blockPlaceDistance = 1;
+	const int c_blockKeepDistance = 2;
 
-	// how many places to try for each lifeform (the lowest is taken)
-	const int c_tries = 6;
+	// how often the blocks about the vehicle are looked at, in seconds
+	const float c_blockCheckSeconds = 0.5f;
+
+	// the low ground lifeforms are placed on: the original's contour above 0x20 (its sea level: the port's water elevation, as for the ruins) and below 0x40,
+	// out of land heights up to 0x7f - the lowest third of the heights between the water and the planet's highest point (the port's reading of the scale)
+	const float c_lowGroundShare = 0x1f / (float) 0x5f;
+
+	// a lifeform's place index is its block times this, plus the number of the attempt that placed it in the block (always fewer than this: a block's species
+	// times its individuals per block stay under 256)
+	const int c_placesPerBlock = 256;
 
 	// the size of the smallest lifeform's marker, in world units (and as much again for each step of size)
 	const float c_markerScale = 1.5f;
@@ -61,10 +71,16 @@ public class TerrainLifeforms : TerrainGridPopulator
 	// the lifeforms placed (for the pairing of mates: lf-behav.txt, "Pair all un-paired lifeforms in the encounter area")
 	public readonly List<TerrainLifeform> m_lifeformList = new List<TerrainLifeform>();
 
-	// the planet the lifeforms were placed on
+	// the planet the lifeforms are placed on, what the generation of its lifeforms gave, its species, and the lifeforms placed in each block
 	int m_planetId = -1;
+	GD_Planet m_planet;
+	ShippedLifeforms.Result m_life;
+	List<GD_Species> m_speciesList;
+	readonly Dictionary<int, List<TerrainLifeform>> m_blockLifeforms = new Dictionary<int, List<TerrainLifeform>>();
+	float m_blockTimer;
 
-	// place the lifeforms of this planet
+	// place the lifeforms of this planet about the place the terrain vehicle goes out at (the random seed of the other populators is not needed: each block
+	// has a generator of its own)
 	public void Initialize( PlanetGenerator planetGenerator, float elevationScale, int randomSeed )
 	{
 		m_elevationScale = elevationScale;
@@ -73,67 +89,139 @@ public class TerrainLifeforms : TerrainGridPopulator
 		Tools.DestroyChildrenOf( gameObject );
 
 		m_lifeformList.Clear();
+		m_blockLifeforms.Clear();
 
-		m_planetId = planetGenerator.GetPlanet().m_id;
+		m_planet = planetGenerator.GetPlanet();
+		m_planetId = m_planet.m_id;
+		m_speciesList = GD_Species.ForPlanet( m_planet );
+		m_life = GD_Species.GetLife( m_planet );
+		m_blockTimer = c_blockCheckSeconds;
 
-		var speciesList = GD_Species.ForPlanet( planetGenerator.GetPlanet() );
+		PlaceBlocksAround( DataController.m_instance.m_playerData.m_general.m_lastDisembarkedCoordinates );
+	}
 
-		if ( speciesList.Count == 0 )
+	// the blocks within c_blockPlaceDistance of this place get their lifeforms, and those beyond c_blockKeepDistance lose theirs - a block's lifeforms come back
+	// the same when the vehicle comes back (but for those killed, captured or eaten, PD_PlanetSurfaces.LoseLifeform)
+	void PlaceBlocksAround( Vector3 worldPosition )
+	{
+		var planetGenerator = GetPlanetGenerator();
+
+		if ( ( m_speciesList == null ) || ( m_speciesList.Count == 0 ) || ( m_life == null ) || ( planetGenerator == null ) || ( planetGenerator.m_elevation == null ) )
 		{
 			return;
 		}
 
-		// remember where the game's random numbers are, so that they can carry on from there when we are done (as the other populators do)
-		var randomState = Random.state;
+		Tools.WorldToMapCoordinates( worldPosition, out var mapX, out var mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
 
-		Random.InitState( randomSeed );
+		var centre = RandomRuinRegions.GetRegion( mapX, mapY, planetGenerator );
+		var kept = new HashSet<int>( RandomRuinRegions.GetRegionsAround( centre, c_blockKeepDistance ) );
 
-		var minimumElevation = ( planetGenerator.m_maximumElevation - planetGenerator.m_waterElevation ) * 0.05f + planetGenerator.m_waterElevation;
+		// the blocks too far away lose their lifeforms
+		var gone = new List<int>();
 
-		foreach ( var species in speciesList )
+		foreach ( var block in m_blockLifeforms.Keys )
 		{
-			var count = Random.Range( c_fewestOfASpecies, c_mostOfASpecies + 1 );
+			if ( !kept.Contains( block ) )
+			{
+				gone.Add( block );
+			}
+		}
+
+		foreach ( var block in gone )
+		{
+			RemoveBlock( block );
+		}
+
+		// the blocks near enough get theirs (each once)
+		foreach ( var block in RandomRuinRegions.GetRegionsAround( centre, c_blockPlaceDistance ) )
+		{
+			if ( !m_blockLifeforms.ContainsKey( block ) )
+			{
+				PlaceBlock( block );
+			}
+		}
+	}
+
+	// places the lifeforms of one block (SEED-OV WF079, WEE91 and WEE4D)
+	void PlaceBlock( int block )
+	{
+		var planetGenerator = GetPlanetGenerator();
+		var placed = new List<TerrainLifeform>();
+
+		m_blockLifeforms[ block ] = placed;
+
+		var column = block % RandomRuinRegions.c_columns;
+		var row = block / RandomRuinRegions.c_columns;
+		var left = column * RandomRuinRegions.c_regionWidth;
+		var top = row * RandomRuinRegions.c_regionHeight;
+
+		// the block's region (the original takes the vehicle's row as it comes into the block; the port, which places a block before the vehicle reaches it,
+		// the block's middle row)
+		var region = m_life.GetRegionAt( top + RandomRuinRegions.c_regionHeight / 2 );
+		var most = m_life.m_individualsPerBlock[ region ];
+		var random = new ShippedLifeforms.Generator( m_life.GetBlockSeed( column, row ) );
+		var water = planetGenerator.m_waterElevation;
+		var highest = water + ( planetGenerator.m_maximumElevation - water ) * c_lowGroundShare;
+		var attempt = 0;
+
+		// the species of the region, from the highest record down (WEE91 stacks them, WF079 takes them off the stack), each a number of times from 0 to one less
+		// than the individuals per block
+		for ( var index = Mathf.Min( m_life.GetPlacedSpeciesCount(), m_speciesList.Count ) - 1; index >= 0; index-- )
+		{
+			if ( m_life.m_species[ index ].m_region != region )
+			{
+				continue;
+			}
+
+			var count = random.Range( 0, most );
 
 			for ( var i = 0; i < count; i++ )
 			{
-				// the lowest dry place of a few near the equator
-				var found = false;
-				var bestX = 0.0f;
-				var bestY = 0.0f;
-				var bestElevation = float.MaxValue;
+				// a cell of the block (WECDD and WECFB reach one cell past it across and down)
+				var x = random.Range( left, left + RandomRuinRegions.c_regionWidth + 1 );
+				var y = random.Range( top, top + RandomRuinRegions.c_regionHeight + 1 );
+				var placeIndex = block * c_placesPerBlock + Mathf.Min( attempt, c_placesPerBlock - 1 );
 
-				for ( var j = 0; j < c_tries; j++ )
+				attempt++;
+
+				RandomRuinRegions.ToMap( Mathf.Repeat( x + 0.5f, RandomRuinRegions.c_surfaceWidth ), Mathf.Min( y + 0.5f, RandomRuinRegions.c_surfaceHeight - 0.5f ), planetGenerator, out var mapX, out var mapY );
+
+				var elevation = planetGenerator.GetBilinearSmoothedElevation( mapX, mapY );
+
+				// only on low dry ground (WED79 and WED8B): an attempt anywhere else places nothing
+				if ( ( elevation <= water ) || ( elevation >= highest ) )
 				{
-					var mapX = Random.Range( 0.0f, planetGenerator.m_textureMapWidth );
-					var mapY = Random.Range( planetGenerator.m_textureMapHeight * 0.35f, planetGenerator.m_textureMapHeight * 0.65f );
-					var elevation = planetGenerator.GetBilinearSmoothedElevation( mapX, mapY );
-
-					if ( ( elevation >= minimumElevation ) && ( elevation < bestElevation ) )
-					{
-						found = true;
-						bestX = mapX;
-						bestY = mapY;
-						bestElevation = elevation;
-					}
+					continue;
 				}
 
-				if ( found )
+				placed.Add( PlaceLifeform( m_speciesList[ index ], mapX, mapY, m_elevationScale, placeIndex ) );
+			}
+		}
+
+		ApplyLostLifeforms( placed );
+	}
+
+	// takes the lifeforms of one block off the surface
+	void RemoveBlock( int block )
+	{
+		if ( m_blockLifeforms.TryGetValue( block, out var placed ) )
+		{
+			foreach ( var lifeform in placed )
+			{
+				// (one eaten or captured is gone already: a destroyed object compares equal to null)
+				if ( lifeform != null )
 				{
-					PlaceLifeform( species, bestX, bestY, elevationScale );
+					RemoveFromSurface( lifeform );
 				}
 			}
 		}
 
-		// give the game its random numbers back
-		Random.state = randomState;
-
-		// (after every random number, so nothing moves)
-		ApplyLostLifeforms();
+		m_blockLifeforms.Remove( block );
 	}
 
 	// the lifeforms killed, captured or eaten on earlier runs of the terrain vehicle in this orbit stay so until the ship leaves it, as the original's stay in
 	// the regions of the planet until DEPART deletes them (DPART-OV WF166): a dead one lies dead, a captured or eaten one is gone
-	void ApplyLostLifeforms()
+	void ApplyLostLifeforms( List<TerrainLifeform> placed )
 	{
 		var planetSurfaces = DataController.m_instance.m_playerData.m_planetSurfaces;
 
@@ -142,7 +230,7 @@ public class TerrainLifeforms : TerrainGridPopulator
 			return;
 		}
 
-		foreach ( var lifeform in m_lifeformList.ToArray() )
+		foreach ( var lifeform in placed.ToArray() )
 		{
 			var lostLifeform = planetSurfaces.FindLostLifeform( m_planetId, lifeform.m_placeIndex );
 
@@ -157,6 +245,8 @@ public class TerrainLifeforms : TerrainGridPopulator
 			}
 			else
 			{
+				placed.Remove( lifeform );
+
 				RemoveFromSurface( lifeform );
 			}
 		}
@@ -173,69 +263,26 @@ public class TerrainLifeforms : TerrainGridPopulator
 		}
 	}
 
-	/// <summary>
-	/// Works out where Initialize places the lifeforms of a planet, without placing any (PlanetSurvey: the science officer's survey from orbit): the same random
-	/// numbers in the same order, so the same places (keep the two loops the same; the probe's orbitsurvey compares them with the lifeforms on the surface).
-	/// Each place is its species' index in GD_Species.ForPlanet and its place on the planet's map. The game's random numbers are put back afterwards.
-	/// </summary>
-	public static List<KeyValuePair<int, Vector2>> ReplayPlaces( PlanetGenerator planetGenerator, int randomSeed )
+	// the blocks follow the terrain vehicle
+	void UpdateBlocks()
 	{
-		var places = new List<KeyValuePair<int, Vector2>>();
+		var controller = SpaceflightController.m_instance;
 
-		if ( ( planetGenerator == null ) || ( planetGenerator.m_elevation == null ) )
+		if ( ( m_planet == null ) || ( controller == null ) || controller.m_gameIsPaused || ( controller.m_terrainVehicle == null ) || ( DataController.m_instance.m_playerData.m_general.m_location != PD_General.Location.Disembarked ) )
 		{
-			return places;
+			return;
 		}
 
-		var speciesList = GD_Species.ForPlanet( planetGenerator.GetPlanet() );
+		m_blockTimer -= Time.deltaTime;
 
-		if ( speciesList.Count == 0 )
+		if ( m_blockTimer > 0.0f )
 		{
-			return places;
+			return;
 		}
 
-		var randomState = Random.state;
+		m_blockTimer = c_blockCheckSeconds;
 
-		Random.InitState( randomSeed );
-
-		var minimumElevation = ( planetGenerator.m_maximumElevation - planetGenerator.m_waterElevation ) * 0.05f + planetGenerator.m_waterElevation;
-
-		for ( var speciesIndex = 0; speciesIndex < speciesList.Count; speciesIndex++ )
-		{
-			var count = Random.Range( c_fewestOfASpecies, c_mostOfASpecies + 1 );
-
-			for ( var i = 0; i < count; i++ )
-			{
-				var found = false;
-				var bestX = 0.0f;
-				var bestY = 0.0f;
-				var bestElevation = float.MaxValue;
-
-				for ( var j = 0; j < c_tries; j++ )
-				{
-					var mapX = Random.Range( 0.0f, planetGenerator.m_textureMapWidth );
-					var mapY = Random.Range( planetGenerator.m_textureMapHeight * 0.35f, planetGenerator.m_textureMapHeight * 0.65f );
-					var elevation = planetGenerator.GetBilinearSmoothedElevation( mapX, mapY );
-
-					if ( ( elevation >= minimumElevation ) && ( elevation < bestElevation ) )
-					{
-						found = true;
-						bestX = mapX;
-						bestY = mapY;
-						bestElevation = elevation;
-					}
-				}
-
-				if ( found )
-				{
-					places.Add( new KeyValuePair<int, Vector2>( speciesIndex, new Vector2( bestX, bestY ) ) );
-				}
-			}
-		}
-
-		Random.state = randomState;
-
-		return places;
+		PlaceBlocksAround( controller.m_terrainVehicle.transform.position );
 	}
 
 	// the height of the ground at this place, and whether it is dry ground a lifeform can walk on (planet.txt: lifeforms on the ground never move onto "liquid" or
@@ -284,15 +331,17 @@ public class TerrainLifeforms : TerrainGridPopulator
 		return model;
 	}
 
-	// the name of a species' model: its body plan, and for a plant one of the two models of its size (by its planet and its place among the planet's species,
-	// so that no random number is drawn for it)
+	// the name of a species' model: its body plan, and for a leaved plant one of the two models of its size (A or B as its icon is even or odd: the shipped
+	// game's set.icon draws the pair's icon with a coin)
 	public static string GetModelName( GD_Species species, int planetId )
 	{
 		var name = species.m_bodyPlan.ToString();
 
-		if ( species.IsPlant() )
+		if ( ( species.m_bodyPlan >= GD_Species.BodyPlan.LeavedSmall ) && ( species.m_bodyPlan <= GD_Species.BodyPlan.LeavedLarge ) )
 		{
-			name += ( ( ( planetId + species.m_index ) % 2 ) == 0 ) ? "A" : "B";
+			var icon = ( species.m_record != null ) ? species.m_record.m_icon : planetId + species.m_index;
+
+			name += ( ( icon % 2 ) == 0 ) ? "A" : "B";
 		}
 
 		return name;
@@ -301,7 +350,7 @@ public class TerrainLifeforms : TerrainGridPopulator
 	// a lifeform at this place: the model of its body plan, tinted with its species' colour (TerrainLifeform), as large as its size - the models stand on their
 	// base and face along +Z, and each one is turned by its place on the map (no random number is drawn for it); without a model a plain shape stands in for
 	// it (a pillar for a plant, a ball for a radial animal, a box for an amorphous one, and a capsule for a bilateral one)
-	void PlaceLifeform( GD_Species species, float mapX, float mapY, float elevationScale )
+	TerrainLifeform PlaceLifeform( GD_Species species, float mapX, float mapY, float elevationScale, int placeIndex )
 	{
 		var planetGenerator = GetPlanetGenerator();
 		var size = c_markerScale * ( 1.0f + species.m_size * 0.5f );
@@ -322,12 +371,12 @@ public class TerrainLifeforms : TerrainGridPopulator
 			var modelLifeform = modelObject.AddComponent<TerrainLifeform>();
 
 			modelLifeform.m_groundOffset = 0.0f;
-			modelLifeform.m_placeIndex = m_lifeformList.Count;
+			modelLifeform.m_placeIndex = placeIndex;
 			modelLifeform.Initialize( species, this );
 
 			m_lifeformList.Add( modelLifeform );
 
-			return;
+			return modelLifeform;
 		}
 
 		PrimitiveType shape;
@@ -373,11 +422,13 @@ public class TerrainLifeforms : TerrainGridPopulator
 		var lifeform = lifeformObject.AddComponent<TerrainLifeform>();
 
 		lifeform.m_groundOffset = groundOffset;
-		lifeform.m_placeIndex = m_lifeformList.Count;
+		lifeform.m_placeIndex = placeIndex;
 
 		lifeform.Initialize( species, this );
 
 		m_lifeformList.Add( lifeform );
+
+		return lifeform;
 	}
 
 	// the lifeform nearest the terrain vehicle, if one is beside it (null otherwise)
@@ -484,9 +535,11 @@ public class TerrainLifeforms : TerrainGridPopulator
 		return true;
 	}
 
-	// the recording under way: it fails if the lifeform gets away, waits while it attacks, and when it is done the data is Interstel's
+	// the blocks about the terrain vehicle, and the recording under way: it fails if the lifeform gets away, waits while it attacks, and when it is done the data is Interstel's
 	void Update()
 	{
+		UpdateBlocks();
+
 		if ( !m_recording || ( SpaceflightController.m_instance == null ) || SpaceflightController.m_instance.m_gameIsPaused )
 		{
 			return;

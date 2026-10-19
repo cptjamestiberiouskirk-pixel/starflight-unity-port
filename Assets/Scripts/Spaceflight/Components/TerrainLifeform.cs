@@ -14,8 +14,8 @@ public class TerrainLifeform : MonoBehaviour
 	// its species (GD_Species.ForPlanet)
 	public GD_Species m_species;
 
-	// its place in the order the lifeforms of its planet are placed (the same every time): what has become of it is kept by it until the ship leaves the orbit
-	// (PD_PlanetSurfaces.LoseLifeform)
+	// its place among the lifeforms of its planet (its block and the attempt that placed it there, the same every time, TerrainLifeforms): what has become of
+	// it is kept by it until the ship leaves the orbit (PD_PlanetSurfaces.LoseLifeform)
 	public int m_placeIndex;
 
 	// its hit points and stuns left, starting with its species'
@@ -531,15 +531,17 @@ public class TerrainLifeform : MonoBehaviour
 			m_attackedMate = false;
 		}
 
-		var niche = m_species.m_niche;
-		var mateNiche = m_mate.m_species.m_niche;
+		// the niches as the shipped game's bits (2 a producer, 4 eats plants, 8 eats animals): a herbivorous or carnivorous producer is a plant that hunts as a
+		// herbivore or a carnivore does
+		var niche = m_species.GetNicheBits();
+		var mateNiche = m_mate.m_species.GetNicheBits();
 
-		var producer = niche == GD_Species.Niche.Producer;
-		var herbivore = niche == GD_Species.Niche.Herbivore;
-		var carnivore = niche == GD_Species.Niche.Carnivore;
-		var omnivore = niche == GD_Species.Niche.Omnivore;
-		var mateProducer = mateNiche == GD_Species.Niche.Producer;
-		var mateHerbivore = mateNiche == GD_Species.Niche.Herbivore;
+		var producer = ( niche & 2 ) != 0;
+		var herbivore = ( niche & 12 ) == 4;
+		var carnivore = ( niche & 12 ) == 8;
+		var omnivore = ( niche & 12 ) == 12;
+		var mateProducer = ( mateNiche & 2 ) != 0;
+		var mateHerbivore = ( mateNiche & 12 ) == 4;
 
 		var mateAlive = m_mate.m_status != Status.Dead;
 		var mateOnGround = !m_mate.IsAirborne();
@@ -646,7 +648,7 @@ public class TerrainLifeform : MonoBehaviour
 			}
 			// "FLOAT <-- ?MOVING TRUE ?ON-GROUND TRUE ?CAN-FLOAT TRUE ?PRODUCER TRUE", "FLOAT <-- ?MOVING TRUE ?ON-GROUND TRUE ?CAN-FLOAT TRUE ?PRODUCER FALSE
 			// ?WANTS-TO-FLOAT TRUE"
-			else if ( m_moving && m_species.m_canFloat && ( ( m_species.m_niche == GD_Species.Niche.Producer ) || ( Random.value < c_wantsToFloatChance ) ) )
+			else if ( m_moving && m_species.m_canFloat && ( m_species.IsPlant() || ( Random.value < c_wantsToFloatChance ) ) )
 			{
 				m_floating = true;
 			}

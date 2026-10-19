@@ -85,7 +85,9 @@ public class AnalysisButton : ShipButton
 			minerals = survey.m_mineralFieldsFound + ( ( survey.m_mineralFieldsFound == 1 ) ? " field" : " fields" ) + element;
 		}
 
-		var life = ( survey.m_speciesCount == 0 ) ? "None" : ( survey.m_speciesCount + " species, " + survey.m_lifeformsFound + " found" );
+		// the species, and the latitude bands their lifeforms were found in
+		var bandsFound = survey.m_lifeBands.Count;
+		var life = ( survey.m_speciesCount == 0 ) ? "None" : ( survey.m_speciesCount + " species, " + ( ( bandsFound == 0 ) ? "none found" : ( "found in " + bandsFound + ( ( bandsFound == 1 ) ? " band" : " bands" ) ) ) );
 
 		return "\nMineral Fields: <color=white>" + Known( minerals, skill ) + "</color>\nLifeforms: <color=white>" + Known( life, skill ) + "</color>";
 	}
