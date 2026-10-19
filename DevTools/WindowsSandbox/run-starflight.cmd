@@ -2,7 +2,7 @@
 rem Runs inside Windows Sandbox when test-build.ps1 starts it: runs the build mapped
 rem to the desktop in a window, then copies its saves and the Code Integrity events
 rem to the Out folder, which is a folder on the host.
-rem   run-starflight.cmd [width] [height]
+rem   run-starflight.cmd [width] [height] [sound]
 set "GAME=C:\Users\WDAGUtilityAccount\Desktop\Starflight\Starflight.exe"
 set "OUT=C:\Users\WDAGUtilityAccount\Desktop\Out\last-run"
 set "DATA=%USERPROFILE%\AppData\LocalLow\DefaultCompany\Starflight"
@@ -13,6 +13,9 @@ if "%HEIGHT%"=="" set "HEIGHT=720"
 
 if exist "%OUT%" rmdir /s /q "%OUT%"
 mkdir "%OUT%"
+
+rem Silent unless test-build.ps1 was given -Sound: the Sandbox's own speakers are muted before the game starts (mute.txt says how)
+if /i not "%~3"=="sound" powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0mute-sandbox.ps1" -Out "%OUT%" > nul
 
 rem Is Smart App Control on in here? 1 = enforce, 2 = evaluation, 0 or missing = off
 reg query "HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy" /v VerifiedAndReputablePolicyState > "%OUT%\smart-app-control.txt" 2>&1
