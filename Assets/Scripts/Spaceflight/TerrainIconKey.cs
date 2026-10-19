@@ -229,7 +229,8 @@ public static class TerrainIconKey
 		return GetSpeciesIcon( lifeform.m_species );
 	}
 
-	// the icon of a species: a flying or floating one's, or its body plan's (the first of a producer's two pictures)
+	// the icon of a species: a flying or floating one's, else the one of its record in the shipped game's lifeforms, else its body plan's (the first of a producer's
+	// two pictures)
 	public static int GetSpeciesIcon( GD_Species species )
 	{
 		if ( species == null )
@@ -245,6 +246,12 @@ public static class TerrainIconKey
 		if ( species.m_canFloat )
 		{
 			return c_floatingLifeform;
+		}
+
+		// the shipped game's own picture of the creature (its records' icons are the producers and the body plans, 0 to 16)
+		if ( species.m_record != null )
+		{
+			return Mathf.Clamp( species.m_record.m_icon, c_largeProducer, c_flyingLifeform - 1 );
 		}
 
 		switch ( species.m_bodyPlan )

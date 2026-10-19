@@ -50948,6 +50948,12 @@ public class ClaudeProbe : MonoBehaviour
 				return 18;
 			}
 
+			// the shipped game's own picture of the creature
+			if ( species.m_record != null )
+			{
+				return species.m_record.m_icon;
+			}
+
 			switch ( species.m_bodyPlan )
 			{
 				case GD_Species.BodyPlan.LeavedLarge: return 0;
