@@ -82,6 +82,9 @@ public class PD_General
 	// in older save files
 	public bool m_veloxStoneLineRemoved;
 
+	// set once the Thrynn have sold the crew their device, the Black Box: they offer it once in a game (COMMSPEC-OV NEED-ENERGY: WF08A) - false in older save files
+	public bool m_thrynnDeviceSold;
+
 	// the lifeforms whose data the crew has collected, for the value of new data (GD_Species.GetBodyClass; a species is its planet's id x 16 + its index) - null in
 	// older save files
 	public List<int> m_knownLifeformClassList;

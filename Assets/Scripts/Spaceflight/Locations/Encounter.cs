@@ -901,7 +901,6 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_homeworldWarningCounts = new int[ 3 ];
 			m_pdEncounter.m_homeworldWarningsGiven = false;
 			m_pdEncounter.m_aliensAreCowardly = false;
-			m_pdEncounter.m_specialQuestionAsked = false;
 			m_pdEncounter.m_specialActionStep = 0;
 			m_pdEncounter.m_specialActionAsked = 0;
 			m_pdEncounter.m_specialActionTimer = 0.0f;
@@ -1449,12 +1448,6 @@ public class Encounter : MonoBehaviour
 			return;
 		}
 
-		// has the player answered their question about energy?
-		if ( ( m_pdEncounter.m_lastQuestionFromAliens == c_elowanEnergyQuestionCommId ) && ( m_pdEncounter.m_lastSubjectFromPlayer == GD_Comm.Subject.Yes ) )
-		{
-			AnswerElowanEnergyQuestion();
-		}
-
 		UpdateMood();
 
 		DefaultEncounterUpdate();
@@ -1481,7 +1474,8 @@ public class Encounter : MonoBehaviour
 		return DataController.m_instance.m_playerData.m_general.GetRaceBaseMood( race, personality.m_startingMood ) < personality.m_friendlyBelow;
 	}
 
-	// the Elowan's question of their own, and their answers to a yes (STRINFO 2.4)
+	// the Elowan's question of their own, asked of a friendly ship as the comm link opens (their special action, COMMSPEC-OV WF174), and their answers to a yes
+	// (STRINFO 2.4)
 	const int c_elowanEnergyQuestionCommId = 6;
 	const int c_elowanNeedNotDireCommId = 4;
 	const int c_elowanEnergyGiftCommId = 5;
@@ -1491,33 +1485,8 @@ public class Encounter : MonoBehaviour
 	const int c_elowanEnergyDireBelow = 200;
 	const int c_elowanEnergyGift = 150;
 
-	// a yes to "Is thine need for energy dire?": the Elowan scan the hold, and give 15 cubic meters of Endurium to a ship with less than 20 (as much of it as the hold
-	// has room for) - a no gets nothing
-	void AnswerElowanEnergyQuestion()
-	{
-		var gameData = DataController.m_instance.m_gameData;
-		var ship = DataController.m_instance.m_playerData.m_playerShip;
-
-		var enduriumId = gameData.m_misc.m_enduriumElementId;
-		var endurium = ( ship.m_elementStorage == null ) ? null : ship.m_elementStorage.Find( enduriumId );
-		var held = ( endurium == null ) ? 0 : endurium.m_volume;
-
-		if ( held >= c_elowanEnergyDireBelow )
-		{
-			SayRaceComm( c_elowanNeedNotDireCommId );
-
-			return;
-		}
-
-		var gift = Mathf.Min( c_elowanEnergyGift, Mathf.Max( 0, ship.GetRemainingVolume() ) );
-
-		if ( gift > 0 )
-		{
-			ship.AddElement( enduriumId, gift );
-		}
-
-		SayRaceComm( c_elowanEnergyGiftCommId );
-	}
+	// how much more agitated the Elowan are by a lie about the ship's need (WF174: 8 +!EDL)
+	const float c_elowanLieAnger = 8.0f;
 
 	// the comm of the Elowan for a ship that has destroyed Elan ("Thou hast done a deed most unthinkably foul... We are now and forever mortal enemies.")
 	const int c_elanDestroyedCommId = 3;
@@ -1723,16 +1692,14 @@ public class Encounter : MonoBehaviour
 	{
 		UpdateCowardice();
 
-		UpdateThrynnTrade();
-
 		UpdateMood();
 
 		DefaultEncounterUpdate();
 	}
 
-	// the Thrynn's offers (STRINFO 2.5), their question of their own: to buy the artifact in the hold they pay the most for, at their prices (STRINFO 1.3.1,
-	// GD_Artifact.m_thrynnPrice), or else the plutonium in the hold, or else to sell "a device that will make your ship invulnerable" - the Black Box - for 30
-	// of the player's energy crystals - and their two answers, "You do not have enough. Do not try to deceive us." and "Very well."
+	// the Thrynn's offers (STRINFO 2.5), made in turn as the comm link opens (their special actions): to buy the plutonium in the hold, to buy an artifact of the
+	// hold, and to sell a friendly ship "a device that will make your ship invulnerable" - the Black Box - for 30 of the player's energy crystals - and their two
+	// answers about the device, "You do not have enough. Do not try to deceive us." and "Very well."
 	const int c_thrynnPlutoniumOfferCommId = 299;
 	const int c_thrynnArtifactOfferCommId = 300;
 	const int c_thrynnBlackBoxOfferCommId = 301;
@@ -1742,179 +1709,52 @@ public class Encounter : MonoBehaviour
 	// the Black Box's price, in tenths of a cubic meter of Endurium
 	const int c_thrynnBlackBoxPrice = 300;
 
-	// the artifact in the hold the Thrynn pay the most for - null if there is none they want
+	// the least plutonium they buy, in tenths, and the share of it they pay in Endurium, in percent (COMMSPEC-OV PLUTONIUM: 3 15 ?>=ELEMENT, QTY 84 100 */)
+	const int c_thrynnLeastPlutonium = 3;
+	const int c_thrynnPlutoniumPercent = 84;
+
+	// how much more agitated a refusal makes them (PLUTONIUM and WF312: 0 5 XY/N; NEED-ENERGY: 5 +!EDL for a yes without the Endurium)
+	const float c_thrynnRefusalAnger = 5.0f;
+
+	// the artifact of the hold the Thrynn offer to buy (COMMSPEC-OV WF312): a step of 1 to 9 through the hold's artifacts from the first, round again past the
+	// last, back to the first if it lands on a Black Box, then the first that is not a Black Box up to the end of the list - null if there is none
 	GD_Artifact FindThrynnArtifact()
 	{
+		var gameData = DataController.m_instance.m_gameData;
 		var ship = DataController.m_instance.m_playerData.m_playerShip;
+		var artifactList = ( ship.m_artifactStorage == null ) ? null : ship.m_artifactStorage.m_artifactList;
 
-		if ( ship.m_artifactStorage == null )
+		if ( ( artifactList == null ) || ( artifactList.Count == 0 ) )
 		{
 			return null;
 		}
 
-		GD_Artifact best = null;
+		var blackBoxId = gameData.FindArtifactId( "Black Box" );
+		var index = Random.Range( 1, 10 ) % artifactList.Count;
 
-		foreach ( var artifact in DataController.m_instance.m_gameData.m_artifactList )
+		if ( ( artifactList[ index ] != null ) && ( artifactList[ index ].m_artifactId == blackBoxId ) )
 		{
-			if ( ( artifact.m_thrynnPrice > 0 ) && ( ( best == null ) || ( artifact.m_thrynnPrice > best.m_thrynnPrice ) ) && ( ship.m_artifactStorage.Find( artifact.m_id ) != null ) )
+			index = 0;
+		}
+
+		for ( ; index < artifactList.Count; index++ )
+		{
+			var artifactId = ( artifactList[ index ] != null ) ? artifactList[ index ].m_artifactId : -1;
+
+			if ( ( artifactId >= 0 ) && ( artifactId < gameData.m_artifactList.Length ) && ( artifactId != blackBoxId ) )
 			{
-				best = artifact;
+				return gameData.m_artifactList[ artifactId ];
 			}
-		}
-
-		return best;
-	}
-
-	// the plutonium in the hold the Thrynn offer to buy, in whole cubic meters (they pay one cubic meter of Endurium for each: decided 2026-10-11 on
-	// "the amount of Endurium offered varies directly with the amount of plutonium available")
-	int FindThrynnPlutonium()
-	{
-		var ship = DataController.m_instance.m_playerData.m_playerShip;
-		var plutoniumId = DataController.m_instance.m_gameData.FindElementId( "Plutonium" );
-		var plutonium = ( ( plutoniumId < 0 ) || ( ship.m_elementStorage == null ) ) ? null : ship.m_elementStorage.Find( plutoniumId );
-
-		return ( plutonium == null ) ? 0 : plutonium.m_volume / 10;
-	}
-
-	// the Endurium the Thrynn pay for this artifact of the hold, in tenths of a cubic meter: their price, but no more than the hold has room for once the artifact
-	// is out of it (the shipped game offers the smaller of the two, COMMSPEC-OV)
-	int GetThrynnArtifactPayment( GD_Artifact artifact )
-	{
-		var ship = DataController.m_instance.m_playerData.m_playerShip;
-
-		return Mathf.Min( artifact.m_thrynnPrice * 10, Mathf.Max( 0, ship.GetRemainingVolume() + artifact.m_volume ) );
-	}
-
-	// the Thrynn's next offer (null if they have nothing to offer)
-	GD_Comm FindThrynnOffer()
-	{
-		var artifact = FindThrynnArtifact();
-
-		if ( artifact != null )
-		{
-			// the game data writes the artifact as X, the price as Y and the plural of "unit" as "unitxx" ("you have aboard your ship a(n) [ARTIFACT]. This
-			// artifact is of interest to us. We will buy it from you for [AMOUNT] cubic Arth unit(s)", STRINFO 2.5) - the shipped game fills them in as the port
-			// does here (COMMSPEC-OV in the decompiled original): "a" or "an" by the first letter, the name with a full stop after it, the amount it will pay
-			// (its price, cut down to the room in the hold) and "unitss" for more than one
-			var offer = FindRaceComm( c_thrynnArtifactOfferCommId );
-
-			if ( offer != null )
-			{
-				var article = ( "AEIOU".IndexOf( char.ToUpper( artifact.m_name[ 0 ] ) ) >= 0 ) ? "an " : "a ";
-				var payment = GetThrynnArtifactPayment( artifact );
-
-				offer = WithAmount( offer, "X", article + artifact.m_name + "." );
-				offer = WithAmount( offer, "Y", ( payment / 10 ).ToString() );
-				offer = WithWord( offer, ". thiss ", ". Thiss " );
-				offer = WithWord( offer, " unitxx ", ( payment > 10 ) ? " unitss " : " unit " );
-			}
-
-			return offer;
-		}
-
-		var plutonium = FindThrynnPlutonium();
-
-		if ( plutonium > 0 )
-		{
-			return WithAmount( FindRaceComm( c_thrynnPlutoniumOfferCommId ), "X", plutonium.ToString() );
-		}
-
-		if ( !DataController.m_instance.m_playerData.m_playerShip.HasArtifact( "Black Box" ) )
-		{
-			return FindRaceComm( c_thrynnBlackBoxOfferCommId );
 		}
 
 		return null;
 	}
 
-	// the answer to a Thrynn offer: a yes makes the trade, a yes to the Black Box without 30 cubic meters of Endurium gets "you do not have enough", and a no gets
-	// "very well" (the sources give no other answer, and no attack)
-	void UpdateThrynnTrade()
+	// what the Thrynn pay for an artifact, in tenths of a cubic meter of Endurium: its value over 33, at least 10 (COMMSPEC-OV WF2AA: ART-VAL, the shipped
+	// game's value of the artifact, twice the game data's actual value)
+	static int GetThrynnPrice( GD_Artifact artifact )
 	{
-		var offer = m_pdEncounter.m_lastQuestionFromAliens;
-
-		if ( ( offer != c_thrynnPlutoniumOfferCommId ) && ( offer != c_thrynnArtifactOfferCommId ) && ( offer != c_thrynnBlackBoxOfferCommId ) )
-		{
-			return;
-		}
-
-		// not answered yet?
-		var answer = m_pdEncounter.m_lastSubjectFromPlayer;
-
-		if ( answer == GD_Comm.Subject.None )
-		{
-			return;
-		}
-
-		// the question has been answered
-		m_pdEncounter.m_lastQuestionFromAliens = 0;
-
-		if ( answer != GD_Comm.Subject.Yes )
-		{
-			if ( answer == GD_Comm.Subject.No )
-			{
-				SayRaceComm( c_thrynnVeryWellCommId );
-			}
-
-			return;
-		}
-
-		var gameData = DataController.m_instance.m_gameData;
-		var ship = DataController.m_instance.m_playerData.m_playerShip;
-		var enduriumId = gameData.m_misc.m_enduriumElementId;
-
-		if ( offer == c_thrynnArtifactOfferCommId )
-		{
-			var artifact = FindThrynnArtifact();
-
-			// their Endurium, the amount they offered (as much of it as the hold has room for)
-			var payment = ( artifact != null ) ? GetThrynnArtifactPayment( artifact ) : 0;
-
-			if ( ( artifact != null ) && ship.RemoveArtifact( artifact.m_name ) )
-			{
-
-				if ( payment > 0 )
-				{
-					ship.AddElement( enduriumId, payment );
-				}
-
-				SayRaceComm( c_thrynnVeryWellCommId );
-			}
-		}
-		else if ( offer == c_thrynnPlutoniumOfferCommId )
-		{
-			var plutonium = FindThrynnPlutonium();
-
-			if ( plutonium > 0 )
-			{
-				ship.RemoveElement( gameData.FindElementId( "Plutonium" ), plutonium * 10 );
-
-				var payment = Mathf.Min( plutonium * 10, Mathf.Max( 0, ship.GetRemainingVolume() ) );
-
-				if ( payment > 0 )
-				{
-					ship.AddElement( enduriumId, payment );
-				}
-
-				SayRaceComm( c_thrynnVeryWellCommId );
-			}
-		}
-		else
-		{
-			var endurium = ( ship.m_elementStorage == null ) ? null : ship.m_elementStorage.Find( enduriumId );
-
-			if ( ( endurium == null ) || ( endurium.m_volume < c_thrynnBlackBoxPrice ) )
-			{
-				SayRaceComm( c_thrynnNotEnoughCommId );
-
-				return;
-			}
-
-			ship.RemoveElement( enduriumId, c_thrynnBlackBoxPrice );
-			ship.AddArtifact( gameData.FindArtifactId( "Black Box" ) );
-
-			SayRaceComm( c_thrynnVeryWellCommId );
-		}
+		return Mathf.Max( 2 * artifact.m_actualValue / 33, 10 );
 	}
 
 	// update encounter with velox
@@ -1928,15 +1768,15 @@ public class Encounter : MonoBehaviour
 	}
 
 	// the Veloxi's demands (STRINFO 2.2), made as the comm link opens (their special actions, below): the Crystal Orb ("most precious Small Egg of Veloxi"), the
-	// Ellipsoid ("focusing stone of Veloxi") and a tribute of 3 Arth energy crystals ("the veloxi always ask for tribute", alpha.txt) - and the thanks for a
-	// tribute paid
+	// Ellipsoid ("focusing stone of Veloxi") and a tribute of Arth energy crystals ("the veloxi always ask for tribute", alpha.txt)
 	const int c_veloxEllipsoidDemandCommId = 397;
 	const int c_veloxCrystalOrbDemandCommId = 398;
 	const int c_veloxTributeDemandCommId = 399;
-	const int c_veloxTributeThanksCommId = 415;
 
-	// the tribute, in tenths of a cubic meter of Endurium
+	// the tribute, in tenths of a cubic meter of Endurium: 3 cubic meters of a neutral fleet, 9 of a hostile one, of a ship with at least 4 (COMMSPEC-OV WF1D2)
 	const int c_veloxTribute = 30;
+	const int c_veloxHostileTribute = 90;
+	const int c_veloxLeastEnduriumForTribute = 40;
 
 	// the Crystal Orb the Veloxi take goes back to its site on its planet, unless that planet has been destroyed (COMMSPEC-OV -ARTIFACT and WEB3F: the orb, species 1,
 	// taken by the Veloxi while ?SPHEXI is on, is put back into its region of the planet; anything else handed over is gone). A site of the recovered data whose
@@ -1968,8 +1808,9 @@ public class Encounter : MonoBehaviour
 	// ---------------------------------------------------------------- a race's special actions as the comm link opens (COMMSPEC-OV)
 
 	// what a race asks of the crew, or tells it, as a comm link opens, before anything else its aliens say (COMMSPEC-OV SA-CASE, run by DO-SA): the Veloxi's
-	// demands for the Crystal Orb (CRYSTAL-ORB), the Ellipsoid (WEF36) and a tribute (WF1D2), and the Elowan's and the Thrynn's word for friends of their rival
-	// race (WEDA7, WEDDB, WEE3F, WEE73) - the values are saved (PD_Encounter.m_specialActionAsked), so new ones go at the end
+	// demands for the Crystal Orb (CRYSTAL-ORB), the Ellipsoid (WEF36) and a tribute (WF1D2), the Elowan's and the Thrynn's word for friends of their rival
+	// race (WEDA7, WEDDB, WEE3F, WEE73), the Elowan's question about energy (WF174) and the Thrynn's offers for plutonium (PLUTONIUM) and an artifact (WF312)
+	// and of their device (NEED-ENERGY) - the values are saved (PD_Encounter.m_specialActionAsked), so new ones go at the end
 	public enum SpecialAction
 	{
 		None,
@@ -1979,13 +1820,17 @@ public class Encounter : MonoBehaviour
 		ElowanThrynnAboard,
 		ElowanFriendsOfThrynn,
 		ThrynnElowanAboard,
-		ThrynnFriendsOfElowan
+		ThrynnFriendsOfElowan,
+		ElowanEnergy,
+		ThrynnPlutonium,
+		ThrynnArtifact,
+		ThrynnDevice
 	}
 
 	// the Elowan's and the Thrynn's special actions, in the order they are run (COMMSPEC-OV SA-ELOWAN and SA-THRYNN; what the Elowan say once Elan has been
 	// destroyed is UpdateElowanAfterElan's)
-	static readonly SpecialAction[] s_elowanSpecialActions = { SpecialAction.ElowanThrynnAboard, SpecialAction.ElowanFriendsOfThrynn };
-	static readonly SpecialAction[] s_thrynnSpecialActions = { SpecialAction.ThrynnElowanAboard, SpecialAction.ThrynnFriendsOfElowan };
+	static readonly SpecialAction[] s_elowanSpecialActions = { SpecialAction.ElowanThrynnAboard, SpecialAction.ElowanFriendsOfThrynn, SpecialAction.ElowanEnergy };
+	static readonly SpecialAction[] s_thrynnSpecialActions = { SpecialAction.ThrynnElowanAboard, SpecialAction.ThrynnFriendsOfElowan, SpecialAction.ThrynnPlutonium, SpecialAction.ThrynnArtifact, SpecialAction.ThrynnDevice };
 
 	// the Veloxi's special actions, in the order they are run (COMMSPEC-OV SA-VELOX)
 	static readonly SpecialAction[] s_veloxSpecialActions = { SpecialAction.VeloxCrystalOrb, SpecialAction.VeloxEllipsoid, SpecialAction.VeloxTribute };
@@ -2017,17 +1862,81 @@ public class Encounter : MonoBehaviour
 		return null;
 	}
 
-	// the line of a special action, if its conditions hold now - null if they do not
+	// the line of a special action, if its conditions hold now - null if they do not; an offer keeps what it names for the answer (PD_Encounter
+	// m_specialActionAmount and m_specialActionArtifactId)
 	GD_Comm FindSpecialActionComm( SpecialAction specialAction )
 	{
-		var ship = DataController.m_instance.m_playerData.m_playerShip;
-		var crew = DataController.m_instance.m_playerData.m_crewAssignment;
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var crew = playerData.m_crewAssignment;
+		var gameData = DataController.m_instance.m_gameData;
 
-		// grovelling aliens say none of them but the tribute (COMMSPEC-OV CRYSTAL-ORB, WEF36, WEDA7, WEDDB, WEE3F and WEE73: A-POSTU above obsequious)
-		var grovelling = GetAlienTalkStance() == GD_Comm.Stance.Obsequious;
+		// the aliens' posture (the original's A-POSTU): grovelling aliens make no demand and say nothing of the crew's friends (CRYSTAL-ORB, WEF36, WEDA7, WEDDB,
+		// WEE3F and WEE73: above obsequious), only friendly ones ask about energy or sell the device (WF174, NEED-ENERGY), and the tribute is asked by neutral
+		// aliens and hostile ones still talking (WF1D2: neutral or hostile, not fight)
+		var posture = GetAlienTalkStance();
+		var grovelling = posture == GD_Comm.Stance.Obsequious;
+		var friendly = posture == GD_Comm.Stance.Friendly;
+		var personality = AlienPersonality.Find( m_gdEncounter.m_race );
+		var fighting = ( personality != null ) && MoodDecides() && ( m_pdEncounter.m_mood >= personality.m_fightFrom );
+		var hostile = ( posture == GD_Comm.Stance.Hostile ) && !fighting;
 
 		switch ( specialAction )
 		{
+			case SpecialAction.ElowanEnergy:
+
+				return friendly ? FindRaceComm( c_elowanEnergyQuestionCommId ) : null;
+
+			case SpecialAction.ThrynnPlutonium:
+			{
+				// 84 percent of the plutonium aboard in Endurium, as much as the hold has room for (PLUTONIUM: QTY 84 100 */ WECBA), named in whole cubic meters
+				var plutonium = HeldElement( gameData.FindElementId( "Plutonium" ) );
+
+				if ( plutonium < c_thrynnLeastPlutonium )
+				{
+					return null;
+				}
+
+				m_pdEncounter.m_specialActionAmount = Mathf.Min( plutonium * c_thrynnPlutoniumPercent / 100, Mathf.Max( 0, ship.GetRemainingVolume() ) );
+
+				return WithAmount( FindRaceComm( c_thrynnPlutoniumOfferCommId ), "X", ( m_pdEncounter.m_specialActionAmount / 10 ).ToString() );
+			}
+
+			case SpecialAction.ThrynnArtifact:
+			{
+				var artifact = FindThrynnArtifact();
+				var offer = ( artifact != null ) ? FindRaceComm( c_thrynnArtifactOfferCommId ) : null;
+
+				if ( offer == null )
+				{
+					return null;
+				}
+
+				// their price, as much of it as the hold has room for (WF2AA: ART-VAL 33 / , at least 10, WECBA)
+				var payment = Mathf.Min( GetThrynnPrice( artifact ), Mathf.Max( 0, ship.GetRemainingVolume() ) );
+
+				m_pdEncounter.m_specialActionAmount = payment;
+				m_pdEncounter.m_specialActionArtifactId = artifact.m_id;
+
+				// the game data writes the artifact as X, the price as Y and the plural of "unit" as "unitxx" ("you have aboard your ship a(n) [ARTIFACT]. This
+				// artifact is of interest to us. We will buy it from you for [AMOUNT] cubic Arth unit(s)", STRINFO 2.5) - the shipped game fills them in as here
+				// (WF25A, WF2AA): "a" or "an" by the first letter, the name with a full stop after it, the payment in whole cubic meters and "unitss" for more than
+				// 10 tenths
+				var article = ( "AEIOU".IndexOf( char.ToUpper( artifact.m_name[ 0 ] ) ) >= 0 ) ? "an " : "a ";
+
+				offer = WithAmount( offer, "X", article + artifact.m_name + "." );
+				offer = WithAmount( offer, "Y", ( payment / 10 ).ToString() );
+				offer = WithWord( offer, ". thiss ", ". Thiss " );
+				offer = WithWord( offer, " unitxx ", ( payment > 10 ) ? " unitss " : " unit " );
+
+				return offer;
+			}
+
+			case SpecialAction.ThrynnDevice:
+
+				// once in a game (NEED-ENERGY: WF08A)
+				return ( friendly && !playerData.m_general.m_thrynnDeviceSold ) ? FindRaceComm( c_thrynnBlackBoxOfferCommId ) : null;
+
 			case SpecialAction.ElowanThrynnAboard:
 
 				return ( !grovelling && crew.HasCrewOfRace( GameData.Race.Thrynn ) ) ? FindRaceComm( c_elowanThrynnAboardCommId ) : null;
@@ -2053,9 +1962,19 @@ public class Encounter : MonoBehaviour
 				return ( !grovelling && ship.HasArtifact( "Ellipsoid" ) ) ? FindRaceComm( c_veloxEllipsoidDemandCommId ) : null;
 
 			case SpecialAction.VeloxTribute:
+			{
+				// 3 cubic meters of a neutral fleet, 9 of a hostile one, of a ship with 4 or more aboard (WF1D2) - the game data writes the amount as X
+				var endurium = HeldElement( gameData.m_misc.m_enduriumElementId );
 
-				// the port's tribute: 3 cubic meters, in any posture (the game data writes the amount as X: STRINFO "pay tribute of 3 Arth energy crystals")
-				return WithAmount( FindRaceComm( c_veloxTributeDemandCommId ), "X", ( c_veloxTribute / 10 ).ToString() );
+				if ( ( ( posture != GD_Comm.Stance.Neutral ) && !hostile ) || ( endurium < c_veloxLeastEnduriumForTribute ) )
+				{
+					return null;
+				}
+
+				m_pdEncounter.m_specialActionAmount = Mathf.Min( endurium, hostile ? c_veloxHostileTribute : c_veloxTribute );
+
+				return WithAmount( FindRaceComm( c_veloxTributeDemandCommId ), "X", ( ( hostile ? c_veloxHostileTribute : c_veloxTribute ) / 10 ).ToString() );
+			}
 		}
 
 		return null;
@@ -2106,10 +2025,19 @@ public class Encounter : MonoBehaviour
 		return false;
 	}
 
-	// true for a special action that waits for the crew's Yes or No (the Veloxi's demands)
+	// true for a special action that waits for the crew's Yes or No (all but the rivals' word for friends of the other race)
 	static bool AsksForAnAnswer( SpecialAction specialAction )
 	{
-		return ( specialAction == SpecialAction.VeloxCrystalOrb ) || ( specialAction == SpecialAction.VeloxEllipsoid ) || ( specialAction == SpecialAction.VeloxTribute );
+		return ( specialAction != SpecialAction.ElowanThrynnAboard ) && ( specialAction != SpecialAction.ElowanFriendsOfThrynn ) && ( specialAction != SpecialAction.ThrynnElowanAboard ) && ( specialAction != SpecialAction.ThrynnFriendsOfElowan );
+	}
+
+	// the Endurium (or another element) in the ship's hold, in tenths of a cubic meter
+	static int HeldElement( int elementId )
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+		var element = ( ( elementId < 0 ) || ( ship.m_elementStorage == null ) ) ? null : ship.m_elementStorage.Find( elementId );
+
+		return ( element == null ) ? 0 : element.m_volume;
 	}
 
 	// the crew's answer to the special action the aliens wait on: Yes, or No - ending the comm link, or no answer in 60 seconds, is a No (COMMSPEC-OV XY/N)
@@ -2185,24 +2113,134 @@ public class Encounter : MonoBehaviour
 				break;
 			}
 
-			// the tribute (WF1D2, 0 100 XY/N): paid, they thank the crew (the port's line); refused, or a yes without the Endurium aboard (decided 2026-10-11), they
-			// fight
+			// the tribute (WF1D2, 0 100 XY/N): paid, they take it and say nothing; refused, they fight
 			case SpecialAction.VeloxTribute:
 			{
 				var enduriumId = gameData.m_misc.m_enduriumElementId;
-				var endurium = ( ship.m_elementStorage == null ) ? null : ship.m_elementStorage.Find( enduriumId );
 
-				if ( yes && ( endurium != null ) && ( endurium.m_volume >= c_veloxTribute ) )
+				if ( yes )
 				{
-					ship.RemoveElement( enduriumId, c_veloxTribute );
+					var tribute = Mathf.Min( m_pdEncounter.m_specialActionAmount, HeldElement( enduriumId ) );
 
-					SayRaceComm( c_veloxTributeThanksCommId );
+					if ( tribute > 0 )
+					{
+						ship.RemoveElement( enduriumId, tribute );
+					}
 				}
 				else
 				{
 					ChangeMood( 100.0f );
 
 					StopSpecialActionsAndFight();
+				}
+
+				break;
+			}
+
+			// "Is thine need for energy dire?" (WF174, 0 0 XY/N): a yes with 20 cubic meters or more aboard is a lie they see through, and angers them by 8; with less
+			// they give 15, as much as the hold has room for, and the rest of their special actions stop; a no gets nothing
+			case SpecialAction.ElowanEnergy:
+			{
+				if ( !yes )
+				{
+					break;
+				}
+
+				var enduriumId = gameData.m_misc.m_enduriumElementId;
+
+				if ( HeldElement( enduriumId ) >= c_elowanEnergyDireBelow )
+				{
+					ChangeMood( c_elowanLieAnger );
+
+					SayRaceComm( c_elowanNeedNotDireCommId );
+				}
+				else
+				{
+					m_pdEncounter.m_specialActionStep = 0;
+
+					var gift = Mathf.Min( c_elowanEnergyGift, Mathf.Max( 0, ship.GetRemainingVolume() ) );
+
+					if ( gift > 0 )
+					{
+						ship.AddElement( enduriumId, gift );
+					}
+
+					SayRaceComm( c_elowanEnergyGiftCommId );
+				}
+
+				break;
+			}
+
+			// the plutonium (PLUTONIUM, 0 5 XY/N): sold, all of it goes for the Endurium they named; refused, they are 5 more agitated and offer nothing more
+			case SpecialAction.ThrynnPlutonium:
+			{
+				if ( yes )
+				{
+					var plutoniumId = gameData.FindElementId( "Plutonium" );
+					var plutonium = HeldElement( plutoniumId );
+
+					if ( plutonium > 0 )
+					{
+						ship.RemoveElement( plutoniumId, plutonium );
+					}
+
+					if ( m_pdEncounter.m_specialActionAmount > 0 )
+					{
+						ship.AddElement( gameData.m_misc.m_enduriumElementId, m_pdEncounter.m_specialActionAmount );
+					}
+				}
+				else
+				{
+					ChangeMood( c_thrynnRefusalAnger );
+
+					m_pdEncounter.m_specialActionStep = 0;
+				}
+
+				break;
+			}
+
+			// the artifact (WF312, 0 5 XY/N): sold, it goes for the Endurium they named; refused, they are 5 more agitated and go on
+			case SpecialAction.ThrynnArtifact:
+			{
+				var artifactId = m_pdEncounter.m_specialActionArtifactId;
+
+				if ( !yes )
+				{
+					ChangeMood( c_thrynnRefusalAnger );
+				}
+				else if ( ( artifactId >= 0 ) && ( artifactId < gameData.m_artifactList.Length ) && ship.RemoveArtifact( gameData.m_artifactList[ artifactId ].m_name ) )
+				{
+					if ( m_pdEncounter.m_specialActionAmount > 0 )
+					{
+						ship.AddElement( gameData.m_misc.m_enduriumElementId, m_pdEncounter.m_specialActionAmount );
+					}
+				}
+
+				break;
+			}
+
+			// the device, the Black Box (NEED-ENERGY, 0 0 XY/N): bought for 30 cubic meters, once in a game; a yes without them gets "You do not have enough. Do not
+			// try to deceive us." and 5 more agitation; a no gets "Very well."
+			case SpecialAction.ThrynnDevice:
+			{
+				var enduriumId = gameData.m_misc.m_enduriumElementId;
+
+				if ( !yes )
+				{
+					SayRaceComm( c_thrynnVeryWellCommId );
+				}
+				else if ( HeldElement( enduriumId ) >= c_thrynnBlackBoxPrice )
+				{
+					ship.RemoveElement( enduriumId, c_thrynnBlackBoxPrice );
+					ship.AddArtifact( gameData.FindArtifactId( "Black Box" ) );
+
+					general.m_thrynnDeviceSold = true;
+				}
+				else
+				{
+					SayRaceComm( c_thrynnNotEnoughCommId );
+
+					ChangeMood( c_thrynnRefusalAnger );
 				}
 
 				break;
@@ -2548,19 +2586,8 @@ public class Encounter : MonoBehaviour
 							}
 							else
 							{
-								// yes - ask a question (the first time, the race's own question if it has one)
-								var specialQuestion = FindSpecialQuestion();
-
-								if ( specialQuestion != null )
-								{
-									m_pdEncounter.m_specialQuestionAsked = true;
-
-									AddComm( GD_Comm.Subject.Question, false, specialQuestion );
-								}
-								else
-								{
-									AddComm( GD_Comm.Subject.Question, false );
-								}
+								// yes - ask a question
+								AddComm( GD_Comm.Subject.Question, false );
 							}
 						}
 					}
@@ -3950,29 +3977,6 @@ public class Encounter : MonoBehaviour
 		{
 			AddComm( GD_Comm.Subject.Custom, false, comm );
 		}
-	}
-
-	// the question of a race's own that the aliens ask the first time they ask a question in an encounter - null if the race has none or has asked it
-	GD_Comm FindSpecialQuestion()
-	{
-		if ( m_pdEncounter.m_specialQuestionAsked )
-		{
-			return null;
-		}
-
-		switch ( m_gdEncounter.m_race )
-		{
-			case GameData.Race.Elowan:
-
-				return FindRaceComm( c_elowanEnergyQuestionCommId );
-
-			case GameData.Race.Thrynn:
-
-				return FindThrynnOffer();
-
-		}
-
-		return null;
 	}
 
 	// a copy of a comm with a placeholder of the game data filled in (the game data writes the amounts the aliens name as X and Y) - null for null

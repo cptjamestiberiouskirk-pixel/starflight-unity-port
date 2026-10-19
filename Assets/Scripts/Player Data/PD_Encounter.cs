@@ -65,14 +65,16 @@ public class PD_Encounter : IComparable
 	// set once the aliens have lost some of their ships and act cowardly (the Spemin, the Thrynn and the Veloxi) - false in older save files
 	public bool m_aliensAreCowardly;
 
-	// set once the aliens have asked the question of their race's own (the Elowan's "Is thine need for energy dire?") - false in older save files
-	public bool m_specialQuestionAsked;
-
 	// the race's special actions as a comm link opens (Encounter.SpecialAction, COMMSPEC-OV DO-SA and XY/N): the next one to run, counted from 1 (0 once they have
 	// all run or one has stopped them), the one waiting for the crew's answer (0 for none) and how much longer it waits, in seconds - 0 in older save files
 	public int m_specialActionStep;
 	public int m_specialActionAsked;
 	public float m_specialActionTimer;
+
+	// what the special action waiting for the answer offers or demands: the Endurium, in tenths of a cubic meter, and the artifact the Thrynn offer to buy (an id
+	// into the game data's artifact list) - 0 in older save files
+	public int m_specialActionAmount;
+	public int m_specialActionArtifactId;
 
 	// the aliens' mood (the original's "emotional disposition level", from 0 most calm to 100 most agitated, see AlienPersonality) and whether it has been set for
 	// this encounter - 0 and false in older save files, and the mood is set again then
