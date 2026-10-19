@@ -134,6 +134,10 @@ public class ClaudeProbe : MonoBehaviour
 		// batch mode never has focus, so the game loop only advances when it is allowed to run in the background
 		Application.runInBackground = true;
 
+		// the runs are silent: the game's sounds and music play as they would, every source at its own volume, but nothing reaches the speakers (the listener's
+		// master volume, which the game never sets) - -probeSound (probe.ps1 -Sound) keeps them audible
+		AudioListener.volume = ( Array.IndexOf( Environment.GetCommandLineArgs(), "-probeSound" ) >= 0 ) ? 1.0f : 0.0f;
+
 		// make sure exceptions come with their script stack so they can be attributed
 		Application.SetStackTraceLogType( LogType.Exception, StackTraceLogType.ScriptOnly );
 
@@ -144,7 +148,7 @@ public class ClaudeProbe : MonoBehaviour
 		DontDestroyOnLoad( probeObject );
 		probeObject.AddComponent<ClaudeProbe>();
 
-		Debug.Log( c_tag + "runtime init" );
+		Debug.Log( c_tag + "runtime init (sound " + ( ( AudioListener.volume > 0.0f ) ? "on" : "off" ) + ")" );
 	}
 
 	static void OnLog( string condition, string stackTrace, LogType type )
@@ -1776,6 +1780,10 @@ public class ClaudeProbe : MonoBehaviour
 
 			case "calming":
 				yield return ScenarioCalming();
+				break;
+
+			case "shippedlifeforms":
+				yield return ScenarioShippedLifeforms();
 				break;
 
 			default:
@@ -23410,6 +23418,30 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- the science officer's survey from orbit (PlanetSurvey, decided 2026-10-17: ROADMAP D6)
 
+	// the bands with life a survey found (x the south edge, y the north edge, z the crowding), read by reflection so that the probe compiles on the code before
+	// roadmap 8.18 (none there), and how many there are (-1 there)
+	static List<Vector3> LifeBandsOf( PlanetSurvey survey )
+	{
+		var bands = new List<Vector3>();
+
+		if ( !( FieldOrNull( survey, "m_lifeBands" ) is System.Collections.IList list ) )
+		{
+			return bands;
+		}
+
+		foreach ( var band in list )
+		{
+			bands.Add( new Vector3( (float) FieldOrNull( band, "m_southEdge" ), (float) FieldOrNull( band, "m_northEdge" ), (int) FieldOrNull( band, "m_crowding" ) ) );
+		}
+
+		return bands;
+	}
+
+	static int LifeBandCountOf( PlanetSurvey survey )
+	{
+		return ( FieldOrNull( survey, "m_lifeBandCount" ) is int count ) ? count : -1;
+	}
+
 	IEnumerator ScenarioOrbitSurvey()
 	{
 		var controller = SpaceflightController.m_instance;
@@ -23435,7 +23467,6 @@ public class ClaudeProbe : MonoBehaviour
 		PlanetSurvey.Forget();
 
 		var depositPlaces = PlanetSurvey.GetDepositPlaces( planet, generator, grid );
-		var lifeformPlaces = PlanetSurvey.GetLifeformPlaces( planet, generator, grid );
 
 		controller.m_displayController.ChangeDisplay( sensors );
 
@@ -23459,7 +23490,7 @@ public class ClaudeProbe : MonoBehaviour
 			sameEachTime = Mathf.Approximately( low.m_marks[ i ].m_eastWest, lowAgain.m_marks[ i ].m_eastWest ) && Mathf.Approximately( low.m_marks[ i ].m_northSouth, lowAgain.m_marks[ i ].m_northSouth );
 		}
 
-		Log( "orbitsurvey: planet 92 from orbit: " + depositPlaces.Count + " deposits, " + lifeformPlaces.Count + " lifeforms | skill 250: " + ( ( high != null ) ? high.m_mineralFieldsFound + "/" + high.m_mineralFields + " fields, " + high.m_lifeformsFound + "/" + high.m_lifeforms + " lifeforms" : "none" ) + " | skill 20: " + ( ( low != null ) ? low.m_mineralFieldsFound + " fields, " + low.m_lifeformsFound + " lifeforms" : "none" ) + " | sensors at 30%: " + ( ( damaged != null ) ? damaged.m_mineralFieldsFound + " fields" : "none" ) + " | analysis: " + analysis );
+		Log( "orbitsurvey: planet 92 from orbit: " + depositPlaces.Count + " deposits | skill 250: " + ( ( high != null ) ? high.m_mineralFieldsFound + "/" + high.m_mineralFields + " fields, " + LifeBandsOf( high ).Count + "/" + LifeBandCountOf( high ) + " bands with life" : "none" ) + " | skill 20: " + ( ( low != null ) ? low.m_mineralFieldsFound + " fields, " + LifeBandsOf( low ).Count + " bands" : "none" ) + " | sensors at 30%: " + ( ( damaged != null ) ? damaged.m_mineralFieldsFound + " fields" : "none" ) + " | analysis: " + analysis );
 
 		// ---- 2. on the surface of planet 92: the deposits and the lifeforms the survey worked out are where the surface puts them
 		var landed = new bool[ 1 ];
@@ -23490,6 +23521,7 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
+		// the lifeforms on the ground stand in the bands with life a survey of full skill finds (roadmap 8.18: their places are not known from orbit)
 		var terrainLifeforms = FieldOrNull( grid, "m_terrainLifeforms" ) as TerrainLifeforms;
 		var lifeformsOnGround = ( terrainLifeforms != null ) ? terrainLifeforms.m_lifeformList : new List<TerrainLifeform>();
 		var lifeformsWrong = new List<string>();
@@ -23498,27 +23530,27 @@ public class ClaudeProbe : MonoBehaviour
 		{
 			Tools.WorldToLatLongCoordinates( lifeformsOnGround[ i ].transform.position, out var eastWest, out var northSouth );
 
-			var place = ( i < lifeformPlaces.Count ) ? lifeformPlaces[ i ] : new Vector3( float.NaN, float.NaN, -1 );
-
 			// (a lifeform may have taken a few steps since it was placed)
-			if ( ( Mathf.Abs( Mathf.DeltaAngle( place.x, eastWest ) ) > 1.5f ) || ( Mathf.Abs( place.y - northSouth ) > 1.5f ) )
+			var inBand = LifeBandsOf( high ).Exists( band => ( northSouth >= band.x - 1.5f ) && ( northSouth <= band.y + 1.5f ) );
+
+			if ( !inBand )
 			{
-				lifeformsWrong.Add( "#" + i + " at " + eastWest.ToString( "F2" ) + "," + northSouth.ToString( "F2" ) + " worked out " + place.x.ToString( "F2" ) + "," + place.y.ToString( "F2" ) );
+				lifeformsWrong.Add( "#" + i + " at " + eastWest.ToString( "F2" ) + "," + northSouth.ToString( "F2" ) );
 			}
 		}
 
-		Log( "orbitsurvey: on planet 92: " + elements.Length + " deposits on the ground (" + depositsWrong.Count + " not where worked out" + ( ( depositsWrong.Count > 0 ) ? ": " + string.Join( "; ", depositsWrong.FindAll( text => text.Length > 0 ) ) : "" ) + "), " + lifeformsOnGround.Count + " lifeforms (" + lifeformsWrong.Count + " not where worked out" + ( ( lifeformsWrong.Count > 0 ) ? ": " + string.Join( "; ", lifeformsWrong ) : "" ) + ")" );
+		Log( "orbitsurvey: on planet 92: " + elements.Length + " deposits on the ground (" + depositsWrong.Count + " not where worked out" + ( ( depositsWrong.Count > 0 ) ? ": " + string.Join( "; ", depositsWrong.FindAll( text => text.Length > 0 ) ) : "" ) + "), " + lifeformsOnGround.Count + " lifeforms (" + lifeformsWrong.Count + " outside the bands found" + ( ( lifeformsWrong.Count > 0 ) ? ": " + string.Join( "; ", lifeformsWrong ) : "" ) + ")" );
 
 		var errorsDuring = s_errorCount - errorsBefore;
 
 		Check( "orbitsurvey: from orbit, every deposit of planet 92 is worked out where the surface places it, of its element", ( elements.Length > 0 ) && ( elements.Length == depositPlaces.Count ) && ( depositsWrong.Count == 0 ), elements.Length + " on the ground, " + depositPlaces.Count + " worked out, " + depositsWrong.Count + " wrong" );
-		Check( "orbitsurvey: from orbit, every lifeform of planet 92 is worked out where the surface places it", ( lifeformsOnGround.Count > 0 ) && ( lifeformsOnGround.Count == lifeformPlaces.Count ) && ( lifeformsWrong.Count == 0 ), lifeformsOnGround.Count + " on the ground, " + lifeformPlaces.Count + " worked out, " + lifeformsWrong.Count + " wrong" );
+		Check( "orbitsurvey: from orbit, every lifeform of planet 92 stands in a band with life the survey finds", ( lifeformsOnGround.Count > 0 ) && ( high != null ) && ( LifeBandsOf( high ).Count > 0 ) && ( lifeformsWrong.Count == 0 ), lifeformsOnGround.Count + " on the ground, " + ( ( high != null ) ? LifeBandsOf( high ).Count.ToString() : "no" ) + " bands, " + lifeformsWrong.Count + " outside them" );
 		Check( "orbitsurvey: the analysis of a planet reading in orbit reports its mineral fields and lifeforms, and keeps the survey for the planet", analysis.Contains( "Mineral Fields: <color=white>" ) && analysis.Contains( "Lifeforms: <color=white>" ) && ( survey != null ) && ( survey.m_planetId == 92 ), analysis );
-		Check( "orbitsurvey: a science officer of full skill with sound sensors finds every mineral field and lifeform; one of skill 20 finds fewer; sensors at 30% find fewer", ( high != null ) && ( low != null ) && ( damaged != null ) && ( high.m_mineralFields > 0 ) && ( high.m_mineralFieldsFound == high.m_mineralFields ) && ( high.m_lifeformsFound == high.m_lifeforms ) && ( low.m_mineralFieldsFound < high.m_mineralFieldsFound ) && ( damaged.m_mineralFieldsFound < high.m_mineralFieldsFound ), ( ( high != null ) ? high.m_mineralFieldsFound + "/" + high.m_mineralFields + " " + high.m_lifeformsFound + "/" + high.m_lifeforms : "none" ) + " | " + ( ( low != null ) ? low.m_mineralFieldsFound.ToString() : "none" ) + " | " + ( ( damaged != null ) ? damaged.m_mineralFieldsFound.ToString() : "none" ) );
+		Check( "orbitsurvey: a science officer of full skill with sound sensors finds every mineral field and band with life; one of skill 20 finds fewer; sensors at 30% find fewer", ( high != null ) && ( low != null ) && ( damaged != null ) && ( high.m_mineralFields > 0 ) && ( high.m_mineralFieldsFound == high.m_mineralFields ) && ( LifeBandsOf( high ).Count == LifeBandCountOf( high ) ) && ( low.m_mineralFieldsFound < high.m_mineralFieldsFound ) && ( damaged.m_mineralFieldsFound < high.m_mineralFieldsFound ), ( ( high != null ) ? high.m_mineralFieldsFound + "/" + high.m_mineralFields + " " + LifeBandsOf( high ).Count + "/" + LifeBandCountOf( high ) : "none" ) + " | " + ( ( low != null ) ? low.m_mineralFieldsFound.ToString() : "none" ) + " | " + ( ( damaged != null ) ? damaged.m_mineralFieldsFound.ToString() : "none" ) );
 		Check( "orbitsurvey: the same officer finds the same marks every time", sameEachTime, sameEachTime.ToString() );
 		Check( "orbitsurvey: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
-		Finish( "scenario=orbitsurvey deposits=" + elements.Length + "/" + depositPlaces.Count + " lifeforms=" + lifeformsOnGround.Count + "/" + lifeformPlaces.Count + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+		Finish( "scenario=orbitsurvey deposits=" + elements.Length + "/" + depositPlaces.Count + " lifeforms=" + lifeformsOnGround.Count + " checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	IEnumerator ScenarioAnalysisSkill()
@@ -24412,23 +24444,41 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 5 );
 
-		// ---- 2. planet 92 (bio density 7): its lifeforms, on dry ground near the equator
+		// ---- 2. planet 92 (bio density 7): its lifeforms, in the blocks about the terrain vehicle (roadmap 8.18: the 3 by 3 of SEED-OV's 18 by 30 cells), on low
+		// dry ground (the original's contour 0x21 to 0x3f: the lowest third of the land)
 		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
 
 		var lifeforms = LifeformsOnTheGround();
 		var placesFirst = LifeformPlaces( lifeforms );
 		var allDryAndTemperate = lifeforms.Count > 0;
 		var planetGenerator = FieldOrNull( controller.m_terrainVehicle, "m_planetGenerator" ) as PlanetGenerator;
+		var lowest = planetGenerator.m_waterElevation;
+		var highest = lowest + ( planetGenerator.m_maximumElevation - lowest ) * 0x1f / (float) 0x5f;
+		var notLowAndNear = new List<string>();
+		var firstByPlace = new Dictionary<int, Vector3>();
+
+		Tools.WorldToMapCoordinates( controller.m_terrainVehicle.transform.position, out var vehicleMapX, out var vehicleMapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
+
+		var vehicleBlock = RandomRuinRegions.GetRegion( vehicleMapX, vehicleMapY, planetGenerator );
+		var nearBlocks = RandomRuinRegions.GetRegionsAround( vehicleBlock, 1 );
 
 		foreach ( var lifeform in lifeforms )
 		{
 			Tools.WorldToMapCoordinates( lifeform.position, out var mapX, out var mapY, planetGenerator.m_textureMapWidth, planetGenerator.m_textureMapHeight );
 
-			var dry = planetGenerator.GetBilinearSmoothedElevation( mapX, mapY ) >= planetGenerator.m_waterElevation;
-			var temperate = ( mapY >= planetGenerator.m_textureMapHeight * 0.35f - 1.0f ) && ( mapY <= planetGenerator.m_textureMapHeight * 0.65f + 1.0f );
+			var elevation = planetGenerator.GetBilinearSmoothedElevation( mapX, mapY );
+			var placeIndex = int.Parse( "0" + LifeformField( lifeform, "m_placeIndex" ) );
 
-			allDryAndTemperate = allDryAndTemperate && dry && temperate;
+			// (by the block it was placed in: a lifeform may have taken a step or two over the block's edge since)
+			if ( ( elevation < lowest ) || ( elevation > highest * 1.05f ) || !nearBlocks.Contains( placeIndex / 256 ) )
+			{
+				notLowAndNear.Add( placeIndex + " at elevation " + elevation.ToString( "F3" ) + " (" + lowest.ToString( "F3" ) + " to " + highest.ToString( "F3" ) + "), block " + ( placeIndex / 256 ) );
+			}
+
+			firstByPlace[ placeIndex ] = lifeform.position;
 		}
+
+		allDryAndTemperate = allDryAndTemperate && ( notLowAndNear.Count == 0 );
 
 		// ---- 3. landed beside the first one, Scan reads it
 		var firstPlace = ( lifeforms.Count > 0 ) ? lifeforms[ 0 ].position : Vector3.zero;
@@ -24438,7 +24488,32 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 5 );
 		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
 
-		var placesAgain = LifeformPlaces( LifeformsOnTheGround() );
+		var lifeformsAgain = LifeformsOnTheGround();
+		var placesAgain = LifeformPlaces( lifeformsAgain );
+		var inBoth = 0;
+		var movedOrGone = new List<string>();
+
+		foreach ( var lifeform in lifeformsAgain )
+		{
+			var placeIndex = int.Parse( "0" + LifeformField( lifeform, "m_placeIndex" ) );
+
+			if ( !firstByPlace.TryGetValue( placeIndex, out var firstPosition ) )
+			{
+				continue;
+			}
+
+			inBoth++;
+
+			// (a lifeform may have taken a few steps in the frames after the landing)
+			var delta = lifeform.position - firstPosition;
+
+			delta.y = 0.0f;
+
+			if ( delta.magnitude > 3.0f )
+			{
+				movedOrGone.Add( placeIndex + " " + delta.magnitude.ToString( "F1" ) );
+			}
+		}
 
 		controller.m_messages.Clear();
 
@@ -24448,12 +24523,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		var scan = MessageList();
 
-		Log( "lifeforms: planet 90 has " + on90 + " | planet 92 has " + lifeforms.Count + " at " + placesFirst + " (all dry and temperate " + allDryAndTemperate + ") | again at " + placesAgain + " | scan: " + scan );
+		Log( "lifeforms: planet 90 has " + on90 + " | planet 92 has " + lifeforms.Count + " at " + placesFirst + " (low, dry and in the blocks about the vehicle " + allDryAndTemperate + ( ( notLowAndNear.Count > 0 ) ? ": not " + string.Join( "; ", notLowAndNear ) : "" ) + ") | again at " + placesAgain + " (" + inBoth + " of the first visit's blocks, moved or gone " + movedOrGone.Count + ") | scan: " + scan );
 
 		Check( "lifeforms: a planet with no life has no lifeforms (control)", on90 == 0, on90 + " lifeforms" );
-		Check( "lifeforms: a planet with life has its lifeforms, 3 to 8 of each species, on dry ground near the equator", ( lifeforms.Count >= 3 ) && ( lifeforms.Count <= 8 * 6 ) && allDryAndTemperate, lifeforms.Count + " lifeforms, all dry and temperate " + allDryAndTemperate );
-		Check( "lifeforms: they are at the same places on every visit", ( placesFirst != "" ) && ( placesFirst == placesAgain ), placesFirst + " | " + placesAgain );
-		Check( "lifeforms: Scan beside one reads it as the notes' scan has it", scan.Contains( "Lifeform" ) && scan.Contains( "Aggression analog" ) && scan.Contains( "Intelligence analog" ) && scan.Contains( "Niche" ) && scan.Contains( "Composition" ), scan );
+		Check( "lifeforms: a planet with life has its lifeforms in the blocks about the terrain vehicle, on low dry ground", ( lifeforms.Count >= 3 ) && allDryAndTemperate, lifeforms.Count + " lifeforms, " + notLowAndNear.Count + " not low, dry and near" );
+		Check( "lifeforms: a block holds the same lifeforms in the same places on every visit", ( inBoth >= 3 ) && ( movedOrGone.Count == 0 ), inBoth + " in both, " + string.Join( "; ", movedOrGone ) );
+		Check( "lifeforms: Scan beside one reads the shipped game's lines (height, niche, the aggression and intelligence analogs) and no composition", scan.Contains( "Lifeform" ) && scan.Contains( "Height: " ) && scan.Contains( "Aggression analog" ) && scan.Contains( "Intelligence analog" ) && scan.Contains( "Niche" ) && !scan.Contains( "Composition" ), scan );
 
 		Finish( "scenario=lifeforms on92=" + lifeforms.Count, 0 );
 	}
@@ -24559,7 +24634,15 @@ public class ClaudeProbe : MonoBehaviour
 
 		var statusAtTheEnd = ( target == null ) ? "" : LifeformField( target, "m_status" );
 
-		// ---- 4. nothing left within range: the laser hits nothing
+		// ---- 4. nothing left within range (every other living lifeform put far off): the laser hits nothing
+		foreach ( var other in LifeformsOnTheGround() )
+		{
+			if ( ( other != target ) && ( LifeformField( other, "m_status" ) != "Dead" ) )
+			{
+				PutAt( other, 400.0f );
+			}
+		}
+
 		var nothingText = Press( "TVFireButton" );
 
 		Log( "tvweapons: weapon set " + weaponSet + " | switch: " + switchText + " | stunner (effect " + stunEffect + "): " + stunText + " (stuns " + stunsBefore + " -> " + stunsAfter + ", " + statusAfterStun + ") | laser: " + laserText +  " (hits " + hitsBefore + " -> " + hitsAfter + ", energy " + fuelBefore + " -> " + fuelAfter + ", " + ( ( fuelBefore - fuelAfter ) * 30767.0f ).ToString( "F1" ) + " of the tank; the stunner " + ( stunFuel * 30767.0f ).ToString( "F1" ) + ") | last: " + lastText + " (" + statusAtTheEnd + ") | then: " + nothingText );
@@ -24675,18 +24758,23 @@ public class ClaudeProbe : MonoBehaviour
 
 		var crewMember = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Captain );
 
-		// ---- 1. the control: a plant of middling aggression next to the vehicle neither moves nor attacks
+		// ---- 1. the control: a lifeform that does not move (made so: the nearest is any species), of middling aggression, next to the vehicle neither moves nor
+		// attacks
+		SetLifeformField( lifeform, "m_movementRate", 0, true );
+		SetLifeformField( lifeform, "m_canFly", false, true );
+		SetLifeformField( lifeform, "m_canFloat", false, true );
 		SetLifeformField( lifeform, "m_aggression", 50 );
 		SetLifeformField( lifeform, "m_noticedPlayer", true );
 		PutAt( lifeform, 8.0f );
 
+		// (across the ground only: PutAt puts it 2 units up, and it comes down onto the ground)
 		var placeBefore = lifeform.position;
 
 		controller.m_messages.Clear();
 
 		yield return new WaitForSecondsRealtime( 2.0f );
 
-		var calmMoved = Vector3.Distance( placeBefore, lifeform.position );
+		var calmMoved = Vector2.Distance( new Vector2( placeBefore.x, placeBefore.z ), new Vector2( lifeform.position.x, lifeform.position.z ) );
 		var calmAttacked = MessageList().Contains( "being attacked" );
 
 		// ---- 2. made dangerous, it attacks the crew (the whole crew at full vitality, and the attack read as soon as it comes: a dangerous lifeform attacks
@@ -43083,6 +43171,38 @@ public class ClaudeProbe : MonoBehaviour
 		return SurveyMarkColors( eastWest, northSouth, offsetX, offsetY, theme.m_statusArmor, theme.m_statusFuel, theme.m_statusDanger, theme.m_backgroundApp ).Contains( kind );
 	}
 
+	// whether a band with life is tinted on the landing map in this theme's life colour: looked at in the middle of the band, at a longitude away from the
+	// mineral fields' crosses (the tint is faint: its alpha under a half)
+	static bool LifeBandTinted( PlanetSurvey survey, Vector3 band, UIKitTheme theme )
+	{
+		var image = SurveyMarksImage();
+		var texture = ( image != null ) ? image.texture as Texture2D : null;
+
+		if ( texture == null )
+		{
+			return false;
+		}
+
+		var northSouth = ( band.x + band.y ) * 0.5f;
+
+		for ( var eastWest = -175.0f; eastWest < 180.0f; eastWest += 5.0f )
+		{
+			var ew = eastWest;
+
+			if ( survey.m_marks.Exists( mark => ( Mathf.Abs( Mathf.DeltaAngle( mark.m_eastWest, ew ) ) < 6.0f ) && ( Mathf.Abs( mark.m_northSouth - northSouth ) < 6.0f ) ) )
+			{
+				continue;
+			}
+
+			var pixel = SurveyMarks.GetPixel( texture.width, texture.height, ew, northSouth );
+			var color = texture.GetPixel( Mathf.FloorToInt( pixel.x ) % texture.width, Mathf.Clamp( Mathf.FloorToInt( pixel.y ), 0, texture.height - 1 ) );
+
+			return ( color.a > 0.05f ) && ( color.a <= 0.5f ) && ( ColorDistance( color, theme.m_statusFuel ) < 0.1f );
+		}
+
+		return false;
+	}
+
 	IEnumerator ScenarioSurveyMap()
 	{
 		var controller = SpaceflightController.m_instance;
@@ -43146,54 +43266,57 @@ public class ClaudeProbe : MonoBehaviour
 		{
 			foreach ( var mark in survey.m_marks )
 			{
-				// (a mineral field's cross under a lifeform's dot is not looked at)
-				var underDot = ( mark.m_kind == PlanetSurvey.Kind.Minerals ) && survey.m_marks.Exists( other => ( other.m_kind == PlanetSurvey.Kind.Life ) && ( Mathf.Abs( Mathf.DeltaAngle( other.m_eastWest, mark.m_eastWest ) ) < 4.0f ) && ( Mathf.Abs( other.m_northSouth - mark.m_northSouth ) < 4.0f ) );
+				var marked = SurveyMarkIs( 0, mark.m_eastWest, mark.m_northSouth, 0.0f, 0.0f, classic );
 
-				if ( underDot )
-				{
-					continue;
-				}
-
-				var kind = ( mark.m_kind == PlanetSurvey.Kind.Minerals ) ? 0 : 1;
-				var marked = SurveyMarkIs( kind, mark.m_eastWest, mark.m_northSouth, 0.0f, 0.0f, classic );
-
-				if ( mark.m_kind == PlanetSurvey.Kind.Minerals )
-				{
-					minerals++;
-					mineralsMarked += marked ? 1 : 0;
-				}
-				else
-				{
-					lifeforms++;
-					lifeformsMarked += marked ? 1 : 0;
-				}
+				minerals++;
+				mineralsMarked += marked ? 1 : 0;
 
 				if ( !marked && ( notMarked.Count < 5 ) )
 				{
-					notMarked.Add( ( ( kind == 0 ) ? "minerals" : "life" ) + " at " + mark.m_eastWest.ToString( "F1" ) + "," + mark.m_northSouth.ToString( "F1" ) );
+					notMarked.Add( "minerals at " + mark.m_eastWest.ToString( "F1" ) + "," + mark.m_northSouth.ToString( "F1" ) );
+				}
+			}
+
+			// each band with life is tinted in the life colour (roadmap 8.18)
+			foreach ( var band in LifeBandsOf( survey ) )
+			{
+				var tinted = LifeBandTinted( survey, band, classic );
+
+				lifeforms++;
+				lifeformsMarked += tinted ? 1 : 0;
+
+				if ( !tinted && ( notMarked.Count < 5 ) )
+				{
+					notMarked.Add( "the band with life from " + band.x.ToString( "F1" ) + " to " + band.y.ToString( "F1" ) );
 				}
 			}
 		}
 
-		// a place far from every mark is clear (the control)
+		// a place far from every mark is clear (the control): outside the bands with life if there is such a place, else only their faint tint there
 		var clearPlace = new Vector2( float.NaN, float.NaN );
+		var clearInBand = false;
 
-		for ( var eastWest = -170.0f; ( eastWest < 180.0f ) && float.IsNaN( clearPlace.x ); eastWest += 10.0f )
+		for ( var pass = 0; ( pass < 2 ) && float.IsNaN( clearPlace.x ); pass++ )
 		{
-			for ( var northSouth = -80.0f; ( northSouth <= 80.0f ) && float.IsNaN( clearPlace.x ); northSouth += 10.0f )
+			for ( var eastWest = -170.0f; ( eastWest < 180.0f ) && float.IsNaN( clearPlace.x ); eastWest += 10.0f )
 			{
-				var ew = eastWest;
-				var ns = northSouth;
-
-				if ( ( survey != null ) && !survey.m_marks.Exists( mark => ( Mathf.Abs( Mathf.DeltaAngle( mark.m_eastWest, ew ) ) < 10.0f ) && ( Mathf.Abs( mark.m_northSouth - ns ) < 10.0f ) ) )
+				for ( var northSouth = -80.0f; ( northSouth <= 80.0f ) && float.IsNaN( clearPlace.x ); northSouth += 10.0f )
 				{
-					clearPlace = new Vector2( ew, ns );
+					var ew = eastWest;
+					var ns = northSouth;
+					var inBand = LifeBandsOf( survey ).Exists( band => ( ns >= band.x - 3.0f ) && ( ns <= band.y + 3.0f ) );
+
+					if ( ( survey != null ) && ( ( pass == 1 ) || !inBand ) && !survey.m_marks.Exists( mark => ( Mathf.Abs( Mathf.DeltaAngle( mark.m_eastWest, ew ) ) < 10.0f ) && ( Mathf.Abs( mark.m_northSouth - ns ) < 10.0f ) ) )
+					{
+						clearPlace = new Vector2( ew, ns );
+						clearInBand = inBand;
+					}
 				}
 			}
 		}
 
 		var clearColors = float.IsNaN( clearPlace.x ) ? null : SurveyMarkColors( clearPlace.x, clearPlace.y, 0.0f, 0.0f, classic.m_statusArmor );
-		var clearAway = ( clearColors != null ) && ( clearColors.Count == 1 ) && clearColors.Contains( -1 );
+		var clearAway = ( clearColors != null ) && ( clearInBand ? clearColors.IsSubsetOf( new[] { -1, -2 } ) : ( ( clearColors.Count == 1 ) && clearColors.Contains( -1 ) ) );
 
 		Log( "surveymap: planet 92: before the analysis shown " + shownBeforeAnalysis + "; after it shown " + shownAfterAnalysis + ", minerals " + mineralsMarked + "/" + minerals + ", lifeforms " + lifeformsMarked + "/" + lifeforms + ( ( notMarked.Count > 0 ) ? " (not marked: " + string.Join( "; ", notMarked ) + ")" : "" ) + ", clear at " + clearPlace + ": " + clearAway );
 
@@ -43335,7 +43458,7 @@ public class ClaudeProbe : MonoBehaviour
 		var errorsDuring = s_errorCount - errorsBefore;
 
 		Check( "surveymap: before the planet is analysed from orbit, the landing map has no marks", !shownBeforeAnalysis, shownBeforeAnalysis.ToString() );
-		Check( "surveymap: after the analysis, every mineral field and lifeform found is marked on the landing map in its colour, and the map is clear away from them", shownAfterAnalysis && ( survey != null ) && ( minerals > 0 ) && ( mineralsMarked == minerals ) && ( lifeforms > 0 ) && ( lifeformsMarked == lifeforms ) && clearAway, shownAfterAnalysis + " " + mineralsMarked + "/" + minerals + " " + lifeformsMarked + "/" + lifeforms + " " + clearAway );
+		Check( "surveymap: after the analysis, every mineral field and band with life found is marked on the landing map in its colour, and the map is clear away from them", shownAfterAnalysis && ( survey != null ) && ( minerals > 0 ) && ( mineralsMarked == minerals ) && ( lifeforms > 0 ) && ( lifeformsMarked == lifeforms ) && clearAway, shownAfterAnalysis + " " + mineralsMarked + "/" + minerals + " " + lifeformsMarked + "/" + lifeforms + " " + clearAway );
 		Check( "surveymap: the marks take the colours of another scheme picked while the map is open, and the views' colours in the light mode", ( otherScheme > 0 ) && inOtherScheme && inLightMode, otherScheme + " " + inOtherScheme + " " + inLightMode );
 		Check( "surveymap: with the Red Cylinder aboard every fixed ancient ruin is marked with a box on the landing map (the random ones tint their regions, see randomruins); without it a planet not analysed has no marks", !shownWithout && shownWith && ( ruinPlaces.Count > 0 ) && ( ruinsMarked == ruinPlaces.Count ) && !shownAfter, shownWithout + " " + shownWith + " " + ruinsMarked + "/" + ruinPlaces.Count + " " + shownAfter );
 		Check( "surveymap: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
@@ -43452,14 +43575,15 @@ public class ClaudeProbe : MonoBehaviour
 		var strengthAfter = ShowsPlanetSurface( sensors ) ? material.GetFloat( "_SurveyStrength" ) : -1.0f;
 		var sensorMarks = ShowsPlanetSurface( sensors ) ? material.GetTexture( "_SurveyTex" ) as Texture2D : null;
 
-		// ---- 3. on the graphics card (with -Graphics): a lifeform's mark shows on the sphere where the lifeform is, and not without the marks
-		var lifeform = ( survey != null ) ? survey.m_marks.Find( mark => mark.m_kind == PlanetSurvey.Kind.Life ) : default( PlanetSurvey.Mark );
-		var hasLifeform = ( survey != null ) && survey.m_marks.Exists( mark => mark.m_kind == PlanetSurvey.Kind.Life );
+		// ---- 3. on the graphics card (with -Graphics): a mineral field's cross shows on the sphere where the field is, and not without the marks (the bands
+		// with life are a faint tint, roadmap 8.18)
+		var lifeform = ( survey != null ) ? survey.m_marks.Find( mark => mark.m_kind == PlanetSurvey.Kind.Minerals ) : default( PlanetSurvey.Mark );
+		var hasLifeform = ( survey != null ) && survey.m_marks.Exists( mark => mark.m_kind == PlanetSurvey.Kind.Minerals );
 		var withGraphics = SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null;
 		var withMarks = hasLifeform ? SensorPlanetPixelAt( material, lifeform.m_eastWest, lifeform.m_northSouth, 1.0f ) : Color.clear;
 		var withoutMarks = hasLifeform ? SensorPlanetPixelAt( material, lifeform.m_eastWest, lifeform.m_northSouth, 0.0f ) : Color.clear;
-		var distanceWith = ColorDistance( withMarks, classic.m_statusFuel );
-		var distanceWithout = ColorDistance( withoutMarks, classic.m_statusFuel );
+		var distanceWith = ColorDistance( withMarks, classic.m_statusArmor );
+		var distanceWithout = ColorDistance( withoutMarks, classic.m_statusArmor );
 
 		// (with -Graphics, a picture of the sensor window with the marks on the planet)
 		if ( withGraphics )
@@ -43467,7 +43591,7 @@ public class ClaudeProbe : MonoBehaviour
 			RenderScreenPicture( System.IO.Path.Combine( System.IO.Path.GetTempPath(), "starflight-probe", "surveysensor-planet-92.png" ) );
 		}
 
-		Log( "surveysensor: planet 92: before the analysis strength " + strengthBefore + " (planet shown " + showsPlanet + "); after it strength " + strengthAfter + " | the lifeform at " + lifeform.m_eastWest.ToString( "F1" ) + "," + lifeform.m_northSouth.ToString( "F1" ) + " on the graphics card: with the marks " + ColorUtility.ToHtmlStringRGB( withMarks ) + " (" + distanceWith.ToString( "F2" ) + " from " + ColorUtility.ToHtmlStringRGB( classic.m_statusFuel ) + "), without " + ColorUtility.ToHtmlStringRGB( withoutMarks ) + " (" + distanceWithout.ToString( "F2" ) + ")" + ( withGraphics ? "" : " (no graphics)" ) );
+		Log( "surveysensor: planet 92: before the analysis strength " + strengthBefore + " (planet shown " + showsPlanet + "); after it strength " + strengthAfter + " | the mineral field at " + lifeform.m_eastWest.ToString( "F1" ) + "," + lifeform.m_northSouth.ToString( "F1" ) + " on the graphics card: with the marks " + ColorUtility.ToHtmlStringRGB( withMarks ) + " (" + distanceWith.ToString( "F2" ) + " from " + ColorUtility.ToHtmlStringRGB( classic.m_statusArmor ) + "), without " + ColorUtility.ToHtmlStringRGB( withoutMarks ) + " (" + distanceWithout.ToString( "F2" ) + ")" + ( withGraphics ? "" : " (no graphics)" ) );
 
 		// ---- 4. another scheme picked while the picture shows the planet: its marks are drawn again in that scheme's colours
 		var otherScheme = -1;
@@ -43476,7 +43600,7 @@ public class ClaudeProbe : MonoBehaviour
 		{
 			var theme = UIKitTheme.LoadScheme( scheme, UIKitTheme.Mode.Dark );
 
-			if ( ( theme != null ) && ( ColorDistance( theme.m_statusFuel, classic.m_statusFuel ) > 0.3f ) )
+			if ( ( theme != null ) && ( ColorDistance( theme.m_statusArmor, classic.m_statusArmor ) > 0.3f ) )
 			{
 				otherScheme = scheme;
 			}
@@ -43493,7 +43617,7 @@ public class ClaudeProbe : MonoBehaviour
 
 			var other = UIKitTheme.GetViewTheme();
 			var shown = ShowsPlanetSurface( sensors ) ? material.GetTexture( "_SurveyTex" ) as Texture2D : null;
-			var nearest = SurveyMarkNearest( shown, lifeform.m_eastWest, lifeform.m_northSouth, out var nearness, other.m_statusFuel, classic.m_statusFuel );
+			var nearest = SurveyMarkNearest( shown, lifeform.m_eastWest, lifeform.m_northSouth, out var nearness, other.m_statusArmor, classic.m_statusArmor );
 
 			inOtherScheme = ( shown != null ) && ( material.GetFloat( "_SurveyStrength" ) > 0.5f ) && ( nearest == 0 ) && ( nearness < 0.05f );
 			otherDetail = nearest + " at " + nearness.ToString( "F3" );
@@ -43503,7 +43627,7 @@ public class ClaudeProbe : MonoBehaviour
 			yield return Frames( 2 );
 		}
 
-		Log( "surveysensor: in scheme " + otherScheme + " the lifeform's dot in its colours " + inOtherScheme + " (" + otherDetail + ")" );
+		Log( "surveysensor: in scheme " + otherScheme + " the mineral field's cross in its colours " + inOtherScheme + " (" + otherDetail + ")" );
 
 		// ---- 5. the landing map shows the very same marks
 		displays.ChangeDisplay( displays.m_terrainMapDisplay );
@@ -43522,7 +43646,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		if ( withGraphics )
 		{
-			Check( "surveysensor: on the graphics card a lifeform's mark shows on the turning planet where the lifeform is, and not without the marks", hasLifeform && ( distanceWith < distanceWithout * 0.5f ) && ( distanceWithout - distanceWith > 0.3f ), distanceWith.ToString( "F2" ) + " with, " + distanceWithout.ToString( "F2" ) + " without" );
+			Check( "surveysensor: on the graphics card a mineral field's mark shows on the turning planet where the field is, and not without the marks", hasLifeform && ( distanceWith < distanceWithout * 0.5f ) && ( distanceWithout - distanceWith > 0.3f ), distanceWith.ToString( "F2" ) + " with, " + distanceWithout.ToString( "F2" ) + " without" );
 		}
 
 		Check( "surveysensor: another scheme picked while the picture shows the planet draws its marks again in that scheme's colours", ( otherScheme > 0 ) && inOtherScheme, otherScheme + " " + inOtherScheme + " " + otherDetail );
@@ -50561,6 +50685,191 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "calming: aliens the player has fired on keep fighting (?FIRED-WEAPONS; control)", firedStance == GD_Comm.Stance.Hostile, firedMood + " " + firedStance );
 
 		Finish( "scenario=calming checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- roadmap 8.18: the lifeforms as the shipped game makes them
+
+	// the shipped generator's species of a planet through ShippedLifeforms.Make (null on the code before roadmap 8.18), as the list of its records
+	static System.Collections.IList ShippedSpeciesOf( GD_Planet planet, out object result )
+	{
+		result = null;
+
+		var type = typeof( ShipButton ).Assembly.GetType( "ShippedLifeforms" );
+		var make = ( type == null ) ? null : type.GetMethod( "Make" );
+
+		if ( make == null )
+		{
+			return null;
+		}
+
+		result = make.Invoke( null, new object[] { planet } );
+
+		return FieldOrNull( result, "m_species" ) as System.Collections.IList;
+	}
+
+	// what the shipped game's generator makes on every planet with life (VITA-OV, HP-OV, LP-OV): the counts, the niches, the ranges of the species' numbers, the
+	// same on a second making, and none on a planet without life
+	IEnumerator ScenarioShippedLifeforms()
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		yield return Frames( 2 );
+
+		var planets = 0;
+		var species = 0;
+		var mostSpecies = 0;
+		var fewestSpecies = int.MaxValue;
+		var hitsOutside = 0;
+		var aggressionOutside = 0;
+		var intelligenceOutside = 0;
+		var iconsOutside = 0;
+		var sizesOutside = 0;
+		var notTheSame = 0;
+		var noneWithoutLife = true;
+		var niches = new Dictionary<int, int>();
+		var icons = new int[ 17 ];
+		var lines = new List<string>();
+		var made = false;
+
+		foreach ( var planet in gameData.m_planetList )
+		{
+			if ( PlayerData.GetBioDensityOf( planet ) <= 0 )
+			{
+				// (a planet without life has none: the control)
+				if ( ( planet.m_id % 50 ) == 0 )
+				{
+					var none = ShippedSpeciesOf( planet, out _ );
+
+					noneWithoutLife &= ( none == null ) || ( none.Count == 0 );
+				}
+
+				continue;
+			}
+
+			var list = ShippedSpeciesOf( planet, out var result );
+
+			if ( list == null )
+			{
+				continue;
+			}
+
+			made = true;
+
+			var again = ShippedSpeciesOf( planet, out _ );
+
+			planets++;
+			species += list.Count;
+			mostSpecies = Mathf.Max( mostSpecies, list.Count );
+			fewestSpecies = Mathf.Min( fewestSpecies, list.Count );
+
+			var plants = 0;
+
+			for ( var i = 0; i < list.Count; i++ )
+			{
+				var creature = list[ i ];
+				var niche = (int) FieldOrNull( creature, "m_niche" );
+				var hits = (int) FieldOrNull( creature, "m_hitPoints" );
+				var aggression = (int) FieldOrNull( creature, "m_aggression" );
+				var intelligence = (int) FieldOrNull( creature, "m_intelligence" );
+				var icon = (int) FieldOrNull( creature, "m_icon" );
+				var size = (int) FieldOrNull( creature, "m_sizeIndex" );
+
+				niches[ niche ] = niches.TryGetValue( niche, out var count ) ? count + 1 : 1;
+				plants += ( ( niche % 4 ) != 0 ) ? 1 : 0;
+
+				if ( ( icon >= 0 ) && ( icon < 17 ) )
+				{
+					icons[ icon ]++;
+				}
+				else
+				{
+					iconsOutside++;
+				}
+
+				hitsOutside += ( ( hits < 6 ) || ( hits > 83 ) ) ? 1 : 0;
+				sizesOutside += ( ( size < 1 ) || ( size > 9 ) ) ? 1 : 0;
+
+				var lo = ( niche == 2 ) ? 1 : ( ( ( niche == 4 ) || ( niche == 6 ) ) ? 1 : 50 );
+				var hi = ( niche == 2 ) ? 10 : ( ( ( niche == 4 ) || ( niche == 6 ) ) ? 60 : 100 );
+
+				aggressionOutside += ( ( aggression < lo ) || ( aggression > hi ) ) ? 1 : 0;
+				intelligenceOutside += ( ( intelligence < lo ) || ( intelligence > hi ) ) ? 1 : 0;
+
+				if ( ( again == null ) || ( again.Count != list.Count ) || ( (int) FieldOrNull( again[ i ], "m_hitPoints" ) != hits ) || ( (int) FieldOrNull( again[ i ], "m_icon" ) != icon ) )
+				{
+					notTheSame++;
+				}
+			}
+
+			var crowding = FieldOrNull( result, "m_crowding" ) as int[];
+			var perBlock = FieldOrNull( result, "m_individualsPerBlock" ) as int[];
+
+			lines.Add( planet.m_id + "(type " + planet.m_planetTypeId + ", bio " + planet.m_bioDensity + "%, regions " + planet.m_temperatureIdA + "-" + planet.m_temperatureIdB + "): " + list.Count + " species (" + plants + " plants), crowding [" + string.Join( ",", crowding ) + "], per block [" + string.Join( ",", perBlock ) + "]" );
+		}
+
+		var nicheText = new List<string>();
+
+		foreach ( var pair in niches )
+		{
+			nicheText.Add( pair.Key + ":" + pair.Value );
+		}
+
+		Log( "shippedlifeforms: " + planets + " planets, " + species + " species (" + fewestSpecies + " to " + mostSpecies + " a planet); niches " + string.Join( " ", nicheText ) + "; icons " + string.Join( " ", icons ) + " | outside: hits " + hitsOutside + ", aggression " + aggressionOutside + ", intelligence " + intelligenceOutside + ", icons " + iconsOutside + ", sizes " + sizesOutside + " | not the same twice " + notTheSame + " | none without life " + noneWithoutLife );
+
+		foreach ( var line in lines )
+		{
+			Log( "shippedlifeforms: " + line );
+		}
+
+		Check( "shippedlifeforms: every planet with life gets its lifeforms from the shipped game's generator", made && ( planets >= 34 ) && ( fewestSpecies >= 1 ) && ( mostSpecies <= 100 ), planets + " planets, " + fewestSpecies + " to " + mostSpecies );
+		Check( "shippedlifeforms: the species' numbers are in the shipped game's ranges (hits 6 to 83, aggression and intelligence by niche, sizes 1 to 9, icons 0 to 16)", made && ( hitsOutside == 0 ) && ( aggressionOutside == 0 ) && ( intelligenceOutside == 0 ) && ( iconsOutside == 0 ) && ( sizesOutside == 0 ), hitsOutside + " " + aggressionOutside + " " + intelligenceOutside + " " + iconsOutside + " " + sizesOutside );
+		Check( "shippedlifeforms: the generator's niches are the shipped six (producers, herbivores, herbivorous producers, carnivores, carnivorous producers, omnivores)", made && niches.ContainsKey( 2 ) && niches.ContainsKey( 4 ) && niches.ContainsKey( 8 ) && !niches.ContainsKey( 0 ), string.Join( " ", nicheText ) );
+		Check( "shippedlifeforms: a planet has the same lifeforms every time, and a planet without life none", made && ( notTheSame == 0 ) && noneWithoutLife, notTheSame + " " + noneWithoutLife );
+
+		// planet 675: the game data gives it 2% life, but its type (a generic one) has no life tables in the shipped game, so it has none and its sensors read 0%
+		var planet675 = gameData.m_planetList[ 675 ];
+		var bio675 = PlayerData.GetBioDensityOf( planet675 );
+		var species675 = GD_Species.ForPlanet( planet675 ).Count;
+
+		Log( "shippedlifeforms: planet 675 (type " + planet675.m_planetTypeId + ", game data " + planet675.m_bioDensity + "%): reads " + bio675 + "%, " + species675 + " species" );
+
+		Check( "shippedlifeforms: planet 675, whose type has no life tables in the shipped game, has no lifeforms and reads 0% life", ( planet675.m_bioDensity > 0 ) && ( bio675 == 0 ) && ( species675 == 0 ), planet675.m_bioDensity + " " + bio675 + " " + species675 );
+
+		// the species of the port are the shipped game's records (GD_Species.ForPlanet: one species a record, its numbers the record's)
+		var wired = 0;
+		var wiredPlanets = 0;
+
+		foreach ( var planet in gameData.m_planetList )
+		{
+			if ( PlayerData.GetBioDensityOf( planet ) <= 0 )
+			{
+				continue;
+			}
+
+			var records = ShippedSpeciesOf( planet, out _ );
+			var speciesList = GD_Species.ForPlanet( planet );
+
+			if ( ( records == null ) || ( records.Count != speciesList.Count ) || ( records.Count == 0 ) )
+			{
+				continue;
+			}
+
+			var same = true;
+
+			for ( var i = 0; i < records.Count; i++ )
+			{
+				same &= ( (int) FieldOrNull( records[ i ], "m_hitPoints" ) == speciesList[ i ].m_hitPoints ) && ( (int) FieldOrNull( records[ i ], "m_aggression" ) == speciesList[ i ].m_aggression ) && ( (int) FieldOrNull( records[ i ], "m_sizeIndex" ) == speciesList[ i ].m_size );
+			}
+
+			wiredPlanets++;
+			wired += same ? 1 : 0;
+		}
+
+		Log( "shippedlifeforms: the port's species are the shipped records on " + wired + " of " + wiredPlanets + " planets" );
+
+		Check( "shippedlifeforms: the port's species of every planet with life are the shipped generator's records (hit points, aggression, size)", ( wiredPlanets >= 34 ) && ( wired == wiredPlanets ), wired + "/" + wiredPlanets );
+
+		Finish( "scenario=shippedlifeforms planets=" + planets + " species=" + species, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
