@@ -1794,6 +1794,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLifeformValues();
 				break;
 
+			case "iconkey":
+				yield return ScenarioIconKey();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -24753,6 +24757,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 5 );
 		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
+		yield return WaitForBlocks();
 
 		Transform lifeform = null;
 
@@ -24771,6 +24776,9 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		var crewMember = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Captain );
+
+		// (every other lifeform far off and unpaired, so that none attacks the crew or bites it meanwhile)
+		PutOthersFarOff( lifeform.GetComponent<TerrainLifeform>() );
 
 		// ---- 1. the control: a lifeform that does not move (made so: the nearest is any species), of middling aggression, next to the vehicle neither moves nor
 		// attacks
@@ -25290,7 +25298,7 @@ public class ClaudeProbe : MonoBehaviour
 		{
 			var otherLifeform = other.GetComponent<TerrainLifeform>();
 
-			if ( ( otherLifeform != grazer ) && ( otherLifeform != prey ) )
+			if ( ( otherLifeform != null ) && ( otherLifeform != grazer ) && ( otherLifeform != prey ) )
 			{
 				other.position += Vector3.right * 500.0f;
 				SetField( otherLifeform, "m_mate", null );
@@ -25409,6 +25417,8 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 5 );
 		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
 
+		yield return WaitForBlocks();
+
 		var all = LifeformsOnTheGround();
 
 		if ( all.Count < 2 )
@@ -25423,6 +25433,8 @@ public class ClaudeProbe : MonoBehaviour
 
 		// (a test plant that stays where it is put: since roadmap 8.18 the first lifeform may be any species)
 		plant.m_species = MakeTestPlant( 121 );
+		plant.m_aggression = plant.m_species.m_aggression;
+		plant.m_noticedPlayer = false;
 		plant.m_status = TerrainLifeform.Status.Alive;
 		plant.m_hits = 100;
 		plant.m_stuns = plant.m_species.m_stunPoints;
@@ -25442,6 +25454,8 @@ public class ClaudeProbe : MonoBehaviour
 		// (roadmap 8.18, the shipped game's BIO-DATA)
 		var unpaidBefore = UnpaidLifeformData();
 		var dataBefore = HoldItems( playerData.m_terrainVehicle, true ).Count;
+
+		PutOthersFarOff( plant );
 		var offer = Press( "TVCargoButton" );
 		var buttons = controller.m_buttonController.GetCurrentButtonSet().ToString();
 		var record = Press( "TVRecordButton" );
@@ -25456,6 +25470,7 @@ public class ClaudeProbe : MonoBehaviour
 		var dataValue = ( dataAfterFirst > dataBefore ) ? (int) FieldOrNull( dataItems[ dataAfterFirst - 1 ], "m_value" ) : -1;
 
 		// ---- 2. the same species again on this landing gives nothing
+		PutOthersFarOff( plant );
 		Press( "TVCargoButton" );
 		Press( "TVRecordButton" );
 
@@ -25545,6 +25560,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 5 );
 		yield return LandInTheArthSystemAt( 92, firstPlace + Vector3.forward * 10.0f, done );
+		yield return WaitForBlocks();
 
 		var all = LifeformsOnTheGround();
 
@@ -25569,6 +25585,12 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 2 );
 
 		// ---- 1. Cargo beside a living plant offers Record and Ignore (Capture is in Tools since 2026-10-17, for a stunned lifeform)
+		PutOthersFarOff( plant, corpse );
+
+		// (neither dangerous nor wimpy, whatever its species: one that attacks or flees holds up or ends the capture)
+		plant.m_aggression = 50;
+		plant.m_noticedPlayer = false;
+
 		var expected = ShippedValue( plant.m_species, 125, 100, false );
 		var offer = Press( "TVCargoButton" );
 		var buttons = controller.m_buttonController.GetCurrentButtonSet().ToString();
@@ -48459,10 +48481,16 @@ public class ClaudeProbe : MonoBehaviour
 
 		var after = LifeformsOnTheGround();
 		var afterDead = 0;
+		var killedAliveAfter = false;
+		var capturedBackAfter = false;
 
 		foreach ( var lifeform in after )
 		{
-			afterDead += ( lifeform.GetComponent<TerrainLifeform>().m_status == TerrainLifeform.Status.Dead ) ? 1 : 0;
+			var afterLifeform = lifeform.GetComponent<TerrainLifeform>();
+
+			afterDead += ( afterLifeform.m_status == TerrainLifeform.Status.Dead ) ? 1 : 0;
+			killedAliveAfter |= ( afterLifeform.m_placeIndex == killedPlace ) && ( afterLifeform.m_status != TerrainLifeform.Status.Dead );
+			capturedBackAfter |= afterLifeform.m_placeIndex == capturedPlace;
 		}
 
 		var afterDeposits = controller.m_disembarked.m_terrainGrid.m_terrainElements.transform.GetComponentsInChildren<TerrainElement>( true );
@@ -48502,7 +48530,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "planetrefill: the Disembark button marks the planet visited in this orbit", ( visited != null ) && visited.Contains( 92 ), visitedText );
 		Check( "planetrefill: in the same orbit the deposits stay taken, the killed lifeform dead and the captured one gone, and what was dropped stays", ( againTaken == 0 ) && ( againMined == Mathf.Max( 1, minedVolume - 10 ) ) && ( again.Count <= lifeformCount - 1 ) && killedDeadAgain && !capturedBack && againDrops && againRuin, againTaken + " " + againMined + " | " + again.Count + " of " + lifeformCount + ", " + againDead + " dead, the killed one dead " + killedDeadAgain + ", the captured one back " + capturedBack + " | " + againDrops + " " + againRuin );
 		Check( "planetrefill: after leaving the orbit the deposits are back whole", ( afterTaken < 0 ) && afterTakenShown && ( afterMinedVolume == minedVolume ), afterTaken + " " + afterTakenShown + " " + afterMinedVolume + " of " + minedVolume );
-		Check( "planetrefill: after leaving the orbit the lifeforms are back, alive", ( after.Count == lifeformCount ) && ( afterDead == 0 ), after.Count + " of " + lifeformCount + ", " + afterDead + " dead" );
+		Check( "planetrefill: after leaving the orbit the lifeforms are back, alive", ( after.Count == lifeformCount ) && killedAliveAfter && capturedBackAfter, after.Count + " of " + lifeformCount + ", " + afterDead + " dead, the killed one alive " + killedAliveAfter + ", the captured one back " + capturedBackAfter );
 		Check( "planetrefill: after leaving the orbit a dropped mineral and a dropped curio are gone, and the curios of the random ruins are back", !afterElement && !afterCurio && !afterRuin, afterElement + " " + afterCurio + " " + afterRuin );
 		Check( "planetrefill: a dropped special artifact, a Black Egg left unarmed and the Endurium taken from an ancient ruin site stay", afterSpecial && afterEgg && afterSite, afterSpecial + " " + afterEgg + " " + afterSite );
 		Check( "planetrefill: a planet the terrain vehicle did not go out on keeps what was taken from it (the control)", control == 0, control.ToString() );
@@ -51150,6 +51178,46 @@ public class ClaudeProbe : MonoBehaviour
 		return species;
 	}
 
+	// every lifeform near the terrain vehicle but these put far off, and every pairing undone: since roadmap 8.18 the blocks about the vehicle hold more
+	// lifeforms, and the blocks follow the vehicle half a second after it goes out, so a dangerous newcomer could attack the crew (delaying a recording) or a mate
+	// bite the lifeform under test - call it once the blocks have settled (WaitForBlocks) and again before each step
+	static void PutOthersFarOff( params TerrainLifeform[] keep )
+	{
+		var vehicle = SpaceflightController.m_instance.m_terrainVehicle.transform.position;
+		var index = 0;
+
+		foreach ( var other in LifeformsOnTheGround() )
+		{
+			var otherLifeform = other.GetComponent<TerrainLifeform>();
+
+			// (the capture beam is a child of the populator too)
+			if ( otherLifeform == null )
+			{
+				continue;
+			}
+
+			SetField( otherLifeform, "m_mate", null );
+
+			if ( System.Array.IndexOf( keep, otherLifeform ) >= 0 )
+			{
+				continue;
+			}
+
+			index++;
+
+			if ( DistanceToVehicle( other ) < 300.0f )
+			{
+				other.position = vehicle + Vector3.right * 600.0f + Vector3.forward * ( index * 10.0f );
+			}
+		}
+	}
+
+	// waits until the blocks about the terrain vehicle have been placed about where it stands (TerrainLifeforms looks every half second)
+	static IEnumerator WaitForBlocks()
+	{
+		yield return new WaitForSecondsRealtime( 1.2f );
+	}
+
 	// the values of the lifeforms as the shipped game's: valuate (ITEMS-OV), a recording an item of the hold worth an eighth of it with no volume (WE6B8), once a
 	// species a landing, a specimen worth all of it, once a species a landing (WE75B), and the recordings carried to the ship with the rest of the cargo
 	IEnumerator ScenarioLifeformValues()
@@ -51182,7 +51250,7 @@ public class ClaudeProbe : MonoBehaviour
 		// ---- 2. on planet 92 of the Arth system, a test plant beside the vehicle (every other lifeform far off): Record puts its data into the terrain vehicle's
 		// hold, an eighth of its value, (30 + 2) x 3 x 1 = 96, so 12, and no volume
 		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
-		yield return Frames( 2 );
+		yield return WaitForBlocks();
 
 		var all = LifeformsOnTheGround();
 
@@ -51202,7 +51270,10 @@ public class ClaudeProbe : MonoBehaviour
 			all[ i ].position = vehicle + Vector3.right * 600.0f + Vector3.forward * ( i * 10.0f );
 		}
 
+		// (its own aggression too: a lifeform keeps the aggression of the species it was placed as, and one over 65 attacked the crew and held up the recording)
 		subject.m_species = testPlant;
+		subject.m_aggression = testPlant.m_aggression;
+		subject.m_noticedPlayer = false;
 		subject.m_status = TerrainLifeform.Status.Alive;
 		subject.m_hits = 100;
 		subject.m_stuns = testPlant.m_stunPoints;
@@ -51212,6 +51283,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var dataBefore = HoldItems( playerData.m_terrainVehicle, true ).Count;
 
+		PutOthersFarOff( subject );
 		Press( "TVCargoButton" );
 		Press( "TVRecordButton" );
 
@@ -51224,6 +51296,7 @@ public class ClaudeProbe : MonoBehaviour
 		var recordingVolume = ( recording == null ) ? -1 : (int) FieldOrNull( recording, "m_volume" );
 
 		// ---- 3. the same species again on this landing: already recorded, nothing more
+		PutOthersFarOff( subject );
 		Press( "TVCargoButton" );
 		Press( "TVRecordButton" );
 
@@ -51240,6 +51313,7 @@ public class ClaudeProbe : MonoBehaviour
 			newLanding.Invoke( null, null );
 		}
 
+		PutOthersFarOff( subject );
 		Press( "TVCargoButton" );
 		Press( "TVRecordButton" );
 
@@ -51253,6 +51327,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var specimensBefore = HoldItems( playerData.m_terrainVehicle, false ).Count;
 
+		PutOthersFarOff( subject );
 		Press( "TVCaptureButton" );
 
 		yield return new WaitForSecondsRealtime( 7.5f );
@@ -51261,12 +51336,16 @@ public class ClaudeProbe : MonoBehaviour
 		var specimenValue = ( specimens.Count > specimensBefore ) ? (int) FieldOrNull( specimens[ specimens.Count - 1 ], "m_value" ) : -1;
 
 		second.m_species = testPlant;
+		second.m_aggression = testPlant.m_aggression;
+		second.m_noticedPlayer = false;
 		second.m_status = TerrainLifeform.Status.Stunned;
 		second.m_hits = 100;
 		second.m_stuns = 0;
 		second.transform.position = new Vector3( vehicle.x + 6.0f, second.transform.position.y, vehicle.z );
 
 		yield return Frames( 2 );
+
+		PutOthersFarOff( second );
 
 		var duplicateText = Press( "TVCaptureButton" );
 
@@ -51297,6 +51376,295 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lifeformvalues: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=lifeformvalues checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: the terrain vehicle's icon key (roadmap 8.27)
+
+	// a static method of the game's code by its type's name, called with these arguments (null if the type or the method is missing: the code before)
+	static object CallStatic( string typeName, string method, params object[] args )
+	{
+		var type = typeof( MapButton ).Assembly.GetType( typeName );
+		var info = ( type == null ) ? null : type.GetMethod( method, BindingFlags.Public | BindingFlags.Static );
+
+		return ( info == null ) ? null : info.Invoke( null, args );
+	}
+
+	// a method of an object called with these arguments (null if the object or the method is missing: the code before)
+	static object CallOrNull( object target, string name, params object[] args )
+	{
+		var method = ( target == null ) ? null : target.GetType().GetMethod( name, c_any );
+
+		return ( method == null ) ? null : method.Invoke( target, args );
+	}
+
+	// a pixel of one of the shipped game's surface icons as "r,g,b" ("missing" on the code before)
+	static string IconPixel( int icon, int column, int row )
+	{
+		var pixel = CallStatic( "TerrainIconKey", "GetPixel", icon, column, row );
+
+		if ( pixel == null )
+		{
+			return "missing";
+		}
+
+		var colour = (Color32) pixel;
+
+		return colour.r + "," + colour.g + "," + colour.b;
+	}
+
+	// the icon the original's map would give this object of the surface, worked out here on its own (-1 for none): the vehicle, the ship, a deposit, a ruin, a
+	// lifeform by its state and its body plan (the first of a producer's two pictures, the animals' plans in the order of the pictures 6 to 16)
+	static int ExpectedIcon( Transform target )
+	{
+		var disembarked = SpaceflightController.m_instance.m_disembarked;
+
+		if ( target == null )
+		{
+			return -1;
+		}
+
+		if ( target.GetComponent<TerrainVehicle>() != null )
+		{
+			return 26;
+		}
+
+		if ( ( disembarked.m_arthShip != null ) && ( target == disembarked.m_arthShip.transform ) )
+		{
+			return 25;
+		}
+
+		if ( target.GetComponent<TerrainElement>() != null )
+		{
+			return 21;
+		}
+
+		var ruin = target.GetComponent<TerrainRuin>();
+
+		if ( ruin != null )
+		{
+			return ruin.m_isAncient ? 24 : 23;
+		}
+
+		var lifeform = target.GetComponent<TerrainLifeform>();
+
+		if ( lifeform != null )
+		{
+			if ( lifeform.m_status == TerrainLifeform.Status.Dead )
+			{
+				return 19;
+			}
+
+			var species = lifeform.m_species;
+
+			if ( species.m_canFly )
+			{
+				return 17;
+			}
+
+			if ( species.m_canFloat )
+			{
+				return 18;
+			}
+
+			// the shipped game's own picture of the creature
+			if ( species.m_record != null )
+			{
+				return species.m_record.m_icon;
+			}
+
+			switch ( species.m_bodyPlan )
+			{
+				case GD_Species.BodyPlan.LeavedLarge: return 0;
+				case GD_Species.BodyPlan.LeavedMedium: return 2;
+				case GD_Species.BodyPlan.LeavedSmall: return 4;
+			}
+
+			return 6 + (int) species.m_bodyPlan;
+		}
+
+		// an artifact lying in a ruin
+		return 22;
+	}
+
+	// the terrain vehicle's icon key as the original's (LISTICONS ICONS, BEHAV-OV >BUTTONS 6: roadmap 8.27): the shipped game's 27 surface icons with their
+	// names (ICON1:1, ICON-NAME), on two pages, icons 0 to 14 and 15 to 26 with the elevation bar on the second, shown on the auxiliary display while the Map is
+	// up (the port's console has no room for the original's seventh button), turned with left and right, and the icons over the surface in the Map's overhead
+	// view, each object with its own; both go when the Map does, however it ends. The code before had no key and no icons
+	IEnumerator ScenarioIconKey()
+	{
+		var controller = SpaceflightController.m_instance;
+		var buttonController = controller.m_buttonController;
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		// out in the terrain vehicle on planet 92 of the Arth system (it has life)
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=iconkey abort: never got into the terrain vehicle (" + DataController.m_instance.m_playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var display = controller.m_displayController.m_terrainVehicleDisplay;
+
+		// ---- 1. the names and the pictures, as the shipped game's
+		var names = new List<string>();
+
+		for ( var icon = 0; icon < 27; icon++ )
+		{
+			names.Add( ( CallStatic( "TerrainIconKey", "GetName", icon ) as string ) ?? "missing" );
+		}
+
+		// the terrain vehicle's top row (black at 3 and 4, the key's light grey elsewhere) and the biped's (the first layer's light cyan at 3 and 5, the second's
+		// blue at 2, 4 and 6 over it)
+		var vehicleRow = IconPixel( 26, 0, 0 ) + " " + IconPixel( 26, 3, 0 ) + " " + IconPixel( 26, 4, 0 );
+		var bipedRow = IconPixel( 9, 2, 0 ) + " " + IconPixel( 9, 3, 0 ) + " " + IconPixel( 9, 4, 0 ) + " " + IconPixel( 9, 5, 0 );
+
+		// ---- 2. no key before the Map is up (control)
+		var keyBefore = display.transform.Find( "Icon key" ) != null;
+
+		// ---- 3. the Map: the key on the auxiliary display, its first page, then the second after a push to the right
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 0 );
+
+		yield return Frames( 10 );
+
+		var mapButton = FieldOrNull( buttonController, "m_currentButton" );
+		var key = ( mapButton != null ) ? CallOrNull( mapButton, "GetIconKey" ) : null;
+		var keyOnDisplay = ( key != null ) && ( ( (Component) key ).transform.parent == display.transform );
+		var firstPage = ( key != null ) ? ( Call( key, "GetPageText" ) as string ) : "no key";
+
+		// the key covers the whole auxiliary display, and it and every part of it are on a layer of the camera that draws the display; the markers are on a layer
+		// of the 3D view's camera, drawn with the ground (before the transparent queue, which the view's effects would put in the wrong place)
+		var keyDrawn = "no key";
+		var keyIsDrawn = false;
+
+		if ( key != null )
+		{
+			var keyCorners = new Vector3[ 4 ];
+			var displayCorners = new Vector3[ 4 ];
+
+			( (RectTransform) ( (Component) key ).transform ).GetWorldCorners( keyCorners );
+			( (RectTransform) display.transform ).GetWorldCorners( displayCorners );
+
+			var covers = ( Vector3.Distance( keyCorners[ 0 ], displayCorners[ 0 ] ) < 0.01f ) && ( Vector3.Distance( keyCorners[ 2 ], displayCorners[ 2 ] ) < 0.01f );
+			var canvas = display.GetComponentInParent<Canvas>();
+			var uiCamera = ( canvas != null ) ? canvas.rootCanvas.worldCamera : null;
+			var parts = ( (Component) key ).GetComponentsInChildren<Transform>( true );
+			var unseenParts = 0;
+
+			foreach ( var part in parts )
+			{
+				if ( ( uiCamera == null ) || ( ( uiCamera.cullingMask & ( 1 << part.gameObject.layer ) ) == 0 ) )
+				{
+					unseenParts++;
+				}
+			}
+
+			var markersNow = CallOrNull( mapButton, "GetIconMarkers" );
+			var spriteRenderers = ( markersNow != null ) ? ( (Component) markersNow ).GetComponentsInChildren<SpriteRenderer>( true ) : new SpriteRenderer[ 0 ];
+			var unseenMarkers = 0;
+
+			foreach ( var spriteRenderer in spriteRenderers )
+			{
+				if ( ( Camera.main == null ) || ( ( Camera.main.cullingMask & ( 1 << spriteRenderer.gameObject.layer ) ) == 0 ) || ( spriteRenderer.sharedMaterial == null ) || ( spriteRenderer.sharedMaterial.renderQueue >= 3000 ) )
+				{
+					unseenMarkers++;
+				}
+			}
+
+			keyIsDrawn = covers && ( unseenParts == 0 ) && ( spriteRenderers.Length > 0 ) && ( unseenMarkers == 0 );
+			keyDrawn = "key " + keyCorners[ 0 ].ToString( "F2" ) + " to " + keyCorners[ 2 ].ToString( "F2" ) + " over the display's " + displayCorners[ 0 ].ToString( "F2" ) + " to " + displayCorners[ 2 ].ToString( "F2" ) + ", " + unseenParts + " of " + parts.Length + " parts off " + ( ( uiCamera != null ) ? uiCamera.name : "no camera" ) + "'s layers, " + unseenMarkers + " of " + spriteRenderers.Length + " markers not drawn with the ground";
+		}
+
+		// with -Graphics, the whole screen as the player sees it, with each page of the key (Logs/screen-pictures/iconkey/)
+		var pictureFolder = ScreenPictureFolder( "iconkey" );
+
+		if ( pictureFolder != "" )
+		{
+			yield return Frames( 10 );
+
+			RenderScreenPicture( System.IO.Path.Combine( pictureFolder, "01_map_key_first_page.png" ) );
+		}
+
+		yield return Tap( Key.RightArrow );
+		yield return Frames( 3 );
+
+		var secondPage = ( key != null ) ? ( Call( key, "GetPageText" ) as string ) : "no key";
+
+		if ( pictureFolder != "" )
+		{
+			RenderScreenPicture( System.IO.Path.Combine( pictureFolder, "02_map_key_second_page.png" ) );
+		}
+
+		// ---- 4. the markers over the surface: each object with the icon the original's map gives it
+		var markers = ( mapButton != null ) ? CallOrNull( mapButton, "GetIconMarkers" ) : null;
+		var markerCount = ( markers != null ) ? (int) Call( markers, "GetMarkerCount" ) : 0;
+		var wrongIcons = new List<string>();
+		var kinds = new Dictionary<int, int>();
+
+		for ( var i = 0; i < markerCount; i++ )
+		{
+			var icon = (int) Call( markers, "GetMarkerIcon", i );
+			var target = Call( markers, "GetMarkerTarget", i ) as Transform;
+			var expected = ExpectedIcon( target );
+
+			kinds[ icon ] = ( kinds.TryGetValue( icon, out var count ) ? count : 0 ) + 1;
+
+			if ( icon != expected )
+			{
+				wrongIcons.Add( ( ( target != null ) ? target.name : "nothing" ) + " " + icon + " not " + expected );
+			}
+		}
+
+		var shownMarkers = ( markers != null ) ? ( (Component) markers ).GetComponentsInChildren<SpriteRenderer>( false ).Length : 0;
+		var deposits = controller.m_disembarked.m_terrainGrid.m_terrainElements.GetComponentsInChildren<TerrainElement>( false ).Length;
+		var lifeforms = controller.m_disembarked.m_terrainGrid.m_terrainLifeforms.m_lifeformList.Count;
+		var kindText = "";
+
+		foreach ( var kind in kinds )
+		{
+			kindText += " " + kind.Key + "x" + kind.Value;
+		}
+
+		// ---- 5. the Map ended with the fire button: the key and the markers go
+		yield return Tap( Key.Enter );
+		yield return Frames( 5 );
+
+		var keyAfterExit = ( key != null ) && ( (UnityEngine.Object) key != null );
+		var markersAfterExit = ( markers != null ) && ( (UnityEngine.Object) markers != null );
+
+		// ---- 6. the Map ended another way (the console's menu changed under it): they go too
+		PressButton( ButtonController.ButtonSet.TerrainVehicle, 0 );
+
+		yield return Frames( 10 );
+
+		var secondMapButton = FieldOrNull( buttonController, "m_currentButton" );
+		var secondKey = ( secondMapButton != null ) ? CallOrNull( secondMapButton, "GetIconKey" ) : null;
+		var secondMarkers = ( secondMapButton != null ) ? CallOrNull( secondMapButton, "GetIconMarkers" ) : null;
+
+		buttonController.ChangeButtonSet( ButtonController.ButtonSet.TerrainVehicle );
+		buttonController.ClearCurrentButton();
+
+		yield return Frames( 5 );
+
+		var keyAfterMenu = ( secondKey != null ) && ( (UnityEngine.Object) secondKey != null );
+		var markersAfterMenu = ( secondMarkers != null ) && ( (UnityEngine.Object) secondMarkers != null );
+
+		Log( "iconkey: names " + string.Join( " | ", names ) + " || vehicle row " + vehicleRow + " | biped row " + bipedRow + " || key before " + keyBefore + ", on the display " + keyOnDisplay + ", " + keyDrawn + " || first page: " + firstPage.Replace( "\n", " | " ) + " || second page: " + secondPage.Replace( "\n", " | " ) + " || markers " + markerCount + " (" + shownMarkers + " shown):" + kindText + ", deposits " + deposits + ", lifeforms " + lifeforms + ", wrong " + string.Join( "; ", wrongIcons ) + " || after Enter: key " + keyAfterExit + ", markers " + markersAfterExit + " || after the menu changed: key " + keyAfterMenu + ", markers " + markersAfterMenu );
+
+		Check( "iconkey: the 27 icons have the shipped game's names, from Large producer to Terrain vehicle (ICON-NAME)", ( names[ 0 ] == "Large producer" ) && ( names[ 9 ] == "Bilateral bipedal" ) && ( names[ 21 ] == "Mineral" ) && ( names[ 24 ] == "Ancient ruins" ) && ( names[ 26 ] == "Terrain vehicle" ), string.Join( " | ", names ) );
+		Check( "iconkey: the pictures are the shipped game's, in its EGA colours on the key's light grey (ICON1:1, C>EGA, GREY1)", ( vehicleRow == "170,170,170 0,0,0 0,0,0" ) && ( bipedRow == "0,0,170 85,255,255 0,0,170 85,255,255" ), vehicleRow + " | " + bipedRow );
+		Check( "iconkey: no key before the Map is up (control)", !keyBefore, keyBefore.ToString() );
+		Check( "iconkey: with the Map up the key is on the auxiliary display, its first page the icons 0 to 14 (SEE-BLTS 0 to 15)", keyOnDisplay && firstPage.StartsWith( "Icon key\nLarge producer" ) && firstPage.EndsWith( "Radial multipedal" ) && !firstPage.Contains( "Amorphous" ), firstPage );
+		Check( "iconkey: the key covers the whole auxiliary display and is drawn by the display's camera, the markers by the 3D view's with the ground", keyIsDrawn, keyDrawn );
+		Check( "iconkey: a push to the right turns to the second page, the icons 15 to 26 and the elevation bar (LISTICONS altitude)", secondPage.StartsWith( "Icon key\nAmorphous\n" ) && secondPage.Contains( "Terrain vehicle\nLo.....elevation.....hi (bar)" ), secondPage );
+		Check( "iconkey: the Map marks the vehicle, the ship, every deposit and every lifeform, each with the icon the original's map gives it", ( markerCount > 0 ) && ( wrongIcons.Count == 0 ) && kinds.ContainsKey( 26 ) && kinds.ContainsKey( 25 ) && ( ( kinds.TryGetValue( 21, out var depositMarks ) ? depositMarks : 0 ) == deposits ) && ( shownMarkers > 0 ), markerCount + ":" + kindText + ", deposits " + deposits + ", lifeforms " + lifeforms + ", wrong " + string.Join( "; ", wrongIcons ) );
+		Check( "iconkey: leaving the Map takes the key and the markers away", ( key != null ) && !keyAfterExit && ( markers != null ) && !markersAfterExit, keyAfterExit + ", " + markersAfterExit );
+		Check( "iconkey: so does a Map that ends another way (the console's menu changed under it)", ( secondKey != null ) && !keyAfterMenu && ( secondMarkers != null ) && !markersAfterMenu, keyAfterMenu + ", " + markersAfterMenu );
+
+		Finish( "scenario=iconkey checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

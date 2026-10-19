@@ -762,6 +762,12 @@ public class ButtonController : MonoBehaviour
 		m_currentButton = null;
 	}
 
+	// the button running now (null for none)
+	public ShipButton GetCurrentButton()
+	{
+		return m_currentButton;
+	}
+
 	// call this to change the button that is selected
 	public void SetSelectedButton( int buttonIndex )
 	{
