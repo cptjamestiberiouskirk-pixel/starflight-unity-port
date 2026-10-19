@@ -26,6 +26,12 @@ public class DistressYesButton : ShipButton
 			return Refuse( "Transmission is being jammed." );
 		}
 
+		// and the heat of the Crystal Planet jams it too (TOW-US, COMM-OV WEFC3: while the heat is among the external events)
+		if ( ( SpaceflightController.m_instance.m_inOrbit != null ) && SpaceflightController.m_instance.m_inOrbit.IsCrystalHeatActive() )
+		{
+			return Refuse( "Transmission is being jammed." );
+		}
+
 		// after the flare of Arth's sun there is no Starport to answer (STRINFO 2.14)
 		if ( playerData.m_general.m_starportDestroyed )
 		{

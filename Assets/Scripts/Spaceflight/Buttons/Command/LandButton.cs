@@ -35,6 +35,20 @@ public class LandButton : ShipButton
 					break;
 				}
 
+				// the heat of the Crystal Planet keeps the landing computer from responding to a ship without the Crystal Orb (LAND-OV ?LAND)
+				if ( ( SpaceflightController.m_instance.m_inOrbit != null ) && SpaceflightController.m_instance.m_inOrbit.IsCrystalHeatActive() )
+				{
+					SoundController.m_instance.PlaySound( SoundController.Sound.Error );
+
+					SpaceflightController.m_instance.m_messages.Clear();
+
+					SpaceflightController.m_instance.m_messages.AddText( "<color=white>Computer not responding!</color>" );
+
+					SpaceflightController.m_instance.m_buttonController.UpdateButtonSprites();
+
+					break;
+				}
+
 				// a planet whose maps could not be generated has no surface we could go down to (the planet generator has aborted it and logged why)
 				var planetController = SpaceflightController.m_instance.m_starSystem.GetPlanetController( playerData.m_general.m_currentPlanetId );
 
