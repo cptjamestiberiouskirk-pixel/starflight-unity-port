@@ -17498,6 +17498,12 @@ public class ClaudeProbe : MonoBehaviour
 		}
 	}
 
+	// the ruins of the sites and formations among these (not the random ruins of the regions about the terrain vehicle, roadmap 8.32: "... ruin of region N")
+	static List<Component> WithoutRegionRuins( List<Component> ruins )
+	{
+		return ( ruins == null ) ? null : ruins.FindAll( ruin => ( ruin != null ) && !ruin.gameObject.name.Contains( " of region " ) );
+	}
+
 	IEnumerator ScenarioFormations()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -17511,7 +17517,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return LandAndGoOut( 35, 130, 46.0f, 14.0f, ruins );
 
-		var sphexiRuins = ruins[ 0 ];
+		var sphexiRuins = WithoutRegionRuins( ruins[ 0 ] );
 		var orbCenter = Tools.LatLongToWorldCoordinates( 14.0f, 46.0f );
 		var orbRuins = 0;
 		var ringRuins = 0;
@@ -17565,7 +17571,7 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 5 );
 		yield return LandAndGoOut( 33, 123, 28.0f, -13.0f, ruins );
 
-		var cityRuins = ruins[ 0 ];
+		var cityRuins = WithoutRegionRuins( ruins[ 0 ] );
 		var pearlCenter = Tools.LatLongToWorldCoordinates( -13.0f, 28.0f );
 		var pearlRuins = 0;
 		var blockRuins = 0;
@@ -17607,7 +17613,7 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 5 );
 		yield return LandAndGoOut( 0, 5, 11.0f, -104.0f, ruins );
 
-		var earthRuins = ( ruins[ 0 ] == null ) ? -1 : ruins[ 0 ].Count;
+		var earthRuins = ( ruins[ 0 ] == null ) ? -1 : WithoutRegionRuins( ruins[ 0 ] ).Count;
 
 		Check( "formations: Earth keeps its 12 ruins (control)", earthRuins == 12, earthRuins + " ruins" );
 
