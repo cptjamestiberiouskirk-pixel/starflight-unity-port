@@ -136,7 +136,7 @@ What each officer's skill does:
 | Communications | Communications | How much of what aliens say you understand |
 | Doctor | Medicine | How fast wounds are treated |
 
-A crew member of an alien race also understands every word their own people say. Some races hold old grudges against others, and they notice who serves in your crew.
+A crew member of an alien race helps your communications officer understand their own people, and helps most as the communications officer. Some races hold old grudges against others, and they notice who serves in your crew.
 
 ### Bank
 
