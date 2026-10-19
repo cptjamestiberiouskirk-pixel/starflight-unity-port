@@ -78,10 +78,6 @@ public class PD_General
 	// various game play variables
 	public bool m_mechan9Unlocked;
 
-	// the first of the Thrynn and the Elowan the crew opened a comm link with (None until then, and in older save files) - the other race holds it against the crew
-	// (STRINFO 2.4 and 2.5)
-	public GameData.Race m_firstContactRace;
-
 	// set once the crew has answered the Veloxi's demand for the Ellipsoid: they no longer say their line about the lost focusing stone (COMMSPEC-OV WEF26) - false
 	// in older save files
 	public bool m_veloxStoneLineRemoved;
