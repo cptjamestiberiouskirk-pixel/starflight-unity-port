@@ -42,13 +42,14 @@ public class TVFireButton : ShipButton
 
 		SoundController.m_instance.PlaySound( stunner ? SoundController.Sound.PhaserFire : SoundController.Sound.LaserFire );
 
-		// the lifeforms near by notice the laser (lf-behav.txt: ?PLAYER-FIRING-LASER)
+		var target = FindNearestLifeform( stunner ? c_stunnerRange : c_laserRange );
+
+		// the lifeforms near where the laser is aimed notice it (BEHAV-OV ?PLAYER-FI and ?ALIEN-CLO: the target, or the vehicle with nothing to aim at)
 		if ( !stunner )
 		{
 			TerrainLifeform.s_laserFiredTime = Time.time;
+			TerrainLifeform.s_laserAimPosition = ( target != null ) ? target.transform.position : SpaceflightController.m_instance.m_terrainVehicle.transform.position;
 		}
-
-		var target = FindNearestLifeform( stunner ? c_stunnerRange : c_laserRange );
 
 		if ( target == null )
 		{
@@ -74,7 +75,7 @@ public class TVFireButton : ShipButton
 			}
 			else
 			{
-				messages.AddText( "<color=white>The stunner " + ( ( target.m_species.m_stunEffect == GD_Species.StunEffect.Unaffected ) ? "has no effect on the lifeform." : "hits the lifeform." ) + "</color>" );
+				messages.AddText( "<color=white>The stunner hits the lifeform.</color>" );
 			}
 		}
 
