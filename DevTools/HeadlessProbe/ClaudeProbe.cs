@@ -1754,6 +1754,14 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioDroneNumbers();
 				break;
 
+			case "impatience":
+				yield return ScenarioImpatience();
+				break;
+
+			case "calming":
+				yield return ScenarioCalming();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -30045,7 +30053,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return LetAliensSpeak( 4, reminders );
 
-		var remindersSpoken = CountReceived( reminders );
+		var remindersSpoken = CountReminders( reminders, GameData.Race.Thrynn );
 		var firstReminder = ( reminders.Count > 0 ) ? reminders[ 0 ] : "nothing";
 
 		LeaveEncounter();
@@ -30074,7 +30082,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "alienwaiting: thrynn hails without a reply " + spoken + " of 6 turns | reminders " + remindersSpoken + " of 4 turns, the first: " + firstReminder + " | question rates spemin " + speminRate + ", mechan " + mechanRate );
 
 		Check( "alienwaiting: aliens whose hail gets no reply hail three times and then wait, as the original", spoken == 3, spoken.ToString() );
-		Check( "alienwaiting: aliens whose question gets no answer say they are waiting twice and then wait, as the original", ( remindersSpoken == 2 ) && ( firstReminder.Contains( CommText( 371 ) ) || firstReminder.Contains( CommText( 372 ) ) ), remindersSpoken + " | " + firstReminder );
+		Check( "alienwaiting: aliens whose question gets no answer say they are waiting twice, as the original (what follows is probe impatience)", ( remindersSpoken == 2 ) && ( firstReminder.Contains( CommText( 371 ) ) || firstReminder.Contains( CommText( 372 ) ) ), remindersSpoken + " | " + firstReminder );
 		Check( "alienwaiting: the aliens ask a question 30 times in 100, the Mechans 70, as the original", ( speminRate == 30 ) && ( mechanRate == 70 ), speminRate + ", " + mechanRate );
 
 		Finish( "scenario=alienwaiting", 0 );
@@ -49524,6 +49532,232 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "dronenumbers: the numbers run from 1 to 99, each as likely: about 16 in 99 are multiples of 6 (10% to 23% of 990)", ( lowest == 1 ) && ( highest == 99 ) && ( multiplesOfSix >= 99 ) && ( multiplesOfSix <= 228 ), lowest + " to " + highest + ", " + multiplesOfSix + " of 990" );
 
 		Finish( "scenario=dronenumbers checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: the aliens' impatience, and a fight that calms down (roadmap 8.26)
+
+	// how many of these texts are one of the race's lines for waiting for an answer
+	static int CountReminders( List<string> said, GameData.Race race )
+	{
+		var count = 0;
+
+		foreach ( var text in said )
+		{
+			if ( SaysALineOfAnyStance( text, race, GD_Comm.Subject.WaitingForResponse ) )
+			{
+				count++;
+			}
+		}
+
+		return count;
+	}
+
+	// meets the Thrynn of this encounter with a friendly hail and, in the comm link, has them ask "You do wissh to becomme alliess do yyou nnot?" (307)
+	static IEnumerator AskTheThrynn( int thrynnId )
+	{
+		var said = new List<string>();
+
+		yield return MeetAndConnect( thrynnId, GD_Comm.Stance.Friendly, said );
+
+		SpaceflightController.m_instance.m_encounter.AddComm( GD_Comm.Subject.Question, false, CommById( 307 ) );
+
+		yield return Frames( 2 );
+	}
+
+	// the aliens' impatience as the original's (COMM-OV COMM-LOOP2, >Y/N, >IMPATIENT, >TERMINATE): after their second reminder they wait once more and then lose
+	// patience, as they do at any button pressed after it: their mood moves by twice their posture's value (8 for neutral Thrynn), the question is dropped, the
+	// comm buttons come back and the link stays up, the answer lost on them; Terminate while reminders are still due costs their patience too. The code before
+	// waited for ever, took a late answer as any other, and let the crew end the link for nothing
+	IEnumerator ScenarioImpatience()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var controller = SpaceflightController.m_instance;
+		var encounter = controller.m_encounter;
+
+		EnsureCrew();
+
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer ).m_communications = 250;
+
+		ship.m_armorPoints = 100000;
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		var thrynnId = FindEncounter( 1, 6, 3, 0, GameData.Race.Thrynn );
+		var question = CommById( 307 );
+
+		// ---- 1. no answer: two reminders, then once more and they lose patience
+		yield return AskTheThrynn( thrynnId );
+
+		var reminders = new List<string>();
+
+		yield return LetAliensSpeak( 2, reminders );
+
+		var moodBeforeTimeout = EncounterField( "m_mood", -1.0f );
+		var lastTurn = new List<string>();
+
+		yield return LetAliensSpeak( 1, lastTurn );
+
+		var timeoutAnger = EncounterField( "m_mood", -1.0f ) - moodBeforeTimeout;
+		var timeoutQuestion = encounter.m_pdEncounter.m_lastQuestionFromAliens;
+		var timeoutButtons = controller.m_buttonController.GetCurrentButtonSet();
+		var timeoutConnected = encounter.m_pdEncounter.m_connected;
+		var remindersSaid = CountReminders( reminders, GameData.Race.Thrynn );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 2. an answer after the second reminder: their patience, not the answer
+		yield return AskTheThrynn( thrynnId );
+		yield return LetAliensSpeak( 2, new List<string>() );
+
+		var moodBeforeLate = EncounterField( "m_mood", -1.0f );
+
+		controller.m_messages.Clear();
+
+		new AnswerYesButton().Execute();
+		yield return Frames( 3 );
+
+		var lateReply = MessageList();
+		var lateAnger = EncounterField( "m_mood", -1.0f ) - moodBeforeLate;
+		var lateQuestion = encounter.m_pdEncounter.m_lastQuestionFromAliens;
+		var lateConnected = encounter.m_pdEncounter.m_connected;
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 3. Terminate while reminders are still due: their patience, and the link ends
+		yield return AskTheThrynn( thrynnId );
+
+		var moodBeforeTerminate = EncounterField( "m_mood", -1.0f );
+
+		new TerminateButton().Execute();
+		yield return Frames( 3 );
+
+		var terminateAnger = EncounterField( "m_mood", -1.0f ) - moodBeforeTerminate;
+		var terminateConnected = encounter.m_pdEncounter.m_connected;
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 4. the control: an answer in time is transmitted, and moves their mood by the question's own change for a yes
+		yield return AskTheThrynn( thrynnId );
+
+		var moodBeforeAnswer = EncounterField( "m_mood", -1.0f );
+
+		controller.m_messages.Clear();
+
+		new AnswerYesButton().Execute();
+		yield return Frames( 3 );
+
+		var answerReply = MessageList();
+		var answerChange = EncounterField( "m_mood", -1.0f ) - moodBeforeAnswer;
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "impatience: no answer: " + remindersSaid + " reminders, then mood " + timeoutAnger.ToString( "+0;-0;0" ) + ", question " + timeoutQuestion + ", buttons " + timeoutButtons + ", link up " + timeoutConnected + " (" + string.Join( " | ", lastTurn ) + ") || late yes: mood " + lateAnger.ToString( "+0;-0;0" ) + ", question " + lateQuestion + ", link up " + lateConnected + ", " + lateReply + " || terminate: mood " + terminateAnger.ToString( "+0;-0;0" ) + ", link up " + terminateConnected + " || yes in time: mood " + answerChange.ToString( "+0;-0;0" ) + " (the question's " + question.m_deltaYes + "), " + answerReply );
+
+		Check( "impatience: with no answer the Thrynn remind twice, then lose patience: 8 more agitation, the question dropped, the comm buttons back, the link up (COMM-LOOP2, >IMPATIENT)", ( remindersSaid == 2 ) && Mathf.Approximately( timeoutAnger, 8.0f ) && ( timeoutQuestion == 0 ) && ( timeoutButtons == ButtonController.ButtonSet.Comm ) && timeoutConnected, remindersSaid + ", " + timeoutAnger + ", " + timeoutQuestion + ", " + timeoutButtons + ", " + timeoutConnected );
+		Check( "impatience: an answer after the second reminder is lost on them: 8 more agitation, nothing transmitted, the question dropped, the link up (>Y/N)", Mathf.Approximately( lateAnger, 8.0f ) && !lateReply.Contains( "Transmitting" ) && ( lateQuestion == 0 ) && lateConnected, lateAnger + ", " + lateQuestion + ", " + lateConnected + " | " + lateReply );
+		Check( "impatience: ending the link while they wait for an answer costs their patience: 8 more agitation, and the link ends (>TERMINATE)", Mathf.Approximately( terminateAnger, 8.0f ) && !terminateConnected, terminateAnger + ", " + terminateConnected );
+		Check( "impatience: an answer in time is transmitted and moves their mood by the question's change for a yes (control)", answerReply.Contains( "Transmitting" ) && Mathf.Approximately( answerChange, question.m_deltaYes ), answerChange + " | " + answerReply );
+
+		Finish( "scenario=impatience checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// a fight the aliens' mood started calms down as the original's (COMM-OV <EDL>, +!EDL, EDL>POSTURE): the mood keeps moving in a fight - the shields lowered take
+	// 5 off it, the weapons disarmed 10 - and below their fight band the aliens stop fighting; only the player's fire keeps them at it. The code before froze the
+	// mood once the aliens fought
+	IEnumerator ScenarioCalming()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var controller = SpaceflightController.m_instance;
+		var encounter = controller.m_encounter;
+
+		EnsureCrew();
+
+		// a weak ship, so the Thrynn fight rather than take flight, that survives their fire
+		SetShipClassesAndCaptain( 0, 0 );
+
+		ship.m_armorPoints = 100000;
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		var thrynnId = FindEncounter( 1, 6, 3, 0, GameData.Race.Thrynn );
+
+		// ---- 1. the ship meets the Thrynn with its shields up and its weapons armed, and their mood is at 85 (their fight band is from 80): they fight
+		ship.m_shieldsAreUp = true;
+		ship.m_weaponsAreArmed = true;
+
+		EnterEncounter( thrynnId );
+		yield return Frames( 10 );
+
+		SetEncounterField( "m_mood", 85.0f );
+		yield return Frames( 5 );
+
+		var fightStance = encounter.m_pdEncounter.m_alienStance;
+
+		// ---- 2. the shields lowered: 5 off, 80, still their fight band
+		ship.m_shieldsAreUp = false;
+		yield return Frames( 5 );
+
+		var shieldsMood = EncounterField( "m_mood", -1.0f );
+		var shieldsStance = encounter.m_pdEncounter.m_alienStance;
+
+		// ---- 3. the weapons disarmed: 10 off, 70, their hostile band: they stop fighting
+		ship.m_weaponsAreArmed = false;
+		yield return Frames( 5 );
+
+		var disarmMood = EncounterField( "m_mood", -1.0f );
+		var disarmStance = encounter.m_pdEncounter.m_alienStance;
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 4. the control: fired on, they keep fighting whatever the shields and weapons do
+		ship.m_shieldsAreUp = true;
+		ship.m_weaponsAreArmed = true;
+
+		EnterEncounter( thrynnId );
+		yield return Frames( 10 );
+
+		SetEncounterField( "m_mood", 85.0f );
+		encounter.PlayerAttacked();
+		yield return Frames( 5 );
+
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+		yield return Frames( 5 );
+
+		var firedMood = EncounterField( "m_mood", -1.0f );
+		var firedStance = encounter.m_pdEncounter.m_alienStance;
+
+		ClearMissiles();
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		SetShipClassesAndCaptain( 0, 250 );
+		controller.m_encounterRange = encounterRange;
+
+		Log( "calming: at 85 " + fightStance + " | shields lowered " + shieldsMood + " " + shieldsStance + " | disarmed " + disarmMood + " " + disarmStance + " || fired on, shields and weapons down: " + firedMood + " " + firedStance );
+
+		Check( "calming: at 85, their fight band, the Thrynn fight (control)", fightStance == GD_Comm.Stance.Hostile, fightStance.ToString() );
+		Check( "calming: lowering the shields takes 5 off their mood even in a fight, 80, still fighting (<EDL>)", Mathf.Approximately( shieldsMood, 80.0f ) && ( shieldsStance == GD_Comm.Stance.Hostile ), shieldsMood + " " + shieldsStance );
+		Check( "calming: disarming takes 10 more, 70, their hostile band, and they stop fighting (+!EDL, EDL>POSTURE)", Mathf.Approximately( disarmMood, 70.0f ) && ( disarmStance != GD_Comm.Stance.Hostile ), disarmMood + " " + disarmStance );
+		Check( "calming: aliens the player has fired on keep fighting (?FIRED-WEAPONS; control)", firedStance == GD_Comm.Stance.Hostile, firedMood + " " + firedStance );
+
+		Finish( "scenario=calming checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
