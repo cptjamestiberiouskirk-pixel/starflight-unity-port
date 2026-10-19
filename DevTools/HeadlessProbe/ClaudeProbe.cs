@@ -1758,6 +1758,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioFlareSterilises();
 				break;
 
+			case "crashline":
+				yield return ScenarioCrashLine();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -32059,12 +32063,15 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=bridgepictures pictures=" + pictures.Count, 0 );
 	}
 
-	// the original tells of motion only through a science officer whose science skill is above 150 (HYPERMSG-OV TRAK-E and WF28B: the ASSIGN-CREW slot at 0x14 is
-	// the science officer, the CREWMEMBER byte at 0x1a the science skill); the radar's blips and sound are the port's and stay for everyone
+	// the science officer reports the aliens' moves as the original's (HYPERMSG-OV TRAK-E and WF28B): at each move of the groups (every 2 star hours) a science
+	// officer of science above 150 says "Motion detected at" once, then a line for each group that moved a map coordinate or more, X and Y its step in the
+	// original's units over -8 (a group 5 coordinates east that comes 2 nearer: X:2); nobody reports below 151, and the radar says nothing of its own. The code
+	// before said "Motion detected." whenever the radar swept over a group, with no figures
 	IEnumerator ScenarioMotionDetected()
 	{
 		var playerData = DataController.m_instance.m_playerData;
 		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
 
 		EnsureCrew();
 
@@ -32073,54 +32080,107 @@ public class ClaudeProbe : MonoBehaviour
 
 		// out in dark hyperspace, with no encounter able to begin
 		controller.m_encounterRange = 0.0f;
-		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 4.0f, 0.0f, 4.0f ) );
+		general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 20.0f, 0.0f, 20.0f ) );
 		controller.SwitchLocation( PD_General.Location.Hyperspace );
 
 		yield return Frames( 30 );
 
-		// a group of aliens within the radar's reach (2048 units in hyperspace)
-		PD_Encounter group = null;
+		// two hyperspace groups to watch, every other one far away
+		var ship = general.m_coordinates;
+		var groups = new List<PD_Encounter>();
 
 		foreach ( var pdEncounter in playerData.m_encounterList )
 		{
-			if ( pdEncounter.GetLocation() == PD_General.Location.Hyperspace )
+			if ( pdEncounter.GetLocation() != PD_General.Location.Hyperspace )
 			{
-				group = pdEncounter;
+				continue;
+			}
 
-				break;
+			if ( ( groups.Count < 2 ) && pdEncounter.HasLivingAlienShips() )
+			{
+				groups.Add( pdEncounter );
+			}
+			else
+			{
+				pdEncounter.m_currentCoordinates = ship + new Vector3( 100.0f * 256.0f, 0.0f, 100.0f * 256.0f );
+				pdEncounter.m_homeCoordinates = pdEncounter.m_currentCoordinates;
 			}
 		}
 
-		group.m_currentCoordinates = playerData.m_general.m_coordinates + new Vector3( 700.0f, 0.0f, 700.0f );
+		var far = ship + new Vector3( 100.0f * 256.0f, 0.0f, -100.0f * 256.0f );
+		var said = new string[ 1 ];
 
-		// ---- a science officer of science 100: the radar sweeps over the group (a turn takes 6 s) and nothing is said
-		scienceOfficer.m_science = 100;
-		controller.m_messages.Clear();
-
-		yield return new WaitForSecondsRealtime( 7.0f );
-
-		var unskilled = MessageList();
-
-		// ---- of science 200: the motion is reported
+		// ---- 1. science 200, a group 5 coordinates east: it comes 2 nearer, X:2 Y:0
 		scienceOfficer.m_science = 200;
+
+		PlaceGroupAt( groups[ 0 ], 5.0f, 0.0f );
+		PlaceGroupAt( groups[ 1 ], 0.0f, 0.0f, far );
+
+		yield return MotionPass( said );
+
+		var east = said[ 0 ];
+
+		// ---- 2. a group 5 west and 3 south: X:-2 Y:-1
+		PlaceGroupAt( groups[ 0 ], -5.0f, -3.0f );
+
+		yield return MotionPass( said );
+
+		var westSouth = said[ 0 ];
+
+		// ---- 3. both at once: one heading, a line each
+		PlaceGroupAt( groups[ 0 ], 5.0f, 0.0f );
+		PlaceGroupAt( groups[ 1 ], -5.0f, -3.0f );
+
+		yield return MotionPass( said );
+
+		var both = said[ 0 ];
+		var headings = System.Text.RegularExpressions.Regex.Matches( both, "Motion detected at" ).Count;
+
+		// ---- 4. a group half a coordinate away comes onto the ship, a step too small to report (control)
+		PlaceGroupAt( groups[ 0 ], 0.5f, 0.0f );
+		PlaceGroupAt( groups[ 1 ], 0.0f, 0.0f, far );
+
+		yield return MotionPass( said );
+
+		var halfway = said[ 0 ];
+
+		// ---- 5. science 150: the same move, and nobody reports it
+		scienceOfficer.m_science = 150;
+
+		PlaceGroupAt( groups[ 0 ], 5.0f, 0.0f );
+
+		yield return MotionPass( said );
+
+		var unskilled = said[ 0 ];
+
+		// ---- 6. science 200, the radar sweeping over a group 2.7 coordinates away for 7 s between two moves: the radar itself says nothing
+		scienceOfficer.m_science = 200;
+
+		groups[ 0 ].m_currentCoordinates = general.m_coordinates + new Vector3( 700.0f, 0.0f, 700.0f );
+		groups[ 0 ].m_homeCoordinates = groups[ 0 ].m_currentCoordinates;
 		controller.m_messages.Clear();
 
 		yield return new WaitForSecondsRealtime( 7.0f );
 
-		var skilled = MessageList();
+		var radarSweep = MessageList();
 
 		controller.m_encounterRange = encounterRange;
 
-		Log( "motiondetected: the group " + Vector3.Distance( group.m_currentCoordinates, playerData.m_general.m_coordinates ).ToString( "F0" ) + " away | science 100: '" + unskilled + "' | science 200: '" + skilled + "'" );
+		Log( "motiondetected: science 200, 5 east: '" + east + "' | 5 west 3 south: '" + westSouth + "' | both: '" + both + "' | half a coordinate: '" + halfway + "' | science 150: '" + unskilled + "' | radar sweep 7 s: '" + radarSweep + "'" );
 
-		Check( "motiondetected: a science officer of science 100 reports no motion, as the original's (above 150 only)", !unskilled.Contains( "Motion detected" ), "'" + unskilled + "'" );
-		Check( "motiondetected: a science officer of science 200 reports the motion", skilled.Contains( "Motion detected" ), "'" + skilled + "'" );
+		Check( "motiondetected: a group 5 coordinates east that comes 2 nearer: Motion detected at, X:2 Y:0 (HYPERMSG-OV WF28B)", east.Contains( "Motion detected at" ) && east.Contains( "X:2" ) && east.Contains( "Y:0" ), "'" + east + "'" );
+		Check( "motiondetected: a group 5 west and 3 south: X:-2 Y:-1", westSouth.Contains( "X:-2" ) && westSouth.Contains( "Y:-1" ), "'" + westSouth + "'" );
+		Check( "motiondetected: two groups at once: one heading, a line for each", ( headings == 1 ) && both.Contains( "X:2" ) && both.Contains( "X:-2" ), headings + " headings: '" + both + "'" );
+		Check( "motiondetected: a step of less than a map coordinate is not reported (control)", !halfway.Contains( "Motion detected" ), "'" + halfway + "'" );
+		Check( "motiondetected: a science officer of science 150 reports nothing, as the original's (above 150 only; control)", !unskilled.Contains( "Motion detected" ), "'" + unskilled + "'" );
+		Check( "motiondetected: the radar sweeping over a group says nothing of its own", !radarSweep.Contains( "Motion detected" ), "'" + radarSweep + "'" );
 
 		// with no science officer assigned (a ship started in the Editor's Spaceflight scene has no crew), nobody reports the motion, and nothing throws
 		{
 			var crew = DataController.m_instance.m_playerData.m_crewAssignment;
 			var scienceFileId = crew.GetFileId( PD_CrewAssignment.Role.ScienceOfficer );
-			var reportsMotion = typeof( Radar ).GetMethod( "ScienceOfficerReportsMotion", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static );
+			var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static;
+			var reportsMotion = typeof( SpaceflightController ).GetMethod( "ScienceOfficerReportsMotion", flags ) ?? typeof( Radar ).GetMethod( "ScienceOfficerReportsMotion", flags );
 			var outcome = "";
 
 			crew.Assign( PD_CrewAssignment.Role.ScienceOfficer, -1 );
@@ -32140,6 +32200,27 @@ public class ClaudeProbe : MonoBehaviour
 		}
 
 		Finish( "scenario=motiondetected checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// puts a group of aliens this many map coordinates east and north of the ship (or of a given place), with its home where it is
+	static void PlaceGroupAt( PD_Encounter pdEncounter, float coordinatesEast, float coordinatesNorth, Vector3? from = null )
+	{
+		var origin = from ?? DataController.m_instance.m_playerData.m_general.m_coordinates;
+
+		pdEncounter.m_currentCoordinates = origin + new Vector3( coordinatesEast * 256.0f, 0.0f, coordinatesNorth * 256.0f );
+		pdEncounter.m_homeCoordinates = pdEncounter.m_currentCoordinates;
+	}
+
+	// one move of the alien groups (2 star hours on), and what the message window says after it
+	static IEnumerator MotionPass( string[] said )
+	{
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		AdvanceGameHours( 2 );
+
+		yield return Frames( 5 );
+
+		said[ 0 ] = System.Text.RegularExpressions.Regex.Replace( MessageList(), "<[^>]*>", "" );
 	}
 
 	// the Trade Depot's Analysis lists the ship's own artifacts only, at their value, as the original's ANALYSIS screen (starflt_080, starflt_099): the Starport's
@@ -49483,6 +49564,139 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "flaresterilises: a game won before a star's flare keeps its life (WEC04; control)", bioWon > 0, bioWon + "%" );
 
 		Finish( "scenario=flaresterilises checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: the crash line, as the original's (roadmap 8.24)
+
+	// descends from orbit (Land, Descend) and keeps every message the window shows, in order, until a safe landing or the end of the game; "[cleared]" marks the
+	// window being cleared
+	static IEnumerator DescendWatching( List<string> lines )
+	{
+		var controller = SpaceflightController.m_instance;
+		var shown = DataController.m_instance.m_playerData.m_general.m_messageList;
+		var last = new List<string>();
+
+		controller.m_messages.Clear();
+
+		PressButton( ButtonController.ButtonSet.CommandB, 0 );
+
+		yield return Frames( 5 );
+
+		PressButton( ButtonController.ButtonSet.Land, 1 );
+
+		var end = Time.realtimeSinceStartup + 60.0f;
+		var settle = -1.0f;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			var now = new List<string>();
+
+			foreach ( var message in shown )
+			{
+				now.Add( System.Text.RegularExpressions.Regex.Replace( message, "<[^>]*>", "" ) );
+			}
+
+			var kept = now.Count >= last.Count;
+
+			for ( var i = 0; kept && ( i < last.Count ); i++ )
+			{
+				kept = now[ i ] == last[ i ];
+			}
+
+			if ( !kept )
+			{
+				lines.Add( "[cleared]" );
+				lines.AddRange( now );
+			}
+			else
+			{
+				lines.AddRange( now.GetRange( last.Count, now.Count - last.Count ) );
+			}
+
+			last = now;
+
+			// a second more once it is over, for the last words
+			if ( ( settle < 0.0f ) && ( CombatController.m_instance.PlayerIsDestroyed() || lines.Exists( line => line.Contains( "Safe landing" ) ) ) )
+			{
+				settle = Time.realtimeSinceStartup + 1.0f;
+			}
+
+			if ( ( settle >= 0.0f ) && ( Time.realtimeSinceStartup > settle ) )
+			{
+				break;
+			}
+
+			yield return null;
+		}
+	}
+
+	// the position of the first line holding this text, or -1
+	static int LineIndex( List<string> lines, string text, int from = 0 )
+	{
+		for ( var i = Mathf.Max( 0, from ); i < lines.Count; i++ )
+		{
+			if ( lines[ i ].Contains( text ) )
+			{
+				return i;
+			}
+		}
+
+		return -1;
+	}
+
+	// a landing without the fuel for it says so as the original's (ORBIT-OV DESCEND, LAND-OV WF430): "Autopilot engaged. Descending...", then the window cleared and
+	// "Out of fuel! Crash imminent!" before "Topography net locked on.", never "Safe landing, captain.", and the game ends with the emergency locator's
+	// transmission; with the fuel for it (the control) no such line and a safe landing. The code before said nothing of the crash before the end
+	IEnumerator ScenarioCrashLine()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+
+		EnsureCrew();
+
+		var planet90Star = gameData.m_planetList[ 90 ].m_starId;
+
+		yield return GoIntoOrbit( planet90Star, 90 );
+
+		// ---- 1. the control: 100 tenths of Endurium, a safe landing
+		SetEndurium( 100 );
+
+		var safe = new List<string>();
+
+		yield return DescendWatching( safe );
+
+		// back to orbit
+		new LaunchYesButton().Execute();
+
+		yield return WaitForLocation( PD_General.Location.InOrbit, 20.0f );
+		yield return Frames( 10 );
+
+		// ---- 2. 1 tenth: a crash
+		SetEndurium( 1 );
+
+		var crash = new List<string>();
+
+		yield return DescendWatching( crash );
+
+		var crashed = CombatController.m_instance.PlayerIsDestroyed();
+
+		Log( "crashline: with 100 tenths: " + string.Join( " | ", safe ) + " || with 1 tenth: " + string.Join( " | ", crash ) + " (destroyed " + crashed + ")" );
+
+		var safeAutopilot = LineIndex( safe, "Autopilot engaged" );
+		var safeTopography = LineIndex( safe, "Topography net locked on", safeAutopilot );
+		var safeLanding = LineIndex( safe, "Safe landing, captain", safeTopography );
+
+		Check( "crashline: with the fuel for it: autopilot, topography net, safe landing, and nothing of a crash (control)", ( safeAutopilot >= 0 ) && ( safeTopography > safeAutopilot ) && ( safeLanding > safeTopography ) && ( LineIndex( safe, "Crash imminent" ) < 0 ), string.Join( " | ", safe ) );
+
+		var crashAutopilot = LineIndex( crash, "Autopilot engaged" );
+		var crashCleared = LineIndex( crash, "[cleared]", crashAutopilot + 1 );
+		var crashLine = LineIndex( crash, "Out of fuel! Crash imminent!", crashCleared );
+		var crashTopography = LineIndex( crash, "Topography net locked on", crashLine );
+
+		Check( "crashline: without it: the autopilot line, then the window cleared and Out of fuel! Crash imminent! before Topography net locked on. (ORBIT-OV DESCEND)", ( crashAutopilot >= 0 ) && ( crashCleared > crashAutopilot ) && ( crashLine > crashCleared ) && ( crashTopography > crashLine ), string.Join( " | ", crash ) );
+		Check( "crashline: no safe landing, and the game ends with the emergency locator's transmission (control)", crashed && ( LineIndex( crash, "Safe landing" ) < 0 ) && ( LineIndex( crash, "crashed on planet" ) >= 0 ), crashed + ": " + string.Join( " | ", crash ) );
+
+		Finish( "scenario=crashline checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
