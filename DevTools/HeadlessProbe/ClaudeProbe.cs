@@ -1714,6 +1714,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioPlanetRefill();
 				break;
 
+			case "lockout":
+				yield return ScenarioLockOut();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -47398,6 +47402,162 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "planetrefill: a planet the terrain vehicle did not go out on keeps what was taken from it (the control)", control == 0, control.ToString() );
 
 		Finish( "scenario=planetrefill lifeforms=" + after.Count + "/" + lifeformCount + " deposit=" + afterTaken, 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: the Old Empire and the Ancients lock out (roadmap 8.25)
+
+	// the subject of each line the aliens of the encounter answer a question with, asked the given number of times (through Encounter.FindComm, the game's own
+	// choice of a line, so that nothing in the message box has to be read)
+	static List<GD_Comm.Subject> AnswerSubjects( GD_Comm.Subject subject, int count )
+	{
+		var findComm = typeof( Encounter ).GetMethod( "FindComm", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic );
+		var subjects = new List<GD_Comm.Subject>();
+
+		for ( var i = 0; i < count; i++ )
+		{
+			var comm = (GD_Comm) findComm.Invoke( SpaceflightController.m_instance.m_encounter, new object[] { subject, false } );
+
+			subjects.Add( ( comm != null ) ? comm.m_subject : GD_Comm.Subject.None );
+		}
+
+		return subjects;
+	}
+
+	// a seed for the game's random numbers whose first draw of 0 to 100 is not under 20 (the original's roll for the lock-out), so that the next question is
+	// answered
+	static int SeedThatAnswers( int from )
+	{
+		for ( var seed = from; seed < from + 1000; seed++ )
+		{
+			UnityEngine.Random.InitState( seed );
+
+			if ( UnityEngine.Random.Range( 0, 101 ) >= 20 )
+			{
+				return seed;
+			}
+		}
+
+		return from;
+	}
+
+	static string SubjectsText( List<GD_Comm.Subject> subjects )
+	{
+		return string.Join( ",", subjects.ConvertAll( subject => ( (int) subject ).ToString() ) );
+	}
+
+	// the Old Empire and the Ancients lock out as the original's (COMM-OV ?LOCKED-OUT, FIND-SUBJECT): each time the aliens are asked about either, a roll of
+	// RRND 0 to 101 under 20 locks that subject out for the rest of the encounter, and from then on they answer it with a subject 5 line (no more information);
+	// the lock is cleared when an encounter begins (INIT_GCOMM, from ENCSETUP). The Veloxi in their neutral band (mood 44): 8 Old Empire lines and 12 on the
+	// Ancients. The code before answered both in order to the last line, then once with a subject 5 line, and started over
+	IEnumerator ScenarioLockOut()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+
+		EnsureCrew();
+
+		// a Veloxi group met in flight
+		var veloxId = -1;
+
+		for ( var i = 0; ( i < gameData.m_encounterList.Length ) && ( veloxId < 0 ); i++ )
+		{
+			if ( ( gameData.m_encounterList[ i ].m_race == GameData.Race.Velox ) && ( gameData.m_encounterList[ i ].m_location != 2 ) )
+			{
+				veloxId = i;
+			}
+		}
+
+		EnterEncounter( veloxId );
+
+		yield return Frames( 10 );
+
+		controller.m_encounter.m_pdEncounter.m_mood = 44.0f;
+		controller.m_encounter.m_pdEncounter.m_moodSet = true;
+
+		// ---- 1. asked about the Old Empire 25 times, the first answered
+		general.SetLastCommId( GameData.Race.Velox, GD_Comm.Subject.OldEmpire, 0 );
+		UnityEngine.Random.InitState( SeedThatAnswers( 1 ) );
+
+		var oldEmpire = AnswerSubjects( GD_Comm.Subject.OldEmpire, 25 );
+		var firstLocked = oldEmpire.IndexOf( GD_Comm.Subject.NoMoreInformation );
+		var lockedForGood = ( firstLocked >= 0 ) && oldEmpire.GetRange( firstLocked, oldEmpire.Count - firstLocked ).TrueForAll( subject => subject == GD_Comm.Subject.NoMoreInformation );
+
+		// ---- 2. the Ancients have a lock of their own: with the Old Empire locked out, the next question about the Ancients is answered
+		general.SetLastCommId( GameData.Race.Velox, GD_Comm.Subject.TheAncients, 0 );
+		UnityEngine.Random.InitState( SeedThatAnswers( 100 ) );
+
+		var ancientsNext = AnswerSubjects( GD_Comm.Subject.TheAncients, 1 );
+
+		// ---- 3. a question about themselves never locks out: after a subject 5 line they start over
+		general.SetLastCommId( GameData.Race.Velox, GD_Comm.Subject.Themselves, 0 );
+		UnityEngine.Random.InitState( 7 );
+
+		var themselves = AnswerSubjects( GD_Comm.Subject.Themselves, 25 );
+		var themselvesStartOver = themselves.Contains( GD_Comm.Subject.Themselves );
+
+		for ( var i = 0; i + 1 < themselves.Count; i++ )
+		{
+			if ( ( themselves[ i ] == GD_Comm.Subject.NoMoreInformation ) && ( themselves[ i + 1 ] != GD_Comm.Subject.Themselves ) )
+			{
+				themselvesStartOver = false;
+			}
+		}
+
+		// ---- 4. how often a question locks out: 400 first questions about the Old Empire, the lock cleared before each (the code before has no lock to clear)
+		var lockField = typeof( PD_Encounter ).GetField( "m_lockedOutSubjects" );
+		var lockedOut = -1;
+
+		if ( lockField != null )
+		{
+			lockedOut = 0;
+
+			UnityEngine.Random.InitState( 12345 );
+
+			for ( var i = 0; i < 400; i++ )
+			{
+				lockField.SetValue( controller.m_encounter.m_pdEncounter, 0 );
+				general.SetLastCommId( GameData.Race.Velox, GD_Comm.Subject.OldEmpire, 0 );
+
+				if ( AnswerSubjects( GD_Comm.Subject.OldEmpire, 1 )[ 0 ] == GD_Comm.Subject.NoMoreInformation )
+				{
+					lockedOut++;
+				}
+			}
+
+			lockField.SetValue( controller.m_encounter.m_pdEncounter, 1 << (int) GD_Comm.Subject.OldEmpire );
+		}
+
+		// ---- 5. the encounter ends and begins again: the Old Empire is answered again
+		var leave = typeof( Encounter ).GetMethod( "LeaveEncounter", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public );
+
+		leave.Invoke( controller.m_encounter, null );
+
+		yield return Frames( 3 );
+
+		EnterEncounter( veloxId );
+
+		yield return Frames( 10 );
+
+		controller.m_encounter.m_pdEncounter.m_mood = 44.0f;
+		controller.m_encounter.m_pdEncounter.m_moodSet = true;
+
+		general.SetLastCommId( GameData.Race.Velox, GD_Comm.Subject.OldEmpire, 0 );
+		UnityEngine.Random.InitState( SeedThatAnswers( 200 ) );
+
+		var afresh = AnswerSubjects( GD_Comm.Subject.OldEmpire, 1 );
+
+		Log( "lockout: Veloxi encounter " + veloxId + "; the Old Empire asked 25 times: " + SubjectsText( oldEmpire ) + " (first subject 5 at " + firstLocked + "); then the Ancients: " + SubjectsText( ancientsNext ) + "; themselves 25 times: " + SubjectsText( themselves ) + "; locked out on " + lockedOut + " of 400 first questions; in a new encounter: " + SubjectsText( afresh ) );
+
+		Check( "lockout: the Veloxi in their neutral band answer the Old Empire with their Old Empire lines (control)", oldEmpire[ 0 ] == GD_Comm.Subject.OldEmpire, SubjectsText( oldEmpire.GetRange( 0, 3 ) ) );
+		Check( "lockout: once a question about the Old Empire is answered with a subject 5 line, every later one is, for the rest of the encounter (COMM-OV ?LOCKED-OUT)", lockedForGood, "first subject 5 at " + firstLocked + ": " + SubjectsText( oldEmpire ) );
+		Check( "lockout: the Ancients have a lock of their own: with the Old Empire locked out, they are still answered (control)", ancientsNext[ 0 ] == GD_Comm.Subject.TheAncients, SubjectsText( ancientsNext ) );
+		Check( "lockout: a question about them locks the subject out one time in five (RRND 0 to 101 under 20, 79 of 400 expected)", ( lockedOut >= 50 ) && ( lockedOut <= 110 ), lockedOut + " of 400" + ( ( lockField == null ) ? " (no lock in this code)" : "" ) );
+		Check( "lockout: an encounter that begins clears the lock, and the Old Empire is answered again", afresh[ 0 ] == GD_Comm.Subject.OldEmpire, SubjectsText( afresh ) );
+		Check( "lockout: a question about themselves never locks out: after a subject 5 line they start over (control)", themselvesStartOver, SubjectsText( themselves ) );
+
+		Finish( "scenario=lockout checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
