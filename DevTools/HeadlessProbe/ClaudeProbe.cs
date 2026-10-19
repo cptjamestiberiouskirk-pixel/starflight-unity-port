@@ -51017,6 +51017,49 @@ public class ClaudeProbe : MonoBehaviour
 		var keyOnDisplay = ( key != null ) && ( ( (Component) key ).transform.parent == display.transform );
 		var firstPage = ( key != null ) ? ( Call( key, "GetPageText" ) as string ) : "no key";
 
+		// the key covers the whole auxiliary display, and it and every part of it are on a layer of the camera that draws the display; the markers are on a layer
+		// of the 3D view's camera, drawn with the ground (before the transparent queue, which the view's effects would put in the wrong place)
+		var keyDrawn = "no key";
+		var keyIsDrawn = false;
+
+		if ( key != null )
+		{
+			var keyCorners = new Vector3[ 4 ];
+			var displayCorners = new Vector3[ 4 ];
+
+			( (RectTransform) ( (Component) key ).transform ).GetWorldCorners( keyCorners );
+			( (RectTransform) display.transform ).GetWorldCorners( displayCorners );
+
+			var covers = ( Vector3.Distance( keyCorners[ 0 ], displayCorners[ 0 ] ) < 0.01f ) && ( Vector3.Distance( keyCorners[ 2 ], displayCorners[ 2 ] ) < 0.01f );
+			var canvas = display.GetComponentInParent<Canvas>();
+			var uiCamera = ( canvas != null ) ? canvas.rootCanvas.worldCamera : null;
+			var parts = ( (Component) key ).GetComponentsInChildren<Transform>( true );
+			var unseenParts = 0;
+
+			foreach ( var part in parts )
+			{
+				if ( ( uiCamera == null ) || ( ( uiCamera.cullingMask & ( 1 << part.gameObject.layer ) ) == 0 ) )
+				{
+					unseenParts++;
+				}
+			}
+
+			var markersNow = CallOrNull( mapButton, "GetIconMarkers" );
+			var spriteRenderers = ( markersNow != null ) ? ( (Component) markersNow ).GetComponentsInChildren<SpriteRenderer>( true ) : new SpriteRenderer[ 0 ];
+			var unseenMarkers = 0;
+
+			foreach ( var spriteRenderer in spriteRenderers )
+			{
+				if ( ( Camera.main == null ) || ( ( Camera.main.cullingMask & ( 1 << spriteRenderer.gameObject.layer ) ) == 0 ) || ( spriteRenderer.sharedMaterial == null ) || ( spriteRenderer.sharedMaterial.renderQueue >= 3000 ) )
+				{
+					unseenMarkers++;
+				}
+			}
+
+			keyIsDrawn = covers && ( unseenParts == 0 ) && ( spriteRenderers.Length > 0 ) && ( unseenMarkers == 0 );
+			keyDrawn = "key " + keyCorners[ 0 ].ToString( "F2" ) + " to " + keyCorners[ 2 ].ToString( "F2" ) + " over the display's " + displayCorners[ 0 ].ToString( "F2" ) + " to " + displayCorners[ 2 ].ToString( "F2" ) + ", " + unseenParts + " of " + parts.Length + " parts off " + ( ( uiCamera != null ) ? uiCamera.name : "no camera" ) + "'s layers, " + unseenMarkers + " of " + spriteRenderers.Length + " markers not drawn with the ground";
+		}
+
 		// with -Graphics, the whole screen as the player sees it, with each page of the key (Logs/screen-pictures/iconkey/)
 		var pictureFolder = ScreenPictureFolder( "iconkey" );
 
@@ -51091,12 +51134,13 @@ public class ClaudeProbe : MonoBehaviour
 		var keyAfterMenu = ( secondKey != null ) && ( (UnityEngine.Object) secondKey != null );
 		var markersAfterMenu = ( secondMarkers != null ) && ( (UnityEngine.Object) secondMarkers != null );
 
-		Log( "iconkey: names " + string.Join( " | ", names ) + " || vehicle row " + vehicleRow + " | biped row " + bipedRow + " || key before " + keyBefore + ", on the display " + keyOnDisplay + " || first page: " + firstPage.Replace( "\n", " | " ) + " || second page: " + secondPage.Replace( "\n", " | " ) + " || markers " + markerCount + " (" + shownMarkers + " shown):" + kindText + ", deposits " + deposits + ", lifeforms " + lifeforms + ", wrong " + string.Join( "; ", wrongIcons ) + " || after Enter: key " + keyAfterExit + ", markers " + markersAfterExit + " || after the menu changed: key " + keyAfterMenu + ", markers " + markersAfterMenu );
+		Log( "iconkey: names " + string.Join( " | ", names ) + " || vehicle row " + vehicleRow + " | biped row " + bipedRow + " || key before " + keyBefore + ", on the display " + keyOnDisplay + ", " + keyDrawn + " || first page: " + firstPage.Replace( "\n", " | " ) + " || second page: " + secondPage.Replace( "\n", " | " ) + " || markers " + markerCount + " (" + shownMarkers + " shown):" + kindText + ", deposits " + deposits + ", lifeforms " + lifeforms + ", wrong " + string.Join( "; ", wrongIcons ) + " || after Enter: key " + keyAfterExit + ", markers " + markersAfterExit + " || after the menu changed: key " + keyAfterMenu + ", markers " + markersAfterMenu );
 
 		Check( "iconkey: the 27 icons have the shipped game's names, from Large producer to Terrain vehicle (ICON-NAME)", ( names[ 0 ] == "Large producer" ) && ( names[ 9 ] == "Bilateral bipedal" ) && ( names[ 21 ] == "Mineral" ) && ( names[ 24 ] == "Ancient ruins" ) && ( names[ 26 ] == "Terrain vehicle" ), string.Join( " | ", names ) );
 		Check( "iconkey: the pictures are the shipped game's, in its EGA colours on the key's light grey (ICON1:1, C>EGA, GREY1)", ( vehicleRow == "170,170,170 0,0,0 0,0,0" ) && ( bipedRow == "0,0,170 85,255,255 0,0,170 85,255,255" ), vehicleRow + " | " + bipedRow );
 		Check( "iconkey: no key before the Map is up (control)", !keyBefore, keyBefore.ToString() );
 		Check( "iconkey: with the Map up the key is on the auxiliary display, its first page the icons 0 to 14 (SEE-BLTS 0 to 15)", keyOnDisplay && firstPage.StartsWith( "Icon key\nLarge producer" ) && firstPage.EndsWith( "Radial multipedal" ) && !firstPage.Contains( "Amorphous" ), firstPage );
+		Check( "iconkey: the key covers the whole auxiliary display and is drawn by the display's camera, the markers by the 3D view's with the ground", keyIsDrawn, keyDrawn );
 		Check( "iconkey: a push to the right turns to the second page, the icons 15 to 26 and the elevation bar (LISTICONS altitude)", secondPage.StartsWith( "Icon key\nAmorphous\n" ) && secondPage.Contains( "Terrain vehicle\nLo.....elevation.....hi (bar)" ), secondPage );
 		Check( "iconkey: the Map marks the vehicle, the ship, every deposit and every lifeform, each with the icon the original's map gives it", ( markerCount > 0 ) && ( wrongIcons.Count == 0 ) && kinds.ContainsKey( 26 ) && kinds.ContainsKey( 25 ) && ( ( kinds.TryGetValue( 21, out var depositMarks ) ? depositMarks : 0 ) == deposits ) && ( shownMarkers > 0 ), markerCount + ":" + kindText + ", deposits " + deposits + ", lifeforms " + lifeforms + ", wrong " + string.Join( "; ", wrongIcons ) );
 		Check( "iconkey: leaving the Map takes the key and the markers away", ( key != null ) && !keyAfterExit && ( markers != null ) && !markersAfterExit, keyAfterExit + ", " + markersAfterExit );

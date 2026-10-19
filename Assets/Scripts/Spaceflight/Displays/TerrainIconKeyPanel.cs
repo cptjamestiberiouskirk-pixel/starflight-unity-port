@@ -36,6 +36,11 @@ public class TerrainIconKeyPanel : MonoBehaviour
 		var rectTransform = (RectTransform) panelObject.transform;
 
 		rectTransform.SetParent( display, false );
+
+		// drawn by the UI's camera as the display is, and over all of it whatever arranges the display's own parts
+		panelObject.layer = display.gameObject.layer;
+		panelObject.AddComponent<LayoutElement>().ignoreLayout = true;
+
 		rectTransform.anchorMin = Vector2.zero;
 		rectTransform.anchorMax = Vector2.one;
 		rectTransform.offsetMin = Vector2.zero;
@@ -82,6 +87,8 @@ public class TerrainIconKeyPanel : MonoBehaviour
 			var pictureObject = new GameObject( "Picture " + row, typeof( RectTransform ) );
 			var pictureTransform = (RectTransform) pictureObject.transform;
 
+			pictureObject.layer = gameObject.layer;
+
 			pictureTransform.SetParent( transform, false );
 			pictureTransform.anchorMin = new Vector2( 0.06f, bottom );
 			pictureTransform.anchorMax = new Vector2( 0.06f, top );
@@ -103,6 +110,8 @@ public class TerrainIconKeyPanel : MonoBehaviour
 
 		var barObject = new GameObject( "Elevation bar", typeof( RectTransform ) );
 		var barTransform = (RectTransform) barObject.transform;
+
+		barObject.layer = gameObject.layer;
 
 		barTransform.SetParent( transform, false );
 		barTransform.anchorMin = new Vector2( 0.1f, barBottom );
@@ -209,6 +218,8 @@ public class TerrainIconKeyPanel : MonoBehaviour
 	{
 		var textObject = new GameObject( name, typeof( RectTransform ) );
 		var textTransform = (RectTransform) textObject.transform;
+
+		textObject.layer = gameObject.layer;
 
 		textTransform.SetParent( transform, false );
 		textTransform.anchorMin = anchorMin;

@@ -26,6 +26,11 @@ public class TerrainIconMarkers : MonoBehaviour
 	// the markers are drawn over the ground and the models
 	const int c_sortingOrder = 100;
 
+	// with the ground and the models (the alpha test queue, after the opaque things and before the 3D view's effects for them, which would draw a transparent
+	// sprite in the wrong place of a view that takes only part of the screen), one material for all of them
+	const int c_renderQueue = 2450;
+	static Material s_material;
+
 	// the Map's height above the vehicle
 	float m_followDistance = 192.0f;
 
@@ -175,6 +180,13 @@ public class TerrainIconMarkers : MonoBehaviour
 
 		spriteRenderer.sprite = TerrainIconKey.GetSprite( icon );
 		spriteRenderer.sortingOrder = c_sortingOrder;
+
+		if ( s_material == null )
+		{
+			s_material = new Material( spriteRenderer.sharedMaterial ) { name = "Icon markers", renderQueue = c_renderQueue };
+		}
+
+		spriteRenderer.sharedMaterial = s_material;
 
 		m_markers.Add( new Marker { m_target = target, m_lifeform = lifeform, m_renderer = spriteRenderer, m_icon = icon } );
 	}
