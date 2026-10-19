@@ -3,20 +3,20 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // draws the marks of the science officer's survey (PlanetSurvey) and the ancient ruins the Red Cylinder finds into a texture laid over a map of the planet:
-// a mineral field is a cross, a lifeform a dot and a fixed ancient ruin a box, each with a dark edge so that it reads on any ground, and a region holding a
-// random ancient ruin a light tint (a planet of ruins has hundreds of them: decided 2026-10-19). The texture covers the planet's map as the landing map shows
-// it: east-west -180 to 180 across, north-south -90 to 90 up (decided 2026-10-17, ROADMAP D6)
+// a mineral field is a cross and a fixed ancient ruin a box, each with a dark edge so that it reads on any ground, a region holding a random ancient ruin a
+// light tint (a planet of ruins has hundreds of them: decided 2026-10-19) and a latitude band with life a tint in the life colour, stronger the more crowded
+// it is (the shipped game places a block's lifeforms only as the terrain vehicle comes into it: decided 2026-10-19). The texture covers the planet's map as
+// the landing map shows it: east-west -180 to 180 across, north-south -90 to 90 up (decided 2026-10-17, ROADMAP D6)
 public static class SurveyMarks
 {
 	// the size of the texture (twice the landing map's 448 by 224, so that the marks stay sharp)
 	public const int c_width = 896;
 	public const int c_height = 448;
 
-	// the sizes of the marks, in pixels of the texture: the half length of a cross's arms (the larger the field, the longer, up to the most), the
-	// radius of a dot, the half size of a box, the width of their lines, and the width of their dark edge
+	// the sizes of the marks, in pixels of the texture: the half length of a cross's arms (the larger the field, the longer, up to the most), the half size
+	// of a box, the width of their lines, and the width of their dark edge
 	const float c_fewestArm = 6.0f;
 	const float c_mostArm = 11.0f;
-	const float c_dotRadius = 6.0f;
 	public const float c_boxHalfSize = 11.0f;
 	const float c_lineWidth = 2.5f;
 	const float c_edgeWidth = 2.0f;
@@ -24,6 +24,11 @@ public static class SurveyMarks
 	// how opaque the dark edge is, and the tint of a region that holds a random ancient ruin
 	const float c_edgeAlpha = 0.85f;
 	const float c_regionTintAlpha = 0.3f;
+
+	// how opaque the tint of a band with life is, from the least crowded region to the most (the shipped game's crowding, up to 256)
+	const float c_leastLifeTintAlpha = 0.12f;
+	const float c_mostLifeTintAlpha = 0.4f;
+	const float c_mostCrowding = 256.0f;
 
 	// the pixels drawn into (kept, so that a new drawing does not make garbage)
 	static Color32[] s_pixels;
@@ -58,7 +63,7 @@ public static class SurveyMarks
 		var ruins = RedCylinder.GetAncientRuinPlaces();
 		var regions = RedCylinder.GetAncientRuinRegions();
 
-		if ( ( ( survey == null ) || ( survey.m_marks.Count == 0 ) ) && ( ruins.Count == 0 ) && ( regions.Count == 0 ) )
+		if ( ( ( survey == null ) || ( ( survey.m_marks.Count == 0 ) && ( survey.m_lifeBands.Count == 0 ) ) ) && ( ruins.Count == 0 ) && ( regions.Count == 0 ) )
 		{
 			return null;
 		}
@@ -96,8 +101,8 @@ public static class SurveyMarks
 
 	/// <summary>
 	/// Draws the survey's marks (none if the survey is null), the ancient ruins (east-west and north-south, in degrees) and the regions that hold a random
-	/// ancient ruin (RandomRuinRegions, none if null) into the texture, in the colours of this theme (the minerals in its armor colour, the life in its fuel
-	/// colour, the ruins and the regions' tint in its danger colour).
+	/// ancient ruin (RandomRuinRegions, none if null) into the texture, in the colours of this theme (the minerals in its armor colour, the bands with life
+	/// in its fuel colour, the ruins and the regions' tint in its danger colour).
 	/// </summary>
 	public static void Draw( Texture2D texture, PlanetSurvey survey, List<Vector2> ruins, UIKitTheme theme, List<int> ancientRegions = null )
 	{
@@ -120,7 +125,16 @@ public static class SurveyMarks
 
 		edge.a = c_edgeAlpha;
 
-		// the regions of the random ancient ruins first, under every mark
+		// the bands with life first, under everything
+		if ( survey != null )
+		{
+			foreach ( var lifeBand in survey.m_lifeBands )
+			{
+				TintBand( width, height, lifeBand.m_southEdge, lifeBand.m_northEdge, theme.m_statusFuel, Mathf.Lerp( c_leastLifeTintAlpha, c_mostLifeTintAlpha, Mathf.Clamp01( lifeBand.m_crowding / c_mostCrowding ) ) );
+			}
+		}
+
+		// then the regions of the random ancient ruins, under every mark
 		if ( ancientRegions != null )
 		{
 			foreach ( var region in ancientRegions )
@@ -142,7 +156,7 @@ public static class SurveyMarks
 				}
 			}
 
-			// the mineral fields first, then the lifeforms over them
+			// the mineral fields
 			foreach ( var mark in survey.m_marks )
 			{
 				if ( mark.m_kind == PlanetSurvey.Kind.Minerals )
@@ -150,14 +164,6 @@ public static class SurveyMarks
 					var arm = Mathf.Lerp( c_fewestArm, c_mostArm, Mathf.Clamp01( mark.m_size / (float) largestField ) );
 
 					DrawCross( width, height, mark.m_eastWest, mark.m_northSouth, arm, edge, theme.m_statusArmor );
-				}
-			}
-
-			foreach ( var mark in survey.m_marks )
-			{
-				if ( mark.m_kind == PlanetSurvey.Kind.Life )
-				{
-					DrawDot( width, height, mark.m_eastWest, mark.m_northSouth, edge, theme.m_statusFuel );
 				}
 			}
 		}
@@ -192,15 +198,6 @@ public static class SurveyMarks
 		DrawLine( width, height, center - b, center + b, c_lineWidth + c_edgeWidth * 2.0f, edge );
 		DrawLine( width, height, center - a, center + a, c_lineWidth, color );
 		DrawLine( width, height, center - b, center + b, c_lineWidth, color );
-	}
-
-	// a dot
-	static void DrawDot( int width, int height, float eastWest, float northSouth, Color edge, Color color )
-	{
-		var center = GetPixel( width, height, eastWest, northSouth );
-
-		DrawLine( width, height, center, center, ( c_dotRadius + c_edgeWidth ) * 2.0f, edge );
-		DrawLine( width, height, center, center, c_dotRadius * 2.0f, color );
 	}
 
 	// a box (four lines)
@@ -299,6 +296,21 @@ public static class SurveyMarks
 			for ( var x = Mathf.Max( 0, Mathf.CeilToInt( low.x - 0.5f ) ); x < Mathf.Min( width, Mathf.CeilToInt( high.x - 0.5f ) ); x++ )
 			{
 				Blend( y * width + x, color, c_regionTintAlpha );
+			}
+		}
+	}
+
+	// lays a tint over a band of latitude all round the planet (its pixels whose middles lie in it)
+	static void TintBand( int width, int height, float southEdge, float northEdge, Color color, float alpha )
+	{
+		var low = GetPixel( width, height, -180.0f, southEdge );
+		var high = GetPixel( width, height, 180.0f, northEdge );
+
+		for ( var y = Mathf.Max( 0, Mathf.CeilToInt( low.y - 0.5f ) ); y < Mathf.Min( height, Mathf.CeilToInt( high.y - 0.5f ) ); y++ )
+		{
+			for ( var x = 0; x < width; x++ )
+			{
+				Blend( y * width + x, color, alpha );
 			}
 		}
 	}

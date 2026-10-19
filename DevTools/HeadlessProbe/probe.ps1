@@ -13,7 +13,9 @@ param(
 	# how long to wait for Unity before stopping it. A scenario that shows a hang on the old code never comes back, so give it a short limit.
 	[int]$TimeoutSeconds = 420,
 	# run with a graphics device (without -nographics), for a scenario that draws pictures (explosionpictures). Slower to start, and it still opens no window.
-	[switch]$Graphics
+	[switch]$Graphics,
+	# play the game's sounds (the runs are silent without it)
+	[switch]$Sound
 )
 
 . (Join-Path $PSScriptRoot 'unity-batch.ps1')
@@ -50,6 +52,7 @@ try {
 	# (Code Integrity event 3033), and only the experimental TerrainJob of Test.unity uses it
 	$unityArgs = @('-batchmode', '--burst-disable-compilation')
 	if (-not $Graphics) { $unityArgs += '-nographics' }
+	if ($Sound) { $unityArgs += '-probeSound' }
 	$unityArgs += '-projectPath', "`"$proj`"", '-logFile', "`"$log`"", '-executeMethod', 'ClaudeProbe.Run', '-probeScenario', $Scenario
 	# an earlier run's log of this name would be read as this run's if Unity wrote none, so it goes first
 	# (one that cannot be deleted is open in another Unity, and this run stops here)
