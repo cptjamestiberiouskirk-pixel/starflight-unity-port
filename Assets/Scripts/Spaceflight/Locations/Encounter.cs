@@ -414,6 +414,9 @@ public class Encounter : MonoBehaviour
 		// get to the player data
 		var playerData = DataController.m_instance.m_playerData;
 
+		// the race remembers how this encounter left it
+		RememberRaceMood();
+
 		// the encounter's end refills the shields, as the original's (HYPER-OV ENCCLEANUP, CHARGE-D: class x 500)
 		playerData.m_playerShip.RechargeShieldsFully();
 
@@ -3152,14 +3155,41 @@ public class Encounter : MonoBehaviour
 		return m_pdEncounter.m_alienStance != GD_Comm.Stance.Hostile;
 	}
 
+	// the least a race's base mood moves at the end of an encounter (HYPER-OV ENCCLEANUP: 5)
+	const float c_raceMoodLeastStep = 5.0f;
+
+	// the end of an encounter moves the race's base mood toward the mood the encounter ended in, by a third of the way and at least 5, and by 5 toward calm when
+	// the two are the same (HYPER-OV ENCCLEANUP: EDL - BASE-EDL, its sign doubled less one, times the larger of |EDL - BASE-EDL| / 3 and 5, kept within 0 to 100)
+	void RememberRaceMood()
+	{
+		if ( ( m_pdEncounter == null ) || ( m_gdEncounter == null ) || !m_pdEncounter.m_moodSet )
+		{
+			return;
+		}
+
+		var personality = AlienPersonality.Find( m_gdEncounter.m_race );
+
+		if ( personality == null )
+		{
+			return;
+		}
+
+		var general = DataController.m_instance.m_playerData.m_general;
+		var baseMood = general.GetRaceBaseMood( m_gdEncounter.m_race, personality.m_startingMood );
+		var difference = m_pdEncounter.m_mood - baseMood;
+		var step = Mathf.Max( Mathf.Floor( Mathf.Abs( difference ) / 3.0f ), c_raceMoodLeastStep );
+
+		general.SetRaceBaseMood( m_gdEncounter.m_race, baseMood + ( ( difference > 0.0f ) ? step : -step ) );
+	}
+
 	// the mood of a new encounter (and of one from a save file written before the aliens had moods)
 	void EnsureMood( AlienPersonality personality )
 	{
 		if ( !m_pdEncounter.m_moodSet )
 		{
-			// the race's mood (the Mechans' is 1 once they have been friendly, COMM-OV +!EDL), and more against a ship that meets them with its shields up or its
-			// weapons armed
-			var startingMood = personality.m_startingMood;
+			// the race's mood, as the last encounters with it have left it (HYPER-OV ENCCLEANUP: BASE-EDL; the Mechans' is 1 once they have been friendly, COMM-OV
+			// +!EDL), and more against a ship that meets them with its shields up or its weapons armed
+			var startingMood = DataController.m_instance.m_playerData.m_general.GetRaceBaseMood( m_gdEncounter.m_race, personality.m_startingMood );
 
 			if ( ( m_gdEncounter.m_race == GameData.Race.Mechan ) && DataController.m_instance.m_playerData.m_general.m_mechan9Unlocked )
 			{

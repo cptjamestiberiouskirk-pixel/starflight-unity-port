@@ -1718,6 +1718,30 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAlienPostures();
 				break;
 
+			case "hyperspaceedge":
+				yield return ScenarioHyperspaceEdge();
+				break;
+
+			case "starport-repairquestion":
+				yield return ScenarioStarportRepairQuestion();
+				break;
+
+			case "fluxdots":
+				yield return ScenarioFluxDots();
+				break;
+
+			case "systemgroups":
+				yield return ScenarioSystemGroups();
+				break;
+
+			case "racememory":
+				yield return ScenarioRaceMemory();
+				break;
+
+			case "fluxmap":
+				yield return ScenarioFluxMap();
+				break;
+
 			case "translation":
 				yield return ScenarioTranslation();
 				break;
@@ -20109,6 +20133,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		message[ 0 ] = panel.m_errorMessageText.text;
 
+		// the repair asks first (since 2026-10-18, as the original's): yes
+		if ( Equals( GetField( panel, "m_currentState" ).ToString(), "RepairQuestion" ) )
+		{
+			Call( panel, "AnswerRepairQuestion", true );
+		}
+
 		// back to the menu, as the player's next key would
 		if ( Equals( GetField( panel, "m_currentState" ).ToString(), "ErrorMessage" ) )
 		{
@@ -20203,10 +20233,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "starport-repair: a whole ship: " + costWhole + " (" + messageWhole + ") | class 1 armor at 200 of 500, shields empty: " + costClass1 + " M.U. (" + messageClass1 + "), armor " + armorAfterClass1 + ", shields " + shieldsAfterClass1 + " of " + ship.GetMaximumShieldPoints() + " | a bare hull at 100 of 250: " + costBareHull + " M.U., armor " + armorAfterBareHull + " | with 10 M.U.: " + costTooPoor + " (" + messageTooPoor + "), armor " + armorTooPoor + " | the ledger on closing: " + ledgerEntry );
 
-		Check( "starport-repair: a whole ship needs no repairs and pays nothing", ( costWhole == 0 ) && messageWhole.Contains( "no repairs" ), costWhole + " | " + messageWhole );
+		Check( "starport-repair: a whole ship needs no repairs and pays nothing", ( costWhole == 0 ) && messageWhole.ToLowerInvariant().Contains( "no repairs" ), costWhole + " | " + messageWhole );
 		Check( "starport-repair: the missing armor is paid at 4 M.U. a point, as the original's, and the ship is whole again with full shields", ( costClass1 == 1200 ) && ( armorAfterClass1 == 500 ) && ( shieldsAfterClass1 == ship.GetMaximumShieldPoints() ), costClass1 + ", " + armorAfterClass1 + ", " + shieldsAfterClass1 );
 		Check( "starport-repair: a bare hull is repaired at 4 M.U. a point too", ( costBareHull == 600 ) && ( armorAfterBareHull == 250 ), costBareHull + ", " + armorAfterBareHull );
-		Check( "starport-repair: without the money the repair is refused and nothing changes", ( costTooPoor == 0 ) && ( armorTooPoor == 100 ) && messageTooPoor.Contains( "insufficient funds" ), costTooPoor + ", " + armorTooPoor + " | " + messageTooPoor );
+		Check( "starport-repair: without the money the repair is refused and nothing changes", ( costTooPoor == 0 ) && ( armorTooPoor == 100 ) && messageTooPoor.ToLowerInvariant().Contains( "insufficient funds" ), costTooPoor + ", " + armorTooPoor + " | " + messageTooPoor );
 
 		Log( "starport-repair: a class 3 laser cannon at 40% and the sensors at 50%: " + costSystems + " M.U., then lasers " + lasersAfter + "%, sensors " + sensorsAfter + "% | a class 5 missile launcher sells for " + resaleWhole + " whole and " + resaleHalf + " at 50%" );
 
@@ -34617,6 +34647,12 @@ public class ClaudeProbe : MonoBehaviour
 
 		panel.RepairClicked();
 
+		// the repair asks first (since 2026-10-18, as the original's): yes
+		if ( Equals( GetField( panel, "m_currentState" ).ToString(), "RepairQuestion" ) )
+		{
+			Call( panel, "AnswerRepairQuestion", true );
+		}
+
 		Log( "armorequivalency: repaired: " + ship.m_armorPoints + " points, hull " + ship.GetHullIntegrity() );
 
 		Check( "armorequivalency: the Starport repair sets the armor to its class's full 750 points", ( ship.m_armorPoints == 750 ) && ( ship.GetHullIntegrity() == 100 ), ship.m_armorPoints + " points, hull " + ship.GetHullIntegrity() );
@@ -47761,6 +47797,727 @@ public class ClaudeProbe : MonoBehaviour
 
 		Finish( "scenario=alienpostures checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
+	// ---------------------------------------------------------------- phase 8: the edge of hyperspace holds the ship (since 2026-10-18)
+
+	// a map place on this row or column (the other coordinate tried from the given one on) with no star and no end of a flux within 6 coordinates
+	static Vector3 QuietMapPlace( float mapX, float mapY, bool alongY )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		for ( var step = 0; step < 200; step++ )
+		{
+			var x = alongY ? mapX : Mathf.Repeat( mapX + step, 250.0f );
+			var y = alongY ? Mathf.Repeat( mapY + step, 220.0f ) : mapY;
+			var quiet = true;
+
+			foreach ( var star in gameData.m_starList )
+			{
+				if ( ( Mathf.Abs( star.m_xCoordinate - x ) <= 6.0f ) && ( Mathf.Abs( star.m_yCoordinate - y ) <= 6.0f ) )
+				{
+					quiet = false;
+					break;
+				}
+			}
+
+			foreach ( var flux in gameData.m_fluxList )
+			{
+				if ( !quiet )
+				{
+					break;
+				}
+
+				if ( ( ( Mathf.Abs( flux.m_x1 - x ) <= 6.0f ) && ( Mathf.Abs( flux.m_y1 - y ) <= 6.0f ) ) || ( ( Mathf.Abs( flux.m_x2 - x ) <= 6.0f ) && ( Mathf.Abs( flux.m_y2 - y ) <= 6.0f ) ) )
+				{
+					quiet = false;
+				}
+			}
+
+			if ( quiet )
+			{
+				return new Vector3( x, 0.0f, y );
+			}
+		}
+
+		return new Vector3( mapX, 0.0f, mapY );
+	}
+
+	// starts the ship at this map place in hyperspace and flies it this way for so long (game time); returns where it ends up and the fuel it burnt
+	IEnumerator FlyInHyperspace( Vector3 mapPlace, Vector3 direction, float seconds, Vector3[] where, float[] fuel )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+
+		controller.m_playerShip.TurnOffEngines();
+		general.m_currentSpeed = 0.0f;
+		general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( mapPlace );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 5 );
+
+		var enduriumBefore = Endurium();
+		var fuelUsedBefore = playerData.m_playerShip.m_fuelUsed;
+
+		general.m_currentDirection = direction.normalized;
+		controller.m_playerShip.TurnOnEngines();
+
+		for ( var end = Time.time + seconds; Time.time < end; )
+		{
+			general.m_currentDirection = direction.normalized;
+
+			yield return null;
+		}
+
+		controller.m_playerShip.TurnOffEngines();
+		general.m_currentSpeed = 0.0f;
+
+		where[ 0 ] = general.m_coordinates;
+		fuel[ 0 ] = ( enduriumBefore - Endurium() ) * 0.1f + ( playerData.m_playerShip.m_fuelUsed - fuelUsedBefore );
+	}
+
+	// the edge of hyperspace holds the ship, as the original's (HYPER-OV FLY, WEE53): each axis is kept within map x 0 to 249 and y 0 to 219, the heading kept, so a
+	// ship flying into an edge stops there and one flying into it at a slant slides along it. The code before let the ship fly off the map
+	IEnumerator ScenarioHyperspaceEdge()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var where = new Vector3[ 1 ];
+		var fuel = new float[ 1 ];
+
+		EnsureCrew();
+		ship.m_elementStorage.Add( 5, 1000 );
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		// game time a sixtieth of a second a frame, however slowly the frames come
+		Time.captureDeltaTime = 1.0f / 60.0f;
+
+		var lowest = Tools.GameToWorldCoordinates( Vector3.zero );
+		var highest = Tools.GameToWorldCoordinates( new Vector3( 249.0f, 0.0f, 219.0f ) );
+
+		// ---- 1. the control: in the middle of the map the ship flies on, two seconds east
+		var middle = QuietMapPlace( 125.0f, 60.0f, false );
+
+		yield return FlyInHyperspace( middle, Vector3.right, 2.0f, where, fuel );
+
+		var movedInMiddle = where[ 0 ].x - Tools.GameToWorldCoordinates( middle ).x;
+
+		// ---- 2. a coordinate from the west edge, five seconds west: the ship stops at the edge, its other coordinate unchanged, and the engines still burn fuel
+		var west = QuietMapPlace( 1.0f, 40.0f, true );
+
+		yield return FlyInHyperspace( west, Vector3.left, 5.0f, where, fuel );
+
+		var westEnd = where[ 0 ];
+		var westFuel = fuel[ 0 ];
+
+		// ---- 3. at a slant into the west edge (north west): the ship slides north along it
+		yield return FlyInHyperspace( west, new Vector3( -1.0f, 0.0f, 1.0f ), 5.0f, where, fuel );
+
+		var slantEnd = where[ 0 ];
+
+		// ---- 4. the east, north and south edges
+		var east = QuietMapPlace( 248.0f, 40.0f, true );
+
+		yield return FlyInHyperspace( east, Vector3.right, 5.0f, where, fuel );
+
+		var eastEnd = where[ 0 ];
+		var north = QuietMapPlace( 40.0f, 218.0f, false );
+
+		yield return FlyInHyperspace( north, Vector3.forward, 5.0f, where, fuel );
+
+		var northEnd = where[ 0 ];
+		var south = QuietMapPlace( 40.0f, 1.0f, false );
+
+		yield return FlyInHyperspace( south, Vector3.back, 5.0f, where, fuel );
+
+		var southEnd = where[ 0 ];
+		var stayedInHyperspace = ( playerData.m_general.m_location == PD_General.Location.Hyperspace );
+
+		Time.captureDeltaTime = 0.0f;
+		controller.m_encounterRange = encounterRange;
+
+		var westMap = Tools.WorldToGameCoordinates( westEnd );
+		var eastMap = Tools.WorldToGameCoordinates( eastEnd );
+		var northMap = Tools.WorldToGameCoordinates( northEnd );
+		var southMap = Tools.WorldToGameCoordinates( southEnd );
+
+		Log( "hyperspaceedge: middle from " + middle + " moved " + movedInMiddle.ToString( "F0" ) + "; west from " + west + " to " + westEnd + " (map " + westMap + ", fuel " + westFuel.ToString( "F2" ) + "); slant to " + slantEnd + "; east from " + east + " to " + eastEnd + " (map " + eastMap + "); north from " + north + " to " + northEnd + " (map " + northMap + "); south from " + south + " to " + southEnd + " (map " + southMap + "); edges " + lowest + " to " + highest );
+
+		Check( "hyperspaceedge: in the middle of the map the ship flies on (control)", movedInMiddle > 100.0f, movedInMiddle.ToString( "F0" ) );
+		Check( "hyperspaceedge: flying west from a coordinate off the edge the ship stops at map x 0, its y unchanged (the code before flew it off the map)", ( Mathf.Abs( westEnd.x - lowest.x ) < 0.01f ) && ( Mathf.Abs( westEnd.z - Tools.GameToWorldCoordinates( west ).z ) < 1.0f ) && ( Mathf.RoundToInt( westMap.x ) == 0 ), westEnd + " map " + westMap );
+		Check( "hyperspaceedge: flying north west into the west edge it slides north along it", ( Mathf.Abs( slantEnd.x - lowest.x ) < 0.01f ) && ( slantEnd.z > Tools.GameToWorldCoordinates( west ).z + 100.0f ), slantEnd.ToString() );
+		Check( "hyperspaceedge: the east, north and south edges hold it at map x 249, y 219 and y 0", ( Mathf.Abs( eastEnd.x - highest.x ) < 0.01f ) && ( Mathf.Abs( northEnd.z - highest.z ) < 0.01f ) && ( Mathf.Abs( southEnd.z - lowest.z ) < 0.01f ) && ( Mathf.RoundToInt( eastMap.x ) == 249 ) && ( Mathf.RoundToInt( northMap.z ) == 219 ) && ( Mathf.RoundToInt( southMap.z ) == 0 ), eastEnd + " " + northEnd + " " + southEnd );
+		Check( "hyperspaceedge: the ship is still in hyperspace, no star or flux on the way", stayedInHyperspace, playerData.m_general.m_location.ToString() );
+
+		Finish( "scenario=hyperspaceedge checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: the Starport asks before repairing (since 2026-10-18)
+
+	// the state of the Ship Configuration panel, by name (State is private to the panel)
+	static string ShipConfigurationState( ShipConfigurationPanel panel )
+	{
+		var state = GetField( panel, "m_currentState" );
+
+		return ( state != null ) ? state.ToString() : "";
+	}
+
+	// presses a direction (or cancel) once on the panel, after the question's 0.3 s, as the player's stick does
+	IEnumerator AnswerWithStick( ShipConfigurationPanel panel, string input )
+	{
+		yield return new WaitForSecondsRealtime( 0.4f );
+
+		SetInput( input, true );
+
+		Call( panel, "Tick" );
+
+		SetInput( input, false );
+
+		yield return Frames( 2 );
+	}
+
+	// the Starport's repair asks first, as the original's (CONFIG-OV WF346, WF2C5): "Cost to repair entire ship: N M.U." and "Shall we repair the ship? [N Y]",
+	// right for yes and left for no; a whole ship needs none, and without the money it says so and asks nothing. The code before repaired at once
+	IEnumerator ScenarioStarportRepairQuestion()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var bank = playerData.m_bank;
+		var panel = FindPanel<ShipConfigurationPanel>();
+
+		bank.m_currentBalance = 100000;
+		ship.m_shieldingClass = 1;
+		ship.m_armorClass = 1;
+
+		yield return OpenPanel( panel, "ship configuration" );
+
+		// ---- 1. class 1 armor at 200 of 500 points and the hull at 90: Repair asks, and nothing changes yet
+		ship.m_armorPoints = 200;
+		ship.SetSystemHealth( PD_PlayerShip.ShipSystem.Hull, 90 );
+
+		var cost = ship.GetStarportRepairCost();
+
+		panel.RepairClicked();
+
+		yield return Frames( 2 );
+
+		var askState = ShipConfigurationState( panel );
+		var askText = panel.m_errorMessageText.text;
+		var unchangedWhileAsking = ( bank.m_currentBalance == 100000 ) && ( ship.m_armorPoints == 200 ) && ( ship.GetHullIntegrity() == 90 );
+
+		// ---- 2. left: no, and nothing changes
+		yield return AnswerWithStick( panel, "m_west" );
+
+		var noState = ShipConfigurationState( panel );
+		var unchangedAfterNo = ( bank.m_currentBalance == 100000 ) && ( ship.m_armorPoints == 200 ) && ( ship.GetHullIntegrity() == 90 );
+
+		// ---- 3. Repair again, right: yes, paid, and the ship is whole
+		if ( askState == "RepairQuestion" )
+		{
+			panel.RepairClicked();
+
+			yield return Frames( 2 );
+			yield return AnswerWithStick( panel, "m_east" );
+		}
+
+		var yesState = ShipConfigurationState( panel );
+		var paid = 100000 - bank.m_currentBalance;
+		var wholeAfterYes = ( ship.m_armorPoints == ship.GetMaximumArmorPoints() ) && ( ship.GetHullIntegrity() == 100 );
+
+		// ---- 4. the controls: a whole ship needs no repairs, and without the money it says so; neither asks
+		panel.RepairClicked();
+
+		yield return Frames( 2 );
+
+		var wholeState = ShipConfigurationState( panel );
+		var wholeText = panel.m_errorMessageText.text;
+
+		Call( panel, "SwitchToMenuBarState" );
+
+		ship.m_armorPoints = 100;
+		bank.m_currentBalance = 10;
+
+		panel.RepairClicked();
+
+		yield return Frames( 2 );
+
+		var poorState = ShipConfigurationState( panel );
+		var poorText = panel.m_errorMessageText.text;
+		var poorUnchanged = ( bank.m_currentBalance == 10 ) && ( ship.m_armorPoints == 100 );
+
+		Call( panel, "SwitchToMenuBarState" );
+
+		yield return ClosePanel( panel, "ship configuration" );
+
+		Log( "starport-repairquestion: cost " + cost + "; asked: " + askState + " '" + askText.Replace( "\n", " / " ) + "', unchanged " + unchangedWhileAsking + "; no: " + noState + ", unchanged " + unchangedAfterNo + "; yes: " + yesState + ", paid " + paid + ", whole " + wholeAfterYes + "; whole ship: " + wholeState + " '" + wholeText + "'; too poor: " + poorState + " '" + poorText.Replace( "\n", " / " ) + "', unchanged " + poorUnchanged );
+
+		Check( "starport-repairquestion: Repair gives the cost to repair the entire ship and asks first, and nothing changes yet (the code before repaired at once)", ( askState == "RepairQuestion" ) && askText.Contains( "Cost to repair entire ship: " + cost + " M.U." ) && askText.Contains( "Shall we repair the ship?" ) && unchangedWhileAsking, askState + " | " + askText );
+		Check( "starport-repairquestion: left (no) leaves everything as it was and goes back to the menu", ( noState == "MenuBar" ) && unchangedAfterNo, noState + " " + unchangedAfterNo );
+		Check( "starport-repairquestion: right (yes) pays the cost and makes the ship whole", ( yesState == "MenuBar" ) && ( paid == cost ) && wholeAfterYes, yesState + " paid " + paid + " of " + cost + " whole " + wholeAfterYes );
+		Check( "starport-repairquestion: a whole ship needs no repairs, and is not asked (control)", ( wholeState == "ErrorMessage" ) && wholeText.ToLowerInvariant().Contains( "no repairs" ), wholeState + " | " + wholeText );
+		Check( "starport-repairquestion: without the money it says so and asks nothing (control)", ( poorState == "ErrorMessage" ) && poorText.ToLowerInvariant().Contains( "insufficient funds" ) && poorUnchanged, poorState + " | " + poorText );
+
+		Finish( "scenario=starport-repairquestion checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: a flux shows as dots by the navigator's skill (since 2026-10-18)
+
+	// the first flux copy of hyperspace: whether it is shown, how many points its particle system draws, and where they are (world coordinates)
+	static int FluxDotsOfFirstFlux( List<Vector3> where, out bool shown, out Vector3 fluxPlace )
+	{
+		var hyperspace = SpaceflightController.m_instance.m_hyperspace;
+		var list = GetField( hyperspace, "m_fluxObjectList" ) as List<GameObject>;
+
+		shown = false;
+		fluxPlace = Vector3.zero;
+		where.Clear();
+
+		if ( ( list == null ) || ( list.Count == 0 ) || ( list[ 0 ] == null ) )
+		{
+			return -1;
+		}
+
+		shown = list[ 0 ].activeInHierarchy;
+		fluxPlace = list[ 0 ].transform.position;
+
+		var particleSystem = list[ 0 ].GetComponentInChildren<ParticleSystem>( true );
+
+		if ( ( particleSystem == null ) || !shown )
+		{
+			return 0;
+		}
+
+		var particles = new ParticleSystem.Particle[ Mathf.Max( 1, particleSystem.particleCount ) ];
+		var count = particleSystem.GetParticles( particles );
+
+		for ( var i = 0; i < count; i++ )
+		{
+			where.Add( ( particleSystem.main.simulationSpace == ParticleSystemSimulationSpace.World ) ? particles[ i ].position : particleSystem.transform.TransformPoint( particles[ i ].position ) );
+		}
+
+		return count;
+	}
+
+	// a flux shows as the original's dots (HYPER-OV .FLUX-ICON): none to a navigator of skill 150 or less, (skill - 150) * 6 / 100 + 1 above (1 at 151 and 166, 2 at
+	// 167, 4 at 200, 7 at 250), and 16 with the Ring Device whatever the skill; each within 120 of the port's units across and 117 along of the flux (RNDCPT(15)),
+	// placed afresh as the ship steps, so they twinkle. The code before drew the same particle swirl whatever the skill
+	IEnumerator ScenarioFluxDots()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var ringId = gameData.FindArtifactId( "Ring Device" );
+		var where = new List<Vector3>();
+		bool shown;
+		Vector3 fluxPlace;
+
+		EnsureCrew();
+
+		var navigator = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Navigator );
+
+		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( ringId ) != null ); guard++ )
+		{
+			ship.RemoveArtifact( ringId );
+		}
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( 4.0f, 0.0f, 4.0f ) );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		// ---- 1. by the navigator's skill, without the Ring Device
+		var skills = new[] { 150, 151, 166, 167, 200, 250 };
+		var expected = new[] { 0, 1, 1, 2, 4, 7 };
+		var counts = new int[ skills.Length ];
+		var allWithin = true;
+
+		for ( var i = 0; i < skills.Length; i++ )
+		{
+			navigator.m_navigation = skills[ i ];
+
+			yield return new WaitForSecondsRealtime( 0.3f );
+
+			counts[ i ] = FluxDotsOfFirstFlux( where, out shown, out fluxPlace );
+
+			foreach ( var dot in where )
+			{
+				allWithin = allWithin && ( Mathf.Abs( dot.x - fluxPlace.x ) <= 120.5f ) && ( Mathf.Abs( dot.z - fluxPlace.z ) <= 117.5f );
+			}
+		}
+
+		// ---- 2. the dots move: two looks 0.3 s apart at skill 250
+		FluxDotsOfFirstFlux( where, out shown, out fluxPlace );
+
+		var first = new List<Vector3>( where );
+
+		yield return new WaitForSecondsRealtime( 0.3f );
+
+		FluxDotsOfFirstFlux( where, out shown, out fluxPlace );
+
+		var moved = ( first.Count > 0 ) && ( where.Count == first.Count ) && !first.TrueForAll( dot => where.Contains( dot ) );
+
+		// ---- 3. with the Ring Device: 16, whatever the skill
+		ship.AddArtifact( ringId );
+
+		navigator.m_navigation = 100;
+
+		yield return new WaitForSecondsRealtime( 0.3f );
+
+		var ringLow = FluxDotsOfFirstFlux( where, out shown, out fluxPlace );
+
+		navigator.m_navigation = 250;
+
+		yield return new WaitForSecondsRealtime( 0.3f );
+
+		var ringHigh = FluxDotsOfFirstFlux( where, out shown, out fluxPlace );
+
+		ship.RemoveArtifact( ringId );
+		controller.m_encounterRange = encounterRange;
+
+		Log( "fluxdots: skills " + string.Join( "/", skills ) + " -> " + string.Join( "/", counts ) + " dots (expected " + string.Join( "/", expected ) + "), all within the RNDCPT ellipse " + allWithin + ", moved " + moved + "; with the Ring Device at 100 and 250: " + ringLow + ", " + ringHigh );
+
+		var countsRight = true;
+
+		for ( var i = 0; i < skills.Length; i++ )
+		{
+			countsRight = countsRight && ( counts[ i ] == expected[ i ] );
+		}
+
+		Check( "fluxdots: a navigator of skill 150 sees no flux, and above it a flux shows (skill - 150) * 6 / 100 + 1 dots: 1, 1, 2, 4 and 7 at 151, 166, 167, 200 and 250 (the code before drew the same swirl)", countsRight, string.Join( "/", counts ) );
+		Check( "fluxdots: the dots lie within the original's RNDCPT(15) ellipse round the flux (120 units across, 117 along), and are placed afresh as the ship steps", allWithin && moved, allWithin + " " + moved );
+		Check( "fluxdots: with the Ring Device a flux shows 16 dots, whatever the navigator's skill", ( ringLow == 16 ) && ( ringHigh == 16 ), ringLow + " " + ringHigh );
+
+		Finish( "scenario=fluxdots checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: a star system's alien groups are placed afresh on each visit (since 2026-10-18)
+
+	// flies the ship into this star from hyperspace for real: it is put in hyperspace a little outside the star's breach distance, then inside it, and
+	// Hyperspace.Update takes it into the system
+	IEnumerator BreachStar( GD_Star star )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+		var outside = star.GetWorldCoordinates() + new Vector3( 1.0f, 0.0f, 0.0f ) * ( star.GetBreachDistance() + 64.0f );
+
+		controller.m_playerShip.TurnOffEngines();
+		general.m_currentSpeed = 0.0f;
+		general.m_lastHyperspaceCoordinates = outside;
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 5 );
+
+		var inside = star.GetWorldCoordinates() + new Vector3( 1.0f, 0.0f, 0.0f ) * ( star.GetBreachDistance() * 0.5f );
+
+		general.m_coordinates = inside;
+		controller.m_playerShip.transform.position = inside;
+
+		for ( var guard = 0; ( guard < 60 ) && ( general.m_location != PD_General.Location.StarSystem ); guard++ )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 3 );
+	}
+
+	// true if a group's place is one of the original's SETRNDXY: within the system's 395 units on each axis (on whole system units, or brought in to 395 from
+	// the middle), in the port's units of 8192 / 400
+	static bool IsPlacedInSystem( Vector3 place )
+	{
+		var units = place / ( 8192.0f / 400.0f );
+		var onGrid = ( Mathf.Abs( units.x - Mathf.Round( units.x ) ) < 0.01f ) && ( Mathf.Abs( units.z - Mathf.Round( units.z ) ) < 0.01f );
+		var onRim = Mathf.Abs( units.magnitude - 395.0f ) < 0.05f;
+
+		return ( Mathf.Abs( units.x ) <= 395.01f ) && ( Mathf.Abs( units.z ) <= 395.01f ) && ( units.magnitude <= 395.05f ) && ( onGrid || onRim );
+	}
+
+	// a star system's alien groups are placed afresh each time the ship comes into it from hyperspace, as the original's SYSSETUP (HYPER-OV SETPLNXY, SETRNDXY: each
+	// axis RRND(-395, 395) of the system's 400 units); not when the system is shown again otherwise (back from orbit, a load). The code before placed them once, at a new game
+	IEnumerator ScenarioSystemGroups()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var sentinel = new Vector3( 12000.0f, 0.0f, 12000.0f );
+
+		EnsureCrew();
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		// a star system group (not the one at Arth's star), and its star
+		PD_Encounter group = null;
+
+		foreach ( var encounter in playerData.m_encounterList )
+		{
+			if ( ( encounter.GetLocation() == PD_General.Location.StarSystem ) && ( encounter.GetStarId() > 0 ) && encounter.HasLivingAlienShips() && ( encounter.GetStarId() != playerData.m_general.m_currentStarId ) )
+			{
+				group = encounter;
+				break;
+			}
+		}
+
+		var star = ( group != null ) ? Array.Find( gameData.m_starList, s => s.m_id == group.GetStarId() ) : null;
+		var places = new List<Vector3>();
+		var wentIn = 0;
+
+		// ---- 1. the group parked outside its system, then the ship comes in from hyperspace three times
+		if ( star != null )
+		{
+			group.m_currentCoordinates = sentinel;
+			group.m_homeCoordinates = sentinel;
+
+			for ( var visit = 0; visit < 3; visit++ )
+			{
+				yield return BreachStar( star );
+
+				if ( playerData.m_general.m_location == PD_General.Location.StarSystem )
+				{
+					wentIn++;
+				}
+
+				places.Add( group.m_currentCoordinates );
+			}
+		}
+
+		// ---- 2. the control: the star system shown again without coming in from hyperspace (as after orbit, an encounter or a load), the group stays where it was
+		var beforeOrbit = ( group != null ) ? group.m_currentCoordinates : Vector3.zero;
+
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+
+		var afterOrbit = ( group != null ) ? group.m_currentCoordinates : Vector3.zero;
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "systemgroups: encounter " + ( ( group != null ) ? group.m_encounterId.ToString() : "none" ) + " of star " + ( ( star != null ) ? star.m_id.ToString() : "none" ) + "; went in " + wentIn + " times, places " + string.Join( ", ", places.ConvertAll( p => ( p / ( 8192.0f / 400.0f ) ).ToString( "F1" ) ) ) + "; shown again " + beforeOrbit + " -> " + afterOrbit );
+
+		var allPlaced = ( places.Count == 3 ) && places.TrueForAll( p => ( p != sentinel ) && IsPlacedInSystem( p ) );
+		var allDifferent = ( places.Count == 3 ) && ( places[ 0 ] != places[ 1 ] ) && ( places[ 1 ] != places[ 2 ] );
+
+		Check( "systemgroups: a star system group (control: found, and the ship goes in from hyperspace each time)", ( group != null ) && ( wentIn == 3 ), wentIn.ToString() );
+		Check( "systemgroups: coming in from hyperspace places the system's group afresh, within the system's 395 units on each axis (the code before left it where it was)", allPlaced, string.Join( ", ", places.ConvertAll( p => p.ToString() ) ) );
+		Check( "systemgroups: each visit draws a new place", allDifferent, string.Join( ", ", places.ConvertAll( p => p.ToString() ) ) );
+		Check( "systemgroups: the system shown again without coming in from hyperspace (as after orbit or a load) leaves the group where it was (control)", Vector3.Distance( beforeOrbit, afterOrbit ) < 0.01f, beforeOrbit + " -> " + afterOrbit );
+
+		Finish( "scenario=systemgroups checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: each race remembers how it was treated (since 2026-10-18)
+
+	// meets an encounter, sets the aliens' mood to this (or leaves it as it starts, below 0), and leaves through the game's own end of an encounter - returns the
+	// mood the aliens started with
+	static IEnumerator MeetSetMoodAndLeave( int encounterId, float endMood, float[] startMood )
+	{
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 5 );
+
+		EnterEncounter( encounterId );
+
+		yield return Frames( 5 );
+
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		Call( encounter, "GetAlienTalkStance" );
+
+		startMood[ 0 ] = encounter.m_pdEncounter.m_mood;
+
+		if ( endMood >= 0.0f )
+		{
+			encounter.m_pdEncounter.m_mood = endMood;
+		}
+
+		Call( encounter, "LeaveEncounter" );
+
+		yield return Frames( 10 );
+	}
+
+	// each race remembers how it was treated: the end of an encounter moves the race's base mood toward the mood the encounter ended in, a third of the way and at
+	// least 5, by 5 toward calm when they are the same, and the next encounter starts from it (HYPER-OV ENCCLEANUP, BASE-EDL). The code before started every
+	// encounter from the race's fixed mood
+	IEnumerator ScenarioRaceMemory()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var start = new float[ 1 ];
+
+		EnsureCrew();
+
+		// shields down and weapons not armed, so that the aliens' mood starts at the race's
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+
+		SpaceflightController.m_instance.m_encounterRange = 0.0f;
+
+		var elowan = FindEncounterOfRace( GameData.Race.Elowan );
+		var thrynn = FindEncounterOfRace( GameData.Race.Thrynn );
+
+		// ---- 1. the first meeting starts from the race's mood (44, the shipped BASE-EDL), and ends angry (90): 44 + 15 = 59
+		yield return MeetSetMoodAndLeave( elowan, 90.0f, start );
+
+		var firstStart = start[ 0 ];
+
+		// ---- 2. the next meeting starts from 59, and ends calm (10): 59 - 16 = 43
+		yield return MeetSetMoodAndLeave( elowan, 10.0f, start );
+
+		var secondStart = start[ 0 ];
+
+		// ---- 3. the next starts from 43, and ends where it started: 5 toward calm, 38
+		yield return MeetSetMoodAndLeave( elowan, 43.0f, start );
+
+		var thirdStart = start[ 0 ];
+
+		yield return MeetSetMoodAndLeave( elowan, -1.0f, start );
+
+		var fourthStart = start[ 0 ];
+
+		// ---- 4. another race is not touched by it (the Thrynn start from their 44)
+		yield return MeetSetMoodAndLeave( thrynn, -1.0f, start );
+
+		var thrynnStart = start[ 0 ];
+
+		// ---- 5. the save keeps it
+		var copy = JsonUtility.FromJson<PD_General>( JsonUtility.ToJson( playerData.m_general ) );
+		var method = typeof( PD_General ).GetMethod( "GetRaceBaseMood", c_any );
+		var saved = ( method == null ) ? -1.0f : (float) method.Invoke( copy, new object[] { GameData.Race.Elowan, 44.0f } );
+
+		Log( "racememory: Elowan encounter " + elowan + ", starts " + firstStart + " / " + secondStart + " / " + thirdStart + " / " + fourthStart + " | Thrynn " + thrynn + " starts " + thrynnStart + " | saved Elowan base " + saved );
+
+		Check( "racememory: the first meeting starts from the race's mood (control)", Mathf.Approximately( firstStart, 44.0f ), firstStart.ToString() );
+		Check( "racememory: after an angry end (90) the next meeting starts a third of the way there, 59 (the code before started at 44 again)", Mathf.Approximately( secondStart, 59.0f ), secondStart.ToString() );
+		Check( "racememory: after a calm end (10) it starts a third of the way down, 43", Mathf.Approximately( thirdStart, 43.0f ), thirdStart.ToString() );
+		Check( "racememory: an end where it started moves it 5 toward calm, 38", Mathf.Approximately( fourthStart, 38.0f ), fourthStart.ToString() );
+		Check( "racememory: another race is not touched (the Thrynn start at 44)", Mathf.Approximately( thrynnStart, 44.0f ), thrynnStart.ToString() );
+		Check( "racememory: the save keeps a race's base mood", Mathf.Approximately( saved, 33.0f ), saved.ToString() );
+
+		Finish( "scenario=racememory checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: known fluxes on the starmap (since 2026-10-18)
+
+	// how many fluxes the starmap draws (-1 on code from before it)
+	static int DrawnFluxCount()
+	{
+		var starmap = SpaceflightController.m_instance.m_starmap;
+		var method = typeof( Starmap ).GetMethod( "GetDrawnFluxCount", c_any );
+
+		return ( method == null ) ? -1 : (int) method.Invoke( starmap, null );
+	}
+
+	// the fluxes the save knows (null on code from before it)
+	static List<int> KnownFluxes()
+	{
+		return FieldOrNull( DataController.m_instance.m_playerData.m_general, "m_knownFluxList" ) as List<int>;
+	}
+
+	// a flux the ship goes through is known from then on, both ways, kept in the save, and drawn on the starmap as a line between its ends (HYPER-OV
+	// SET-FLUX-STATE, MAP-OV WEA70 and WEA4C). The code before remembered no flux and drew none
+	IEnumerator ScenarioFluxMap()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var flux = gameData.m_fluxList[ 0 ];
+		var jumped = new bool[ 1 ];
+		var folder = ScreenPictureFolder( "fluxmap" );
+
+		EnsureCrew();
+
+		// a navigator who never loses the ship's bearings for long, fuel, and no encounter able to begin
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Navigator ).m_navigation = 250;
+		playerData.m_playerShip.AddElement( 5, 500 );
+		controller.m_encounterRange = 0.0f;
+
+		playerData.m_general.m_lastHyperspaceCoordinates = flux.GetFrom() + new Vector3( 1024.0f, 0.0f, 0.0f );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		// ---- 1. no flux known yet: the starmap draws none (the control)
+		controller.m_starmap.Show();
+
+		yield return Frames( 3 );
+
+		var drawnBefore = DrawnFluxCount();
+
+		controller.m_starmap.Hide();
+
+		// ---- 2. through flux 0: it is known both ways
+		yield return FluxJumpFrom( flux, jumped );
+
+		for ( var end = Time.time + 5.0f; ( Time.time < end ) && Equals( GetField( controller.m_hyperspace, "m_travelingThroughFlux" ), true ); )
+		{
+			yield return null;
+		}
+
+		// and the fade out of the flux (2 s), so that the picture below shows the starmap and not the flux's tunnel
+		yield return new WaitForSeconds( 2.5f );
+
+		var known = KnownFluxes();
+		var reverse = -1;
+
+		foreach ( var other in gameData.m_fluxList )
+		{
+			if ( ( other.m_x1 == flux.m_x2 ) && ( other.m_y1 == flux.m_y2 ) && ( other.m_x2 == flux.m_x1 ) && ( other.m_y2 == flux.m_y1 ) )
+			{
+				reverse = other.m_id;
+			}
+		}
+
+		var knownBothWays = ( known != null ) && known.Contains( flux.m_id ) && known.Contains( reverse ) && ( known.Count == 2 );
+
+		// ---- 3. the starmap draws it, once, as a line between its ends
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( ( flux.m_x1 + flux.m_x2 ) * 0.5f, 0.0f, ( flux.m_y1 + flux.m_y2 ) * 0.5f ) );
+
+		controller.m_starmap.Show();
+
+		yield return Frames( 5 );
+
+		var drawnAfter = DrawnFluxCount();
+
+		// a picture of it, in a run with a graphics device (probe.ps1 -Graphics): without one, rendering the cameras just after a flux jump crashes Unity
+		if ( SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null )
+		{
+			RenderScreenPicture( System.IO.Path.Combine( folder, "01_starmap_with_flux_0.png" ) );
+		}
+
+		controller.m_starmap.Hide();
+		controller.m_buttonController.DeactivateButton();
+
+		// ---- 4. the save keeps it
+		var copy = JsonUtility.FromJson<PD_General>( JsonUtility.ToJson( playerData.m_general ) );
+		var savedKnown = FieldOrNull( copy, "m_knownFluxList" ) as List<int>;
+		var saved = ( savedKnown != null ) && savedKnown.Contains( flux.m_id ) && savedKnown.Contains( reverse );
+
+		Log( "fluxmap: flux 0 " + flux.m_x1 + "," + flux.m_y1 + " to " + flux.m_x2 + "," + flux.m_y2 + " (reverse " + reverse + "): drawn before " + drawnBefore + ", jumped " + jumped[ 0 ] + ", known [" + ( ( known != null ) ? string.Join( ",", known ) : "none" ) + "], drawn after " + drawnAfter + ", saved " + saved + "; picture in " + folder );
+
+		Check( "fluxmap: with no flux known the starmap draws none (control)", drawnBefore <= 0, drawnBefore.ToString() );
+		Check( "fluxmap: a flux the ship goes through is known both ways (the code before remembered none)", jumped[ 0 ] && knownBothWays, jumped[ 0 ] + " " + ( ( known != null ) ? string.Join( ",", known ) : "none" ) );
+		Check( "fluxmap: the starmap draws the known flux once, as a line between its ends", drawnAfter == 1, drawnAfter.ToString() );
+		Check( "fluxmap: the save keeps the known fluxes", saved, saved.ToString() );
+
+		Finish( "scenario=fluxmap checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
 	// ---------------------------------------------------------------- phase 8: the officer's translation strength (roadmap 8.9)
 
 	// the translation strength against the aliens of the encounter (Encounter.GetTranslationStrength), or -1 on the code before, which has none
