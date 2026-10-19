@@ -8,9 +8,15 @@ public class AnswerNoButton : ShipButton
 
 	public override bool Execute()
 	{
-		SpaceflightController.m_instance.m_encounter.AddComm( GD_Comm.Subject.No, true );
+		var encounter = SpaceflightController.m_instance.m_encounter;
 
-		SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Comm );
+		encounter.AddComm( GD_Comm.Subject.No, true );
+
+		// the comm buttons again, unless the answer has ended the comm link (a refused demand of the Veloxi's, or the comm's equipment check)
+		if ( encounter.m_pdEncounter.m_connected )
+		{
+			SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Comm );
+		}
 
 		return false;
 	}

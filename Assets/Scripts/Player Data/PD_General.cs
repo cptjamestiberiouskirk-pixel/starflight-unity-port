@@ -82,6 +82,10 @@ public class PD_General
 	// (STRINFO 2.4 and 2.5)
 	public GameData.Race m_firstContactRace;
 
+	// set once the crew has answered the Veloxi's demand for the Ellipsoid: they no longer say their line about the lost focusing stone (COMMSPEC-OV WEF26) - false
+	// in older save files
+	public bool m_veloxStoneLineRemoved;
+
 	// the lifeforms whose data the crew has collected, for the value of new data (GD_Species.GetBodyClass; a species is its planet's id x 16 + its index) - null in
 	// older save files
 	public List<int> m_knownLifeformClassList;

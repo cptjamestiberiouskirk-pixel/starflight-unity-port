@@ -902,6 +902,9 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_homeworldWarningsGiven = false;
 			m_pdEncounter.m_aliensAreCowardly = false;
 			m_pdEncounter.m_specialQuestionAsked = false;
+			m_pdEncounter.m_specialActionStep = 0;
+			m_pdEncounter.m_specialActionAsked = 0;
+			m_pdEncounter.m_specialActionTimer = 0.0f;
 			m_pdEncounter.m_moodSet = false;
 			m_pdEncounter.m_alienPhrases = 0;
 			m_pdEncounter.m_alienPhraseLimit = 0;
@@ -1990,15 +1993,14 @@ public class Encounter : MonoBehaviour
 	{
 		UpdateCowardice();
 
-		UpdateVeloxDemand();
-
 		UpdateMood();
 
 		DefaultEncounterUpdate();
 	}
 
-	// the Veloxi's demands (STRINFO 2.2), their question of their own: the Crystal Orb ("most precious Small Egg of Veloxi"), the Ellipsoid ("focusing stone of
-	// Veloxi"), or else a tribute of 3 Arth energy crystals ("the veloxi always ask for tribute", alpha.txt) - and the thanks for a tribute paid
+	// the Veloxi's demands (STRINFO 2.2), made as the comm link opens (their special actions, below): the Crystal Orb ("most precious Small Egg of Veloxi"), the
+	// Ellipsoid ("focusing stone of Veloxi") and a tribute of 3 Arth energy crystals ("the veloxi always ask for tribute", alpha.txt) - and the thanks for a
+	// tribute paid
 	const int c_veloxEllipsoidDemandCommId = 397;
 	const int c_veloxCrystalOrbDemandCommId = 398;
 	const int c_veloxTributeDemandCommId = 399;
@@ -2034,88 +2036,211 @@ public class Encounter : MonoBehaviour
 		}
 	}
 
-	// the answer to a Veloxi demand: a yes hands over what they demand, and anything else - a no, or ending the comm link with no answer - "will result in a Veloxi
-	// attack" (STRINFO 2.2 for the Crystal Orb and the Ellipsoid; for the tribute, and for a yes with less than 3 cubic meters of Endurium, decided
-	// 2026-10-11)
-	void UpdateVeloxDemand()
+	// ---------------------------------------------------------------- a race's special actions as the comm link opens (COMMSPEC-OV)
+
+	// what a race asks of the crew as a comm link opens, before anything else its aliens say (COMMSPEC-OV SA-CASE, run by DO-SA): the Veloxi's demands for the
+	// Crystal Orb (CRYSTAL-ORB), the Ellipsoid (WEF36) and a tribute (WF1D2)
+	public enum SpecialAction
 	{
-		var demand = m_pdEncounter.m_lastQuestionFromAliens;
+		None,
+		VeloxCrystalOrb,
+		VeloxEllipsoid,
+		VeloxTribute
+	}
 
-		if ( ( demand != c_veloxEllipsoidDemandCommId ) && ( demand != c_veloxCrystalOrbDemandCommId ) && ( demand != c_veloxTributeDemandCommId ) )
+	// the Veloxi's special actions, in the order they are run (COMMSPEC-OV SA-CASE)
+	static readonly SpecialAction[] s_veloxSpecialActions = { SpecialAction.VeloxCrystalOrb, SpecialAction.VeloxEllipsoid, SpecialAction.VeloxTribute };
+
+	// how long the aliens wait for the answer to a special action, in seconds (COMMSPEC-OV XY/N: TIRED-TIME 60000 ms) - they say nothing else meanwhile
+	const float c_specialActionAnswerSeconds = 60.0f;
+
+	// the Veloxi's line about their lost focusing stone, which they no longer say once the crew has answered their demand for the Ellipsoid (COMMSPEC-OV WEF26)
+	const int c_veloxStoneLineCommId = 469;
+
+	// the special actions of this encounter's race - null if it has none
+	SpecialAction[] GetSpecialActions()
+	{
+		switch ( m_gdEncounter.m_race )
 		{
-			return;
+			case GameData.Race.Velox:
+
+				return s_veloxSpecialActions;
 		}
 
-		// not answered yet?
-		var answer = m_pdEncounter.m_lastSubjectFromPlayer;
+		return null;
+	}
 
-		if ( answer == GD_Comm.Subject.None )
+	// the line of a special action, if its conditions hold now - null if they do not
+	GD_Comm FindSpecialActionComm( SpecialAction specialAction )
+	{
+		var ship = DataController.m_instance.m_playerData.m_playerShip;
+
+		// the Veloxi demand the artifacts only when they are not grovelling (COMMSPEC-OV CRYSTAL-ORB and WEF36: A-POSTU above obsequious)
+		var grovelling = GetAlienTalkStance() == GD_Comm.Stance.Obsequious;
+
+		switch ( specialAction )
 		{
-			return;
+			case SpecialAction.VeloxCrystalOrb:
+
+				return ( !grovelling && ship.HasArtifact( "Crystal Orb" ) ) ? FindRaceComm( c_veloxCrystalOrbDemandCommId ) : null;
+
+			case SpecialAction.VeloxEllipsoid:
+
+				return ( !grovelling && ship.HasArtifact( "Ellipsoid" ) ) ? FindRaceComm( c_veloxEllipsoidDemandCommId ) : null;
+
+			case SpecialAction.VeloxTribute:
+
+				// the port's tribute: 3 cubic meters, in any posture (the game data writes the amount as X: STRINFO "pay tribute of 3 Arth energy crystals")
+				return WithAmount( FindRaceComm( c_veloxTributeDemandCommId ), "X", ( c_veloxTribute / 10 ).ToString() );
 		}
+
+		return null;
+	}
+
+	// asks the next of the race's special actions whose conditions hold, in place of the aliens' next phrase - false once none is left, and the comm link goes on
+	// as usual (COMMSPEC-OV DO-SA: the list in its order, until one of them stops it) - a home fleet says only its homeworld's warnings
+	bool AskNextSpecialAction()
+	{
+		var specialActions = IsHomeFleet() ? null : GetSpecialActions();
+
+		while ( ( specialActions != null ) && ( m_pdEncounter.m_specialActionStep > 0 ) && ( m_pdEncounter.m_specialActionStep <= specialActions.Length ) )
+		{
+			var specialAction = specialActions[ m_pdEncounter.m_specialActionStep - 1 ];
+
+			// the one after it comes next
+			m_pdEncounter.m_specialActionStep++;
+
+			var comm = FindSpecialActionComm( specialAction );
+
+			if ( comm == null )
+			{
+				continue;
+			}
+
+			AddComm( GD_Comm.Subject.Custom, false, comm );
+
+			// the crew answers it with Yes, No or Terminate (COMMSPEC-OV XY/N)
+			SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.AnswerQuestion );
+
+			m_pdEncounter.m_specialActionAsked = (int) specialAction;
+			m_pdEncounter.m_specialActionTimer = c_specialActionAnswerSeconds;
+
+			return true;
+		}
+
+		m_pdEncounter.m_specialActionStep = 0;
+
+		return false;
+	}
+
+	// the crew's answer to the special action the aliens wait on: Yes, or No - ending the comm link, or no answer in 60 seconds, is a No (COMMSPEC-OV XY/N)
+	void AnswerSpecialAction( bool yes )
+	{
+		var specialAction = (SpecialAction) m_pdEncounter.m_specialActionAsked;
+
+		// it has been answered
+		m_pdEncounter.m_specialActionAsked = 0;
 
 		var gameData = DataController.m_instance.m_gameData;
-		var ship = DataController.m_instance.m_playerData.m_playerShip;
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var general = playerData.m_general;
 		var messages = SpaceflightController.m_instance.m_messages;
-		var handedOver = false;
 
-		if ( answer == GD_Comm.Subject.Yes )
+		switch ( specialAction )
 		{
-			if ( demand == c_veloxCrystalOrbDemandCommId )
-			{
-				handedOver = ship.RemoveArtifact( "Crystal Orb" );
+			// the Crystal Orb (CRYSTAL-ORB, 0 100 XY/N): given, it goes back to its site; refused, they fight, and the Veloxi are at war with the crew for good (their
+			// base mood set to 100)
+			case SpecialAction.VeloxCrystalOrb:
 
-				if ( handedOver )
+				if ( yes )
 				{
-					messages.AddText( "<color=white>The Veloxi take the Crystal Orb aboard.</color>" );
+					if ( ship.RemoveArtifact( "Crystal Orb" ) )
+					{
+						messages.AddText( "<color=white>The Veloxi take the Crystal Orb aboard.</color>" );
 
-					// and put it back where it was found
-					ReturnCrystalOrbToItsSite();
+						// and put it back where it was found
+						ReturnCrystalOrbToItsSite();
+					}
 				}
-			}
-			else if ( demand == c_veloxEllipsoidDemandCommId )
-			{
-				handedOver = ship.RemoveArtifact( "Ellipsoid" );
-
-				if ( handedOver )
+				else
 				{
-					messages.AddText( "<color=white>The Veloxi take the Ellipsoid aboard.</color>" );
+					ChangeMood( 100.0f );
+
+					general.SetRaceBaseMood( GameData.Race.Velox, 100.0f );
+
+					StopSpecialActionsAndFight();
 				}
+
+				break;
+
+			// the Ellipsoid (WEF36, -40 50 XY/N): given, their mood and the race's base mood go 40 down; refused, 50 up, and they fight - after either answer their
+			// line about the lost focusing stone is gone for good (WEF26)
+			case SpecialAction.VeloxEllipsoid:
+			{
+				var personality = AlienPersonality.Find( GameData.Race.Velox );
+				var baseMood = general.GetRaceBaseMood( GameData.Race.Velox, ( personality != null ) ? personality.m_startingMood : 0.0f );
+
+				general.m_veloxStoneLineRemoved = true;
+
+				if ( yes )
+				{
+					ChangeMood( -40.0f );
+
+					if ( ship.RemoveArtifact( "Ellipsoid" ) )
+					{
+						messages.AddText( "<color=white>The Veloxi take the Ellipsoid aboard.</color>" );
+					}
+
+					general.SetRaceBaseMood( GameData.Race.Velox, baseMood - 40.0f );
+				}
+				else
+				{
+					ChangeMood( 50.0f );
+
+					general.SetRaceBaseMood( GameData.Race.Velox, baseMood + 50.0f );
+
+					StopSpecialActionsAndFight();
+				}
+
+				break;
 			}
-			else
+
+			// the tribute (WF1D2, 0 100 XY/N): paid, they thank the crew (the port's line); refused, or a yes without the Endurium aboard (decided 2026-10-11), they
+			// fight
+			case SpecialAction.VeloxTribute:
 			{
 				var enduriumId = gameData.m_misc.m_enduriumElementId;
 				var endurium = ( ship.m_elementStorage == null ) ? null : ship.m_elementStorage.Find( enduriumId );
 
-				if ( ( endurium != null ) && ( endurium.m_volume >= c_veloxTribute ) )
+				if ( yes && ( endurium != null ) && ( endurium.m_volume >= c_veloxTribute ) )
 				{
 					ship.RemoveElement( enduriumId, c_veloxTribute );
 
-					handedOver = true;
-
 					SayRaceComm( c_veloxTributeThanksCommId );
 				}
+				else
+				{
+					ChangeMood( 100.0f );
+
+					StopSpecialActionsAndFight();
+				}
+
+				break;
 			}
 		}
+	}
 
-		// the question has been answered
-		m_pdEncounter.m_lastQuestionFromAliens = 0;
+	// a refused special action stops the rest of them, ends the comm link and angers the aliens by 100 more, to fight (COMMSPEC-OV STOP-SA and WEBB6)
+	void StopSpecialActionsAndFight()
+	{
+		m_pdEncounter.m_specialActionStep = 0;
 
-		if ( handedOver )
-		{
-			return;
-		}
-
-		// the attack - they end the comm link, since the aliens hold their fire while it is up
-		m_pdEncounter.m_alienStance = GD_Comm.Stance.Hostile;
+		ChangeMood( 100.0f );
 
 		if ( m_pdEncounter.m_connected )
 		{
 			Disconnect();
-		}
-		else
-		{
-			m_pdEncounter.m_disconnected = true;
 		}
 	}
 
@@ -2345,6 +2470,18 @@ public class Encounter : MonoBehaviour
 		// have we already disconnected?
 		if ( !m_pdEncounter.m_disconnected )
 		{
+			// is a special action of the race's waiting for the crew's answer? the aliens say nothing else meanwhile, and no answer in 60 seconds is a No
+			// (COMMSPEC-OV XY/N)
+			if ( m_pdEncounter.m_specialActionAsked != 0 )
+			{
+				m_pdEncounter.m_specialActionTimer -= Time.deltaTime;
+
+				if ( m_pdEncounter.m_specialActionTimer <= 0.0f )
+				{
+					AnswerSpecialAction( false );
+				}
+			}
+
 			// are the aliens waiting for the answer to their question? after 20 seconds they say they are waiting, twice at most (COMM-OV TIRED-OF-WAITING)
 			if ( ( m_pdEncounter.m_lastQuestionFromAliens != 0 ) && m_pdEncounter.m_connected && ( m_pdEncounter.m_lastSubjectFromPlayer == GD_Comm.Subject.None ) )
 			{
@@ -2361,8 +2498,8 @@ public class Encounter : MonoBehaviour
 				}
 			}
 
-			// did the aliens ask a question?
-			if ( m_pdEncounter.m_lastQuestionFromAliens == 0 )
+			// did the aliens ask a question (or a special action)?
+			if ( ( m_pdEncounter.m_lastQuestionFromAliens == 0 ) && ( m_pdEncounter.m_specialActionAsked == 0 ) )
 			{
 				// no - update the statement timer
 				m_pdEncounter.m_conversationTimer -= Time.deltaTime;
@@ -2373,8 +2510,13 @@ public class Encounter : MonoBehaviour
 					// reset the conversation timer
 					m_pdEncounter.m_conversationTimer = Random.Range( 10.0f, 30.0f );
 
+					// has the comm link just opened? the race's special actions come before anything else the aliens say (COMMSPEC-OV DO-SA)
+					if ( m_pdEncounter.m_connected && ( m_pdEncounter.m_specialActionStep > 0 ) && AskNextSpecialAction() )
+					{
+						aliensSaidSomething = true;
+					}
 					// do the aliens fight? then they say nothing: no hail, no answer to the player's hail, no statement
-					if ( AliensAreFighting() )
+					else if ( AliensAreFighting() )
 					{
 						aliensSaidSomething = false;
 					}
@@ -3856,24 +3998,6 @@ public class Encounter : MonoBehaviour
 
 				return FindThrynnOffer();
 
-			case GameData.Race.Velox:
-			{
-				// the most precious of what they want first
-				var ship = DataController.m_instance.m_playerData.m_playerShip;
-
-				if ( ship.HasArtifact( "Crystal Orb" ) )
-				{
-					return FindRaceComm( c_veloxCrystalOrbDemandCommId );
-				}
-
-				if ( ship.HasArtifact( "Ellipsoid" ) )
-				{
-					return FindRaceComm( c_veloxEllipsoidDemandCommId );
-				}
-
-				// the game data writes the amount of the tribute as X (STRINFO: "pay tribute of 3 Arth energy crystals")
-				return WithAmount( FindRaceComm( c_veloxTributeDemandCommId ), "X", ( c_veloxTribute / 10 ).ToString() );
-			}
 		}
 
 		return null;
@@ -4012,12 +4136,19 @@ public class Encounter : MonoBehaviour
 		return lines;
 	}
 
-	// true if the race has a line on this subject in this posture (not a homeworld line, nor a surrender line unless the aliens are cowardly)
+	// true for a line the aliens do not say in the usual way: a homeworld line, a surrender line unless they are cowardly, and the Veloxi's line about their lost
+	// focusing stone once the crew has answered their demand for the Ellipsoid (COMMSPEC-OV WEF26)
+	bool IsLineLeftOut( GD_Comm comm )
+	{
+		return comm.m_homeworld || ( comm.m_surrender && !m_pdEncounter.m_aliensAreCowardly ) || ( ( comm.m_id == c_veloxStoneLineCommId ) && DataController.m_instance.m_playerData.m_general.m_veloxStoneLineRemoved );
+	}
+
+	// true if the race has a line on this subject in this posture (not one of the lines left out: IsLineLeftOut)
 	bool HasLineIn( GameData.Race race, GD_Comm.Subject subject, GD_Comm.Stance stance )
 	{
 		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
 		{
-			if ( comm.m_homeworld || ( comm.m_surrender && !m_pdEncounter.m_aliensAreCowardly ) )
+			if ( IsLineLeftOut( comm ) )
 			{
 				continue;
 			}
@@ -4184,7 +4315,7 @@ public class Encounter : MonoBehaviour
 
 		foreach ( var comm in gameData.m_commList )
 		{
-			if ( comm.m_homeworld || ( comm.m_surrender && !m_pdEncounter.m_aliensAreCowardly ) )
+			if ( IsLineLeftOut( comm ) )
 			{
 				continue;
 			}
@@ -4207,7 +4338,7 @@ public class Encounter : MonoBehaviour
 		{
 			foreach ( var comm in gameData.m_commList )
 			{
-				if ( comm.m_homeworld || ( comm.m_surrender && !m_pdEncounter.m_aliensAreCowardly ) )
+				if ( IsLineLeftOut( comm ) )
 				{
 					continue;
 				}
@@ -4291,9 +4422,12 @@ public class Encounter : MonoBehaviour
 		// a veloxi drone's numbers are answered on its own buttons before the comm link's phrases begin, with no equipment check (COMMSPEC-OV VPROBE#)
 		var droneAnswer = outgoing && ( m_gdEncounter.m_race == GameData.Race.VeloxProbe ) && ( m_pdEncounter.m_lastQuestionFromAliens != 0 ) && ( ( subject == GD_Comm.Subject.Yes ) || ( subject == GD_Comm.Subject.No ) );
 
+		// and so is the answer to a special action of the race's (COMMSPEC-OV XY/N, run as the comm link opens)
+		var specialActionAnswer = outgoing && ( m_pdEncounter.m_specialActionAsked != 0 ) && ( ( subject == GD_Comm.Subject.Yes ) || ( subject == GD_Comm.Subject.No ) );
+
 		// once the link is up, each phrase of the player's goes through the comm's equipment check, and comm equipment that has broken down or malfunctions ends
 		// the link (COMM-OV CL1: the equipment check with part 2 once phrases have been exchanged, then COMMUNICATIONS HAVE BEEN TERMINATED)
-		if ( outgoing && m_pdEncounter.m_connected && ( subject != GD_Comm.Subject.Terminate ) && !droneAnswer && !playerData.m_playerShip.UseEquipment( PD_PlayerShip.ShipSystem.Comm ) )
+		if ( outgoing && m_pdEncounter.m_connected && ( subject != GD_Comm.Subject.Terminate ) && !droneAnswer && !specialActionAnswer && !playerData.m_playerShip.UseEquipment( PD_PlayerShip.ShipSystem.Comm ) )
 		{
 			Disconnect();
 
@@ -4648,11 +4782,23 @@ public class Encounter : MonoBehaviour
 			ChangeMood( comm.m_moodAction );
 		}
 
+		// the crew's answer to a special action
+		if ( specialActionAnswer )
+		{
+			AnswerSpecialAction( subject == GD_Comm.Subject.Yes );
+		}
+
 		// did we want the communications to terminate?
 		if ( subject == GD_Comm.Subject.Terminate )
 		{
 			// yes - get out of video chat
 			Disconnect();
+
+			// ending the comm link while the aliens wait for the answer to a special action is a No (COMMSPEC-OV XY/N: TERMINATE)
+			if ( outgoing && ( m_pdEncounter.m_specialActionAsked != 0 ) )
+			{
+				AnswerSpecialAction( false );
+			}
 		}
 		else if ( !outgoing && comm.m_endsCommLink && m_pdEncounter.m_connected )
 		{
@@ -4698,8 +4844,8 @@ public class Encounter : MonoBehaviour
 			Debug.Log( "Sorry, alien race " + m_gdEncounter.m_race + " is not available to display yet!" );
 		}
 
-		// are the aliens trying to ask a question that we haven't answered yet?
-		if ( ( m_pdEncounter.m_lastQuestionFromAliens != 0 ) && ( m_pdEncounter.m_lastSubjectFromPlayer == GD_Comm.Subject.None ) )
+		// are the aliens trying to ask a question that we haven't answered yet (or waiting on the answer to a special action)?
+		if ( ( ( m_pdEncounter.m_lastQuestionFromAliens != 0 ) && ( m_pdEncounter.m_lastSubjectFromPlayer == GD_Comm.Subject.None ) ) || ( m_pdEncounter.m_specialActionAsked != 0 ) )
 		{
 			// yes - change to the answer question button set
 			SpaceflightController.m_instance.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.AnswerQuestion );
@@ -4722,6 +4868,13 @@ public class Encounter : MonoBehaviour
 		if ( ( playerGeneral.m_firstContactRace == GameData.Race.None ) && ( GetRivalRace( m_gdEncounter.m_race ) != GameData.Race.None ) )
 		{
 			playerGeneral.m_firstContactRace = m_gdEncounter.m_race;
+		}
+
+		// a comm link that opens now runs the race's special actions first, at every opening (COMMSPEC-OV DO-SA) - not one shown again from a save file
+		if ( !m_pdEncounter.m_connected )
+		{
+			m_pdEncounter.m_specialActionStep = 1;
+			m_pdEncounter.m_specialActionAsked = 0;
 		}
 
 		// we are connected now
