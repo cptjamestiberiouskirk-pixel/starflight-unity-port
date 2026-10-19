@@ -58,7 +58,7 @@ New to *Starflight*? Read the notices in Operations, create and assign a crew of
 
 ## ✅ Status: version 1.4.0
 
-The whole game is playable, from a new game to the ending. Every item of the first seven phases of the [roadmap to parity with the original](ROADMAP.md) is done or decided (59 of 59), and every screen has been compared side by side with the original's. A reading of the shipped game's own code in October 2026 found 37 more of its behaviours to build (Phase 8); 36 of them are built, and the last, the lifeforms as the shipped game makes and values them, is under way.
+The whole game is playable, from a new game to the ending. Every item of the first seven phases of the [roadmap to parity with the original](ROADMAP.md) is done or decided (59 of 59), and every screen has been compared side by side with the original's. A reading of the shipped game's own code in October 2026 found 37 more of its behaviours to build (Phase 8), and all 37 are built.
 
 Every change is compile-checked in CI and exercised by a headless test harness that plays the real game scenes: 276 scenarios with 1,513 checks, all passing on this release, plus an automated playthrough that plays a new game all the way to the ending and Interstel's bonus.
 
@@ -248,7 +248,7 @@ Assets/
 - Alien ships have the armor and shields of their vessels in the game data, and move at the original's pace: the more of them, the slower each
 - The starmap shows the fuel needed to fly to the cursor
 - Planets can be recommended for colonization and named by the player; Interstel pays a bonus or fines the crew at the Starport, and each evaluation appears under its recommendation's number, date, system, orbit and name, one per page on the Operations evaluation screen
-- The 34 planets with life have lifeforms of their own species, made as the original makes them from each planet's own seed (regions by temperature, niches, classes, orders and species), which Scan reads and the terrain vehicle's laser and stunner affect. They are placed block by block about the terrain vehicle as it drives, on low dry ground. Dangerous lifeforms come after the vehicle and attack the crew, while timid ones flee. A crew member whose vitality reaches 0 dies, a dead captain's command passes down the chain of command, and the game is lost when the whole crew has died. Lifeforms hunt, flee and eat one another, and some fly or float out of reach. The terrain vehicle's Cargo button records a lifeform's data, which Interstel pays for at the Starport, and Tools, Capture puts a stunned one into stasis with a capture beam, as a specimen the Trade Depot will buy. Look describes the nearest lifeform and what it is doing, along with the minerals, ruins and dropped cargo next to the vehicle
+- The 34 planets with life have lifeforms of their own species, made as the original makes them from each planet's own seed (regions by temperature, niches, classes, orders and species), which Scan reads and the terrain vehicle's laser and stunner affect. They are placed block by block about the terrain vehicle as it drives, on low dry ground. Dangerous lifeforms come after the vehicle and attack the crew, while timid ones flee. A crew member whose vitality reaches 0 dies, a dead captain's command passes down the chain of command, and the game is lost when the whole crew has died. Lifeforms hunt, flee and eat one another, and some fly or float out of reach. The terrain vehicle's Cargo button records a lifeform's data, and Tools, Capture puts a stunned one into stasis with a capture beam, as a specimen: both go into the hold, worth what the original's valuate gives (the farther from Arth, the more), and the Trade Depot buys them. Look describes the nearest lifeform and what it is doing, along with the minerals, ruins and dropped cargo next to the vehicle
 - Lava destroys a terrain vehicle that drives into it, and the Starport installs a new one for a fine
 - Terrain vehicle fuel as the original's: every kilometer driven costs fuel by the ground under the vehicle, little at the shore, more the higher it climbs and about seven times as much on a liquid; a storm makes each kilometer dearer without slowing the vehicle
 - Surface weather as the original's: spells of weather rolled from the planet's weather activity, with storms picked by its surface; a storm halves the terrain vehicle's efficiency and can injure the crew, heavy snow, fog and rain cost a quarter of it, and storms and heavy snow lose the bearing to the ship unless the navigator is highly skilled
@@ -281,9 +281,9 @@ Assets/
 
 </details>
 
-### 📊 Completion: 95 of 96 roadmap items
+### 📊 Completion: 96 of 96 roadmap items
 
-Every item of Phases 0 to 7 in [ROADMAP.md](ROADMAP.md) is done or decided, and so is every item in the screen-by-screen comparison with the original (`Research/Screen comparison.md`), the UI kit included. Of Phase 8, the reading of the shipped game's code, 36 of its 37 items are built; the lifeforms as the shipped game makes and values them (8.18) are under way. The headless test harness covers every one of them, and its playthrough plays a new game through to the win. A full playthrough of 1.0.0 by hand is still to come.
+Every item of Phases 0 to 7 in [ROADMAP.md](ROADMAP.md) is done or decided, and so is every item in the screen-by-screen comparison with the original (`Research/Screen comparison.md`), the UI kit included. All 37 items of Phase 8, the reading of the shipped game's code, are built. The headless test harness covers every one of them, and its playthrough plays a new game through to the win. A full playthrough of 1.0.0 by hand is still to come.
 
 Nothing is open from the comparison with the original's code: its last two items, the speeds in an encounter and the aliens' distress calls, were measured in the original game.
 

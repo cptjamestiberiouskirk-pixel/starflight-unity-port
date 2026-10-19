@@ -85,14 +85,14 @@ public class PD_General
 	// set once the Thrynn have sold the crew their device, the Black Box: they offer it once in a game (COMMSPEC-OV NEED-ENERGY: WF08A) - false in older save files
 	public bool m_thrynnDeviceSold;
 
-	// the lifeforms whose data the crew has collected, for the value of new data (GD_Species.GetBodyClass and GetOrder; a species is its planet's id x 128 + its
-	// index, as are its class and order, since the shipped game's are records of their planet) - null in older save files
+	// the lifeforms whose data the crew had collected, for the value of new data in the 1984 notes' rule (classes, orders and species already known) - no longer
+	// used since the values are the shipped game's (roadmap 8.18: GD_Species.GetValue); kept so that older save files read as they were
 	public List<int> m_knownLifeformClassList;
 	public List<int> m_knownLifeformOrderList;
 	public List<int> m_knownLifeformSpeciesList;
 
-	// what the lifeform data recorded since the last visit to the Starport is worth (planet.txt: "When the player returns to starport recorded information is
-	// automatically paid for") - 0 in older save files
+	// what the lifeform data recorded before roadmap 8.18 was worth, which Interstel paid on docking (planet.txt) - a recording is now an item of the hold, sold at
+	// the Trade Depot as the shipped game's; an older save file's value is still paid on its next docking (PlayerData.PayLifeformData), and 0 otherwise
 	public int m_unpaidLifeformDataValue;
 
 	// true once a Black Egg has destroyed the Crystal Planet at its control nexus: the game is won, and no star flares any more (the original's ?WIN, disys.txt ?FLARE)
@@ -350,64 +350,6 @@ public class PD_General
 	// the calendar the stardates of this save are in: 1 for the original's (saves made before 2026-10-09 have 0, the real-world calendar, and are repaired when they are loaded)
 	public const int c_originalCalendar = 1;
 	public int m_stardateCalendar;
-
-	// the value of the data of a lifeform of this species, which becomes known (planet.txt): its base is that of a new class, order or species, or nothing for a
-	// species already known, and "If the lifeform was recorded and it is dead cut its value in half"
-	public int LearnLifeform( GD_Species species, int planetId, bool dead )
-	{
-		if ( m_knownLifeformClassList == null )
-		{
-			m_knownLifeformClassList = new List<int>();
-		}
-
-		if ( m_knownLifeformOrderList == null )
-		{
-			m_knownLifeformOrderList = new List<int>();
-		}
-
-		if ( m_knownLifeformSpeciesList == null )
-		{
-			m_knownLifeformSpeciesList = new List<int>();
-		}
-
-		var bodyClass = species.GetBodyClass( planetId );
-		var order = species.GetOrder( planetId );
-		var speciesKey = planetId * 128 + species.m_index;
-
-		var baseValue = 0;
-
-		if ( !m_knownLifeformClassList.Contains( bodyClass ) )
-		{
-			baseValue = GD_Species.c_newClassValue;
-		}
-		else if ( !m_knownLifeformOrderList.Contains( order ) )
-		{
-			baseValue = GD_Species.c_newOrderValue;
-		}
-		else if ( !m_knownLifeformSpeciesList.Contains( speciesKey ) )
-		{
-			baseValue = GD_Species.c_newSpeciesValue;
-		}
-
-		if ( !m_knownLifeformClassList.Contains( bodyClass ) )
-		{
-			m_knownLifeformClassList.Add( bodyClass );
-		}
-
-		if ( !m_knownLifeformOrderList.Contains( order ) )
-		{
-			m_knownLifeformOrderList.Add( order );
-		}
-
-		if ( !m_knownLifeformSpeciesList.Contains( speciesKey ) )
-		{
-			m_knownLifeformSpeciesList.Add( speciesKey );
-		}
-
-		var value = species.GetDataValue( baseValue );
-
-		return dead ? value / 2 : value;
-	}
 
 	// this resets everything to initial game state
 	public void Reset()

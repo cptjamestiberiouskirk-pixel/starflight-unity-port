@@ -18,6 +18,10 @@ public class PD_Specimen
 	// its description (its species' body plan)
 	public string m_name;
 
+	// true for a lifeform's recorded data rather than the lifeform itself (the shipped game's BIO-DATA, ITEMS-OV WE6B8: an item of the hold with no volume, worth
+	// an eighth of the lifeform's value, sold at the Trade Depot like a specimen) - false in older save files, which had no recordings in the holds
+	public bool m_isBioData;
+
 	// its volume, in tenths of a cubic meter like everything in the cargo holds
 	public int m_volume;
 
