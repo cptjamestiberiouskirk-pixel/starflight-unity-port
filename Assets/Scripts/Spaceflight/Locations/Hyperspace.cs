@@ -289,6 +289,9 @@ public class Hyperspace : MonoBehaviour
 					// change the system
 					playerData.m_general.m_currentStarId = star.m_id;
 
+					// its alien groups are placed afresh
+					SpaceflightController.m_instance.PlaceStarSystemEncounters( star.m_id );
+
 					// set the position of the player inside this system
 					var starToShip = playerData.m_general.m_coordinates - star.GetWorldCoordinates();
 					starToShip.Normalize();
@@ -335,6 +338,9 @@ public class Hyperspace : MonoBehaviour
 
 					// and the navigator loses the ship's bearings for a while
 					SpaceflightController.m_instance.LoseBearings();
+
+					// the flux is known from now on, and the starmap draws it (HYPER-OV >FLUX-NODE, SET-FLUX-STATE)
+					playerData.m_general.LearnFlux( flux );
 
 					// start the warp cinematics
 					m_travelingThroughFlux = true;

@@ -173,6 +173,95 @@ public class PD_General
 		return m_orbitPermissionList;
 	}
 
+	// the continuum fluxes the ship has been through, by their GD_Flux ids, both ways: the original marks a flux known when the ship goes through it and keeps
+	// that in the save, and its starmap draws the known ones (HYPER-OV SET-FLUX-STATE, MAP-OV WEA70) - older saves have none: see GetKnownFluxes
+	public List<int> m_knownFluxList;
+
+	// returns the fluxes the ship has been through (never null)
+	public List<int> GetKnownFluxes()
+	{
+		if ( m_knownFluxList == null )
+		{
+			m_knownFluxList = new List<int>();
+		}
+
+		return m_knownFluxList;
+	}
+
+	// remembers a flux the ship has gone through: it and the flux that runs the other way between the same two ends
+	public void LearnFlux( GD_Flux flux )
+	{
+		var known = GetKnownFluxes();
+		var fluxList = DataController.m_instance.m_gameData.m_fluxList;
+
+		if ( ( flux == null ) || ( fluxList == null ) )
+		{
+			return;
+		}
+
+		foreach ( var other in fluxList )
+		{
+			var sameWay = ( other.m_x1 == flux.m_x1 ) && ( other.m_y1 == flux.m_y1 ) && ( other.m_x2 == flux.m_x2 ) && ( other.m_y2 == flux.m_y2 );
+			var otherWay = ( other.m_x1 == flux.m_x2 ) && ( other.m_y1 == flux.m_y2 ) && ( other.m_x2 == flux.m_x1 ) && ( other.m_y2 == flux.m_y1 );
+
+			if ( ( sameWay || otherWay ) && !known.Contains( other.m_id ) )
+			{
+				known.Add( other.m_id );
+			}
+		}
+	}
+
+	// each race's base mood, the mood its aliens start an encounter from: the original's BASE-EDL of the race's originator, which the end of every encounter moves
+	// toward the mood the encounter ended in (HYPER-OV ENCCLEANUP), so a race remembers how it was treated - saved; a race not in the list starts from its
+	// personality's starting mood (older saves have none)
+	[Serializable] public class RaceMood
+	{
+		public int m_race;
+		public float m_baseMood;
+	}
+
+	public List<RaceMood> m_raceMoodList;
+
+	// a race's base mood, or this starting mood if the race has none yet
+	public float GetRaceBaseMood( GameData.Race race, float startingMood )
+	{
+		if ( m_raceMoodList != null )
+		{
+			foreach ( var raceMood in m_raceMoodList )
+			{
+				if ( raceMood.m_race == (int) race )
+				{
+					return raceMood.m_baseMood;
+				}
+			}
+		}
+
+		return startingMood;
+	}
+
+	// sets a race's base mood (kept between 0 and 100)
+	public void SetRaceBaseMood( GameData.Race race, float baseMood )
+	{
+		if ( m_raceMoodList == null )
+		{
+			m_raceMoodList = new List<RaceMood>();
+		}
+
+		baseMood = Mathf.Clamp( baseMood, 0.0f, 100.0f );
+
+		foreach ( var raceMood in m_raceMoodList )
+		{
+			if ( raceMood.m_race == (int) race )
+			{
+				raceMood.m_baseMood = baseMood;
+
+				return;
+			}
+		}
+
+		m_raceMoodList.Add( new RaceMood { m_race = (int) race, m_baseMood = baseMood } );
+	}
+
 	// the order the aliens' eleven combat rules are tried in, by their numbers in the original's shipped order: a rule that fires swaps places with the rule halfway
 	// up the list, and the order lasts from one encounter to the next (COMBAT-OV <COMBAT>, the rule engine's swap, kept by SAVE-OVERLAY) - saved; older saves
 	// start from the shipped order

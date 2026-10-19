@@ -1730,6 +1730,26 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioFluxDots();
 				break;
 
+			case "systemgroups":
+				yield return ScenarioSystemGroups();
+				break;
+
+			case "racememory":
+				yield return ScenarioRaceMemory();
+				break;
+
+			case "fluxmap":
+				yield return ScenarioFluxMap();
+				break;
+
+			case "lockout":
+				yield return ScenarioLockOut();
+				break;
+
+			case "translation":
+				yield return ScenarioTranslation();
+				break;
+
 			case "dronenumbers":
 				yield return ScenarioDroneNumbers();
 				break;
@@ -21236,7 +21256,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "systemeffects: a damaged shield generator holds less charge (half of it at half its health)", ( shieldsWhole > 0 ) && ( shieldsHalf == shieldsWhole / 2 ), shieldsWhole + " -> " + shieldsHalf );
 		Check( "systemeffects: in hyperspace engines at half health keep the top speed (the original's engine damage counts only in an encounter's acceleration, HYPER-OV !S/A)", ( speedWhole > 0.0f ) && Mathf.Abs( speedHalf - speedWhole ) < 0.01f, speedWhole + " -> " + speedHalf );
 		Check( "systemeffects: a damaged laser cannon does less damage, and a destroyed one does not fire", ( laserHits[ 0 ] > 0 ) && ( laserHits[ 1 ] == Mathf.RoundToInt( laserHits[ 0 ] / 2.0f ) ) && !firesDestroyed, laserHits[ 0 ] + " -> " + laserHits[ 1 ] + ", " + firesDestroyed );
-		Check( "systemeffects: destroyed comm equipment garbles what a fully trained officer understands", commWhole.Contains( speminComm.m_text ) && !commDestroyed.Contains( speminComm.m_text ), commDestroyed );
+		Check( "systemeffects: destroyed comm equipment garbles no more: a fully trained officer still understands every word (COMM-OV ?SCRAMBLE reads only the officer's strength; the equipment check stops a damaged comm instead)", commWhole.Contains( speminComm.m_text ) && commDestroyed.Contains( speminComm.m_text ), commDestroyed );
 		Check( "systemeffects: destroyed sensors malfunction and give no readings", sensorsWhole.Contains( "Star System Scan" ) && sensorsBroken.Contains( "Sensors: MALFUNCTION" ) && !sensorsBroken.Contains( "Star System Scan" ), sensorsBroken );
 
 		Finish( "scenario=systemeffects shields=" + shieldsWhole + "/" + shieldsHalf + " speed=" + speedWhole + "/" + speedHalf + " laser=" + laserHits[ 0 ] + "/" + laserHits[ 1 ], 0 );
@@ -22618,7 +22638,7 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 4. translation: an officer with no skill, and the Thrynn's greeting comes through whole with a Thrynn aboard - garbled without (the control)
+		// ---- 4. translation: an officer with no skill, and the Thrynn's greeting comes through in part with a Thrynn aboard - garbled without (the control)
 		officer.m_communications = 0;
 
 		var withThrynn = new List<string>();
@@ -22660,7 +22680,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "rivals: the first comm link with the Thrynn is remembered", ( firstBefore == "None" ) && ( firstAfter == "Thrynn" ), firstBefore + " -> " + firstAfter );
 		Check( "rivals: after the Thrynn the Elowan greet the crew as friends of the Thrynn, and start in their hostile band", elowanGreeting.Contains( CommText( 2 ) ) && ( elowanMood >= 60.0f ), elowanMood + " | " + elowanGreeting );
 		Check( "rivals: with a Thrynn aboard the Elowan have no dealings with the ship, end the comm link, and do not attack", noDealings.Contains( CommText( 1 ) ) && noDealingsDisconnected && ( noDealingsStance != GD_Comm.Stance.Hostile ), noDealingsDisconnected + ", " + noDealingsStance + " | " + noDealings );
-		Check( "rivals: with a Thrynn aboard an officer with no skill understands every word of the Thrynn, and without one not (control)", wholeWithThrynn && !wholeWithout, string.Join( " | ", withThrynn ) + " || " + string.Join( " | ", withoutThrynn ) );
+		Check( "rivals: with a Thrynn aboard an officer with no skill gets the Thrynn's greeting in part, not every word (the crew member adds 50 to the translation strength, COMM-OV INIT-MCOMM: probe translation), and without one garbled (control)", !wholeWithThrynn && !wholeWithout, string.Join( " | ", withThrynn ) + " || " + string.Join( " | ", withoutThrynn ) );
 		Check( "rivals: with an Elowan aboard the Thrynn greet with \"most regrettable\", and start in their hostile band (60, less the 8 of the player's friendly hail)", regrettable.Contains( CommText( 297 ) ) && ( thrynnMood >= 52.0f ), thrynnMood + " | " + regrettable );
 
 		Finish( "scenario=rivals first=" + firstAfter + " elowanMood=" + elowanMood + " thrynnMood=" + thrynnMood, 0 );
@@ -48187,6 +48207,744 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "fluxdots: with the Ring Device a flux shows 16 dots, whatever the navigator's skill", ( ringLow == 16 ) && ( ringHigh == 16 ), ringLow + " " + ringHigh );
 
 		Finish( "scenario=fluxdots checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: a star system's alien groups are placed afresh on each visit (since 2026-10-18)
+
+	// flies the ship into this star from hyperspace for real: it is put in hyperspace a little outside the star's breach distance, then inside it, and
+	// Hyperspace.Update takes it into the system
+	IEnumerator BreachStar( GD_Star star )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+		var outside = star.GetWorldCoordinates() + new Vector3( 1.0f, 0.0f, 0.0f ) * ( star.GetBreachDistance() + 64.0f );
+
+		controller.m_playerShip.TurnOffEngines();
+		general.m_currentSpeed = 0.0f;
+		general.m_lastHyperspaceCoordinates = outside;
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 5 );
+
+		var inside = star.GetWorldCoordinates() + new Vector3( 1.0f, 0.0f, 0.0f ) * ( star.GetBreachDistance() * 0.5f );
+
+		general.m_coordinates = inside;
+		controller.m_playerShip.transform.position = inside;
+
+		for ( var guard = 0; ( guard < 60 ) && ( general.m_location != PD_General.Location.StarSystem ); guard++ )
+		{
+			yield return null;
+		}
+
+		yield return Frames( 3 );
+	}
+
+	// true if a group's place is one of the original's SETRNDXY: within the system's 395 units on each axis (on whole system units, or brought in to 395 from
+	// the middle), in the port's units of 8192 / 400
+	static bool IsPlacedInSystem( Vector3 place )
+	{
+		var units = place / ( 8192.0f / 400.0f );
+		var onGrid = ( Mathf.Abs( units.x - Mathf.Round( units.x ) ) < 0.01f ) && ( Mathf.Abs( units.z - Mathf.Round( units.z ) ) < 0.01f );
+		var onRim = Mathf.Abs( units.magnitude - 395.0f ) < 0.05f;
+
+		return ( Mathf.Abs( units.x ) <= 395.01f ) && ( Mathf.Abs( units.z ) <= 395.01f ) && ( units.magnitude <= 395.05f ) && ( onGrid || onRim );
+	}
+
+	// a star system's alien groups are placed afresh each time the ship comes into it from hyperspace, as the original's SYSSETUP (HYPER-OV SETPLNXY, SETRNDXY: each
+	// axis RRND(-395, 395) of the system's 400 units); not when the system is shown again otherwise (back from orbit, a load). The code before placed them once, at a new game
+	IEnumerator ScenarioSystemGroups()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var sentinel = new Vector3( 12000.0f, 0.0f, 12000.0f );
+
+		EnsureCrew();
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		// a star system group (not the one at Arth's star), and its star
+		PD_Encounter group = null;
+
+		foreach ( var encounter in playerData.m_encounterList )
+		{
+			if ( ( encounter.GetLocation() == PD_General.Location.StarSystem ) && ( encounter.GetStarId() > 0 ) && encounter.HasLivingAlienShips() && ( encounter.GetStarId() != playerData.m_general.m_currentStarId ) )
+			{
+				group = encounter;
+				break;
+			}
+		}
+
+		var star = ( group != null ) ? Array.Find( gameData.m_starList, s => s.m_id == group.GetStarId() ) : null;
+		var places = new List<Vector3>();
+		var wentIn = 0;
+
+		// ---- 1. the group parked outside its system, then the ship comes in from hyperspace three times
+		if ( star != null )
+		{
+			group.m_currentCoordinates = sentinel;
+			group.m_homeCoordinates = sentinel;
+
+			for ( var visit = 0; visit < 3; visit++ )
+			{
+				yield return BreachStar( star );
+
+				if ( playerData.m_general.m_location == PD_General.Location.StarSystem )
+				{
+					wentIn++;
+				}
+
+				places.Add( group.m_currentCoordinates );
+			}
+		}
+
+		// ---- 2. the control: the star system shown again without coming in from hyperspace (as after orbit, an encounter or a load), the group stays where it was
+		var beforeOrbit = ( group != null ) ? group.m_currentCoordinates : Vector3.zero;
+
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+
+		var afterOrbit = ( group != null ) ? group.m_currentCoordinates : Vector3.zero;
+
+		controller.m_encounterRange = encounterRange;
+
+		Log( "systemgroups: encounter " + ( ( group != null ) ? group.m_encounterId.ToString() : "none" ) + " of star " + ( ( star != null ) ? star.m_id.ToString() : "none" ) + "; went in " + wentIn + " times, places " + string.Join( ", ", places.ConvertAll( p => ( p / ( 8192.0f / 400.0f ) ).ToString( "F1" ) ) ) + "; shown again " + beforeOrbit + " -> " + afterOrbit );
+
+		var allPlaced = ( places.Count == 3 ) && places.TrueForAll( p => ( p != sentinel ) && IsPlacedInSystem( p ) );
+		var allDifferent = ( places.Count == 3 ) && ( places[ 0 ] != places[ 1 ] ) && ( places[ 1 ] != places[ 2 ] );
+
+		Check( "systemgroups: a star system group (control: found, and the ship goes in from hyperspace each time)", ( group != null ) && ( wentIn == 3 ), wentIn.ToString() );
+		Check( "systemgroups: coming in from hyperspace places the system's group afresh, within the system's 395 units on each axis (the code before left it where it was)", allPlaced, string.Join( ", ", places.ConvertAll( p => p.ToString() ) ) );
+		Check( "systemgroups: each visit draws a new place", allDifferent, string.Join( ", ", places.ConvertAll( p => p.ToString() ) ) );
+		Check( "systemgroups: the system shown again without coming in from hyperspace (as after orbit or a load) leaves the group where it was (control)", Vector3.Distance( beforeOrbit, afterOrbit ) < 0.01f, beforeOrbit + " -> " + afterOrbit );
+
+		Finish( "scenario=systemgroups checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: each race remembers how it was treated (since 2026-10-18)
+
+	// meets an encounter, sets the aliens' mood to this (or leaves it as it starts, below 0), and leaves through the game's own end of an encounter - returns the
+	// mood the aliens started with
+	static IEnumerator MeetSetMoodAndLeave( int encounterId, float endMood, float[] startMood )
+	{
+		EnterStarSystem( DataController.m_instance.m_gameData.m_misc.m_arthStarId );
+
+		yield return Frames( 5 );
+
+		EnterEncounter( encounterId );
+
+		yield return Frames( 5 );
+
+		var encounter = SpaceflightController.m_instance.m_encounter;
+
+		Call( encounter, "GetAlienTalkStance" );
+
+		startMood[ 0 ] = encounter.m_pdEncounter.m_mood;
+
+		if ( endMood >= 0.0f )
+		{
+			encounter.m_pdEncounter.m_mood = endMood;
+		}
+
+		Call( encounter, "LeaveEncounter" );
+
+		yield return Frames( 10 );
+	}
+
+	// each race remembers how it was treated: the end of an encounter moves the race's base mood toward the mood the encounter ended in, a third of the way and at
+	// least 5, by 5 toward calm when they are the same, and the next encounter starts from it (HYPER-OV ENCCLEANUP, BASE-EDL). The code before started every
+	// encounter from the race's fixed mood
+	IEnumerator ScenarioRaceMemory()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var ship = playerData.m_playerShip;
+		var start = new float[ 1 ];
+
+		EnsureCrew();
+
+		// shields down and weapons not armed, so that the aliens' mood starts at the race's
+		ship.m_shieldsAreUp = false;
+		ship.m_weaponsAreArmed = false;
+
+		SpaceflightController.m_instance.m_encounterRange = 0.0f;
+
+		var elowan = FindEncounterOfRace( GameData.Race.Elowan );
+		var thrynn = FindEncounterOfRace( GameData.Race.Thrynn );
+
+		// ---- 1. the first meeting starts from the race's mood (44, the shipped BASE-EDL), and ends angry (90): 44 + 15 = 59
+		yield return MeetSetMoodAndLeave( elowan, 90.0f, start );
+
+		var firstStart = start[ 0 ];
+
+		// ---- 2. the next meeting starts from 59, and ends calm (10): 59 - 16 = 43
+		yield return MeetSetMoodAndLeave( elowan, 10.0f, start );
+
+		var secondStart = start[ 0 ];
+
+		// ---- 3. the next starts from 43, and ends where it started: 5 toward calm, 38
+		yield return MeetSetMoodAndLeave( elowan, 43.0f, start );
+
+		var thirdStart = start[ 0 ];
+
+		yield return MeetSetMoodAndLeave( elowan, -1.0f, start );
+
+		var fourthStart = start[ 0 ];
+
+		// ---- 4. another race is not touched by it (the Thrynn start from their 44)
+		yield return MeetSetMoodAndLeave( thrynn, -1.0f, start );
+
+		var thrynnStart = start[ 0 ];
+
+		// ---- 5. the save keeps it
+		var copy = JsonUtility.FromJson<PD_General>( JsonUtility.ToJson( playerData.m_general ) );
+		var method = typeof( PD_General ).GetMethod( "GetRaceBaseMood", c_any );
+		var saved = ( method == null ) ? -1.0f : (float) method.Invoke( copy, new object[] { GameData.Race.Elowan, 44.0f } );
+
+		Log( "racememory: Elowan encounter " + elowan + ", starts " + firstStart + " / " + secondStart + " / " + thirdStart + " / " + fourthStart + " | Thrynn " + thrynn + " starts " + thrynnStart + " | saved Elowan base " + saved );
+
+		Check( "racememory: the first meeting starts from the race's mood (control)", Mathf.Approximately( firstStart, 44.0f ), firstStart.ToString() );
+		Check( "racememory: after an angry end (90) the next meeting starts a third of the way there, 59 (the code before started at 44 again)", Mathf.Approximately( secondStart, 59.0f ), secondStart.ToString() );
+		Check( "racememory: after a calm end (10) it starts a third of the way down, 43", Mathf.Approximately( thirdStart, 43.0f ), thirdStart.ToString() );
+		Check( "racememory: an end where it started moves it 5 toward calm, 38", Mathf.Approximately( fourthStart, 38.0f ), fourthStart.ToString() );
+		Check( "racememory: another race is not touched (the Thrynn start at 44)", Mathf.Approximately( thrynnStart, 44.0f ), thrynnStart.ToString() );
+		Check( "racememory: the save keeps a race's base mood", Mathf.Approximately( saved, 33.0f ), saved.ToString() );
+
+		Finish( "scenario=racememory checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: known fluxes on the starmap (since 2026-10-18)
+
+	// how many fluxes the starmap draws (-1 on code from before it)
+	static int DrawnFluxCount()
+	{
+		var starmap = SpaceflightController.m_instance.m_starmap;
+		var method = typeof( Starmap ).GetMethod( "GetDrawnFluxCount", c_any );
+
+		return ( method == null ) ? -1 : (int) method.Invoke( starmap, null );
+	}
+
+	// the fluxes the save knows (null on code from before it)
+	static List<int> KnownFluxes()
+	{
+		return FieldOrNull( DataController.m_instance.m_playerData.m_general, "m_knownFluxList" ) as List<int>;
+	}
+
+	// a flux the ship goes through is known from then on, both ways, kept in the save, and drawn on the starmap as a line between its ends (HYPER-OV
+	// SET-FLUX-STATE, MAP-OV WEA70 and WEA4C). The code before remembered no flux and drew none
+	IEnumerator ScenarioFluxMap()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var flux = gameData.m_fluxList[ 0 ];
+		var jumped = new bool[ 1 ];
+		var folder = ScreenPictureFolder( "fluxmap" );
+
+		EnsureCrew();
+
+		// a navigator who never loses the ship's bearings for long, fuel, and no encounter able to begin
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Navigator ).m_navigation = 250;
+		playerData.m_playerShip.AddElement( 5, 500 );
+		controller.m_encounterRange = 0.0f;
+
+		playerData.m_general.m_lastHyperspaceCoordinates = flux.GetFrom() + new Vector3( 1024.0f, 0.0f, 0.0f );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		// ---- 1. no flux known yet: the starmap draws none (the control)
+		controller.m_starmap.Show();
+
+		yield return Frames( 3 );
+
+		var drawnBefore = DrawnFluxCount();
+
+		controller.m_starmap.Hide();
+
+		// ---- 2. through flux 0: it is known both ways
+		yield return FluxJumpFrom( flux, jumped );
+
+		for ( var end = Time.time + 5.0f; ( Time.time < end ) && Equals( GetField( controller.m_hyperspace, "m_travelingThroughFlux" ), true ); )
+		{
+			yield return null;
+		}
+
+		// and the fade out of the flux (2 s), so that the picture below shows the starmap and not the flux's tunnel
+		yield return new WaitForSeconds( 2.5f );
+
+		var known = KnownFluxes();
+		var reverse = -1;
+
+		foreach ( var other in gameData.m_fluxList )
+		{
+			if ( ( other.m_x1 == flux.m_x2 ) && ( other.m_y1 == flux.m_y2 ) && ( other.m_x2 == flux.m_x1 ) && ( other.m_y2 == flux.m_y1 ) )
+			{
+				reverse = other.m_id;
+			}
+		}
+
+		var knownBothWays = ( known != null ) && known.Contains( flux.m_id ) && known.Contains( reverse ) && ( known.Count == 2 );
+
+		// ---- 3. the starmap draws it, once, as a line between its ends
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( ( flux.m_x1 + flux.m_x2 ) * 0.5f, 0.0f, ( flux.m_y1 + flux.m_y2 ) * 0.5f ) );
+
+		controller.m_starmap.Show();
+
+		yield return Frames( 5 );
+
+		var drawnAfter = DrawnFluxCount();
+
+		// a picture of it, in a run with a graphics device (probe.ps1 -Graphics): without one, rendering the cameras just after a flux jump crashes Unity
+		if ( SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null )
+		{
+			RenderScreenPicture( System.IO.Path.Combine( folder, "01_starmap_with_flux_0.png" ) );
+		}
+
+		controller.m_starmap.Hide();
+		controller.m_buttonController.DeactivateButton();
+
+		// ---- 4. the save keeps it
+		var copy = JsonUtility.FromJson<PD_General>( JsonUtility.ToJson( playerData.m_general ) );
+		var savedKnown = FieldOrNull( copy, "m_knownFluxList" ) as List<int>;
+		var saved = ( savedKnown != null ) && savedKnown.Contains( flux.m_id ) && savedKnown.Contains( reverse );
+
+		Log( "fluxmap: flux 0 " + flux.m_x1 + "," + flux.m_y1 + " to " + flux.m_x2 + "," + flux.m_y2 + " (reverse " + reverse + "): drawn before " + drawnBefore + ", jumped " + jumped[ 0 ] + ", known [" + ( ( known != null ) ? string.Join( ",", known ) : "none" ) + "], drawn after " + drawnAfter + ", saved " + saved + "; picture in " + folder );
+
+		Check( "fluxmap: with no flux known the starmap draws none (control)", drawnBefore <= 0, drawnBefore.ToString() );
+		Check( "fluxmap: a flux the ship goes through is known both ways (the code before remembered none)", jumped[ 0 ] && knownBothWays, jumped[ 0 ] + " " + ( ( known != null ) ? string.Join( ",", known ) : "none" ) );
+		Check( "fluxmap: the starmap draws the known flux once, as a line between its ends", drawnAfter == 1, drawnAfter.ToString() );
+		Check( "fluxmap: the save keeps the known fluxes", saved, saved.ToString() );
+
+		Finish( "scenario=fluxmap checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: the Old Empire and the Ancients lock out (roadmap 8.25)
+
+	// the subject of each line the aliens of the encounter answer a question with, asked the given number of times (through Encounter.FindComm, the game's own
+	// choice of a line, so that nothing in the message box has to be read)
+	static List<GD_Comm.Subject> AnswerSubjects( GD_Comm.Subject subject, int count )
+	{
+		var findComm = typeof( Encounter ).GetMethod( "FindComm", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic );
+		var subjects = new List<GD_Comm.Subject>();
+
+		for ( var i = 0; i < count; i++ )
+		{
+			var comm = (GD_Comm) findComm.Invoke( SpaceflightController.m_instance.m_encounter, new object[] { subject, false } );
+
+			subjects.Add( ( comm != null ) ? comm.m_subject : GD_Comm.Subject.None );
+		}
+
+		return subjects;
+	}
+
+	// a seed for the game's random numbers whose first draw of 0 to 100 is not under 20 (the original's roll for the lock-out), so that the next question is
+	// answered
+	static int SeedThatAnswers( int from )
+	{
+		for ( var seed = from; seed < from + 1000; seed++ )
+		{
+			UnityEngine.Random.InitState( seed );
+
+			if ( UnityEngine.Random.Range( 0, 101 ) >= 20 )
+			{
+				return seed;
+			}
+		}
+
+		return from;
+	}
+
+	static string SubjectsText( List<GD_Comm.Subject> subjects )
+	{
+		return string.Join( ",", subjects.ConvertAll( subject => ( (int) subject ).ToString() ) );
+	}
+
+	// the Old Empire and the Ancients lock out as the original's (COMM-OV ?LOCKED-OUT, FIND-SUBJECT): each time the aliens are asked about either, a roll of
+	// RRND 0 to 101 under 20 locks that subject out for the rest of the encounter, and from then on they answer it with a subject 5 line (no more information);
+	// the lock is cleared when an encounter begins (INIT_GCOMM, from ENCSETUP). The Veloxi in their neutral band (mood 44): 8 Old Empire lines and 12 on the
+	// Ancients. The code before answered both in order to the last line, then once with a subject 5 line, and started over
+	IEnumerator ScenarioLockOut()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+
+		EnsureCrew();
+
+		// a Veloxi group met in flight
+		var veloxId = -1;
+
+		for ( var i = 0; ( i < gameData.m_encounterList.Length ) && ( veloxId < 0 ); i++ )
+		{
+			if ( ( gameData.m_encounterList[ i ].m_race == GameData.Race.Velox ) && ( gameData.m_encounterList[ i ].m_location != 2 ) )
+			{
+				veloxId = i;
+			}
+		}
+
+		EnterEncounter( veloxId );
+
+		yield return Frames( 10 );
+
+		controller.m_encounter.m_pdEncounter.m_mood = 44.0f;
+		controller.m_encounter.m_pdEncounter.m_moodSet = true;
+
+		// ---- 1. asked about the Old Empire 25 times, the first answered
+		general.SetLastCommId( GameData.Race.Velox, GD_Comm.Subject.OldEmpire, 0 );
+		UnityEngine.Random.InitState( SeedThatAnswers( 1 ) );
+
+		var oldEmpire = AnswerSubjects( GD_Comm.Subject.OldEmpire, 25 );
+		var firstLocked = oldEmpire.IndexOf( GD_Comm.Subject.NoMoreInformation );
+		var lockedForGood = ( firstLocked >= 0 ) && oldEmpire.GetRange( firstLocked, oldEmpire.Count - firstLocked ).TrueForAll( subject => subject == GD_Comm.Subject.NoMoreInformation );
+
+		// ---- 2. the Ancients have a lock of their own: with the Old Empire locked out, the next question about the Ancients is answered
+		general.SetLastCommId( GameData.Race.Velox, GD_Comm.Subject.TheAncients, 0 );
+		UnityEngine.Random.InitState( SeedThatAnswers( 100 ) );
+
+		var ancientsNext = AnswerSubjects( GD_Comm.Subject.TheAncients, 1 );
+
+		// ---- 3. a question about themselves never locks out: after a subject 5 line they start over
+		general.SetLastCommId( GameData.Race.Velox, GD_Comm.Subject.Themselves, 0 );
+		UnityEngine.Random.InitState( 7 );
+
+		var themselves = AnswerSubjects( GD_Comm.Subject.Themselves, 25 );
+		var themselvesStartOver = themselves.Contains( GD_Comm.Subject.Themselves );
+
+		for ( var i = 0; i + 1 < themselves.Count; i++ )
+		{
+			if ( ( themselves[ i ] == GD_Comm.Subject.NoMoreInformation ) && ( themselves[ i + 1 ] != GD_Comm.Subject.Themselves ) )
+			{
+				themselvesStartOver = false;
+			}
+		}
+
+		// ---- 4. how often a question locks out: 400 first questions about the Old Empire, the lock cleared before each (the code before has no lock to clear)
+		var lockField = typeof( PD_Encounter ).GetField( "m_lockedOutSubjects" );
+		var lockedOut = -1;
+
+		if ( lockField != null )
+		{
+			lockedOut = 0;
+
+			UnityEngine.Random.InitState( 12345 );
+
+			for ( var i = 0; i < 400; i++ )
+			{
+				lockField.SetValue( controller.m_encounter.m_pdEncounter, 0 );
+				general.SetLastCommId( GameData.Race.Velox, GD_Comm.Subject.OldEmpire, 0 );
+
+				if ( AnswerSubjects( GD_Comm.Subject.OldEmpire, 1 )[ 0 ] == GD_Comm.Subject.NoMoreInformation )
+				{
+					lockedOut++;
+				}
+			}
+
+			lockField.SetValue( controller.m_encounter.m_pdEncounter, 1 << (int) GD_Comm.Subject.OldEmpire );
+		}
+
+		// ---- 5. the encounter ends and begins again: the Old Empire is answered again
+		var leave = typeof( Encounter ).GetMethod( "LeaveEncounter", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public );
+
+		leave.Invoke( controller.m_encounter, null );
+
+		yield return Frames( 3 );
+
+		EnterEncounter( veloxId );
+
+		yield return Frames( 10 );
+
+		controller.m_encounter.m_pdEncounter.m_mood = 44.0f;
+		controller.m_encounter.m_pdEncounter.m_moodSet = true;
+
+		general.SetLastCommId( GameData.Race.Velox, GD_Comm.Subject.OldEmpire, 0 );
+		UnityEngine.Random.InitState( SeedThatAnswers( 200 ) );
+
+		var afresh = AnswerSubjects( GD_Comm.Subject.OldEmpire, 1 );
+
+		Log( "lockout: Veloxi encounter " + veloxId + "; the Old Empire asked 25 times: " + SubjectsText( oldEmpire ) + " (first subject 5 at " + firstLocked + "); then the Ancients: " + SubjectsText( ancientsNext ) + "; themselves 25 times: " + SubjectsText( themselves ) + "; locked out on " + lockedOut + " of 400 first questions; in a new encounter: " + SubjectsText( afresh ) );
+
+		Check( "lockout: the Veloxi in their neutral band answer the Old Empire with their Old Empire lines (control)", oldEmpire[ 0 ] == GD_Comm.Subject.OldEmpire, SubjectsText( oldEmpire.GetRange( 0, 3 ) ) );
+		Check( "lockout: once a question about the Old Empire is answered with a subject 5 line, every later one is, for the rest of the encounter (COMM-OV ?LOCKED-OUT)", lockedForGood, "first subject 5 at " + firstLocked + ": " + SubjectsText( oldEmpire ) );
+		Check( "lockout: the Ancients have a lock of their own: with the Old Empire locked out, they are still answered (control)", ancientsNext[ 0 ] == GD_Comm.Subject.TheAncients, SubjectsText( ancientsNext ) );
+		Check( "lockout: a question about them locks the subject out one time in five (RRND 0 to 101 under 20, 79 of 400 expected)", ( lockedOut >= 50 ) && ( lockedOut <= 110 ), lockedOut + " of 400" + ( ( lockField == null ) ? " (no lock in this code)" : "" ) );
+		Check( "lockout: an encounter that begins clears the lock, and the Old Empire is answered again", afresh[ 0 ] == GD_Comm.Subject.OldEmpire, SubjectsText( afresh ) );
+		Check( "lockout: a question about themselves never locks out: after a subject 5 line they start over (control)", themselvesStartOver, SubjectsText( themselves ) );
+
+		Finish( "scenario=lockout checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: the officer's translation strength (roadmap 8.9)
+
+	// the translation strength against the aliens of the encounter (Encounter.GetTranslationStrength), or -1 on the code before, which has none
+	static int TranslationStrength()
+	{
+		var method = typeof( Encounter ).GetMethod( "GetTranslationStrength" );
+
+		return ( method == null ) ? -1 : (int) method.Invoke( SpaceflightController.m_instance.m_encounter, null );
+	}
+
+	// an alien line said through the message box: how many of its words came through as they are in the game data, of how many (-1 if the shown words cannot be
+	// lined up with the line's)
+	static int WordsThrough( GD_Comm comm, out int words )
+	{
+		var shown = AlienCommShown( comm );
+		var start = shown.LastIndexOf( "<color=#0a0>" );
+		var end = ( start >= 0 ) ? shown.IndexOf( "</color>", start ) : -1;
+		var shownText = ( ( start >= 0 ) && ( end > start ) ) ? shown.Substring( start + 12, end - start - 12 ) : "";
+		var shownWords = shownText.Split( (char[]) null, StringSplitOptions.RemoveEmptyEntries );
+		var plainWords = comm.m_text.Split( (char[]) null, StringSplitOptions.RemoveEmptyEntries );
+
+		words = plainWords.Length;
+
+		if ( shownWords.Length != plainWords.Length )
+		{
+			return -1;
+		}
+
+		var through = 0;
+
+		for ( var i = 0; i < plainWords.Length; i++ )
+		{
+			if ( string.Equals( shownWords[ i ], plainWords[ i ], StringComparison.OrdinalIgnoreCase ) )
+			{
+				through++;
+			}
+		}
+
+		return through;
+	}
+
+	// the race's lines with nothing filled in (no captain, ship or alien names, no subject) and on one line of text, of five words or more
+	static List<GD_Comm> PlainLines( GameData.Race race )
+	{
+		var lines = new List<GD_Comm>();
+
+		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
+		{
+			if ( ( comm.m_race == race ) && !string.IsNullOrEmpty( comm.m_text ) && ( comm.m_text.IndexOfAny( new[] { '&', '*', '/', '(', ')', '%', '+', '\n', '\r' } ) < 0 ) && ( comm.m_text.Split( (char[]) null, StringSplitOptions.RemoveEmptyEntries ).Length >= 5 ) )
+			{
+				lines.Add( comm );
+			}
+		}
+
+		return lines;
+	}
+
+	// the first encounter of the race met in flight (not in orbit)
+	static int FindFlightEncounter( GameData.Race race )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		for ( var i = 0; i < gameData.m_encounterList.Length; i++ )
+		{
+			if ( ( gameData.m_encounterList[ i ].m_race == race ) && ( gameData.m_encounterList[ i ].m_location != 2 ) )
+			{
+				return i;
+			}
+		}
+
+		return -1;
+	}
+
+	// the officer's translation strength as the original's (COMM-OV INIT-MCOMM, ?SCRAMBLE): the square root of the communications skill plus 50 for a crew member
+	// of the aliens' race aboard and 50 more if the officer is one (the Veloxi, the Thrynn and the Elowan), plus 250 for the Spemin with the Whining Orb aboard,
+	// times 167 / 10, at most 250; a word of the aliens is garbled when its value, 0 to 249, is over the strength. The code before compared a word's difficulty
+	// with skill / 250 times the comm system's health, and a crew member of the aliens' race or the Whining Orb made every word understood
+	IEnumerator ScenarioTranslation()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var crew = playerData.m_crewAssignment;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+		ship.RestoreSystems();
+
+		var officer = crew.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer );
+		var humanRaceId = -1;
+		var thrynnRaceId = -1;
+
+		for ( var i = 0; i < gameData.m_crewRaceList.Length; i++ )
+		{
+			if ( ( gameData.m_crewRaceList[ i ].m_race == GameData.Race.Human ) && ( humanRaceId < 0 ) )
+			{
+				humanRaceId = i;
+			}
+
+			if ( ( gameData.m_crewRaceList[ i ].m_race == GameData.Race.Thrynn ) && ( thrynnRaceId < 0 ) )
+			{
+				thrynnRaceId = i;
+			}
+		}
+
+		// a human crew, and no Whining Orb aboard
+		foreach ( var role in new[] { PD_CrewAssignment.Role.Captain, PD_CrewAssignment.Role.ScienceOfficer, PD_CrewAssignment.Role.Navigator, PD_CrewAssignment.Role.Engineer, PD_CrewAssignment.Role.CommunicationsOfficer, PD_CrewAssignment.Role.Doctor } )
+		{
+			var file = crew.GetPersonnelFile( role );
+
+			if ( file != null )
+			{
+				file.m_crewRaceId = humanRaceId;
+			}
+		}
+
+		// a navigator of their own, apart from the officer (the probe's crew can be one person in every post)
+		var navigator = playerData.m_personnel.CreateNewPersonnel();
+
+		navigator.m_name = "Probe Navigator";
+		navigator.m_crewRaceId = humanRaceId;
+		navigator.m_vitality = 100.0f;
+		navigator.m_navigation = 250;
+
+		playerData.m_personnel.m_personnelList.Add( navigator );
+		crew.Assign( PD_CrewAssignment.Role.Navigator, navigator.m_fileId );
+
+		var orbId = gameData.FindArtifactId( "Whining Orb" );
+
+		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( orbId ) != null ); guard++ )
+		{
+			ship.RemoveArtifact( orbId );
+		}
+
+		// ---- 1. the Thrynn: the strength by the officer's skill
+		EnterEncounter( FindFlightEncounter( GameData.Race.Thrynn ) );
+		yield return Frames( 10 );
+
+		var skills = new[] { 0, 30, 50, 100, 150, 200, 225, 250 };
+		var expected = new[] { 0, 83, 116, 167, 200, 233, 250, 250 };
+		var bySkill = new List<string>();
+		var skillsMatch = true;
+
+		for ( var i = 0; i < skills.Length; i++ )
+		{
+			officer.m_communications = skills[ i ];
+
+			var strength = TranslationStrength();
+
+			bySkill.Add( skills[ i ] + ":" + strength );
+			skillsMatch = skillsMatch && ( strength == expected[ i ] );
+		}
+
+		// ---- 2. a crew member of their race: skill 100 and a Thrynn navigator 200, the officer a Thrynn as well 233
+		officer.m_communications = 100;
+		navigator.m_crewRaceId = thrynnRaceId;
+
+		var withThrynnNavigator = TranslationStrength();
+
+		officer.m_crewRaceId = thrynnRaceId;
+
+		var withThrynnOfficer = TranslationStrength();
+
+		officer.m_crewRaceId = humanRaceId;
+
+		// ---- 3. the words that come through: skill 100 (strength 167, a word through with a chance of 168 in 250), skill 0 with a Thrynn navigator (116), and
+		// skill 250 (the control: every word)
+		var thrynnLines = PlainLines( GameData.Race.Thrynn );
+
+		navigator.m_crewRaceId = humanRaceId;
+		officer.m_communications = 100;
+
+		var throughAt100 = 0;
+		var wordsAt100 = 0;
+		var unmatched = 0;
+
+		foreach ( var line in thrynnLines )
+		{
+			var through = WordsThrough( line, out var words );
+
+			if ( through < 0 )
+			{
+				unmatched++;
+
+				continue;
+			}
+
+			throughAt100 += through;
+			wordsAt100 += words;
+		}
+
+		officer.m_communications = 0;
+		navigator.m_crewRaceId = thrynnRaceId;
+
+		var wholeWithNavigator = 0;
+
+		foreach ( var line in thrynnLines )
+		{
+			if ( WordsThrough( line, out var words ) == words )
+			{
+				wholeWithNavigator++;
+			}
+		}
+
+		navigator.m_crewRaceId = humanRaceId;
+		officer.m_communications = 250;
+
+		var wholeAt250 = 0;
+
+		foreach ( var line in thrynnLines )
+		{
+			if ( WordsThrough( line, out var words ) == words )
+			{
+				wholeAt250++;
+			}
+		}
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 4. the Veloxi: a Thrynn aboard does not help with them (skill 100: 167)
+		EnterEncounter( FindFlightEncounter( GameData.Race.Velox ) );
+		yield return Frames( 10 );
+
+		officer.m_communications = 100;
+		navigator.m_crewRaceId = thrynnRaceId;
+
+		var veloxWithThrynn = TranslationStrength();
+
+		navigator.m_crewRaceId = humanRaceId;
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 5. the Spemin: skill 0 gives 0, and the Whining Orb 250
+		EnterEncounter( FindFlightEncounter( GameData.Race.Spemin ) );
+		yield return Frames( 10 );
+
+		officer.m_communications = 0;
+
+		var speminWithout = TranslationStrength();
+
+		ship.AddArtifact( orbId );
+
+		var speminWithOrb = TranslationStrength();
+
+		ship.RemoveArtifact( orbId );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		var rateAt100 = ( wordsAt100 > 0 ) ? (float) throughAt100 / wordsAt100 : 0.0f;
+
+		Log( "translation: strength by skill against the Thrynn " + string.Join( " ", bySkill ) + "; skill 100 with a Thrynn navigator " + withThrynnNavigator + ", the officer a Thrynn too " + withThrynnOfficer + "; " + thrynnLines.Count + " Thrynn lines (" + unmatched + " not lined up): at skill 100 " + throughAt100 + " of " + wordsAt100 + " words through (" + ( rateAt100 * 100.0f ).ToString( "F1" ) + "%), skill 0 with a Thrynn navigator " + wholeWithNavigator + " lines whole, skill 250 " + wholeAt250 + " whole; Veloxi with a Thrynn aboard " + veloxWithThrynn + "; Spemin skill 0 " + speminWithout + ", with the Whining Orb " + speminWithOrb );
+
+		Check( "translation: the strength is the square root of the officer's skill times 167 / 10, at most 250 (0, 83, 116, 167, 200, 233, 250, 250 at 0, 30, 50, 100, 150, 200, 225, 250)", skillsMatch, string.Join( " ", bySkill ) );
+		Check( "translation: a Thrynn aboard adds 50 to the skill against the Thrynn (100: 200), and a Thrynn officer 50 more (233)", ( withThrynnNavigator == 200 ) && ( withThrynnOfficer == 233 ), withThrynnNavigator + ", " + withThrynnOfficer );
+		Check( "translation: a crew member of another race does not help (a Thrynn aboard against the Veloxi, skill 100: 167)", veloxWithThrynn == 167, veloxWithThrynn.ToString() );
+		Check( "translation: the Whining Orb adds 250 against the Spemin (skill 0: 0 without it, 250 with it)", ( speminWithout == 0 ) && ( speminWithOrb == 250 ), speminWithout + ", " + speminWithOrb );
+		Check( "translation: at skill 100 about two words in three come through (168 in 250 expected; the code before let through about two in five)", ( wordsAt100 >= 200 ) && ( rateAt100 >= 0.57f ) && ( rateAt100 <= 0.77f ), throughAt100 + " of " + wordsAt100 );
+		Check( "translation: with no skill and a Thrynn aboard their lines come through in part, not whole (the code before: every word)", wholeWithNavigator < thrynnLines.Count / 10 + 1, wholeWithNavigator + " of " + thrynnLines.Count + " whole" );
+		Check( "translation: at skill 250 every line comes through whole (control)", ( thrynnLines.Count > 10 ) && ( wholeAt250 == thrynnLines.Count ), wholeAt250 + " of " + thrynnLines.Count );
+
+		Finish( "scenario=translation checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 8: the Veloxi drone's numbers as the original's (roadmap 8.36)

@@ -51,6 +51,10 @@ public class PD_Encounter : IComparable
 	// set when the player fires on the aliens - they stay hostile until the player leaves the encounter (false in older save files)
 	public bool m_attackedByPlayer;
 
+	// the subjects the aliens will say no more about in this encounter, a bit each (1 << subject): the Old Empire and the Ancients can lock out
+	// (Encounter.IsLockedOut, the original's (LOCK-OUT)) - 0 in older save files
+	public int m_lockedOutSubjects;
+
 	// how many of their homeworld's warnings a home fleet has given, and whether it has given its last one (it attacks then) - 0 and false in older save files
 	public int m_homeworldWarningCount;
 	public bool m_homeworldWarningsGiven;
@@ -178,6 +182,22 @@ public class PD_Encounter : IComparable
 		}
 
 		// set the current coordinates to be at home
+		m_currentCoordinates = m_homeCoordinates;
+	}
+
+	// puts a group in a star system at a random place of the system, its home there too, as the original's SETRNDXY (HYPER-OV): each axis RRND(-395, 395) of the
+	// system's 400 units (SYSRADIUS less 5), the original's system being a square; a place in its corners, outside the port's round system, is brought in to 395
+	// from the middle along its direction
+	public void PlaceAtRandomInStarSystem()
+	{
+		var place = new Vector3( UnityEngine.Random.Range( -395, 395 ), 0.0f, UnityEngine.Random.Range( -395, 395 ) );
+
+		if ( place.magnitude > 395.0f )
+		{
+			place = place.normalized * 395.0f;
+		}
+
+		m_homeCoordinates = place * ( 8192.0f / 400.0f );
 		m_currentCoordinates = m_homeCoordinates;
 	}
 
