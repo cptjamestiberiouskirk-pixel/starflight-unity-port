@@ -21218,7 +21218,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "systemeffects: a damaged shield generator holds less charge (half of it at half its health)", ( shieldsWhole > 0 ) && ( shieldsHalf == shieldsWhole / 2 ), shieldsWhole + " -> " + shieldsHalf );
 		Check( "systemeffects: in hyperspace engines at half health keep the top speed (the original's engine damage counts only in an encounter's acceleration, HYPER-OV !S/A)", ( speedWhole > 0.0f ) && Mathf.Abs( speedHalf - speedWhole ) < 0.01f, speedWhole + " -> " + speedHalf );
 		Check( "systemeffects: a damaged laser cannon does less damage, and a destroyed one does not fire", ( laserHits[ 0 ] > 0 ) && ( laserHits[ 1 ] == Mathf.RoundToInt( laserHits[ 0 ] / 2.0f ) ) && !firesDestroyed, laserHits[ 0 ] + " -> " + laserHits[ 1 ] + ", " + firesDestroyed );
-		Check( "systemeffects: destroyed comm equipment garbles no more: a fully trained officer still understands every word (COMM-OV ?SCRAMBLE reads only the officer's strength; the equipment check fails a damaged comm instead)", commWhole.Contains( speminComm.m_text ) && commDestroyed.Contains( speminComm.m_text ), commDestroyed );
+		Check( "systemeffects: destroyed comm equipment garbles no more: a fully trained officer still understands every word (COMM-OV ?SCRAMBLE reads only the officer's strength; the equipment check stops a damaged comm instead)", commWhole.Contains( speminComm.m_text ) && commDestroyed.Contains( speminComm.m_text ), commDestroyed );
 		Check( "systemeffects: destroyed sensors malfunction and give no readings", sensorsWhole.Contains( "Star System Scan" ) && sensorsBroken.Contains( "Sensors: MALFUNCTION" ) && !sensorsBroken.Contains( "Star System Scan" ), sensorsBroken );
 
 		Finish( "scenario=systemeffects shields=" + shieldsWhole + "/" + shieldsHalf + " speed=" + speedWhole + "/" + speedHalf + " laser=" + laserHits[ 0 ] + "/" + laserHits[ 1 ], 0 );
@@ -47849,7 +47849,6 @@ public class ClaudeProbe : MonoBehaviour
 		ship.RestoreSystems();
 
 		var officer = crew.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer );
-		var navigator = crew.GetPersonnelFile( PD_CrewAssignment.Role.Navigator );
 		var humanRaceId = -1;
 		var thrynnRaceId = -1;
 
@@ -47876,6 +47875,17 @@ public class ClaudeProbe : MonoBehaviour
 				file.m_crewRaceId = humanRaceId;
 			}
 		}
+
+		// a navigator of their own, apart from the officer (the probe's crew can be one person in every post)
+		var navigator = playerData.m_personnel.CreateNewPersonnel();
+
+		navigator.m_name = "Probe Navigator";
+		navigator.m_crewRaceId = humanRaceId;
+		navigator.m_vitality = 100.0f;
+		navigator.m_navigation = 250;
+
+		playerData.m_personnel.m_personnelList.Add( navigator );
+		crew.Assign( PD_CrewAssignment.Role.Navigator, navigator.m_fileId );
 
 		var orbId = gameData.FindArtifactId( "Whining Orb" );
 
