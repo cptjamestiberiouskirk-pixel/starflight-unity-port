@@ -1702,6 +1702,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioJettison();
 				break;
 
+			case "lookland":
+				yield return ScenarioLookLand();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -46964,6 +46968,88 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "jettison: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=jettison checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: Look describes the land and the region's temperature (roadmap 8.30)
+
+	// one field of Look's report ("Terrain", "Temperature"), without its colours ("" if it is not there)
+	static string LookField( string report, string field )
+	{
+		var plain = System.Text.RegularExpressions.Regex.Replace( report, "<[^>]*>", "" );
+		var match = System.Text.RegularExpressions.Regex.Match( plain, field + @": ([^\n]*?)(  Gravity:|\n|$)" );
+
+		return match.Success ? match.Groups[ 1 ].Value.Trim() : "";
+	}
+
+	// Look's report with the terrain vehicle at this latitude (Look reads where the vehicle is from the saved coordinates)
+	static string LookAtLatitude( float northSouth )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+
+		playerData.m_general.m_lastDisembarkedCoordinates = Tools.LatLongToWorldCoordinates( 0.0f, northSouth );
+
+		SpaceflightController.m_instance.m_messages.Clear();
+
+		new LookButton().Execute();
+
+		return string.Join( "\n", playerData.m_general.m_messageList );
+	}
+
+	IEnumerator ScenarioLookLand()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var errorsBefore = s_errorCount;
+		var done = new bool[ 1 ];
+
+		// the region temperatures of the original, coldest first (the REGIONS file)
+		var regionWords = new[] { "Subfreezing", "Arctic", "Temperate", "Tropical", "Searing", "Furnace" };
+
+		EnsureCrew();
+
+		// ---- 1. planet 94 of Arth: rock under an atmosphere, searing to inferno
+		yield return LandOnPlanet94At( Tools.LatLongToWorldCoordinates( 4.3f, -16.0f ), done );
+
+		if ( !done[ 0 ] )
+		{
+			Finish( "scenario=lookland abort: no landing on planet 94 (" + playerData.m_general.m_location + ")", 2 );
+			yield break;
+		}
+
+		var planet94 = gameData.m_planetList[ 94 ];
+		var nearThePole = LookAtLatitude( 85.0f );
+
+		yield return Frames( 2 );
+
+		var atTheEquator = LookAtLatitude( 0.0f );
+
+		yield return Frames( 2 );
+
+		var again = LookAtLatitude( 0.0f );
+
+		var terrain94 = LookField( atTheEquator, "Terrain" );
+		var terrain94Again = LookField( again, "Terrain" );
+		var temperaturePole = LookField( nearThePole, "Temperature" );
+		var temperatureEquator = LookField( atTheEquator, "Temperature" );
+		var coldest94 = regionWords[ Mathf.Clamp( planet94.m_temperatureIdA, 0, 5 ) ];
+		var hottest94 = regionWords[ Mathf.Clamp( planet94.m_temperatureIdB, 0, 5 ) ];
+
+		// ---- 2. planet 92 of Arth: frozen
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+
+		var terrain92 = done[ 0 ] ? LookField( LookAtLatitude( 0.0f ), "Terrain" ) : "(no landing)";
+
+		Log( "lookland: planet 94 (surface " + planet94.m_surfaceId + ", atmosphere " + planet94.m_atmosphereIdA + ", temperatures " + planet94.m_temperatureIdA + " to " + planet94.m_temperatureIdB + "): terrain '" + terrain94 + "', again '" + terrain94Again + "', temperature near the pole '" + temperaturePole + "', at the equator '" + temperatureEquator + "' | planet 92: terrain '" + terrain92 + "'" );
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "lookland: the land of a rocky planet with an atmosphere in the original's words (a colour, then rock and dirt or a sand)", System.Text.RegularExpressions.Regex.IsMatch( terrain94, "^(Grey|Yellowish|Reddish|Brownish|Black) (rock and dirt|rocky sand|pebbly sand|coarse sand|powdery sand)$" ), terrain94 );
+		Check( "lookland: a frozen planet: cracked plains and hills of coloured snow and ice", System.Text.RegularExpressions.Regex.IsMatch( terrain92, "^Cracked plains and hills of (white|blue tinted|green tinted|red tinted|yellow tinted) snow and ice$" ), terrain92 );
+		Check( "lookland: a planet's land reads the same every time", ( terrain94 != "" ) && ( terrain94 == terrain94Again ), terrain94 + " | " + terrain94Again );
+		Check( "lookland: the temperature is the region's: the planet's coldest near a pole, its hottest at the equator", ( temperaturePole == coldest94 ) && ( temperatureEquator == hottest94 ), temperaturePole + " / " + temperatureEquator + " (expected " + coldest94 + " / " + hottest94 + ")" );
+		Check( "lookland: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=lookland checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
