@@ -36,6 +36,18 @@ public class TerrainRuin : MonoBehaviour
 		return planetId * 100 + ruinIndex * 10 + itemIndex;
 	}
 
+	// the planet of an item's key
+	public static int GetRandomItemPlanetId( int itemKey )
+	{
+		return itemKey / 100;
+	}
+
+	// the ruin of an item's key (its place among the planet's ruins)
+	public static int GetRandomItemRuinIndex( int itemKey )
+	{
+		return ( itemKey / 10 ) % 10;
+	}
+
 	// how close the terrain vehicle has to be to record what is in the ruin (a ruin is larger than a deposit)
 	const float c_reachDistance = 20.0f;
 

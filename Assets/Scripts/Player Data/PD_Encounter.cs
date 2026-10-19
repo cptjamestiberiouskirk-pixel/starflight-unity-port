@@ -38,9 +38,15 @@ public class PD_Encounter : IComparable
 	public int m_numCorrectAnswers;
 	public bool m_mechan9NoHumansWarningDone;
 
-	// combat timer for alien attacks
-	public float m_combatTimer;
 	public bool m_inCombat;
+
+	// the turns of the encounter, as the original's (COMBAT-OV COMBAT): whose turn the last pass was (0 the player's ship, then each alien ship's slot plus one, ^VES),
+	// the aliens' fire latch (WDE55: on once an alien has fired, and off again whenever their posture is neutral or calmer), the seconds since an alien last fired
+	// (WE03D), and whether the comm link has been terminated since the last hail (TERMINA) - 0 and false in older save files
+	public int m_combatTurn;
+	public bool m_aliensOpenedFire;
+	public float m_secondsSinceAlienFire;
+	public bool m_commTerminated;
 
 	// set when the player fires on the aliens - they stay hostile until the player leaves the encounter (false in older save files)
 	public bool m_attackedByPlayer;

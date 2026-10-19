@@ -15,17 +15,11 @@ public class Encounter : MonoBehaviour
 	// how long the "permission to orbit granted" message stays up before the ship is back in orbit (in seconds)
 	const float c_returnToOrbitDelay = 3.0f;
 
-	// the speed the alien ships move at this frame (GetAlienShipSpeed)
-	float m_alienShipSpeedNow;
-
 	// the rate the alien ships turn at
 	public float m_alienShipTurnRate;
 
 	// the camera dolly speed
 	public float m_cameraDollySpeed;
-
-	// how often to update the target coordinates
-	public float m_targetCoordinateUpdateFrequency;
 
 	// the main encounter map
 	public GameObject m_main;
@@ -386,55 +380,21 @@ public class Encounter : MonoBehaviour
 		// a few of a race's ships may call for help, and more of them warp in
 		UpdateDistressCall();
 
-		// the player ship's turns, on which its shields regain their charge
-		UpdateShieldTurns();
+		// the turns of the encounter: the player ship's, on which its shields regain their charge, and the alien ships', on which they fire or move
+		UpdateCombatTurns();
 
 		// do we want to update the ships (both alien and player)?
 		if ( !m_pdEncounter.m_connected )
 		{
-			m_alienShipSpeedNow = GetAlienShipSpeed();
-
-			// update the position and rotation of the active alien ship models
-			for ( var alienShipIndex = 0; alienShipIndex < m_alienShipModelList.Length; alienShipIndex++ )
-			{
-				var alienShipModel = m_alienShipModelList[ alienShipIndex ];
-
-				if ( alienShipModel.activeInHierarchy )
-				{
-					var alienShip = m_alienShipList[ alienShipIndex ];
-
-					// skip this model if there is no alien ship in its slot (this should never happen)
-					if ( alienShip == null )
-					{
-						continue;
-					}
-
-					// destroyed ships don't fly any more (the wreckage stays where the ship was destroyed)
-					if ( alienShip.m_isDead )
-					{
-						continue;
-					}
-
-					var vessel = gameData.m_vesselList[ alienShip.m_vesselId ];
-
-					switch ( vessel.m_race )
-					{
-						case GameData.Race.Mechan:
-							UpdateMechanAlienShip( alienShip, alienShipModel );
-							break;
-
-						default:
-							DefaultAlienShipUpdate( alienShip, alienShipModel );
-							break;
-					}
-				}
-			}
+			// the alien ships go on toward the cells their turns have given them
+			MoveAlienShipsToTheirCells();
 
 			// finalize alien ships and camera transform
 			FinalizeAlienShips();
 
-			// has the player left the encounter?
-			if ( playerData.m_general.m_coordinates.magnitude >= 4096.0f )
+			// has the player left the encounter? once every ship that has come into it, alive or a wreck, is more than 22 cells away across or along, unless the player
+			// is in combat (HYPER-OV ?UNNEST: no other icon within ENCRADIUS; COMBAT-OV 'UNNEST while ?COMBAT is off)
+			if ( AllShipsAreOutOfReach() && !PlayerIsInCombat() )
 			{
 				// yes - go back to where the encounter began
 				LeaveEncounter();
@@ -770,8 +730,9 @@ public class Encounter : MonoBehaviour
 		// the aliens' shields and weapons are taken as they are when the encounter shows, without a word (the original's IAPWR sets them without one)
 		m_shieldsAndWeaponsKnown = false;
 
-		// the player ship's first turn is a whole turn away
-		m_shieldTurnTimer = 0.0f;
+		// the first turn is a whole pass away, and the aliens' fire may come only after the race's update has let it
+		m_combatPassTimer = 0.0f;
+		m_alienFireFrame = -1;
 
 		// and so are the player's, for the aliens' mood
 		m_playerShieldsSeen = false;
@@ -870,6 +831,14 @@ public class Encounter : MonoBehaviour
 			{
 				alienShip.m_addedToEncounter = false;
 			}
+
+			// and the turns start afresh: the player's ship first, the aliens' fire latch off, the time since they fired from now, and the comm link not ended
+			// (HYPER-OV ENCSETUP: CLEAR-CO and WE055; COMM-OV clears TERMINA with the new encounter's comm, and sets it for a race with no language, which the
+			// combat rules read from RaceTalks)
+			m_pdEncounter.m_combatTurn = 0;
+			m_pdEncounter.m_aliensOpenedFire = false;
+			m_pdEncounter.m_secondsSinceAlienFire = 0.0f;
+			m_pdEncounter.m_commTerminated = false;
 
 			// an encounter in orbit has no place of its own in the star system - it is at its planet, and that is the side its ships come from
 			if ( m_pdEncounter.GetLocation() == PD_General.Location.InOrbit )
@@ -1163,9 +1132,6 @@ public class Encounter : MonoBehaviour
 					continue;
 				}
 
-				// generate a random position inside of a unit circle
-				var randomPosition = Random.insideUnitCircle;
-
 				Vector3 coordinates;
 
 				if ( m_justEntered )
@@ -1182,25 +1148,41 @@ public class Encounter : MonoBehaviour
 						directionOfApproach = Vector3.forward;
 					}
 
-					// put alien ship in area approximately in the correct direction of approach
-					coordinates = new Vector3( randomPosition.x, 0.0f, randomPosition.y ) * 256.0f + directionOfApproach * 4096.0f;
+					// the aliens arrive about 21 cells ahead, from the way they came, 3 cells either way across and along (HYPERMSG-OV WE616: RRND -3 to 4 cells
+					// round the encounter's centre, the ship entering 21 cells back), and no farther than 21 cells across or along, so that the encounter does not
+					// end as it begins
+					var spread = new Vector3( Random.Range( -c_arrivalSpreadCells, c_arrivalSpreadCells + 1 ), 0.0f, Random.Range( -c_arrivalSpreadCells, c_arrivalSpreadCells + 1 ) );
+					var offset = directionOfApproach * c_arrivalCells + spread;
+
+					offset.x = Mathf.Clamp( offset.x, -c_arrivalCells, c_arrivalCells );
+					offset.z = Mathf.Clamp( offset.z, -c_arrivalCells, c_arrivalCells );
+
+					coordinates = playerData.m_general.m_coordinates + offset * CombatController.c_unitsPerCell;
 				}
 				else
 				{
-					// put alien ship in a random position on a circle around the player
-					coordinates = Vector3.Normalize( new Vector3( randomPosition.x, 0.0f, randomPosition.y ) ) * 4096.0f;
+					// ships that come later arrive on the square 15 cells round the player's ship (HYPERMSG-OV WE616)
+					var side = Random.Range( -c_waveCells, c_waveCells + 1 );
+					var edge = ( Random.Range( 0, 2 ) == 0 ) ? -c_waveCells : c_waveCells;
+					var offset = ( Random.Range( 0, 2 ) == 0 ) ? new Vector3( side, 0.0f, edge ) : new Vector3( edge, 0.0f, side );
+
+					coordinates = playerData.m_general.m_coordinates + offset * CombatController.c_unitsPerCell;
 				}
 
-				// make alien ship face the center of the encounter space
-				var direction = -Vector3.Normalize( coordinates );
+				// make alien ship face the player's ship
+				var direction = Vector3.Normalize( playerData.m_general.m_coordinates - coordinates );
+
+				if ( direction == Vector3.zero )
+				{
+					direction = Vector3.forward;
+				}
 
 				// update the alien ship
 				alienShip.m_coordinates = coordinates;
-				alienShip.m_targetCoordinates = Vector3.zero;
+				alienShip.m_targetCoordinates = coordinates;
 				alienShip.m_currentDirection = direction;
 				alienShip.m_lastDirection = direction;
 				alienShip.m_currentBankingAngle = 0.0f;
-				alienShip.m_timeSinceLastTargetCoordinateChange = (float) alienShipIndex / (float) m_gdEncounter.m_maxNumShipsAtOnce * m_targetCoordinateUpdateFrequency;
 				alienShip.m_addedToEncounter = true;
 
 				// we are done adding an alien ship to this slot
@@ -2536,174 +2518,519 @@ public class Encounter : MonoBehaviour
 		return aliensSaidSomething;
 	}
 
-	// update alien combat behavior
+	// ---------------------------------------------------------------- the turns of an encounter, as the original's (COMBAT-OV COMBAT and <COMBAT>)
+
+	// sizes in cells of the original's combat map (CombatController.c_unitsPerCell): an encounter ends once every ship is more than 22 cells away across or along
+	// (HYPER-OV ?UNNEST, ENCRADIUS), the aliens arrive about 21 cells ahead, 3 cells either way, and later ships 15 cells round the player's (HYPERMSG-OV WE616),
+	// hostile aliens close to within 11 cells across and along, and those with lasers only to within 3 (COMBAT-OV WE0A1 and WDF96), and a laser fires within 5
+	// (WE0AB, IsWithinWeaponsReach)
+	const int c_encounterRadiusCells = 22;
+	const int c_arrivalCells = 21;
+	const int c_arrivalSpreadCells = 3;
+	const int c_waveCells = 15;
+	const int c_approachFromCells = 11;
+	const int c_laserCloseCells = 3;
+
+	// an alien ship moves away once no alien has fired for 2 minutes (COMBAT-OV WE043: 120000 ms since WE03D)
+	const float c_idleSeconds = 120.0f;
+
+	// the postures of the original's combat rules (COMM-OV A-POSTU)
+	const int c_postureObsequious = 1;
+	const int c_postureFriendly = 2;
+	const int c_postureNeutral = 4;
+	const int c_postureHostile = 8;
+	const int c_postureFight = 16;
+
+	// the number of the aliens' combat rules (the original's RULECNT of <COMBAT>)
+	public const int c_combatRuleCount = 11;
+
+	// the frame in which the race's update has let the aliens fire (UpdateAlienCombat: the one way to alien fire), and the time to the next pass of the main loop
+	int m_alienFireFrame = -1;
+	float m_combatPassTimer;
+
+	// the conditions of the rules, each worked out at most once in a turn (the original's rule engine marks them unknown at the start of every turn, DISTRACT):
+	// 0 not yet, 1 true, 2 false
+	enum CombatCondition
+	{
+		FireLatch,
+		MissileArmed,
+		MissileRoll,
+		LaserArmed,
+		LaserRoll,
+		WithinWeaponsReach,
+		Hostile,
+		Fight,
+		Obsequious,
+		TwoInNinetyNine,
+		SixtyNineInNinetyNine,
+		CommTerminated,
+		RaceTalks,
+		Idle,
+		CanMove,
+		FartherThanApproach,
+		WithinLaserClose,
+		Count
+	}
+
+	readonly int[] m_conditions = new int[ (int) CombatCondition.Count ];
+	int m_turnPosture;
+
+	// every race's update ends here: the aliens may fire in this frame, on their turns (UpdateCombatTurns) - and they hold their fire for as long as the comm link
+	// is up, as their turns stop then (every alien fire rule in the original design notes needs "?IN-COMM FALSE")
 	void UpdateAlienCombat()
 	{
-		// the aliens hold their fire for as long as the comm link is up (every alien fire rule in the original design notes needs "?IN-COMM FALSE")
-		// this is the one place all alien fire comes through, so it covers every race - the time to their next shot does not run down while they talk
-		if ( m_pdEncounter.m_connected )
+		m_alienFireFrame = Time.frameCount;
+	}
+
+	// the turns, once a pass of the original's main loop (c_passSeconds): each pass is one icon's turn, the player's ship's or an alien ship's, round the icons of
+	// the encounter (COMBAT-OV COMBAT, ^VES round ILOCAL: wrecks included)
+	void UpdateCombatTurns()
+	{
+		m_combatPassTimer += Time.deltaTime;
+
+		for ( var pass = 0; ( pass < 8 ) && ( m_combatPassTimer >= c_passSeconds ); pass++ )
+		{
+			m_combatPassTimer -= c_passSeconds;
+
+			CombatPass();
+		}
+
+		// (a long frame does not save up passes)
+		m_combatPassTimer = Mathf.Min( m_combatPassTimer, c_passSeconds );
+
+		// the time since an alien last fired (the original's TIME against WE03D)
+		m_pdEncounter.m_secondsSinceAlienFire += Time.deltaTime;
+	}
+
+	// one pass: the next icon's turn - the player's ship gains its shield turn (WEF20), an alien ship goes through its combat rules, a wreck does nothing; the
+	// aliens take no turns while the comm link is up
+	void CombatPass()
+	{
+		var alienShipList = m_pdEncounter.GetAlienShipList();
+		var icons = alienShipList.Length + 1;
+
+		for ( var step = 0; step < icons; step++ )
+		{
+			m_pdEncounter.m_combatTurn = ( Mathf.Max( 0, m_pdEncounter.m_combatTurn ) + 1 ) % icons;
+
+			if ( m_pdEncounter.m_combatTurn == 0 )
+			{
+				DataController.m_instance.m_playerData.m_playerShip.GainShieldTurn();
+
+				return;
+			}
+
+			var alienShip = alienShipList[ m_pdEncounter.m_combatTurn - 1 ];
+
+			if ( !alienShip.m_addedToEncounter )
+			{
+				continue;
+			}
+
+			if ( !alienShip.m_isDead && !m_pdEncounter.m_connected )
+			{
+				AlienShipTurn( alienShip );
+			}
+
+			return;
+		}
+	}
+
+	// the icons that take turns: the player's ship and every alien ship that has come into the encounter, a wreck as well (ILOCAL)
+	int GetTurnIcons()
+	{
+		var icons = 1;
+
+		if ( m_pdEncounter != null )
+		{
+			foreach ( var alienShip in m_pdEncounter.GetAlienShipList() )
+			{
+				if ( alienShip.m_addedToEncounter )
+				{
+					icons++;
+				}
+			}
+		}
+
+		return icons;
+	}
+
+	// how long a round of turns takes: an icon's turn comes every (icons) passes
+	float GetTurnSeconds()
+	{
+		return GetTurnIcons() * c_passSeconds;
+	}
+
+	// an alien ship's turn: the first of the combat rules that holds is carried out, and moves forward in their order (the original's rule engine swaps it with
+	// the rule halfway up, and keeps the order); with none, a ship that can move wanders (COMBAT-OV WEEF0, WEDCE)
+	void AlienShipTurn( PD_AlienShip alienShip )
+	{
+		for ( var condition = 0; condition < m_conditions.Length; condition++ )
+		{
+			m_conditions[ condition ] = 0;
+		}
+
+		m_turnPosture = GetCombatPosture();
+
+		var order = DataController.m_instance.m_playerData.m_general.GetCombatRuleOrder( c_combatRuleCount );
+
+		for ( var position = 0; position < order.Length; position++ )
+		{
+			var rule = order[ position ];
+
+			if ( !CombatRuleHolds( rule, alienShip ) )
+			{
+				continue;
+			}
+
+			CarryOutCombatRule( rule, alienShip );
+
+			order[ position ] = order[ position / 2 ];
+			order[ position / 2 ] = rule;
+
+			return;
+		}
+
+		if ( Holds( CombatCondition.CanMove, alienShip ) )
+		{
+			StepAlienShip( alienShip, WanderStep() );
+		}
+	}
+
+	// the eleven combat rules, by their numbers in the original's shipped order (COMBAT-OV <COMBAT>): 1 to 3 launch a missile, 4 to 6 fire the laser, 7 to 9 move
+	// away, 10 and 11 close in
+	bool CombatRuleHolds( int rule, PD_AlienShip alienShip )
+	{
+		switch ( rule )
+		{
+			// once they have opened fire, a missile by the vessel's fire delay, while fewer than 10 are in the air
+			case 1: return Holds( CombatCondition.FireLatch, alienShip ) && Holds( CombatCondition.MissileArmed, alienShip ) && Holds( CombatCondition.MissileRoll, alienShip );
+
+			// before that, a hostile alien opens fire with a missile with a chance of 2 in 99, and one that fights at once
+			case 2: return !Holds( CombatCondition.FireLatch, alienShip ) && Holds( CombatCondition.TwoInNinetyNine, alienShip ) && Holds( CombatCondition.Hostile, alienShip ) && Holds( CombatCondition.MissileArmed, alienShip );
+			case 3: return !Holds( CombatCondition.FireLatch, alienShip ) && Holds( CombatCondition.Fight, alienShip ) && Holds( CombatCondition.MissileArmed, alienShip );
+
+			// once they have opened fire, the laser by the vessel's fire delay, within 5 cells
+			case 4: return Holds( CombatCondition.FireLatch, alienShip ) && Holds( CombatCondition.LaserArmed, alienShip ) && Holds( CombatCondition.LaserRoll, alienShip ) && Holds( CombatCondition.WithinWeaponsReach, alienShip );
+
+			// before that, a hostile alien with no missile opens fire with its laser with a chance of 2 in 99, and one that fights at once, within 5 cells
+			case 5: return !Holds( CombatCondition.FireLatch, alienShip ) && Holds( CombatCondition.TwoInNinetyNine, alienShip ) && Holds( CombatCondition.Hostile, alienShip ) && !Holds( CombatCondition.MissileArmed, alienShip ) && Holds( CombatCondition.LaserArmed, alienShip ) && Holds( CombatCondition.WithinWeaponsReach, alienShip );
+			case 6: return !Holds( CombatCondition.FireLatch, alienShip ) && Holds( CombatCondition.Fight, alienShip ) && !Holds( CombatCondition.MissileArmed, alienShip ) && Holds( CombatCondition.LaserArmed, alienShip ) && Holds( CombatCondition.WithinWeaponsReach, alienShip );
+
+			// once the comm link is over, aliens that are neither hostile nor grovelling move away 69 times in 99
+			case 7: return Holds( CombatCondition.CommTerminated, alienShip ) && !Holds( CombatCondition.Hostile, alienShip ) && !Holds( CombatCondition.Obsequious, alienShip ) && Holds( CombatCondition.SixtyNineInNinetyNine, alienShip ) && Holds( CombatCondition.CanMove, alienShip );
+
+			// grovelling aliens of a race that does not talk flee
+			case 8: return Holds( CombatCondition.Obsequious, alienShip ) && !Holds( CombatCondition.RaceTalks, alienShip ) && Holds( CombatCondition.CanMove, alienShip );
+
+			// with no alien shot for 2 minutes, they move away
+			case 9: return Holds( CombatCondition.Idle, alienShip ) && Holds( CombatCondition.CanMove, alienShip );
+
+			// hostile aliens close in to within 11 cells, and those with a laser and no missile to within 3
+			case 10: return Holds( CombatCondition.CanMove, alienShip ) && Holds( CombatCondition.Hostile, alienShip ) && Holds( CombatCondition.FartherThanApproach, alienShip );
+			case 11: return Holds( CombatCondition.CanMove, alienShip ) && Holds( CombatCondition.Hostile, alienShip ) && !Holds( CombatCondition.WithinLaserClose, alienShip ) && Holds( CombatCondition.LaserArmed, alienShip ) && !Holds( CombatCondition.MissileArmed, alienShip );
+
+			default: return false;
+		}
+	}
+
+	// carries out a rule that holds: a missile (WEC95), the laser (WECEA), a step away (WED72) or a step closer (WED86)
+	void CarryOutCombatRule( int rule, PD_AlienShip alienShip )
+	{
+		var vessel = DataController.m_instance.m_gameData.m_vesselList[ alienShip.m_vesselId ];
+
+		switch ( rule )
+		{
+			case 1:
+			case 2:
+			case 3:
+				CombatController.m_instance.AlienLaunchesMissile( alienShip, vessel );
+				AlienShipFired( alienShip );
+				break;
+
+			case 4:
+			case 5:
+			case 6:
+				CombatController.m_instance.AlienFiresLaser( alienShip, vessel );
+				AlienShipFired( alienShip );
+				break;
+
+			case 7:
+			case 8:
+			case 9:
+				StepAlienShip( alienShip, AwayStep( alienShip ) );
+				break;
+
+			case 10:
+			case 11:
+				StepAlienShip( alienShip, TowardStep( alienShip ) );
+				break;
+		}
+	}
+
+	// an alien ship has fired: the aliens' fire latch is on, the time since an alien fired starts again, and the ship turns to face the player's (WE055, WE9DF)
+	void AlienShipFired( PD_AlienShip alienShip )
+	{
+		m_pdEncounter.m_aliensOpenedFire = true;
+		m_pdEncounter.m_secondsSinceAlienFire = 0.0f;
+
+		var toPlayer = DataController.m_instance.m_playerData.m_general.m_coordinates - alienShip.m_coordinates;
+
+		toPlayer.y = 0.0f;
+
+		if ( toPlayer.sqrMagnitude > 1.0f )
+		{
+			alienShip.m_currentDirection = toPlayer.normalized;
+		}
+	}
+
+	// whether a condition holds for this turn, worked out the first time a rule asks
+	bool Holds( CombatCondition condition, PD_AlienShip alienShip )
+	{
+		if ( m_conditions[ (int) condition ] == 0 )
+		{
+			m_conditions[ (int) condition ] = WorkOutCondition( condition, alienShip ) ? 1 : 2;
+		}
+
+		return m_conditions[ (int) condition ] == 1;
+	}
+
+	// the conditions of the combat rules (COMBAT-OV)
+	bool WorkOutCondition( CombatCondition condition, PD_AlienShip alienShip )
+	{
+		var vessel = DataController.m_instance.m_gameData.m_vesselList[ alienShip.m_vesselId ];
+		var offset = DataController.m_instance.m_playerData.m_general.m_coordinates - alienShip.m_coordinates;
+		var cellsAcross = Mathf.Abs( offset.x ) / CombatController.c_unitsPerCell;
+		var cellsAlong = Mathf.Abs( offset.z ) / CombatController.c_unitsPerCell;
+
+		switch ( condition )
+		{
+			// the aliens' fire latch, on once one of them has fired and off whenever their posture is neutral or calmer (WDF72: read and stored again)
+			case CombatCondition.FireLatch:
+				m_pdEncounter.m_aliensOpenedFire = m_pdEncounter.m_aliensOpenedFire && ( m_turnPosture > c_postureNeutral );
+				return m_pdEncounter.m_aliensOpenedFire;
+
+			// armed, and the vessel has a missile launcher or plasma bolts (WDFC0); armed with a laser (WDFA4) - the aliens are armed while they are hostile or
+			// fight (?A-WEAP), and fire only in a frame the race's update has let them
+			case CombatCondition.MissileArmed:
+				return AlienFireIsAllowed() && AliensAreArmed() && ( ( vessel.m_missileClass > 0 ) || vessel.m_hasPlasmaBolts );
+
+			case CombatCondition.LaserArmed:
+				return AlienFireIsAllowed() && AliensAreArmed() && ( vessel.m_laserClass > 0 );
+
+			// the missile's roll, 6 times the vessel's fire delay under RRND 1 to 100, while fewer than 10 of the aliens' missiles are in the air (WDFD2), and the
+			// laser's, 8 times it (WDFF4)
+			case CombatCondition.MissileRoll:
+				return ( vessel.m_fireDelay != 0 ) && ( 6 * vessel.m_fireDelay < Random.Range( 1, 100 ) ) && ( CombatController.m_instance.GetAlienMissilesInFlight() < 10 );
+
+			case CombatCondition.LaserRoll:
+				return ( vessel.m_fireDelay != 0 ) && ( 8 * vessel.m_fireDelay < Random.Range( 1, 100 ) );
+
+			// within 5 cells across and along (WE0AB)
+			case CombatCondition.WithinWeaponsReach:
+				return IsWithinWeaponsReach( alienShip.m_coordinates, DataController.m_instance.m_playerData.m_general.m_coordinates );
+
+			// the posture (WE12D, WE139, WE121)
+			case CombatCondition.Hostile:
+				return m_turnPosture == c_postureHostile;
+
+			case CombatCondition.Fight:
+				return m_turnPosture == c_postureFight;
+
+			case CombatCondition.Obsequious:
+				return m_turnPosture == c_postureObsequious;
+
+			// the rolls: RRND 1 to 100 under 3 (WDF8C) and under 70 (WE019)
+			case CombatCondition.TwoInNinetyNine:
+				return Random.Range( 1, 100 ) < 3;
+
+			case CombatCondition.SixtyNineInNinetyNine:
+				return Random.Range( 1, 100 ) < 70;
+
+			// the comm link has been terminated since the last hail, or the race has no language (WE00F: TERMINA, set at the start for such a race)
+			case CombatCondition.CommTerminated:
+				return m_pdEncounter.m_commTerminated || !RaceTalks();
+
+			// the race talks (WE025: its originator's T%)
+			case CombatCondition.RaceTalks:
+				return RaceTalks();
+
+			// no alien has fired for 2 minutes (WE043)
+			case CombatCondition.Idle:
+				return m_pdEncounter.m_secondsSinceAlienFire > c_idleSeconds;
+
+			// the vessel moves at all (WE06B: vessel byte 6)
+			case CombatCondition.CanMove:
+				return vessel.GetSpeedFactor() > 0.0f;
+
+			// 11 cells or more away across or along (WE0A1), and within 3 cells as the crow flies, in whole cells (WDF96: SQRT of the squares)
+			case CombatCondition.FartherThanApproach:
+				return ( cellsAcross >= c_approachFromCells ) || ( cellsAlong >= c_approachFromCells );
+
+			case CombatCondition.WithinLaserClose:
+				var across = Mathf.RoundToInt( cellsAcross );
+				var along = Mathf.RoundToInt( cellsAlong );
+				return Mathf.FloorToInt( Mathf.Sqrt( across * across + along * along ) ) < c_laserCloseCells;
+
+			default:
+				return false;
+		}
+	}
+
+	// true in a frame in which the race's update has let the aliens fire, while the comm link is down
+	bool AlienFireIsAllowed()
+	{
+		return ( m_alienFireFrame == Time.frameCount ) && !m_pdEncounter.m_connected && ( CombatController.m_instance != null ) && !CombatController.m_instance.PlayerIsDestroyed();
+	}
+
+	// the aliens' posture as the original's combat rules read it (A-POSTU): 16 while they fight (their stance is hostile), else the posture of their lines -
+	// 8 hostile, 4 neutral, 2 friendly, 1 obsequious
+	public int GetCombatPosture()
+	{
+		if ( m_pdEncounter.m_alienStance == GD_Comm.Stance.Hostile )
+		{
+			return c_postureFight;
+		}
+
+		switch ( GetAlienTalkStance() )
+		{
+			case GD_Comm.Stance.Hostile: return c_postureHostile;
+			case GD_Comm.Stance.Friendly: return c_postureFriendly;
+			case GD_Comm.Stance.Obsequious: return c_postureObsequious;
+			default: return c_postureNeutral;
+		}
+	}
+
+	// true if the race of the encounter has lines to say (the Uhlek have none)
+	bool RaceTalks()
+	{
+		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
+		{
+			if ( comm.m_race == m_gdEncounter.m_race )
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	// a step of a cell toward the player's ship on each axis it is a half cell or more away on (WED86: the signs; none on the player's own cell)
+	Vector3 TowardStep( PD_AlienShip alienShip )
+	{
+		var offset = DataController.m_instance.m_playerData.m_general.m_coordinates - alienShip.m_coordinates;
+
+		return new Vector3( StepSign( offset.x ), 0.0f, StepSign( offset.z ) );
+	}
+
+	// a step of a cell away from the player's ship, and a random one on its cell (WED72)
+	Vector3 AwayStep( PD_AlienShip alienShip )
+	{
+		var away = -TowardStep( alienShip );
+
+		if ( away == Vector3.zero )
+		{
+			away = new Vector3( ( Random.Range( 0, 2 ) == 0 ) ? -1.0f : 1.0f, 0.0f, ( Random.Range( 0, 2 ) == 0 ) ? -1.0f : 1.0f );
+		}
+
+		return away;
+	}
+
+	// a step of a wandering ship, never still (WEDCE): across 0 half the time and -1 or 1 a quarter each; along -1 or 1 when across is 0, else as across
+	static Vector3 WanderStep()
+	{
+		var across = WanderAxis();
+		var along = ( across == 0 ) ? ( ( Random.Range( 0, 2 ) == 0 ) ? -1 : 1 ) : WanderAxis();
+
+		return new Vector3( across, 0.0f, along );
+	}
+
+	static int WanderAxis()
+	{
+		var roll = Random.Range( 0, 4 );
+
+		return ( roll < 2 ) ? 0 : ( ( roll == 2 ) ? -1 : 1 );
+	}
+
+	// -1, 0 or 1 by the sign of a distance, 0 within half a cell
+	static float StepSign( float distance )
+	{
+		return ( distance > CombatController.c_unitsPerCell * 0.5f ) ? 1.0f : ( ( distance < -CombatController.c_unitsPerCell * 0.5f ) ? -1.0f : 0.0f );
+	}
+
+	// gives an alien ship its step for this turn: the cell it moves to over the turn, and the way it faces
+	void StepAlienShip( PD_AlienShip alienShip, Vector3 step )
+	{
+		if ( step == Vector3.zero )
 		{
 			return;
 		}
 
-		// only attack if hostile stance
-		if ( m_pdEncounter.m_alienStance != GD_Comm.Stance.Hostile )
+		alienShip.m_targetCoordinates = alienShip.m_coordinates + step * CombatController.c_unitsPerCell;
+		alienShip.m_currentDirection = step.normalized;
+	}
+
+	// the alien ships go on toward the cells their turns gave them, each there by its next turn: a turn moves a ship a cell across, a cell along or both at once
+	// (a diagonal step is a cell each way, as the original's), so a ship goes as far across or along as a cell in a round of turns
+	void MoveAlienShipsToTheirCells()
+	{
+		var cellSpeed = CombatController.c_unitsPerCell / GetTurnSeconds() * Time.deltaTime;
+
+		foreach ( var alienShip in m_pdEncounter.GetAlienShipList() )
 		{
-			// DEBUG: Log stance periodically
-			if ( Time.frameCount % 300 == 0 )
+			if ( !alienShip.m_addedToEncounter || alienShip.m_isDead )
 			{
-				Debug.Log( $"UpdateAlienCombat: Aliens not hostile (stance={m_pdEncounter.m_alienStance}, m_pdEncounter hashcode={m_pdEncounter.GetHashCode()})" );
-			}
-			return;
-		}
-
-		// Log first time we detect hostile stance
-		if ( Time.frameCount % 60 == 0 )
-		{
-			Debug.Log( $"UpdateAlienCombat: ALIENS ARE HOSTILE! (m_pdEncounter hashcode={m_pdEncounter.GetHashCode()})" );
-		}
-
-		// check if CombatController exists
-		if ( CombatController.m_instance == null )
-		{
-			Debug.LogWarning( "UpdateAlienCombat: CombatController.m_instance is null!" );
-			return;
-		}
-
-		// get game data
-		var gameData = DataController.m_instance.m_gameData;
-		var playerData = DataController.m_instance.m_playerData;
-
-		// update combat timer
-		m_pdEncounter.m_combatTimer -= Time.deltaTime;
-		
-		// DEBUG: Log combat state periodically
-		if ( Time.frameCount % 120 == 0 )
-		{
-			var alienShipList = m_pdEncounter.GetAlienShipList();
-			int aliveCount = 0;
-			float closestDistance = float.MaxValue;
-			foreach ( var ship in alienShipList )
-			{
-				if ( !ship.m_isDead && ship.m_addedToEncounter )
-				{
-					aliveCount++;
-					float dist = Vector3.Distance( ship.m_coordinates, playerData.m_general.m_coordinates );
-					if ( dist < closestDistance ) closestDistance = dist;
-				}
-			}
-			Debug.Log( $"UpdateAlienCombat: HOSTILE! Timer={m_pdEncounter.m_combatTimer:F2}, AliveShips={aliveCount}, ClosestDist={closestDistance:F0}" );
-		}
-
-		// time to attack?
-		if ( m_pdEncounter.m_combatTimer <= 0.0f )
-		{
-			Debug.Log( "UpdateAlienCombat: Timer expired, attempting to fire!" );
-			
-			// reset timer based on alien vessel fire delay
-			m_pdEncounter.m_combatTimer = Random.Range( 2.0f, 5.0f );
-
-			// pick a random alien ship to fire
-			var alienShipList = m_pdEncounter.GetAlienShipList();
-			var eligibleShips = new System.Collections.Generic.List<int>();
-
-			for ( int i = 0; i < alienShipList.Length; i++ )
-			{
-				var alienShip = alienShipList[ i ];
-
-				// skip dead or not in encounter
-				if ( alienShip.m_isDead || !alienShip.m_addedToEncounter )
-				{
-					continue;
-				}
-
-				// check range
-				if ( IsWithinWeaponsReach( alienShip.m_coordinates, playerData.m_general.m_coordinates ) )
-				{
-					eligibleShips.Add( i );
-				}
-				else
-				{
-					Debug.Log( $"UpdateAlienCombat: Ship {i} out of range" );
-				}
+				continue;
 			}
 
-			Debug.Log( $"UpdateAlienCombat: Found {eligibleShips.Count} eligible ships to fire" );
+			// the way to the cell, and the longer of its two sides (the whole way for a step across or along, a cell's side of the diagonal)
+			var toCell = alienShip.m_targetCoordinates - alienShip.m_coordinates;
+			var longerSide = Mathf.Max( Mathf.Abs( toCell.x ), Mathf.Abs( toCell.z ) );
+			var speed = ( longerSide > 0.001f ) ? cellSpeed * toCell.magnitude / longerSide : cellSpeed;
 
-			// fire from a random eligible ship
-			if ( eligibleShips.Count > 0 )
-			{
-				int attackerIndex = eligibleShips[ Random.Range( 0, eligibleShips.Count ) ];
-				var attackerShip = alienShipList[ attackerIndex ];
-				var vessel = gameData.m_vesselList[ attackerShip.m_vesselId ];
-
-				// adjust fire delay based on vessel
-				m_pdEncounter.m_combatTimer = vessel.m_fireDelay * 0.5f + Random.Range( 1.0f, 3.0f );
-
-				Debug.Log( $"UpdateAlienCombat: Ship {attackerIndex} ({vessel.m_name}) FIRING at player!" );
-
-				// fire at player
-				CombatController.m_instance.AlienFiresAtPlayer( attackerShip, vessel );
-			}
+			alienShip.m_coordinates = Vector3.MoveTowards( alienShip.m_coordinates, alienShip.m_targetCoordinates, speed );
 		}
 	}
 
-	// mechan ship movement
-	void UpdateMechanAlienShip( PD_AlienShip alienShip, GameObject alienShipModel )
+	// true once every ship that has come into the encounter, alive or a wreck, is more than 22 cells away from the player's across or along
+	bool AllShipsAreOutOfReach()
 	{
-		BuzzPlayer( alienShip, alienShipModel, 1.0f );
-	}
+		var playerCoordinates = DataController.m_instance.m_playerData.m_general.m_coordinates;
+		var reach = c_encounterRadiusCells * CombatController.c_unitsPerCell;
 
-	// default alien ship movement
-	void DefaultAlienShipUpdate( PD_AlienShip alienShip, GameObject alienShipModel )
-	{
-		BuzzPlayer( alienShip, alienShipModel, 1.0f );
-	}
-
-	// moves the alien ship towards the player
-	void BuzzPlayer( PD_AlienShip alienShip, GameObject alienShipModel, float alienShipSpeedMultiplier )
-	{
-		// get to the player data
-		var playerData = DataController.m_instance.m_playerData;
-
-		// move the alien ship towards the player
-		MoveAlienShip( alienShip, alienShipModel, alienShipSpeedMultiplier, playerData.m_general.m_coordinates );
-	}
-
-	// moves the alien ship towards the target coordinates
-	void MoveAlienShip( PD_AlienShip alienShip, GameObject alienShipModel, float alienShipSpeedMultiplier, Vector3 targetCoordinates )
-	{
-		// update time since we changed target coordinates for this alien ship
-		alienShip.m_timeSinceLastTargetCoordinateChange += Time.deltaTime;
-
-		// change target coordinates every so often
-		if ( alienShip.m_timeSinceLastTargetCoordinateChange >= m_targetCoordinateUpdateFrequency )
+		foreach ( var alienShip in m_pdEncounter.GetAlienShipList() )
 		{
-			var randomCoordinates = Random.insideUnitCircle;
+			if ( !alienShip.m_addedToEncounter )
+			{
+				continue;
+			}
 
-			alienShip.m_targetCoordinates = targetCoordinates + Vector3.Normalize( new Vector3( randomCoordinates.x, 0.0f, randomCoordinates.y ) ) * 256.0f;
+			var offset = alienShip.m_coordinates - playerCoordinates;
 
-			alienShip.m_timeSinceLastTargetCoordinateChange -= m_targetCoordinateUpdateFrequency;
+			if ( ( Mathf.Abs( offset.x ) <= reach ) && ( Mathf.Abs( offset.z ) <= reach ) )
+			{
+				return false;
+			}
 		}
 
-		// steer the alien ship towards the target coordinates
-		var desiredDirection = Vector3.Normalize( alienShip.m_targetCoordinates - alienShip.m_coordinates );
+		return true;
+	}
 
-		alienShip.m_currentDirection = Vector3.Slerp( alienShip.m_currentDirection, desiredDirection, Time.deltaTime * m_alienShipTurnRate );
+	// true while the player is in combat (the console's Combat menu is up: the original's ?COMBAT)
+	bool PlayerIsInCombat()
+	{
+		var buttonController = SpaceflightController.m_instance.m_buttonController;
 
-		// move the alien ship forward, at the speed of its vessel
-		var gameData = DataController.m_instance.m_gameData;
-		var speedFactor = ( ( alienShip.m_vesselId >= 0 ) && ( alienShip.m_vesselId < gameData.m_vesselList.Length ) ) ? gameData.m_vesselList[ alienShip.m_vesselId ].GetSpeedFactor() : 1.0f;
-
-		alienShip.m_coordinates += alienShip.m_currentDirection * Time.deltaTime * m_alienShipSpeedNow * alienShipSpeedMultiplier * speedFactor;
+		return ( buttonController != null ) && ( buttonController.GetCurrentButtonSet() == ButtonController.ButtonSet.Combat );
 	}
 
 	// the speed an alien ship moves at, as the original's (COMBAT-OV COMBAT, WEDCE): each pass of the original's main loop one icon of the encounter takes its
-	// turn (^VES, round the local icons: the player's ship and the aliens' ships), and an alien ship's turn moves it one cell (CombatController.c_unitsPerCell):
-	// a cell every (ships + 1) passes (c_passSeconds) - with one ship two cells a second (measured in the original at GOG's speed: a turn every 0.508 s)
+	// turn (^VES, round the local icons: the player's ship and the aliens' ships, wrecks included), and an alien ship's turn moves it one cell at most
+	// (CombatController.c_unitsPerCell): a cell every (icons) passes (c_passSeconds) - with one ship two cells a second (measured in the original at GOG's speed:
+	// a turn every 0.508 s)
 	public float GetAlienShipSpeed()
 	{
-		return CombatController.c_unitsPerCell / ( ( GetAlienShipsPresent() + 1 ) * c_passSeconds );
+		return CombatController.c_unitsPerCell / GetTurnSeconds();
 	}
 
 	// the living alien ships in the encounter (the original's #VESS)
@@ -3025,28 +3352,6 @@ public class Encounter : MonoBehaviour
 
 		// (a long frame does not save up passes)
 		m_distressPassTimer = Mathf.Min( m_distressPassTimer, c_passSeconds );
-	}
-
-	// the player ship's turns, as the original's (COMBAT-OV COMBAT, run once a pass of the main loop through 'EXTERNAL-EVENTS): each pass is one icon's turn, the
-	// alien ships' and the player ship's in turn (^VES round robin over ILOCAL), so the ship has a turn every (ships + 1) passes, as the aliens' moves do
-	// (GetAlienShipSpeed); on it the shields regain 20 points while below what the shielding can hold (WEF20, WEEC4), raised or lowered
-	float m_shieldTurnTimer;
-
-	void UpdateShieldTurns()
-	{
-		var passesPerTurn = GetAlienShipsPresent() + 1;
-
-		m_shieldTurnTimer += Time.deltaTime;
-
-		for ( var turn = 0; ( turn < 4 ) && ( m_shieldTurnTimer >= passesPerTurn * c_passSeconds ); turn++ )
-		{
-			m_shieldTurnTimer -= passesPerTurn * c_passSeconds;
-
-			DataController.m_instance.m_playerData.m_playerShip.GainShieldTurn();
-		}
-
-		// (a long frame does not save up turns)
-		m_shieldTurnTimer = Mathf.Min( m_shieldTurnTimer, passesPerTurn * c_passSeconds );
 	}
 
 	// one pass of the original's rolls: returns 1 when the aliens call for help, 2 when their ships warp in, 0 otherwise (public for the probe)
@@ -3923,6 +4228,12 @@ public class Encounter : MonoBehaviour
 		// and the hails: the player's reply to the aliens' hail has the posture's full effect and counts as a phrase, a hail of the player's before the aliens have
 		// hailed makes the player the hailer, whose postures each have their full effect once, and the aliens' second and third hail without a reply anger them by 4
 		// and by 9 (COMM-OV >RESPOND and RESPOND>EDL, HAILER and NEW-POSTURE>EDL, <TALK> and +4/9>EDL)
+		// a hail or an answer of the player's opens the comm link again (COMM-OV >HAIL and >RESPOND clear TERMINA)
+		if ( outgoing && ( ( subject == GD_Comm.Subject.GreetingResponse ) || ( subject == GD_Comm.Subject.GreetingHail ) ) )
+		{
+			m_pdEncounter.m_commTerminated = false;
+		}
+
 		if ( outgoing && ( subject == GD_Comm.Subject.GreetingResponse ) )
 		{
 			m_pdEncounter.m_playerPhrases++;
@@ -4342,6 +4653,9 @@ public class Encounter : MonoBehaviour
 		// we are not connected any more
 		m_pdEncounter.m_connected = false;
 		m_pdEncounter.m_disconnected = true;
+
+		// and the comm link has been terminated, which some of the aliens' combat rules read (COMM-OV TERMINATE: TERMINA)
+		m_pdEncounter.m_commTerminated = true;
 
 		// the end of every comm link, in the original's words (COMM-OV: "COMMUNICATIONS HAVE BEEN TERMINATED")
 		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Communications have been terminated.</color>" );

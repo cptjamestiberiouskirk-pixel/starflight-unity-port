@@ -239,7 +239,7 @@ Flying inside a star system uses no fuel.
 
 ### In hyperspace
 
-The coordinates at the top show where you are. Stars appear as you fly; fly into one to enter its system.
+The coordinates at the top show where you are. Stars appear as you fly; fly into one to enter its system. The map runs from 0 to 249 across and 0 to 219 up: at its edge the ship goes no further, and flying into the edge at a slant slides you along it.
 
 **The Starmap** (Navigation, **Starmap**, hyperspace only) pauses the game and shows the region around you. Move the cursor with the direction keys: the top line shows your position, the cursor's, the distance and **the fuel the trip needs**. Escape or Enter closes it.
 
@@ -307,9 +307,11 @@ The vehicle's status display shows its fuel, its efficiency, how full its hold i
 - **A lifeform**: **Record** its data, or **Ignore** it. To capture a living one into stasis, stun it first, then use Tools, **Capture** beside it (a dead lifeform can only be recorded).
 - **A mineral deposit**: names it and how much it holds. To take it, use Tools, **Mine**.
 
-**Mine** aims the mining laser at the nearest deposit within reach and cuts it into the hold a tenth of a cubic meter at a time, on the vehicle's fuel. A deposit holds between 1.0 and 9.9 cubic meters, and the largest takes about seven seconds. The laser stops when the deposit is gone, when the hold is full or the fuel runs out, or when you press Enter; what is left of a deposit stays for your next visit.
+**Mine** aims the mining laser at the nearest deposit within reach and cuts it into the hold a tenth of a cubic meter at a time, on the vehicle's fuel. A deposit holds between 1.0 and 9.9 cubic meters, and the largest takes about seven seconds. The laser stops when the deposit is gone, when the hold is full or the fuel runs out, or when you press Enter; what is left of a deposit stays as it is while the ship is in orbit.
 
 The vehicle's hold takes 50 cubic meters.
+
+What you take from a planet stays taken, and what you kill or capture stays gone, for as long as the ship stays in orbit. Once the ship leaves the orbit, the planet's minerals, lifeforms and ordinary artifacts are back as they were, and minerals or ordinary artifacts you dropped there are gone. A special artifact you drop stays where it lies.
 
 ### Getting back
 
@@ -330,7 +332,7 @@ Drive back to the ship and stop beside it, within half a kilometer, to go back i
 
 Alien ships move around the galaxy, and the radar shows them coming. When they close in, the ship drops into an **encounter**: you, them and the space around you. Some groups guard planets instead, and meet you when you go into orbit there.
 
-To leave an encounter, fly out of its area. Once you are clear, a minute passes before anyone else can stop you.
+Aliens act by their attitude. Hostile ones close in and may open fire; friendly and neutral ones go their way once you have talked or they have nothing more to say; grovelling ones flee. The encounter is over when every ship, wrecks included, is far enough from you: fly away from them, or wait for them to leave. It does not end while the Combat menu is up. Once you are clear, a minute passes before anyone else can stop you.
 
 In an encounter, Science, **Sensors** moves a ring over the ships with the direction keys; Enter scans the one under it. **Analysis** then tells you what it is, its size, and whether its shields are up and its weapons armed. Your crew also tells you when aliens raise their shields or arm their weapons.
 

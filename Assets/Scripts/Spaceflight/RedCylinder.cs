@@ -2,13 +2,14 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // the Red Cylinder, the "ancient-ruin locater device" (STRINFO: "the Red Cylinder ancient-ruin locater device"; the Starport's analysis: "an orbital scanner of
-// some sort") - the shipped game says "THE RED CYLINDER IS FLASHING" in the code of its landing map (STARB.COM, beside the site and region words), so the port
-// has it flash while the crosshair of the landing map is near an ancient ruin of the planet: one of its random ancient ruins (worked out from orbit as the surface
-// places them) or a formation of ancient ruins - how near is the port's
+// some sort") - in the shipped game, when the landing map opens with the Red Cylinder aboard, it flashes the planet's message and artifact sites on the map, up to
+// ten, and says "THE RED CYLINDER IS FLASHING" (SITE-OV .MERCATOR, WF389, WF290); the ancient ruins it finds from orbit are marked with the survey's marks
+// (SurveyMarks, decided 2026-10-17, ROADMAP D6)
 public static class RedCylinder
 {
-	// how near the crosshair has to be, in degrees
-	public const float c_flashRange = 8.0f;
+	// the most sites it flashes (the shipped game keeps ten, SITE-OV WF261), and for how long, in seconds (the shipped game cycles their colours 80 times)
+	public const int c_maxSites = 10;
+	public const float c_flashSeconds = 3.0f;
 
 	// the ancient ruins of the planet last looked at
 	static int s_planetId = -1;
@@ -17,45 +18,79 @@ public static class RedCylinder
 	// none (what GetAncientRuinPlaces returns without the Red Cylinder)
 	static readonly List<Vector2> s_none = new List<Vector2>();
 
-	// whether it was flashing at the last look (so that the message comes once each time the crosshair comes near)
-	static bool s_flashing;
+	// the sites flashing on the landing map, and until when
+	static List<Vector2> s_sites = new List<Vector2>();
+	static float s_flashUntil;
 
-	// the landing map has opened: the next look reports afresh
-	public static void Reset()
+	// the landing map has opened: with the Red Cylinder aboard, the planet's message and artifact sites flash on it, and the Red Cylinder says so
+	public static void MapOpened()
 	{
-		s_flashing = false;
-	}
+		s_sites = GetFlashingSites();
+		s_flashUntil = ( s_sites.Count > 0 ) ? Time.time + c_flashSeconds : 0.0f;
 
-	// looks at the crosshair (east-west and north-south, in degrees): returns true if the Red Cylinder is flashing, and says so when it begins
-	public static bool Look( float eastWest, float northSouth )
-	{
-		var near = IsNearAncientRuin( eastWest, northSouth );
-
-		if ( near && !s_flashing && ( SpaceflightController.m_instance != null ) )
+		if ( ( s_sites.Count > 0 ) && ( SpaceflightController.m_instance != null ) )
 		{
 			SpaceflightController.m_instance.m_messages.AddText( "<color=red>The Red Cylinder is flashing.</color>" );
 		}
-
-		s_flashing = near;
-
-		return near;
 	}
 
-	// true if the ship carries the Red Cylinder and this place is near an ancient ruin of the planet it orbits
-	public static bool IsNearAncientRuin( float eastWest, float northSouth )
+	// true while the sites flash on the landing map
+	public static bool IsFlashing()
 	{
-		foreach ( var place in GetAncientRuinPlaces() )
-		{
-			// (east-west goes round the planet)
-			var eastWestApart = Mathf.Abs( Mathf.DeltaAngle( place.x, eastWest ) );
+		return ( s_sites.Count > 0 ) && ( Time.time < s_flashUntil );
+	}
 
-			if ( ( eastWestApart <= c_flashRange ) && ( Mathf.Abs( place.y - northSouth ) <= c_flashRange ) )
+	/// <summary>
+	/// The sites flashing on the landing map (east-west and north-south, in degrees). The list is kept: do not change it.
+	/// </summary>
+	public static List<Vector2> GetSites()
+	{
+		return s_sites;
+	}
+
+	// the planet's message sites and the sites of the artifacts still lying there (SITE-OV WF389: the planet's messages and artifacts that have a place), up to ten,
+	// if the ship carries the Red Cylinder - none without it (a message placed at random spots is left out: the port draws its spot on the surface)
+	public static List<Vector2> GetFlashingSites()
+	{
+		var sites = new List<Vector2>();
+		var gameData = DataController.m_instance.m_gameData;
+		var playerData = DataController.m_instance.m_playerData;
+
+		if ( !playerData.m_playerShip.HasArtifact( "Red Cylinder" ) )
+		{
+			return sites;
+		}
+
+		var planetId = playerData.m_general.m_currentPlanetId;
+
+		foreach ( var planetMessage in gameData.m_planetMessageList )
+		{
+			if ( ( planetMessage.m_planetId == planetId ) && ( planetMessage.m_placement == "Site" ) )
 			{
-				return true;
+				AddSite( sites, planetMessage.m_longitude, planetMessage.m_latitude );
 			}
 		}
 
-		return false;
+		foreach ( var artifactSite in gameData.m_artifactSiteList )
+		{
+			if ( ( artifactSite.m_planetId == planetId ) && ( ( playerData.m_planetSurfaces == null ) || !playerData.m_planetSurfaces.IsArtifactSiteTaken( artifactSite.m_id ) ) )
+			{
+				AddSite( sites, artifactSite.m_longitude, artifactSite.m_latitude );
+			}
+		}
+
+		return sites;
+	}
+
+	// adds a site once (a message and an artifact can lie at one), while there is room for it
+	static void AddSite( List<Vector2> sites, int eastWest, int northSouth )
+	{
+		var place = new Vector2( eastWest, northSouth );
+
+		if ( ( sites.Count < c_maxSites ) && !sites.Contains( place ) )
+		{
+			sites.Add( place );
+		}
 	}
 
 	/// <summary>
