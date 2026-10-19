@@ -129,6 +129,13 @@ public class DisembarkButton : ShipButton
 				playerData.m_playerShip.DropShields();
 				playerData.m_playerShip.DisarmWeapons();
 
+				// the surface of this planet has been visited in this orbit (the original's ?LANDED, which WF095 sets on the first run): what is taken from it comes back
+				// when the ship leaves the orbit (DPART-OV DEPART)
+				if ( playerData.m_planetSurfaces != null )
+				{
+					playerData.m_planetSurfaces.VisitPlanet( playerData.m_general.m_currentPlanetId );
+				}
+
 				// the original's words (SHIPBUTTONS: "STANDBY...SCANNING PLANET.")
 				SpaceflightController.m_instance.m_messages.AddText( "<color=white>Standby...scanning planet.</color>" );
 
