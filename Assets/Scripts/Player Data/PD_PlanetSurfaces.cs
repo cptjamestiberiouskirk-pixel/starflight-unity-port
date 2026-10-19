@@ -48,6 +48,10 @@ public class PD_PlanetSurfaces
 		// a Black Egg the crew chose not to arm when it was dropped ("ARM THIS DEVICE?", ITEMS-OV WE9AA) - false for an egg in a save from before the question,
 		// which was armed by being dropped
 		public bool m_leftUnarmed;
+
+		// the wreck of a terrain vehicle that ran out of fuel here (MOVE-OV WEF48 leaves it as an item of 300 cubic meters, too big for any hold) - it holds
+		// nothing (its cargo was dropped beside it) and cannot be picked up
+		public bool m_isVehicleWreck;
 	}
 
 	// what the terrain vehicle has dropped on the planets ("when an object is dropped on a planet's surface it can be picked up again" - the manual, page 21)

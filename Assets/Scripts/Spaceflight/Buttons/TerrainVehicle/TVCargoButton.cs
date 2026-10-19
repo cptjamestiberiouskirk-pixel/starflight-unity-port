@@ -822,6 +822,14 @@ public class TVCargoButton : ShipButton
 
 			var remainingVolume = playerData.m_terrainVehicle.GetRemainingVolume();
 
+			// the wreck of a terrain vehicle is far too big for the hold (MOVE-OV WEF48 makes it 300 cubic meters)
+			if ( droppedCargo.m_isVehicleWreck )
+			{
+				text += ( ( text == "" ) ? "" : "\n" ) + "<color=yellow>The wreck of a terrain vehicle lies here, far too big for the cargo hold.</color>";
+
+				continue;
+			}
+
 			if ( ( droppedCargo.m_artifactId >= 0 ) && ( droppedCargo.m_artifactId < gameData.m_artifactList.Length ) )
 			{
 				var artifact = gameData.m_artifactList[ droppedCargo.m_artifactId ];

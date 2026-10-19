@@ -219,7 +219,7 @@ Found on 2026-10-18 by reading the shipped game's decompiled overlays against th
 | 8.11 | The artifact that makes the aliens chase harder is the Crystal Pearl | HYPERMSG-OV `(!'EXT)`, COMMSPEC-OV `WEA50` (`?12`) | MISSING |
 | 8.12 | Fluxes the ship has been through are remembered and drawn on the starmap | HYPER-OV `SET-FLUX-STATE`; MAP-OV `WEA70`, `WEA4C` | MISSING |
 | 8.13 | Back into orbit after the Noah 9 derelict or a destroyed orbit fleet | HYPER-OV `?DOUBLE-UNNEST`, `SKIP2NEST`; HYPERMSG-OV `WE84B` | MISSING |
-| 8.14 | A terrain vehicle that runs out of fuel is lost: the crew walk back, the vehicle stays as debris, the Starport fines its loss | MOVE-OV `WF16E`, `WEF48`; SHIPBUTTONS `WF095`; OP-OV `WF045` | MISSING |
+| 8.14 | A terrain vehicle that runs out of fuel is lost: the crew walk back, the vehicle stays as debris, the Starport fines its loss | MOVE-OV `WF16E`, `WEF48`; SHIPBUTTONS `WF095`; OP-OV `WF045` | the vehicle is lost and left as a wreck where it stopped (`MoveButton.LeaveTheWreck`, `TerrainRuins.PlaceVehicleWreck`, `DroppedCargo.m_isVehicleWreck`); the walk back and the fine were there (probe `outoffuel`) |
 | 8.15 | The Red Cylinder flashes the planet's message and artifact sites when the landing map opens | SITE-OV `.MERCATOR`, `WF389`, `WF290` | MISSING |
 | 8.16 | A deposit's mineral: the planet's first element half the time, the second a quarter, the third 15%, any other element 10% | SEED-OV `WF0F7`, `WF0C7` | MISSING |
 | 8.17 | Jettison from the ship's hold | CAPTAIN `(/ITEMS)`, `TOSS` | Jettison on the ship's cargo list: an artifact or a specimen at once, an element by a volume typed or stepped with the stick (`ShipCargoJettisonButton`; probe `jettison`) |

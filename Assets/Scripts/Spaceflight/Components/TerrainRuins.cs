@@ -357,6 +357,12 @@ public class TerrainRuins : TerrainGridPopulator
 	// places something the terrain vehicle has dropped where it lies (call it when it is dropped, and the ruins place everything dropped on a planet again on every visit)
 	public GameObject PlaceDroppedCargo( PD_PlanetSurfaces.DroppedCargo droppedCargo )
 	{
+		// the wreck of a terrain vehicle that ran out of fuel looks like the vehicle
+		if ( droppedCargo.m_isVehicleWreck )
+		{
+			return PlaceVehicleWreck( droppedCargo );
+		}
+
 		if ( ( m_ruinTemplates == null ) || ( m_ruinTemplates.Length == 0 ) || ( GetPlanetGenerator() == null ) )
 		{
 			return null;
@@ -379,6 +385,73 @@ public class TerrainRuins : TerrainGridPopulator
 		droppedObject.AddComponent<TerrainDroppedCargo>().m_droppedCargoId = droppedCargo.m_id;
 
 		return droppedObject;
+	}
+
+	// places the wreck of a terrain vehicle that ran out of fuel where it stopped (MOVE-OV WEF48): the terrain vehicle's meshes as they are shown, each a new object
+	// with the same mesh and materials, so nothing of the vehicle that runs (its scripts, beams, lights and colliders) comes with it
+	GameObject PlaceVehicleWreck( PD_PlanetSurfaces.DroppedCargo droppedCargo )
+	{
+		var controller = SpaceflightController.m_instance;
+		var model = ( ( controller != null ) && ( controller.m_terrainVehicle != null ) ) ? controller.m_terrainVehicle.m_terrainVehicleModel : null;
+
+		if ( model == null )
+		{
+			return null;
+		}
+
+		var wreck = new GameObject( "Terrain vehicle wreck " + droppedCargo.m_id );
+
+		wreck.transform.SetParent( transform, false );
+		wreck.transform.position = new Vector3( droppedCargo.m_x, droppedCargo.m_y, droppedCargo.m_z );
+		wreck.transform.rotation = Quaternion.Euler( 0.0f, ( droppedCargo.m_id * 47 ) % 360, 0.0f );
+
+		// the model's own size in the world
+		var modelScale = model.transform.lossyScale;
+		var parentScale = transform.lossyScale;
+
+		wreck.transform.localScale = new Vector3( modelScale.x / Mathf.Max( parentScale.x, 0.0001f ), modelScale.y / Mathf.Max( parentScale.y, 0.0001f ), modelScale.z / Mathf.Max( parentScale.z, 0.0001f ) );
+
+		var toModel = model.transform.worldToLocalMatrix;
+
+		foreach ( var meshFilter in model.GetComponentsInChildren<MeshFilter>( true ) )
+		{
+			var meshRenderer = meshFilter.GetComponent<MeshRenderer>();
+
+			if ( ( meshRenderer == null ) || !meshRenderer.enabled || ( meshFilter.sharedMesh == null ) || !IsShownInModel( meshFilter.transform, model.transform ) )
+			{
+				continue;
+			}
+
+			// the part where it sits on the model
+			var place = toModel * meshFilter.transform.localToWorldMatrix;
+			var part = new GameObject( meshFilter.name );
+
+			part.transform.SetParent( wreck.transform, false );
+			part.transform.localPosition = place.GetColumn( 3 );
+			part.transform.localRotation = place.rotation;
+			part.transform.localScale = place.lossyScale;
+
+			part.AddComponent<MeshFilter>().sharedMesh = meshFilter.sharedMesh;
+			part.AddComponent<MeshRenderer>().sharedMaterials = meshRenderer.sharedMaterials;
+		}
+
+		wreck.AddComponent<TerrainDroppedCargo>().m_droppedCargoId = droppedCargo.m_id;
+
+		return wreck;
+	}
+
+	// true if a part of the model is switched on along the way up to the model (a beam or an effect that is off is not part of the vehicle's look)
+	static bool IsShownInModel( Transform part, Transform model )
+	{
+		for ( var current = part; ( current != null ) && ( current != model ); current = current.parent )
+		{
+			if ( !current.gameObject.activeSelf )
+			{
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	// takes away the rocks and the trees that are too close to a ruin (call this once all the populators have placed their objects - taking them away moves nothing else)

@@ -157,11 +157,16 @@ public class ScanButton : ShipButton
 				var distance = Vector3.Distance( child.position, vehiclePos );
 
 				// something the terrain vehicle dropped lies with the ruins
-				if ( ( distance <= c_scanRange ) && ( child.GetComponent<TerrainDroppedCargo>() != null ) )
+				var dropped = child.GetComponent<TerrainDroppedCargo>();
+
+				if ( ( distance <= c_scanRange ) && ( dropped != null ) )
 				{
 					droppedCount++;
 
-					ShowLabelOnObject( child.gameObject, "Dropped cargo", LabelColour( UIKitTheme.ColorRole.TextWarning, Color.yellow ) );
+					// (the wreck of a terrain vehicle that ran out of fuel lies with what was dropped)
+					var droppedCargo = ( DataController.m_instance.m_playerData.m_planetSurfaces != null ) ? DataController.m_instance.m_playerData.m_planetSurfaces.FindDroppedCargo( dropped.m_droppedCargoId ) : null;
+
+					ShowLabelOnObject( child.gameObject, ( ( droppedCargo != null ) && droppedCargo.m_isVehicleWreck ) ? "Terrain vehicle wreck" : "Dropped cargo", LabelColour( UIKitTheme.ColorRole.TextWarning, Color.yellow ) );
 
 					continue;
 				}
