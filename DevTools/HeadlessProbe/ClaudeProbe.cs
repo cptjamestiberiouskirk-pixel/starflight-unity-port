@@ -1694,6 +1694,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioCargoDescribe();
 				break;
 
+			case "soundeffects":
+				yield return ScenarioSoundEffects();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -45870,7 +45874,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "aboutscreen: the save panel has an About button, which opens the About screen (the code before had none)", buttonShown && aboutShown, buttonShown + " " + aboutShown );
 		Check( "aboutscreen: it credits the port's author and the remake it is built on, released into the public domain", aboutText.Contains( "cptjamestiberiouskirk-pixel" ) && aboutText.Contains( "Built on the Starflight Remake Project by Marvin Herbold, released into the public domain." ), aboutText );
-		Check( "aboutscreen: it thanks the remake's contributors and names Starflight's makers, the music made for this port and the licences of the sounds", aboutText.Contains( "Jeff Graw" ) && aboutText.Contains( "Planet Map Project" ) && aboutText.Contains( "Binary Systems" ) && aboutText.Contains( "Music: made for this port." ) && !aboutText.Contains( "Tabletop Audio" ) && aboutText.Contains( "bubaproducer" ), aboutText );
+		Check( "aboutscreen: it thanks the remake's contributors and names Starflight's makers and the music and sound effects made for this port", aboutText.Contains( "Jeff Graw" ) && aboutText.Contains( "Planet Map Project" ) && aboutText.Contains( "Binary Systems" ) && aboutText.Contains( "Music: made for this port." ) && !aboutText.Contains( "Tabletop Audio" ) && aboutText.Contains( "Sound effects: made for this port." ) && !aboutText.Contains( "bubaproducer" ), aboutText );
 		Check( "aboutscreen: Escape closes it, back to the save panel's menu", closedByEscape, closedByEscape.ToString() );
 		Check( "aboutscreen: the intro credits the port and its author's GitHub account, and no longer BraveArmy.com or the 2017 team", intro.Contains( "Starflight: The Remaking of a Legend" ) && intro.Contains( "github.com/cptjamestiberiouskirk-pixel" ) && !intro.Contains( "BraveArmy" ) && !intro.Contains( "Marvin" ), intro );
 		Check( "aboutscreen: the original's credits stay on the intro (Binary Systems, Electronic Arts)", intro.Contains( "Binary Systems" ) && intro.Contains( "Electronic Arts" ), intro );
@@ -46484,6 +46488,225 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "cargodescribe: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
 
 		Finish( "scenario=cargodescribe checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- every sound effect made for the port (since 2026-10-19)
+
+	IEnumerator ScenarioSoundEffects()
+	{
+		var errorsBefore = s_errorCount;
+		var soundController = SoundController.m_instance;
+
+		yield return Frames( 5 );
+
+		if ( soundController == null )
+		{
+			Finish( "scenario=soundeffects abort: no SoundController", 2 );
+			yield break;
+		}
+
+		// every clip field of the SoundController, the Sound value the game plays it by, the clip made for the port that it holds, and that file's
+		// length in seconds and sample rate (every clip it replaced was two channels or another length, an MP3 or a freesound download)
+		var expected = new[]
+		{
+			new { field = "m_activate", sound = "Activate", clip = "Activate", seconds = 0.495f, rate = 48000 },
+			new { field = "m_alarm", sound = "Alarm", clip = "Alarm", seconds = 2.000f, rate = 48000 },
+			new { field = "m_beep", sound = "Beep", clip = "Beep", seconds = 0.800f, rate = 48000 },
+			new { field = "m_click", sound = "Click", clip = "Click", seconds = 0.200f, rate = 48000 },
+			new { field = "m_close", sound = "Close", clip = "Close", seconds = 1.000f, rate = 48000 },
+			new { field = "m_countdown", sound = "Countdown", clip = "Countdown", seconds = 5.600f, rate = 48000 },
+			new { field = "m_deactivate", sound = "Deactivate", clip = "Deactivate", seconds = 0.500f, rate = 48000 },
+			new { field = "m_decompression", sound = "Decompression", clip = "Decompression", seconds = 15.000f, rate = 48000 },
+			new { field = "m_dieselEngine", sound = "DieselEngine", clip = "Diesel Idle", seconds = 7.012f, rate = 44100 },
+			new { field = "m_dockingBayDoorClose", sound = "DockingBayDoorClose", clip = "Docking Bay Door Close", seconds = 15.000f, rate = 48000 },
+			new { field = "m_dockingBayDoorOpen", sound = "DockingBayDoorOpen", clip = "Docking Bay Door Open", seconds = 19.000f, rate = 48000 },
+			new { field = "m_enterWarp", sound = "EnterWarp", clip = "Flux Enter", seconds = 2.000f, rate = 48000 },
+			new { field = "m_error", sound = "Error", clip = "Error", seconds = 0.500f, rate = 48000 },
+			new { field = "m_exitWarp", sound = "ExitWarp", clip = "Flux Exit", seconds = 3.000f, rate = 48000 },
+			new { field = "m_launch", sound = "Launch", clip = "Launch", seconds = 30.000f, rate = 48000 },
+			new { field = "m_open", sound = "Open", clip = "Open", seconds = 0.450f, rate = 48000 },
+			new { field = "m_planetLanding", sound = "PlanetLanding", clip = "Planet Landing", seconds = 37.500f, rate = 48000 },
+			new { field = "m_planetLaunching", sound = "PlanetLaunching", clip = "Planet Launching", seconds = 18.000f, rate = 48000 },
+			new { field = "m_radarBlip", sound = "RadarBlip", clip = "Radar Blip", seconds = 0.300f, rate = 48000 },
+			new { field = "m_scanning", sound = "Scanning", clip = "Scanner", seconds = 9.000f, rate = 48000 },
+			new { field = "m_staticLong", sound = "StaticLong", clip = "Static Long", seconds = 5.000f, rate = 48000 },
+			new { field = "m_staticShort", sound = "StaticShort", clip = "Static Short", seconds = 0.500f, rate = 48000 },
+			new { field = "m_transport", sound = "Transport", clip = "Transporter", seconds = 6.000f, rate = 48000 },
+			new { field = "m_update", sound = "Update", clip = "Update", seconds = 0.700f, rate = 48000 },
+			new { field = "m_warbleLong", sound = "WarbleLong", clip = "Warble Long", seconds = 5.000f, rate = 48000 },
+			new { field = "m_warbleShort", sound = "WarbleShort", clip = "Warble Short", seconds = 0.500f, rate = 48000 },
+			new { field = "m_laserFire", sound = "LaserFire", clip = "Rover Laser", seconds = 0.900f, rate = 48000 },
+			new { field = "m_laserFireAlt", sound = "LaserFireAlt", clip = "Rover Laser Alt", seconds = 0.900f, rate = 48000 },
+			new { field = "m_missileLaunch", sound = "MissileLaunch", clip = "Missile Launch", seconds = 1.500f, rate = 48000 },
+			new { field = "m_explosion", sound = "Explosion", clip = "Surface Explosion", seconds = 3.000f, rate = 48000 },
+			new { field = "m_torpedoFire", sound = "TorpedoFire", clip = "Missile Launch", seconds = 1.500f, rate = 48000 },
+			new { field = "m_phaserFire", sound = "PhaserFire", clip = "Laser Cannon", seconds = 1.500f, rate = 48000 },
+			new { field = "m_commChirp", sound = "CommChirp", clip = "Comm Hail", seconds = 0.500f, rate = 48000 },
+			new { field = "m_torpedoExplosion", sound = "TorpedoExplosion", clip = "torpedo explosion", seconds = 4.000f, rate = 48000 },
+			new { field = "m_transporter", sound = "Transporter", clip = "Cargo Transfer", seconds = 3.000f, rate = 48000 },
+			new { field = "m_shipExplosion", sound = "ShipExplosion", clip = "ship_explosion", seconds = 10.000f, rate = 48000 },
+			new { field = "m_shieldHit", sound = "ShieldHit", clip = "shield_hit_1", seconds = 2.000f, rate = 48000 },
+			new { field = "m_energyWeapon", sound = "EnergyWeapon", clip = "Alien Laser", seconds = 2.000f, rate = 48000 },
+			new { field = "m_redAlert", sound = "RedAlert", clip = "Hull Alarm", seconds = 2.500f, rate = 48000 },
+			new { field = "m_miningLaser", sound = "MiningLaser", clip = "Mining Laser", seconds = 5.503f, rate = 44100 },
+			new { field = "m_captureBeam", sound = "CaptureBeam", clip = "Capture Beam", seconds = 5.016f, rate = 44100 },
+			new { field = "m_artifactHum", sound = "ArtifactHum", clip = "Artifact Hum", seconds = 6.014f, rate = 44100 },
+			new { field = "m_depositCrumble", sound = "DepositCrumble", clip = "Deposit Crumble", seconds = 2.000f, rate = 48000 },
+		};
+
+		var soundList = GetField( soundController, "m_soundList" ) as AudioClip[];
+
+		// ---- 1. each field holds its new clip, in one channel, at its file's rate and length, under its Sound value in the sound list
+		foreach ( var entry in expected )
+		{
+			var clip = GetField( soundController, entry.field ) as AudioClip;
+			var clipName = ( clip != null ) ? clip.name : "(none)";
+			var length = ( clip != null ) ? clip.length : 0.0f;
+			var channels = ( clip != null ) ? clip.channels : 0;
+			var rate = ( clip != null ) ? clip.frequency : 0;
+
+			AudioClip listed = null;
+
+			if ( ( soundList != null ) && Enum.IsDefined( typeof( SoundController.Sound ), entry.sound ) )
+			{
+				var index = (int) Enum.Parse( typeof( SoundController.Sound ), entry.sound );
+
+				listed = ( index < soundList.Length ) ? soundList[ index ] : null;
+			}
+
+			var holds = ( clipName == entry.clip ) && ( Mathf.Abs( length - entry.seconds ) < 0.003f ) && ( channels == 1 ) && ( rate == entry.rate ) && ( listed == clip );
+
+			Check( "soundeffects: " + entry.field + " holds " + entry.clip + " (" + entry.seconds.ToString( "0.000" ) + " s, mono, " + entry.rate + " Hz)", holds, clipName + ", " + length.ToString( "0.000" ) + " s, " + channels + " channel(s), " + rate + " Hz, listed as " + ( ( listed != null ) ? listed.name : "(none)" ) );
+		}
+
+		// ---- 2. the astronaut's footstep in the Starport is the new one: the Starport scene names the footstep file, which is one channel at its new length
+		var footstepPath = "Assets/Sounds/Footstep.wav";
+		var footstepGuid = AssetDatabase.AssetPathToGUID( footstepPath );
+		var starportScene = System.IO.File.ReadAllText( "Assets/Scenes/Starport.unity" );
+		var footstep = AssetDatabase.LoadAssetAtPath<AudioClip>( footstepPath );
+		var footstepLength = ( footstep != null ) ? footstep.length : 0.0f;
+		var footstepChannels = ( footstep != null ) ? footstep.channels : 0;
+
+		Check( "soundeffects: the astronaut's footstep is Footstep (0.400 s, mono)", !string.IsNullOrEmpty( footstepGuid ) && starportScene.Contains( "guid: " + footstepGuid ) && ( Mathf.Abs( footstepLength - 0.400f ) < 0.01f ) && ( footstepChannels == 1 ), footstepGuid + ", " + footstepLength.ToString( "0.000" ) + " s, " + footstepChannels + " channel(s)" );
+
+		// ---- 3. the sound effects in the project are exactly the files made for the port: every audio clip outside the music, one channel each
+		var madeFiles = new HashSet<string>
+		{
+			"Assets/Sounds/Activate.wav",
+			"Assets/Sounds/Alarm.wav",
+			"Assets/Sounds/Alien Laser.wav",
+			"Assets/Sounds/Artifact Hum.wav",
+			"Assets/Sounds/Beep.wav",
+			"Assets/Sounds/Capture Beam.wav",
+			"Assets/Sounds/Cargo Transfer.wav",
+			"Assets/Sounds/Click.wav",
+			"Assets/Sounds/Close.wav",
+			"Assets/Sounds/Comm Hail.wav",
+			"Assets/Sounds/Countdown.wav",
+			"Assets/Sounds/Deactivate.wav",
+			"Assets/Sounds/Decompression.wav",
+			"Assets/Sounds/Deposit Crumble.wav",
+			"Assets/Sounds/Diesel Idle.wav",
+			"Assets/Sounds/Docking Bay Door Close.wav",
+			"Assets/Sounds/Docking Bay Door Open.wav",
+			"Assets/Sounds/Error.wav",
+			"Assets/Sounds/Flux Enter.wav",
+			"Assets/Sounds/Flux Exit.wav",
+			"Assets/Sounds/Footstep.wav",
+			"Assets/Sounds/Hull Alarm.wav",
+			"Assets/Sounds/Laser Cannon.wav",
+			"Assets/Sounds/Launch.wav",
+			"Assets/Sounds/Mining Laser.wav",
+			"Assets/Sounds/Missile Launch.wav",
+			"Assets/Sounds/Open.wav",
+			"Assets/Sounds/Planet Landing.wav",
+			"Assets/Sounds/Planet Launching.wav",
+			"Assets/Sounds/Radar Blip.wav",
+			"Assets/Sounds/Scanner.wav",
+			"Assets/Sounds/Static Long.wav",
+			"Assets/Sounds/Static Short.wav",
+			"Assets/Sounds/Transporter.wav",
+			"Assets/Sounds/Update.wav",
+			"Assets/Sounds/Warble Long.wav",
+			"Assets/Sounds/Warble Short.wav",
+			"Assets/_MyCombatAssets/Sounds/Rover Laser Alt.wav",
+			"Assets/_MyCombatAssets/Sounds/Rover Laser.wav",
+			"Assets/_MyCombatAssets/Sounds/Surface Explosion.wav",
+			"Assets/_MyCombatAssets/Sounds/shield_hit_1.wav",
+			"Assets/_MyCombatAssets/Sounds/ship_explosion.wav",
+			"Assets/_MyCombatAssets/Sounds/torpedo explosion.wav",
+		};
+		var others = new List<string>();
+		var stereo = new List<string>();
+		var missing = new List<string>( madeFiles );
+
+		foreach ( var guid in AssetDatabase.FindAssets( "t:AudioClip", new[] { "Assets" } ) )
+		{
+			var path = AssetDatabase.GUIDToAssetPath( guid );
+
+			if ( path.StartsWith( "Assets/Music/" ) )
+			{
+				continue;
+			}
+
+			missing.Remove( path );
+
+			if ( !madeFiles.Contains( path ) )
+			{
+				others.Add( path );
+			}
+
+			var asset = AssetDatabase.LoadAssetAtPath<AudioClip>( path );
+
+			if ( ( asset != null ) && ( asset.channels != 1 ) )
+			{
+				stereo.Add( path );
+			}
+		}
+
+		Check( "soundeffects: every sound effect in the project is one made for the port (" + madeFiles.Count + " files)", ( others.Count == 0 ) && ( missing.Count == 0 ), "others: " + ( ( others.Count > 0 ) ? string.Join( ", ", others ) : "none" ) + "; missing: " + ( ( missing.Count > 0 ) ? string.Join( ", ", missing ) : "none" ) );
+		Check( "soundeffects: every sound effect is one channel", stereo.Count == 0, ( stereo.Count > 0 ) ? string.Join( ", ", stereo ) : "none" );
+
+		// ---- 4. PlaySound puts each Sound value's clip on an audio source of the pool (the path every call site takes)
+		var notPlayed = new List<string>();
+
+		ClearPool();
+
+		foreach ( var entry in expected )
+		{
+			if ( !Enum.IsDefined( typeof( SoundController.Sound ), entry.sound ) )
+			{
+				notPlayed.Add( entry.sound + " (no such Sound)" );
+				continue;
+			}
+
+			try
+			{
+				soundController.PlaySound( (SoundController.Sound) Enum.Parse( typeof( SoundController.Sound ), entry.sound ), 0.0f );
+			}
+			catch ( Exception exception )
+			{
+				notPlayed.Add( entry.sound + " (" + exception.GetType().Name + ")" );
+				continue;
+			}
+
+			var pool = PoolSounds();
+
+			if ( !pool.Exists( held => held.StartsWith( entry.clip ) ) )
+			{
+				notPlayed.Add( entry.sound + " -> " + string.Join( ", ", pool ) );
+			}
+
+			ClearPool();
+		}
+
+		Check( "soundeffects: PlaySound plays each Sound value's new clip", notPlayed.Count == 0, ( notPlayed.Count > 0 ) ? string.Join( "; ", notPlayed ) : "all " + expected.Length );
+
+		yield return Frames( 3 );
+
+		Check( "soundeffects: no errors", s_errorCount == errorsBefore, ( s_errorCount - errorsBefore ) + " error(s)" );
+
+		Finish( "scenario=soundeffects checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
