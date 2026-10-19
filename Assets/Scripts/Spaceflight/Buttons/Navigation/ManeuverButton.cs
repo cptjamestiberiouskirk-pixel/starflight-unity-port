@@ -62,6 +62,16 @@ public class ManeuverButton : ShipButton
 
 				break;
 
+			case PD_General.Location.Encounter:
+
+				// the Noah 9 derelict, or a drone that has let the ship into orbit: Maneuver goes back into orbit at once (the original's MANEUVER, SKIP2NEST)
+				if ( SpaceflightController.m_instance.m_encounter.ManeuverBackIntoOrbit() )
+				{
+					return false;
+				}
+
+				break;
+
 			case PD_General.Location.StarSystem:
 
 				// show the system display

@@ -341,6 +341,12 @@ public class SpaceflightController : MonoBehaviour
 			playerData.m_general.GetOrbitPermissions().Clear();
 		}
 
+		// leaving orbit lets an encounter that ended back in orbit begin again the next time (the original's WD9EC, cleared by UNNEST-CLEAN on leaving orbit)
+		if ( ( newLocation == PD_General.Location.StarSystem ) || ( newLocation == PD_General.Location.Hyperspace ) || ( newLocation == PD_General.Location.DockingBay ) || ( newLocation == PD_General.Location.Starport ) )
+		{
+			playerData.m_general.GetOrbitEncountersEnded().Clear();
+		}
+
 		// a ship in the star system or in hyperspace has left any orbit, and the next planet's landing site starts at LAT 0 LONG 0: the original's DEPART sets PLHI to
 		// -1 on leaving orbit, and Select Site then puts its crosshair in the middle of the map (SITE-OV in the decompiled original, WF014) - within one orbit the
 		// last site chosen stays
@@ -854,6 +860,12 @@ public class SpaceflightController : MonoBehaviour
 
 			// skip an encounter that has already let the ship into orbit during this visit to the star system
 			if ( HasOrbitPermission( encounter.m_encounterId ) )
+			{
+				continue;
+			}
+
+			// and one that ended back in this orbit (the Noah 9 derelict), until the ship leaves it
+			if ( playerData.m_general.GetOrbitEncountersEnded().Contains( encounter.m_encounterId ) )
 			{
 				continue;
 			}

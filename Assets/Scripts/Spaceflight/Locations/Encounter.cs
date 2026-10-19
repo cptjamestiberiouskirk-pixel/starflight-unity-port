@@ -443,12 +443,22 @@ public class Encounter : MonoBehaviour
 
 			case PD_General.Location.InOrbit:
 
-				// in orbit around a planet - did the aliens let the ship into orbit (a veloxi drone that was answered correctly)?
-				if ( SpaceflightController.m_instance.HasOrbitPermission( m_pdEncounter.m_encounterId ) )
+				// in orbit around a planet - does the ship go back into orbit (a veloxi drone that was answered correctly, the Noah 9 derelict, or a fleet whose
+				// ships are all destroyed)?
+				if ( EndsBackInOrbit() )
 				{
-					// yes - the encounter ends first, then the ship is back in orbit, which says "...Orbit established." (the encounter does not begin again
-					// while the ship stays in this star system)
+					// yes - the derelict does not begin again until the ship leaves orbit (a drone's permission lasts the visit to the star system, and a fleet with
+					// no ship left never begins again)
+					if ( !SpaceflightController.m_instance.HasOrbitPermission( m_pdEncounter.m_encounterId ) && !playerData.m_general.GetOrbitEncountersEnded().Contains( m_pdEncounter.m_encounterId ) )
+					{
+						playerData.m_general.GetOrbitEncountersEnded().Add( m_pdEncounter.m_encounterId );
+					}
+
+					// the encounter ends first, then the orbital maneuver, and the ship is back in orbit, which says "...Orbit established." (WF022: OSET, the
+					// original's INITIATING ORBITAL MANEUVER... and ...ORBIT ESTABLISHED)
 					SayLeavingEncounter();
+
+					SpaceflightController.m_instance.m_messages.AddText( "<color=white>Initiating orbital maneuver...</color>" );
 
 					SpaceflightController.m_instance.SwitchLocation( PD_General.Location.InOrbit );
 
@@ -474,6 +484,38 @@ public class Encounter : MonoBehaviour
 		}
 
 		SayLeavingEncounter();
+	}
+
+	// true if an encounter that began in orbit ends back in orbit rather than out in the star system: one that has let the ship into orbit, the Noah 9 derelict, and
+	// a fleet whose ships are all destroyed unless it is a fleet of 255 (HYPER-OV ENCCLEANUP: SKIP2NEST for species 19, and when WDA56 is off - MAX#SHIPS less
+	// #SHIPS-DESTROYED is none and MAX#SHIPS is not 255 - for an encounter entered from orbit)
+	bool EndsBackInOrbit()
+	{
+		if ( ( m_pdEncounter == null ) || ( m_gdEncounter == null ) )
+		{
+			return false;
+		}
+
+		return SpaceflightController.m_instance.HasOrbitPermission( m_pdEncounter.m_encounterId ) || ( m_gdEncounter.m_race == GameData.Race.NoahDerelict ) || ( !m_pdEncounter.HasLivingAlienShips() && ( m_gdEncounter.m_maxNumShips != 255 ) );
+	}
+
+	// Maneuver leaves at once an encounter from orbit that lets the ship back into orbit from its start: the Noah 9 derelict, and a drone that has let the ship
+	// into orbit (the original's MANEUVER: with SKIP2NEST on, UNNEST) - returns true if it did
+	public bool ManeuverBackIntoOrbit()
+	{
+		if ( ( m_pdEncounter == null ) || ( m_gdEncounter == null ) || ( DataController.m_instance.m_playerData.m_general.m_lastLocation != PD_General.Location.InOrbit ) )
+		{
+			return false;
+		}
+
+		if ( ( m_gdEncounter.m_race != GameData.Race.NoahDerelict ) && !SpaceflightController.m_instance.HasOrbitPermission( m_pdEncounter.m_encounterId ) )
+		{
+			return false;
+		}
+
+		LeaveEncounter();
+
+		return true;
 	}
 
 	// say so, as the original does ("LEAVING ENCOUNTER..." and "...ENCOUNTER TERMINATED", made in STARB.COM as "LEAVING STARPORT..." and "...STARPORT CLEAR" are)
