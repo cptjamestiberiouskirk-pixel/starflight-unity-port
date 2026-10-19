@@ -1678,6 +1678,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioMusic();
 				break;
 
+			case "disembarkshields":
+				yield return ScenarioDisembarkShields();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -45992,6 +45996,74 @@ public class ClaudeProbe : MonoBehaviour
 
 			yield return null;
 		}
+	}
+
+	// ---------------------------------------------------------------- phase 8: Disembark lowers the shields and disarms (roadmap 8.35)
+
+	IEnumerator ScenarioDisembarkShields()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var errorsBefore = s_errorCount;
+
+		EnsureCrew();
+
+		// on the ground of planet 94 of Arth, in the ship, with the shields up and the weapons armed (the original's Disembark runs WEDEC first: SHIPBUTTONS WF095)
+		yield return GoIntoOrbit( 25, 94 );
+
+		controller.m_planetside.UpdateTerrainGridNow();
+		controller.SwitchLocation( PD_General.Location.Planetside );
+
+		yield return Frames( 10 );
+
+		ship.m_shieldingClass = Mathf.Max( ship.m_shieldingClass, 1 );
+		ship.m_shieldPoints = ship.GetMaximumShieldPoints();
+		ship.m_shieldsAreUp = true;
+		ship.m_weaponsAreArmed = true;
+
+		var chargeBefore = ship.m_shieldPoints;
+
+		controller.m_messages.Clear();
+
+		// the real Disembark button (the second of the command set on a planet), every line in the order it first came up, until the terrain vehicle is out
+		PressButton( ButtonController.ButtonSet.CommandA, 1 );
+
+		var lines = new List<string>();
+		var end = Time.realtimeSinceStartup + 15.0f;
+
+		while ( Time.realtimeSinceStartup < end )
+		{
+			foreach ( var message in playerData.m_general.m_messageList )
+			{
+				var line = System.Text.RegularExpressions.Regex.Replace( message, "<[^>]*>", "" );
+
+				if ( !lines.Contains( line ) )
+				{
+					lines.Add( line );
+				}
+			}
+
+			if ( playerData.m_general.m_location == PD_General.Location.Disembarked )
+			{
+				break;
+			}
+
+			yield return null;
+		}
+
+		var said = string.Join( " | ", lines );
+		var isOut = playerData.m_general.m_location == PD_General.Location.Disembarked;
+
+		Log( "disembarkshields: (" + playerData.m_general.m_location + ") shields up " + ship.m_shieldsAreUp + ", weapons armed " + ship.m_weaponsAreArmed + ", charge " + chargeBefore + " -> " + ship.m_shieldPoints + "; " + said );
+
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Check( "disembarkshields: Disembark lowers the shields and disarms the weapons, saying so before Standby", isOut && !ship.m_shieldsAreUp && !ship.m_weaponsAreArmed && said.StartsWith( "Shields are down. | Weapons are disarmed. | Standby...scanning planet." ), ship.m_shieldsAreUp + " " + ship.m_weaponsAreArmed + " | " + said );
+		Check( "disembarkshields: the lowered shields keep their charge", ship.m_shieldPoints == chargeBefore, chargeBefore + " -> " + ship.m_shieldPoints );
+		Check( "disembarkshields: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=disembarkshields checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
