@@ -1746,6 +1746,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioLockOut();
 				break;
 
+			case "orbitreturn":
+				yield return ScenarioOrbitReturn();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -14738,9 +14742,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "orbit: the way out of an encounter that began in a star system or in hyperspace is unchanged (control)", ( locationBefore == PD_General.Location.StarSystem ) && ( locationAfterSystemEncounter == PD_General.Location.StarSystem ) && ( Vector3.Distance( systemMove, Vector3.right * range ) < 0.01f ) && ( locationAfterHyperspaceEncounter != PD_General.Location.Encounter ) && ( Vector3.Distance( hyperspaceMove, Vector3.right * range ) < 0.01f ), "star system: " + locationAfterSystemEncounter + " moved " + systemMove + " | hyperspace: " + locationAfterHyperspaceEncounter + " moved " + hyperspaceMove + " | expected (" + range.ToString( "F1" ) + ", 0, 0)" );
 
-		// ---- the star of encounter 316 (a derelict in orbit 3 of star 30, and no other encounter in that star system)
-		const int c_encounterId = 316;
-		const int c_starId = 30;
+		// ---- the star of encounter 302 (a Veloxi drone in orbit 5 of star 29, and no other encounter in that star system; the Noah 9 derelict, which this used,
+		// lets the ship back into orbit since roadmap 8.13: probe orbitreturn)
+		const int c_encounterId = 302;
+		const int c_starId = 29;
 
 		var theEncounter = gameData.m_encounterList[ c_encounterId ];
 
@@ -14786,7 +14791,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var locationAtOtherPlanet = playerData.m_general.m_location;
 
-		// ---- 2. into orbit around the planet the derelict is at
+		// ---- 2. into orbit around the planet the drone is at
 		var exceptionsBefore = s_exceptionCount;
 
 		yield return EnterOrbit( guardedPlanetId );
@@ -14845,7 +14850,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "orbit: an encounter from orbit ends at the level of the star system, where the ship was", ( locationAfterLeaving == "StarSystem" ) && ( movedBy == 0.0f ) && ( locationLater == "StarSystem" ), locationAfterLeaving + ", moved " + movedBy.ToString( "F1" ) + ", later " + locationLater );
 
-		// ---- 4. back into orbit: the derelict is still there, so the encounter begins again
+		// ---- 4. back into orbit: the drone is still there, so the encounter begins again
 		var locationSecondTime = "not tried";
 
 		if ( encounterBegun )
@@ -48672,6 +48677,151 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "lockout: a question about themselves never locks out: after a subject 5 line they start over (control)", themselvesStartOver, SubjectsText( themselves ) );
 
 		Finish( "scenario=lockout checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: back into orbit after the derelict or a destroyed orbit fleet (roadmap 8.13)
+
+	// ends the current encounter the game's own way (Encounter.LeaveEncounter, which the probe's LeaveEncounter helper does not run)
+	static void EndEncounterAsTheGameDoes()
+	{
+		var leave = typeof( Encounter ).GetMethod( "LeaveEncounter", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public );
+
+		leave.Invoke( SpaceflightController.m_instance.m_encounter, null );
+	}
+
+	// the planet an encounter of the game data waits in orbit around (-1 if none)
+	static int PlanetOfOrbitEncounter( int encounterId )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+		var gdEncounter = gameData.m_encounterList[ encounterId ];
+		var starId = DataController.m_instance.m_playerData.FindEncounter( encounterId ).GetStarId();
+
+		return PlanetInOrbit( starId, gdEncounter.m_orbitPosition );
+	}
+
+	// an encounter that began in orbit ends back in orbit, not out in the star system, after the Noah 9 derelict and after an orbit fleet whose ships are all
+	// destroyed (HYPER-OV ENCCLEANUP: SKIP2NEST for species 19, and for an encounter entered from orbit with MAX#SHIPS - #SHIPS-DESTROYED at 0 unless MAX#SHIPS is
+	// 255; WF022 then OSET: "INITIATING ORBITAL MANEUVER...", "...ORBIT ESTABLISHED"), and Maneuver leaves the derelict's encounter at once (MANEUVER: SKIP2NEST,
+	// UNNEST); the derelict begins again only once the ship has left orbit. The code before ended every encounter from orbit out in the star system, unless a drone
+	// had let the ship into orbit
+	IEnumerator ScenarioOrbitReturn()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+
+		EnsureCrew();
+
+		// a ship that survives what the aliens do meanwhile
+		playerData.m_playerShip.m_armorPoints = 100000;
+
+		// ---- 1. the derelict (encounter 316): into orbit, the encounter begins, and Maneuver leaves it back into orbit around the same planet
+		const int c_derelictId = 316;
+
+		var derelictPlanet = PlanetOfOrbitEncounter( c_derelictId );
+		var derelictStar = gameData.m_planetList[ derelictPlanet ].m_starId;
+
+		yield return GoIntoOrbit( derelictStar, derelictPlanet );
+
+		var derelictBegun = ( general.m_location == PD_General.Location.Encounter ) && ( general.m_currentEncounterId == c_derelictId );
+
+		controller.m_messages.Clear();
+
+		new ManeuverButton().Execute();
+
+		yield return Frames( 10 );
+
+		var afterManeuver = general.m_location;
+		var planetAfterManeuver = general.m_currentPlanetId;
+		var lines = System.Text.RegularExpressions.Regex.Replace( MessageList(), "<[^>]*>", "" );
+
+		yield return Frames( 30 );
+
+		var laterInOrbit = general.m_location;
+
+		// ---- 2. out to the star system and back into orbit: the derelict begins again, and flying out of it ends back in orbit too
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+		yield return EnterOrbit( derelictPlanet );
+
+		var derelictAgain = ( general.m_location == PD_General.Location.Encounter ) && ( general.m_currentEncounterId == c_derelictId );
+
+		if ( derelictAgain )
+		{
+			yield return FlyOutOfEncounter();
+		}
+
+		var afterFlyingOut = general.m_location;
+
+		// ---- 3. an orbit fleet whose ships are all destroyed (the Veloxi drone, encounter 304): back into orbit, and it never begins again
+		const int c_droneId = 304;
+
+		var dronePlanet = PlanetOfOrbitEncounter( c_droneId );
+		var droneStar = gameData.m_planetList[ dronePlanet ].m_starId;
+
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 5 );
+		yield return GoIntoOrbit( droneStar, dronePlanet );
+
+		var droneBegun = ( general.m_location == PD_General.Location.Encounter ) && ( general.m_currentEncounterId == c_droneId );
+
+		foreach ( var alienShip in playerData.FindEncounter( c_droneId ).GetAlienShipList() )
+		{
+			alienShip.m_isDead = true;
+		}
+
+		EndEncounterAsTheGameDoes();
+
+		yield return Frames( 10 );
+
+		var afterDestroyed = general.m_location;
+
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+		yield return EnterOrbit( dronePlanet );
+
+		var droneAgain = general.m_location;
+
+		// ---- 4. the control: an orbit encounter with living ships (the Veloxi drone 302, made hostile) still ends out in the star system
+		const int c_livingId = 302;
+
+		var livingPlanet = PlanetOfOrbitEncounter( c_livingId );
+		var livingStar = gameData.m_planetList[ livingPlanet ].m_starId;
+
+		controller.SwitchLocation( PD_General.Location.StarSystem );
+
+		yield return Frames( 5 );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 5 );
+		yield return GoIntoOrbit( livingStar, livingPlanet );
+
+		var livingBegun = ( general.m_location == PD_General.Location.Encounter ) && ( general.m_currentEncounterId == c_livingId );
+
+		EndEncounterAsTheGameDoes();
+
+		yield return Frames( 10 );
+
+		var afterLiving = general.m_location;
+
+		Log( "orbitreturn: derelict begun " + derelictBegun + ", after Maneuver " + afterManeuver + " at planet " + planetAfterManeuver + " (" + derelictPlanet + "), 30 frames later " + laterInOrbit + " | lines: " + lines + " | begins again from the system " + derelictAgain + ", after flying out " + afterFlyingOut + " | drone 304 begun " + droneBegun + ", its ships destroyed: " + afterDestroyed + ", into orbit again: " + droneAgain + " | drone 302 alive, begun " + livingBegun + ": " + afterLiving );
+
+		Check( "orbitreturn: Maneuver in the derelict's encounter goes back into orbit around its planet at once, and the derelict does not begin again there", derelictBegun && ( afterManeuver == PD_General.Location.InOrbit ) && ( planetAfterManeuver == derelictPlanet ) && ( laterInOrbit == PD_General.Location.InOrbit ), derelictBegun + ", " + afterManeuver + " at " + planetAfterManeuver + ", later " + laterInOrbit );
+		Check( "orbitreturn: in the original's words: ...Encounter terminated., Initiating orbital maneuver..., ...Orbit established.", ( lines.IndexOf( "Encounter terminated" ) >= 0 ) && ( lines.IndexOf( "Initiating orbital maneuver" ) > lines.IndexOf( "Encounter terminated" ) ) && ( lines.IndexOf( "Orbit established" ) > lines.IndexOf( "Initiating orbital maneuver" ) ), lines );
+		Check( "orbitreturn: once the ship has left orbit the derelict begins again, and flying out of it ends back in orbit", derelictAgain && ( afterFlyingOut == PD_General.Location.InOrbit ), derelictAgain + ", " + afterFlyingOut );
+		Check( "orbitreturn: an orbit encounter whose ships are all destroyed ends back in orbit, and never begins again", droneBegun && ( afterDestroyed == PD_General.Location.InOrbit ) && ( droneAgain == PD_General.Location.InOrbit ), droneBegun + ", " + afterDestroyed + ", again " + droneAgain );
+		Check( "orbitreturn: an orbit encounter with living ships still ends out in the star system (control)", livingBegun && ( afterLiving == PD_General.Location.StarSystem ), livingBegun + ", " + afterLiving );
+
+		Finish( "scenario=orbitreturn checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)
