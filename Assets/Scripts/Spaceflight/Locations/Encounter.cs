@@ -417,6 +417,9 @@ public class Encounter : MonoBehaviour
 		// the race remembers how this encounter left it
 		RememberRaceMood();
 
+		// the Mysterions, the Nomad probes and the Minstrels move on
+		MoveOn();
+
 		// the encounter's end refills the shields, as the original's (HYPER-OV ENCCLEANUP, CHARGE-D: class x 500)
 		playerData.m_playerShip.RechargeShieldsFully();
 
@@ -474,6 +477,30 @@ public class Encounter : MonoBehaviour
 		}
 
 		SayLeavingEncounter();
+	}
+
+	// the Mysterions, the Nomad probes and the Minstrels move on to anywhere in hyperspace after each encounter, and keep how far they are from home (HYPER-OV
+	// ENCCLEANUP: WDC19 gives species 4, 5 and 11 a place of RRND 0 to 2000 and RRND 0 to 1760 of the original's units, 8 to a map coordinate; their displacement
+	// from home is left as it was) - all of them are groups of hyperspace
+	void MoveOn()
+	{
+		var race = m_gdEncounter.m_race;
+
+		if ( ( race != GameData.Race.Mysterion ) && ( race != GameData.Race.NomadProbe ) && ( race != GameData.Race.Minstrel ) )
+		{
+			return;
+		}
+
+		if ( m_pdEncounter.GetLocation() != PD_General.Location.Hyperspace )
+		{
+			return;
+		}
+
+		var place = Tools.GameToWorldCoordinates( new Vector3( Random.Range( 0, 2000 ) / 8.0f, 0.0f, Random.Range( 0, 1760 ) / 8.0f ) );
+		var move = place - m_pdEncounter.m_currentCoordinates;
+
+		m_pdEncounter.m_currentCoordinates = place;
+		m_pdEncounter.m_homeCoordinates += move;
 	}
 
 	// say so, as the original does ("LEAVING ENCOUNTER..." and "...ENCOUNTER TERMINATED", made in STARB.COM as "LEAVING STARPORT..." and "...STARPORT CLEAR" are)
