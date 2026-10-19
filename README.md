@@ -217,7 +217,7 @@ Assets/
 <summary>Show the full feature list (spoilers)</summary>
 
 - Full Starport operations: Personnel, Crew Assignment, Ship Configuration, the Trade Depot, the Bank and Operations
-- Hyperspace navigation and star system exploration
+- Hyperspace navigation and star system exploration; the edge of hyperspace holds the ship, as in the original
 - Planetary landings and terrain vehicle exploration
 - The terrain vehicle offers to go back into the ship when it stops within 3 km of it on the way back, and Tools, Return drives it back by itself
 - The terrain vehicle mines mineral deposits with a mining laser (Tools, Mine), a tenth of a cubic meter at a time on the vehicle's energy

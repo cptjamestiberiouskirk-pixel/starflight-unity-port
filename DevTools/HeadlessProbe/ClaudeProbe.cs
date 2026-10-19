@@ -1718,6 +1718,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAlienPostures();
 				break;
 
+			case "hyperspaceedge":
+				yield return ScenarioHyperspaceEdge();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -47757,6 +47761,165 @@ public class ClaudeProbe : MonoBehaviour
 
 		Finish( "scenario=alienpostures checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
+	// ---------------------------------------------------------------- phase 8: the edge of hyperspace holds the ship (since 2026-10-18)
+
+	// a map place on this row or column (the other coordinate tried from the given one on) with no star and no end of a flux within 6 coordinates
+	static Vector3 QuietMapPlace( float mapX, float mapY, bool alongY )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		for ( var step = 0; step < 200; step++ )
+		{
+			var x = alongY ? mapX : Mathf.Repeat( mapX + step, 250.0f );
+			var y = alongY ? Mathf.Repeat( mapY + step, 220.0f ) : mapY;
+			var quiet = true;
+
+			foreach ( var star in gameData.m_starList )
+			{
+				if ( ( Mathf.Abs( star.m_xCoordinate - x ) <= 6.0f ) && ( Mathf.Abs( star.m_yCoordinate - y ) <= 6.0f ) )
+				{
+					quiet = false;
+					break;
+				}
+			}
+
+			foreach ( var flux in gameData.m_fluxList )
+			{
+				if ( !quiet )
+				{
+					break;
+				}
+
+				if ( ( ( Mathf.Abs( flux.m_x1 - x ) <= 6.0f ) && ( Mathf.Abs( flux.m_y1 - y ) <= 6.0f ) ) || ( ( Mathf.Abs( flux.m_x2 - x ) <= 6.0f ) && ( Mathf.Abs( flux.m_y2 - y ) <= 6.0f ) ) )
+				{
+					quiet = false;
+				}
+			}
+
+			if ( quiet )
+			{
+				return new Vector3( x, 0.0f, y );
+			}
+		}
+
+		return new Vector3( mapX, 0.0f, mapY );
+	}
+
+	// starts the ship at this map place in hyperspace and flies it this way for so long (game time); returns where it ends up and the fuel it burnt
+	IEnumerator FlyInHyperspace( Vector3 mapPlace, Vector3 direction, float seconds, Vector3[] where, float[] fuel )
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var general = playerData.m_general;
+
+		controller.m_playerShip.TurnOffEngines();
+		general.m_currentSpeed = 0.0f;
+		general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( mapPlace );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 5 );
+
+		var enduriumBefore = Endurium();
+		var fuelUsedBefore = playerData.m_playerShip.m_fuelUsed;
+
+		general.m_currentDirection = direction.normalized;
+		controller.m_playerShip.TurnOnEngines();
+
+		for ( var end = Time.time + seconds; Time.time < end; )
+		{
+			general.m_currentDirection = direction.normalized;
+
+			yield return null;
+		}
+
+		controller.m_playerShip.TurnOffEngines();
+		general.m_currentSpeed = 0.0f;
+
+		where[ 0 ] = general.m_coordinates;
+		fuel[ 0 ] = ( enduriumBefore - Endurium() ) * 0.1f + ( playerData.m_playerShip.m_fuelUsed - fuelUsedBefore );
+	}
+
+	// the edge of hyperspace holds the ship, as the original's (HYPER-OV FLY, WEE53): each axis is kept within map x 0 to 249 and y 0 to 219, the heading kept, so a
+	// ship flying into an edge stops there and one flying into it at a slant slides along it. The code before let the ship fly off the map
+	IEnumerator ScenarioHyperspaceEdge()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var controller = SpaceflightController.m_instance;
+		var ship = playerData.m_playerShip;
+		var where = new Vector3[ 1 ];
+		var fuel = new float[ 1 ];
+
+		EnsureCrew();
+		ship.m_elementStorage.Add( 5, 1000 );
+
+		var encounterRange = controller.m_encounterRange;
+
+		controller.m_encounterRange = 0.0f;
+
+		// game time a sixtieth of a second a frame, however slowly the frames come
+		Time.captureDeltaTime = 1.0f / 60.0f;
+
+		var lowest = Tools.GameToWorldCoordinates( Vector3.zero );
+		var highest = Tools.GameToWorldCoordinates( new Vector3( 249.0f, 0.0f, 219.0f ) );
+
+		// ---- 1. the control: in the middle of the map the ship flies on, two seconds east
+		var middle = QuietMapPlace( 125.0f, 60.0f, false );
+
+		yield return FlyInHyperspace( middle, Vector3.right, 2.0f, where, fuel );
+
+		var movedInMiddle = where[ 0 ].x - Tools.GameToWorldCoordinates( middle ).x;
+
+		// ---- 2. a coordinate from the west edge, five seconds west: the ship stops at the edge, its other coordinate unchanged, and the engines still burn fuel
+		var west = QuietMapPlace( 1.0f, 40.0f, true );
+
+		yield return FlyInHyperspace( west, Vector3.left, 5.0f, where, fuel );
+
+		var westEnd = where[ 0 ];
+		var westFuel = fuel[ 0 ];
+
+		// ---- 3. at a slant into the west edge (north west): the ship slides north along it
+		yield return FlyInHyperspace( west, new Vector3( -1.0f, 0.0f, 1.0f ), 5.0f, where, fuel );
+
+		var slantEnd = where[ 0 ];
+
+		// ---- 4. the east, north and south edges
+		var east = QuietMapPlace( 248.0f, 40.0f, true );
+
+		yield return FlyInHyperspace( east, Vector3.right, 5.0f, where, fuel );
+
+		var eastEnd = where[ 0 ];
+		var north = QuietMapPlace( 40.0f, 218.0f, false );
+
+		yield return FlyInHyperspace( north, Vector3.forward, 5.0f, where, fuel );
+
+		var northEnd = where[ 0 ];
+		var south = QuietMapPlace( 40.0f, 1.0f, false );
+
+		yield return FlyInHyperspace( south, Vector3.back, 5.0f, where, fuel );
+
+		var southEnd = where[ 0 ];
+		var stayedInHyperspace = ( playerData.m_general.m_location == PD_General.Location.Hyperspace );
+
+		Time.captureDeltaTime = 0.0f;
+		controller.m_encounterRange = encounterRange;
+
+		var westMap = Tools.WorldToGameCoordinates( westEnd );
+		var eastMap = Tools.WorldToGameCoordinates( eastEnd );
+		var northMap = Tools.WorldToGameCoordinates( northEnd );
+		var southMap = Tools.WorldToGameCoordinates( southEnd );
+
+		Log( "hyperspaceedge: middle from " + middle + " moved " + movedInMiddle.ToString( "F0" ) + "; west from " + west + " to " + westEnd + " (map " + westMap + ", fuel " + westFuel.ToString( "F2" ) + "); slant to " + slantEnd + "; east from " + east + " to " + eastEnd + " (map " + eastMap + "); north from " + north + " to " + northEnd + " (map " + northMap + "); south from " + south + " to " + southEnd + " (map " + southMap + "); edges " + lowest + " to " + highest );
+
+		Check( "hyperspaceedge: in the middle of the map the ship flies on (control)", movedInMiddle > 100.0f, movedInMiddle.ToString( "F0" ) );
+		Check( "hyperspaceedge: flying west from a coordinate off the edge the ship stops at map x 0, its y unchanged (the code before flew it off the map)", ( Mathf.Abs( westEnd.x - lowest.x ) < 0.01f ) && ( Mathf.Abs( westEnd.z - Tools.GameToWorldCoordinates( west ).z ) < 1.0f ) && ( Mathf.RoundToInt( westMap.x ) == 0 ), westEnd + " map " + westMap );
+		Check( "hyperspaceedge: flying north west into the west edge it slides north along it", ( Mathf.Abs( slantEnd.x - lowest.x ) < 0.01f ) && ( slantEnd.z > Tools.GameToWorldCoordinates( west ).z + 100.0f ), slantEnd.ToString() );
+		Check( "hyperspaceedge: the east, north and south edges hold it at map x 249, y 219 and y 0", ( Mathf.Abs( eastEnd.x - highest.x ) < 0.01f ) && ( Mathf.Abs( northEnd.z - highest.z ) < 0.01f ) && ( Mathf.Abs( southEnd.z - lowest.z ) < 0.01f ) && ( Mathf.RoundToInt( eastMap.x ) == 249 ) && ( Mathf.RoundToInt( northMap.z ) == 219 ) && ( Mathf.RoundToInt( southMap.z ) == 0 ), eastEnd + " " + northEnd + " " + southEnd );
+		Check( "hyperspaceedge: the ship is still in hyperspace, no star or flux on the way", stayedInHyperspace, playerData.m_general.m_location.ToString() );
+
+		Finish( "scenario=hyperspaceedge checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
 	// ---------------------------------------------------------------- batch 1 (starport side)
 
 	struct SellResult
