@@ -217,7 +217,7 @@ Found on 2026-10-18 by reading the shipped game's decompiled overlays against th
 | 8.9 | The comm officer's translation strength: 16.7 x the square root of skill and the bonuses, at most 250 | COMM-OV `INIT-MCOMM` | MISSING |
 | 8.10 | The Crystal Pearl fires when the ship is heavily damaged and the aliens are armed, and puts the ship at a random place in hyperspace | HYPERMSG-OV `?PRL`; SCIENCE `?HEAVY` | MISSING |
 | 8.11 | The artifact that makes the aliens chase harder is the Crystal Pearl | HYPERMSG-OV `(!'EXT)`, COMMSPEC-OV `WEA50` (`?12`) | MISSING |
-| 8.12 | Fluxes the ship has been through are remembered and drawn on the starmap | HYPER-OV `SET-FLUX-STATE`; MAP-OV `WEA70`, `WEA4C` | MISSING |
+| 8.12 | Fluxes the ship has been through are remembered and drawn on the starmap | HYPER-OV `SET-FLUX-STATE`; MAP-OV `WEA70`, `WEA4C` | A flux the ship goes through is known both ways and saved, and the starmap draws every known flux as a line between its ends, in the scheme's secondary text colour (`PD_General.LearnFlux`, `Starmap.DrawKnownFluxes`; probe `fluxmap`) |
 | 8.13 | Back into orbit after the Noah 9 derelict or a destroyed orbit fleet | HYPER-OV `?DOUBLE-UNNEST`, `SKIP2NEST`; HYPERMSG-OV `WE84B` | MISSING |
 | 8.14 | A terrain vehicle that runs out of fuel is lost: the crew walk back, the vehicle stays as debris, the Starport fines its loss | MOVE-OV `WF16E`, `WEF48`; SHIPBUTTONS `WF095`; OP-OV `WF045` | MISSING |
 | 8.15 | The Red Cylinder flashes the planet's message and artifact sites when the landing map opens | SITE-OV `.MERCATOR`, `WF389`, `WF290` | MISSING |
