@@ -9,8 +9,13 @@ public class Encounter : MonoBehaviour
 	// the text of the comm that stands in when the game data has nothing to say for a race, subject and stance
 	const string c_noCommFoundText = "ERROR";
 
-	// how many numbers a veloxi drone asks the player to confirm before it lets the ship into orbit (the original's number is not known - 3 was chosen)
-	const int c_droneNumberCount = 3;
+	// a veloxi drone asks six numbers before it lets the ship into orbit, the first half a second after the comm link is up and each next a moment after an
+	// answer, and gives 15 seconds to answer each (COMMSPEC-OV VPROBE#: 6 0 DO, "RECEIVING:" and a 500 ms wait before the number, "TRANSMITTING:" and 500 ms
+	// after the answer, TIRED-TIME 15000 ms)
+	const int c_droneNumberCount = 6;
+	const float c_droneFirstNumberSeconds = 0.5f;
+	const float c_droneNextNumberSeconds = 1.0f;
+	const float c_droneAnswerSeconds = 15.0f;
 
 	// how long the "permission to orbit granted" message stays up before the ship is back in orbit (in seconds)
 	const float c_returnToOrbitDelay = 3.0f;
@@ -867,6 +872,10 @@ public class Encounter : MonoBehaviour
 			// combat rules read from RaceTalks)
 			m_pdEncounter.m_combatTurn = 0;
 			m_pdEncounter.m_aliensOpenedFire = false;
+
+			// the Shimmering Ball is off until Combat is entered (HYPER-OV ENCSETUP: CLEAR-CO)
+			CombatController.m_instance.ResetShimmeringBall();
+
 			m_pdEncounter.m_secondsSinceAlienFire = 0.0f;
 			m_pdEncounter.m_commTerminated = false;
 
@@ -2141,8 +2150,9 @@ public class Encounter : MonoBehaviour
 		}
 	}
 
-	// update encounter with a veloxi drone - before it lets a ship into orbit it asks the player to confirm a series of numbers, and only a yes to the multiples of 6
-	// (and a no to the others) gets "permission to orbit granted" - anything else gets "permission to orbit denied" and an attack (STRINFO 2.3)
+	// update encounter with a veloxi drone - before it lets a ship into orbit it asks the player to confirm six numbers, and only a yes to the multiples of 6 (and
+	// a no to the others) gets "permission to orbit granted" - a wrong answer, or none in 15 seconds, gets "permission to orbit denied" and an attack (STRINFO 2.3,
+	// COMMSPEC-OV VPROBE#)
 	// returns true if the drone has ended the encounter
 	bool UpdateVeloxProbeEncounter()
 	{
@@ -2190,7 +2200,14 @@ public class Encounter : MonoBehaviour
 
 			if ( ( answer != GD_Comm.Subject.Yes ) && ( answer != GD_Comm.Subject.No ) )
 			{
-				// no - keep waiting
+				// no - the drone waits 15 seconds, and no answer is a wrong one (VPROBE#: TIRED-TIME, answer 2)
+				m_pdEncounter.m_conversationTimer -= Time.deltaTime;
+
+				if ( m_pdEncounter.m_conversationTimer <= 0.0f )
+				{
+					DenyOrbit();
+				}
+
 				return false;
 			}
 
@@ -2220,16 +2237,16 @@ public class Encounter : MonoBehaviour
 				return false;
 			}
 
-			// no - the next number comes shortly
-			m_pdEncounter.m_conversationTimer = Random.Range( 2.0f, 4.0f );
+			// no - the next number comes a moment later
+			m_pdEncounter.m_conversationTimer = c_droneNextNumberSeconds;
 
 			return false;
 		}
 
-		// the first number comes shortly after the comm link is up
-		if ( m_pdEncounter.m_conversationTimer > 4.0f )
+		// the first number comes half a second after the comm link is up
+		if ( ( m_pdEncounter.m_numCorrectAnswers == 0 ) && ( m_pdEncounter.m_conversationTimer > c_droneFirstNumberSeconds ) )
 		{
-			m_pdEncounter.m_conversationTimer = Random.Range( 2.0f, 4.0f );
+			m_pdEncounter.m_conversationTimer = c_droneFirstNumberSeconds;
 		}
 
 		// is it time for the next number?
@@ -2243,26 +2260,10 @@ public class Encounter : MonoBehaviour
 		return false;
 	}
 
-	// the drone asks the player to confirm a number from 1 to 99 - about half of them are multiples of 6
+	// the drone asks the player to confirm a number from 1 to 99, each as likely, so 16 in 99 are multiples of 6 (VPROBE#: 1 100 RRND)
 	void AskDroneNumber()
 	{
-		int number;
-
-		if ( Random.Range( 0, 2 ) == 0 )
-		{
-			// a multiple of 6 (6 to 96)
-			number = 6 * Random.Range( 1, 17 );
-		}
-		else
-		{
-			// any other number (a multiple of 6 moves up by one, which is at most 97)
-			number = Random.Range( 1, 100 );
-
-			if ( ( number % 6 ) == 0 )
-			{
-				number++;
-			}
-		}
+		var number = Random.Range( 1, 100 );
 
 		// show the number (the drones ask in numbers only, so there is nothing to garble)
 		SpaceflightController.m_instance.m_messages.AddText( "<color=white>Receiving:</color>\n<color=#0a0>" + number + "?</color>" );
@@ -2278,6 +2279,9 @@ public class Encounter : MonoBehaviour
 
 		// remember the number (it is never 0, which means no question)
 		m_pdEncounter.m_lastQuestionFromAliens = number;
+
+		// and give the player 15 seconds to answer it
+		m_pdEncounter.m_conversationTimer = c_droneAnswerSeconds;
 	}
 
 	// the drone lets the ship into orbit
@@ -4058,6 +4062,56 @@ public class Encounter : MonoBehaviour
 		return false;
 	}
 
+	// how well the communications officer understands the aliens of this encounter, 0 to 250, as the original's (COMM-OV INIT-MCOMM, COMM-OFF-SKILL): the square
+	// root of the officer's communications skill, plus 50 when a crew member of the aliens' race is aboard and 50 more when the officer is one (the Veloxi, the
+	// Thrynn and the Elowan, the races that can serve: O>P), plus 250 for the Spemin with the Whining Orb aboard, times 167 / 10, at most 250 - so 0 at skill
+	// 0, 167 at 100 and 250 from 225; a damaged comm system garbles no more (the equipment check of PD_PlayerShip.UseEquipment fails it instead)
+	public int GetTranslationStrength()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var officer = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer );
+		var race = m_gdEncounter.m_race;
+		var skill = ( officer != null ) ? Mathf.Max( 0, officer.m_communications ) : 0;
+
+		if ( ( race == GameData.Race.Velox ) || ( race == GameData.Race.Thrynn ) || ( race == GameData.Race.Elowan ) )
+		{
+			// a crew member of their race aboard (the officer counts)
+			if ( playerData.m_crewAssignment.HasCrewOfRace( race ) )
+			{
+				skill += 50;
+			}
+
+			// and the officer one of them
+			if ( ( officer != null ) && ( officer.m_crewRaceId >= 0 ) && ( officer.m_crewRaceId < gameData.m_crewRaceList.Length ) && ( gameData.m_crewRaceList[ officer.m_crewRaceId ].m_race == race ) )
+			{
+				skill += 50;
+			}
+		}
+
+		// the Whining Orb translates the language of the Spemin (the Thrynn: "There is an orb device which makes a queer whining sound. This translates the
+		// Spemin language.")
+		if ( ( race == GameData.Race.Spemin ) && playerData.m_playerShip.HasArtifact( "Whining Orb" ) )
+		{
+			skill += 250;
+		}
+
+		// the whole square root (SQRT)
+		var root = Mathf.FloorToInt( Mathf.Sqrt( skill ) );
+
+		for ( var guard = 0; ( guard < 4 ) && ( ( root + 1 ) * ( root + 1 ) <= skill ); guard++ )
+		{
+			root++;
+		}
+
+		for ( var guard = 0; ( guard < 4 ) && ( root > 0 ) && ( root * root > skill ); guard++ )
+		{
+			root--;
+		}
+
+		return Mathf.Min( 250, root * 167 / 10 );
+	}
+
 	// the original's lock-out of a subject (COMM-OV ?LOCKED-OUT, which FIND-SUBJECT runs on every look-up of an alien line): each time the aliens are asked about
 	// the Old Empire or the Ancients, a roll of RRND 0 to 101 under 20 locks that subject out, and it stays locked out until the next encounter begins (INIT_GCOMM
 	// clears the locks, from ENCSETUP); the other subjects never lock out
@@ -4265,9 +4319,12 @@ public class Encounter : MonoBehaviour
 		// remember what the player said last (looking for an outgoing comm changes it)
 		var lastSubjectFromPlayer = m_pdEncounter.m_lastSubjectFromPlayer;
 
+		// a veloxi drone's numbers are answered on its own buttons before the comm link's phrases begin, with no equipment check (COMMSPEC-OV VPROBE#)
+		var droneAnswer = outgoing && ( m_gdEncounter.m_race == GameData.Race.VeloxProbe ) && ( m_pdEncounter.m_lastQuestionFromAliens != 0 ) && ( ( subject == GD_Comm.Subject.Yes ) || ( subject == GD_Comm.Subject.No ) );
+
 		// once the link is up, each phrase of the player's goes through the comm's equipment check, and comm equipment that has broken down or malfunctions ends
 		// the link (COMM-OV CL1: the equipment check with part 2 once phrases have been exchanged, then COMMUNICATIONS HAVE BEEN TERMINATED)
-		if ( outgoing && m_pdEncounter.m_connected && ( subject != GD_Comm.Subject.Terminate ) && !playerData.m_playerShip.UseEquipment( PD_PlayerShip.ShipSystem.Comm ) )
+		if ( outgoing && m_pdEncounter.m_connected && ( subject != GD_Comm.Subject.Terminate ) && !droneAnswer && !playerData.m_playerShip.UseEquipment( PD_PlayerShip.ShipSystem.Comm ) )
 		{
 			Disconnect();
 
@@ -4429,25 +4486,11 @@ public class Encounter : MonoBehaviour
 				}
 			}
 
-			// the Whining Orb translates the language of the Spemin (the Thrynn: "There is an orb device which makes a queer whining sound. This translates the
-			// Spemin language.") - nothing they say is garbled with it aboard
-			var translated = ( m_gdEncounter.m_race == GameData.Race.Spemin ) && playerData.m_playerShip.HasArtifact( "Whining Orb" );
-
-			// and a crew member of their own race understands every word: "all phrases will be un-scrambled if any member of the player's crew is the same race as
-			// the race of the alien" (compart.txt 13; alpha.txt: the officer's skill and race affect the translation - decided 2026-10-11)
-			translated = translated || playerData.m_crewAssignment.HasCrewOfRace( m_gdEncounter.m_race );
-
 			// did we find any?
-			if ( ( possibleGarbles.Count > 0 ) && !translated )
+			if ( possibleGarbles.Count > 0 )
 			{
-				// yes - get the personnel file of the comm officer
-				personnelFile = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer );
-
-				// compute the training level (in 0 to 1 range)
-				var trainingLevel = personnelFile.m_communications / 250.0f;
-
-				// damaged comm equipment garbles more: the officer's training counts in proportion to its health
-				trainingLevel *= playerData.m_playerShip.GetSystemFactor( PD_PlayerShip.ShipSystem.Comm );
+				// yes - how well the communications officer understands them, 0 to 250 (the Whining Orb and a crew member of their race help)
+				var strength = GetTranslationStrength();
 
 				// create and seed the noise generator
 				var fastNoise = new FastNoise( comm.m_id );
@@ -4477,11 +4520,12 @@ public class Encounter : MonoBehaviour
 
 					commWordIndex++;
 
-					// get the difficulty level of this word
-					var difficulty = fastNoise.GetNoise( commWordIndex, 0 ) * 0.45f + 0.5f;
+					// the word's own value, 0 to 249: it is garbled when that is over the officer's strength (COMM-OV ?SCRAMBLE: a value of the word, mod 250,
+					// against COMM-OFF-SKILL), so a word comes through with a chance of (strength + 1) / 250
+					var wordValue = Mathf.Clamp( Mathf.FloorToInt( ( fastNoise.GetNoise( commWordIndex, 0 ) * 0.5f + 0.5f ) * 250.0f ), 0, 249 );
 
 					// is this word too hard for our poor comm officer?
-					if ( difficulty > trainingLevel )
+					if ( wordValue > strength )
 					{
 						// yes - pick number of syllables (based on race)
 						int minSyllables = 1;

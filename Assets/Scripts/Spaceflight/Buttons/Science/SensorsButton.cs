@@ -53,7 +53,7 @@ public class SensorsButton : ShipButton
 				var planet = gameData.m_planetList[ playerData.m_general.m_currentPlanetId ];
 
 				// start the scan
-				SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.StartScanning( SensorsDisplay.ScanType.Planet, 18, planet.m_mass, planet.m_bioDensity, planet.m_mineralDensity );
+				SpaceflightController.m_instance.m_displayController.m_sensorsDisplay.StartScanning( SensorsDisplay.ScanType.Planet, 18, planet.m_mass, playerData.GetBioDensity( planet ), planet.m_mineralDensity );
 
 				return true;
 
@@ -100,6 +100,18 @@ public class SensorsButton : ShipButton
 
 				// get the star
 				var star = gameData.m_starList[ playerData.m_general.m_currentStarId ];
+
+				// the analysis of a star that has flared finds its planets sterilised, for good (ANALYZE-OV WF436: WEC26, whatever the science officer's skill)
+				if ( star.HasFlared( playerData.m_general.m_gameTime, playerData.m_general.m_gameWon, playerData.m_general.m_winTime ) )
+				{
+					foreach ( var flaredPlanet in star.GetPlanetList() )
+					{
+						if ( ( flaredPlanet != null ) && ( flaredPlanet.m_id != -1 ) )
+						{
+							playerData.m_planetSurfaces.SterilisePlanet( flaredPlanet.m_id );
+						}
+					}
+				}
 
 				// count planets
 				var numPlanets = 0;

@@ -19,7 +19,8 @@ public class TerrainGrid : MonoBehaviour
 	// the lifeforms of the planet (made when the planet is populated, next to the ruins, so the scene needs no object for it)
 	public TerrainLifeforms m_terrainLifeforms;
 
-	// the seed of a planet's ruins (TerrainRuins.GetRandomRuinPlaces works their places out with it from orbit, so it has to be the one the surface uses)
+	// the seed of a planet's ruins: the message ruins at random places draw with it (the random ruins of the regions have generators of their own since roadmap
+	// 8.32, RandomRuinRegions)
 	public static int GetRuinSeed( GD_Planet planet )
 	{
 		return planet.m_id + 4;
