@@ -74,7 +74,7 @@ Decided later:
   - (c) Leave lifeforms out.
 - **D4. Interstel Police** (the copy protection arrest). Decided 2026-10-12: left out. The arrest was the original game's copy protection (a wrong security code at launch, read from the code wheel), not part of the game itself, and the port has no code wheel. The launch asks for no code, and the police's lines are not used.
 - **D5. Conflicts in the sources.**
-  - The Rod Device site: STRINFO gives two different coordinates. Decided 2026-10-09: Harrison's base 2, as New Scotland's own entry says.
+  - The Rod Device site: STRINFO gives two different places for it. Decided 2026-10-09: the one its planet's own entry gives.
   - The Red Cylinder's planet: STRINFO prints it as planet 4 of its star three times (1.2, 4.1, 5.1), but the planet's name, the orbit number 5 in its 5.1 entry (the third planet from that sun) and the Elowan message (3.1, "planet 3") all point to orbit 5. Decided 2026-10-09: the third planet (orbit 5).
   - The real effects of the Black Box, the Hypercube and the Ellipsoid. Decided 2026-10-11: none beyond their documented roles. STRINFO 4.1 gives no effect, and their analyses read as curios ("It slices, it dices", "decorative", "a 4-dimensional puzzle"); the Black Box is the Thrynn's sale (#156) and the Ellipsoid a Veloxi demand (#155).
   - The flare deadline. Decided 2026-10-09: the data does not disagree with itself. The year, month and day fields of every star still to flare give its flare day in the original calendar of 10 months of 30 days (234 of 234), so Arth's day 300 is 01-01-4621. The original checks for a flare as each day ends, so Arth's flare comes as 30-10-4620, the last day of the year, ends: the Elowan's "final week of your Ten-month". See item 0.7.
@@ -87,7 +87,7 @@ Decided later:
 - **D8. Ship speed by the engines. Decided 2026-10-17: the top speed in hyperspace and in a star system follows the engines' class, in both.** The original's ship flies at one speed whatever its engines (HYPER-OV `CSPEED`: 12 units a step in a star system, 1 in hyperspace, the step growing by one each pass; the engines and the ship's mass count only in an encounter's acceleration, `!S/A`). At the original's pace in the GOG release a new ship was too fast to stop at a planet in the port's 3D view. Class 5 engines now have the original's top speeds (2998 units a second in a star system, 371 in hyperspace), class 1 a third of them, each class a sixth more; and the ship reaches its top speed from a twelfth of it in 5 seconds over its acceleration in G (engines against mass), so a new ship of 5 G takes a second, as the original's 12 steps. Fuel still goes by the distance flown, and an encounter keeps the original's rules. A slower ship takes longer on a trip, and the game's clock runs in real time, so a trip with class 1 engines takes more game days than with class 5.
 - **D9. The gap list. Decided 2026-10-18: build the shipped game's behaviour for 37 of the 39 differences of Phase 8, and leave two as they are.** Four readings of the decompiled overlays against the port (flight and fluxes, encounters and comms, planets and the surface, the Starport, crew and ship) listed every behaviour of the shipped game the port lacks, each with the overlay words that do it. Built as the shipped game does: every item of Phase 8. This reopens and replaces earlier calls that were made before the shipped code could be read: D3 (lifeforms come from the shipped game's generator and values, item 8.18), item 3.0 (a planet's minerals, lifeforms and curios come back after the ship leaves, as the shipped game seeds them afresh, item 8.19), item 3.5 (random ruins by the shipped game's rule, item 8.32), the translation rule of 2026-10-11 (item 8.9), the Veloxi drone's three numbers of item 0.2 (six, item 8.36), the Shimmering Ball of 2026-10-10 (the aliens' aim jitters, item 8.37), the Crystal Pearl's trigger of #128 (item 8.10), the Crystal Planet's damage rate of item 5.2 (item 8.1), and the artifact that draws the aliens (the Crystal Pearl, as the shipped code has it, item 8.11). Left as they are: the player's aiming (target cycling and separate laser and missile buttons) and the port's earlier departures (the Ship's Log menu, the Messages log, five automatic save slots, D4, music, salvage by flying over a wreck, D8).
 
-A note on reading STRINFO: its "PLANET N OF SYSTEM X, Y" is the N-th planet from the sun, not the orbit number. This holds in 17 of the 18 entries that also print an orbit number; the 18th is Koann (see D5). To find the JSON's `m_orbitPosition`, sort the star's planets by orbit.
+A note on reading STRINFO: its "PLANET N OF SYSTEM X, Y" is the N-th planet from the sun, not the orbit number. This holds in 17 of the 18 entries that also print an orbit number; the 18th is the one in D5. To find the JSON's `m_orbitPosition`, sort the star's planets by orbit.
 
 ## Phase 0: Foundations
 
@@ -139,7 +139,7 @@ Decided 2026-10-09: place only what the sources document (the 14 artifact sites 
 | # | Item | Original (source) | Port today |
 |---|---|---|---|
 | 3.0 | What has been taken from a planet stays taken: deposits now, the artifacts and messages with 3.2 and 3.3 | the manual (page 21) | #100: every disembark had placed the planet again from its seed, so a deposit that had been picked up was back. Replaced 2026-10-18 (D9, item 8.19): the shipped game deletes a planet's minerals, lifeforms and curios when the ship leaves and seeds them afresh |
-| 3.1 | Ruins at the sites of the recovered data: a ruin at each artifact site and at each message, and the two formations (the Most Magnificent Hexagon of 6 ancient ruins on Sphexi, the City of the Ancients of 15) | planet.txt, dir.txt SEED-OV, data from 0.4 | the messages: #102, 12 ruins on Earth; the artifact sites: #108; the two formations: #109 |
+| 3.1 | Ruins at the sites of the recovered data: a ruin at each artifact site and at each message, and the two formations (the Most Magnificent Hexagon of 6 ancient ruins, the City of the Ancients of 15) | planet.txt, dir.txt SEED-OV, data from 0.4 | the messages: #102; the artifact sites: #108; the two formations: #109 |
 | 3.2 | The 12 special artifacts at their 14 sites, taken with the Cargo button | STRINFO 4.1 | #108: in the ruins of their sites, taken once and saved, carried to the ship; the Black Box, the Flat Device and the Whining Orb are bought, not found |
 | 3.3 | The 38 messages go to the ship's log under Messages, recorded with the Cargo button beside their ruin and dated the day they were found | STRINFO 3.1; the manual (page 21) | #102 |
 | 3.4 | Dropping cargo, and the terrain vehicle's cargo display (decided 2026-10-09: both, dropping first) | the manual (page 21): Cargo lists what the vehicle carries "and gives you the option of dropping anything", and a dropped object can be picked up again; the display is not in the sources | dropping: #110; the display: #112, shown while the cargo list is open |
@@ -147,23 +147,23 @@ Decided 2026-10-09: place only what the sources document (the 14 artifact sites 
 
 ## Phase 4: Artifact effects
 
-Only the effects that matter for winning had to come before Phase 5. The others could follow at any time.
+Only the effects that matter for winning had to come before Phase 5. The others could follow at any time. Where each artifact lies is left out, so that the roadmap gives nothing away to players.
 
 | Artifact | Effect (source: Starport analysis, STRINFO) | How it is obtained | Needed to win |
 |---|---|---|---|
-| Crystal Orb | cancels the Crystal Planet's field: #115, with item 5.2 | Sphexi, 46N 14E | yes |
-| Black Egg | a planet bomb, armed by dropping it: #117 (countdown in orbit, the planet destroyed and saved) | three Old Empire sites | yes |
-| Crystal Cone | finds the Crystal Planet's nexus from orbit: #118 (the messages report it on entering orbit and on Land; how it is shown is the port's choice) | Uhlek space | INFERRED yes |
-| Ring Device | shows nearby fluxes (alpha.txt: fluxes are hidden without it and navigation skill) | Mars, 90N 0 | no; decided 2026-10-10: fluxes are hidden without it (#132); since 2026-10-15 also shown to a navigator of skill above 150, as the released game's HYPER-OV .FLUX-ICON |
+| Crystal Orb | cancels the Crystal Planet's field: #115, with item 5.2 | found | yes |
+| Black Egg | a planet bomb, armed by dropping it: #117 (countdown in orbit, the planet destroyed and saved) | found | yes |
+| Crystal Cone | finds the Crystal Planet's nexus from orbit: #118 (the messages report it on entering orbit and on Land; how it is shown is the port's choice) | found | INFERRED yes |
+| Ring Device | shows nearby fluxes (alpha.txt: fluxes are hidden without it and navigation skill) | found | no; decided 2026-10-10: fluxes are hidden without it (#132); since 2026-10-15 also shown to a navigator of skill above 150, as the released game's HYPER-OV .FLUX-ICON |
 | Whining Orb | translates Spemin: #126 | Starport, 6000 MU | no |
 | Flat Device | shields the terrain vehicle from lifeforms: a lifeform hits half as often with the device in the ship or the terrain vehicle (the half is the port's choice) | Starport, 30,000 MU | no |
-| Shimmering Ball | automatic cloak in combat; decided 2026-10-10: the aliens cannot fire at the ship until it fires (replaced 2026-10-18 by item 8.37: the aliens' aim jitters, as the shipped game's). #130 (3 s uncloaked after each shot) | 68,66 planet 1 | no |
-| Rod Device | stronger laser shield: #127 (half of every alien laser hit; the amount is the port's choice) | New Scotland (site: D5) | no |
-| Tesseract | doubles engine efficiency: #124 (half the engines' fuel in hyperspace) | 18,50 planet 5 | no |
-| Crystal Pearl | warps a badly damaged ship away: #128 (out of an encounter below a tenth of the armor; the tenth is the port's choice; replaced 2026-10-18 by item 8.10, the shipped game's trigger and destination) | City of the Ancients | no |
-| Red Cylinder | finds ancient ruins from orbit: flashes on the landing map near an ancient ruin (the shipped game's "THE RED CYLINDER IS FLASHING" is in its landing map code; how near is the port's choice) | Koann (planet: D5) | no |
-| Dodecahedron | attracts every ship nearby: #129 (twice the alien radar distance), replaced on 2026-10-15 by the released game's rule (HYPERMSG-OV TRAK-E: groups come four fifths of the way at each move instead of half, and are not held near home) | 118,146 planet 4 | no |
-| Black Box, Hypercube, Ellipsoid | none beyond their documented roles (D5, decided 2026-10-11) | Thrynn trade, Earth, 81,98 | no |
+| Shimmering Ball | automatic cloak in combat; decided 2026-10-10: the aliens cannot fire at the ship until it fires (replaced 2026-10-18 by item 8.37: the aliens' aim jitters, as the shipped game's). #130 (3 s uncloaked after each shot) | found | no |
+| Rod Device | stronger laser shield: #127 (half of every alien laser hit; the amount is the port's choice) | found | no |
+| Tesseract | doubles engine efficiency: #124 (half the engines' fuel in hyperspace) | found | no |
+| Crystal Pearl | warps a badly damaged ship away: #128 (out of an encounter below a tenth of the armor; the tenth is the port's choice; replaced 2026-10-18 by item 8.10, the shipped game's trigger and destination) | found | no |
+| Red Cylinder | finds ancient ruins from orbit: flashes on the landing map near an ancient ruin (the shipped game's "THE RED CYLINDER IS FLASHING" is in its landing map code; how near is the port's choice) | found | no |
+| Dodecahedron | attracts every ship nearby: #129 (twice the alien radar distance), replaced on 2026-10-15 by the released game's rule (HYPERMSG-OV TRAK-E: groups come four fifths of the way at each move instead of half, and are not held near home) | found | no |
+| Black Box, Hypercube, Ellipsoid | none beyond their documented roles (D5, decided 2026-10-11) | found or traded | no |
 
 ## Phase 5: Main story and endgame
 
@@ -172,8 +172,8 @@ After this phase the game can be played from start to win.
 | # | Item | Original (source) |
 |---|---|---|
 | 5.1 | Arth's sun flares on its date: the Starport is destroyed and the game goes on (distress gets no answer; the win message can still arrive). #121: day 300 unless the game is won; a ship in Arth's system is incinerated; no Starport model, no docking, no answer to distress | STRINFO 2.12, 2.14, Elowan comm, data (D5); disys.txt `?FLARE` |
-| 5.2 | The Crystal Planet (192,152 planet 1): its field damages a ship without the Orb. #115: 5 points a second in orbit without the Orb (the rate is the port's choice; replaced 2026-10-18 by item 8.1, the shipped game's heat sequence and landing lock) | STRINFO 5.1; disys.txt `'HEAT` (crystal planet heating routine) |
-| 5.3 | Drop the armed Black Egg at 47N 45E to win. Anywhere else on the Crystal Planet: "damaged but not destroyed". On the Uhlek brain world (55,32 planet 2) the Uhlek fall silent. On Elan the Elowan young die. #117: the egg, the nexus, the damaged planet and the crew's two reports; #123: the Uhlek harmless, the Elowan mortal enemies | STRINFO 2.12, 5.1, SS Story; disys.txt `?BOMB` |
+| 5.2 | The Crystal Planet: its field damages a ship without the Orb. #115: 5 points a second in orbit without the Orb (the rate is the port's choice; replaced 2026-10-18 by item 8.1, the shipped game's heat sequence and landing lock) | STRINFO 5.1; disys.txt `'HEAT` (crystal planet heating routine) |
+| 5.3 | Drop the armed Black Egg at the Crystal Planet's control nexus to win. Anywhere else on the Crystal Planet: "damaged but not destroyed". On the Uhlek brain world the Uhlek fall silent. On Elan the Elowan young die. #117: the egg, the nexus, the damaged planet and the crew's two reports; #123: the Uhlek harmless, the Elowan mortal enemies | STRINFO 2.12, 5.1, SS Story; disys.txt `?BOMB` |
 | 5.4 | Win sequence: the message, 500,000 MU, the Interstel medal, a supplemental evaluation; no more flares after the win. #120: the win saved, no flares, the bonus paid on docking, the evaluation in Operations | STRINFO 1.2, 2.12; disys.txt `?WIN`, `?FLARE`, `WMSG` |
 | 5.5 | Every way to lose (flare, ship destroyed, all crew dead) ends through the same game over. #122: one destruction path, and the game over names the cause; all crew dead waited for Phase 6 (crew death is only in the 1984 drafts). With Phase 6's crew death, all crew dead ends through the same game over (`CombatController.EndGame`) | STRINFO, disys.txt |
 
