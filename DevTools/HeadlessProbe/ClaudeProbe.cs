@@ -48689,16 +48689,6 @@ public class ClaudeProbe : MonoBehaviour
 		leave.Invoke( SpaceflightController.m_instance.m_encounter, null );
 	}
 
-	// the planet an encounter of the game data waits in orbit around (-1 if none)
-	static int PlanetOfOrbitEncounter( int encounterId )
-	{
-		var gameData = DataController.m_instance.m_gameData;
-		var gdEncounter = gameData.m_encounterList[ encounterId ];
-		var starId = DataController.m_instance.m_playerData.FindEncounter( encounterId ).GetStarId();
-
-		return PlanetInOrbit( starId, gdEncounter.m_orbitPosition );
-	}
-
 	// an encounter that began in orbit ends back in orbit, not out in the star system, after the Noah 9 derelict and after an orbit fleet whose ships are all
 	// destroyed (HYPER-OV ENCCLEANUP: SKIP2NEST for species 19, and for an encounter entered from orbit with MAX#SHIPS - #SHIPS-DESTROYED at 0 unless MAX#SHIPS is
 	// 255; WF022 then OSET: "INITIATING ORBITAL MANEUVER...", "...ORBIT ESTABLISHED"), and Maneuver leaves the derelict's encounter at once (MANEUVER: SKIP2NEST,
