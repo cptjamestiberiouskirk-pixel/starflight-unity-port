@@ -263,9 +263,9 @@ Assets/
 - The Spemin, Thrynn and Veloxi home fleets warn ships away from their homeworlds, more sternly each time, and attack after the last warning
 - The Spemin, Thrynn and Veloxi give up after losing half their ships: they stop fighting and surrender
 - The crew reports when aliens raise or lower their shields and arm or disarm their weapons, and Analysis gives the class of their shields and whether they are up
-- The Elowan give 15 cubic meters of Endurium to a crew whose need for energy is dire, and see through one that already has 20 or more
-- As the comm link opens the Veloxi demand the Crystal Orb and the Ellipsoid if the ship carries them (not when they grovel), then a tribute of Endurium, and attack a crew that refuses; a refused Orb is war with the Veloxi for good, the Ellipsoid given or refused calms or angers the race, and a Crystal Orb they take goes back to where it was found
-- The Thrynn buy artifacts at their own prices and plutonium for Endurium, and sell the Black Box for 30 Endurium
+- Friendly Elowan give 15 cubic meters of Endurium to a crew whose need for energy is dire, and see through one that already has 20 or more
+- As the comm link opens the Veloxi demand the Crystal Orb and the Ellipsoid if the ship carries them (not when they grovel), then a tribute of 3 or 9 cubic meters of Endurium, and attack a crew that refuses; a refused Orb is war with the Veloxi for good, the Ellipsoid given or refused calms or angers the race, and a Crystal Orb they take goes back to where it was found
+- The Thrynn buy plutonium and artifacts for Endurium, and sell a friendly crew the Black Box for 30 Endurium, once
 - The Elowan, Thrynn, Spemin and Veloxi have moods: the player's posture calms or angers them, they grovel before a stronger ship, grow tired of talking, and fight or flee once they are too agitated to talk; and each race remembers how its last encounters ended, and meets the ship again in that mood
 - The Elowan and the Thrynn end the comm link and fight a crew that is friends with the other race, or has one of them aboard, and a crew member of the aliens' own race helps the communications officer understand them
 - The Minstrels sing, the Nomad probes transmit their planetary data, and the Noah 9 derelict sends its distress beacon and recorded message
