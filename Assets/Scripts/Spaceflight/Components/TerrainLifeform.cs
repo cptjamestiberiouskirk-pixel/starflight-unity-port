@@ -28,8 +28,8 @@ public class TerrainLifeform : MonoBehaviour
 	public bool m_hitWithLaser;
 	public bool m_hitWithStunner;
 
-	// a stunned lifeform gets its stuns back one by one (lf-words.txt: "INCREMENT-STUNS : Add one to the Stuns of that alien", while "?STUNS<STUN-POINTS") - the
-	// pace is the port's: two a second, so that a lifeform stays stunned for 5 to 50 seconds
+	// a stunned lifeform gets its stuns back one at each pass of its behaviour (BEHAV-OV WEB69, INCREMENT-: one more while they are under its species' stun effect,
+	// "?STUNS<STU") - the port's pass is every c_behaviourInterval, two a second, so a stunner hit of 10 to 30 stuns it for 5 to 15 seconds
 	const float c_stunsRecoveredPerSecond = 2.0f;
 
 	float m_stunRecovery;
@@ -115,8 +115,13 @@ public class TerrainLifeform : MonoBehaviour
 	// delayed")
 	public float m_lastAttackTime = -100.0f;
 
-	// when the player last fired the laser (for "?PLAYER-FIRING-LASER : Set to True when player fires. Set back to false shortly after")
+	// when the player last fired the laser (for "?PLAYER-FIRING-LASER : Set to True when player fires. Set back to false shortly after"), and where it was aimed
+	// (BEHAV-OV ?ALIEN-CLO: within 6 cells of the weapon's target, WEAPXY)
 	public static float s_laserFiredTime = -100.0f;
+	public static Vector3 s_laserAimPosition;
+
+	// the original's 6 cells about the laser's aim, in world units (the notes' squares are about 9: c_closeEnough is their 5)
+	const float c_aimCloseEnough = 6.0f * 9.0f;
 
 	// its aggression now (the laser changes it, lf-words.txt: REDUCE-AGGR-LEVEL, INCREASES-AGGR-LEVEL), and whether it has noticed the terrain vehicle
 	public int m_aggression;
@@ -193,15 +198,15 @@ public class TerrainLifeform : MonoBehaviour
 		return ( m_status == Status.Alive ) ? "Alive" : ( ( m_status == Status.Stunned ) ? "Stunned" : "Dead" );
 	}
 
-	// the laser: "if it hits, it does from 20 to 100 points of damage" (planet.txt) - returns the damage
+	// the laser: the shipped game's REDUCE-HIT (BEHAV-OV ?REDUCE-PO), 10 to 50 hit points off one that has any left - returns the damage
 	public int HitWithLaser()
 	{
-		if ( m_status == Status.Dead )
+		if ( ( m_status == Status.Dead ) || ( m_hits <= 0 ) )
 		{
 			return 0;
 		}
 
-		var damage = Random.Range( 20, 101 );
+		var damage = Mathf.Min( m_hits, Random.Range( 10, 51 ) );
 
 		m_hits -= damage;
 		m_hitWithLaser = true;
@@ -211,8 +216,9 @@ public class TerrainLifeform : MonoBehaviour
 		return damage;
 	}
 
-	// the stunner: "the effect of the stunner on any given species is drawn from that specie's Species record. The lifeform may either be 1) unaffected 2) stunned
-	// for some period of time or 3) killed" (planet.txt), and a stunner hit takes 10 to 50 stuns (lf-words.txt: REDUCE-STUNS-BY-10-to-50)
+	// the stunner: the shipped game's REDUCE-STU (BEHAV-OV ?REDUCE-PO), 10 to 30 stuns off one that has some under 128, kept in a byte as the original's, so that
+	// below 0 they wrap round to 256 less the rest; then WEB2B and STUN-EFFEC: wrapped stuns (over 128) come off its hit points as the rest, and it is left
+	// with 1 stun - every lifeform of the shipped game can be stunned, and it is stunned from the first hit (UpdateStatus)
 	public void HitWithStunner()
 	{
 		if ( m_status == Status.Dead )
@@ -222,29 +228,15 @@ public class TerrainLifeform : MonoBehaviour
 
 		m_hitWithStunner = true;
 
-		switch ( m_species.m_stunEffect )
+		if ( ( m_stuns > 0 ) && ( m_stuns < 128 ) )
 		{
-			case GD_Species.StunEffect.Unaffected:
+			m_stuns = ( m_stuns - Random.Range( 10, 31 ) ) & 0xff;
+		}
 
-				return;
-
-			case GD_Species.StunEffect.Killed:
-
-				m_hits = 0;
-				break;
-
-			default:
-
-				m_stuns -= Random.Range( 10, 51 );
-
-				// "STUN-EFFECTS-HITS : Take the absolute value of the Stuns and subtract it from the Hits. Then set Stuns to 0."
-				if ( m_stuns < 0 )
-				{
-					m_hits += m_stuns;
-					m_stuns = 0;
-				}
-
-				break;
+		if ( m_stuns > 128 )
+		{
+			m_hits = Mathf.Max( 0, m_hits - ( 256 - m_stuns ) );
+			m_stuns = 1;
 		}
 
 		UpdateStatus();
@@ -288,7 +280,8 @@ public class TerrainLifeform : MonoBehaviour
 			return;
 		}
 
-		if ( ( m_stuns <= 0 ) && ( m_status == Status.Alive ) )
+		// stunned while its stuns are under its species' stun effect (BEHAV-OV ?STUNNED, ?STUNS<STU): from the first stunner hit until they are all back
+		if ( ( m_stuns < m_species.m_stunPoints ) && ( m_status == Status.Alive ) )
 		{
 			m_status = Status.Stunned;
 			m_stunRecovery = 0.0f;
@@ -365,19 +358,24 @@ public class TerrainLifeform : MonoBehaviour
 			return false;
 		}
 
-		// the weapons: "REDUCE-AGGR-LEVEL <-- ?PLAYER-FIRING-LASER TRUE ?ALIEN-CLOSE-ENOUGH TRUE ?ALIEN-SMART-ENOUGH TRUE ?ULTRA-AGGR FALSE ?RANDOM-SCARED TRUE",
-		// "INCREASE-AGGR-LEVEL <-- ?ALIEN-HIT-WITH-LASER TRUE ?DUMB-ENOUGH TRUE ?RANDOM-ANGRY TRUE ?PRODUCER FALSE" (and the same for the stunner)
-		if ( ( Time.time - s_laserFiredTime < 1.0f ) && ( distance <= c_closeEnough ) && ( m_species.m_intelligence >= 70 ) && ( m_aggression < 80 ) && ( Random.value < 0.1f ) )
+		// the weapons, as the shipped game's AGGR-MODIF (BEHAV-OV): the laser fired within 6 cells of it scares a smart one (species intelligence over 69) that is
+		// not over 79 in aggression, one time in ten (REDUCE-AGG: 1 to 50 off), and a hit by either weapon angers one over 79, one time in ten (INCREASES-: 1 to 20
+		// more, at most 100) - both change its species' record, not its own aggression, which it took from the record when it was placed, so only the lifeforms
+		// placed after it show the change (an original quirk); the record is put back on the next run of the terrain vehicle (TerrainLifeforms.Initialize)
+		var toAim = s_laserAimPosition - transform.position;
+		var laserNear = ( Mathf.Abs( toAim.x ) < c_aimCloseEnough ) && ( Mathf.Abs( toAim.z ) < c_aimCloseEnough );
+
+		if ( ( Time.time - s_laserFiredTime < 1.0f ) && laserNear && ( m_species.m_intelligence > 69 ) && ( m_aggression <= 79 ) && ( Random.Range( 0, 100 ) < 10 ) )
 		{
-			m_aggression -= Random.Range( 1, 51 );
+			m_species.m_aggression = Mathf.Max( 0, m_species.m_aggression - Random.Range( 1, 51 ) );
 		}
 
-		if ( ( m_hitWithLaser || m_hitWithStunner ) && ( m_species.m_intelligence < 35 ) && ( Random.value < 0.1f ) && !m_species.IsPlant() )
+		if ( ( m_hitWithLaser || m_hitWithStunner ) && ( m_aggression > 79 ) && ( Random.Range( 0, 100 ) < 10 ) )
 		{
-			m_aggression += Random.Range( 1, 21 );
+			m_species.m_aggression = Mathf.Min( 100, m_species.m_aggression + Random.Range( 1, 21 ) );
 		}
 
-		m_aggression = Mathf.Clamp( m_aggression, 1, 100 );
+		m_aggression = Mathf.Clamp( m_aggression, 0, 100 );
 		m_hitWithLaser = false;
 		m_hitWithStunner = false;
 
@@ -389,7 +387,7 @@ public class TerrainLifeform : MonoBehaviour
 
 		var mobile = m_species.m_movementRate > 0;
 		var dangerous = m_aggression > 65;
-		var wimpy = m_aggression < 35;
+		var wimpy = m_aggression < 50;
 
 		// "ATTACK-PLAYER <-- ?ALIVE TRUE ?STUNNED FALSE ?NOTICE-PLAYER TRUE ?DANGEROUS TRUE ?NEXT-TO-PLAYER TRUE"
 		if ( m_noticedPlayer && dangerous && ( distance <= c_nextToPlayer ) )

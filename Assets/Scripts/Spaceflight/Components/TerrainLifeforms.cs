@@ -95,6 +95,16 @@ public class TerrainLifeforms : TerrainGridPopulator
 		m_planetId = m_planet.m_id;
 		m_speciesList = GD_Species.ForPlanet( m_planet );
 		m_life = GD_Species.GetLife( m_planet );
+
+		// the weapons change a species' aggression for the rest of a run (TerrainLifeform.Behave), as the original's for the rest of a landing: its record's is
+		// put back (VITA-OV makes the records again on each landing)
+		foreach ( var species in m_speciesList )
+		{
+			if ( species.m_record != null )
+			{
+				species.m_aggression = Mathf.Clamp( species.m_record.m_aggression, 1, 100 );
+			}
+		}
 		m_blockTimer = c_blockCheckSeconds;
 
 		PlaceBlocksAround( DataController.m_instance.m_playerData.m_general.m_lastDisembarkedCoordinates );

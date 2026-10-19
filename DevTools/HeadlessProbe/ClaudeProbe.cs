@@ -1786,6 +1786,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioShippedLifeforms();
 				break;
 
+			case "lifeweapons":
+				yield return ScenarioLifeWeapons();
+				break;
+
 			case "iconkey":
 				yield return ScenarioIconKey();
 				break;
@@ -25280,6 +25284,22 @@ public class ClaudeProbe : MonoBehaviour
 		var plantEaten = plant == null;
 
 		// ---- 3. the grazer made a large carnivore, and a small herbivore 25 units away, on the side its own wandering would take it towards the hunter: it flees
+		// (every other lifeform put far off and the two unpaired first: the hunter pairs with the nearest unpaired lifeform, and since roadmap 8.18 the blocks
+		// about the vehicle hold more of them)
+		foreach ( var other in LifeformsOnTheGround() )
+		{
+			var otherLifeform = other.GetComponent<TerrainLifeform>();
+
+			if ( ( otherLifeform != grazer ) && ( otherLifeform != prey ) )
+			{
+				other.position += Vector3.right * 500.0f;
+				SetField( otherLifeform, "m_mate", null );
+			}
+		}
+
+		SetField( grazer, "m_mate", null );
+		SetField( prey, "m_mate", null );
+
 		grazer.m_species = MakeTestAnimal( GD_Species.Niche.Carnivore, 6 );
 		prey.m_species = MakeTestAnimal( GD_Species.Niche.Herbivore, 2 );
 		prey.m_aggression = 50;
@@ -48324,6 +48344,8 @@ public class ClaudeProbe : MonoBehaviour
 		// a lifeform killed (its hits gone, through its own status check) and one captured (the capture takes it off the surface with RemoveEaten)
 		var killed = lifeforms[ 0 ].GetComponent<TerrainLifeform>();
 		var captured = lifeforms[ 1 ].GetComponent<TerrainLifeform>();
+		var killedPlace = killed.m_placeIndex;
+		var capturedPlace = captured.m_placeIndex;
 
 		killed.m_hits = 0;
 		typeof( TerrainLifeform ).GetMethod( "UpdateStatus", BindingFlags.NonPublic | BindingFlags.Instance ).Invoke( killed, null );
@@ -48366,10 +48388,16 @@ public class ClaudeProbe : MonoBehaviour
 
 		var again = LifeformsOnTheGround();
 		var againDead = 0;
+		var killedDeadAgain = false;
+		var capturedBack = false;
 
 		foreach ( var lifeform in again )
 		{
-			againDead += ( lifeform.GetComponent<TerrainLifeform>().m_status == TerrainLifeform.Status.Dead ) ? 1 : 0;
+			var againLifeform = lifeform.GetComponent<TerrainLifeform>();
+
+			againDead += ( againLifeform.m_status == TerrainLifeform.Status.Dead ) ? 1 : 0;
+			killedDeadAgain |= ( againLifeform.m_placeIndex == killedPlace ) && ( againLifeform.m_status == TerrainLifeform.Status.Dead );
+			capturedBack |= againLifeform.m_placeIndex == capturedPlace;
 		}
 
 		var againTaken = surfaces.GetDepositVolumeLeft( 92, takenIndex );
@@ -48426,7 +48454,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "planetrefill: visited [" + visitedText + "], " + deposits.Length + " deposits, " + lifeformCount + " lifeforms | same orbit: deposit left " + againTaken + ", mined " + againMined + " of " + minedVolume + ", lifeforms " + again.Count + " (" + againDead + " dead), drops " + againDrops + ", ruin item taken " + againRuin + " | after leaving: deposit record " + afterTaken + ", shown " + afterTakenShown + ", mined one " + afterMinedVolume + " of " + minedVolume + ", lifeforms " + after.Count + " (" + afterDead + " dead), element " + afterElement + ", curio " + afterCurio + ", special " + afterSpecial + ", egg " + afterEgg + ", ruin item taken " + afterRuin + ", site item taken " + afterSite + " | planet 90's deposit " + control );
 
 		Check( "planetrefill: the Disembark button marks the planet visited in this orbit", ( visited != null ) && visited.Contains( 92 ), visitedText );
-		Check( "planetrefill: in the same orbit the deposits stay taken, the killed lifeform dead and the captured one gone, and what was dropped stays", ( againTaken == 0 ) && ( againMined == Mathf.Max( 1, minedVolume - 10 ) ) && ( again.Count == lifeformCount - 1 ) && ( againDead == 1 ) && againDrops && againRuin, againTaken + " " + againMined + " | " + again.Count + " of " + lifeformCount + ", " + againDead + " dead | " + againDrops + " " + againRuin );
+		Check( "planetrefill: in the same orbit the deposits stay taken, the killed lifeform dead and the captured one gone, and what was dropped stays", ( againTaken == 0 ) && ( againMined == Mathf.Max( 1, minedVolume - 10 ) ) && ( again.Count <= lifeformCount - 1 ) && killedDeadAgain && !capturedBack && againDrops && againRuin, againTaken + " " + againMined + " | " + again.Count + " of " + lifeformCount + ", " + againDead + " dead, the killed one dead " + killedDeadAgain + ", the captured one back " + capturedBack + " | " + againDrops + " " + againRuin );
 		Check( "planetrefill: after leaving the orbit the deposits are back whole", ( afterTaken < 0 ) && afterTakenShown && ( afterMinedVolume == minedVolume ), afterTaken + " " + afterTakenShown + " " + afterMinedVolume + " of " + minedVolume );
 		Check( "planetrefill: after leaving the orbit the lifeforms are back, alive", ( after.Count == lifeformCount ) && ( afterDead == 0 ), after.Count + " of " + lifeformCount + ", " + afterDead + " dead" );
 		Check( "planetrefill: after leaving the orbit a dropped mineral and a dropped curio are gone, and the curios of the random ruins are back", !afterElement && !afterCurio && !afterRuin, afterElement + " " + afterCurio + " " + afterRuin );
@@ -50858,6 +50886,174 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "shippedlifeforms: the port's species of every planet with life are the shipped generator's records (hit points, aggression, size)", ( wiredPlanets >= 34 ) && ( wired == wiredPlanets ), wired + "/" + wiredPlanets );
 
 		Finish( "scenario=shippedlifeforms planets=" + planets + " species=" + species, 0 );
+	}
+
+	// ---------------------------------------------------------------- roadmap 8.18 part D: the terrain vehicle's weapons as the shipped game's (BEHAV-OV)
+
+	// one step of a lifeform's behaviour, at once (TerrainLifeform.Behave)
+	static void BehaveOnce( TerrainLifeform lifeform )
+	{
+		var method = typeof( TerrainLifeform ).GetMethod( "Behave", BindingFlags.NonPublic | BindingFlags.Instance );
+
+		if ( method != null )
+		{
+			method.Invoke( lifeform, null );
+		}
+	}
+
+	// the laser's aim for the lifeforms (TerrainLifeform.s_laserAimPosition, none on the code before roadmap 8.18 part D)
+	static void SetLaserAim( Vector3 position )
+	{
+		var field = typeof( TerrainLifeform ).GetField( "s_laserAimPosition", BindingFlags.Public | BindingFlags.Static );
+
+		if ( field != null )
+		{
+			field.SetValue( null, position );
+		}
+	}
+
+	// the laser and the stunner as the shipped game's (BEHAV-OV ?REDUCE-PO, WEB2B, EFFECT-LIF, WEB69, AGGR-MODIF, VS.PLAYER): a laser hit takes 10 to 50 hit
+	// points, a stunner hit 10 to 30 stuns and stuns at once, past 0 the stuns wrap round in their byte and the rest comes off the hit points, the stuns come back
+	// one a behaviour step, one under 50 in aggression flees, and the weapons change the species' aggression, not the lifeform's own
+	IEnumerator ScenarioLifeWeapons()
+	{
+		var done = new bool[ 1 ];
+		var errorsBefore = s_errorCount;
+
+		EnsureCrew();
+
+		// planet 92 of the Arth system: the lifeform nearest the terrain vehicle, given a species of its own for the test
+		yield return LandInTheArthSystemAt( 92, Vector3.zero, done );
+		yield return Frames( 2 );
+
+		Transform nearest = null;
+
+		foreach ( var candidate in LifeformsOnTheGround() )
+		{
+			if ( ( nearest == null ) || ( DistanceToVehicle( candidate ) < DistanceToVehicle( nearest ) ) )
+			{
+				nearest = candidate;
+			}
+		}
+
+		if ( nearest == null )
+		{
+			Finish( "scenario=lifeweapons abort: no lifeform", 2 );
+			yield break;
+		}
+
+		var lifeform = nearest.GetComponent<TerrainLifeform>();
+		var species = MakeTestAnimal( GD_Species.Niche.Herbivore, 4 );
+
+		species.m_canFly = false;
+		species.m_stunEffect = GD_Species.StunEffect.Stunned;
+		lifeform.m_species = species;
+
+		// ---- 1. the laser: 10 to 50 hit points a hit (REDUCE-HIT)
+		var laserLowest = int.MaxValue;
+		var laserHighest = 0;
+
+		for ( var i = 0; i < 80; i++ )
+		{
+			lifeform.m_status = TerrainLifeform.Status.Alive;
+			lifeform.m_hits = 255;
+			lifeform.m_stuns = species.m_stunPoints;
+
+			var damage = lifeform.HitWithLaser();
+
+			laserLowest = Mathf.Min( laserLowest, damage );
+			laserHighest = Mathf.Max( laserHighest, damage );
+		}
+
+		// ---- 2. the stunner: 10 to 30 stuns off, and stunned from the first hit (REDUCE-STU, ?STUNNED: stuns under the species' stun effect)
+		species.m_stunPoints = 40;
+		lifeform.m_status = TerrainLifeform.Status.Alive;
+		lifeform.m_hits = 100;
+		lifeform.m_stuns = 40;
+		lifeform.HitWithStunner();
+
+		var stunsAfter = lifeform.m_stuns;
+		var statusAfter = lifeform.m_status;
+
+		// ---- 3. it gets its stuns back one a behaviour step (two a second) and is up again once they are all back (WEB69, INCREMENT-)
+		var recoverStart = Time.time;
+		var recoverUntil = Time.realtimeSinceStartup + 20.0f;
+
+		while ( ( lifeform.m_status == TerrainLifeform.Status.Stunned ) && ( Time.realtimeSinceStartup < recoverUntil ) )
+		{
+			yield return null;
+		}
+
+		var recoverSeconds = Time.time - recoverStart;
+		var expectedSeconds = ( 40 - stunsAfter ) / 2.0f;
+		var recovered = ( statusAfter == TerrainLifeform.Status.Stunned ) && ( lifeform.m_status == TerrainLifeform.Status.Alive ) && ( lifeform.m_stuns == 40 ) && ( Mathf.Abs( recoverSeconds - expectedSeconds ) < 1.5f );
+
+		// ---- 4. a stunner hit past 0 wraps round in the byte, and the rest comes off the hit points, leaving 1 stun (REDUCE-STU, WEB2B, STUN-EFFEC)
+		species.m_stunPoints = 8;
+		lifeform.m_status = TerrainLifeform.Status.Alive;
+		lifeform.m_hits = 50;
+		lifeform.m_stuns = 8;
+		lifeform.HitWithStunner();
+
+		var wrapHits = lifeform.m_hits;
+		var wrapStuns = lifeform.m_stuns;
+		var wrapStatus = lifeform.m_status;
+
+		// ---- 5. one under 50 in aggression that has noticed the vehicle flees it (VS.PLAYER WE556: the original's wimpy is under 50)
+		species.m_stunPoints = 50;
+		lifeform.m_status = TerrainLifeform.Status.Alive;
+		lifeform.m_hits = 100;
+		lifeform.m_stuns = 50;
+		lifeform.m_aggression = 45;
+		lifeform.m_noticedPlayer = true;
+		PutAt( nearest, 30.0f );
+		BehaveOnce( lifeform );
+
+		var fleeing = lifeform.m_behaviour == TerrainLifeform.Behaviour.FleeingPlayer;
+
+		// ---- 6. a weapon's hit angers one over 79 one time in ten, on its species' record, not its own aggression (AGGR-MODIF, INCREASES-) - out of the vehicle's
+		// reach, so that it does not attack the crew meanwhile
+		species.m_aggression = 50;
+		lifeform.m_aggression = 85;
+		PutAt( nearest, 40.0f );
+
+		for ( var i = 0; i < 80; i++ )
+		{
+			lifeform.m_hitWithLaser = true;
+			BehaveOnce( lifeform );
+		}
+
+		var speciesAngered = species.m_aggression;
+		var ownAfterAnger = lifeform.m_aggression;
+
+		// ---- 7. the laser fired near a smart one not over 79 scares it one time in ten, on its species' record (AGGR-MODIF, REDUCE-AGG)
+		species.m_aggression = 50;
+		species.m_intelligence = 80;
+		lifeform.m_aggression = 50;
+		PutAt( nearest, 20.0f );
+
+		for ( var i = 0; i < 80; i++ )
+		{
+			TerrainLifeform.s_laserFiredTime = Time.time;
+			SetLaserAim( nearest.position );
+			BehaveOnce( lifeform );
+		}
+
+		var speciesScared = species.m_aggression;
+		var ownAfterFear = lifeform.m_aggression;
+		var errorsDuring = s_errorCount - errorsBefore;
+
+		Log( "lifeweapons: laser " + laserLowest + " to " + laserHighest + " | stunner: stuns 40 -> " + stunsAfter + ", " + statusAfter + ", up again after " + recoverSeconds.ToString( "F1" ) + " s (" + expectedSeconds.ToString( "F1" ) + " expected), " + lifeform.m_stuns + " stuns | wrap: hits 50 -> " + wrapHits + ", stuns " + wrapStuns + ", " + wrapStatus + " | aggression 45 flees " + fleeing + " | anger: species 50 -> " + speciesAngered + ", own " + ownAfterAnger + " | fear: species 50 -> " + speciesScared + ", own " + ownAfterFear );
+
+		Check( "lifeweapons: a laser hit takes 10 to 50 hit points (REDUCE-HIT)", ( laserLowest >= 10 ) && ( laserHighest <= 50 ) && ( laserLowest <= 14 ) && ( laserHighest >= 46 ), laserLowest + " to " + laserHighest );
+		Check( "lifeweapons: a stunner hit takes 10 to 30 stuns and stuns the lifeform at once (REDUCE-STU, ?STUNNED)", ( statusAfter == TerrainLifeform.Status.Stunned ) && ( stunsAfter >= 10 ) && ( stunsAfter <= 30 ), stunsAfter + " " + statusAfter );
+		Check( "lifeweapons: the stuns come back two a second and the lifeform is up again once they are all back (WEB69, INCREMENT-)", recovered, recoverSeconds.ToString( "F1" ) + " s, " + expectedSeconds.ToString( "F1" ) + " expected, " + lifeform.m_stuns );
+		Check( "lifeweapons: stuns taken past 0 wrap round, the rest comes off the hit points and 1 stun is left (WEB2B, STUN-EFFEC)", ( wrapStuns == 1 ) && ( wrapHits >= 28 ) && ( wrapHits <= 48 ) && ( wrapStatus == TerrainLifeform.Status.Stunned ), wrapHits + " " + wrapStuns + " " + wrapStatus );
+		Check( "lifeweapons: a lifeform under 50 in aggression that has noticed the vehicle flees it (WE556)", fleeing, fleeing.ToString() );
+		Check( "lifeweapons: the weapons anger and scare the species' record, not the lifeform's own aggression (AGGR-MODIF)", ( speciesAngered > 50 ) && ( ownAfterAnger == 85 ) && ( speciesScared < 50 ) && ( ownAfterFear == 50 ), speciesAngered + " " + ownAfterAnger + " " + speciesScared + " " + ownAfterFear );
+		Check( "lifeweapons: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
+
+		Finish( "scenario=lifeweapons checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 8: the terrain vehicle's icon key (roadmap 8.27)
