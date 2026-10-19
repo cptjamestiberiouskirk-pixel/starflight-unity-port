@@ -1738,6 +1738,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioRaceMemory();
 				break;
 
+			case "fluxmap":
+				yield return ScenarioFluxMap();
+				break;
+
 			case "lockout":
 				yield return ScenarioLockOut();
 				break;
@@ -48404,6 +48408,114 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "racememory: the save keeps a race's base mood", Mathf.Approximately( saved, 33.0f ), saved.ToString() );
 
 		Finish( "scenario=racememory checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- phase 8: known fluxes on the starmap (since 2026-10-18)
+
+	// how many fluxes the starmap draws (-1 on code from before it)
+	static int DrawnFluxCount()
+	{
+		var starmap = SpaceflightController.m_instance.m_starmap;
+		var method = typeof( Starmap ).GetMethod( "GetDrawnFluxCount", c_any );
+
+		return ( method == null ) ? -1 : (int) method.Invoke( starmap, null );
+	}
+
+	// the fluxes the save knows (null on code from before it)
+	static List<int> KnownFluxes()
+	{
+		return FieldOrNull( DataController.m_instance.m_playerData.m_general, "m_knownFluxList" ) as List<int>;
+	}
+
+	// a flux the ship goes through is known from then on, both ways, kept in the save, and drawn on the starmap as a line between its ends (HYPER-OV
+	// SET-FLUX-STATE, MAP-OV WEA70 and WEA4C). The code before remembered no flux and drew none
+	IEnumerator ScenarioFluxMap()
+	{
+		var dataController = DataController.m_instance;
+		var playerData = dataController.m_playerData;
+		var gameData = dataController.m_gameData;
+		var controller = SpaceflightController.m_instance;
+		var flux = gameData.m_fluxList[ 0 ];
+		var jumped = new bool[ 1 ];
+		var folder = ScreenPictureFolder( "fluxmap" );
+
+		EnsureCrew();
+
+		// a navigator who never loses the ship's bearings for long, fuel, and no encounter able to begin
+		playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Navigator ).m_navigation = 250;
+		playerData.m_playerShip.AddElement( 5, 500 );
+		controller.m_encounterRange = 0.0f;
+
+		playerData.m_general.m_lastHyperspaceCoordinates = flux.GetFrom() + new Vector3( 1024.0f, 0.0f, 0.0f );
+
+		controller.SwitchLocation( PD_General.Location.Hyperspace );
+
+		yield return Frames( 10 );
+
+		// ---- 1. no flux known yet: the starmap draws none (the control)
+		controller.m_starmap.Show();
+
+		yield return Frames( 3 );
+
+		var drawnBefore = DrawnFluxCount();
+
+		controller.m_starmap.Hide();
+
+		// ---- 2. through flux 0: it is known both ways
+		yield return FluxJumpFrom( flux, jumped );
+
+		for ( var end = Time.time + 5.0f; ( Time.time < end ) && Equals( GetField( controller.m_hyperspace, "m_travelingThroughFlux" ), true ); )
+		{
+			yield return null;
+		}
+
+		// and the fade out of the flux (2 s), so that the picture below shows the starmap and not the flux's tunnel
+		yield return new WaitForSeconds( 2.5f );
+
+		var known = KnownFluxes();
+		var reverse = -1;
+
+		foreach ( var other in gameData.m_fluxList )
+		{
+			if ( ( other.m_x1 == flux.m_x2 ) && ( other.m_y1 == flux.m_y2 ) && ( other.m_x2 == flux.m_x1 ) && ( other.m_y2 == flux.m_y1 ) )
+			{
+				reverse = other.m_id;
+			}
+		}
+
+		var knownBothWays = ( known != null ) && known.Contains( flux.m_id ) && known.Contains( reverse ) && ( known.Count == 2 );
+
+		// ---- 3. the starmap draws it, once, as a line between its ends
+		playerData.m_general.m_lastHyperspaceCoordinates = Tools.GameToWorldCoordinates( new Vector3( ( flux.m_x1 + flux.m_x2 ) * 0.5f, 0.0f, ( flux.m_y1 + flux.m_y2 ) * 0.5f ) );
+
+		controller.m_starmap.Show();
+
+		yield return Frames( 5 );
+
+		var drawnAfter = DrawnFluxCount();
+
+		// a picture of it, in a run with a graphics device (probe.ps1 -Graphics): without one, rendering the cameras just after a flux jump crashes Unity
+		if ( SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null )
+		{
+			RenderScreenPicture( System.IO.Path.Combine( folder, "01_starmap_with_flux_0.png" ) );
+		}
+
+		controller.m_starmap.Hide();
+		controller.m_buttonController.DeactivateButton();
+
+		// ---- 4. the save keeps it
+		var copy = JsonUtility.FromJson<PD_General>( JsonUtility.ToJson( playerData.m_general ) );
+		var savedKnown = FieldOrNull( copy, "m_knownFluxList" ) as List<int>;
+		var saved = ( savedKnown != null ) && savedKnown.Contains( flux.m_id ) && savedKnown.Contains( reverse );
+
+		Log( "fluxmap: flux 0 " + flux.m_x1 + "," + flux.m_y1 + " to " + flux.m_x2 + "," + flux.m_y2 + " (reverse " + reverse + "): drawn before " + drawnBefore + ", jumped " + jumped[ 0 ] + ", known [" + ( ( known != null ) ? string.Join( ",", known ) : "none" ) + "], drawn after " + drawnAfter + ", saved " + saved + "; picture in " + folder );
+
+		Check( "fluxmap: with no flux known the starmap draws none (control)", drawnBefore <= 0, drawnBefore.ToString() );
+		Check( "fluxmap: a flux the ship goes through is known both ways (the code before remembered none)", jumped[ 0 ] && knownBothWays, jumped[ 0 ] + " " + ( ( known != null ) ? string.Join( ",", known ) : "none" ) );
+		Check( "fluxmap: the starmap draws the known flux once, as a line between its ends", drawnAfter == 1, drawnAfter.ToString() );
+		Check( "fluxmap: the save keeps the known fluxes", saved, saved.ToString() );
+
+		Finish( "scenario=fluxmap checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 8: the Old Empire and the Ancients lock out (roadmap 8.25)
