@@ -323,7 +323,7 @@ Drive back to the ship and stop beside it, within half a kilometer, to go back i
 - **Fuel**: every kilometer costs fuel by the ground you drive on: little on low ground, more on high ground, and about seven times as much on a liquid. Below 0% the tank still has a small reserve. If the vehicle runs dry, the crew walks back to the ship, the cargo stays behind, and the longer the walk the likelier someone is hurt on the way.
 - **Storms**: the weather can change every star hour, and the wilder the planet's weather the more often a storm comes. Rain, fog and snow make every kilometer cost more fuel and a storm twice as much. A storm can injure the crew, and storms and heavy snow hide the bearing to the ship unless your navigator is highly skilled.
 - **Lava**: drive off molten ground at once. After a few seconds in lava the vehicle and its cargo are lost. The crew gets back to the ship, and the Starport fits a new vehicle for a 10,000 M.U. fine.
-- **Lifeforms**: they live in the lowlands of their latitude band, and more appear as you drive on. Some are harmless and some flee, but dangerous ones come at the vehicle and attack the crew. The laser kills; the stunner only stuns.
+- **Lifeforms**: they live in the lowlands of their latitude band, and more appear as you drive on. Some are harmless and some flee, but dangerous ones come at the vehicle and attack the crew. The laser kills; the stunner stuns at once, for a few seconds, and a lifeform with little to stun is hurt by it as well.
 
 ---
 
