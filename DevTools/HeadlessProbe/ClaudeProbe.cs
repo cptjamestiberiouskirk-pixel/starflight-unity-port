@@ -1718,6 +1718,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioAlienPostures();
 				break;
 
+			case "translation":
+				yield return ScenarioTranslation();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -21214,7 +21218,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "systemeffects: a damaged shield generator holds less charge (half of it at half its health)", ( shieldsWhole > 0 ) && ( shieldsHalf == shieldsWhole / 2 ), shieldsWhole + " -> " + shieldsHalf );
 		Check( "systemeffects: in hyperspace engines at half health keep the top speed (the original's engine damage counts only in an encounter's acceleration, HYPER-OV !S/A)", ( speedWhole > 0.0f ) && Mathf.Abs( speedHalf - speedWhole ) < 0.01f, speedWhole + " -> " + speedHalf );
 		Check( "systemeffects: a damaged laser cannon does less damage, and a destroyed one does not fire", ( laserHits[ 0 ] > 0 ) && ( laserHits[ 1 ] == Mathf.RoundToInt( laserHits[ 0 ] / 2.0f ) ) && !firesDestroyed, laserHits[ 0 ] + " -> " + laserHits[ 1 ] + ", " + firesDestroyed );
-		Check( "systemeffects: destroyed comm equipment garbles what a fully trained officer understands", commWhole.Contains( speminComm.m_text ) && !commDestroyed.Contains( speminComm.m_text ), commDestroyed );
+		Check( "systemeffects: destroyed comm equipment garbles no more: a fully trained officer still understands every word (COMM-OV ?SCRAMBLE reads only the officer's strength; the equipment check fails a damaged comm instead)", commWhole.Contains( speminComm.m_text ) && commDestroyed.Contains( speminComm.m_text ), commDestroyed );
 		Check( "systemeffects: destroyed sensors malfunction and give no readings", sensorsWhole.Contains( "Star System Scan" ) && sensorsBroken.Contains( "Sensors: MALFUNCTION" ) && !sensorsBroken.Contains( "Star System Scan" ), sensorsBroken );
 
 		Finish( "scenario=systemeffects shields=" + shieldsWhole + "/" + shieldsHalf + " speed=" + speedWhole + "/" + speedHalf + " laser=" + laserHits[ 0 ] + "/" + laserHits[ 1 ], 0 );
@@ -22596,7 +22600,7 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 4. translation: an officer with no skill, and the Thrynn's greeting comes through whole with a Thrynn aboard - garbled without (the control)
+		// ---- 4. translation: an officer with no skill, and the Thrynn's greeting comes through in part with a Thrynn aboard - garbled without (the control)
 		officer.m_communications = 0;
 
 		var withThrynn = new List<string>();
@@ -22638,7 +22642,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "rivals: the first comm link with the Thrynn is remembered", ( firstBefore == "None" ) && ( firstAfter == "Thrynn" ), firstBefore + " -> " + firstAfter );
 		Check( "rivals: after the Thrynn the Elowan greet the crew as friends of the Thrynn, and start in their hostile band", elowanGreeting.Contains( CommText( 2 ) ) && ( elowanMood >= 60.0f ), elowanMood + " | " + elowanGreeting );
 		Check( "rivals: with a Thrynn aboard the Elowan have no dealings with the ship, end the comm link, and do not attack", noDealings.Contains( CommText( 1 ) ) && noDealingsDisconnected && ( noDealingsStance != GD_Comm.Stance.Hostile ), noDealingsDisconnected + ", " + noDealingsStance + " | " + noDealings );
-		Check( "rivals: with a Thrynn aboard an officer with no skill understands every word of the Thrynn, and without one not (control)", wholeWithThrynn && !wholeWithout, string.Join( " | ", withThrynn ) + " || " + string.Join( " | ", withoutThrynn ) );
+		Check( "rivals: with a Thrynn aboard an officer with no skill gets the Thrynn's greeting in part, not every word (the crew member adds 50 to the translation strength, COMM-OV INIT-MCOMM: probe translation), and without one garbled (control)", !wholeWithThrynn && !wholeWithout, string.Join( " | ", withThrynn ) + " || " + string.Join( " | ", withoutThrynn ) );
 		Check( "rivals: with an Elowan aboard the Thrynn greet with \"most regrettable\", and start in their hostile band (60, less the 8 of the player's friendly hail)", regrettable.Contains( CommText( 297 ) ) && ( thrynnMood >= 52.0f ), thrynnMood + " | " + regrettable );
 
 		Finish( "scenario=rivals first=" + firstAfter + " elowanMood=" + elowanMood + " thrynnMood=" + thrynnMood, 0 );
@@ -47757,6 +47761,261 @@ public class ClaudeProbe : MonoBehaviour
 
 		Finish( "scenario=alienpostures checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
+	// ---------------------------------------------------------------- phase 8: the officer's translation strength (roadmap 8.9)
+
+	// the translation strength against the aliens of the encounter (Encounter.GetTranslationStrength), or -1 on the code before, which has none
+	static int TranslationStrength()
+	{
+		var method = typeof( Encounter ).GetMethod( "GetTranslationStrength" );
+
+		return ( method == null ) ? -1 : (int) method.Invoke( SpaceflightController.m_instance.m_encounter, null );
+	}
+
+	// an alien line said through the message box: how many of its words came through as they are in the game data, of how many (-1 if the shown words cannot be
+	// lined up with the line's)
+	static int WordsThrough( GD_Comm comm, out int words )
+	{
+		var shown = AlienCommShown( comm );
+		var start = shown.LastIndexOf( "<color=#0a0>" );
+		var end = ( start >= 0 ) ? shown.IndexOf( "</color>", start ) : -1;
+		var shownText = ( ( start >= 0 ) && ( end > start ) ) ? shown.Substring( start + 12, end - start - 12 ) : "";
+		var shownWords = shownText.Split( (char[]) null, StringSplitOptions.RemoveEmptyEntries );
+		var plainWords = comm.m_text.Split( (char[]) null, StringSplitOptions.RemoveEmptyEntries );
+
+		words = plainWords.Length;
+
+		if ( shownWords.Length != plainWords.Length )
+		{
+			return -1;
+		}
+
+		var through = 0;
+
+		for ( var i = 0; i < plainWords.Length; i++ )
+		{
+			if ( string.Equals( shownWords[ i ], plainWords[ i ], StringComparison.OrdinalIgnoreCase ) )
+			{
+				through++;
+			}
+		}
+
+		return through;
+	}
+
+	// the race's lines with nothing filled in (no captain, ship or alien names, no subject) and on one line of text, of five words or more
+	static List<GD_Comm> PlainLines( GameData.Race race )
+	{
+		var lines = new List<GD_Comm>();
+
+		foreach ( var comm in DataController.m_instance.m_gameData.m_commList )
+		{
+			if ( ( comm.m_race == race ) && !string.IsNullOrEmpty( comm.m_text ) && ( comm.m_text.IndexOfAny( new[] { '&', '*', '/', '(', ')', '%', '+', '\n', '\r' } ) < 0 ) && ( comm.m_text.Split( (char[]) null, StringSplitOptions.RemoveEmptyEntries ).Length >= 5 ) )
+			{
+				lines.Add( comm );
+			}
+		}
+
+		return lines;
+	}
+
+	// the first encounter of the race met in flight (not in orbit)
+	static int FindFlightEncounter( GameData.Race race )
+	{
+		var gameData = DataController.m_instance.m_gameData;
+
+		for ( var i = 0; i < gameData.m_encounterList.Length; i++ )
+		{
+			if ( ( gameData.m_encounterList[ i ].m_race == race ) && ( gameData.m_encounterList[ i ].m_location != 2 ) )
+			{
+				return i;
+			}
+		}
+
+		return -1;
+	}
+
+	// the officer's translation strength as the original's (COMM-OV INIT-MCOMM, ?SCRAMBLE): the square root of the communications skill plus 50 for a crew member
+	// of the aliens' race aboard and 50 more if the officer is one (the Veloxi, the Thrynn and the Elowan), plus 250 for the Spemin with the Whining Orb aboard,
+	// times 167 / 10, at most 250; a word of the aliens is garbled when its value, 0 to 249, is over the strength. The code before compared a word's difficulty
+	// with skill / 250 times the comm system's health, and a crew member of the aliens' race or the Whining Orb made every word understood
+	IEnumerator ScenarioTranslation()
+	{
+		var playerData = DataController.m_instance.m_playerData;
+		var gameData = DataController.m_instance.m_gameData;
+		var crew = playerData.m_crewAssignment;
+		var ship = playerData.m_playerShip;
+
+		EnsureCrew();
+		ship.RestoreSystems();
+
+		var officer = crew.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer );
+		var navigator = crew.GetPersonnelFile( PD_CrewAssignment.Role.Navigator );
+		var humanRaceId = -1;
+		var thrynnRaceId = -1;
+
+		for ( var i = 0; i < gameData.m_crewRaceList.Length; i++ )
+		{
+			if ( ( gameData.m_crewRaceList[ i ].m_race == GameData.Race.Human ) && ( humanRaceId < 0 ) )
+			{
+				humanRaceId = i;
+			}
+
+			if ( ( gameData.m_crewRaceList[ i ].m_race == GameData.Race.Thrynn ) && ( thrynnRaceId < 0 ) )
+			{
+				thrynnRaceId = i;
+			}
+		}
+
+		// a human crew, and no Whining Orb aboard
+		foreach ( var role in new[] { PD_CrewAssignment.Role.Captain, PD_CrewAssignment.Role.ScienceOfficer, PD_CrewAssignment.Role.Navigator, PD_CrewAssignment.Role.Engineer, PD_CrewAssignment.Role.CommunicationsOfficer, PD_CrewAssignment.Role.Doctor } )
+		{
+			var file = crew.GetPersonnelFile( role );
+
+			if ( file != null )
+			{
+				file.m_crewRaceId = humanRaceId;
+			}
+		}
+
+		var orbId = gameData.FindArtifactId( "Whining Orb" );
+
+		for ( var guard = 0; ( guard < 10 ) && ( ship.m_artifactStorage.Find( orbId ) != null ); guard++ )
+		{
+			ship.RemoveArtifact( orbId );
+		}
+
+		// ---- 1. the Thrynn: the strength by the officer's skill
+		EnterEncounter( FindFlightEncounter( GameData.Race.Thrynn ) );
+		yield return Frames( 10 );
+
+		var skills = new[] { 0, 30, 50, 100, 150, 200, 225, 250 };
+		var expected = new[] { 0, 83, 116, 167, 200, 233, 250, 250 };
+		var bySkill = new List<string>();
+		var skillsMatch = true;
+
+		for ( var i = 0; i < skills.Length; i++ )
+		{
+			officer.m_communications = skills[ i ];
+
+			var strength = TranslationStrength();
+
+			bySkill.Add( skills[ i ] + ":" + strength );
+			skillsMatch = skillsMatch && ( strength == expected[ i ] );
+		}
+
+		// ---- 2. a crew member of their race: skill 100 and a Thrynn navigator 200, the officer a Thrynn as well 233
+		officer.m_communications = 100;
+		navigator.m_crewRaceId = thrynnRaceId;
+
+		var withThrynnNavigator = TranslationStrength();
+
+		officer.m_crewRaceId = thrynnRaceId;
+
+		var withThrynnOfficer = TranslationStrength();
+
+		officer.m_crewRaceId = humanRaceId;
+
+		// ---- 3. the words that come through: skill 100 (strength 167, a word through with a chance of 168 in 250), skill 0 with a Thrynn navigator (116), and
+		// skill 250 (the control: every word)
+		var thrynnLines = PlainLines( GameData.Race.Thrynn );
+
+		navigator.m_crewRaceId = humanRaceId;
+		officer.m_communications = 100;
+
+		var throughAt100 = 0;
+		var wordsAt100 = 0;
+		var unmatched = 0;
+
+		foreach ( var line in thrynnLines )
+		{
+			var through = WordsThrough( line, out var words );
+
+			if ( through < 0 )
+			{
+				unmatched++;
+
+				continue;
+			}
+
+			throughAt100 += through;
+			wordsAt100 += words;
+		}
+
+		officer.m_communications = 0;
+		navigator.m_crewRaceId = thrynnRaceId;
+
+		var wholeWithNavigator = 0;
+
+		foreach ( var line in thrynnLines )
+		{
+			if ( WordsThrough( line, out var words ) == words )
+			{
+				wholeWithNavigator++;
+			}
+		}
+
+		navigator.m_crewRaceId = humanRaceId;
+		officer.m_communications = 250;
+
+		var wholeAt250 = 0;
+
+		foreach ( var line in thrynnLines )
+		{
+			if ( WordsThrough( line, out var words ) == words )
+			{
+				wholeAt250++;
+			}
+		}
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 4. the Veloxi: a Thrynn aboard does not help with them (skill 100: 167)
+		EnterEncounter( FindFlightEncounter( GameData.Race.Velox ) );
+		yield return Frames( 10 );
+
+		officer.m_communications = 100;
+		navigator.m_crewRaceId = thrynnRaceId;
+
+		var veloxWithThrynn = TranslationStrength();
+
+		navigator.m_crewRaceId = humanRaceId;
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		// ---- 5. the Spemin: skill 0 gives 0, and the Whining Orb 250
+		EnterEncounter( FindFlightEncounter( GameData.Race.Spemin ) );
+		yield return Frames( 10 );
+
+		officer.m_communications = 0;
+
+		var speminWithout = TranslationStrength();
+
+		ship.AddArtifact( orbId );
+
+		var speminWithOrb = TranslationStrength();
+
+		ship.RemoveArtifact( orbId );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+
+		var rateAt100 = ( wordsAt100 > 0 ) ? (float) throughAt100 / wordsAt100 : 0.0f;
+
+		Log( "translation: strength by skill against the Thrynn " + string.Join( " ", bySkill ) + "; skill 100 with a Thrynn navigator " + withThrynnNavigator + ", the officer a Thrynn too " + withThrynnOfficer + "; " + thrynnLines.Count + " Thrynn lines (" + unmatched + " not lined up): at skill 100 " + throughAt100 + " of " + wordsAt100 + " words through (" + ( rateAt100 * 100.0f ).ToString( "F1" ) + "%), skill 0 with a Thrynn navigator " + wholeWithNavigator + " lines whole, skill 250 " + wholeAt250 + " whole; Veloxi with a Thrynn aboard " + veloxWithThrynn + "; Spemin skill 0 " + speminWithout + ", with the Whining Orb " + speminWithOrb );
+
+		Check( "translation: the strength is the square root of the officer's skill times 167 / 10, at most 250 (0, 83, 116, 167, 200, 233, 250, 250 at 0, 30, 50, 100, 150, 200, 225, 250)", skillsMatch, string.Join( " ", bySkill ) );
+		Check( "translation: a Thrynn aboard adds 50 to the skill against the Thrynn (100: 200), and a Thrynn officer 50 more (233)", ( withThrynnNavigator == 200 ) && ( withThrynnOfficer == 233 ), withThrynnNavigator + ", " + withThrynnOfficer );
+		Check( "translation: a crew member of another race does not help (a Thrynn aboard against the Veloxi, skill 100: 167)", veloxWithThrynn == 167, veloxWithThrynn.ToString() );
+		Check( "translation: the Whining Orb adds 250 against the Spemin (skill 0: 0 without it, 250 with it)", ( speminWithout == 0 ) && ( speminWithOrb == 250 ), speminWithout + ", " + speminWithOrb );
+		Check( "translation: at skill 100 about two words in three come through (168 in 250 expected; the code before let through about two in five)", ( wordsAt100 >= 200 ) && ( rateAt100 >= 0.57f ) && ( rateAt100 <= 0.77f ), throughAt100 + " of " + wordsAt100 );
+		Check( "translation: with no skill and a Thrynn aboard their lines come through in part, not whole (the code before: every word)", wholeWithNavigator < thrynnLines.Count / 10 + 1, wholeWithNavigator + " of " + thrynnLines.Count + " whole" );
+		Check( "translation: at skill 250 every line comes through whole (control)", ( thrynnLines.Count > 10 ) && ( wholeAt250 == thrynnLines.Count ), wholeAt250 + " of " + thrynnLines.Count );
+
+		Finish( "scenario=translation checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
 	// ---------------------------------------------------------------- batch 1 (starport side)
 
 	struct SellResult
