@@ -91,7 +91,7 @@ public class DockingBay : MonoBehaviour
 			SpaceflightController.m_instance.m_messages.AddText( "<color=white>A new terrain vehicle has been installed. Interstel has fined you " + PD_TerrainVehicle.c_lossFine.ToString( "N0", System.Globalization.CultureInfo.InvariantCulture ) + " MU - see Operations.</color>" );
 		}
 
-		// back at the Starport with lifeform data: Interstel pays for it
+		// lifeform data an older save file recorded before roadmap 8.18: Interstel pays for it (recordings are now sold at the Trade Depot)
 		var lifeformDataValue = playerData.PayLifeformData();
 
 		if ( lifeformDataValue > 0 )
