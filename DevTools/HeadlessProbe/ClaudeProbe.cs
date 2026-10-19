@@ -50696,10 +50696,25 @@ public class ClaudeProbe : MonoBehaviour
 		var keyOnDisplay = ( key != null ) && ( ( (Component) key ).transform.parent == display.transform );
 		var firstPage = ( key != null ) ? ( Call( key, "GetPageText" ) as string ) : "no key";
 
+		// with -Graphics, the whole screen as the player sees it, with each page of the key (Logs/screen-pictures/iconkey/)
+		var pictureFolder = ScreenPictureFolder( "iconkey" );
+
+		if ( pictureFolder != "" )
+		{
+			yield return Frames( 10 );
+
+			RenderScreenPicture( System.IO.Path.Combine( pictureFolder, "01_map_key_first_page.png" ) );
+		}
+
 		yield return Tap( Key.RightArrow );
 		yield return Frames( 3 );
 
 		var secondPage = ( key != null ) ? ( Call( key, "GetPageText" ) as string ) : "no key";
+
+		if ( pictureFolder != "" )
+		{
+			RenderScreenPicture( System.IO.Path.Combine( pictureFolder, "02_map_key_second_page.png" ) );
+		}
 
 		// ---- 4. the markers over the surface: each object with the icon the original's map gives it
 		var markers = ( mapButton != null ) ? CallIfThere( mapButton, "GetIconMarkers" ) : null;
