@@ -58,7 +58,7 @@ New to *Starflight*? Read the notices in Operations, create and assign a crew of
 
 ## ✅ Status: version 1.4.0
 
-The whole game is playable, from a new game to the ending. Every item of the first seven phases of the [roadmap to parity with the original](ROADMAP.md) is done or decided (59 of 59), and every screen has been compared side by side with the original's. A reading of the shipped game's own code in October 2026 found 37 more of its behaviours to build (Phase 8); 35 of them are built, and the last two, the lifeforms as the shipped game makes and values them and the terrain vehicle's icon key, are under way.
+The whole game is playable, from a new game to the ending. Every item of the first seven phases of the [roadmap to parity with the original](ROADMAP.md) is done or decided (59 of 59), and every screen has been compared side by side with the original's. A reading of the shipped game's own code in October 2026 found 37 more of its behaviours to build (Phase 8); 36 of them are built, and the last, the lifeforms as the shipped game makes and values them, is under way.
 
 Every change is compile-checked in CI and exercised by a headless test harness that plays the real game scenes: 276 scenarios with 1,513 checks, all passing on this release, plus an automated playthrough that plays a new game all the way to the ending and Interstel's bonus.
 
@@ -222,6 +222,7 @@ Assets/
 - The terrain vehicle offers to go back into the ship when it stops within 3 km of it on the way back, and Tools, Return drives it back by itself
 - The terrain vehicle mines mineral deposits with a mining laser (Tools, Mine), a tenth of a cubic meter at a time on the vehicle's energy
 - The terrain vehicle's cargo list sends its cargo to the ship by transporter from within 20 km (Send)
+- The terrain vehicle's Map marks what is around it with the original's own surface icons, and shows their key on the auxiliary display, two pages with the elevation bar
 - Ruins on the planets where the original game left its messages, recorded in the ship's log by the terrain vehicle
 - The original's special artifacts in the ruins of their sites, picked up by the terrain vehicle, with the Most Magnificent Hexagon and the City of the Ancients around two of them
 - The terrain vehicle can drop cargo and pick it up again, with a cargo display while the cargo list is open
@@ -280,9 +281,9 @@ Assets/
 
 </details>
 
-### 📊 Completion: 94 of 96 roadmap items
+### 📊 Completion: 95 of 96 roadmap items
 
-Every item of Phases 0 to 7 in [ROADMAP.md](ROADMAP.md) is done or decided, and so is every item in the screen-by-screen comparison with the original (`Research/Screen comparison.md`), the UI kit included. Of Phase 8, the reading of the shipped game's code, 35 of its 37 items are built; the lifeforms as the shipped game makes and values them (8.18) and the terrain vehicle's icon key (8.27) are under way. The headless test harness covers every one of them, and its playthrough plays a new game through to the win. A full playthrough of 1.0.0 by hand is still to come.
+Every item of Phases 0 to 7 in [ROADMAP.md](ROADMAP.md) is done or decided, and so is every item in the screen-by-screen comparison with the original (`Research/Screen comparison.md`), the UI kit included. Of Phase 8, the reading of the shipped game's code, 36 of its 37 items are built; the lifeforms as the shipped game makes and values them (8.18) are under way. The headless test harness covers every one of them, and its playthrough plays a new game through to the win. A full playthrough of 1.0.0 by hand is still to come.
 
 Nothing is open from the comparison with the original's code: its last two items, the speeds in an encounter and the aliens' distress calls, were measured in the original game.
 
