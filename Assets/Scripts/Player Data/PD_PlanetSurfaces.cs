@@ -62,6 +62,10 @@ public class PD_PlanetSurfaces
 	// the planets a Black Egg has destroyed (ids into the game data's planet list)
 	public List<int> m_destroyedPlanetList;
 
+	// the planets a flare of their star has sterilised: no life on them for good (ANALYZE-OV WEC26 sets the PLANET record's life byte to 0 on the first analysis of
+	// the star after its flare) - read their life through PlayerData.GetBioDensity (null in older save files)
+	public List<int> m_sterilisedPlanetList;
+
 	[Serializable]
 
 	public class LostLifeform
@@ -92,6 +96,7 @@ public class PD_PlanetSurfaces
 		m_destroyedPlanetList = new List<int>();
 		m_lostLifeformList = new List<LostLifeform>();
 		m_visitedPlanetList = new List<int>();
+		m_sterilisedPlanetList = new List<int>();
 	}
 
 	// make sure there are lists (save files from before them have none)
@@ -130,6 +135,30 @@ public class PD_PlanetSurfaces
 		if ( m_visitedPlanetList == null )
 		{
 			m_visitedPlanetList = new List<int>();
+		}
+
+		if ( m_sterilisedPlanetList == null )
+		{
+			m_sterilisedPlanetList = new List<int>();
+		}
+	}
+
+	// true if a flare of its star has sterilised this planet
+	public bool IsPlanetSterilised( int planetId )
+	{
+		Validate();
+
+		return m_sterilisedPlanetList.Contains( planetId );
+	}
+
+	// call this when a flare of its star sterilises a planet
+	public void SterilisePlanet( int planetId )
+	{
+		Validate();
+
+		if ( !m_sterilisedPlanetList.Contains( planetId ) )
+		{
+			m_sterilisedPlanetList.Add( planetId );
 		}
 	}
 
