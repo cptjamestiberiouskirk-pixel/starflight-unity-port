@@ -134,6 +134,10 @@ public class ClaudeProbe : MonoBehaviour
 		// batch mode never has focus, so the game loop only advances when it is allowed to run in the background
 		Application.runInBackground = true;
 
+		// the runs are silent: the game's sounds and music play as they would, every source at its own volume, but nothing reaches the speakers (the listener's
+		// master volume, which the game never sets) - -probeSound (probe.ps1 -Sound) keeps them audible
+		AudioListener.volume = ( Array.IndexOf( Environment.GetCommandLineArgs(), "-probeSound" ) >= 0 ) ? 1.0f : 0.0f;
+
 		// make sure exceptions come with their script stack so they can be attributed
 		Application.SetStackTraceLogType( LogType.Exception, StackTraceLogType.ScriptOnly );
 
@@ -144,7 +148,7 @@ public class ClaudeProbe : MonoBehaviour
 		DontDestroyOnLoad( probeObject );
 		probeObject.AddComponent<ClaudeProbe>();
 
-		Debug.Log( c_tag + "runtime init" );
+		Debug.Log( c_tag + "runtime init (sound " + ( ( AudioListener.volume > 0.0f ) ? "on" : "off" ) + ")" );
 	}
 
 	static void OnLog( string condition, string stackTrace, LogType type )
