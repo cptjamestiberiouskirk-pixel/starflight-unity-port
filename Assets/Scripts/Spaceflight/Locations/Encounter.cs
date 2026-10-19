@@ -891,6 +891,7 @@ public class Encounter : MonoBehaviour
 			m_pdEncounter.m_numCorrectAnswers = 0;
 			m_pdEncounter.m_mechan9NoHumansWarningDone = false;
 			m_pdEncounter.m_attackedByPlayer = false;
+			m_pdEncounter.m_lockedOutSubjects = 0;
 			m_pdEncounter.m_homeworldWarningCount = 0;
 			m_pdEncounter.m_homeworldWarningCounts = new int[ 3 ];
 			m_pdEncounter.m_homeworldWarningsGiven = false;
@@ -4030,6 +4031,26 @@ public class Encounter : MonoBehaviour
 		return false;
 	}
 
+	// the original's lock-out of a subject (COMM-OV ?LOCKED-OUT, which FIND-SUBJECT runs on every look-up of an alien line): each time the aliens are asked about
+	// the Old Empire or the Ancients, a roll of RRND 0 to 101 under 20 locks that subject out, and it stays locked out until the next encounter begins (INIT_GCOMM
+	// clears the locks, from ENCSETUP); the other subjects never lock out
+	bool IsLockedOut( GD_Comm.Subject subject )
+	{
+		if ( ( subject != GD_Comm.Subject.OldEmpire ) && ( subject != GD_Comm.Subject.TheAncients ) )
+		{
+			return false;
+		}
+
+		var bit = 1 << (int) subject;
+
+		if ( Random.Range( 0, 101 ) < 20 )
+		{
+			m_pdEncounter.m_lockedOutSubjects |= bit;
+		}
+
+		return ( m_pdEncounter.m_lockedOutSubjects & bit ) != 0;
+	}
+
 	// find a comm based on the subject
 	GD_Comm FindComm( GD_Comm.Subject subject, bool outgoing )
 	{
@@ -4059,6 +4080,14 @@ public class Encounter : MonoBehaviour
 		else
 		{
 			race = m_gdEncounter.m_race;
+
+			// a question about the Old Empire or the Ancients can lock that subject out for the rest of the encounter, and the aliens answer it with a subject 5
+			// line from then on
+			if ( IsLockedOut( subject ) )
+			{
+				subject = GD_Comm.Subject.NoMoreInformation;
+			}
+
 			stance = GetAlienTalkStance();
 
 			// a home fleet says only its homeworld's warnings

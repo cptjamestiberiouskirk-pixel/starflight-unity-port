@@ -350,6 +350,7 @@ Some things to know:
 - Every race has its own temper. Your posture, your shields and weapons, the strength of your ship and what you say all change how they treat you. A stronger ship gets more respect.
 - Races remember. A race you leave angry meets you angrier next time, and one you leave calm meets you calmer.
 - Aliens hold their fire while a comm link is up.
+- Aliens can tire of questions about the Old Empire and the Ancients. Once they say they know nothing more, they keep saying so until you meet them again.
 - Fire on aliens and they will not talk to you again in that encounter.
 - How much you understand depends on your communications officer.
 - What they tell you is kept in the Ship's Log, under Alien Comms. Much of the game's story is told this way: listen.
