@@ -150,7 +150,7 @@ Buy, sell, repair and name your ship.
 
 - **Buy** and **Sell**: cargo pods, engines, shielding, armor, a missile launcher and a laser cannon. Every part but the pods comes in classes 1 to 5 (prices in [section 14](#ship-equipment)). The ship holds one of each part: sell the old one before buying another class. A part sells back for what it is worth in its condition.
 - **Cargo pods**: 500 M.U. each, up to 16. Each holds 50 cubic meters. **The ship starts with none**, so it can carry no cargo until you buy some.
-- **Repair**: the Starport restores the armor for 4 M.U. a point and the hull for 250 M.U. a point of its integrity, and repairs damaged equipment by the part's price and how badly it is damaged. Shields are refilled free.
+- **Repair**: the Starport restores the armor for 4 M.U. a point and the hull for 250 M.U. a point of its integrity, and repairs damaged equipment by the part's price and how badly it is damaged. Shields are refilled free. Repair first tells you what the whole repair costs and asks "Shall we repair the ship? [N Y]": press right for yes, left for no. It is all or nothing.
 - **Name**: christen the ship. It cannot launch without a name.
 
 The right side shows what is installed, with the ship's mass, its acceleration and the Endurium aboard.
@@ -239,7 +239,7 @@ Flying inside a star system uses no fuel.
 
 ### In hyperspace
 
-The coordinates at the top show where you are. Stars appear as you fly; fly into one to enter its system.
+The coordinates at the top show where you are. Stars appear as you fly; fly into one to enter its system. The map runs from 0 to 249 across and 0 to 219 up: at its edge the ship goes no further, and flying into the edge at a slant slides you along it.
 
 **The Starmap** (Navigation, **Starmap**, hyperspace only) pauses the game and shows the region around you. Move the cursor with the direction keys: the top line shows your position, the cursor's, the distance and **the fuel the trip needs**. Escape or Enter closes it.
 
@@ -257,7 +257,7 @@ Landing and launching from a planet burn fuel too, more on heavier planets. Rais
 
 - **Nebulae**: shields cannot be raised inside one.
 - **Stars**: Science, **Sensors** in a star system reports the star's class and its stability: stable, slightly unstable, or unstable with the Arth days left before it flares. The stability is your science officer's call: one with little skill often reports it "Not certain", so scan again or train them. A star that flares destroys any ship in its system.
-- **Continuum fluxes**: notices from other captains speak of rifts in hyperspace that fling ships far across the map.
+- **Continuum fluxes**: notices from other captains speak of rifts in hyperspace that fling ships far across the map. A well-trained navigator may see one as a few faint dots, more of them the better the training.
 
 ### Time
 
@@ -332,7 +332,7 @@ Drive back to the ship and stop beside it, within half a kilometer, to go back i
 
 Alien ships move around the galaxy, and the radar shows them coming. When they close in, the ship drops into an **encounter**: you, them and the space around you. Some groups guard planets instead, and meet you when you go into orbit there.
 
-To leave an encounter, fly out of its area. Once you are clear, a minute passes before anyone else can stop you.
+Aliens act by their attitude. Hostile ones close in and may open fire; friendly and neutral ones go their way once you have talked or they have nothing more to say; grovelling ones flee. The encounter is over when every ship, wrecks included, is far enough from you: fly away from them, or wait for them to leave. It does not end while the Combat menu is up. Once you are clear, a minute passes before anyone else can stop you.
 
 In an encounter, Science, **Sensors** moves a ring over the ships with the direction keys; Enter scans the one under it. **Analysis** then tells you what it is, its size, and whether its shields are up and its weapons armed. Your crew also tells you when aliens raise their shields or arm their weapons.
 
@@ -348,6 +348,7 @@ Aliens may ask you questions too. The console then offers **Yes**, **No** and **
 Some things to know:
 
 - Every race has its own temper. Your posture, your shields and weapons, the strength of your ship and what you say all change how they treat you. A stronger ship gets more respect.
+- Races remember. A race you leave angry meets you angrier next time, and one you leave calm meets you calmer.
 - Aliens hold their fire while a comm link is up.
 - Aliens can tire of questions about the Old Empire and the Ancients. Once they say they know nothing more, they keep saying so until you meet them again.
 - Fire on aliens and they will not talk to you again in that encounter.

@@ -91,7 +91,7 @@ The port runs on **Unity 6 (6000.3.13f1)** and has been modernized throughout:
 
 ## 🎮 Features
 
-- **Combat**: laser cannons, missile launchers, shields and armor, with alien tactics and victory and defeat detection. Alien ships have their own armor and shield points, any race turns hostile when fired on (the Uhlek attack on sight), aliens hold their fire while a comm link is up, and every shot burns a little Endurium.
+- **Combat**: laser cannons, missile launchers, shields and armor, with alien tactics and victory and defeat detection. Alien ships have their own armor and shield points, any race turns hostile when fired on (the Uhlek attack on sight), aliens hold their fire while a comm link is up, and every shot burns a little Endurium. Aliens act by their posture, as the original's combat rules: fighting aliens open fire, hostile ones close in and may open fire, friendly and neutral ones leave once the talking is over, grovelling ones flee, and an encounter ends when every ship is far enough away.
 - **Encounters in orbit**: home fleets, drones and a derelict wait in orbit around their planets and meet the ship when it arrives. Leaving the encounter returns the ship to the star system, as in the original.
 - **Speed by the engines**: the ship steers the moment you press a direction and stops when you let go, as in the original. Its top speed in hyperspace and in a star system follows its engines: class 1 flies at a third of the original's top speed, class 5 at all of it, and the ship's acceleration (engines against mass) sets how quickly it gets there, so a heavily loaded ship is sluggish.
 - **Ship systems over time**: shields keep their charge and, as in the original, regain it on the ship's turns in an encounter and in full when it ends, and the engineer's repairs and the crew's healing take time, going faster with higher skill: everyone on board heals slowly, and the doctor's patient twice as fast. The doctor asks which crew member to examine or treat, just like the original.
@@ -217,7 +217,7 @@ Assets/
 <summary>Show the full feature list (spoilers)</summary>
 
 - Full Starport operations: Personnel, Crew Assignment, Ship Configuration, the Trade Depot, the Bank and Operations
-- Hyperspace navigation and star system exploration
+- Hyperspace navigation and star system exploration; the edge of hyperspace holds the ship, as in the original
 - Planetary landings and terrain vehicle exploration
 - The terrain vehicle offers to go back into the ship when it stops within 3 km of it on the way back, and Tools, Return drives it back by itself
 - The terrain vehicle mines mineral deposits with a mining laser (Tools, Mine), a tenth of a cubic meter at a time on the vehicle's energy
@@ -238,7 +238,7 @@ Assets/
 - The Flat Device shields the terrain vehicle: lifeforms hit its crew half as often
 - The Red Cylinder flashes a planet's message and artifact sites on the landing map when it opens, and marks its ancient ruins
 - The ancient ruins placed by STRINFO's editors, on the Mechans' ice planet and deep in Elowan space, hold their Endurium
-- Continuum fluxes show on the screen to a navigator trained beyond 150, or with the Ring Device aboard
+- Continuum fluxes show on the screen as the original's twinkling dots: to a navigator trained beyond 150, 1 to 7 of them by skill, and 16 with the Ring Device aboard
 - The price of Endurium rises with the notices of 20-02 and 15-05, and the Starport buys it back at its selling price
 - Nebulae keep the shields down
 - The Starport repairs the hull and damaged systems at the original's prices, and buys parts back according to their condition
@@ -266,7 +266,7 @@ Assets/
 - The Elowan give 15 cubic meters of Endurium to a crew whose need for energy is dire, and see through one that already has 20 or more
 - The Veloxi demand a tribute of Endurium, and the Crystal Orb or the Ellipsoid if the ship carries one, and attack a crew that refuses; a Crystal Orb they take goes back to where it was found
 - The Thrynn buy artifacts at their own prices and plutonium for Endurium, and sell the Black Box for 30 Endurium
-- The Elowan, Thrynn, Spemin and Veloxi have moods: the player's posture calms or angers them, they grovel before a stronger ship, grow tired of talking, and fight or flee once they are too agitated to talk
+- The Elowan, Thrynn, Spemin and Veloxi have moods: the player's posture calms or angers them, they grovel before a stronger ship, grow tired of talking, and fight or flee once they are too agitated to talk; and each race remembers how its last encounters ended, and meets the ship again in that mood
 - The Elowan and the Thrynn hold the crew's friendship with the other race against it, and a crew member of the aliens' own race understands every word they say
 - The Minstrels sing, the Nomad probes transmit their planetary data, and the Noah 9 derelict sends its distress beacon and recorded message
 - Aliens asked about the Old Empire or the Ancients can refuse to say more about it for the rest of the encounter, one question in five, as in the original
