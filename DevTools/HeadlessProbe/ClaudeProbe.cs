@@ -45154,10 +45154,13 @@ public class ClaudeProbe : MonoBehaviour
 		yield return Frames( 10 );
 		yield return ShieldGain( 6.0f, outside );
 
-		// ---- 2. Spemin group 135 with one ship in it, then three: four seconds each
+		// ---- 2. Spemin group 135 with one ship in it, then three: four seconds each, in the Combat menu as in a fight (out of it the encounter can end by itself
+		// once the aliens move off over 22 cells, the original's ?UNNEST)
 		EnterEncounter( 135 );
 
 		yield return Frames( 3 );
+
+		controller.m_buttonController.ChangeButtonSet( ButtonController.ButtonSet.Combat );
 
 		KeepAlienShips( 1 );
 
