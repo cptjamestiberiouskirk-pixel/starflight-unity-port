@@ -67,7 +67,8 @@ public class TerrainGridPopulator : MonoBehaviour
 	}
 
 	// populate the planet
-	protected void Initialize( float elevationScale, GameObject[] templates, int numObjects, int randomSeed, bool favorHigherElevations, float minScale, float maxScale, ObjectSpawnedCallback onObjectSpawned = null )
+	// (chooseTemplate picks the template of the object placed i-th, with no random numbers, so it moves nothing; null takes the templates in turn)
+	protected void Initialize( float elevationScale, GameObject[] templates, int numObjects, int randomSeed, bool favorHigherElevations, float minScale, float maxScale, ObjectSpawnedCallback onObjectSpawned = null, System.Func<int, int> chooseTemplate = null )
 	{
 		Debug.Log( "Placing " + numObjects + " objects under " + transform.name + " with using a random seed of " + randomSeed + "..." );
 
@@ -100,7 +101,8 @@ public class TerrainGridPopulator : MonoBehaviour
 		for ( var i = 0; i < numObjects; i++ )
 		{
 			// grab the template for the next object
-			var template = templates[ i % numTemplateObjects ];
+			var templateIndex = ( chooseTemplate != null ) ? Mathf.Clamp( chooseTemplate( i ), 0, numTemplateObjects - 1 ) : ( i % numTemplateObjects );
+			var template = templates[ templateIndex ];
 
 			// we'll figure out what values to use for these in the loop
 			var mapX = 0.0f;
@@ -214,7 +216,7 @@ public class TerrainGridPopulator : MonoBehaviour
 			// call the callback if one was provided
 			if ( onObjectSpawned != null )
 			{
-				onObjectSpawned( clonedObject, i % numTemplateObjects );
+				onObjectSpawned( clonedObject, templateIndex );
 			}
 		}
 
@@ -255,7 +257,7 @@ public class TerrainGridPopulator : MonoBehaviour
 	/// spawn lists, which this adds to. drawVolume is a deposit's callback (it draws one random number for each deposit placed); null for objects whose
 	/// callback draws none. The game's random numbers are put back afterwards, as Initialize does.
 	/// </summary>
-	public static List<ReplayedPlace> ReplayPlaces( PlanetGenerator planetGenerator, List<Vector3>[,] spawnLists, float elevationScale, int numTemplates, int numObjects, int randomSeed, bool favorHigherElevations, float minScale, float maxScale, System.Func<int> drawVolume )
+	public static List<ReplayedPlace> ReplayPlaces( PlanetGenerator planetGenerator, List<Vector3>[,] spawnLists, float elevationScale, int numTemplates, int numObjects, int randomSeed, bool favorHigherElevations, float minScale, float maxScale, System.Func<int> drawVolume, System.Func<int, int> chooseTemplate = null )
 	{
 		var places = new List<ReplayedPlace>();
 
@@ -325,7 +327,7 @@ public class TerrainGridPopulator : MonoBehaviour
 
 			AddToSpawnList( planetGenerator, spawnLists, position );
 
-			places.Add( new ReplayedPlace { m_position = position, m_templateIndex = i % numTemplates, m_volume = ( drawVolume != null ) ? drawVolume() : 0 } );
+			places.Add( new ReplayedPlace { m_position = position, m_templateIndex = ( chooseTemplate != null ) ? Mathf.Clamp( chooseTemplate( i ), 0, numTemplates - 1 ) : ( i % numTemplates ), m_volume = ( drawVolume != null ) ? drawVolume() : 0 } );
 		}
 
 		Random.state = randomState;
@@ -334,9 +336,9 @@ public class TerrainGridPopulator : MonoBehaviour
 	}
 
 	// populate the planet with a callback for each spawned object
-	protected void InitializeWithCallback( float elevationScale, GameObject[] templates, int numObjects, int randomSeed, bool favorHigherElevations, float minScale, float maxScale, ObjectSpawnedCallback callback )
+	protected void InitializeWithCallback( float elevationScale, GameObject[] templates, int numObjects, int randomSeed, bool favorHigherElevations, float minScale, float maxScale, ObjectSpawnedCallback callback, System.Func<int, int> chooseTemplate = null )
 	{
-		Initialize( elevationScale, templates, numObjects, randomSeed, favorHigherElevations, minScale, maxScale, callback );
+		Initialize( elevationScale, templates, numObjects, randomSeed, favorHigherElevations, minScale, maxScale, callback, chooseTemplate );
 	}
 
 	// figure out which of the spawn lists a position on the planet belongs to
