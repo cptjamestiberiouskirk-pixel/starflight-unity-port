@@ -46057,7 +46057,8 @@ public class ClaudeProbe : MonoBehaviour
 			yield return null;
 		}
 
-		yield return Frames( 5 );
+		// and the fade out of the flux (2 s), so that the picture below shows the starmap and not the flux's tunnel
+		yield return new WaitForSeconds( 2.5f );
 
 		var known = KnownFluxes();
 		var reverse = -1;
