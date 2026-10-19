@@ -61,6 +61,9 @@ public class TerrainLifeforms : TerrainGridPopulator
 	// the lifeforms placed (for the pairing of mates: lf-behav.txt, "Pair all un-paired lifeforms in the encounter area")
 	public readonly List<TerrainLifeform> m_lifeformList = new List<TerrainLifeform>();
 
+	// the planet the lifeforms were placed on
+	int m_planetId = -1;
+
 	// place the lifeforms of this planet
 	public void Initialize( PlanetGenerator planetGenerator, float elevationScale, int randomSeed )
 	{
@@ -70,6 +73,8 @@ public class TerrainLifeforms : TerrainGridPopulator
 		Tools.DestroyChildrenOf( gameObject );
 
 		m_lifeformList.Clear();
+
+		m_planetId = planetGenerator.GetPlanet().m_id;
 
 		var speciesList = GD_Species.ForPlanet( planetGenerator.GetPlanet() );
 
@@ -121,6 +126,51 @@ public class TerrainLifeforms : TerrainGridPopulator
 
 		// give the game its random numbers back
 		Random.state = randomState;
+
+		// (after every random number, so nothing moves)
+		ApplyLostLifeforms();
+	}
+
+	// the lifeforms killed, captured or eaten on earlier runs of the terrain vehicle in this orbit stay so until the ship leaves it, as the original's stay in
+	// the regions of the planet until DEPART deletes them (DPART-OV WF166): a dead one lies dead, a captured or eaten one is gone
+	void ApplyLostLifeforms()
+	{
+		var planetSurfaces = DataController.m_instance.m_playerData.m_planetSurfaces;
+
+		if ( planetSurfaces == null )
+		{
+			return;
+		}
+
+		foreach ( var lifeform in m_lifeformList.ToArray() )
+		{
+			var lostLifeform = planetSurfaces.FindLostLifeform( m_planetId, lifeform.m_placeIndex );
+
+			if ( lostLifeform == null )
+			{
+				continue;
+			}
+
+			if ( lostLifeform.m_isDead )
+			{
+				lifeform.LieDead();
+			}
+			else
+			{
+				RemoveFromSurface( lifeform );
+			}
+		}
+	}
+
+	// call this when a lifeform dies
+	public void LifeformDied( TerrainLifeform lifeform )
+	{
+		var planetSurfaces = DataController.m_instance.m_playerData.m_planetSurfaces;
+
+		if ( planetSurfaces != null )
+		{
+			planetSurfaces.LoseLifeform( m_planetId, lifeform.m_placeIndex, true );
+		}
 	}
 
 	/// <summary>
@@ -272,6 +322,7 @@ public class TerrainLifeforms : TerrainGridPopulator
 			var modelLifeform = modelObject.AddComponent<TerrainLifeform>();
 
 			modelLifeform.m_groundOffset = 0.0f;
+			modelLifeform.m_placeIndex = m_lifeformList.Count;
 			modelLifeform.Initialize( species, this );
 
 			m_lifeformList.Add( modelLifeform );
@@ -322,6 +373,7 @@ public class TerrainLifeforms : TerrainGridPopulator
 		var lifeform = lifeformObject.AddComponent<TerrainLifeform>();
 
 		lifeform.m_groundOffset = groundOffset;
+		lifeform.m_placeIndex = m_lifeformList.Count;
 
 		lifeform.Initialize( species, this );
 
@@ -593,8 +645,22 @@ public class TerrainLifeforms : TerrainGridPopulator
 		SoundController.m_instance.PlaySound( SoundController.Sound.Activate );
 	}
 
-	// a lifeform has been eaten: it is gone at once (taken out of the list and off the surface, so that neither Scan nor Fire finds it before it is destroyed)
+	// a lifeform has been eaten (or captured): it is gone at once (taken out of the list and off the surface, so that neither Scan nor Fire finds it before it is
+	// destroyed), and stays gone on later runs of the terrain vehicle until the ship leaves the orbit
 	public void RemoveEaten( TerrainLifeform lifeform )
+	{
+		var planetSurfaces = DataController.m_instance.m_playerData.m_planetSurfaces;
+
+		if ( planetSurfaces != null )
+		{
+			planetSurfaces.LoseLifeform( m_planetId, lifeform.m_placeIndex, false );
+		}
+
+		RemoveFromSurface( lifeform );
+	}
+
+	// takes a lifeform out of the list and off the surface
+	void RemoveFromSurface( TerrainLifeform lifeform )
 	{
 		m_lifeformList.Remove( lifeform );
 
