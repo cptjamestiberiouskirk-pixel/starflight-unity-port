@@ -181,6 +181,22 @@ public class PD_Encounter : IComparable
 		m_currentCoordinates = m_homeCoordinates;
 	}
 
+	// puts a group in a star system at a random place of the system, its home there too, as the original's SETRNDXY (HYPER-OV): each axis RRND(-395, 395) of the
+	// system's 400 units (SYSRADIUS less 5), the original's system being a square; a place in its corners, outside the port's round system, is brought in to 395
+	// from the middle along its direction
+	public void PlaceAtRandomInStarSystem()
+	{
+		var place = new Vector3( UnityEngine.Random.Range( -395, 395 ), 0.0f, UnityEngine.Random.Range( -395, 395 ) );
+
+		if ( place.magnitude > 395.0f )
+		{
+			place = place.normalized * 395.0f;
+		}
+
+		m_homeCoordinates = place * ( 8192.0f / 400.0f );
+		m_currentCoordinates = m_homeCoordinates;
+	}
+
 	// repair save files written before the game data moved this encounter (encounters 144 to 146 were in a star system, the original has them in hyperspace) - its ships and what was said are kept
 	public bool ValidateLocation()
 	{

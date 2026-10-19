@@ -642,6 +642,19 @@ public class SpaceflightController : MonoBehaviour
 		}
 	}
 
+	// a star system's alien groups are placed afresh each time the ship comes into it from hyperspace, as the original's SYSSETUP (HYPER-OV: SETPLNXY gives each
+	// alien group of the system SETRNDXY); not when the ship comes back to the system from orbit, an encounter or the Starport, or when a game is loaded
+	public void PlaceStarSystemEncounters( int starId )
+	{
+		foreach ( var encounter in DataController.m_instance.m_playerData.m_encounterList )
+		{
+			if ( ( encounter.GetLocation() == PD_General.Location.StarSystem ) && ( encounter.GetStarId() == starId ) )
+			{
+				encounter.PlaceAtRandomInStarSystem();
+			}
+		}
+	}
+
 	// how the aliens come after the ship, as the original's TRAK-E (HYPERMSG-OV): every 2 star hours each group jumps towards the ship, along each axis a share of the
 	// way - a half in hyperspace, three quarters in a star system, four fifths and six sevenths with the Crystal Pearl aboard (WF333) - in whole map coordinates of 8 of
 	// the original's units, rounded towards none, and the whole way once that comes to none, so that it lands on the ship (WF31B). In hyperspace only the groups of the
