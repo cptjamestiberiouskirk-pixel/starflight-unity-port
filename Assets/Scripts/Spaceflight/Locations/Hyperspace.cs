@@ -19,6 +19,19 @@ public class Hyperspace : MonoBehaviour
 	readonly List<GameObject> m_fluxObjectList = new List<GameObject>();
 	bool m_fluxesShown;
 
+	// a flux is drawn as the original's dots (HYPER-OV .FLUX-ICON): GetFluxDotCount grey points, each at the flux's place plus RNDCPT(15) (up to 22 pixels up or
+	// down, and across up to the ellipse's half width at that height, 15 pixels at the middle; the original's view is 4 pixels a unit across and 6 up, so up to 120
+	// of the port's units across and 117 along), placed afresh at every step of the ship (PlayerShip.c_hyperspaceStepsPerSecond), so they twinkle. The particle
+	// systems of the flux copies are given their points by hand, with numbers of their own so that the game's Random is not touched
+	readonly List<ParticleSystem> m_fluxParticleSystemList = new List<ParticleSystem>();
+	readonly ParticleSystem.Particle[] m_fluxDots = new ParticleSystem.Particle[ c_mostFluxDots ];
+	readonly System.Random m_fluxDotRandom = new System.Random( 13 );
+	int m_fluxDotCount;
+	float m_fluxDotTimer;
+	const int c_mostFluxDots = 16;
+	const float c_fluxDotSize = 4.0f;
+	static readonly Color32 c_fluxDotColour = new Color32( 190, 190, 190, 255 );
+
 	// flux travel timer
 	float m_timer;
 
@@ -84,6 +97,23 @@ public class Hyperspace : MonoBehaviour
 			// remember it (it is shown or hidden in the update, with the Ring Device)
 			m_fluxObjectList.Add( clonedFlux );
 
+			// its particle system draws the dots it is given, and nothing of its own
+			var particleSystem = clonedFlux.GetComponentInChildren<ParticleSystem>( true );
+
+			if ( particleSystem != null )
+			{
+				var emission = particleSystem.emission;
+
+				emission.enabled = false;
+
+				var main = particleSystem.main;
+
+				main.maxParticles = Mathf.Max( main.maxParticles, c_mostFluxDots );
+				main.prewarm = false;
+			}
+
+			m_fluxParticleSystemList.Add( particleSystem );
+
 			clonedFlux.SetActive( false );
 		}
 
@@ -94,6 +124,63 @@ public class Hyperspace : MonoBehaviour
 
 		// we are not travelling through a flux now
 		m_travelingThroughFlux = false;
+	}
+
+	// how many dots a flux shows (the original's HYPER-OV .FLUX-ICON): none unless the navigator's skill is above 150 or the Ring Device is aboard; then
+	// (skill - 150) * 6 / 100 + 1, 1 at 151 to 7 at 250, and 16 with the Ring Device whatever the skill (SETUP-MOV: ?HAS-RING-DEVICE is 16 with artifact 8 aboard)
+	public static int GetFluxDotCount( int navigatorSkill, bool ringDevice )
+	{
+		if ( ( navigatorSkill <= 150 ) && !ringDevice )
+		{
+			return 0;
+		}
+
+		return Mathf.Max( ( navigatorSkill - 150 ) * 6 / 100 + 1, ringDevice ? c_mostFluxDots : 0 );
+	}
+
+	// gives every flux shown its dots, each at the flux's place plus the original's RNDCPT(15): a = RRND(0, 23) pixels up or down, then b = RRND(0, the
+	// ellipse's half width at that height + 1) across, each negated half the time (HYPER-OV RNDCPT), 8 of the port's units a pixel across and 32 / 6 up
+	void PlaceFluxDots()
+	{
+		for ( var i = 0; i < m_fluxParticleSystemList.Count; i++ )
+		{
+			var particleSystem = m_fluxParticleSystemList[ i ];
+
+			if ( particleSystem == null )
+			{
+				continue;
+			}
+
+			var fluxPlace = m_fluxObjectList[ i ].transform.position;
+
+			for ( var dot = 0; dot < m_fluxDotCount; dot++ )
+			{
+				var up = m_fluxDotRandom.Next( 0, 23 );
+				var halfWidth = Mathf.Sqrt( Mathf.Max( 0.0f, 225.0f - Mathf.Pow( up * 2.0f / 3.0f, 2.0f ) ) );
+				var across = m_fluxDotRandom.Next( 0, Mathf.FloorToInt( halfWidth ) + 1 );
+
+				if ( m_fluxDotRandom.Next( 0, 2 ) == 0 )
+				{
+					up = -up;
+				}
+
+				if ( m_fluxDotRandom.Next( 0, 2 ) == 0 )
+				{
+					across = -across;
+				}
+
+				var place = fluxPlace + new Vector3( across * 8.0f, 0.0f, up * 32.0f / 6.0f );
+
+				m_fluxDots[ dot ].position = particleSystem.transform.InverseTransformPoint( place );
+				m_fluxDots[ dot ].velocity = Vector3.zero;
+				m_fluxDots[ dot ].startSize = c_fluxDotSize;
+				m_fluxDots[ dot ].startColor = c_fluxDotColour;
+				m_fluxDots[ dot ].startLifetime = 1.0f;
+				m_fluxDots[ dot ].remainingLifetime = 1.0f;
+			}
+
+			particleSystem.SetParticles( m_fluxDots, m_fluxDotCount );
+		}
 	}
 
 	// unity update
@@ -111,8 +198,10 @@ public class Hyperspace : MonoBehaviour
 		// get to the game data
 		var gameData = DataController.m_instance.m_gameData;
 
-		// the fluxes can be seen with the Ring Device aboard or by a navigator of skill above 150
-		var showFluxes = playerData.m_playerShip.HasArtifact( "Ring Device" ) || ( CombatController.GetNavigatorSkill() > 150 );
+		// the fluxes can be seen with the Ring Device aboard or by a navigator of skill above 150, as dots, more of them the better the navigator
+		m_fluxDotCount = GetFluxDotCount( CombatController.GetNavigatorSkill(), playerData.m_playerShip.HasArtifact( "Ring Device" ) );
+
+		var showFluxes = ( m_fluxDotCount > 0 );
 
 		if ( showFluxes != m_fluxesShown )
 		{
@@ -121,6 +210,21 @@ public class Hyperspace : MonoBehaviour
 			foreach ( var fluxObject in m_fluxObjectList )
 			{
 				fluxObject.SetActive( showFluxes );
+			}
+
+			m_fluxDotTimer = 0.0f;
+		}
+
+		// the dots are placed afresh at every step of the ship
+		if ( m_fluxesShown )
+		{
+			m_fluxDotTimer -= Time.deltaTime;
+
+			if ( m_fluxDotTimer <= 0.0f )
+			{
+				m_fluxDotTimer = 1.0f / PlayerShip.c_hyperspaceStepsPerSecond;
+
+				PlaceFluxDots();
 			}
 		}
 
