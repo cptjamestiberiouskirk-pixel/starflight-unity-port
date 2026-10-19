@@ -173,6 +173,22 @@ public class PD_General
 		return m_orbitPermissionList;
 	}
 
+	// the encounters in orbit that have ended back in orbit (the Noah 9 derelict) and do not begin again until the ship leaves orbit (the original's WD9EC: on from
+	// the encounter entered from orbit until UNNEST-CLEAN, on leaving orbit) - saved, so that the derelict does not begin again after the game is loaded in that
+	// orbit (older saves have none: see GetOrbitEncountersEnded)
+	public List<int> m_orbitEncountersEnded;
+
+	// returns the encounters in orbit that have ended back in orbit until the ship leaves it (never null)
+	public List<int> GetOrbitEncountersEnded()
+	{
+		if ( m_orbitEncountersEnded == null )
+		{
+			m_orbitEncountersEnded = new List<int>();
+		}
+
+		return m_orbitEncountersEnded;
+	}
+
 	// the continuum fluxes the ship has been through, by their GD_Flux ids, both ways: the original marks a flux known when the ship goes through it and keeps
 	// that in the save, and its starmap draws the known ones (HYPER-OV SET-FLUX-STATE, MAP-OV WEA70) - older saves have none: see GetKnownFluxes
 	public List<int> m_knownFluxList;

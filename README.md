@@ -92,7 +92,7 @@ The port runs on **Unity 6 (6000.3.13f1)** and has been modernized throughout:
 ## 🎮 Features
 
 - **Combat**: laser cannons, missile launchers, shields and armor, with alien tactics and victory and defeat detection. Alien ships have their own armor and shield points, any race turns hostile when fired on (the Uhlek attack on sight), aliens hold their fire while a comm link is up, and every shot burns a little Endurium. Aliens act by their posture, as the original's combat rules: fighting aliens open fire, hostile ones close in and may open fire, friendly and neutral ones leave once the talking is over, grovelling ones flee, and an encounter ends when every ship is far enough away.
-- **Encounters in orbit**: home fleets, drones and a derelict wait in orbit around their planets and meet the ship when it arrives. Leaving the encounter returns the ship to the star system, as in the original.
+- **Encounters in orbit**: home fleets, drones and a derelict wait in orbit around their planets and meet the ship when it arrives. Leaving the encounter returns the ship to the star system, as in the original, or to orbit after the Noah 9 derelict or a fleet destroyed to the last ship.
 - **Speed by the engines**: the ship steers the moment you press a direction and stops when you let go, as in the original. Its top speed in hyperspace and in a star system follows its engines: class 1 flies at a third of the original's top speed, class 5 at all of it, and the ship's acceleration (engines against mass) sets how quickly it gets there, so a heavily loaded ship is sluggish.
 - **Ship systems over time**: shields keep their charge and, as in the original, regain it on the ship's turns in an encounter and in full when it ends, and the engineer's repairs and the crew's healing take time, going faster with higher skill: everyone on board heals slowly, and the doctor's patient twice as fast. The doctor asks which crew member to examine or treat, just like the original.
 - **Living suns**: each star system's sun churns, its corona flickers and small flares rise from its rim and fall back, all in the color of real stars of its class.
@@ -234,9 +234,10 @@ Assets/
 - The Crystal Pearl, when the captain chooses Maneuver in a fight with the ship heavily damaged, warps it out of the encounter to a place anywhere in hyperspace
 - The ship steers the moment you press a direction and stops when you let go, as in the original, and its top speed follows its engines: class 5 engines fly at the original's pace in hyperspace and in star systems, as measured in GOG's version of the game, class 1 at a third of it, and the ship's acceleration (engines against mass) sets how quickly it gets there
 - Alien ships come after you as in the original: every two star hours they jump toward your ship, half the way in hyperspace and three quarters in a star system, and in hyperspace they stay near their home ground; the Crystal Pearl draws them farther and faster
-- The Shimmering Ball cloaks the ship in combat until it fires
+- A science officer trained beyond 150 reports each of those jumps: "Motion detected at", and how far each group moved across and along, in map coordinates
+- The Shimmering Ball, once Combat is entered, makes the aliens' aim waver: their lasers hit one shot in nine, and their missiles and plasma bolts often land beside the ship
 - The Flat Device shields the terrain vehicle: lifeforms hit its crew half as often
-- The Red Cylinder flashes a planet's message and artifact sites on the landing map when it opens, and marks its ancient ruins
+- The Red Cylinder flashes a planet's message and artifact sites on the landing map when it opens, and marks its ancient ruins: a box on each fixed one, a light tint over the regions that hold the random ones
 - The ancient ruins placed by STRINFO's editors, on the Mechans' ice planet and deep in Elowan space, hold their Endurium
 - Continuum fluxes show on the screen as the original's twinkling dots: to a navigator trained beyond 150, 1 to 7 of them by skill, and 16 with the Ring Device aboard; a flux the ship has been through is remembered, and the starmap draws it as a line between its ends
 - The price of Endurium rises with the notices of 20-02 and 15-05, and the Starport buys it back at its selling price
@@ -250,16 +251,17 @@ Assets/
 - Lava destroys a terrain vehicle that drives into it, and the Starport installs a new one for a fine
 - Terrain vehicle fuel as the original's: every kilometer driven costs fuel by the ground under the vehicle, little at the shore, more the higher it climbs and about seven times as much on a liquid; a storm makes each kilometer dearer without slowing the vehicle
 - Surface weather as the original's: spells of weather rolled from the planet's weather activity, with storms picked by its surface; a storm halves the terrain vehicle's efficiency and can injure the crew, heavy snow, fog and rain cost a quarter of it, and storms and heavy snow lose the bearing to the ship unless the navigator is highly skilled
-- A quarter of the planets hold random ruins: ancient crystal ruins with Endurium or truly amazing artifacts, and Old Empire ruins with artifacts
+- Random ruins as the original places them: none on the common planets, many on the planets of ruins, region by region as the terrain vehicle drives; ancient crystal ruins with Endurium beside them, and recent ruins, both sometimes holding a curio
 - Destroyed ships leave debris that the ship can salvage by flying over it
 - The science officer's skill decides how much of an analysis is revealed, and each planet's readings are analyzed once
 - The bank pays the original's 12% annual interest on the balance when the crew boards at the Starport and with each new colony recommendation, shown as an Interest row in the ledger
 - Hits that get past the shields fall on the armor, and only once the armor is gone on the hull, the ship's systems (engines, sensors, comms, shield generator, missile launcher, laser cannon) and the crew, as in the original. The ship is lost when the hull's integrity is gone, and damaged systems work in proportion to their health (damaged engines slow the ship only in a fight, as in the original) and can malfunction when they are used, with a chance of their damage, after which they stay inoperative until they are repaired, as in the original. Damage shows the original's DAMAGE display, with a bar for the hull and each system, and Repair lets the player choose what the engineer repairs (the hull and the systems, never the armor), using minerals from the hold
 - The game can be won: destroying the Crystal Planet ends the flares, Interstel pays its 500,000 MU bonus at once, and a supplemental evaluation waits at the Starport
 - Arth's sun flares on 01-01-4621 unless the game has been won: the Starport is destroyed, and any ship in Arth's system is incinerated
+- A star's flare sterilises its planets: once the star has been scanned after its flare, they have no life left
 - 10 alien races, each with its own encounter behavior
 - Aliens with only a ship or two left call for help, and more of their ships warp in
-- Encounters that guard planets from orbit, fought over the planet's own surface; a Veloxi drone grants permission to orbit to a crew that answers its numbers the Veloxi way
+- Encounters that guard planets from orbit, fought over the planet's own surface; a Veloxi drone grants permission to orbit to a crew that answers its six numbers the Veloxi way, each within 15 seconds
 - The Spemin, Thrynn and Veloxi home fleets warn ships away from their homeworlds, more sternly each time, and attack after the last warning
 - The Spemin, Thrynn and Veloxi give up after losing half their ships: they stop fighting and surrender
 - The crew reports when aliens raise or lower their shields and arm or disarm their weapons, and Analysis gives the class of their shields and whether they are up
@@ -268,7 +270,7 @@ Assets/
 - The Thrynn buy artifacts at their own prices and plutonium for Endurium, and sell the Black Box for 30 Endurium
 - The Elowan, Thrynn, Spemin and Veloxi have moods: the player's posture calms or angers them, they grovel before a stronger ship, grow tired of talking, and fight or flee once they are too agitated to talk; and each race remembers how its last encounters ended, and meets the ship again in that mood
 - The Elowan and the Thrynn hold the crew's friendship with the other race against it, and a crew member of the aliens' own race helps the communications officer understand them
-- The Minstrels sing, the Nomad probes transmit their planetary data, and the Noah 9 derelict sends its distress beacon and recorded message
+- The Minstrels sing, the Nomad probes transmit their planetary data, and the Noah 9 derelict sends its distress beacon and recorded message; the Minstrels, the Nomad probes and the Mysterions move on after each meeting, to anywhere in hyperspace
 - Aliens asked about the Old Empire or the Ancients can refuse to say more about it for the rest of the encounter, one question in five, as in the original
 - A complete combat system with lasers, missiles, shields and armor
 - Ship destruction with debris

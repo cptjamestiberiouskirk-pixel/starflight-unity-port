@@ -90,10 +90,7 @@ public class GD_Star
 
 		if ( won || ( days < 1 ) || ( days >= c_stableDays ) )
 		{
-			// a flare day after the win had no flare (with no time of the win, a game saved after the win before it was kept, the flare counts as before it)
-			var flared = ( days < 1 ) && ( !won || ( winTime < 0.0f ) || ( Mathf.FloorToInt( winTime ) > m_daysToNextFlare ) );
-
-			return flared ? "Stable (post-flare)" : "Stable";
+			return HasFlared( today, won, winTime ) ? "Stable (post-flare)" : "Stable";
 		}
 
 		if ( days > c_unstableDays )
@@ -102,6 +99,16 @@ public class GD_Star
 		}
 
 		return "Unstable - estimated time to flare: " + days + ( ( days == 1 ) ? " Arth day" : " Arth days" );
+	}
+
+	// true once the star has flared: its flare day has come, and the game was not won before it (ANALYZE-OV WEC04: STARDATE not below the flare date, and ?WIN
+	// none or after it) - a flare day after the win had no flare (with no time of the win, a game saved after the win before it was kept, the flare counts as
+	// before it)
+	public bool HasFlared( float today, bool won, float winTime )
+	{
+		var days = Mathf.CeilToInt( m_daysToNextFlare - today );
+
+		return ( days < 1 ) && ( !won || ( winTime < 0.0f ) || ( Mathf.FloorToInt( winTime ) > m_daysToNextFlare ) );
 	}
 
 	// call this to get the breach distance

@@ -131,10 +131,15 @@ public class CombatController : MonoBehaviour
 	// the game over screen adds GAME OVER after the cause (the original's crew death, HEAL-OV: "!!CREW DECEASED!!" and "**GAME OVER**")
 	bool m_gameOverCauseSaysGameOver;
 
-	// the Shimmering Ball cloaks the ship in combat, and a shot of the player drops the cloak for a while (decided 2026-10-10; how long is the port's
-	// choice) - the time until it cloaks the ship again
-	const float c_uncloakedTime = 3.0f;
-	float m_uncloakedTimer;
+	// the Shimmering Ball: entering Combat with it aboard puts a cell of jitter on each axis of every alien laser's, missile's and plasma bolt's aim until the
+	// encounter ends (COMBAT-OV WF414: WE96B sets WDE41 from the Ball's being aboard each time Combat is entered, and CLOAKING DEVICE NOW ACTIVE is said then;
+	// CLEAR-CO clears it when an encounter begins; WE911 adds RRND -1 to 2 to each axis of the aim) - not saved, as the original's
+	bool m_shimmeringBallActive;
+
+	// the plasma bolts in the air whose aim the Shimmering Ball jitters, re-aimed each pass (WE929 aims a bolt again at the ship plus the jitter), and the time to the
+	// next pass
+	readonly List<MissileProjectile> m_jitteredBolts = new List<MissileProjectile>();
+	float m_boltPassTimer;
 
 	// player debris template (assign in inspector)
 	public GameObject m_playerDebrisTemplate;
@@ -227,17 +232,60 @@ public class CombatController : MonoBehaviour
 			m_playerMissileCooldown -= Time.deltaTime;
 		}
 
-		if ( m_uncloakedTimer > 0.0f )
+		// the plasma bolts in the air are aimed again at the ship, each pass with a fresh jitter
+		if ( m_jitteredBolts.Count > 0 )
 		{
-			m_uncloakedTimer -= Time.deltaTime;
+			m_boltPassTimer += Time.deltaTime;
+
+			if ( m_boltPassTimer >= Encounter.c_passSeconds )
+			{
+				m_boltPassTimer = 0.0f;
+
+				for ( var i = m_jitteredBolts.Count - 1; i >= 0; i-- )
+				{
+					var bolt = m_jitteredBolts[ i ];
+
+					if ( ( bolt == null ) || !bolt.gameObject.activeSelf || !m_shimmeringBallActive )
+					{
+						m_jitteredBolts.RemoveAt( i );
+
+						continue;
+					}
+
+					bolt.SetTargetOffset( RollAimJitter() );
+				}
+			}
 		}
 	}
 
-	// true while the Shimmering Ball cloaks the ship: "this artifact seems to be a cloaking device. As far as we can tell it should operate automatically during
-	// combat" (the Starport's analysis) - the aliens cannot fire at a ship they cannot see
-	public bool PlayerIsCloaked()
+	// the player enters Combat: with the Shimmering Ball aboard its jitter is on from now until the encounter ends (COMBAT-OV WF414, WE96B: "this artifact seems
+	// to be a cloaking device. As far as we can tell it should operate automatically during combat", the Starport's analysis)
+	public void EnterCombat()
 	{
-		return ( m_uncloakedTimer <= 0.0f ) && DataController.m_instance.m_playerData.m_playerShip.HasArtifact( "Shimmering Ball" );
+		m_shimmeringBallActive = DataController.m_instance.m_playerData.m_playerShip.HasArtifact( "Shimmering Ball" );
+
+		if ( m_shimmeringBallActive )
+		{
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Cloaking device now active</color>" );
+		}
+	}
+
+	// an encounter begins: the Shimmering Ball is off until Combat is entered (HYPER-OV ENCSETUP: CLEAR-CO)
+	public void ResetShimmeringBall()
+	{
+		m_shimmeringBallActive = false;
+		m_jitteredBolts.Clear();
+	}
+
+	// the jitter of an alien weapon's aim, in the port's units: none, or -1 to 1 cells on each axis while the Shimmering Ball is on (WE911: RRND -1 2 on each axis)
+	Vector3 RollAimJitter()
+	{
+		if ( !m_shimmeringBallActive )
+		{
+			return Vector3.zero;
+		}
+
+		return new Vector3( UnityEngine.Random.Range( -1, 2 ), 0.0f, UnityEngine.Random.Range( -1, 2 ) ) * c_unitsPerCell;
 	}
 
 	/// <summary>
@@ -440,9 +488,6 @@ public class CombatController : MonoBehaviour
 		// firing on the aliens makes them hostile for the rest of the encounter (whether or not the shot does any damage)
 		SpaceflightController.m_instance.m_encounter.PlayerAttacked();
 
-		// and it shows them where the ship is, cloaked or not
-		m_uncloakedTimer = c_uncloakedTime;
-
 		// check if target is immune
 		if ( targetVessel.m_immuneToLasers )
 		{
@@ -536,9 +581,6 @@ public class CombatController : MonoBehaviour
 
 		// firing on the aliens makes them hostile for the rest of the encounter (whether or not the missile hits)
 		encounter.PlayerAttacked();
-
-		// and it shows them where the ship is, cloaked or not
-		m_uncloakedTimer = c_uncloakedTime;
 
 		// the launch uses up a little endurium
 		playerData.m_playerShip.UseUpFuel( c_missileFuelPerShot );
@@ -1026,10 +1068,10 @@ public class CombatController : MonoBehaviour
 	}
 
 	// true if nothing can be fired at the player now: the ship has been destroyed (a missile launched now would still be in the air when the game over screen
-	// pauses the game), or the Shimmering Ball cloaks it
+	// pauses the game)
 	bool AlienCannotFire()
 	{
-		return m_playerIsDestroyed || PlayerIsCloaked();
+		return m_playerIsDestroyed;
 	}
 
 	// an alien ship launches its missile at the player, at any range (COMBAT-OV WEC95): a plasma bolt from a vessel that has them, else a missile of the vessel's
@@ -1065,7 +1107,8 @@ public class CombatController : MonoBehaviour
 				{
 					m_alienMissilesInFlight = Mathf.Max( 0, m_alienMissilesInFlight - 1 );
 
-					if ( reachedTarget && !m_playerIsDestroyed )
+					// (aimed off the ship by the Shimmering Ball it lands beside it, and misses like a missile does)
+					if ( reachedTarget && !m_playerIsDestroyed && ( Vector3.Distance( SpaceflightController.m_instance.m_playerShip.transform.position, hitPosition ) <= c_alienMissileHitRadius ) )
 					{
 						// what hit the ship, in the original's words (DAMAGE-OV: PLASMA BOLT)
 						SpaceflightController.m_instance.m_messages.AddText( "<color=red>Plasma bolt</color>" );
@@ -1084,6 +1127,14 @@ public class CombatController : MonoBehaviour
 					// play torpedo explosion sound
 					SoundController.m_instance.PlaySound( SoundController.Sound.TorpedoExplosion );
 				} );
+
+				// the Shimmering Ball jitters its aim, again each pass while it is in the air (WE929, WE911)
+				if ( m_shimmeringBallActive )
+				{
+					bolt.SetTargetOffset( RollAimJitter() );
+
+					m_jitteredBolts.Add( bolt );
+				}
 
 				// play torpedo launch sound
 				SoundController.m_instance.PlaySound( SoundController.Sound.TorpedoFire );
@@ -1107,8 +1158,9 @@ public class CombatController : MonoBehaviour
 			m_alienMissilesInFlight++;
 
 			// it flies to where the ship was when it was launched, and only the plasma bolt follows the ship (COMBAT-OV WE929): it hits if the ship is still
-			// about in that place (within 100 units, a cell and a quarter of the original's combat map at c_unitsPerCell)
-			missile.Fire( alienPosition, playerShip.transform.position, ( hitPosition, reachedTarget ) =>
+			// about in that place (within 100 units, a cell and a quarter of the original's combat map at c_unitsPerCell) - with the Shimmering Ball on, its aim
+			// is off by -1 to 1 cells on each axis (WEC95, WE911), and an aim a cell off along both axes misses
+			missile.Fire( alienPosition, playerShip.transform.position + RollAimJitter(), ( hitPosition, reachedTarget ) =>
 			{
 				m_alienMissilesInFlight = Mathf.Max( 0, m_alienMissilesInFlight - 1 );
 
@@ -1162,12 +1214,23 @@ public class CombatController : MonoBehaviour
 		// calculate direction to player
 		var direction = ( playerPosition - alienPosition ).normalized;
 
+		// the Shimmering Ball jitters the aim by -1 to 1 cells on each axis (WECEA: WE911)
+		var jitter = RollAimJitter();
+
 		// fire laser
 		var laser = GetAvailableLaser();
 		if ( laser != null )
 		{
 			laser.SetColor( new Color( 1.0f, 0.5f, 0.5f ) ); // red laser
-			laser.Fire( alienPosition, playerPosition );
+			laser.Fire( alienPosition, playerPosition + jitter );
+		}
+
+		// a beam that is not aimed at the ship's cell misses it (WECC7: LASER MISSED US!)
+		if ( jitter != Vector3.zero )
+		{
+			SpaceflightController.m_instance.m_messages.AddText( "<color=white>Laser missed us!</color>" );
+
+			return true;
 		}
 
 		// apply damage: twice a laser's damage at that distance, and the Rod Device "projects an enhanced laser shield around a spaceship" (the Starport's
