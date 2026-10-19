@@ -161,7 +161,7 @@ Only the effects that matter for winning had to come before Phase 5. The others 
 | Rod Device | stronger laser shield: #127 (half of every alien laser hit; the amount is the port's choice) | found | no |
 | Tesseract | doubles engine efficiency: #124 (half the engines' fuel in hyperspace) | found | no |
 | Crystal Pearl | warps a badly damaged ship away: #128 (out of an encounter below a tenth of the armor; the tenth is the port's choice; replaced 2026-10-18 by item 8.10, the shipped game's trigger and destination) | found | no |
-| Red Cylinder | finds ancient ruins from orbit: flashes on the landing map near an ancient ruin (the shipped game's "THE RED CYLINDER IS FLASHING" is in its landing map code; how near is the port's choice) | found | no |
+| Red Cylinder | finds ancient ruins from orbit: marks them on the landing map (D6), and flashes the planet's message and artifact sites when the landing map opens (SITE-OV, item 8.15) | found | no |
 | Dodecahedron | attracts every ship nearby: #129 (twice the alien radar distance), replaced on 2026-10-15 by the released game's rule (HYPERMSG-OV TRAK-E: groups come four fifths of the way at each move instead of half, and are not held near home), which on 2026-10-18 turned out to be the Crystal Pearl's (item 8.11): no word of the shipped game looks for the Dodecahedron | found | no |
 | Black Box, Hypercube, Ellipsoid | none beyond their documented roles (D5, decided 2026-10-11) | found or traded | no |
 
@@ -220,7 +220,7 @@ Found on 2026-10-18 by reading the shipped game's decompiled overlays against th
 | 8.12 | Fluxes the ship has been through are remembered and drawn on the starmap | HYPER-OV `SET-FLUX-STATE`; MAP-OV `WEA70`, `WEA4C` | MISSING |
 | 8.13 | Back into orbit after the Noah 9 derelict or a destroyed orbit fleet | HYPER-OV `?DOUBLE-UNNEST`, `SKIP2NEST`; HYPERMSG-OV `WE84B` | MISSING |
 | 8.14 | A terrain vehicle that runs out of fuel is lost: the crew walk back, the vehicle stays as debris, the Starport fines its loss | MOVE-OV `WF16E`, `WEF48`; SHIPBUTTONS `WF095`; OP-OV `WF045` | the vehicle is lost and left as a wreck where it stopped (`MoveButton.LeaveTheWreck`, `TerrainRuins.PlaceVehicleWreck`, `DroppedCargo.m_isVehicleWreck`); the walk back and the fine were there (probe `outoffuel`) |
-| 8.15 | The Red Cylinder flashes the planet's message and artifact sites when the landing map opens | SITE-OV `.MERCATOR`, `WF389`, `WF290` | MISSING |
+| 8.15 | The Red Cylinder flashes the planet's message and artifact sites when the landing map opens | SITE-OV `.MERCATOR`, `WF389`, `WF290` | the sites blink over the landing map for a few seconds when it opens (`RedCylinder.MapOpened`, `TerrainMapDisplay`; probe `redcylinder`); messages placed at random spots are left out |
 | 8.16 | A deposit's mineral: the planet's first element half the time, the second a quarter, the third 15%, any other element 10% | SEED-OV `WF0F7`, `WF0C7` | the original's shares, drawn apart from the planet's seeded draws (`TerrainElement.ChooseDepositElement`, used by `TerrainElements` and `PlanetSurvey`; probe `depositminerals`) |
 | 8.17 | Jettison from the ship's hold | CAPTAIN `(/ITEMS)`, `TOSS` | Jettison on the ship's cargo list: an artifact or a specimen at once, an element by a volume typed or stepped with the stick (`ShipCargoJettisonButton`; probe `jettison`) |
 | 8.18 | Lifeforms as the shipped game makes and values them (replaces D3) | HP-OV, VITA-OV, LP-OV, ITEMS-OV `valuate` | MISSING |
