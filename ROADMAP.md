@@ -226,7 +226,7 @@ Found on 2026-10-18 by reading the shipped game's decompiled overlays against th
 | 8.18 | Lifeforms as the shipped game makes and values them (replaces D3) | HP-OV, VITA-OV, LP-OV, ITEMS-OV `valuate` | MISSING |
 | 8.19 | A planet's minerals, lifeforms and curios come back after the ship leaves (replaces 3.0) | DPART-OV `WF166`, `WF0D6`; MOVE-OV `?POPULA` | MISSING |
 | 8.20 | A navigator above 150 sees a flux as 1 to 7 dots by skill, 16 with the Ring Device | HYPER-OV `.FLUX-ICON` | MISSING |
-| 8.21 | The edge of hyperspace holds the ship | HYPER-OV `FLY`, `WEE53` | MISSING |
+| 8.21 | The edge of hyperspace holds the ship | HYPER-OV `FLY`, `WEE53` | Each axis kept within map x 0 to 249 and y 0 to 219, the heading kept, so the ship stops at an edge and slides along it at a slant; the engines still burn fuel at the edge (`PlayerShip.Update`; probe `hyperspaceedge`) |
 | 8.22 | Alien groups in a star system are placed afresh on each visit | HYPER-OV `SYSSETUP`, `SETRNDXY` | MISSING |
 | 8.23 | The Mysterions, Nomad probes and Minstrels move on after an encounter | HYPER-OV `ENCCLEANUP`, `WDC19` | MISSING |
 | 8.24 | "OUT OF FUEL! CRASH IMMINENT!" and the motion report's coordinates | ORBIT-OV `DESCEND`; HYPERMSG-OV `WF28B` | MISSING |

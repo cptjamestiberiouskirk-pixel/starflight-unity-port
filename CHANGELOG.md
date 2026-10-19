@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **The Crystal Orb Goes Back to Its Site**: a Crystal Orb handed to the Veloxi was gone for good. In the original the Veloxi's demand (COMMSPEC-OV `CRYSTAL-ORB`, `-ARTIFACT`, `WEB3F`) puts the orb back into its region of its planet, so it can be found again, unless that planet has been destroyed; anything else they take is gone. The port now does the same (`Encounter.ReturnCrystalOrbToItsSite`, `PD_PlanetSurfaces.ReturnArtifactSite`). Roadmap 8.2. New probe scenario `orbreturns`.
+- **The Edge of Hyperspace Holds the Ship**: the ship could fly off the map in hyperspace, past coordinates 0 and 249 across and 0 and 219 up, where nothing is. The original keeps each axis within the map on every step (HYPER-OV `FLY`, `WEE53`), with no message and the heading kept, so a ship stops at the edge and one flying into it at a slant slides along it; its engines still burn fuel there. The port now does the same (`PlayerShip.Update`). A place off the map (a ship leaving a star system or a flux at the edge) is not moved, as in the original: the next step brings the ship back. Roadmap 8.21. New probe scenario `hyperspaceedge`.
 
 ## [1.4.0] - 2026-10-18
 
