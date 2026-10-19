@@ -22406,12 +22406,17 @@ public class ClaudeProbe : MonoBehaviour
 	}
 
 	// meets the aliens of an encounter, hails them in this posture and lets them answer (the comm link is up then) - adds what the messages show
-	static IEnumerator MeetAndConnect( int encounterId, GD_Comm.Stance posture, List<string> said )
+	static IEnumerator MeetAndConnect( int encounterId, GD_Comm.Stance posture, List<string> said, System.Action afterEntering = null )
 	{
 		var encounter = SpaceflightController.m_instance.m_encounter;
 
 		EnterEncounter( encounterId );
 		yield return Frames( 10 );
+
+		if ( afterEntering != null )
+		{
+			afterEntering();
+		}
 
 		DataController.m_instance.m_playerData.m_playerShip.RestoreSystems();
 
@@ -22612,14 +22617,6 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 2: the Elowan and the Thrynn, and a crew that is friends with the other race
 
-	// the first of the Thrynn and the Elowan the crew opened a comm link with ("missing" on the code before it was remembered)
-	static string FirstContactRace()
-	{
-		var field = typeof( PD_General ).GetField( "m_firstContactRace" );
-
-		return ( field == null ) ? "missing" : field.GetValue( DataController.m_instance.m_playerData.m_general ).ToString();
-	}
-
 	// true if the text holds one of the game data's lines of this race and subject, in any stance
 	static bool SaysALineOfAnyStance( string text, GameData.Race race, GD_Comm.Subject subject )
 	{
@@ -22634,16 +22631,49 @@ public class ClaudeProbe : MonoBehaviour
 		return false;
 	}
 
+	// meets these aliens with a friendly hail and lets them speak once after their greeting - adds the greeting, what they said next, whether the comm link is still
+	// up, their mood, their stance and the posture of their talk
+	static IEnumerator MeetTheRivals( int encounterId, List<string> results, bool weakAliens = false )
+	{
+		var encounter = SpaceflightController.m_instance.m_encounter;
+		var said = new List<string>();
+
+		yield return MeetAndConnect( encounterId, GD_Comm.Stance.Friendly, said, weakAliens ? (System.Action) WeakenAlienShips : null );
+		yield return LetAliensSpeak( 1, said );
+		yield return Frames( 3 );
+
+		results.Add( ( said.Count > 0 ) ? said[ 0 ] : "nothing said" );
+		results.Add( ( said.Count > 1 ) ? said[ 1 ] : "nothing said" );
+		results.Add( encounter.m_pdEncounter.m_connected.ToString() );
+		results.Add( EncounterField( "m_mood", -1.0f ).ToString( "F0" ) );
+		results.Add( encounter.m_pdEncounter.m_alienStance.ToString() );
+		results.Add( Call( encounter, "GetAlienTalkStance" ).ToString() );
+
+		LeaveEncounter();
+		yield return Frames( 10 );
+	}
+
+	// true if the rivals said this line as the comm link opened, ended the link and were angered to fight
+	static bool EndedTheLinkWith( List<string> results, int commId )
+	{
+		return results[ 1 ].Contains( CommText( commId ) ) && ( results[ 2 ] == "False" ) && ( int.Parse( results[ 3 ] ) >= 99 ) && ( results[ 4 ] == "Hostile" );
+	}
+
+	// the Elowan and the Thrynn and a crew that is friends with their rival race, as the original's special actions (COMMSPEC-OV WEDA7, WEDDB, WEE3F, WEE73): one of
+	// the rival race in the crew, or the rival race's base mood in its friendly band, and as the comm link opens they say what they think of it, end the link and
+	// fight (100 more on their mood) - unless they grovel. A first comm link with the other race counts for nothing. The code before greeted such a crew with the
+	// line, started them in their hostile band and kept the link up (the Elowan with a Thrynn aboard ended it without a fight), and counted the first contact
 	IEnumerator ScenarioRivals()
 	{
 		var dataController = DataController.m_instance;
 		var playerData = dataController.m_playerData;
+		var general = playerData.m_general;
 		var controller = SpaceflightController.m_instance;
-		var encounter = controller.m_encounter;
 
 		EnsureCrew();
 
 		var officer = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.CommunicationsOfficer );
+		var navigatorFileId = playerData.m_crewAssignment.GetPersonnelFile( PD_CrewAssignment.Role.Navigator ).m_fileId;
 
 		officer.m_communications = 250;
 		playerData.m_playerShip.m_armorPoints = 100000;
@@ -22655,29 +22685,31 @@ public class ClaudeProbe : MonoBehaviour
 		var elowanId = FindEncounterOfRace( GameData.Race.Elowan );
 		var thrynnId = FindEncounter( 1, 6, 3, 0, GameData.Race.Thrynn );
 
-		// ---- 1. the first comm link of the game is with the Thrynn: it is remembered
-		var firstBefore = FirstContactRace();
+		general.SetRaceBaseMood( GameData.Race.Elowan, 44.0f );
+		general.SetRaceBaseMood( GameData.Race.Thrynn, 44.0f );
+
+		// ---- 1. the first comm link of the game is with the Thrynn, then the Elowan: they greet as usual and keep the link up (control)
 		var thrynnSaid = new List<string>();
 
 		yield return MeetAndConnect( thrynnId, GD_Comm.Stance.Friendly, thrynnSaid );
 
-		var firstAfter = FirstContactRace();
-
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 2. then the Elowan: their greeting says what they think of friends of the Thrynn, and they start in their hostile band
-		var elowanSaid = new List<string>();
+		var firstContact = new List<string>();
 
-		yield return MeetAndConnect( elowanId, GD_Comm.Stance.Friendly, elowanSaid );
+		yield return MeetTheRivals( elowanId, firstContact );
 
-		var elowanGreeting = ( elowanSaid.Count > 0 ) ? elowanSaid[ 0 ] : "nothing said";
-		var elowanMood = EncounterField( "m_mood", -1.0f );
+		// ---- 2. the Thrynn's base mood in their friendly band (20, under their 30): the Elowan call the crew friends of the Thrynn, end the link and fight
+		general.SetRaceBaseMood( GameData.Race.Thrynn, 20.0f );
 
-		LeaveEncounter();
-		yield return Frames( 10 );
+		var friendsOfThrynn = new List<string>();
 
-		// ---- 3. a Thrynn in the crew: the Elowan have no dealings with the ship, end the comm link and do not attack
+		yield return MeetTheRivals( elowanId, friendsOfThrynn );
+
+		general.SetRaceBaseMood( GameData.Race.Thrynn, 44.0f );
+
+		// ---- 3. a Thrynn in the crew: the Elowan say so, end the link and fight
 		var thrynnCrew = playerData.m_personnel.CreateNewPersonnel();
 
 		thrynnCrew.m_name = "Thrynn";
@@ -22687,20 +22719,9 @@ public class ClaudeProbe : MonoBehaviour
 		playerData.m_personnel.m_personnelList.Add( thrynnCrew );
 		playerData.m_crewAssignment.Assign( PD_CrewAssignment.Role.Navigator, thrynnCrew.m_fileId );
 
-		EnterEncounter( elowanId );
-		yield return Frames( 10 );
+		var thrynnAboard = new List<string>();
 
-		var noDealingsSaid = new List<string>();
-
-		yield return LetAliensSpeak( 1, noDealingsSaid );
-		yield return Frames( 3 );
-
-		var noDealings = ( noDealingsSaid.Count > 0 ) ? noDealingsSaid[ 0 ] : "nothing said";
-		var noDealingsDisconnected = encounter.m_pdEncounter.m_disconnected;
-		var noDealingsStance = encounter.m_pdEncounter.m_alienStance;
-
-		LeaveEncounter();
-		yield return Frames( 10 );
+		yield return MeetTheRivals( elowanId, thrynnAboard );
 
 		// ---- 4. translation: an officer with no skill, and the Thrynn's greeting comes through in part with a Thrynn aboard - garbled without (the control)
 		officer.m_communications = 0;
@@ -22724,30 +22745,51 @@ public class ClaudeProbe : MonoBehaviour
 		var wholeWithThrynn = ( withThrynn.Count > 0 ) && SaysALineOfAnyStance( withThrynn[ 0 ], GameData.Race.Thrynn, GD_Comm.Subject.GreetingResponse );
 		var wholeWithout = ( withoutThrynn.Count > 0 ) && ( SaysALineOfAnyStance( withoutThrynn[ 0 ], GameData.Race.Thrynn, GD_Comm.Subject.GreetingResponse ) || SaysOneOf( withoutThrynn[ 0 ], 297 ) );
 
-		// ---- 5. an Elowan in the crew (the same crew member, now an Elowan): the Thrynn greet with "most regrettable" and start in their hostile band
+		// ---- 5. an Elowan in the crew (the same crew member, now an Elowan): the Thrynn find it "most regrettable", end the link and fight
 		officer.m_communications = 250;
 
 		var elowanAboard = new List<string>();
 
-		yield return MeetAndConnect( thrynnId, GD_Comm.Stance.Friendly, elowanAboard );
+		yield return MeetTheRivals( thrynnId, elowanAboard );
 
-		var regrettable = ( elowanAboard.Count > 0 ) ? elowanAboard[ 0 ] : "nothing said";
-		var thrynnMood = EncounterField( "m_mood", -1.0f );
+		// ---- 6. no Elowan aboard, and the Elowan's base mood in their friendly band (10, under their 25): the Thrynn consider the crew their enemy, end the link
+		// and fight
+		playerData.m_crewAssignment.Assign( PD_CrewAssignment.Role.Navigator, navigatorFileId );
+		general.SetRaceBaseMood( GameData.Race.Elowan, 10.0f );
 
-		LeaveEncounter();
-		yield return Frames( 10 );
+		var friendsOfElowan = new List<string>();
+
+		yield return MeetTheRivals( thrynnId, friendsOfElowan );
+
+		general.SetRaceBaseMood( GameData.Race.Elowan, 44.0f );
+
+		// ---- 7. the Elowan aboard again, and the Thrynn grovelling (their hostile band, 70 less the 8 of the friendly hail, before a far stronger ship, theirs badly
+		// damaged): no word of it, and the link stays up (A-POSTU above obsequious)
+		playerData.m_crewAssignment.Assign( PD_CrewAssignment.Role.Navigator, thrynnCrew.m_fileId );
+		general.SetRaceBaseMood( GameData.Race.Thrynn, 70.0f );
+		SetShipClassesAndCaptain( 5, 250 );
+
+		var grovelling = new List<string>();
+
+		yield return MeetTheRivals( thrynnId, grovelling, true );
+
+		SetShipClassesAndCaptain( 0, 250 );
+		general.SetRaceBaseMood( GameData.Race.Thrynn, 44.0f );
+		playerData.m_crewAssignment.Assign( PD_CrewAssignment.Role.Navigator, navigatorFileId );
 
 		controller.m_encounterRange = encounterRange;
 
-		Log( "rivals: first contact " + firstBefore + " -> " + firstAfter + " || elowan after the thrynn: " + elowanGreeting + " (mood " + elowanMood + ") || thrynn aboard: " + noDealings + " (disconnected " + noDealingsDisconnected + ", stance " + noDealingsStance + ") || skill 0, thrynn aboard: " + string.Join( " | ", withThrynn ) + " || skill 0, none aboard: " + string.Join( " | ", withoutThrynn ) + " || elowan aboard: " + regrettable + " (mood " + thrynnMood + ")" );
+		Log( "rivals: (greeting | next | link up | mood | stance | posture) first contact with the Thrynn, then the Elowan: " + string.Join( " | ", firstContact ) + " || friends of the Thrynn: " + string.Join( " | ", friendsOfThrynn ) + " || Thrynn aboard: " + string.Join( " | ", thrynnAboard ) + " || skill 0, Thrynn aboard: " + string.Join( " | ", withThrynn ) + " || skill 0, none aboard: " + string.Join( " | ", withoutThrynn ) + " || Elowan aboard: " + string.Join( " | ", elowanAboard ) + " || friends of the Elowan: " + string.Join( " | ", friendsOfElowan ) + " || grovelling: " + string.Join( " | ", grovelling ) );
 
-		Check( "rivals: the first comm link with the Thrynn is remembered", ( firstBefore == "None" ) && ( firstAfter == "Thrynn" ), firstBefore + " -> " + firstAfter );
-		Check( "rivals: after the Thrynn the Elowan greet the crew as friends of the Thrynn, and start in their hostile band", elowanGreeting.Contains( CommText( 2 ) ) && ( elowanMood >= 60.0f ), elowanMood + " | " + elowanGreeting );
-		Check( "rivals: with a Thrynn aboard the Elowan have no dealings with the ship, end the comm link, and do not attack", noDealings.Contains( CommText( 1 ) ) && noDealingsDisconnected && ( noDealingsStance != GD_Comm.Stance.Hostile ), noDealingsDisconnected + ", " + noDealingsStance + " | " + noDealings );
+		Check( "rivals: a first comm link with the Thrynn counts for nothing: the Elowan greet as usual and keep the link up (control)", !firstContact[ 0 ].Contains( CommText( 2 ) ) && !firstContact[ 1 ].Contains( CommText( 2 ) ) && ( firstContact[ 2 ] == "True" ) && ( int.Parse( firstContact[ 3 ] ) < 60 ), string.Join( " | ", firstContact ) );
+		Check( "rivals: with the Thrynn's base mood in their friendly band the Elowan call the crew friends of the Thrynn as the link opens, end it and fight (WEDDB)", EndedTheLinkWith( friendsOfThrynn, 2 ), string.Join( " | ", friendsOfThrynn ) );
+		Check( "rivals: with a Thrynn aboard the Elowan say they will have no dealings with the ship as the link opens, end it and fight (WEDA7)", EndedTheLinkWith( thrynnAboard, 1 ), string.Join( " | ", thrynnAboard ) );
 		Check( "rivals: with a Thrynn aboard an officer with no skill gets the Thrynn's greeting in part, not every word (the crew member adds 50 to the translation strength, COMM-OV INIT-MCOMM: probe translation), and without one garbled (control)", !wholeWithThrynn && !wholeWithout, string.Join( " | ", withThrynn ) + " || " + string.Join( " | ", withoutThrynn ) );
-		Check( "rivals: with an Elowan aboard the Thrynn greet with \"most regrettable\", and start in their hostile band (60, less the 8 of the player's friendly hail)", regrettable.Contains( CommText( 297 ) ) && ( thrynnMood >= 52.0f ), thrynnMood + " | " + regrettable );
+		Check( "rivals: with an Elowan aboard the Thrynn find it most regrettable as the link opens, end it and fight (WEE3F)", EndedTheLinkWith( elowanAboard, 297 ), string.Join( " | ", elowanAboard ) );
+		Check( "rivals: with the Elowan's base mood in their friendly band the Thrynn call the crew allies of the Elowan as the link opens, end it and fight (WEE73)", EndedTheLinkWith( friendsOfElowan, 298 ), string.Join( " | ", friendsOfElowan ) );
+		Check( "rivals: grovelling before a far stronger ship the Thrynn say nothing of the Elowan aboard and keep the link up (A-POSTU above obsequious)", ( grovelling[ 5 ] == "Obsequious" ) && !grovelling[ 0 ].Contains( CommText( 297 ) ) && !grovelling[ 1 ].Contains( CommText( 297 ) ) && ( grovelling[ 2 ] == "True" ), string.Join( " | ", grovelling ) );
 
-		Finish( "scenario=rivals first=" + firstAfter + " elowanMood=" + elowanMood + " thrynnMood=" + thrynnMood, 0 );
+		Finish( "scenario=rivals checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
 	// ---------------------------------------------------------------- phase 2: the races that transmit rather than talk
