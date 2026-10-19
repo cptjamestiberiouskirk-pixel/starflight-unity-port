@@ -211,6 +211,57 @@ public class PD_General
 		}
 	}
 
+	// each race's base mood, the mood its aliens start an encounter from: the original's BASE-EDL of the race's originator, which the end of every encounter moves
+	// toward the mood the encounter ended in (HYPER-OV ENCCLEANUP), so a race remembers how it was treated - saved; a race not in the list starts from its
+	// personality's starting mood (older saves have none)
+	[Serializable] public class RaceMood
+	{
+		public int m_race;
+		public float m_baseMood;
+	}
+
+	public List<RaceMood> m_raceMoodList;
+
+	// a race's base mood, or this starting mood if the race has none yet
+	public float GetRaceBaseMood( GameData.Race race, float startingMood )
+	{
+		if ( m_raceMoodList != null )
+		{
+			foreach ( var raceMood in m_raceMoodList )
+			{
+				if ( raceMood.m_race == (int) race )
+				{
+					return raceMood.m_baseMood;
+				}
+			}
+		}
+
+		return startingMood;
+	}
+
+	// sets a race's base mood (kept between 0 and 100)
+	public void SetRaceBaseMood( GameData.Race race, float baseMood )
+	{
+		if ( m_raceMoodList == null )
+		{
+			m_raceMoodList = new List<RaceMood>();
+		}
+
+		baseMood = Mathf.Clamp( baseMood, 0.0f, 100.0f );
+
+		foreach ( var raceMood in m_raceMoodList )
+		{
+			if ( raceMood.m_race == (int) race )
+			{
+				raceMood.m_baseMood = baseMood;
+
+				return;
+			}
+		}
+
+		m_raceMoodList.Add( new RaceMood { m_race = (int) race, m_baseMood = baseMood } );
+	}
+
 	// the order the aliens' eleven combat rules are tried in, by their numbers in the original's shipped order: a rule that fires swaps places with the rule halfway
 	// up the list, and the order lasts from one encounter to the next (COMBAT-OV <COMBAT>, the rule engine's swap, kept by SAVE-OVERLAY) - saved; older saves
 	// start from the shipped order
