@@ -219,7 +219,22 @@ if ( $action !== '' )
 			exit;
 		}
 		
-		$adminMessages[] = ( AdminPasswordHash() === null ) ? 'The admin login is not set up: see admin-config.example.php.' : 'Wrong password.';
+		// (closed after too many failed logins: say for how long, in whole minutes)
+		$lockSeconds = AdminLoginLockSeconds();
+		$lockMinutes = (int) ceil( $lockSeconds / 60 );
+		
+		if ( AdminPasswordHash() === null )
+		{
+			$adminMessages[] = 'The admin login is not set up: see admin-config.example.php.';
+		}
+		else if ( $lockSeconds > 0 )
+		{
+			$adminMessages[] = 'Too many failed logins. Try again in ' . $lockMinutes . ( ( $lockMinutes === 1 ) ? ' minute.' : ' minutes.' );
+		}
+		else
+		{
+			$adminMessages[] = 'Wrong password.';
+		}
 		
 		$showLogin = true;
 	}
