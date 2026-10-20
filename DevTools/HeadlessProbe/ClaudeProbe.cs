@@ -20615,13 +20615,32 @@ public class ClaudeProbe : MonoBehaviour
 
 	// ---------------------------------------------------------------- phase 1: alien vessels with their own armor, shields and speed
 
+	// the icons that take turns in the encounter: the player's ship and every alien ship that has come in, a wreck as well (the original's ILOCAL)
+	static int TurnIcons( Encounter encounter )
+	{
+		var icons = 1;
+
+		foreach ( var alienShip in encounter.m_pdEncounter.GetAlienShipList() )
+		{
+			if ( alienShip.m_addedToEncounter )
+			{
+				icons++;
+			}
+		}
+
+		return icons;
+	}
+
 	// enters an encounter of a race and returns how far its first ship travels per second of game time over some seconds of game time, the name and move delay of
 	// that ship's vessel, and whether its ships have the armor and shield points of their vessels in the game data
 	// each ship's vessel is picked at random from the encounter's vessels, and the vessels of one race do not all have the same move delay (the Elowan warship has
 	// 2700, the transport and the scout 2200), so the speed has to be compared with the move delay of the ship that was watched
 	// game time and not real time: the coroutine runs after the encounter's Update of the same frame, so the ship has moved by this frame's Time.deltaTime, which
 	// Unity caps on a slow frame (on such a frame real time runs ahead of the ship)
-	static IEnumerator AlienShipTravel( GameData.Race race, float seconds, float[] perSecond, int[] moveDelay, string[] vesselName, string[] points )
+	// the distance travelled depends on the ship's turns (a diagonal step is a cell each way, a turn can give no step) and on how many ships have come in (a round of
+	// turns is a pass for each icon), neither of which has to do with the vessel; so it also returns the share of the original's speed the ship moved at while it
+	// went to a cell: the longer side of each frame's move (a cell's side of a diagonal) against a cell every (icons) passes, 1 whatever the step or the count
+	static IEnumerator AlienShipTravel( GameData.Race race, float seconds, float[] perSecond, int[] moveDelay, string[] vesselName, string[] points, float[] shareOfRule = null, float[] movingSeconds = null )
 	{
 		var gameData = DataController.m_instance.m_gameData;
 		var encounter = SpaceflightController.m_instance.m_encounter;
@@ -20649,20 +20668,48 @@ public class ClaudeProbe : MonoBehaviour
 		var last = watched.m_coordinates;
 		var travelled = 0.0f;
 		var elapsed = 0.0f;
+		var moved = 0.0f;
+		var allowed = 0.0f;
+		var moving = 0.0f;
 
 		// a limit in real time in case game time stands still
 		var giveUp = Time.realtimeSinceStartup + seconds * 10.0f;
 
 		while ( ( elapsed < seconds ) && ( Time.realtimeSinceStartup < giveUp ) )
 		{
+			var target = watched.m_targetCoordinates;
+			var icons = TurnIcons( encounter );
+
 			yield return null;
 
-			travelled += Vector3.Distance( last, watched.m_coordinates );
+			var step = watched.m_coordinates - last;
+			var longerSide = Mathf.Max( Mathf.Abs( step.x ), Mathf.Abs( step.z ) );
+
+			travelled += step.magnitude;
 			elapsed += Time.deltaTime;
+
+			// a frame of the way to a cell: the ship moved, toward the same cell as before the frame, without getting there, and no ship came in
+			if ( ( longerSide > 0.0f ) && ( watched.m_targetCoordinates == target ) && ( watched.m_coordinates != target ) && ( TurnIcons( encounter ) == icons ) )
+			{
+				moved += longerSide;
+				allowed += CombatController.c_unitsPerCell / ( icons * Encounter.c_passSeconds ) * Time.deltaTime;
+				moving += Time.deltaTime;
+			}
+
 			last = watched.m_coordinates;
 		}
 
 		perSecond[ 0 ] = ( elapsed > 0.0f ) ? ( travelled / elapsed ) : 0.0f;
+
+		if ( shareOfRule != null )
+		{
+			shareOfRule[ 0 ] = ( allowed > 0.0f ) ? ( moved / allowed ) : 0.0f;
+		}
+
+		if ( movingSeconds != null )
+		{
+			movingSeconds[ 0 ] = moving;
+		}
 
 		ClearMissiles();
 		LeaveEncounter();
@@ -20675,24 +20722,33 @@ public class ClaudeProbe : MonoBehaviour
 		var moveDelay = new int[ 1 ];
 		var vesselName = new string[ 1 ];
 		var points = new string[ 1 ];
+		var shareOfRule = new float[ 1 ];
+		var movingSeconds = new float[ 1 ];
 
 		EnsureCrew();
 
-		yield return AlienShipTravel( GameData.Race.Spemin, 3.0f, perSecond, moveDelay, vesselName, points );
+		yield return AlienShipTravel( GameData.Race.Spemin, 6.0f, perSecond, moveDelay, vesselName, points, shareOfRule, movingSeconds );
 
 		var speminSpeed = perSecond[ 0 ];
 		var speminDelay = moveDelay[ 0 ];
 		var speminVessel = vesselName[ 0 ];
 		var speminPoints = points[ 0 ];
+		var speminShare = shareOfRule[ 0 ];
+		var speminMoving = movingSeconds[ 0 ];
 
-		yield return AlienShipTravel( GameData.Race.Elowan, 3.0f, perSecond, moveDelay, vesselName, points );
+		yield return AlienShipTravel( GameData.Race.Elowan, 6.0f, perSecond, moveDelay, vesselName, points, shareOfRule, movingSeconds );
 
 		var elowanSpeed = perSecond[ 0 ];
 		var elowanDelay = moveDelay[ 0 ];
 		var elowanVessel = vesselName[ 0 ];
 		var elowanPoints = points[ 0 ];
+		var elowanShare = shareOfRule[ 0 ];
+		var elowanMoving = movingSeconds[ 0 ];
 
-		var ratio = ( elowanSpeed > 0.0f ) ? ( speminSpeed / elowanSpeed ) : -1.0f;
+		// the two ships' speeds against the original's, a cell each round of turns: the distance per second would also count the steps their turns gave them
+		// (diagonal, straight or none) and how many ships had come in by then, which differ from one encounter to the next whatever the vessels
+		var ratio = ( elowanShare > 0.0f ) ? ( speminShare / elowanShare ) : -1.0f;
+		var bothMoved = ( speminMoving > 1.0f ) && ( elowanMoving > 1.0f );
 
 		// every vessel alike, as the original's (COMBAT-OV moves every alien ship one unit a turn; the move delays of the vessel records, 1500 for the Spemin and
 		// 2200 or 2700 for the Elowan, are read nowhere)
@@ -20737,10 +20793,10 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		Log( "vesselstats: spemin ships " + speminPoints + "| elowan ships " + elowanPoints + "| travel per second of game time: " + speminVessel + " (move delay " + speminDelay + ") " + speminSpeed.ToString( "0.0" ) + ", " + elowanVessel + " (move delay " + elowanDelay + ") " + elowanSpeed.ToString( "0.0" ) + ", ratio " + ratio.ToString( "0.000" ) + " (expected " + expected.ToString( "0.000" ) + "); a Mechan Scout travelled " + standstillTravel.ToString( "0.000" ) + " in 2 s" );
+		Log( "vesselstats: spemin ships " + speminPoints + "| elowan ships " + elowanPoints + "| travel per second of game time: " + speminVessel + " (move delay " + speminDelay + ") " + speminSpeed.ToString( "0.0" ) + ", " + elowanVessel + " (move delay " + elowanDelay + ") " + elowanSpeed.ToString( "0.0" ) + "; share of a cell each round of turns while going to a cell " + speminShare.ToString( "0.000" ) + " over " + speminMoving.ToString( "0.0" ) + " s and " + elowanShare.ToString( "0.000" ) + " over " + elowanMoving.ToString( "0.0" ) + " s, ratio " + ratio.ToString( "0.000" ) + " (expected " + expected.ToString( "0.000" ) + "); a Mechan Scout travelled " + standstillTravel.ToString( "0.000" ) + " in 2 s" );
 
 		Check( "vesselstats: every alien ship has the armor and shield points of its vessel in the game data", allMatch, speminPoints + elowanPoints );
-		Check( "vesselstats: every alien ship moves at one speed whatever its vessel, as the original's (a Spemin ship as fast as an Elowan one; the move delays are read nowhere)", Mathf.Abs( ratio - expected ) < 0.02f, ratio.ToString( "0.000" ) + " (" + speminVessel + " " + speminDelay + ", " + elowanVessel + " " + elowanDelay + ")" );
+		Check( "vesselstats: every alien ship moves at one speed whatever its vessel, as the original's (a Spemin ship as fast as an Elowan one, a cell each round of turns; the move delays are read nowhere)", bothMoved && ( Mathf.Abs( speminShare - 1.0f ) < 0.01f ) && ( Mathf.Abs( elowanShare - 1.0f ) < 0.01f ) && ( Mathf.Abs( ratio - expected ) < 0.02f ), ratio.ToString( "0.000" ) + " (" + speminVessel + " " + speminDelay + " at " + speminShare.ToString( "0.000" ) + " of the rule for " + speminMoving.ToString( "0.0" ) + " s, " + elowanVessel + " " + elowanDelay + " at " + elowanShare.ToString( "0.000" ) + " for " + elowanMoving.ToString( "0.0" ) + " s)" );
 		Check( "vesselstats: a Mechan Scout, whose vessel record's byte 6 is 0, does not move at all (COMBAT-OV WE06B)", standstillTravel < 0.01f, standstillTravel.ToString( "0.000" ) );
 
 		Finish( "scenario=vesselstats ratio=" + ratio.ToString( "0.000" ) + " expected=" + expected.ToString( "0.000" ) + " elowan=" + elowanDelay + " points=" + allMatch, 0 );
