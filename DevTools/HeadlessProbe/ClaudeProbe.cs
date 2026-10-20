@@ -1798,6 +1798,10 @@ public class ClaudeProbe : MonoBehaviour
 				yield return ScenarioIconKey();
 				break;
 
+			case "carpetlook":
+				yield return ScenarioCarpetLook();
+				break;
+
 			default:
 				Finish( "abort: unknown scenario " + scenario, 2 );
 				break;
@@ -48305,7 +48309,7 @@ public class ClaudeProbe : MonoBehaviour
 		var errorsDuring = s_errorCount - errorsBefore;
 
 		Check( "lookland: the land of a rocky planet with an atmosphere in the original's words (a colour, then rock and dirt or a sand)", System.Text.RegularExpressions.Regex.IsMatch( terrain94, "^(Grey|Yellowish|Reddish|Brownish|Black) (rock and dirt|rocky sand|pebbly sand|coarse sand|powdery sand)$" ), terrain94 );
-		Check( "lookland: a frozen planet: cracked plains and hills of coloured snow and ice", System.Text.RegularExpressions.Regex.IsMatch( terrain92, "^Cracked plains and hills of (white|blue tinted|green tinted|red tinted|yellow tinted) snow and ice$" ), terrain92 );
+		Check( "lookland: a frozen planet: cracked plains and hills of coloured snow and ice (then its carpet lifeform, if it has life)", System.Text.RegularExpressions.Regex.IsMatch( terrain92, "^Cracked plains and hills of (white|blue tinted|green tinted|red tinted|yellow tinted) snow and ice(, with [a-z-]+ carpet lifeform)?$" ), terrain92 );
 		Check( "lookland: a planet's land reads the same every time", ( terrain94 != "" ) && ( terrain94 == terrain94Again ), terrain94 + " | " + terrain94Again );
 		Check( "lookland: the temperature is the region's: the planet's coldest near a pole, its hottest at the equator", ( temperaturePole == coldest94 ) && ( temperatureEquator == hottest94 ), temperaturePole + " / " + temperatureEquator + " (expected " + coldest94 + " / " + hottest94 + ")" );
 		Check( "lookland: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
@@ -51721,6 +51725,100 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "iconkey: so does a Map that ends another way (the console's menu changed under it)", ( secondKey != null ) && !keyAfterMenu && ( secondMarkers != null ) && !markersAfterMenu, keyAfterMenu + ", " + markersAfterMenu );
 
 		Finish( "scenario=iconkey checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
+	}
+
+	// ---------------------------------------------------------------- the carpet lifeform on Look's terrain line
+
+	// the first solid planet whose generation gives a carpet lifeform, the first with none (a planet without life has none), and how many of the planets with
+	// life have one (gas giants and molten planets left out: nobody lands on the one, and the terrain vehicle is lost in the other's lava)
+	static void FindCarpetPlanets( out GD_Planet withCarpet, out GD_Planet withoutCarpet, out int carpets, out int withLife )
+	{
+		withCarpet = null;
+		withoutCarpet = null;
+		carpets = 0;
+		withLife = 0;
+
+		foreach ( var planet in DataController.m_instance.m_gameData.m_planetList )
+		{
+			if ( ( planet.m_surfaceId == 1 ) || ( planet.m_surfaceId == 4 ) )
+			{
+				continue;
+			}
+
+			var hasLife = GD_Species.ForPlanet( planet ).Count > 0;
+			var hasCarpet = hasLife && !string.IsNullOrEmpty( GD_Species.GetLife( planet ).m_carpet );
+
+			withLife += hasLife ? 1 : 0;
+			carpets += hasCarpet ? 1 : 0;
+
+			if ( hasCarpet )
+			{
+				withCarpet = withCarpet ?? planet;
+			}
+			else
+			{
+				withoutCarpet = withoutCarpet ?? planet;
+			}
+		}
+	}
+
+	// the land on Look's terrain line, without its colour tags ("" if there is no terrain line)
+	static string TerrainLine( string look )
+	{
+		const string c_start = "Terrain: <color=white>";
+
+		var start = look.IndexOf( c_start, StringComparison.Ordinal );
+
+		if ( start < 0 )
+		{
+			return "";
+		}
+
+		start += c_start.Length;
+
+		var end = look.IndexOf( "</color>", start, StringComparison.Ordinal );
+
+		return ( end < 0 ) ? look.Substring( start ) : look.Substring( start, end - start );
+	}
+
+	IEnumerator ScenarioCarpetLook()
+	{
+		var done = new bool[ 1 ];
+
+		EnsureCrew();
+
+		FindCarpetPlanets( out var withCarpet, out var withoutCarpet, out var carpets, out var withLife );
+
+		if ( ( withCarpet == null ) || ( withoutCarpet == null ) )
+		{
+			Finish( "scenario=carpetlook abort: no planet " + ( ( withCarpet == null ) ? "with" : "without" ) + " a carpet lifeform", 2 );
+			yield break;
+		}
+
+		var carpet = GD_Species.GetLife( withCarpet ).m_carpet;
+
+		// ---- 1. on a planet whose region has a carpet lifeform: Look gives the land, then the carpet, as the original's MAPS screen (MAPS-OV .CARPET)
+		yield return LandOnPlanetAt( withCarpet.m_starId, withCarpet.m_id, Vector3.zero, done );
+
+		var landedWith = done[ 0 ];
+		var lookWith = Press( "LookButton" );
+
+		// ---- 2. on a planet with no carpet: the land alone (control)
+		yield return LandOnPlanetAt( withoutCarpet.m_starId, withoutCarpet.m_id, Vector3.zero, done );
+
+		var landedWithout = done[ 0 ];
+		var lookWithout = Press( "LookButton" );
+
+		var terrainWith = TerrainLine( lookWith );
+		var terrainWithout = TerrainLine( lookWithout );
+		var expected = ", with " + carpet.ToLower() + " carpet lifeform";
+
+		Log( "carpetlook: " + carpets + " of the " + withLife + " solid planets with life have a carpet lifeform; planet " + withCarpet.m_id + " (carpet " + carpet + ", landed " + landedWith + "): '" + terrainWith + "' || planet " + withoutCarpet.m_id + " (no carpet, landed " + landedWithout + "): '" + terrainWithout + "'" );
+
+		Check( "carpetlook: on a planet whose region has a carpet lifeform, Look's terrain line gives the land, then the carpet, as the original's MAPS screen (MAPS-OV .CARPET: WITH <kind> CARPET LIFEFORM)", landedWith && terrainWith.EndsWith( expected ) && ( terrainWith.Length > expected.Length ), terrainWith );
+		Check( "carpetlook: on a planet with no carpet lifeform, the terrain line gives the land alone (control)", landedWithout && ( terrainWithout.Length > 0 ) && !terrainWithout.Contains( "carpet" ), terrainWithout );
+
+		Finish( "scenario=carpetlook carpet=" + carpet + " planet=" + withCarpet.m_id, 0 );
 	}
 
 	// ---------------------------------------------------------------- batch 1 (starport side)

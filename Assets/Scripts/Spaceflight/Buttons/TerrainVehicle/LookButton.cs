@@ -30,7 +30,11 @@ public class LookButton : ShipButton
 		report += "Temperature: <color=white>" + planet.GetRegionTemperatureText( northSouth ) + "</color>  Gravity: <color=white>" + planet.GetGravityText() + "</color>\n";
 		report += "Atmo: <color=white>" + atmosphere + "</color>\n";
 		report += "Hydro: <color=white>" + hydrosphere + "</color>\n";
-		report += "Terrain: <color=white>" + planet.GetLandText() + "</color>";
+		// the land, then the carpet lifeform of the region if it has one (MAPS-OV .CARPET: "<land>, WITH <kind> CARPET LIFEFORM." - PLSET-OV SETC draws the
+		// kind once at the landing, for the landing's band; the port draws it once for the planet, ShippedLifeforms.Make)
+		var carpet = GD_Species.GetLife( planet ).m_carpet;
+
+		report += "Terrain: <color=white>" + planet.GetLandText() + ( string.IsNullOrEmpty( carpet ) ? "" : ", with " + carpet.ToLower() + " carpet lifeform" ) + "</color>";
 
 		// what is next to the terrain vehicle (planet.txt, LOOK: "a description of the icon the eyeball is over is given" - the port describes what is nearest)
 		report += DescribeNearby();

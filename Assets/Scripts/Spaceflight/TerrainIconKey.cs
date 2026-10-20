@@ -100,7 +100,8 @@ public static class TerrainIconKey
 		0, 0x18, 0x00, 0x4a, 0x24, 0xd5, 0x7e, 0x7e, 0xab, 11, 0x00, 0x00, 0x34, 0x18, 0x2a, 0x00, 0x00, 0x54
 	};
 
-	// the 16 EGA colours (the adapter's own palette, which the shipped game leaves as it is on this screen)
+	// the 16 EGA colours (the adapter's own palette: the shipped game never sets the EGA palette, its only palette writes being the Tandy 1000's in GAME-OV
+	// SET.COLORS)
 	static readonly Color32[] s_egaColours =
 	{
 		new Color32( 0, 0, 0, 255 ), new Color32( 0, 0, 170, 255 ), new Color32( 0, 170, 0, 255 ), new Color32( 0, 170, 170, 255 ),
