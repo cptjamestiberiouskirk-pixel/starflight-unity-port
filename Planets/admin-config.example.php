@@ -11,8 +11,12 @@
 //
 // Failed logins are counted in a file in the system's temporary folder: after 5 from one address,
 // or 20 from all together, the login closes for 30 seconds, doubling with each further failure up
-// to an hour, and a day without failures forgets them. To keep the counts elsewhere (say, where the
-// temporary folder is cleared often), name a file the web server can write that it does not serve:
+// to an hour, and a day without failures forgets them. Deleting the file forgets them at once and
+// opens the login. While the file cannot be used the login stays closed, and the server's error log
+// says why: the folder cannot be written, or the file is a link or another user's (in a shared
+// temporary folder anyone can make it first). On a shared server, or where the temporary folder is
+// cleared often, name a file in a folder of its own that only the web server can write and that it
+// does not serve:
 //
 //     'throttleFile' => '/var/lib/starflight-planets/admin-logins.json',
 

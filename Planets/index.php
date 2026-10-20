@@ -219,13 +219,18 @@ if ( $action !== '' )
 			exit;
 		}
 		
-		// (closed after too many failed logins: say for how long, in whole minutes)
+		// (closed after too many failed logins: say for how long, in whole minutes; or closed because
+		// the failed logins cannot be counted)
 		$lockSeconds = AdminLoginLockSeconds();
-		$lockMinutes = (int) ceil( $lockSeconds / 60 );
+		$lockMinutes = (int) ceil( ( $lockSeconds ?? 0 ) / 60 );
 		
 		if ( AdminPasswordHash() === null )
 		{
 			$adminMessages[] = 'The admin login is not set up: see admin-config.example.php.';
+		}
+		else if ( $lockSeconds === null )
+		{
+			$adminMessages[] = 'The admin login is closed: the failed logins cannot be counted. The server\'s error log says why, and admin-config.example.php what to do.';
 		}
 		else if ( $lockSeconds > 0 )
 		{

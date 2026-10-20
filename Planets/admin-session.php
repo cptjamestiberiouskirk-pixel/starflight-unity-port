@@ -5,7 +5,9 @@
 // as the admin's, and every admin form carries the session's token, which every admin action
 // checks before it changes anything. Failed logins are counted, per address and in all, and
 // past a few the login closes for a while that doubles with each further failure, so that a
-// password cannot be guessed however many sessions the guesses come from.
+// password cannot be guessed however many sessions the guesses come from. Each attempt is counted
+// before its password is checked (a login gives its count back), so that logins sent all at once
+// cannot get past the count, and while the counts cannot be kept the login stays closed.
 
 const ADMIN_CONFIG_FILE = __DIR__ . '/admin-config.php';
 
@@ -124,21 +126,66 @@ function AdminAddressKey() : string
 	return hash( 'sha256', (string) ( $_SERVER[ 'REMOTE_ADDR' ] ?? '' ) );
 }
 
-// reads the counts, lets $change alter them and writes them back, all under a lock on the file,
-// and returns what $change returns; without the file nothing is counted (the login then works as
-// before, slowed by a second a failure) and the server's error log says so
-function AdminThrottle( callable $change )
+// opens the counts' file, or returns false and the server's error log says why; a link, or a file
+// another user owns, is refused, since in a shared temporary folder anyone can make it first, to
+// send the counts' writes into another file or to clear the counts
+function AdminOpenThrottleFile( string $file )
 {
-	$file = AdminThrottleFile();
+	if ( is_link( $file ) )
+	{
+		error_log( 'Starflight planets: the failed logins are not counted in ' . $file . ', which is a link' );
+		
+		return false;
+	}
+	
 	$handle = @fopen( $file, 'c+' );
 	
 	if ( $handle === false )
 	{
 		error_log( 'Starflight planets: the failed logins cannot be counted in ' . $file );
 		
-		$state = [];
+		return false;
+	}
+	
+	// the file opened must be the one now at the name, and no link: the name can have been changed
+	// between the check above and the opening (nothing has been written yet)
+	clearstatcache( true, $file );
+	
+	$opened = fstat( $handle );
+	$named = @lstat( $file );
+	
+	if ( ( $opened === false ) || ( $named === false ) || ( ( $named[ 'mode' ] & 0170000 ) === 0120000 ) || ( $opened[ 'dev' ] !== $named[ 'dev' ] ) || ( $opened[ 'ino' ] !== $named[ 'ino' ] ) )
+	{
+		fclose( $handle );
 		
-		return $change( $state );
+		error_log( 'Starflight planets: the failed logins are not counted in ' . $file . ', which changed as it was opened' );
+		
+		return false;
+	}
+	
+	// (where the server can tell whose a file is)
+	if ( function_exists( 'posix_geteuid' ) && ( $opened[ 'uid' ] !== posix_geteuid() ) )
+	{
+		fclose( $handle );
+		
+		error_log( 'Starflight planets: the failed logins are not counted in ' . $file . ', which another user owns' );
+		
+		return false;
+	}
+	
+	return $handle;
+}
+
+// reads the counts, lets $change alter them and writes them back, all under a lock on the file,
+// and returns what $change returns; returns null when the file cannot be used, and the login then
+// stays closed, since a login that could not be counted could be tried without end
+function AdminThrottle( callable $change )
+{
+	$handle = AdminOpenThrottleFile( AdminThrottleFile() );
+	
+	if ( $handle === false )
+	{
+		return null;
 	}
 	
 	flock( $handle, LOCK_EX );
@@ -204,8 +251,9 @@ function AdminForgetOldFailures( array &$state, int $now )
 	}
 }
 
-// how many seconds the login stays closed for this address (0 while it is open)
-function AdminLoginLockSeconds() : int
+// how many seconds the login stays closed for this address (0 while it is open), or null while the
+// failed logins cannot be counted (the login is closed then)
+function AdminLoginLockSeconds() : ?int
 {
 	return AdminThrottle( function ( array &$state )
 	{
@@ -219,10 +267,14 @@ function AdminLoginLockSeconds() : int
 	} );
 }
 
-// counts a failed login, for this address and in all
-function AdminCountFailedLogin()
+// whether the login is open for this address and, if it is, counts this attempt as a failure, for
+// this address and in all, before its password is checked: both under the one lock on the file, so
+// that logins sent all at once cannot have more passwords checked than the free failures allow;
+// returns 0 when the attempt may go on (and $allBefore is then the count in all before it), else how
+// many seconds the login stays closed, or null while the failed logins cannot be counted
+function AdminBeginLogin( ?array &$allBefore ) : ?int
 {
-	AdminThrottle( function ( array &$state )
+	return AdminThrottle( function ( array &$state ) use ( &$allBefore )
 	{
 		$now = time();
 		
@@ -230,6 +282,15 @@ function AdminCountFailedLogin()
 		
 		$key = AdminAddressKey();
 		$address = $state[ 'addresses' ][ $key ] ?? [ 'failures' => 0, 'last' => 0, 'until' => 0 ];
+		
+		$until = max( (int) $address[ 'until' ], (int) $state[ 'all' ][ 'until' ] );
+		
+		if ( $until > $now )
+		{
+			return $until - $now;
+		}
+		
+		$allBefore = $state[ 'all' ];
 		
 		$address[ 'failures' ] = (int) $address[ 'failures' ] + 1;
 		$address[ 'last' ] = $now;
@@ -244,23 +305,50 @@ function AdminCountFailedLogin()
 		$all[ 'until' ] = $now + AdminLockSeconds( $all[ 'failures' ], ADMIN_FREE_FAILURES_IN_ALL );
 		
 		$state[ 'all' ] = $all;
+		
+		return 0;
 	} );
 }
 
-// forgets this address's failures (it has logged in)
-function AdminForgetAddressFailures()
+// forgets this address's failures (it has logged in) and gives back the failure its login was
+// counted as in all: the count in all goes back to $allBefore, what it was before the login, unless
+// other failures have been counted since, which then stay
+function AdminForgetLoginFailures( array $allBefore )
 {
-	AdminThrottle( function ( array &$state )
+	AdminThrottle( function ( array &$state ) use ( $allBefore )
 	{
 		unset( $state[ 'addresses' ][ AdminAddressKey() ] );
+		
+		$all = $state[ 'all' ] ?? null;
+		
+		if ( !is_array( $all ) )
+		{
+			return;
+		}
+		
+		if ( (int) $all[ 'failures' ] === (int) ( $allBefore[ 'failures' ] ?? 0 ) + 1 )
+		{
+			$state[ 'all' ] = $allBefore;
+			
+			return;
+		}
+		
+		$all[ 'failures' ] = max( 0, (int) $all[ 'failures' ] - 1 );
+		$all[ 'until' ] = min( (int) $all[ 'until' ], (int) $all[ 'last' ] + AdminLockSeconds( $all[ 'failures' ], ADMIN_FREE_FAILURES_IN_ALL ) );
+		
+		$state[ 'all' ] = $all;
 	} );
 }
 
-// returns false for a wrong password, and without checking it while the login is closed; a failed
-// login also gives the form a new token, so a guess cannot be sent again with the old one
+// returns false for a wrong password, and without checking it while the login is closed (or the
+// failed logins cannot be counted); each attempt is counted as a failure before its password is
+// checked, and a login gives its failure back; a failed login also gives the form a new token, so
+// a guess cannot be sent again with the old one
 function AdminLogIn( string $password ) : bool
 {
-	if ( AdminLoginLockSeconds() > 0 )
+	$allBefore = null;
+	
+	if ( AdminBeginLogin( $allBefore ) !== 0 )
 	{
 		$_SESSION[ 'token' ] = bin2hex( random_bytes( 32 ) );
 		
@@ -271,8 +359,6 @@ function AdminLogIn( string $password ) : bool
 	
 	if ( ( $hash === null ) || !password_verify( $password, $hash ) )
 	{
-		AdminCountFailedLogin();
-		
 		$_SESSION[ 'token' ] = bin2hex( random_bytes( 32 ) );
 		
 		// slow down guessing
@@ -281,7 +367,7 @@ function AdminLogIn( string $password ) : bool
 		return false;
 	}
 	
-	AdminForgetAddressFailures();
+	AdminForgetLoginFailures( $allBefore ?? [] );
 	
 	// a new session id and a new token, so nothing from before the login carries over
 	session_regenerate_id( true );
