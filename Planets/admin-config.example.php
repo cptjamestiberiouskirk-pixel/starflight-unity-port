@@ -13,10 +13,11 @@
 // or 20 from all together, the login closes for 30 seconds, doubling with each further failure up
 // to an hour, and a day without failures forgets them. Deleting the file forgets them at once and
 // opens the login. While the file cannot be used the login stays closed, and the server's error log
-// says why: the folder cannot be written, or the file is a link or another user's (in a shared
-// temporary folder anyone can make it first). On a shared server, or where the temporary folder is
-// cleared often, name a file in a folder of its own that only the web server can write and that it
-// does not serve:
+// says why: the folder cannot be written or locked, or the file is a link, has another name too, or
+// is another user's (in a shared temporary folder anyone can make it first). A file of the web
+// server's that others can write is made writable by it alone. On a shared server, or where the
+// temporary folder is cleared often, name a file in a folder of its own that only the web server
+// can write and that it does not serve:
 //
 //     'throttleFile' => '/var/lib/starflight-planets/admin-logins.json',
 

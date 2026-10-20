@@ -163,14 +163,47 @@ function AdminOpenThrottleFile( string $file )
 		return false;
 	}
 	
-	// (where the server can tell whose a file is)
-	if ( function_exists( 'posix_geteuid' ) && ( $opened[ 'uid' ] !== posix_geteuid() ) )
+	// a second name (a hard link) could be another file of the server's, which the counts would overwrite
+	if ( $opened[ 'nlink' ] > 1 )
 	{
 		fclose( $handle );
 		
-		error_log( 'Starflight planets: the failed logins are not counted in ' . $file . ', which another user owns' );
+		error_log( 'Starflight planets: the failed logins are not counted in ' . $file . ', which has another name too' );
 		
 		return false;
+	}
+	
+	// (where the server can tell whose a file is)
+	if ( function_exists( 'posix_geteuid' ) )
+	{
+		if ( $opened[ 'uid' ] !== posix_geteuid() )
+		{
+			fclose( $handle );
+			
+			error_log( 'Starflight planets: the failed logins are not counted in ' . $file . ', which another user owns' );
+			
+			return false;
+		}
+		
+		// the server's own file is made writable by the server alone (the umask can leave it writable by others)
+		if ( ( $opened[ 'mode' ] & 0022 ) !== 0 )
+		{
+			@chmod( $file, 0600 );
+			
+			clearstatcache( true, $file );
+			
+			$opened = fstat( $handle );
+		}
+		
+		// (the mode of the file opened, so a name changed meanwhile cannot pass)
+		if ( ( $opened === false ) || ( ( $opened[ 'mode' ] & 0022 ) !== 0 ) )
+		{
+			fclose( $handle );
+			
+			error_log( 'Starflight planets: the failed logins are not counted in ' . $file . ', which other users can write' );
+			
+			return false;
+		}
 	}
 	
 	return $handle;
@@ -188,7 +221,15 @@ function AdminThrottle( callable $change )
 		return null;
 	}
 	
-	flock( $handle, LOCK_EX );
+	// (on a file system without locks the counts could not be kept for logins sent all at once)
+	if ( !flock( $handle, LOCK_EX ) )
+	{
+		fclose( $handle );
+		
+		error_log( 'Starflight planets: the failed logins cannot be counted in ' . AdminThrottleFile() . ', which cannot be locked' );
+		
+		return null;
+	}
 	
 	$text = stream_get_contents( $handle );
 	$state = json_decode( ( $text === false ) || ( $text === '' ) ? '[]' : $text, true );
