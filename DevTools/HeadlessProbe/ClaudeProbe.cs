@@ -48309,7 +48309,7 @@ public class ClaudeProbe : MonoBehaviour
 		var errorsDuring = s_errorCount - errorsBefore;
 
 		Check( "lookland: the land of a rocky planet with an atmosphere in the original's words (a colour, then rock and dirt or a sand)", System.Text.RegularExpressions.Regex.IsMatch( terrain94, "^(Grey|Yellowish|Reddish|Brownish|Black) (rock and dirt|rocky sand|pebbly sand|coarse sand|powdery sand)$" ), terrain94 );
-		Check( "lookland: a frozen planet: cracked plains and hills of coloured snow and ice", System.Text.RegularExpressions.Regex.IsMatch( terrain92, "^Cracked plains and hills of (white|blue tinted|green tinted|red tinted|yellow tinted) snow and ice$" ), terrain92 );
+		Check( "lookland: a frozen planet: cracked plains and hills of coloured snow and ice (then its carpet lifeform, if it has life)", System.Text.RegularExpressions.Regex.IsMatch( terrain92, "^Cracked plains and hills of (white|blue tinted|green tinted|red tinted|yellow tinted) snow and ice(, with [a-z-]+ carpet lifeform)?$" ), terrain92 );
 		Check( "lookland: a planet's land reads the same every time", ( terrain94 != "" ) && ( terrain94 == terrain94Again ), terrain94 + " | " + terrain94Again );
 		Check( "lookland: the temperature is the region's: the planet's coldest near a pole, its hottest at the equator", ( temperaturePole == coldest94 ) && ( temperatureEquator == hottest94 ), temperaturePole + " / " + temperatureEquator + " (expected " + coldest94 + " / " + hottest94 + ")" );
 		Check( "lookland: no error is logged", errorsDuring == 0, errorsDuring + " errors" + ( ( errorsDuring > 0 ) ? ", the last: " + s_lastError : "" ) );
