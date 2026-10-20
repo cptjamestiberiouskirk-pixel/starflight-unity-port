@@ -9248,7 +9248,7 @@ public class ClaudeProbe : MonoBehaviour
 		var mechanId = FindEncounterOfRace( GameData.Race.Mechan );
 		var questionId = 0;
 
-		// a mechan question that is answered with yes (101, 102, 103 and 105 are answered with no)
+		// the mechan question the test answers
 		foreach ( var comm in gameData.m_commList )
 		{
 			if ( ( comm.m_race == GameData.Race.Mechan ) && ( comm.m_subject == GD_Comm.Subject.Question ) && ( comm.m_id != 101 ) && ( comm.m_id != 102 ) && ( comm.m_id != 103 ) && ( comm.m_id != 105 ) )
@@ -15595,7 +15595,7 @@ public class ClaudeProbe : MonoBehaviour
 		Check( "encounterdata: the repaired scout keeps its destroyed ship and what was said", kept, "kept " + kept );
 		Check( "encounterdata: an encounter that is where the game data has it is left alone (control)", controlUnchanged, controlText );
 
-		// ---- 5. in the game: the drone at the planet in orbit 5 of 143,115 (star 29, the planet with a Black Egg), and the Spemin home fleet at the one planet of 82,148 (star 32)
+		// ---- 5. in the game: a Veloxi drone in orbit around its planet, and the Spemin home fleet at its homeworld
 		var begun = new int[ 1 ];
 
 		var blackEggPlanet = PlanetInOrbit( 29, 5 );
@@ -16495,7 +16495,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "recovereddata: planets: " + planets + " (by hand: 130, 112, 123, 4, 5, 107, 33, 115)" );
 
-		Check( "recovereddata: the planets match the ones worked out by hand (Sphexi 130, the Black Egg of 143,115 at 112, the City of the Ancients 123, Mars 4, Earth 5, Heaven 107, the Crystal Planet 33, the Noah 9 wreck 115)", ( orb == 130 ) && ( eggAt143 == 112 ) && ( pearl == 123 ) && ( ring == 4 ) && ( hypercube == 5 ) && ( heaven == 107 ) && ( crystalPlanet == 33 ) && ( noahWreck == 115 ), planets );
+		Check( "recovereddata: the planets match the ones worked out by hand (Sphexi, a Black Egg's planet, the City of the Ancients, Mars, Earth, Heaven, the Crystal Planet and the Noah 9 wreck)", ( orb == 130 ) && ( eggAt143 == 112 ) && ( pearl == 123 ) && ( ring == 4 ) && ( hypercube == 5 ) && ( heaven == 107 ) && ( crystalPlanet == 33 ) && ( noahWreck == 115 ), planets );
 
 		// ---- the two numberings meet: the guards in orbit (game data orbits) wait at the planets STRINFO names (counted from the sun)
 		var guards = "302 at " + PlanetOfOrbitEncounter( 302 ) + " / Black Egg " + eggAt143 + ", 305 at " + PlanetOfOrbitEncounter( 305 ) + " / Crystal Orb " + orb + ", 77 at " + PlanetOfOrbitEncounter( 77 ) + " / Heaven " + heaven + ", 33 at " + PlanetOfOrbitEncounter( 33 ) + " / Shimmering Ball " + PlanetOfRecord( sites, "m_artifactName", "Shimmering Ball" );
@@ -17105,7 +17105,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
-		// ---- what the recovered data puts on Earth (planet 5, the third planet of 215, 86): the messages at sites (a site can hold several) and the ones at random places
+		// ---- what the recovered data puts on Earth: the messages at sites (a site can hold several) and the ones at random places
 		const int c_earth = 5;
 
 		var siteKeys = new HashSet<string>();
@@ -17136,7 +17136,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		var expectedRuins = siteKeys.Count + randomMessages;
 
-		// ---- land at 11N x 104W (the crosshair's "latitude" is east-west in the port, its "longitude" north-south) and go out in the terrain vehicle
+		// ---- land at the Hypercube's site (the crosshair's "latitude" is east-west in the port, its "longitude" north-south) and go out in the terrain vehicle
 		yield return GoIntoOrbit( 0, c_earth );
 
 		// the site is chosen in orbit, as the player does: the star system on the way puts it back in the middle (SITE-OV, after DEPART)
@@ -17174,10 +17174,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		var siteHolds = ( siteRuin == null ) ? "no ruin" : string.Join( ",", MessagesInRuin( siteRuin ) );
 
-		Log( "ruins: Earth has " + siteMessageIds.Count + " messages at 11N x 104W (" + string.Join( ",", siteMessageIds ) + "), " + siteKeys.Count + " sites and " + randomMessages + " messages at random places: " + expectedRuins + " ruins expected, " + ruins.Count + " on the ground | the ruin at the site holds " + siteHolds );
+		Log( "ruins: Earth has " + siteMessageIds.Count + " messages at the Hypercube's site (" + string.Join( ",", siteMessageIds ) + "), " + siteKeys.Count + " sites and " + randomMessages + " messages at random places: " + expectedRuins + " ruins expected, " + ruins.Count + " on the ground | the ruin at the site holds " + siteHolds );
 
 		Check( "ruins: Earth has a ruin for each site and for each message at a random place", ( expectedRuins == 12 ) && ( ruins.Count == expectedRuins ), ruins.Count + " of " + expectedRuins );
-		Check( "ruins: the ruin of 11N x 104W is at its latitude and longitude and holds both of its messages", ( siteRuin != null ) && ( siteHolds == string.Join( ",", siteMessageIds ) ) && ( siteMessageIds.Count == 2 ), siteHolds );
+		Check( "ruins: the Hypercube's ruin is at its site's latitude and longitude and holds both of its messages", ( siteRuin != null ) && ( siteHolds == string.Join( ",", siteMessageIds ) ) && ( siteMessageIds.Count == 2 ), siteHolds );
 
 		// ---- no rock or tree right next to a ruin
 		var crowded = 0;
@@ -17329,7 +17329,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
-		// ---- 1. the decisions of 2026-10-09 on two of STRINFO's conflicts: the Rod Device at 54N x 13E, and Koann 3 the third planet of 112, 200 (orbit 5, planet 58)
+		// ---- 1. the decisions of 2026-10-09 on two of STRINFO's conflicts: where the Rod Device lies, and which planet Koann 3 is
 		var rodDevice = "missing";
 		var redCylinderPlanet = -1;
 
@@ -17358,9 +17358,9 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "artifactsites: the Rod Device at " + rodDevice + ", the Red Cylinder on planet " + redCylinderPlanet + ", Koann 3's evaluation for planet " + koannPlanet + " (planet 58 is in orbit 5 of star 16)" );
 
-		Check( "artifactsites: the Rod Device lies at 54N x 13E, and the Red Cylinder and Koann 3's evaluation are on the third planet of 112, 200", ( rodDevice == "54/13" ) && ( redCylinderPlanet == 58 ) && ( koannPlanet == 58 ), rodDevice + ", " + redCylinderPlanet + ", " + koannPlanet );
+		Check( "artifactsites: the Rod Device lies where the decision of 2026-10-09 puts it, and the Red Cylinder and Koann 3's evaluation are on the same planet", ( rodDevice == "54/13" ) && ( redCylinderPlanet == 58 ) && ( koannPlanet == 58 ), rodDevice + ", " + redCylinderPlanet + ", " + koannPlanet );
 
-		// ---- 2. Earth, at 11N x 104W: the Hypercube lies in the ruin of the invoice
+		// ---- 2. Earth: the Hypercube lies in one of its ruins
 		const int c_earth = 5;
 		var hypercubeId = gameData.FindArtifactId( "Hypercube" );
 
@@ -17400,7 +17400,7 @@ public class ClaudeProbe : MonoBehaviour
 		var siteArtifacts = ( siteRuin == null ) ? null : FieldOrNull( siteRuin, "m_artifactSiteIds" ) as List<int>;
 		var siteHolds = ( siteArtifacts == null ) ? "nothing" : string.Join( ",", siteArtifacts );
 
-		Log( "artifactsites: Earth has " + ruins.Count + " ruins; the ruin of 11N x 104W holds the artifact sites " + siteHolds + " and the messages " + ( ( siteRuin == null ) ? "-" : string.Join( ",", MessagesInRuin( siteRuin ) ) ) );
+		Log( "artifactsites: Earth has " + ruins.Count + " ruins; the Hypercube's ruin holds the artifact sites " + siteHolds + " and the messages " + ( ( siteRuin == null ) ? "-" : string.Join( ",", MessagesInRuin( siteRuin ) ) ) );
 
 		Check( "artifactsites: the Hypercube's site shares the ruin of the invoice, and Earth still has 12 ruins", ( ruins.Count == 12 ) && ( siteArtifacts != null ) && ( siteArtifacts.Count == 1 ) && ( gameData.m_artifactSiteList[ siteArtifacts[ 0 ] ].m_artifactId == hypercubeId ), ruins.Count + " ruins, sites " + siteHolds );
 
@@ -17524,7 +17524,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
-		// ---- 1. Sphexi (planet 130, the first of 132, 165): the Crystal Orb at 46N x 14E in the middle of six ruins - the drones in its orbit let the ship in first
+		// ---- 1. Sphexi: the Crystal Orb in the middle of six ruins - the drones in its orbit let the ship in first
 		controller.GrantOrbitPermission( 305 );
 
 		yield return LandAndGoOut( 35, 130, 46.0f, 14.0f, ruins );
@@ -17577,7 +17577,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "formations: the Crystal Orb's ruin on Sphexi stands in the middle of six ruins in a circle (the Most Magnificent Hexagon)", ( sphexiRuins != null ) && ( orbRuins == 1 ) && ( ringRuins == 6 ) && allAtOneDistance && evenlySpread, orbRuins + " + " + ringRuins + ", distances " + ringDistances.Trim() );
 
-		// ---- 2. the City of the Ancients (planet 123, the first of 56, 144): fifteen ruins, the Crystal Pearl's at 28N x 13W in their southwest
+		// ---- 2. the City of the Ancients: fifteen ruins, one of them the Crystal Pearl's
 		controller.SwitchLocation( PD_General.Location.Planetside );
 
 		yield return Frames( 5 );
@@ -18317,7 +18317,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "blackegg: away from the control nexus the Crystal Planet is damaged but not destroyed", damagedText.Contains( "CRYSTAL PLANET DAMAGED BUT NOT DESTROYED" ) && !crystalAfterAway && ( eggsLeftOn33 == 0 ) && ( playerData.m_general.m_location == PD_General.Location.InOrbit ), crystalAfterAway + ", " + eggsLeftOn33 + ", " + playerData.m_general.m_location );
 
-		// ---- 4. an egg at the control nexus (47N x 45E): the Crystal Planet is destroyed
+		// ---- 4. an egg at the control nexus: the Crystal Planet is destroyed
 		var atTheNexus = Tools.LatLongToWorldCoordinates( 45.0f, 47.0f );
 
 		playerData.m_planetSurfaces.AddDroppedCargo( 33, atTheNexus.x, 0.0f, atTheNexus.z, -1, 0, blackEggId );
@@ -18566,7 +18566,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "crystalcone: without the Cone: " + withoutTheCone + " | with the Cone: " + withTheCone + " | on Land: " + onLand + " | around planet 90: " + aroundPlanet90 );
 
 		Check( "crystalcone: in orbit around the Crystal Planet without the Crystal Cone nothing is said about the nexus (control)", !withoutTheCone.Contains( "nexus" ) && ( withoutTheCone.Length > 0 ), withoutTheCone );
-		Check( "crystalcone: with the Crystal Cone, going into orbit around the Crystal Planet reports the control nexus at 47N x 45E", withTheCone.Contains( "control nexus" ) && withTheCone.Contains( "47N x 45E" ), withTheCone );
+		Check( "crystalcone: with the Crystal Cone, going into orbit around the Crystal Planet reports the control nexus and its site", withTheCone.Contains( "control nexus" ) && withTheCone.Contains( "47N x 45E" ), withTheCone );
 		Check( "crystalcone: with the Crystal Cone, Land over the Crystal Planet reports the nexus again", onLand.Contains( "47N x 45E" ), onLand );
 		Check( "crystalcone: with the Crystal Cone, in orbit around an ordinary planet nothing is said about a nexus (control)", !aroundPlanet90.Contains( "nexus" ), aroundPlanet90 );
 
@@ -21068,7 +21068,7 @@ public class ClaudeProbe : MonoBehaviour
 		Log( "colonies: said after the yes and the Enter for Mardan 4: " + string.Join( " || ", saidForHeaven ).Replace( '\n', '/' ) + " | for " + unsuitableA + ": " + string.Join( " || ", saidForA ).Replace( '\n', '/' ) );
 
 		Check( "colonies: after Yes the console asks \"Name this planet:\", and after the name and Enter says \"Recommendation logged.\"", ( saidForHeaven.Count == 2 ) && saidForHeaven[ 0 ].Contains( "Name this planet: _" ) && saidForHeaven[ 1 ].Contains( "Recommendation logged." ), string.Join( " || ", saidForHeaven ) );
-		Check( "colonies: Mardan 4's evaluation is under RECOMMENDATION: 1, its DATE, SYSTEM: 217,88, its ORBIT and NAME: NEW EDEN (a backspace took the X away)", evaluationText.Contains( "RECOMMENDATION: 1\nDATE: " ) && System.Text.RegularExpressions.Regex.IsMatch( evaluationText, "RECOMMENDATION: 1\nDATE: \\d\\d-\\d\\d-\\d{4}\nSYSTEM: 217,88\nORBIT: " + heavenOrbit + "\nNAME: NEW EDEN\nEVALUATION:\nGOOD WORK!" ), evaluationText.Replace( '\n', '/' ) );
+		Check( "colonies: Mardan 4's evaluation is under RECOMMENDATION: 1, its DATE, SYSTEM, its ORBIT and NAME: NEW EDEN (a backspace took the X away)", evaluationText.Contains( "RECOMMENDATION: 1\nDATE: " ) && System.Text.RegularExpressions.Regex.IsMatch( evaluationText, "RECOMMENDATION: 1\nDATE: \\d\\d-\\d\\d-\\d{4}\nSYSTEM: 217,88\nORBIT: " + heavenOrbit + "\nNAME: NEW EDEN\nEVALUATION:\nGOOD WORK!" ), evaluationText.Replace( '\n', '/' ) );
 		Check( "colonies: a name is cut to the original's 15 characters, and a planet left unnamed has an empty NAME line", evaluationText.Contains( "RECOMMENDATION: 2\n" ) && evaluationText.Contains( "SYSTEM: 55,32\nORBIT: " + orbitA + "\nNAME: ABCDEFGHIJKLMNO\nEVALUATION:\nDUE TO" ) && evaluationText.Contains( "RECOMMENDATION: 3\n" ) && evaluationText.Contains( "ORBIT: " + orbitB + "\nNAME: \nEVALUATION:\nDUE TO" ), evaluationText.Replace( '\n', '/' ) );
 
 		Finish( "scenario=colonies asked=" + askedForHeaven + " pending=" + pendingCount + " change=" + change + " pendingAfter=" + pendingAfter, 0 );
@@ -21076,7 +21076,7 @@ public class ClaudeProbe : MonoBehaviour
 
 	// a planet recommended for colonization is rated by the original's rules as the captain logs it (CAPTAIN overlay WF30E, WF348 and WF292): six checks that make
 	// it unsuitable, and points that make its bonus, 5,000 MU a point. Every planet of the game data goes through the real booking: STRINFO's list of 51 suitable
-	// planets is the record the rules are checked against (50 of them come out with their listed bonus; its "planet 3 of 209,80" is a slip for planet 4, which
+	// planets is the record the rules are checked against (50 of them come out with their listed bonus; one entry is a slip for the next planet out, which
 	// scores the listed 35,000), and the rules also pay five Tropical-Inferno planets the list does not have
 	IEnumerator ScenarioColonyRating()
 	{
@@ -21142,7 +21142,7 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		// the planets the list lacks: 123,101 orbit 1, 121,158 orbit 2, 114,138 orbit 3, 17,108 orbit 3 and 88,78 orbit 2
+		// the five planets the list lacks
 		var unlistedIds = new[] { 101, 391, 427, 641, 692 };
 		var unlistedBonuses = new[] { 35000, 30000, 30000, 30000, 35000 };
 		var unlisted = new List<string>();
@@ -21825,7 +21825,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		controller.m_encounterRange = 0.0f;
 
-		// ---- 1. the Thrynn home fleet (encounter 165, orbit 4 of 129,33): the ship does not answer, and each hail is the next warning, then the attack
+		// ---- 1. the Thrynn home fleet (encounter 165, at its homeworld): the ship does not answer, and each hail is the next warning, then the attack
 		var thrynnStar = StarAt( 129, 33 );
 
 		yield return GoIntoOrbit( thrynnStar, PlanetInOrbit( thrynnStar, 4 ) );
@@ -21856,7 +21856,7 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 2. the Veloxi home fleet (encounter 233, orbit 3 of 150,148): the ship hails first, and the Veloxi, who have no homeworld response in the shipped game,
+		// ---- 2. the Veloxi home fleet (encounter 233, at its homeworld): the ship hails first, and the Veloxi, who have no homeworld response in the shipped game,
 		// answer with the first of their refusals ("Us are not answer the questions", never said before: every warning used to move one counter along); then their
 		// own hails in order, holding fire until the last ("Banzaii")
 		var veloxStar = StarAt( 150, 148 );
@@ -21887,9 +21887,9 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 2b. the Gazurtoid: the shipped game says their "holy land, the planet of the Gazurtoid" lines (94, 95) only at their homeworld, planet 4 of 86,55, where
+		// ---- 2b. the Gazurtoid: the shipped game says their "holy land, the planet of the Gazurtoid" lines (94, 95) only at their homeworld, where
 		// their fleet waits in orbit (encounter 65) - its hail is that line, and the last warning; the Gazurtoid guarding the Shimmering Ball's planet (encounter 33,
-		// orbit 1 of 68,66) are no home fleet, and none of their three hails is a homeworld line
+		// in orbit) are no home fleet, and none of their three hails is a homeworld line
 		var gazurtoidHome = StarAt( 86, 55 );
 
 		yield return GoIntoOrbit( gazurtoidHome, PlanetInOrbit( gazurtoidHome, 4 ) );
@@ -21923,7 +21923,7 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		Log( "homeworlds: gazurtoid fleet at home begun " + gazurtoidHomeBegun + ", said " + string.Join( " | ", gazurtoidHomeSaid ) + ", last warning " + gazurtoidHomeLast + " || gazurtoid at 68,66 begun " + gazurtoidAwayBegun + ", said " + string.Join( " | ", gazurtoidAwaySaid ) );
+		Log( "homeworlds: gazurtoid fleet at home begun " + gazurtoidHomeBegun + ", said " + string.Join( " | ", gazurtoidHomeSaid ) + ", last warning " + gazurtoidHomeLast + " || gazurtoid away from home begun " + gazurtoidAwayBegun + ", said " + string.Join( " | ", gazurtoidAwaySaid ) );
 
 		Check( "homeworlds: the Gazurtoid fleet at their homeworld hails with \"the holy land, the planet of the Gazurtoid\", its last warning", gazurtoidHomeBegun && gazurtoidHomeLine && gazurtoidHomeLast, gazurtoidHomeLine + ", " + gazurtoidHomeLast + " | " + string.Join( " | ", gazurtoidHomeSaid ) );
 		Check( "homeworlds: the Gazurtoid guarding the Shimmering Ball's planet are no home fleet and never say a homeworld line", gazurtoidAwayBegun && ( gazurtoidAwaySaid.Count == 3 ) && !gazurtoidAwayHomeLine, string.Join( " | ", gazurtoidAwaySaid ) );
@@ -23196,7 +23196,7 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 3. the Noah 9 derelict in orbit 3 of 175,94: its distress beacon, and once the ship answers it (the comm link is up at once), the two parts of its
+		// ---- 3. the Noah 9 derelict in its orbit: its distress beacon, and once the ship answers it (the comm link is up at once), the two parts of its
 		// recorded message
 		var noahStar = StarAt( 175, 94 );
 
@@ -29147,7 +29147,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
-		// ---- 1. the Mechans' ice planet: planet 5 of 145,107, a ruin with 3.1 cubic meters at 36N x 90E
+		// ---- 1. the Mechans' ice planet: a ruin with 3.1 cubic meters
 		var mechanStar = StarAt( 145, 107 );
 		var mechanPlanet = gameData.FindPlanetFromSun( 145, 107, 5 );
 		var mechanSite = Tools.LatLongToWorldCoordinates( 90.0f, 36.0f );
@@ -29160,7 +29160,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		yield return Frames( 5 );
 
-		// ---- 2. deep in Elowan space: planet 2 of 154,62, two ruins with 3.1 and 5.9 cubic meters at 42S x 13W
+		// ---- 2. deep in Elowan space: a planet with two ruins with 3.1 and 5.9 cubic meters
 		var thrynnStar = StarAt( 154, 62 );
 		var thrynnPlanet = gameData.FindPlanetFromSun( 154, 62, 2 );
 		var thrynnSite = Tools.LatLongToWorldCoordinates( -13.0f, -42.0f );
@@ -29169,10 +29169,10 @@ public class ClaudeProbe : MonoBehaviour
 
 		var thrynnRuins = done[ 0 ] ? EnduriumInRuinsNear( thrynnSite, 100.0f ) : "(never got into the terrain vehicle)";
 
-		Log( "ancientsites: planet " + mechanPlanet + " of star " + mechanStar + ", ruins near 36N x 90E (Endurium in tenths): [" + mechanRuins + "] | planet " + thrynnPlanet + " of star " + thrynnStar + ", ruins near 42S x 13W: [" + thrynnRuins + "]" );
+		Log( "ancientsites: planet " + mechanPlanet + " of star " + mechanStar + ", ruins near the site (Endurium in tenths): [" + mechanRuins + "] | planet " + thrynnPlanet + " of star " + thrynnStar + ", ruins near the site: [" + thrynnRuins + "]" );
 
-		Check( "ancientsites: the Mechans' ice planet has an ancient ruin at 36N x 90E with 3.1 cubic meters of Endurium and nothing else near it", mechanRuins == "31", mechanRuins );
-		Check( "ancientsites: planet 2 of 154,62 has two ancient ruins at 42S x 13W with 3.1 and 5.9 cubic meters of Endurium", thrynnRuins == "31,59", thrynnRuins );
+		Check( "ancientsites: the Mechans' ice planet has an ancient ruin at its site with 3.1 cubic meters of Endurium and nothing else near it", mechanRuins == "31", mechanRuins );
+		Check( "ancientsites: the planet deep in Elowan space has two ancient ruins with 3.1 and 5.9 cubic meters of Endurium", thrynnRuins == "31,59", thrynnRuins );
 
 		Finish( "scenario=ancientsites", 0 );
 	}
@@ -30489,7 +30489,7 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 2. into orbit around Heaven (145,107, orbit 4): the Mechan fleet stops the ship; four right answers (98, yes) make them friendly, mechan 9 is unlocked
+		// ---- 2. into orbit around Heaven: the Mechan fleet stops the ship; four right answers make them friendly, mechan 9 is unlocked
 		// and the ship goes back into orbit
 		var heavenStar = StarAt( 145, 107 );
 
@@ -39055,7 +39055,7 @@ public class ClaudeProbe : MonoBehaviour
 		}
 	}
 
-	// stage 6: from the docking bay to Sphexi (132,165, star 35) through hyperspace, into orbit around planet 130, where the Veloxi drones ask their numbers
+	// stage 6: from the docking bay to Sphexi through hyperspace and into orbit, where the Veloxi drones ask their numbers
 	IEnumerator ScenarioPlaythrough6()
 	{
 		var dataController = DataController.m_instance;
@@ -39247,7 +39247,7 @@ public class ClaudeProbe : MonoBehaviour
 		s_ptEncounters.Add( "the drones of Sphexi again (" + when + "): " + answered[ 0 ] + " answered, then " + playerData.m_general.m_location );
 	}
 
-	// stage 7: in orbit around Sphexi (the drones ask again when the game is loaded there). Land at the Crystal Orb's site (46N x 14E)
+	// stage 7: in orbit around Sphexi (the drones ask again when the game is loaded there). Land at the Crystal Orb's site
 	IEnumerator ScenarioPlaythrough7()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -39386,7 +39386,7 @@ public class ClaudeProbe : MonoBehaviour
 	}
 
 	// stage 9: in the star system of Sphexi with the Crystal Orb. Out into hyperspace, a meeting with the Velox (hail, statement, question), then on to the star of
-	// a Black Egg (238,189) and into orbit around its planet
+	// a Black Egg and into orbit around its planet
 	IEnumerator ScenarioPlaythrough9()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -39406,7 +39406,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Check( "playthrough-9: out of Sphexi's system into hyperspace", done[ 0 ], playerData.m_general.m_location.ToString() );
 
-		// ---- 1. the Velox of encounter 229 (138,163)
+		// ---- 1. the Velox of encounter 229
 		var met = new bool[ 1 ];
 
 		yield return PtSeekEncounter( 229, met );
@@ -39442,7 +39442,7 @@ public class ClaudeProbe : MonoBehaviour
 		// ---- 2. on to the Black Egg's star
 		yield return PtHyperspaceTo( eggStar, 2.0f, done );
 
-		Check( "playthrough-9: hyperspace travel reaches the star of the Black Egg (238,189)", done[ 0 ], playerData.m_general.m_location + " star " + playerData.m_general.m_currentStarId );
+		Check( "playthrough-9: hyperspace travel reaches the star of the Black Egg", done[ 0 ], playerData.m_general.m_location + " star " + playerData.m_general.m_currentStarId );
 
 		if ( done[ 0 ] )
 		{
@@ -39458,7 +39458,7 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=playthrough-9 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
-	// stage 10: in orbit around the Black Egg's planet (238,189 planet 3). Land at 52N x 16E, take the egg, and back into the ship
+	// stage 10: in orbit around the Black Egg's planet. Land at the egg's site, take it, and back into the ship
 	IEnumerator ScenarioPlaythrough10()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -39727,7 +39727,7 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=playthrough-13 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
-	// stage 14: in hyperspace after the Uhlek. On to the star of the Crystal Cone (20,198) in Uhlek space, with whatever comes on the way, and into orbit
+	// stage 14: in hyperspace after the Uhlek. On to the star of the Crystal Cone in Uhlek space, with whatever comes on the way, and into orbit
 	// around the Cone's planet
 	IEnumerator ScenarioPlaythrough14()
 	{
@@ -39796,7 +39796,7 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=playthrough-14 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
-	// stage 15: in orbit around the Crystal Cone's planet (20,198 planet 1). Land at 29S x 55W, take the Cone, and back into the ship
+	// stage 15: in orbit around the Crystal Cone's planet. Land at its site, take the Cone, and back into the ship
 	IEnumerator ScenarioPlaythrough15()
 	{
 		var playerData = DataController.m_instance.m_playerData;
@@ -39854,7 +39854,7 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=playthrough-16 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
-	// stage 17: in hyperspace by the Cone's star. On to the Crystal Planet (192,152 planet 1) and into orbit with the Crystal Orb aboard: its field does no harm,
+	// stage 17: in hyperspace by the Cone's star. On to the Crystal Planet and into orbit with the Crystal Orb aboard: its field does no harm,
 	// and the Crystal Cone finds the control nexus
 	IEnumerator ScenarioPlaythrough17()
 	{
@@ -39893,7 +39893,7 @@ public class ClaudeProbe : MonoBehaviour
 		var orbitMessages = PtMessages();
 
 		Check( "playthrough-17: into orbit around the Crystal Planet", done[ 0 ] && ( playerData.m_general.m_currentPlanetId == crystalPlanet ), playerData.m_general.m_location + " " + playerData.m_general.m_currentPlanetId );
-		Check( "playthrough-17: in orbit the Crystal Cone reports the control nexus at 47N x 45E", orbitMessages.Contains( "47" ) && orbitMessages.Contains( "45" ), orbitMessages );
+		Check( "playthrough-17: in orbit the Crystal Cone reports the control nexus and its site", orbitMessages.Contains( "47" ) && orbitMessages.Contains( "45" ), orbitMessages );
 
 		// a few seconds in orbit with the shields down: the Crystal Orb keeps the field off
 		var armorBefore = ship.m_armorPoints;
@@ -39939,7 +39939,7 @@ public class ClaudeProbe : MonoBehaviour
 		Finish( "scenario=playthrough-17 checks=" + s_checksPassed + "/" + ( s_checksPassed + s_checksFailed ), 0 );
 	}
 
-	// stage 18: in orbit around the Crystal Planet. Land at the control nexus (47N x 45E: the Cone reports it on Land too), go out (the terrain vehicle takes the
+	// stage 18: in orbit around the Crystal Planet. Land at the control nexus (the Cone reports it on Land too), go out (the terrain vehicle takes the
 	// Black Egg), drive to the nexus by the vehicle's coordinates, drop the egg with the cargo list, and back into the ship
 	IEnumerator ScenarioPlaythrough18()
 	{
@@ -42862,7 +42862,7 @@ public class ClaudeProbe : MonoBehaviour
 		LeaveEncounter();
 		yield return Frames( 10 );
 
-		// ---- 3. the Thrynn home fleet (165, orbit 4 of 129,33), down to one ship: a call at the first pass
+		// ---- 3. the Thrynn home fleet (165, at its homeworld), down to one ship: a call at the first pass
 		var thrynnStar = StarAt( 129, 33 );
 
 		yield return GoIntoOrbit( thrynnStar, PlanetInOrbit( thrynnStar, 4 ) );
@@ -43448,7 +43448,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "surveymap: in scheme " + otherScheme + " (" + ( ( otherScheme > 0 ) ? ColorUtility.ToHtmlStringRGB( UIKitTheme.LoadScheme( otherScheme, UIKitTheme.Mode.Dark ).m_statusArmor ) : "" ) + ", classic " + ColorUtility.ToHtmlStringRGB( classic.m_statusArmor ) + ") the first field's cross in its colours " + inOtherScheme + " (" + otherSchemeDetail + "), in the light mode in the views' colours " + inLightMode + " (" + lightModeDetail + ")" );
 
-		// ---- 4. the Red Cylinder at 145,107, around the planet of the documented ancient ruins (not analysed): no marks without it, the ruins with it
+		// ---- 4. the Red Cylinder in orbit around a planet with documented ancient ruins (not analysed): no marks without it, the ruins with it
 		var ruinPlaces = new List<Vector2>();
 		var shownWithout = true;
 		var shownWith = false;
@@ -43529,7 +43529,7 @@ public class ClaudeProbe : MonoBehaviour
 			}
 		}
 
-		Log( "surveymap: at 145,107: without the Red Cylinder shown " + shownWithout + ", with it shown " + shownWith + " and " + ruinsMarked + " of " + ruinPlaces.Count + " ruins marked, after it is gone shown " + shownAfter );
+		Log( "surveymap: at the test planet: without the Red Cylinder shown " + shownWithout + ", with it shown " + shownWith + " and " + ruinsMarked + " of " + ruinPlaces.Count + " ruins marked, after it is gone shown " + shownAfter );
 
 		var errorsDuring = s_errorCount - errorsBefore;
 
@@ -45568,7 +45568,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		Log( "artifactmodels: " + modelled + " of " + special + " special artifacts modelled" + ( ( details.Count > 0 ) ? " (" + string.Join( "; ", details ) + ")" : "" ) + ", curios with models: " + curiosWithModels.Count );
 
-		// ---- 2. on Earth at 11N x 104W the Hypercube shows beside the ruin that holds it, hovering and turning
+		// ---- 2. on Earth the Hypercube shows beside the ruin that holds it, hovering and turning
 		yield return GoIntoOrbit( 0, 5 );
 
 		playerData.m_general.m_selectedLatitude = -104.0f;
@@ -45630,7 +45630,7 @@ public class ClaudeProbe : MonoBehaviour
 		var taken = ArtifactsHeld( playerData.m_terrainVehicle.m_artifactStorage, gameData.FindArtifactId( "Hypercube" ) ) == 1;
 		var goneAfter = ( siteRuin != null ) && ( siteRuin.m_artifactDisplays.FindAll( d => d != null ).Count == 0 ) && ( display == null );
 
-		Log( "artifactmodels: Earth (in the vehicle " + done[ 0 ] + "): the ruin of 11N x 104W " + ( ( siteRuin != null ) ? "found" : "not found" ) + ", " + displays.Count + " artifacts shown beside it" + ( ( display != null ) ? " (" + display.name + ", " + apart.ToString( "F1" ) + " from its middle)" : "" ) + ", moving " + moves + "; taken " + taken + ", shown after " + !goneAfter );
+		Log( "artifactmodels: Earth (in the vehicle " + done[ 0 ] + "): the Hypercube's ruin " + ( ( siteRuin != null ) ? "found" : "not found" ) + ", " + displays.Count + " artifacts shown beside it" + ( ( display != null ) ? " (" + display.name + ", " + apart.ToString( "F1" ) + " from its middle)" : "" ) + ", moving " + moves + "; taken " + taken + ", shown after " + !goneAfter );
 
 		var errorsDuring = s_errorCount - errorsBefore;
 
@@ -46872,7 +46872,7 @@ public class ClaudeProbe : MonoBehaviour
 
 		EnsureCrew();
 
-		// the artifact hum: on Earth at 11N x 104W beside the Hypercube's ruin, loud near it, fading with distance, silent far off, paused with the game
+		// the artifact hum: on Earth beside the Hypercube's ruin, loud near it, fading with distance, silent far off, paused with the game
 		yield return GoIntoOrbit( 0, 5 );
 
 		playerData.m_general.m_selectedLatitude = -104.0f;
