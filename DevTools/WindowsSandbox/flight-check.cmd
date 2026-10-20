@@ -11,6 +11,10 @@ if "%MODE%"=="" set "MODE=timed"
 if exist "%OUT%" rmdir /s /q "%OUT%"
 mkdir "%OUT%"
 mkdir "%DATA%"
+
+rem silent: the Sandbox's own speakers are muted before the game starts (mute.txt says how)
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0mute-sandbox.ps1" -Out "%OUT%" > nul
+
 copy /y "%~dp0SaveGame0.json" "%DATA%\SaveGame0.json" > nul
 
 start "" /min powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0watch-starflight.ps1" -Out "%OUT%"

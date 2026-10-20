@@ -21,7 +21,9 @@ param(
 	# share the graphics card with the Sandbox. Off by default: on the PC this was first tried on it made the Sandbox crash as the game started.
 	[switch]$Gpu,
 	# write the configuration and stop, without starting the Sandbox
-	[switch]$NoLaunch
+	[switch]$NoLaunch,
+	# let the game be heard: without it the Sandbox's speakers are muted before the game starts (mute-sandbox.ps1)
+	[switch]$Sound
 )
 
 $sandboxExe = Join-Path $env:windir 'System32\WindowsSandbox.exe'
@@ -56,8 +58,8 @@ $scripts = Join-Path $root 'scripts'
 $out = Join-Path $root 'out'
 New-Item -ItemType Directory -Force -Path $scripts, $out | Out-Null
 
-# fresh copies of the two scripts that run in the Sandbox, with Windows line endings for cmd.exe
-foreach ( $name in 'run-starflight.cmd', 'watch-starflight.ps1' ) {
+# fresh copies of the scripts that run in the Sandbox, with Windows line endings for cmd.exe
+foreach ( $name in 'run-starflight.cmd', 'watch-starflight.ps1', 'mute-sandbox.ps1' ) {
 	$text = [IO.File]::ReadAllText( ( Join-Path $PSScriptRoot $name ) ) -replace "`r?`n", "`r`n"
 	[IO.File]::WriteAllText( ( Join-Path $scripts $name ), $text, [Text.Encoding]::ASCII )
 }
@@ -65,6 +67,7 @@ foreach ( $name in 'run-starflight.cmd', 'watch-starflight.ps1' ) {
 # the Sandbox's desktop, where the three folders show up
 $desktop = 'C:\Users\WDAGUtilityAccount\Desktop'
 $vgpu = if ( $Gpu ) { 'Enable' } else { 'Disable' }
+$sound = if ( $Sound ) { ' sound' } else { '' }
 
 $wsb = @"
 <Configuration>
@@ -88,7 +91,7 @@ $wsb = @"
     </MappedFolder>
   </MappedFolders>
   <LogonCommand>
-    <Command>cmd.exe /c $desktop\Scripts\run-starflight.cmd $Width $Height</Command>
+    <Command>cmd.exe /c $desktop\Scripts\run-starflight.cmd $Width $Height$sound</Command>
   </LogonCommand>
 </Configuration>
 "@
