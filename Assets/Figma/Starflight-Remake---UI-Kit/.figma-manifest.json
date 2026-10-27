@@ -1,0 +1,396 @@
+{
+    "fileName": "Starflight Remake - UI Kit",
+    "screens": [
+        {
+            "assetName": "Planet",
+            "rootNodeId": "10:459",
+            "contentHash": "82e90993fc8f5bc6",
+            "generated": [
+                "images/img-sj0s7z1hs9p2r-2577836.png",
+                "tokens.uss",
+                "Planet.uss",
+                "Planet.uxml"
+            ],
+            "tokens": [
+                {
+                    "name": "--space-950",
+                    "id": "VariableID:2:3",
+                    "type": "COLOR",
+                    "value": "rgba(5, 7, 13, 1)"
+                },
+                {
+                    "name": "--space-900",
+                    "id": "VariableID:2:4",
+                    "type": "COLOR",
+                    "value": "rgba(10, 15, 28, 1)"
+                },
+                {
+                    "name": "--space-800",
+                    "id": "VariableID:2:5",
+                    "type": "COLOR",
+                    "value": "rgba(17, 26, 46, 1)"
+                },
+                {
+                    "name": "--space-700",
+                    "id": "VariableID:2:6",
+                    "type": "COLOR",
+                    "value": "rgba(26, 39, 66, 1)"
+                },
+                {
+                    "name": "--space-600",
+                    "id": "VariableID:2:7",
+                    "type": "COLOR",
+                    "value": "rgba(36, 54, 90, 1)"
+                },
+                {
+                    "name": "--space-400",
+                    "id": "VariableID:2:8",
+                    "type": "COLOR",
+                    "value": "rgba(74, 98, 144, 1)"
+                },
+                {
+                    "name": "--space-200",
+                    "id": "VariableID:2:9",
+                    "type": "COLOR",
+                    "value": "rgba(159, 179, 217, 1)"
+                },
+                {
+                    "name": "--ink-100",
+                    "id": "VariableID:2:10",
+                    "type": "COLOR",
+                    "value": "rgba(230, 240, 255, 1)"
+                },
+                {
+                    "name": "--white",
+                    "id": "VariableID:2:11",
+                    "type": "COLOR",
+                    "value": "rgba(255, 255, 255, 1)"
+                },
+                {
+                    "name": "--cyan-300",
+                    "id": "VariableID:2:12",
+                    "type": "COLOR",
+                    "value": "rgba(127, 243, 255, 1)"
+                },
+                {
+                    "name": "--cyan-400",
+                    "id": "VariableID:2:13",
+                    "type": "COLOR",
+                    "value": "rgba(61, 230, 255, 1)"
+                },
+                {
+                    "name": "--cyan-500",
+                    "id": "VariableID:2:14",
+                    "type": "COLOR",
+                    "value": "rgba(0, 200, 240, 1)"
+                },
+                {
+                    "name": "--cyan-700",
+                    "id": "VariableID:2:15",
+                    "type": "COLOR",
+                    "value": "rgba(0, 122, 153, 1)"
+                },
+                {
+                    "name": "--magenta-400",
+                    "id": "VariableID:2:16",
+                    "type": "COLOR",
+                    "value": "rgba(255, 79, 216, 1)"
+                },
+                {
+                    "name": "--magenta-600",
+                    "id": "VariableID:2:17",
+                    "type": "COLOR",
+                    "value": "rgba(176, 23, 154, 1)"
+                },
+                {
+                    "name": "--amber-400",
+                    "id": "VariableID:2:18",
+                    "type": "COLOR",
+                    "value": "rgba(255, 184, 77, 1)"
+                },
+                {
+                    "name": "--amber-500",
+                    "id": "VariableID:2:19",
+                    "type": "COLOR",
+                    "value": "rgba(255, 154, 31, 1)"
+                },
+                {
+                    "name": "--green-400",
+                    "id": "VariableID:2:20",
+                    "type": "COLOR",
+                    "value": "rgba(77, 255, 166, 1)"
+                },
+                {
+                    "name": "--green-600",
+                    "id": "VariableID:2:21",
+                    "type": "COLOR",
+                    "value": "rgba(20, 184, 106, 1)"
+                },
+                {
+                    "name": "--red-400",
+                    "id": "VariableID:2:22",
+                    "type": "COLOR",
+                    "value": "rgba(255, 90, 106, 1)"
+                },
+                {
+                    "name": "--red-600",
+                    "id": "VariableID:2:23",
+                    "type": "COLOR",
+                    "value": "rgba(196, 30, 46, 1)"
+                },
+                {
+                    "name": "--color-bg-app",
+                    "id": "VariableID:2:25",
+                    "type": "COLOR",
+                    "value": "var(--space-950)"
+                },
+                {
+                    "name": "--color-bg-panel",
+                    "id": "VariableID:2:26",
+                    "type": "COLOR",
+                    "value": "var(--space-900)"
+                },
+                {
+                    "name": "--color-bg-raised",
+                    "id": "VariableID:2:27",
+                    "type": "COLOR",
+                    "value": "var(--space-800)"
+                },
+                {
+                    "name": "--color-bg-hover",
+                    "id": "VariableID:2:28",
+                    "type": "COLOR",
+                    "value": "var(--space-700)"
+                },
+                {
+                    "name": "--color-border-subtle",
+                    "id": "VariableID:2:29",
+                    "type": "COLOR",
+                    "value": "var(--space-700)"
+                },
+                {
+                    "name": "--color-border-default",
+                    "id": "VariableID:2:30",
+                    "type": "COLOR",
+                    "value": "var(--space-600)"
+                },
+                {
+                    "name": "--color-border-accent",
+                    "id": "VariableID:2:31",
+                    "type": "COLOR",
+                    "value": "var(--cyan-400)"
+                },
+                {
+                    "name": "--color-border-alert",
+                    "id": "VariableID:2:32",
+                    "type": "COLOR",
+                    "value": "var(--red-400)"
+                },
+                {
+                    "name": "--color-text-primary",
+                    "id": "VariableID:2:33",
+                    "type": "COLOR",
+                    "value": "var(--ink-100)"
+                },
+                {
+                    "name": "--color-text-secondary",
+                    "id": "VariableID:2:34",
+                    "type": "COLOR",
+                    "value": "var(--space-200)"
+                },
+                {
+                    "name": "--color-text-muted",
+                    "id": "VariableID:2:35",
+                    "type": "COLOR",
+                    "value": "var(--space-400)"
+                },
+                {
+                    "name": "--color-text-accent",
+                    "id": "VariableID:2:36",
+                    "type": "COLOR",
+                    "value": "var(--cyan-300)"
+                },
+                {
+                    "name": "--color-text-on-accent",
+                    "id": "VariableID:2:37",
+                    "type": "COLOR",
+                    "value": "var(--space-950)"
+                },
+                {
+                    "name": "--color-text-alert",
+                    "id": "VariableID:2:38",
+                    "type": "COLOR",
+                    "value": "var(--red-400)"
+                },
+                {
+                    "name": "--color-text-warning",
+                    "id": "VariableID:2:39",
+                    "type": "COLOR",
+                    "value": "var(--amber-400)"
+                },
+                {
+                    "name": "--color-accent-primary",
+                    "id": "VariableID:2:40",
+                    "type": "COLOR",
+                    "value": "var(--cyan-400)"
+                },
+                {
+                    "name": "--color-accent-primary-strong",
+                    "id": "VariableID:2:41",
+                    "type": "COLOR",
+                    "value": "var(--cyan-500)"
+                },
+                {
+                    "name": "--color-accent-primary-dim",
+                    "id": "VariableID:2:42",
+                    "type": "COLOR",
+                    "value": "var(--cyan-700)"
+                },
+                {
+                    "name": "--color-accent-secondary",
+                    "id": "VariableID:2:43",
+                    "type": "COLOR",
+                    "value": "var(--amber-400)"
+                },
+                {
+                    "name": "--color-status-shield",
+                    "id": "VariableID:2:44",
+                    "type": "COLOR",
+                    "value": "var(--cyan-400)"
+                },
+                {
+                    "name": "--color-status-armor",
+                    "id": "VariableID:2:45",
+                    "type": "COLOR",
+                    "value": "var(--amber-400)"
+                },
+                {
+                    "name": "--color-status-fuel",
+                    "id": "VariableID:2:46",
+                    "type": "COLOR",
+                    "value": "var(--green-400)"
+                },
+                {
+                    "name": "--color-status-danger",
+                    "id": "VariableID:2:47",
+                    "type": "COLOR",
+                    "value": "var(--red-400)"
+                },
+                {
+                    "name": "--spacing-2xs",
+                    "id": "VariableID:2:49",
+                    "type": "FLOAT",
+                    "value": "2px"
+                },
+                {
+                    "name": "--spacing-xs",
+                    "id": "VariableID:2:50",
+                    "type": "FLOAT",
+                    "value": "4px"
+                },
+                {
+                    "name": "--spacing-sm",
+                    "id": "VariableID:2:51",
+                    "type": "FLOAT",
+                    "value": "8px"
+                },
+                {
+                    "name": "--spacing-md",
+                    "id": "VariableID:2:52",
+                    "type": "FLOAT",
+                    "value": "12px"
+                },
+                {
+                    "name": "--spacing-lg",
+                    "id": "VariableID:2:53",
+                    "type": "FLOAT",
+                    "value": "16px"
+                },
+                {
+                    "name": "--spacing-xl",
+                    "id": "VariableID:2:54",
+                    "type": "FLOAT",
+                    "value": "24px"
+                },
+                {
+                    "name": "--spacing-2xl",
+                    "id": "VariableID:2:55",
+                    "type": "FLOAT",
+                    "value": "32px"
+                },
+                {
+                    "name": "--spacing-3xl",
+                    "id": "VariableID:2:56",
+                    "type": "FLOAT",
+                    "value": "48px"
+                },
+                {
+                    "name": "--radius-none",
+                    "id": "VariableID:2:58",
+                    "type": "FLOAT",
+                    "value": "0px"
+                },
+                {
+                    "name": "--radius-sm",
+                    "id": "VariableID:2:59",
+                    "type": "FLOAT",
+                    "value": "2px"
+                },
+                {
+                    "name": "--radius-md",
+                    "id": "VariableID:2:60",
+                    "type": "FLOAT",
+                    "value": "4px"
+                },
+                {
+                    "name": "--radius-lg",
+                    "id": "VariableID:2:61",
+                    "type": "FLOAT",
+                    "value": "8px"
+                },
+                {
+                    "name": "--radius-full",
+                    "id": "VariableID:2:62",
+                    "type": "FLOAT",
+                    "value": "999px"
+                }
+            ],
+            "nodes": [
+                {
+                    "figmaNodeId": "10:459",
+                    "cssClass": "",
+                    "styleClass": "",
+                    "doc": "Planet",
+                    "path": "1",
+                    "tag": "VisualElement",
+                    "classes": "",
+                    "props": [
+                        {
+                            "k": "width",
+                            "v": "980px"
+                        },
+                        {
+                            "k": "height",
+                            "v": "980px"
+                        },
+                        {
+                            "k": "border-radius",
+                            "v": "980px"
+                        },
+                        {
+                            "k": "background-image",
+                            "v": "url(\"project://database/Assets/Figma/Starflight-Remake---UI-Kit/images/img-sj0s7z1hs9p2r-2577836.png?fileID=2800000&guid=5b355ed62486a404ba55553225fb91b6&type=3#img-sj0s7z1hs9p2r-2577836\")"
+                        },
+                        {
+                            "k": "-unity-background-scale-mode",
+                            "v": "scale-to-fit"
+                        }
+                    ]
+                }
+            ],
+            "components": [],
+            "states": []
+        }
+    ],
+    "matchedMappings": []
+}
