@@ -1,0 +1,5 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+    <Style src="tokens.uss" />
+    <Style src="Planet.uss" />
+    <ui:VisualElement style="width: 980px; height: 980px; border-radius: 980px; background-image: url(&quot;project://database/Assets/Figma/Starflight-Remake---UI-Kit/images/img-sj0s7z1hs9p2r-2577836.png?fileID=2800000&amp;guid=5b355ed62486a404ba55553225fb91b6&amp;type=3#img-sj0s7z1hs9p2r-2577836&quot;); -unity-background-scale-mode: scale-to-fit;" />
+</ui:UXML>
